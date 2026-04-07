@@ -1,0 +1,185 @@
+name: Deploy Frontend
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/frontend/**'
+      - 'packages/**'
+      - '.github/workflows/deploy-frontend.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  check-affected:
+    name: Check if frontend is affected
+    runs-on: ubuntu-latest
+    outputs:
+      affected: ${{ steps.check.outputs.affected }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check if frontend affected
+        id: check
+        run: |
+          BASE=${{ github.event.before }}
+          HEAD=${{ github.sha }}
+          
+          if pnpm nx show projects --affected --base=$BASE --head=$HEAD | grep -q "frontend"; then
+            echo "affected=true" >> $GITHUB_OUTPUT
+          else
+            echo "affected=false" >> $GITHUB_OUTPUT
+          fi
+
+  version-bump:
+    name: Bump version
+    needs: check-affected
+    if: needs.check-affected.outputs.affected == 'true' && !contains(github.event.head_commit.message, '[skip ci]')
+    runs-on: ubuntu-latest
+    outputs:
+      new_version: ${{ steps.bump.outputs.new_version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Determine version bump type
+        id: version_type
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          echo "Commit message: $COMMIT_MSG"
+
+          if [[ "$COMMIT_MSG" == *"[major]"* ]] || [[ "$COMMIT_MSG" == *"BREAKING CHANGE"* ]]; then
+            echo "type=major" >> $GITHUB_OUTPUT
+          elif [[ "$COMMIT_MSG" == *"[minor]"* ]] || [[ "$COMMIT_MSG" == *"feat:"* ]]; then
+            echo "type=minor" >> $GITHUB_OUTPUT
+          else
+            echo "type=patch" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Bump version
+        id: bump
+        working-directory: apps/frontend
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
+          TYPE=${{ steps.version_type.outputs.type }}
+          echo "Bumping version type: $TYPE"
+
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
+          MAJOR=${VERSION_PARTS[0]}
+          MINOR=${VERSION_PARTS[1]}
+          PATCH=${VERSION_PARTS[2]}
+
+          if [ "$TYPE" = "major" ]; then
+            MAJOR=$((MAJOR + 1))
+            MINOR=0
+            PATCH=0
+          elif [ "$TYPE" = "minor" ]; then
+            MINOR=$((MINOR + 1))
+            PATCH=0
+          else
+            PATCH=$((PATCH + 1))
+          fi
+
+          NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+          echo "New version: $NEW_VERSION"
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+          npm version $NEW_VERSION --no-git-tag-version
+          
+          cd ../..
+          git add apps/frontend/package.json
+          git commit -m "chore(frontend): bump version to $NEW_VERSION [skip ci]"
+          git tag v$NEW_VERSION-frontend
+          git push origin main
+          git push origin v$NEW_VERSION-frontend
+
+  build-and-deploy:
+    name: Build and deploy to Yandex Cloud
+    needs: version-bump
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.version-bump.outputs.new_version }}-frontend
+
+      - name: Login to Yandex Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: cr.yandex
+          username: json_key
+          password: ${{ secrets.YC_SA_JSON_CREDENTIALS }}
+
+      - name: Build and Push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./apps/frontend
+          push: true
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}
+            NEXT_PUBLIC_WS_URL=${{ secrets.NEXT_PUBLIC_WS_URL }}
+          tags: |
+            cr.yandex/${{ secrets.YC_REGISTRY_ID }}/quokkaq-frontend:${{ needs.version-bump.outputs.new_version }}
+            cr.yandex/${{ secrets.YC_REGISTRY_ID }}/quokkaq-frontend:latest
+
+      - name: Copy Docker Compose file
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USERNAME }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          source: 'apps/frontend/docker-compose.prod.yml'
+          target: '~/quokkaq-frontend/'
+          strip_components: 2
+          debug: true
+
+      - name: Deploy to VM
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          YC_SA_JSON_CREDENTIALS: ${{ secrets.YC_SA_JSON_CREDENTIALS }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USERNAME }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          envs: YC_SA_JSON_CREDENTIALS
+          script: |
+            export YC_REGISTRY_ID=${{ secrets.YC_REGISTRY_ID }}
+            export VERSION=${{ needs.version-bump.outputs.new_version }}
+            export ACME_EMAIL=${{ secrets.ACME_EMAIL }}
+
+            echo "Deploying frontend version $VERSION"
+
+            echo "$YC_SA_JSON_CREDENTIALS" | docker login --username json_key --password-stdin cr.yandex
+
+            docker pull cr.yandex/$YC_REGISTRY_ID/quokkaq-frontend:$VERSION
+
+            cd ~/quokkaq-frontend
+
+            docker network create traefik-public || true
+
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+
+            docker image prune -f

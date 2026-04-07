@@ -1,96 +1,305 @@
-# Quokkaq
+# QuokkaQ Monorepo
 
-<a alt="Nx logo" href="https://nx.dev" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/nrwl/nx/master/images/nx-logo.png" width="45"></a>
+Nx-based monorepo for the QuokkaQ queue management system.
 
-✨ Your new, shiny [Nx workspace](https://nx.dev) is ready ✨.
+## Architecture
 
-[Learn more about this workspace setup and its capabilities](https://nx.dev/getting-started/intro#learn-nx?utm_source=nx_project&amp;utm_medium=readme&amp;utm_campaign=nx_projects) or run `npx nx graph` to visually explore what was created. Now, let's get you up to speed!
+This monorepo contains three main applications and three shared packages:
 
-## Run tasks
+### Applications (`apps/`)
 
-To run tasks with Nx use:
+- **frontend** - Next.js web application for administrators and staff
+- **backend** - Go API server with PostgreSQL, Redis, and MinIO
+- **kiosk-desktop** - Tauri desktop application for self-service kiosks
 
-```sh
-npx nx <target> <project-name>
+### Packages (`packages/`)
+
+- **shared-types** - TypeScript types and Zod schemas shared between apps
+- **ui-kit** - Reusable React UI components (shadcn/ui based)
+- **kiosk-lib** - Kiosk-specific utilities (printing, websockets, timers)
+
+## Getting Started
+
+### Prerequisites
+
+- **Node.js** 22+
+- **pnpm** 10+
+- **Go** 1.26+ (for backend)
+- **Rust** (for kiosk-desktop)
+
+### Installation
+
+```bash
+# Install dependencies
+pnpm install
+
+# Build all packages
+pnpm nx run-many -t build --all
 ```
 
-For example:
+### Development
 
-```sh
-npx nx build myproject
+Run apps individually:
+
+```bash
+# Frontend
+pnpm nx dev frontend
+
+# Backend
+pnpm nx serve backend
+
+# Kiosk Desktop
+pnpm nx dev kiosk-desktop
 ```
 
-These targets are either [inferred automatically](https://nx.dev/concepts/inferred-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or defined in the `project.json` or `package.json` files.
+## Project Structure
 
-[More about running tasks in the docs &raquo;](https://nx.dev/features/run-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Add new projects
-
-While you could add new projects to your workspace manually, you might want to leverage [Nx plugins](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) and their [code generation](https://nx.dev/features/generate-code?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) feature.
-
-To install a new plugin you can use the `nx add` command. Here's an example of adding the React plugin:
-```sh
-npx nx add @nx/react
+```
+quokkaq/
+├── apps/
+│   ├── frontend/          # Next.js app
+│   │   ├── app/           # App router pages
+│   │   ├── components/    # React components
+│   │   ├── lib/           # Utilities
+│   │   └── package.json
+│   │
+│   ├── backend/           # Go API
+│   │   ├── cmd/           # Entry points
+│   │   ├── internal/      # Business logic
+│   │   ├── go.mod
+│   │   └── Dockerfile
+│   │
+│   └── kiosk-desktop/     # Tauri app
+│       ├── agent/         # Go printer agent
+│       ├── src-tauri/     # Rust backend
+│       └── package.json
+│
+├── packages/
+│   ├── shared-types/      # Common types
+│   ├── ui-kit/            # UI components
+│   └── kiosk-lib/         # Kiosk utilities
+│
+├── .github/workflows/     # CI/CD pipelines
+├── nx.json                # Nx configuration
+├── pnpm-workspace.yaml    # pnpm workspace config
+└── tsconfig.base.json     # Base TypeScript config
 ```
 
-Use the plugin's generator to create new projects. For example, to create a new React app or library:
+## Nx Commands
 
-```sh
-# Generate an app
-npx nx g @nx/react:app demo
+### Building
 
-# Generate a library
-npx nx g @nx/react:lib some-lib
+```bash
+# Build everything
+pnpm nx run-many -t build --all
+
+# Build only affected projects
+pnpm nx affected -t build
+
+# Build specific app
+pnpm nx build frontend
 ```
 
-You can use `npx nx list` to get a list of installed plugins. Then, run `npx nx list <plugin-name>` to learn about more specific capabilities of a particular plugin. Alternatively, [install Nx Console](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) to browse plugins and generators in your IDE.
+### Testing
 
-[Learn more about Nx plugins &raquo;](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) | [Browse the plugin registry &raquo;](https://nx.dev/plugin-registry?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+```bash
+# Test all
+pnpm nx run-many -t test --all
 
-## Set up CI!
-
-### Step 1
-
-To connect to Nx Cloud, run the following command:
-
-```sh
-npx nx connect
+# Test only affected
+pnpm nx affected -t test
 ```
 
-Connecting to Nx Cloud ensures a [fast and scalable CI](https://nx.dev/ci/intro/why-nx-cloud?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) pipeline. It includes features such as:
+### Linting
 
-- [Remote caching](https://nx.dev/ci/features/remote-cache?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Task distribution across multiple machines](https://nx.dev/ci/features/distribute-task-execution?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Automated e2e test splitting](https://nx.dev/ci/features/split-e2e-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Task flakiness detection and rerunning](https://nx.dev/ci/features/flaky-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+```bash
+# Lint all
+pnpm nx run-many -t lint --all
 
-### Step 2
-
-Use the following command to configure a CI workflow for your workspace:
-
-```sh
-npx nx g ci-workflow
+# Lint only affected
+pnpm nx affected -t lint
 ```
 
-[Learn more about Nx on CI](https://nx.dev/ci/intro/ci-with-nx#ready-get-started-with-your-provider?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+### Dependency Graph
 
-## Install Nx Console
+Visualize project dependencies:
 
-Nx Console is an editor extension that enriches your developer experience. It lets you run tasks, generate code, and improves code autocompletion in your IDE. It is available for VSCode and IntelliJ.
+```bash
+pnpm nx graph
+```
 
-[Install Nx Console &raquo;](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+## CI/CD
 
-## Useful links
+The monorepo uses Nx affected detection to intelligently deploy only changed applications:
 
-Learn more:
+### Workflows
 
-- [Learn more about this workspace setup](https://nx.dev/getting-started/intro#learn-nx?utm_source=nx_project&amp;utm_medium=readme&amp;utm_campaign=nx_projects)
-- [Learn about Nx on CI](https://nx.dev/ci/intro/ci-with-nx?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Releasing Packages with Nx release](https://nx.dev/features/manage-releases?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [What are Nx plugins?](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+1. **CI** (`.github/workflows/ci.yml`)
+   - Runs on every PR and push to `main`
+   - Tests, lints, and builds only affected projects
+   - Uses Nx cache for faster builds
 
-And join the Nx community:
-- [Discord](https://go.nx.dev/community)
-- [Follow us on X](https://twitter.com/nxdevtools) or [LinkedIn](https://www.linkedin.com/company/nrwl)
-- [Our Youtube channel](https://www.youtube.com/@nxdevtools)
-- [Our blog](https://nx.dev/blog?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+2. **Deploy Frontend** (`.github/workflows/deploy-frontend.yml`)
+   - Triggers when `apps/frontend/` or `packages/` change
+   - Bumps version in `apps/frontend/package.json`
+   - Builds Docker image
+   - Deploys to Yandex Cloud
+   - Tags release as `vX.Y.Z-frontend`
+
+3. **Deploy Backend** (`.github/workflows/deploy-backend.yml`)
+   - Triggers when `apps/backend/` changes
+   - Bumps version in `apps/backend/VERSION`
+   - Builds Docker image
+   - Deploys to Yandex Cloud
+   - Tags release as `vX.Y.Z-backend`
+
+4. **Release Kiosk** (`.github/workflows/release-kiosk.yml`)
+   - Triggers when `apps/kiosk-desktop/` or `packages/` change
+   - Bumps version in `package.json`, `Cargo.toml`, `tauri.conf.json`
+   - Builds for macOS, Windows, and Linux in parallel
+   - Creates GitHub Release
+   - Tags release as `vX.Y.Z-kiosk`
+
+### Version Bumping
+
+Versions are bumped automatically based on commit messages:
+
+- `[major]` or `BREAKING CHANGE` → major version bump
+- `[minor]` or `feat:` → minor version bump
+- Otherwise → patch version bump
+
+Example:
+```bash
+git commit -m "feat: add new feature [minor]"
+```
+
+### Independent Versioning
+
+Each application has its own version:
+- Frontend: `apps/frontend/package.json`
+- Backend: `apps/backend/VERSION`
+- Kiosk: `apps/kiosk-desktop/package.json`
+
+Tags follow the pattern: `v1.2.3-frontend`, `v1.2.3-backend`, `v1.2.3-kiosk`
+
+## Package Dependencies
+
+```
+frontend
+├── @quokkaq/shared-types
+└── @quokkaq/ui-kit
+
+kiosk-desktop
+├── @quokkaq/shared-types
+├── @quokkaq/ui-kit
+└── @quokkaq/kiosk-lib
+
+kiosk-lib
+└── @quokkaq/shared-types
+```
+
+Nx automatically detects these dependencies and:
+- Builds packages in the correct order
+- Deploys apps when their dependencies change
+- Caches builds for faster rebuilds
+
+## Adding a New Package
+
+1. Create directory: `packages/my-package/`
+2. Add `package.json`:
+   ```json
+   {
+     "name": "@quokkaq/my-package",
+     "version": "0.1.0",
+     "main": "./src/index.ts"
+   }
+   ```
+3. Add `project.json`:
+   ```json
+   {
+     "name": "my-package",
+     "$schema": "../../node_modules/nx/schemas/project-schema.json",
+     "sourceRoot": "packages/my-package/src",
+     "projectType": "library",
+     "tags": ["type:lib"]
+   }
+   ```
+4. Add `tsconfig.json` (extends `../../tsconfig.base.json`)
+5. Update `tsconfig.base.json` paths:
+   ```json
+   {
+     "paths": {
+       "@quokkaq/my-package": ["packages/my-package/src/index.ts"]
+     }
+   }
+   ```
+6. Run `pnpm install`
+
+## Environment Variables
+
+### Frontend
+
+See `apps/frontend/.env.example`
+
+### Backend
+
+See `apps/backend/.env.example` and `apps/backend/.env.prod.example`
+
+### CI/CD Secrets
+
+Required GitHub secrets:
+- `YC_SA_JSON_CREDENTIALS` - Yandex Cloud service account JSON
+- `YC_REGISTRY_ID` - Yandex Container Registry ID
+- `VM_HOST` - Deployment server host
+- `VM_USERNAME` - Deployment server username
+- `VM_SSH_KEY` - SSH private key for deployment
+- `NEXT_PUBLIC_API_URL` - Frontend API URL
+- `NEXT_PUBLIC_WS_URL` - Frontend WebSocket URL
+- `POSTGRES_PASSWORD`, `REDIS_PASSWORD`, etc. - Backend secrets
+
+## Troubleshooting
+
+### Nx Cache Issues
+
+Clear Nx cache:
+```bash
+pnpm nx reset
+```
+
+### Dependency Issues
+
+Reinstall all dependencies:
+```bash
+rm -rf node_modules apps/*/node_modules packages/*/node_modules
+pnpm install
+```
+
+### Build Errors
+
+Build packages in order:
+```bash
+pnpm nx run-many -t build --projects=shared-types,ui-kit,kiosk-lib
+pnpm nx run-many -t build --projects=frontend,backend,kiosk-desktop
+```
+
+## Migration from Old Structure
+
+This monorepo was migrated from three separate repositories:
+- `quokkaq-frontend` → `apps/frontend`
+- `quokkaq-go-backend` → `apps/backend`
+- `quokkaq-kiosk-desktop` → `apps/kiosk-desktop`
+
+The old repositories are archived in `../quokkaq-old/` and can be restored if needed.
+
+## Contributing
+
+1. Create a feature branch from `main`
+2. Make changes
+3. Run tests and linting
+4. Create a PR
+5. CI will automatically test only affected projects
+6. After merge to `main`, affected apps will be deployed automatically
+
+## License
+
+See individual app LICENSE files.
