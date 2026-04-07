@@ -6,14 +6,14 @@ import { enUS, ru } from 'date-fns/locale';
 import { Calendar as CalendarIcon } from 'lucide-react';
 import { useLocale } from 'next-intl';
 
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
+import { cn } from '../lib/utils';
+import { Button } from './button';
+import { Calendar } from './calendar';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger
-} from '@/components/ui/popover';
+} from './popover';
 
 interface DatePickerProps {
   value?: string; // YYYY-MM-DD format

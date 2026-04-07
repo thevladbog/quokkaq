@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useRef, useId } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Button } from './button';
+import { Input } from './input';
+import { Label } from './label';
 import { Upload, X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import Image from 'next/image';
-import { logger } from '@/lib/logger';
+import { logger } from '../lib/logger';
 
 interface ImageUploadProps {
   value?: string | null;

@@ -9,14 +9,7 @@
     "types": ["node"],
     "declaration": true,
     "declarationMap": true,
-    "outDir": "./dist",
-    "baseUrl": ".",
-    "paths": {
-      "@/lib/*": ["src/lib/*"],
-      "@/components/ui/*": ["src/components/*"],
-      "@/components/*": ["src/components/*"],
-      "@/hooks/*": ["src/hooks/*"]
-    }
+    "outDir": "./dist"
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

@@ -12,14 +12,7 @@
     "module": "esnext",
     "lib": ["es2020", "dom"],
     "skipLibCheck": true,
-    "skipDefaultLibCheck": true,
-    "ignoreDeprecations": "6.0",
-    "baseUrl": ".",
-    "paths": {
-      "@quokkaq/shared-types": ["packages/shared-types/src/index.ts"],
-      "@quokkaq/ui-kit": ["packages/ui-kit/src/index.ts"],
-      "@quokkaq/kiosk-lib": ["packages/kiosk-lib/src/index.ts"]
-    }
+    "skipDefaultLibCheck": true
   },
   "exclude": ["node_modules", "tmp"]
 }
