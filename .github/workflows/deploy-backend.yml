@@ -135,7 +135,8 @@ jobs:
       - name: Build and Push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./apps/backend
+          context: .
+          file: ./apps/backend/Dockerfile
           push: true
           tags: |
             cr.yandex/${{ secrets.YC_REGISTRY_ID }}/quokkaq-backend:${{ needs.version-bump.outputs.new_version }}

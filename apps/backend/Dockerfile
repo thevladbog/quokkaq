@@ -1,5 +1,6 @@
+# Backend Dockerfile for Nx monorepo
 # Build stage
-FROM golang:1.26.0-alpine AS builder
+FROM golang:1.23-alpine AS builder
 
 # Install build dependencies
 RUN apk add --no-cache git ca-certificates tzdata
@@ -8,13 +9,13 @@ RUN apk add --no-cache git ca-certificates tzdata
 WORKDIR /build
 
 # Copy go mod files
-COPY go.mod go.sum ./
+COPY apps/backend/go.mod apps/backend/go.sum ./
 
 # Download dependencies
 RUN go mod download
 
 # Copy source code
-COPY . .
+COPY apps/backend/ ./
 
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
@@ -27,7 +28,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
 FROM alpine:latest
 
 # Install runtime dependencies
-RUN apk --no-cache add ca-certificates tzdata
+RUN apk --no-cache add ca-certificates tzdata wget
 
 # Create non-root user
 RUN addgroup -g 1000 appuser && \
@@ -38,11 +39,10 @@ WORKDIR /app
 
 # Copy artifacts from builder
 COPY --from=builder /build/quokkaq-backend .
-COPY --from=builder /build/docs ./docs
 
-# Copy static assets if needed
-COPY --from=builder /build/quokka-logo.svg .
-COPY --from=builder /build/logo-text.svg .
+# Copy static assets if they exist
+COPY --from=builder /build/docs ./docs 2>/dev/null || true
+COPY --from=builder /build/*.svg . 2>/dev/null || true
 
 # Change ownership to non-root user
 RUN chown -R appuser:appuser /app
