@@ -6,10 +6,17 @@
     "moduleResolution": "bundler",
     "target": "ES2020",
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "types": ["node"],
     "declaration": true,
     "declarationMap": true,
     "outDir": "./dist",
-    "rootDir": "./src"
+    "baseUrl": ".",
+    "paths": {
+      "@/lib/*": ["src/lib/*"],
+      "@/components/ui/*": ["src/components/*"],
+      "@/components/*": ["src/components/*"],
+      "@/hooks/*": ["src/hooks/*"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

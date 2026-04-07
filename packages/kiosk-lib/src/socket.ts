@@ -1,4 +1,4 @@
-import { Ticket } from './api';
+import type { Ticket } from '@quokkaq/shared-types';
 import { logger } from './logger';
 
 const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:3001';
