@@ -1,0 +1,41 @@
+{
+  "name": "kiosk-desktop",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/kiosk-desktop",
+  "projectType": "application",
+  "tags": ["type:app", "platform:desktop", "lang:rust", "lang:go"],
+  "targets": {
+    "build:agent": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/src-tauri/binaries"],
+      "options": {
+        "command": "node scripts/build-agent.mjs",
+        "cwd": "apps/kiosk-desktop"
+      }
+    },
+    "dev": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build:agent"],
+      "options": {
+        "command": "npm run tauri dev",
+        "cwd": "apps/kiosk-desktop"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build:agent"],
+      "outputs": ["{projectRoot}/src-tauri/target/release"],
+      "options": {
+        "command": "npm run tauri build",
+        "cwd": "apps/kiosk-desktop"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "cargo clippy",
+        "cwd": "apps/kiosk-desktop/src-tauri"
+      }
+    }
+  }
+}

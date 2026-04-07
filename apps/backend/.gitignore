@@ -1,0 +1,118 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Go binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+api.exe
+quokkaq-backend
+quokkaq-backend.exe
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.txt
+coverage.html
+
+# Go workspace file
+go.work
+go.work.sum
+
+# Dependency directories
+vendor/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+.env.prod
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+logs/
+log/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Build directories
+dist/
+build/
+bin/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# MinIO/S3 local storage
+minio-data/
+s3-data/
+
+# Redis dump
+dump.rdb
+
+# Air (hot reload tool)
+tmp/
+.air.toml
+
+# Generated documentation (optional - comment out if you want to track it)
+# docs/swagger.json
+# docs/swagger.yaml
+# docs/docs.go
+
+# OS-specific files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Archive files
+*.zip
+*.tar.gz
+*.rar
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Debug files
+debug
+debug.test
+__debug_bin
+
+# Certificate files
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+
+# Compiled Object files
+*.o
+*.a
+*.so
+
+# Profiling data
+*.prof
+cpu.prof
+mem.prof

@@ -1,0 +1,140 @@
+name: Deploy Backend to Yandex Cloud
+
+on:
+  push:
+    branches:
+      - prod-release
+
+jobs:
+  version-bump:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      new_version: ${{ steps.bump.outputs.new_version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Determine version bump type
+        id: version_type
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          echo "Commit message: $COMMIT_MSG"
+          
+          if [[ "$COMMIT_MSG" == *"[major]"* ]] || [[ "$COMMIT_MSG" == *"BREAKING CHANGE"* ]]; then
+            echo "type=major" >> $GITHUB_OUTPUT
+          elif [[ "$COMMIT_MSG" == *"[minor]"* ]] || [[ "$COMMIT_MSG" == *"feat:"* ]]; then
+            echo "type=minor" >> $GITHUB_OUTPUT
+          else
+            echo "type=patch" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Bump version
+        id: bump
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          
+          TYPE=${{ steps.version_type.outputs.type }}
+          echo "Bumping version type: $TYPE"
+          
+          NEW_VERSION=$(node scripts/bump-version.js $TYPE)
+          echo "New version: $NEW_VERSION"
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          
+          git add VERSION
+          git commit -m "chore: bump backend version to $NEW_VERSION [skip ci]"
+          git tag v$NEW_VERSION
+          git push origin prod-release
+          git push origin v$NEW_VERSION
+
+  build-and-deploy:
+    needs: version-bump
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.version-bump.outputs.new_version }}
+
+      - name: Login to Yandex Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: cr.yandex
+          username: json_key
+          password: ${{ secrets.YC_SA_JSON_CREDENTIALS }}
+
+      - name: Build and Push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            cr.yandex/${{ secrets.YC_REGISTRY_ID }}/quokkaq-backend:${{ needs.version-bump.outputs.new_version }}
+            cr.yandex/${{ secrets.YC_REGISTRY_ID }}/quokkaq-backend:latest
+
+      - name: Copy Docker Compose file
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USERNAME }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          source: "docker-compose.prod.yml"
+          target: "~/quokkaq-backend/"
+          debug: true
+
+      - name: Deploy to VM
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          YC_SA_JSON_CREDENTIALS: ${{ secrets.YC_SA_JSON_CREDENTIALS }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USERNAME }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          envs: YC_SA_JSON_CREDENTIALS
+          script: |
+            export YC_REGISTRY_ID=${{ secrets.YC_REGISTRY_ID }}
+            export TAG=${{ needs.version-bump.outputs.new_version }}
+            
+            # Export secrets as env vars for docker-compose
+            export POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+            export REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+            export MINIO_ROOT_USER=${{ secrets.MINIO_ROOT_USER }}
+            export MINIO_ROOT_PASSWORD=${{ secrets.MINIO_ROOT_PASSWORD }}
+            export SMTP_HOST=${{ secrets.SMTP_HOST }}
+            export SMTP_PORT=${{ secrets.SMTP_PORT }}
+            export SMTP_USER=${{ secrets.SMTP_USER }}
+            export SMTP_PASS=${{ secrets.SMTP_PASS }}
+            export SMTP_FROM=${{ secrets.SMTP_FROM }}
+            export SMTP_SECURE=${{ secrets.SMTP_SECURE }}
+            export JWT_SECRET=${{ secrets.JWT_SECRET }}
+            export APP_BASE_URL=${{ secrets.APP_BASE_URL }}
+            export AWS_S3_BUCKET=${{ secrets.AWS_S3_BUCKET }}
+            export ACME_EMAIL=${{ secrets.ACME_EMAIL }}
+
+            echo "Deploying backend version $TAG"
+            
+            echo "$YC_SA_JSON_CREDENTIALS" | docker login --username json_key --password-stdin cr.yandex
+            
+            docker pull cr.yandex/$YC_REGISTRY_ID/quokkaq-backend:$TAG
+            
+            cd ~/quokkaq-backend
+            
+            # We use --env-file /dev/null to avoid looking for a .env file if we pass everything via export
+            # But docker compose usually picks up env vars from shell.
+            
+            # Ensure traefik-public network exists
+            docker network create traefik-public || true
+            
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            
+            docker image prune -f
+

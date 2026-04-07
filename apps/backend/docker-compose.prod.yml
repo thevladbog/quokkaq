@@ -1,0 +1,197 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: quokkaq-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-quokkaq}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - quokkaq-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for background jobs
+  redis:
+    image: redis:7-alpine
+    container_name: quokkaq-redis
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    networks:
+      - quokkaq-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MinIO for file storage
+  minio:
+    image: minio/minio:latest
+    container_name: quokkaq-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio_data:/data
+    networks:
+      - quokkaq-network
+      - traefik-public
+    labels:
+      # MinIO API
+      - "traefik.enable=true"
+      - "traefik.http.routers.minio-api.rule=Host(`s3.quokkaq.v-b.tech`)"
+      - "traefik.http.routers.minio-api.entrypoints=websecure"
+      - "traefik.http.routers.minio-api.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.minio-api.service=minio-api"
+      - "traefik.http.services.minio-api.loadbalancer.server.port=9000"
+      
+      # MinIO Console
+      - "traefik.http.routers.minio-console.rule=Host(`minio.quokkaq.v-b.tech`)"
+      - "traefik.http.routers.minio-console.entrypoints=websecure"
+      - "traefik.http.routers.minio-console.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.minio-console.service=minio-console"
+      - "traefik.http.services.minio-console.loadbalancer.server.port=9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # QuokkaQ Backend API
+  backend:
+    image: cr.yandex/${YC_REGISTRY_ID}/quokkaq-backend:${TAG}
+    container_name: quokkaq-backend
+    restart: unless-stopped
+    environment:
+      # Database Configuration
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: ${POSTGRES_DB:-quokkaq}
+      DB_SSLMODE: disable
+      PORT: 3001
+      APP_BASE_URL: ${APP_BASE_URL:-https://quokkaq.v-b.tech}
+      
+      # MinIO Configuration
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      AWS_REGION: us-east-1
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET:-quokkaq-materials}
+      AWS_ENDPOINT: http://minio:9000
+      AWS_PUBLIC_ENDPOINT: ${AWS_PUBLIC_ENDPOINT:-https://s3.quokkaq.v-b.tech}
+      
+      # SMTP Configuration
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SMTP_FROM: ${SMTP_FROM}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      
+      # Redis Configuration
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - quokkaq-network
+      - traefik-public
+    labels:
+      # Main API
+      - "traefik.enable=true"
+      - "traefik.http.routers.quokkaq-api.rule=Host(`api.quokkaq.v-b.tech`)"
+      - "traefik.http.routers.quokkaq-api.entrypoints=websecure"
+      - "traefik.http.routers.quokkaq-api.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.quokkaq-api.service=quokkaq-api"
+      - "traefik.http.services.quokkaq-api.loadbalancer.server.port=3001"
+      
+      # CORS middleware
+      - "traefik.http.middlewares.quokkaq-cors.headers.accesscontrolallowmethods=GET,OPTIONS,PUT,POST,DELETE,PATCH"
+      - "traefik.http.middlewares.quokkaq-cors.headers.accesscontrolalloworiginlist=https://app.quokkaq.v-b.tech,https://quokkaq.v-b.tech"
+      - "traefik.http.middlewares.quokkaq-cors.headers.accesscontrolmaxage=100"
+      - "traefik.http.middlewares.quokkaq-cors.headers.addvaryheader=true"
+      - "traefik.http.middlewares.quokkaq-cors.headers.accesscontrolallowheaders=*"
+      - "traefik.http.middlewares.quokkaq-cors.headers.accesscontrolallowcredentials=true"
+      
+      # Security headers
+      - "traefik.http.middlewares.quokkaq-security.headers.stsSeconds=31536000"
+      - "traefik.http.middlewares.quokkaq-security.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.quokkaq-security.headers.stsPreload=true"
+      - "traefik.http.middlewares.quokkaq-security.headers.forceSTSHeader=true"
+      
+      # WebSocket support - required for real-time updates
+      - "traefik.http.middlewares.websocket-headers.headers.customrequestheaders.Connection=Upgrade"
+      - "traefik.http.middlewares.websocket-headers.headers.customrequestheaders.Upgrade=websocket"
+      
+      # Apply middlewares
+      - "traefik.http.routers.quokkaq-api.middlewares=quokkaq-cors,quokkaq-security,websocket-headers"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Reverse Proxy
+  traefik:
+    image: traefik:v3.6
+    container_name: traefik
+    restart: unless-stopped
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "traefik_letsencrypt:/letsencrypt"
+    networks:
+      - traefik-public
+      - quokkaq-network
+
+networks:
+  traefik-public:
+    external: true
+  quokkaq-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  minio_data:
+    driver: local
+  traefik_letsencrypt:
+    driver: local
+

@@ -1,0 +1,3 @@
+# Disable all search engine indexing
+User-agent: *
+Disallow: /

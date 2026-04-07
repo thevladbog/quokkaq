@@ -1,0 +1,2230 @@
+basePath: /
+definitions:
+  handlers.AssignUnitRequest:
+    properties:
+      permissions:
+        items:
+          type: string
+        type: array
+      unitId:
+        type: string
+    type: object
+  handlers.CallNextRequest:
+    properties:
+      counterId:
+        type: string
+      serviceId:
+        type: string
+    type: object
+  handlers.CreateInvitationRequest:
+    properties:
+      email:
+        type: string
+      targetRoles:
+        type: object
+      targetUnits:
+        type: object
+      templateId:
+        type: string
+    type: object
+  handlers.CreateTicketRequest:
+    properties:
+      serviceId:
+        type: string
+      unitId:
+        type: string
+    type: object
+  handlers.ForgotPasswordRequest:
+    properties:
+      email:
+        type: string
+    type: object
+  handlers.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  handlers.LoginResponse:
+    properties:
+      token:
+        type: string
+    type: object
+  handlers.PickRequest:
+    properties:
+      counterId:
+        type: string
+    type: object
+  handlers.RegisterUserRequest:
+    properties:
+      name:
+        type: string
+      password:
+        type: string
+      token:
+        type: string
+    type: object
+  handlers.RemoveUnitRequest:
+    properties:
+      unitId:
+        type: string
+    type: object
+  handlers.ResetPasswordRequest:
+    properties:
+      newPassword:
+        type: string
+      token:
+        type: string
+    type: object
+  handlers.TransferRequest:
+    properties:
+      toCounterId:
+        type: string
+      toUserId:
+        type: string
+    type: object
+  handlers.UpdateStatusRequest:
+    properties:
+      status:
+        type: string
+    type: object
+  models.Booking:
+    properties:
+      code:
+        type: string
+      createdAt:
+        type: string
+      id:
+        type: string
+      scheduledAt:
+        type: string
+      serviceId:
+        type: string
+      status:
+        type: string
+      unitId:
+        type: string
+      userName:
+        type: string
+      userPhone:
+        type: string
+    type: object
+  models.Counter:
+    properties:
+      assignedTo:
+        type: string
+      assignedUser:
+        $ref: '#/definitions/models.User'
+      id:
+        type: string
+      name:
+        type: string
+      unitId:
+        type: string
+    type: object
+  models.Invitation:
+    properties:
+      createdAt:
+        type: string
+      email:
+        type: string
+      expiresAt:
+        type: string
+      id:
+        type: string
+      status:
+        type: string
+      targetRoles:
+        type: object
+      targetUnits:
+        description: Stored permissions to be assigned upon acceptance (JSONB; OpenAPI
+          as generic object)
+        type: object
+      token:
+        type: string
+      updatedAt:
+        type: string
+      userId:
+        type: string
+    type: object
+  models.MessageTemplate:
+    properties:
+      content:
+        type: string
+      createdAt:
+        type: string
+      id:
+        type: string
+      isDefault:
+        type: boolean
+      name:
+        type: string
+      subject:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  models.PreRegistration:
+    properties:
+      code:
+        description: 6-digit unique code
+        type: string
+      comment:
+        type: string
+      createdAt:
+        type: string
+      customerName:
+        type: string
+      customerPhone:
+        type: string
+      date:
+        description: YYYY-MM-DD
+        type: string
+      id:
+        type: string
+      service:
+        $ref: '#/definitions/models.Service'
+      serviceId:
+        type: string
+      status:
+        description: created, canceled, ticket_issued, completed
+        type: string
+      ticket:
+        $ref: '#/definitions/models.Ticket'
+      ticketId:
+        type: string
+      time:
+        description: HH:MM
+        type: string
+      unitId:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  models.Role:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+    type: object
+  models.Service:
+    properties:
+      backgroundColor:
+        type: string
+      children:
+        items:
+          $ref: '#/definitions/models.Service'
+        type: array
+      description:
+        type: string
+      descriptionEn:
+        type: string
+      descriptionRu:
+        type: string
+      duration:
+        description: In seconds
+        type: integer
+      gridCol:
+        type: integer
+      gridColSpan:
+        type: integer
+      gridRow:
+        description: Grid configuration
+        type: integer
+      gridRowSpan:
+        type: integer
+      id:
+        type: string
+      imageUrl:
+        type: string
+      isLeaf:
+        type: boolean
+      maxWaitingTime:
+        description: In seconds
+        type: integer
+      name:
+        type: string
+      nameEn:
+        type: string
+      nameRu:
+        type: string
+      numberSequence:
+        type: string
+      parentId:
+        type: string
+      prebook:
+        type: boolean
+      prefix:
+        type: string
+      textColor:
+        type: string
+      unitId:
+        type: string
+    type: object
+  models.SlotConfig:
+    properties:
+      createdAt:
+        type: string
+      days:
+        description: '["monday", "tuesday", ...]'
+        items:
+          type: string
+        type: array
+      endTime:
+        description: HH:MM
+        type: string
+      id:
+        type: string
+      interval:
+        description: in minutes
+        type: integer
+      startTime:
+        description: HH:MM
+        type: string
+      unitId:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  models.Ticket:
+    properties:
+      booking:
+        $ref: '#/definitions/models.Booking'
+      bookingId:
+        type: string
+      calledAt:
+        type: string
+      completedAt:
+        type: string
+      confirmedAt:
+        type: string
+      counter:
+        $ref: '#/definitions/models.Counter'
+      counterId:
+        type: string
+      createdAt:
+        type: string
+      id:
+        type: string
+      isEod:
+        type: boolean
+      lastCalledAt:
+        type: string
+      maxWaitingTime:
+        description: Snapshot from Service at creation
+        type: integer
+      preRegistration:
+        $ref: '#/definitions/models.PreRegistration'
+      preRegistrationId:
+        type: string
+      priority:
+        type: integer
+      queueNumber:
+        type: string
+      service:
+        $ref: '#/definitions/models.Service'
+      serviceId:
+        type: string
+      status:
+        type: string
+      unitId:
+        type: string
+    type: object
+  models.Unit:
+    properties:
+      code:
+        type: string
+      companyId:
+        type: string
+      config:
+        type: object
+      counters:
+        items:
+          $ref: '#/definitions/models.Counter'
+        type: array
+      createdAt:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      preRegistrations:
+        items:
+          $ref: '#/definitions/models.PreRegistration'
+        type: array
+      services:
+        items:
+          $ref: '#/definitions/models.Service'
+        type: array
+      slotConfig:
+        $ref: '#/definitions/models.SlotConfig'
+      tickets:
+        items:
+          $ref: '#/definitions/models.Ticket'
+        type: array
+      timezone:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  models.UnitMaterial:
+    properties:
+      createdAt:
+        type: string
+      filename:
+        type: string
+      id:
+        type: string
+      type:
+        type: string
+      unitId:
+        type: string
+      url:
+        type: string
+    type: object
+  models.User:
+    properties:
+      createdAt:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      isActive:
+        type: boolean
+      name:
+        type: string
+      phone:
+        type: string
+      roles:
+        description: Relations
+        items:
+          $ref: '#/definitions/models.UserRole'
+        type: array
+      type:
+        type: string
+      units:
+        items:
+          $ref: '#/definitions/models.UserUnit'
+        type: array
+    type: object
+  models.UserRole:
+    properties:
+      id:
+        type: string
+      role:
+        $ref: '#/definitions/models.Role'
+      roleId:
+        type: string
+      userId:
+        type: string
+    type: object
+  models.UserUnit:
+    properties:
+      id:
+        type: string
+      permissions:
+        items:
+          type: string
+        type: array
+      unit:
+        $ref: '#/definitions/models.Unit'
+      unitId:
+        type: string
+      userId:
+        type: string
+    type: object
+host: localhost:3001
+info:
+  contact:
+    email: support@swagger.io
+    name: API Support
+    url: http://www.swagger.io/support
+  description: This is the backend API for QuokkaQ, rewritten in Go.
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: QuokkaQ Go Backend API
+  version: "1.0"
+paths:
+  /auth/forgot-password:
+    post:
+      consumes:
+      - application/json
+      description: Sends a password reset link to the user's email
+      parameters:
+      - description: Email Address
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.ForgotPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Reset link sent
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Request Password Reset
+      tags:
+      - auth
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticates a user and returns a JWT token
+      parameters:
+      - description: Login Credentials
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.LoginResponse'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+      summary: User Login
+      tags:
+      - auth
+  /auth/me:
+    get:
+      description: Returns the currently authenticated user's information
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.User'
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "404":
+          description: User not found
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Get current user
+      tags:
+      - auth
+  /auth/reset-password:
+    post:
+      consumes:
+      - application/json
+      description: Resets the user's password using a valid token
+      parameters:
+      - description: New Password and Token
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.ResetPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Password reset successfully
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Invalid or expired token
+          schema:
+            type: string
+      summary: Reset Password
+      tags:
+      - auth
+  /bookings:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new booking for a service in a unit
+      parameters:
+      - description: Booking Data
+        in: body
+        name: booking
+        required: true
+        schema:
+          $ref: '#/definitions/models.Booking'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Booking'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Create a new booking
+      tags:
+      - bookings
+  /bookings/{id}:
+    delete:
+      description: Deletes a booking by its ID
+      parameters:
+      - description: Booking ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Delete a booking
+      tags:
+      - bookings
+    get:
+      description: Retrieves a specific booking by its ID
+      parameters:
+      - description: Booking ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Booking'
+        "404":
+          description: Booking not found
+          schema:
+            type: string
+      summary: Get a booking by ID
+      tags:
+      - bookings
+    put:
+      consumes:
+      - application/json
+      description: Updates an existing booking
+      parameters:
+      - description: Booking ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Booking Data
+        in: body
+        name: booking
+        required: true
+        schema:
+          $ref: '#/definitions/models.Booking'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Booking'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Update a booking
+      tags:
+      - bookings
+  /counters:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new counter for a unit
+      parameters:
+      - description: Counter Data
+        in: body
+        name: counter
+        required: true
+        schema:
+          $ref: '#/definitions/models.Counter'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Counter'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Create a new counter
+      tags:
+      - counters
+  /counters/{id}:
+    delete:
+      description: Deletes a counter by its ID
+      parameters:
+      - description: Counter ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Delete a counter
+      tags:
+      - counters
+    get:
+      description: Retrieves a specific counter by its ID
+      parameters:
+      - description: Counter ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Counter'
+        "404":
+          description: Counter not found
+          schema:
+            type: string
+      summary: Get a counter by ID
+      tags:
+      - counters
+    put:
+      consumes:
+      - application/json
+      description: Updates an existing counter
+      parameters:
+      - description: Counter ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Counter Data
+        in: body
+        name: counter
+        required: true
+        schema:
+          $ref: '#/definitions/models.Counter'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Counter'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Update a counter
+      tags:
+      - counters
+  /counters/{id}/call-next:
+    post:
+      consumes:
+      - application/json
+      description: Calls the next waiting ticket for the counter
+      parameters:
+      - description: Counter ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Counter not found or no tickets
+          schema:
+            type: string
+      summary: Call next ticket
+      tags:
+      - counters
+  /counters/{id}/force-release:
+    post:
+      consumes:
+      - application/json
+      description: Force releases a counter (supervisor)
+      parameters:
+      - description: Counter ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Counter not found
+          schema:
+            type: string
+      summary: Force release counter
+      tags:
+      - counters
+  /counters/{id}/occupy:
+    post:
+      consumes:
+      - application/json
+      description: Sets a counter as occupied by the current user
+      parameters:
+      - description: Counter ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Counter'
+        "404":
+          description: Counter not found
+          schema:
+            type: string
+      summary: Occupy counter
+      tags:
+      - counters
+  /counters/{id}/release:
+    post:
+      consumes:
+      - application/json
+      description: Releases a counter
+      parameters:
+      - description: Counter ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Counter'
+        "404":
+          description: Counter not found
+          schema:
+            type: string
+      summary: Release counter
+      tags:
+      - counters
+  /invitations:
+    get:
+      description: Retrieves all invitations
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Invitation'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Get all invitations
+      tags:
+      - invitations
+    post:
+      consumes:
+      - application/json
+      description: Creates a new invitation for a user with optional pre-assigned
+        units and roles
+      parameters:
+      - description: Invitation Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateInvitationRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Invitation'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Create a new invitation
+      tags:
+      - invitations
+  /invitations/{id}:
+    delete:
+      description: Deletes an invitation by its ID
+      parameters:
+      - description: Invitation ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Delete an invitation
+      tags:
+      - invitations
+  /invitations/{id}/resend:
+    patch:
+      consumes:
+      - application/json
+      description: Resends an active invitation by its ID
+      parameters:
+      - description: Invitation ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Resend an invitation
+      tags:
+      - invitations
+  /invitations/register:
+    post:
+      consumes:
+      - application/json
+      description: Registers a new user using an invitation token
+      parameters:
+      - description: Register Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.RegisterUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.User'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Register a new user via invitation
+      tags:
+      - invitations
+  /invitations/token/{token}:
+    get:
+      description: Retrieves an invitation by its token
+      parameters:
+      - description: Invitation Token
+        in: path
+        name: token
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Invitation'
+        "404":
+          description: Not Found
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Get invitation by token
+      tags:
+      - invitations
+  /services:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new service for a unit
+      parameters:
+      - description: Service Data
+        in: body
+        name: service
+        required: true
+        schema:
+          $ref: '#/definitions/models.Service'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Service'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Create a new service
+      tags:
+      - services
+  /services/{id}:
+    delete:
+      description: Deletes a service by its ID
+      parameters:
+      - description: Service ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Delete a service
+      tags:
+      - services
+    get:
+      description: Retrieves a specific service by its ID
+      parameters:
+      - description: Service ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Service'
+        "404":
+          description: Service not found
+          schema:
+            type: string
+      summary: Get a service by ID
+      tags:
+      - services
+    put:
+      consumes:
+      - application/json
+      description: Updates an existing service
+      parameters:
+      - description: Service ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Service Data
+        in: body
+        name: service
+        required: true
+        schema:
+          $ref: '#/definitions/models.Service'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Service'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "404":
+          description: Not found
+          schema:
+            type: string
+        "409":
+          description: Conflict (e.g. unit change not allowed)
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Update a service
+      tags:
+      - services
+  /system/setup:
+    post:
+      consumes:
+      - application/json
+      description: Creates the first administrator if the system is not initialized
+      parameters:
+      - description: User Data
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/models.User'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.User'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "403":
+          description: Forbidden - System already initialized
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Setup first admin
+      tags:
+      - system
+  /system/status:
+    get:
+      description: Checks if the system is initialized (has users)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: boolean
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Get system status
+      tags:
+      - system
+  /templates:
+    get:
+      description: Retrieves all message templates
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.MessageTemplate'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Get all templates
+      tags:
+      - templates
+    post:
+      consumes:
+      - application/json
+      description: Creates a new message template
+      parameters:
+      - description: Template Data
+        in: body
+        name: template
+        required: true
+        schema:
+          $ref: '#/definitions/models.MessageTemplate'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.MessageTemplate'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Create a new template
+      tags:
+      - templates
+  /templates/{id}:
+    delete:
+      description: Deletes a template by its ID
+      parameters:
+      - description: Template ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Delete a template
+      tags:
+      - templates
+    get:
+      description: Retrieves a specific template by its ID
+      parameters:
+      - description: Template ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.MessageTemplate'
+        "404":
+          description: Template not found
+          schema:
+            type: string
+      summary: Get a template by ID
+      tags:
+      - templates
+    put:
+      consumes:
+      - application/json
+      description: Updates an existing template
+      parameters:
+      - description: Template ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Template Data
+        in: body
+        name: template
+        required: true
+        schema:
+          $ref: '#/definitions/models.MessageTemplate'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.MessageTemplate'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Update a template
+      tags:
+      - templates
+  /tickets/{id}:
+    get:
+      description: Retrieves a ticket by its ID
+      parameters:
+      - description: Ticket ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Ticket'
+        "404":
+          description: Ticket not found
+          schema:
+            type: string
+      summary: Get ticket by ID
+      tags:
+      - tickets
+  /tickets/{id}/pick:
+    post:
+      consumes:
+      - application/json
+      description: Picks a specific ticket for a counter
+      parameters:
+      - description: Ticket ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Pick Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.PickRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Ticket'
+        "404":
+          description: Ticket not found
+          schema:
+            type: string
+      summary: Pick ticket
+      tags:
+      - tickets
+  /tickets/{id}/recall:
+    post:
+      consumes:
+      - application/json
+      description: Recalls a ticket
+      parameters:
+      - description: Ticket ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Ticket'
+        "404":
+          description: Ticket not found
+          schema:
+            type: string
+      summary: Recall ticket
+      tags:
+      - tickets
+  /tickets/{id}/return:
+    post:
+      consumes:
+      - application/json
+      description: Returns a ticket to the waiting queue
+      parameters:
+      - description: Ticket ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Ticket'
+        "404":
+          description: Ticket not found
+          schema:
+            type: string
+      summary: Return ticket to queue
+      tags:
+      - tickets
+  /tickets/{id}/status:
+    patch:
+      consumes:
+      - application/json
+      description: Updates the status of a ticket
+      parameters:
+      - description: Ticket ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update Status Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Ticket'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Update ticket status
+      tags:
+      - tickets
+  /tickets/{id}/transfer:
+    post:
+      consumes:
+      - application/json
+      description: Transfers a ticket to another counter or user
+      parameters:
+      - description: Ticket ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Transfer Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.TransferRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Ticket'
+        "404":
+          description: Ticket not found
+          schema:
+            type: string
+      summary: Transfer ticket
+      tags:
+      - tickets
+  /units:
+    get:
+      description: Retrieves a list of all units
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Unit'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Get all units
+      tags:
+      - units
+    post:
+      consumes:
+      - application/json
+      description: Creates a new unit
+      parameters:
+      - description: Unit Data
+        in: body
+        name: unit
+        required: true
+        schema:
+          $ref: '#/definitions/models.Unit'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Unit'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Create a new unit
+      tags:
+      - units
+  /units/{id}:
+    delete:
+      description: Deletes a unit by its ID
+      parameters:
+      - description: Unit ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Delete a unit
+      tags:
+      - units
+    get:
+      description: Retrieves a specific unit by its ID
+      parameters:
+      - description: Unit ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Unit'
+        "404":
+          description: Unit not found
+          schema:
+            type: string
+      summary: Get a unit by ID
+      tags:
+      - units
+    patch:
+      consumes:
+      - application/json
+      description: Updates an existing unit
+      parameters:
+      - description: Unit ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Unit Data
+        in: body
+        name: unit
+        required: true
+        schema:
+          $ref: '#/definitions/models.Unit'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Unit'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Update a unit
+      tags:
+      - units
+  /units/{unitId}/ad-settings:
+    patch:
+      consumes:
+      - application/json
+      description: Updates ad settings for a unit
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        type: string
+      - description: Ad Settings
+        in: body
+        name: settings
+        required: true
+        schema:
+          additionalProperties: true
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: boolean
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Update ad settings
+      tags:
+      - units
+  /units/{unitId}/bookings:
+    get:
+      description: Retrieves all bookings for a specific unit
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Booking'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Get bookings by unit
+      tags:
+      - bookings
+  /units/{unitId}/call-next:
+    post:
+      consumes:
+      - application/json
+      description: Calls the next waiting ticket for a unit
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        type: string
+      - description: Call Next Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CallNextRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Ticket'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "404":
+          description: No waiting tickets
+          schema:
+            type: string
+      summary: Call next ticket
+      tags:
+      - tickets
+  /units/{unitId}/counters:
+    get:
+      description: Retrieves all counters for a specific unit
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Counter'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Get counters by unit
+      tags:
+      - counters
+  /units/{unitId}/materials:
+    get:
+      description: Retrieves materials for a unit
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.UnitMaterial'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Get unit materials
+      tags:
+      - units
+    post:
+      consumes:
+      - application/json
+      description: Adds a material to a unit
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        type: string
+      - description: Material Data
+        in: body
+        name: material
+        required: true
+        schema:
+          $ref: '#/definitions/models.UnitMaterial'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.UnitMaterial'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Add material to unit
+      tags:
+      - units
+  /units/{unitId}/materials/{materialId}:
+    delete:
+      description: Deletes a material by ID
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        type: string
+      - description: Material ID
+        in: path
+        name: materialId
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Delete material
+      tags:
+      - units
+  /units/{unitId}/services:
+    get:
+      description: Retrieves all services for a specific unit
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Service'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Get services by unit
+      tags:
+      - services
+  /units/{unitId}/shift/counters:
+    get:
+      description: Retrieves counters for shift view
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Counter'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Get shift counters
+      tags:
+      - shift
+  /units/{unitId}/shift/dashboard:
+    get:
+      description: Retrieves dashboard statistics for a unit
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Get dashboard stats
+      tags:
+      - shift
+  /units/{unitId}/shift/eod:
+    post:
+      consumes:
+      - application/json
+      description: Performs end of day operations for a unit
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Execute End of Day
+      tags:
+      - shift
+  /units/{unitId}/shift/queue:
+    get:
+      description: Retrieves current queue tickets for a unit
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Ticket'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Get queue tickets
+      tags:
+      - shift
+  /units/{unitId}/tickets:
+    get:
+      description: Retrieves all tickets for a specific unit
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Ticket'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Get tickets by unit
+      tags:
+      - tickets
+    post:
+      consumes:
+      - application/json
+      description: Creates a new ticket for a service in a unit
+      parameters:
+      - description: Ticket Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateTicketRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Ticket'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Create a new ticket
+      tags:
+      - tickets
+  /users:
+    get:
+      description: Retrieves a list of all users
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.User'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Get all users
+      tags:
+      - users
+    post:
+      consumes:
+      - application/json
+      description: Creates a new user with the provided details
+      parameters:
+      - description: User Data
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/models.User'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.User'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Create a new user
+      tags:
+      - users
+  /users/{id}:
+    delete:
+      description: Deletes a user by their ID
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Delete a user
+      tags:
+      - users
+    get:
+      description: Retrieves a specific user by their ID
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.User'
+        "404":
+          description: User not found
+          schema:
+            type: string
+      summary: Get a user by ID
+      tags:
+      - users
+    patch:
+      consumes:
+      - application/json
+      description: Updates an existing user
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: User Data
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/models.User'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.User'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Update a user
+      tags:
+      - users
+  /users/{id}/units:
+    get:
+      description: Retrieves units assigned to a user
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Unit'
+            type: array
+        "404":
+          description: User not found
+          schema:
+            type: string
+      summary: Get user units
+      tags:
+      - users
+  /users/{id}/units/assign:
+    post:
+      consumes:
+      - application/json
+      description: Assigns a unit to a user with optional permissions
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Assign Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.AssignUnitRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: boolean
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Assign unit to user
+      tags:
+      - users
+  /users/{id}/units/remove:
+    post:
+      consumes:
+      - application/json
+      description: Removes a unit from a user
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Remove Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.RemoveUnitRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: boolean
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Remove unit from user
+      tags:
+      - users
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
