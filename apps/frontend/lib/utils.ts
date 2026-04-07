@@ -30,3 +30,32 @@ export function getLocalizedName(
 ): string {
   return getLocalizedValue(name, nameRu, nameEn, currentLocale);
 }
+
+// Get initials from user name
+export function getInitials(name?: string): string {
+  if (!name) return 'U';
+
+  const parts = name.trim().split(' ');
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  return name.substring(0, 2).toUpperCase();
+}
+
+// Generate avatar color based on name
+export function getAvatarColor(name?: string): string {
+  if (!name) return 'hsl(var(--primary))';
+
+  const colors = [
+    'hsl(220, 90%, 56%)', // blue
+    'hsl(340, 75%, 55%)', // pink
+    'hsl(160, 60%, 45%)', // teal
+    'hsl(30, 80%, 55%)', // orange
+    'hsl(280, 65%, 60%)' // purple
+  ];
+
+  const hash = name
+    .split('')
+    .reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return colors[hash % colors.length];
+}

@@ -13,19 +13,43 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import { useAuthContext } from '@/contexts/AuthContext';
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useRouter } from '../../src/i18n/navigation';
+import { useEffect, useState } from 'react';
 
 export default function Home() {
   const t = useTranslations('home');
   const { isAuthenticated, isLoading, user } = useAuthContext();
   const router = useRouter();
+  const [systemChecked, setSystemChecked] = useState(false);
+
+  // Check system initialization status first
+  useEffect(() => {
+    const checkSystemStatus = async () => {
+      try {
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/system/status`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          if (!data.initialized) {
+            // System not initialized, redirect handled by SystemStatusGuard
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('Failed to check system status:', error);
+      }
+      setSystemChecked(true);
+    };
+
+    checkSystemStatus();
+  }, []);
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    if (systemChecked && !isLoading && !isAuthenticated) {
       router.push('/login');
     }
-  }, [isLoading, isAuthenticated, router]);
+  }, [isLoading, isAuthenticated, router, systemChecked]);
 
   if (isLoading) {
     return (

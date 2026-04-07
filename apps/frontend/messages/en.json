@@ -386,6 +386,7 @@
     },
     "pre_registrations": {
       "title": "Pre-registrations",
+      "select_unit": "Select a unit to manage pre-registrations",
       "create_title": "Create Pre-registration",
       "create_desc": "Fill in the details to create a new pre-registration.",
       "edit_title": "Edit Pre-registration",
@@ -889,5 +890,10 @@
       "display": "Queue Display - QuokkaQ"
     },
     "ticket": "Your Ticket - QuokkaQ"
+  },
+  "profile": {
+    "language": "Language",
+    "theme": "Theme",
+    "logout": "Logout"
   }
 }

@@ -26,24 +26,30 @@ import {
   Mail,
   MessageSquare,
   CalendarClock,
-  Monitor
+  Monitor,
+  LogOut,
+  Globe
 } from 'lucide-react';
 import Image from 'next/image';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { Link, usePathname } from '@/src/i18n/navigation';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu';
+  Popover,
+  PopoverContent,
+  PopoverTrigger
+} from '@/components/ui/popover';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import ThemeToggle from '@/components/ThemeToggle';
 import { useTranslations } from 'next-intl';
+import { getInitials, getAvatarColor } from '@/lib/utils';
 
 const AppSidebar = () => {
   const tAdmin = useTranslations('admin');
   const tNav = useTranslations('nav');
+  const tProfile = useTranslations('profile');
   const { user, isAuthenticated, logout } = useAuthContext();
   const pathname = usePathname();
 
@@ -268,37 +274,93 @@ const AppSidebar = () => {
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <SidebarMenuButton>
-                        <User />
-                        <span>{user?.name || user?.email || 'User'}</span>
-                      </SidebarMenuButton>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent className='ml-2 w-[--radix-dropdown-menu-trigger-width]'>
-                      <div className='space-y-2 p-2'>
-                        <div className='flex items-center justify-between'>
-                          <span className='text-sm'>
-                            {tAdmin('settings.language', {
-                              defaultValue: 'Language'
-                            })}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <SidebarMenuButton className='h-12'>
+                        <Avatar size='sm'>
+                          <AvatarFallback
+                            bgColor={getAvatarColor(
+                              user?.name || user?.email
+                            )}
+                            className='text-white'
+                          >
+                            {getInitials(user?.name || user?.email)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className='flex flex-col items-start overflow-hidden'>
+                          <span className='truncate text-sm font-medium'>
+                            {user?.name || user?.email || 'User'}
                           </span>
+                          {user?.name && user?.email && (
+                            <span className='text-muted-foreground truncate text-xs'>
+                              {user?.email}
+                            </span>
+                          )}
+                        </div>
+                      </SidebarMenuButton>
+                    </PopoverTrigger>
+
+                    <PopoverContent
+                      className='w-80'
+                      align='end'
+                      side='top'
+                      sideOffset={8}
+                    >
+                      {/* Profile Card */}
+                      <div className='flex items-center gap-3 pb-3'>
+                        <Avatar size='lg'>
+                          <AvatarFallback
+                            bgColor={getAvatarColor(
+                              user?.name || user?.email
+                            )}
+                            className='text-white text-lg'
+                          >
+                            {getInitials(user?.name || user?.email)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className='flex flex-1 flex-col overflow-hidden'>
+                          <p className='truncate font-medium'>
+                            {user?.name || 'User'}
+                          </p>
+                          <p className='text-muted-foreground truncate text-sm'>
+                            {user?.email}
+                          </p>
+                        </div>
+                      </div>
+
+                      <Separator />
+
+                      {/* Settings */}
+                      <div className='space-y-3 py-3'>
+                        <div className='flex items-center justify-between'>
+                          <div className='flex items-center gap-2'>
+                            <Globe className='h-4 w-4' />
+                            <span className='text-sm'>
+                              {tProfile('language')}
+                            </span>
+                          </div>
                           <LanguageSwitcher />
                         </div>
+
                         <div className='flex items-center justify-between'>
-                          <span className='text-sm'>
-                            {tAdmin('settings.theme', {
-                              defaultValue: 'Theme'
-                            })}
-                          </span>
+                          <span className='text-sm'>{tProfile('theme')}</span>
                           <ThemeToggle />
                         </div>
                       </div>
-                      <DropdownMenuItem className='mt-2' onClick={logout}>
-                        Logout
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+
+                      <Separator />
+
+                      {/* Logout */}
+                      <Button
+                        variant='ghost'
+                        className='hover:text-destructive mt-2 w-full justify-start text-destructive'
+                        onClick={logout}
+                      >
+                        <LogOut className='mr-2 h-4 w-4' />
+                        {tProfile('logout')}
+                      </Button>
+                    </PopoverContent>
+                  </Popover>
                 </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroupContent>

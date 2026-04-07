@@ -166,7 +166,7 @@ export default function SetupPage() {
               />
             </div>
           </CardContent>
-          <CardFooter className='space-y-2'>
+          <CardFooter className='mt-6'>
             <Button
               type='submit'
               className='w-full'

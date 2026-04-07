@@ -2,6 +2,13 @@
 
 import { useRouter, usePathname } from '@/src/i18n/navigation';
 import { useLocale } from 'next-intl';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select';
 
 export default function LanguageSwitcher() {
   const router = useRouter();
@@ -12,18 +19,33 @@ export default function LanguageSwitcher() {
     router.replace(pathname, { locale: newLocale });
   };
 
+  const languages = {
+    en: { flag: '🇬🇧', name: 'English' },
+    ru: { flag: '🇷🇺', name: 'Русский' }
+  };
+
   return (
-    <div className='flex space-x-2'>
-      <button
-        onClick={() => switchLocale(locale === 'en' ? 'ru' : 'en')}
-        className={`rounded-md px-3 py-1 text-sm font-medium ${
-          locale === 'en'
-            ? 'bg-primary text-primary-foreground'
-            : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-        }`}
-      >
-        {locale === 'en' ? 'RU' : 'EN'}
-      </button>
-    </div>
+    <Select value={locale} onValueChange={switchLocale}>
+      <SelectTrigger size='sm' className='w-[140px]'>
+        <SelectValue>
+          <span className='flex items-center gap-2'>
+            {languages[locale as keyof typeof languages].flag}{' '}
+            {languages[locale as keyof typeof languages].name}
+          </span>
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value='en'>
+          <span className='flex items-center gap-2'>
+            {languages.en.flag} {languages.en.name}
+          </span>
+        </SelectItem>
+        <SelectItem value='ru'>
+          <span className='flex items-center gap-2'>
+            {languages.ru.flag} {languages.ru.name}
+          </span>
+        </SelectItem>
+      </SelectContent>
+    </Select>
   );
 }
