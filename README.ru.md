@@ -369,11 +369,11 @@ Frontend будет доступен по адресу <http://localhost:3000>
 **6. (Опционально) Запустите kiosk desktop:**
 
 ```bash
-cd apps/kiosk-desktop
-npm install
-npm run build:agent
-npm run tauri dev
+# Из корня workspace - Nx автоматически соберет агент и запустит dev сервер
+pnpm nx dev kiosk-desktop
 ```
+
+> **Примечание:** Для kiosk desktop требуется Rust toolchain. Команда `dev` автоматически собирает Go-агент перед запуском Tauri.
 
 ---
 
@@ -472,8 +472,8 @@ Nx кэширует результаты сборки для ускорения 
 # Очистить Nx кэш
 pnpm nx reset
 
-# Просмотр директории кэша
-pnpm nx show
+# Показать детали проекта
+pnpm nx show project <имя-проекта>
 ```
 
 #### Определение затронутых проектов
@@ -511,7 +511,7 @@ pnpm nx affected -t lint
 Срабатывает при изменениях в `apps/frontend/` или `packages/`:
 
 - Автоматически повышает версию в `apps/frontend/package.json`
-- Собирает Docker образ с Next.js standalone выводом
+- Собирает Docker-образ с Next.js standalone выводом
 - Отправляет в Yandex Container Registry
 - Разворачивает на Yandex Cloud VM
 - Создает git тег: `vX.Y.Z-frontend`
@@ -521,7 +521,7 @@ pnpm nx affected -t lint
 Срабатывает при изменениях в `apps/backend/`:
 
 - Повышает версию в `apps/backend/VERSION`
-- Собирает Go бинарник в Docker
+- Собирает Go-бинарник в Docker
 - Отправляет в Yandex Container Registry
 - Разворачивает на Yandex Cloud VM
 - Создает git тег: `vX.Y.Z-backend`
@@ -813,7 +813,9 @@ CI автоматически:
 
 Исходный код предоставляется для просмотра и оценки только. Любое использование, модификация или распространение требует явного письменного разрешения от правообладателя.
 
-См. LICENSE файлы отдельных приложений для полных условий.
+Для получения полных условий лицензии см.:
+- Корневая лицензия: [LICENSE](LICENSE) | [LICENSE.ru](LICENSE.ru)
+- Лицензии приложений: [Frontend](apps/frontend/LICENSE) | [Backend](apps/backend/LICENSE) | [Kiosk](apps/kiosk-desktop/LICENSE)
 
 ---
 

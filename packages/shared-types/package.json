@@ -1,6 +1,7 @@
 {
   "name": "@quokkaq/shared-types",
   "version": "0.1.0",
+  "license": "UNLICENSED",
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",

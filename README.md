@@ -356,11 +356,11 @@ The frontend will be available at <http://localhost:3000>
 **6. (Optional) Start kiosk desktop:**
 
 ```bash
-cd apps/kiosk-desktop
-npm install
-npm run build:agent
-npm run tauri dev
+# From workspace root - Nx will build agent and start dev server
+pnpm nx dev kiosk-desktop
 ```
+
+> **Note:** The kiosk desktop requires Rust toolchain. The `dev` command automatically builds the Go agent sidecar before starting Tauri.
 
 ---
 
@@ -459,8 +459,8 @@ Nx caches build outputs for faster rebuilds:
 # Clear Nx cache
 pnpm nx reset
 
-# View cache directory
-pnpm nx show
+# Show project details
+pnpm nx show project <project-name>
 ```
 
 #### Affected Detection
@@ -793,7 +793,9 @@ This project is proprietary software. **All rights reserved.**
 
 The source code is made available for viewing and evaluation purposes only. Any use, modification, or distribution requires explicit written permission from the copyright holder.
 
-See individual app LICENSE files for complete terms.
+For complete license terms, see:
+- Root license: [LICENSE](LICENSE) | [LICENSE.ru](LICENSE.ru)
+- Application licenses: [Frontend](apps/frontend/LICENSE) | [Backend](apps/backend/LICENSE) | [Kiosk](apps/kiosk-desktop/LICENSE)
 
 ---
 
