@@ -19,56 +19,39 @@ import {
 } from '@/components/ui/select';
 import { Plus, X, UserPlus, Mail } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-
-interface OnboardingState {
-  unit?: {
-    name: string;
-    code: string;
-    timezone: string;
-  } | null;
-  services?: Array<{
-    name: string;
-    description: string;
-  }>;
-  invites?: Array<{
-    email: string;
-    role: string;
-  }>;
-}
-
-interface InviteTeamStepProps {
-  state: OnboardingState;
-  onNext: (data: Partial<OnboardingState>) => void;
-  onBack: () => void;
-  onSkip: () => void;
-}
+import type { OnboardingInvite, OnboardingWizardStepProps } from '../types';
+import { newInviteRow, normalizeInviteRows } from '../types';
 
 export function InviteTeamStep({
   state,
   onNext,
   onBack,
   onSkip
-}: InviteTeamStepProps) {
+}: OnboardingWizardStepProps) {
   const t = useTranslations('onboarding.team');
 
-  const [invites, setInvites] = useState(
+  const [invites, setInvites] = useState<OnboardingInvite[]>(() =>
     state.invites && state.invites.length > 0
-      ? state.invites
-      : [{ email: '', role: 'staff' }]
+      ? normalizeInviteRows(state.invites)
+      : [newInviteRow()]
   );
 
   const addInvite = () => {
-    setInvites([...invites, { email: '', role: 'staff' }]);
+    setInvites((prev) => [...prev, newInviteRow()]);
   };
 
-  const removeInvite = (index: number) => {
-    setInvites(invites.filter((_, i) => i !== index));
+  const removeInvite = (id: string) => {
+    setInvites((prev) => prev.filter((inv) => inv.id !== id));
   };
 
-  const updateInvite = (index: number, field: string, value: string) => {
-    const updated = [...invites];
-    updated[index] = { ...updated[index], [field]: value };
-    setInvites(updated);
+  const updateInvite = (
+    id: string,
+    field: keyof Pick<OnboardingInvite, 'email' | 'role'>,
+    value: string
+  ) => {
+    setInvites((prev) =>
+      prev.map((inv) => (inv.id === id ? { ...inv, [field]: value } : inv))
+    );
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -98,9 +81,9 @@ export function InviteTeamStep({
 
       <CardContent className='space-y-6'>
         <div className='space-y-4'>
-          {invites.map((invite, index) => (
+          {invites.map((invite) => (
             <div
-              key={index}
+              key={invite.id}
               className='relative space-y-3 rounded-lg border p-4'
             >
               {invites.length > 1 && (
@@ -109,7 +92,8 @@ export function InviteTeamStep({
                   variant='ghost'
                   size='sm'
                   className='absolute top-2 right-2'
-                  onClick={() => removeInvite(index)}
+                  onClick={() => removeInvite(invite.id)}
+                  aria-label={t('removeInviteAria')}
                 >
                   <X className='h-4 w-4' />
                 </Button>
@@ -117,38 +101,38 @@ export function InviteTeamStep({
 
               <div className='grid gap-3 md:grid-cols-2'>
                 <div className='space-y-2'>
-                  <Label htmlFor={`email-${index}`}>
+                  <Label htmlFor={`email-${invite.id}`}>
                     {t('emailLabel')}{' '}
                     <span className='text-red-500'>{t('required')}</span>
                   </Label>
                   <div className='relative'>
                     <Mail className='absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform text-gray-400' />
                     <Input
-                      id={`email-${index}`}
+                      id={`email-${invite.id}`}
                       type='email'
                       placeholder={t('emailPlaceholder')}
                       value={invite.email}
                       onChange={(e) =>
-                        updateInvite(index, 'email', e.target.value)
+                        updateInvite(invite.id, 'email', e.target.value)
                       }
                       className='pl-10'
-                      required={index === 0}
+                      required={invite.id === invites[0]?.id}
                     />
                   </div>
                 </div>
 
                 <div className='space-y-2'>
-                  <Label htmlFor={`role-${index}`}>
+                  <Label htmlFor={`role-${invite.id}`}>
                     {t('roleLabel')}{' '}
                     <span className='text-red-500'>{t('required')}</span>
                   </Label>
                   <Select
                     value={invite.role}
                     onValueChange={(value) =>
-                      updateInvite(index, 'role', value)
+                      updateInvite(invite.id, 'role', value)
                     }
                   >
-                    <SelectTrigger>
+                    <SelectTrigger id={`role-${invite.id}`}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -199,11 +183,11 @@ export function InviteTeamStep({
       </CardContent>
 
       <CardFooter className='flex justify-between'>
-        <Button type='button' variant='outline' onClick={onBack}>
+        <Button type='button' variant='outline' onClick={() => onBack?.()}>
           {t('back')}
         </Button>
         <div className='flex gap-2'>
-          <Button type='button' variant='ghost' onClick={onSkip}>
+          <Button type='button' variant='ghost' onClick={() => onSkip?.()}>
             {t('skip')}
           </Button>
           <Button type='submit'>{t('continue')}</Button>

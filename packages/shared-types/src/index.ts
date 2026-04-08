@@ -311,7 +311,11 @@ export const SubscriptionPlanSchema = z.object({
   id: z.string(),
   name: z.string(),
   code: z.string(),
-  price: z.number(),
+  price: z
+    .number()
+    .describe(
+      'Amount in minor currency units (e.g. cents for USD), matching Stripe amounts.'
+    ),
   currency: z.string(),
   interval: z.enum(['month', 'year']),
   features: z.record(z.string(), z.boolean()).optional(),

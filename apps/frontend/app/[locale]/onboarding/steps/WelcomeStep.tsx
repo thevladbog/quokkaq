@@ -15,12 +15,9 @@ import {
   Settings
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import type { OnboardingWizardStepProps } from '../types';
 
-interface WelcomeStepProps {
-  onNext: () => void;
-}
-
-export function WelcomeStep({ onNext }: WelcomeStepProps) {
+export function WelcomeStep({ onNext }: OnboardingWizardStepProps) {
   const t = useTranslations('onboarding.welcome');
 
   return (

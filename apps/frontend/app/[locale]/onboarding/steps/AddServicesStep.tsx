@@ -13,36 +13,14 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Plus, X, Briefcase } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-
-interface OnboardingState {
-  unit?: {
-    name: string;
-    code: string;
-    timezone: string;
-  } | null;
-  services?: Array<{
-    name: string;
-    description: string;
-  }>;
-  invites?: Array<{
-    email: string;
-    role: string;
-  }>;
-}
-
-interface AddServicesStepProps {
-  state: OnboardingState;
-  onNext: (data: Partial<OnboardingState>) => void;
-  onBack: () => void;
-  onSkip: () => void;
-}
+import type { OnboardingWizardStepProps } from '../types';
 
 export function AddServicesStep({
   state,
   onNext,
   onBack,
   onSkip
-}: AddServicesStepProps) {
+}: OnboardingWizardStepProps) {
   const t = useTranslations('onboarding.services');
 
   const [services, setServices] = useState(
@@ -162,11 +140,11 @@ export function AddServicesStep({
       </CardContent>
 
       <CardFooter className='flex justify-between'>
-        <Button type='button' variant='outline' onClick={onBack}>
+        <Button type='button' variant='outline' onClick={() => onBack?.()}>
           {t('back')}
         </Button>
         <div className='flex gap-2'>
-          <Button type='button' variant='ghost' onClick={onSkip}>
+          <Button type='button' variant='ghost' onClick={() => onSkip?.()}>
             {t('skip')}
           </Button>
           <Button type='submit'>{t('continue')}</Button>

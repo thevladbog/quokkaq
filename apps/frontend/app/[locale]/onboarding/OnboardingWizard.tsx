@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/src/i18n/navigation';
 import { useMutation } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { WelcomeStep } from './steps/WelcomeStep';
@@ -12,22 +13,7 @@ import { InviteTeamStep } from './steps/InviteTeamStep';
 import { CompleteStep } from './steps/CompleteStep';
 import { useTranslations } from 'next-intl';
 import { companiesApiExt } from '@/lib/api';
-
-type OnboardingState = {
-  unit: {
-    name: string;
-    code: string;
-    timezone: string;
-  } | null;
-  services: Array<{
-    name: string;
-    description: string;
-  }>;
-  invites: Array<{
-    email: string;
-    role: string;
-  }>;
-};
+import type { OnboardingState } from './types';
 
 export function OnboardingWizard() {
   const router = useRouter();
@@ -43,6 +29,9 @@ export function OnboardingWizard() {
     mutationFn: () => companiesApiExt.completeOnboarding(),
     onSuccess: () => {
       router.push('/admin');
+    },
+    onError: () => {
+      toast.error(t('complete.completeError'));
     }
   });
 
@@ -79,6 +68,7 @@ export function OnboardingWizard() {
   };
 
   const handleComplete = () => {
+    if (completeMutation.isPending) return;
     completeMutation.mutate();
   };
 
@@ -103,6 +93,11 @@ export function OnboardingWizard() {
           onBack={handleBack}
           onSkip={handleSkip}
           onComplete={handleComplete}
+          isPending={
+            currentStepData.id === 'complete'
+              ? completeMutation.isPending
+              : undefined
+          }
         />
       </Card>
     </div>

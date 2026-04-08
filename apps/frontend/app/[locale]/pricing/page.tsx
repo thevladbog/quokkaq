@@ -118,6 +118,7 @@ const legacyPlans: LegacyPricingPlan[] = [
   }
 ];
 
+/** API plan amounts use `SubscriptionPlanSchema.price` (minor units); see `@quokkaq/shared-types`. */
 function minorUnitDivisor(currency: string, intlLocale: string): number {
   try {
     const digits =

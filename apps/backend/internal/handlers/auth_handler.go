@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/services"
@@ -35,10 +36,10 @@ type ResetPasswordRequest struct {
 }
 
 type SignupRequest struct {
-	Name        string `json:"name"`
-	Email       string `json:"email"`
-	Password    string `json:"password"`
-	CompanyName string `json:"companyName"`
+	Name        string `json:"name" binding:"required"`
+	Email       string `json:"email" binding:"required"`
+	Password    string `json:"password" binding:"required"`
+	CompanyName string `json:"companyName" binding:"required"`
 	PlanCode    string `json:"planCode"` // optional, defaults to starter with trial
 }
 
@@ -173,6 +174,7 @@ func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 // @Success      201  {object}  LoginResponse "Created"
 // @Failure      400  {string}  string "Bad Request"
 // @Failure      409  {string}  string "Email already exists"
+// @Failure      500  {string}  string "Internal Server Error"
 // @Router       /auth/signup [post]
 func (h *AuthHandler) Signup(w http.ResponseWriter, r *http.Request) {
 	var req SignupRequest
@@ -194,11 +196,12 @@ func (h *AuthHandler) Signup(w http.ResponseWriter, r *http.Request) {
 
 	token, err := h.service.Signup(req.Name, req.Email, req.Password, req.CompanyName, req.PlanCode)
 	if err != nil {
-		status := http.StatusBadRequest
 		if errors.Is(err, services.ErrEmailAlreadyExists) {
-			status = http.StatusConflict
+			http.Error(w, "An account with this email already exists", http.StatusConflict)
+			return
 		}
-		http.Error(w, err.Error(), status)
+		log.Printf("Signup: %v", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 

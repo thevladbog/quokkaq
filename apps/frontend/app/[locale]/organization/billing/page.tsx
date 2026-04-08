@@ -1,6 +1,5 @@
 import { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
-import { Suspense } from 'react';
 import { OrganizationBillingContent } from './OrganizationBillingContent';
 
 export async function generateMetadata({
@@ -29,8 +28,6 @@ export default async function OrganizationBillingPage({
     locale,
     namespace: 'organization.billing'
   });
-  const tCommon = await getTranslations({ locale, namespace: 'common' });
-
   return (
     <div className='container mx-auto px-4 py-8'>
       <div className='mb-8'>
@@ -38,9 +35,7 @@ export default async function OrganizationBillingPage({
         <p className='text-gray-600'>{t('description')}</p>
       </div>
 
-      <Suspense fallback={<div>{tCommon('loading')}</div>}>
-        <OrganizationBillingContent />
-      </Suspense>
+      <OrganizationBillingContent />
     </div>
   );
 }

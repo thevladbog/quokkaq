@@ -166,6 +166,38 @@ func (s *quotaService) GetLimit(companyID string, metric string) (int, error) {
 	return limit, nil
 }
 
+// quotaMetricKeys are the metrics exposed by GetUsageMetrics / GetCurrentUsage.
+var quotaMetricKeys = []string{"units", "users", "tickets_per_month", "services", "counters"}
+
+// limitsMapForCompany loads subscription plan limits once and merges defaults for missing keys.
+func (s *quotaService) limitsMapForCompany(companyID string) (map[string]int, error) {
+	db := database.DB
+
+	var company models.Company
+	if err := db.Preload("Subscription.Plan").Where("id = ?", companyID).First(&company).Error; err != nil {
+		return nil, err
+	}
+
+	var fromPlan map[string]int
+	if company.Subscription != nil && company.Subscription.Plan.ID != "" && len(company.Subscription.Plan.Limits) > 0 {
+		if err := json.Unmarshal(company.Subscription.Plan.Limits, &fromPlan); err != nil {
+			return nil, err
+		}
+	}
+
+	out := make(map[string]int, len(quotaMetricKeys))
+	for _, m := range quotaMetricKeys {
+		if fromPlan != nil {
+			if v, ok := fromPlan[m]; ok {
+				out[m] = v
+				continue
+			}
+		}
+		out[m] = s.getDefaultLimit(m)
+	}
+	return out, nil
+}
+
 // getDefaultLimit returns default limits for free/no-subscription users
 func (s *quotaService) getDefaultLimit(metric string) int {
 	defaults := map[string]int{
@@ -206,23 +238,21 @@ func (s *quotaService) GetUsageMetrics(companyID string) (*UsageMetrics, error) 
 	billingMonth := time.Date(nowUTC.Year(), nowUTC.Month(), 1, 0, 0, 0, 0, time.UTC)
 	nextMonth := billingMonth.AddDate(0, 1, 0)
 
-	metrics := []string{"units", "users", "tickets_per_month", "services", "counters"}
+	limits, err := s.limitsMapForCompany(companyID)
+	if err != nil {
+		return nil, err
+	}
+
 	usageMap := make(map[string]UsageMetricInfo)
-
-	for _, metric := range metrics {
+	for _, metric := range quotaMetricKeys {
 		current, err := s.GetCurrentUsage(companyID, metric)
-		if err != nil {
-			return nil, err
-		}
-
-		limit, err := s.GetLimit(companyID, metric)
 		if err != nil {
 			return nil, err
 		}
 
 		usageMap[metric] = UsageMetricInfo{
 			Current: current,
-			Limit:   limit,
+			Limit:   limits[metric],
 		}
 	}
 

@@ -57,7 +57,8 @@ func (h *InvoiceHandler) GetMyInvoices(w http.ResponseWriter, r *http.Request) {
 
 	invoices, err := h.invoiceRepo.FindByCompanyID(companyID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("GetMyInvoices invoiceRepo.FindByCompanyID: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 

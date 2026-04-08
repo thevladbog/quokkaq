@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"errors"
 	"log"
 	"net/http"
 	"quokkaq-go-backend/internal/middleware"
@@ -9,7 +8,6 @@ import (
 	"quokkaq-go-backend/internal/services"
 
 	"github.com/go-chi/chi/v5"
-	"gorm.io/gorm"
 )
 
 type UsageHandler struct {
@@ -78,7 +76,7 @@ func (h *UsageHandler) GetUsageMetrics(w http.ResponseWriter, r *http.Request) {
 // @Security     BearerAuth
 // @Success      200  {object}  handlers.UsageMetricsResponse
 // @Failure      401  {string}  string "Unauthorized"
-// @Failure      404  {string}  string "User has no units or company"
+// @Failure      404  {string}  string "User has no associated company"
 // @Failure      500  {string}  string "Internal Server Error"
 // @Router       /usage-metrics/me [get]
 func (h *UsageHandler) GetMyUsageMetrics(w http.ResponseWriter, r *http.Request) {
@@ -88,20 +86,20 @@ func (h *UsageHandler) GetMyUsageMetrics(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	result, err := h.userRepo.GetFirstUserUnit(userID)
+	companyID, err := h.userRepo.GetCompanyIDByUserID(userID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			http.Error(w, "User has no associated units or company", http.StatusNotFound)
+		if repository.IsNotFound(err) {
+			http.Error(w, "User has no associated company", http.StatusNotFound)
 			return
 		}
-		log.Printf("GetMyUsageMetrics userRepo.GetFirstUserUnit: %v", err)
+		log.Printf("GetMyUsageMetrics userRepo.GetCompanyIDByUserID: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	metrics, err := h.quotaService.GetUsageMetrics(result.CompanyID)
+	metrics, err := h.quotaService.GetUsageMetrics(companyID)
 	if err != nil {
-		log.Printf("GetMyUsageMetrics quotaService.GetUsageMetrics(%q): %v", result.CompanyID, err)
+		log.Printf("GetMyUsageMetrics quotaService.GetUsageMetrics(%q): %v", companyID, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}

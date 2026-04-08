@@ -235,6 +235,12 @@ const docTemplate = `{
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 }
             }
@@ -3718,7 +3724,7 @@ const docTemplate = `{
                         }
                     },
                     "404": {
-                        "description": "User has no units or company",
+                        "description": "User has no associated company",
                         "schema": {
                             "type": "string"
                         }
@@ -4231,6 +4237,12 @@ const docTemplate = `{
         },
         "handlers.SignupRequest": {
             "type": "object",
+            "required": [
+                "companyName",
+                "email",
+                "name",
+                "password"
+            ],
             "properties": {
                 "companyName": {
                     "type": "string"

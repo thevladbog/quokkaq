@@ -1142,6 +1142,14 @@
       "codeInvalid": "Code must contain 2-6 uppercase letters or numbers",
       "codeHelp": "Unique code of 2-6 characters (letters and numbers)",
       "timezoneLabel": "Timezone",
+      "timezoneRequired": "Select a timezone",
+      "timezone": {
+        "moscow": "Moscow (UTC+3)",
+        "samara": "Samara (UTC+4)",
+        "yekaterinburg": "Yekaterinburg (UTC+5)",
+        "novosibirsk": "Novosibirsk (UTC+7)",
+        "vladivostok": "Vladivostok (UTC+10)"
+      },
       "timezoneHelp": "Used for scheduling and reports",
       "tip": "Hint",
       "tipDesc": "You can add more units later in the admin panel.",
@@ -1184,7 +1192,8 @@
       "back": "Back",
       "skip": "Skip",
       "continue": "Continue",
-      "required": "*"
+      "required": "*",
+      "removeInviteAria": "Remove invite row"
     },
     "complete": {
       "title": "Setup Complete!",
@@ -1205,7 +1214,8 @@
       },
       "trialActive": "Trial period active!",
       "trialDesc": "You have 14 days of full access to all features. Add a payment method anytime to continue after the trial period.",
-      "goToDashboard": "Go to Dashboard"
+      "goToDashboard": "Go to Dashboard",
+      "completeError": "Could not finish setup. Please try again."
     }
   },
   "billing": {

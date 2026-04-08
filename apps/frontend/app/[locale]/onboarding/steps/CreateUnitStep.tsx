@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { z } from 'zod';
 import {
   CardContent,
   CardFooter,
@@ -19,30 +20,37 @@ import {
 } from '@/components/ui/select';
 import { Building2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import type { OnboardingWizardStepProps } from '../types';
 
-interface OnboardingState {
-  unit?: {
-    name: string;
-    code: string;
-    timezone: string;
-  } | null;
-  services?: Array<{
-    name: string;
-    description: string;
-  }>;
-  invites?: Array<{
-    email: string;
-    role: string;
-  }>;
-}
+const TIMEZONES = [
+  { value: 'Europe/Moscow', labelKey: 'moscow' },
+  { value: 'Europe/Samara', labelKey: 'samara' },
+  { value: 'Asia/Yekaterinburg', labelKey: 'yekaterinburg' },
+  { value: 'Asia/Novosibirsk', labelKey: 'novosibirsk' },
+  { value: 'Asia/Vladivostok', labelKey: 'vladivostok' }
+] as const;
 
-interface CreateUnitStepProps {
-  state: OnboardingState;
-  onNext: (data: Partial<OnboardingState>) => void;
-  onBack: () => void;
-}
+const TIMEZONE_VALUES = TIMEZONES.map((z) => z.value);
 
-export function CreateUnitStep({ state, onNext, onBack }: CreateUnitStepProps) {
+const unitFormSchema = z.object({
+  name: z.string().trim().min(1, { message: 'nameRequired' }),
+  code: z
+    .string()
+    .trim()
+    .min(1, { message: 'codeRequired' })
+    .regex(/^[A-Z0-9]{2,6}$/, { message: 'codeInvalid' }),
+  timezone: z
+    .string()
+    .refine((v) => TIMEZONE_VALUES.includes(v), {
+      message: 'timezoneRequired'
+    })
+});
+
+export function CreateUnitStep({
+  state,
+  onNext,
+  onBack
+}: OnboardingWizardStepProps) {
   const t = useTranslations('onboarding.unit');
 
   const [formData, setFormData] = useState({
@@ -53,35 +61,36 @@ export function CreateUnitStep({ state, onNext, onBack }: CreateUnitStepProps) {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const timezones = [
-    { value: 'Europe/Moscow', label: 'Москва (UTC+3)' },
-    { value: 'Europe/Samara', label: 'Самара (UTC+4)' },
-    { value: 'Asia/Yekaterinburg', label: 'Екатеринбург (UTC+5)' },
-    { value: 'Asia/Novosibirsk', label: 'Новосибирск (UTC+7)' },
-    { value: 'Asia/Vladivostok', label: 'Владивосток (UTC+10)' }
-  ];
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    const newErrors: Record<string, string> = {};
-
-    if (!formData.name.trim()) {
-      newErrors.name = t('nameRequired');
-    }
-
-    if (!formData.code.trim()) {
-      newErrors.code = t('codeRequired');
-    } else if (!/^[A-Z0-9]{2,6}$/.test(formData.code)) {
-      newErrors.code = t('codeInvalid');
-    }
-
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
+    const parsed = unitFormSchema.safeParse(formData);
+    if (!parsed.success) {
+      const next: Record<string, string> = {};
+      for (const issue of parsed.error.issues) {
+        const key = String(issue.path[0] ?? '');
+        const msgKey = issue.message;
+        if (key === 'name' && msgKey === 'nameRequired') {
+          next.name = t('nameRequired');
+        } else if (key === 'code') {
+          if (msgKey === 'codeRequired') next.code = t('codeRequired');
+          else next.code = t('codeInvalid');
+        } else if (key === 'timezone' && msgKey === 'timezoneRequired') {
+          next.timezone = t('timezoneRequired');
+        }
+      }
+      setErrors(next);
       return;
     }
 
-    onNext({ unit: formData });
+    setErrors({});
+    onNext({
+      unit: {
+        name: parsed.data.name,
+        code: parsed.data.code,
+        timezone: parsed.data.timezone
+      }
+    });
   };
 
   return (
@@ -146,17 +155,23 @@ export function CreateUnitStep({ state, onNext, onBack }: CreateUnitStepProps) {
               setFormData((prev) => ({ ...prev, timezone: value }))
             }
           >
-            <SelectTrigger>
+            <SelectTrigger
+              id='timezone'
+              className={errors.timezone ? 'border-red-500' : ''}
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {timezones.map((tz) => (
+              {TIMEZONES.map((tz) => (
                 <SelectItem key={tz.value} value={tz.value}>
-                  {tz.label}
+                  {t(`timezone.${tz.labelKey}`)}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+          {errors.timezone && (
+            <p className='text-sm text-red-500'>{errors.timezone}</p>
+          )}
           <p className='text-xs text-gray-500'>{t('timezoneHelp')}</p>
         </div>
 
@@ -168,7 +183,7 @@ export function CreateUnitStep({ state, onNext, onBack }: CreateUnitStepProps) {
       </CardContent>
 
       <CardFooter className='flex justify-between'>
-        <Button type='button' variant='outline' onClick={onBack}>
+        <Button type='button' variant='outline' onClick={() => onBack?.()}>
           {t('back')}
         </Button>
         <Button type='submit'>{t('continue')}</Button>

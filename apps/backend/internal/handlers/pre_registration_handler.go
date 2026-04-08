@@ -193,7 +193,7 @@ func (h *PreRegistrationHandler) Validate(w http.ResponseWriter, r *http.Request
 			return
 		}
 		log.Printf("ValidateForKiosk: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 	RespondJSON(w, preReg)
@@ -232,26 +232,22 @@ func (h *PreRegistrationHandler) Redeem(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 		log.Printf("Redeem ValidateForKiosk: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
 	// 2. Create Ticket
 	ticket, err := h.ticketService.CreateTicketWithPreRegistration(preReg.UnitID, preReg.ServiceID, preReg.ID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("Redeem CreateTicketWithPreRegistration: %v", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
 	// 3. Mark as Redeemed
 	if err := h.service.MarkAsRedeemed(preReg.ID, ticket.ID); err != nil {
-		// Log error but don't fail the request as ticket is created?
-		// Or fail? If we fail, client might retry and create duplicate tickets.
-		// Ideally we should have a transaction.
-		// For now, let's log and return success with warning or just success.
-		// But if we don't mark it, it can be reused.
-		// Let's return error for now.
-		http.Error(w, "Failed to update pre-registration status", http.StatusInternalServerError)
+		log.Printf("Redeem MarkAsRedeemed: %v", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 

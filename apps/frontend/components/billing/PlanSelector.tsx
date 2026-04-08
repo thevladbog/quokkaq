@@ -173,6 +173,7 @@ export function PlanSelector({
             <CardFooter>
               {!isCurrentPlan(plan.id) ? (
                 <Button
+                  type='button'
                   onClick={() => onSelect(plan)}
                   disabled={isLoading}
                   className='w-full'
@@ -181,7 +182,12 @@ export function PlanSelector({
                   {plan.price > 0 ? t('selectPlan') : t('contactUs')}
                 </Button>
               ) : (
-                <Button variant='outline' className='w-full' disabled>
+                <Button
+                  type='button'
+                  variant='outline'
+                  className='w-full'
+                  disabled
+                >
                   {t('currentPlan')}
                 </Button>
               )}

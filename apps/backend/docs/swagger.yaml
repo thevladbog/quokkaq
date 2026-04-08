@@ -114,6 +114,11 @@ definitions:
       planCode:
         description: optional, defaults to starter with trial
         type: string
+    required:
+    - companyName
+    - email
+    - name
+    - password
     type: object
   handlers.TransferRequest:
     properties:
@@ -905,6 +910,10 @@ paths:
             type: string
         "409":
           description: Email already exists
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
           schema:
             type: string
       summary: Sign Up
@@ -3202,7 +3211,7 @@ paths:
           schema:
             type: string
         "404":
-          description: User has no units or company
+          description: User has no associated company
           schema:
             type: string
         "500":

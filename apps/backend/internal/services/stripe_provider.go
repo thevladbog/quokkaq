@@ -21,6 +21,9 @@ import (
 	"gorm.io/gorm/clause"
 )
 
+// ErrStripeCustomerNotFound is returned when a company has no Stripe customer id in settings.
+var ErrStripeCustomerNotFound = errors.New("stripe customer not found for company")
+
 type StripeProvider struct {
 	secretKey     string
 	webhookSecret string
@@ -47,13 +50,15 @@ func (p *StripeProvider) CreateCheckoutSession(ctx context.Context, subscription
 		pricePlan = &subscription.Plan
 	}
 
-	// Get or create Stripe customer
 	customerID, err := p.GetCustomerID(ctx, subscription.CompanyID)
 	if err != nil {
-		// Create customer if not exists
-		customerID, err = p.CreateCustomer(ctx, subscription.CompanyID, subscription.Company.BillingEmail, subscription.Company.Name)
-		if err != nil {
-			return "", "", fmt.Errorf("failed to create customer: %w", err)
+		if errors.Is(err, ErrStripeCustomerNotFound) {
+			customerID, err = p.CreateCustomer(ctx, subscription.CompanyID, subscription.Company.BillingEmail, subscription.Company.Name)
+			if err != nil {
+				return "", "", fmt.Errorf("failed to create customer: %w", err)
+			}
+		} else {
+			return "", "", fmt.Errorf("get stripe customer: %w", err)
 		}
 	}
 
@@ -116,6 +121,9 @@ func (p *StripeProvider) CreateInvoice(ctx context.Context, subscription *models
 
 	customerID, err := p.GetCustomerID(ctx, subscription.CompanyID)
 	if err != nil {
+		if !errors.Is(err, ErrStripeCustomerNotFound) {
+			return nil, fmt.Errorf("get stripe customer: %w", err)
+		}
 		customerID, err = p.CreateCustomer(ctx, subscription.CompanyID, subscription.Company.BillingEmail, subscription.Company.Name)
 		if err != nil {
 			return nil, fmt.Errorf("failed to ensure stripe customer: %w", err)
@@ -268,17 +276,16 @@ func (p *StripeProvider) GetCustomerID(ctx context.Context, companyID string) (s
 		return "", err
 	}
 
-	// Parse metadata to get Stripe customer ID
 	var metadata map[string]interface{}
 	if company.Settings != nil {
 		if err := json.Unmarshal(company.Settings, &metadata); err == nil {
-			if customerID, ok := metadata["stripe_customer_id"].(string); ok {
+			if customerID, ok := metadata["stripe_customer_id"].(string); ok && customerID != "" {
 				return customerID, nil
 			}
 		}
 	}
 
-	return "", fmt.Errorf("customer not found")
+	return "", ErrStripeCustomerNotFound
 }
 
 func (p *StripeProvider) CreateCustomer(ctx context.Context, companyID, email, name string) (createdID string, err error) {
@@ -383,6 +390,9 @@ func (p *StripeProvider) handleInvoicePaymentFailed(ctx context.Context, stripeI
 }
 
 func (p *StripeProvider) handleSubscriptionDeleted(ctx context.Context, stripeSubscription *stripe.Subscription) error {
+	if stripeSubscription.ID == "" {
+		return fmt.Errorf("stripe subscription id is empty")
+	}
 	companyID := stripeSubscription.Metadata["company_id"]
 	if companyID == "" {
 		return fmt.Errorf("company_id not found in metadata")
@@ -390,7 +400,7 @@ func (p *StripeProvider) handleSubscriptionDeleted(ctx context.Context, stripeSu
 
 	db := database.DB.WithContext(ctx)
 	return db.Model(&models.Subscription{}).
-		Where("company_id = ?", companyID).
+		Where("company_id = ? AND stripe_subscription_id = ?", companyID, stripeSubscription.ID).
 		Update("status", "canceled").Error
 }
 

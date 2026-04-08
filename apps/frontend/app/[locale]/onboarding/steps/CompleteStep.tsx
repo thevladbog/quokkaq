@@ -7,31 +7,15 @@ import {
   CardTitle
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, Sparkles, ArrowRight } from 'lucide-react';
+import { CheckCircle, Sparkles, ArrowRight, Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import type { OnboardingWizardStepProps } from '../types';
 
-interface OnboardingState {
-  unit?: {
-    name: string;
-    code: string;
-    timezone: string;
-  } | null;
-  services?: Array<{
-    name: string;
-    description: string;
-  }>;
-  invites?: Array<{
-    email: string;
-    role: string;
-  }>;
-}
-
-interface CompleteStepProps {
-  state: OnboardingState;
-  onComplete: () => void;
-}
-
-export function CompleteStep({ state, onComplete }: CompleteStepProps) {
+export function CompleteStep({
+  state,
+  onComplete,
+  isPending = false
+}: OnboardingWizardStepProps) {
   const t = useTranslations('onboarding.complete');
 
   const summary = {
@@ -115,9 +99,18 @@ export function CompleteStep({ state, onComplete }: CompleteStepProps) {
       </CardContent>
 
       <CardFooter className='flex justify-center'>
-        <Button onClick={onComplete} size='lg' className='px-8'>
+        <Button
+          onClick={() => onComplete?.()}
+          size='lg'
+          className='px-8'
+          disabled={isPending}
+        >
+          {isPending ? (
+            <Loader2 className='mr-2 h-5 w-5 animate-spin' aria-hidden />
+          ) : (
+            <ArrowRight className='mr-2 h-5 w-5' aria-hidden />
+          )}
           {t('goToDashboard')}
-          <ArrowRight className='ml-2 h-5 w-5' />
         </Button>
       </CardFooter>
     </>

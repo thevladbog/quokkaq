@@ -48,6 +48,20 @@ import ThemeToggle from '@/components/ThemeToggle';
 import { useTranslations } from 'next-intl';
 import { getInitials, getAvatarColor } from '@/lib/utils';
 
+function filterSubItemsByRole<T extends { roles?: string[] }>(
+  items: T[],
+  isAuthenticated: boolean,
+  user: { roles?: string[] } | null | undefined
+): T[] {
+  return items.filter(
+    (item) =>
+      !item.roles ||
+      (isAuthenticated && user?.roles?.includes('admin')) ||
+      (isAuthenticated &&
+        user?.roles?.some((role: string) => item.roles?.includes(role)))
+  );
+}
+
 const AppSidebar = () => {
   const tAdmin = useTranslations('admin');
   const tNav = useTranslations('nav');
@@ -218,20 +232,16 @@ const AppSidebar = () => {
     return hasRole || hasPermission;
   });
 
-  const filteredSettingsSubItems = settingsSubItems.filter(
-    (item) =>
-      !item.roles || // No role restriction
-      (isAuthenticated && user?.roles?.includes('admin')) || // Admin has access to everything
-      (isAuthenticated &&
-        user?.roles?.some((role: string) => item.roles?.includes(role))) // User has required role
+  const filteredSettingsSubItems = filterSubItemsByRole(
+    settingsSubItems,
+    isAuthenticated,
+    user
   );
 
-  const filteredOrganizationSubItems = organizationSubItems.filter(
-    (item) =>
-      !item.roles || // No role restriction
-      (isAuthenticated && user?.roles?.includes('admin')) || // Admin has access to everything
-      (isAuthenticated &&
-        user?.roles?.some((role: string) => item.roles?.includes(role))) // User has required role
+  const filteredOrganizationSubItems = filterSubItemsByRole(
+    organizationSubItems,
+    isAuthenticated,
+    user
   );
 
   return (
