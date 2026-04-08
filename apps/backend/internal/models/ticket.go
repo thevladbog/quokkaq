@@ -15,6 +15,7 @@ type Ticket struct {
 	Status            string     `gorm:"default:'waiting'" json:"status"`
 	Priority          int        `gorm:"default:0" json:"priority"`
 	IsEOD             bool       `gorm:"default:false" json:"isEod"`
+	TTSUrl            *string    `json:"ttsUrl,omitempty"` // URL to the generated TTS audio file
 	CreatedAt         time.Time  `gorm:"default:now()" json:"createdAt"`
 	CalledAt          *time.Time `json:"calledAt,omitempty"`
 	ConfirmedAt       *time.Time `json:"confirmedAt,omitempty"`

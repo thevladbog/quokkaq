@@ -20,7 +20,11 @@ func main() {
 
 	// Drop all tables
 	fmt.Println("Dropping existing tables...")
-	database.DB.Migrator().DropTable(
+	if err := database.DB.Migrator().DropTable(
+		&models.PasswordResetToken{},
+		&models.ServiceSlot{},
+		&models.DaySchedule{},
+		&models.PreRegistration{},
 		&models.DesktopTerminal{},
 		&models.TicketHistory{},
 		&models.Ticket{},
@@ -32,6 +36,10 @@ func main() {
 		&models.UserRole{},
 		&models.User{},
 		&models.Role{},
+		&models.UsageRecord{},
+		&models.Invoice{},
+		&models.Subscription{},
+		&models.SubscriptionPlan{},
 		&models.Unit{},
 		&models.Company{},
 		&models.Notification{},
@@ -39,12 +47,19 @@ func main() {
 		&models.UnitMaterial{},
 		&models.Invitation{},
 		&models.MessageTemplate{},
-	)
+	); err != nil {
+		fmt.Printf("Warning: Error dropping tables: %v\n", err)
+	}
 
 	// Recreate tables with auto-migration
 	fmt.Println("Creating tables...")
+
 	database.AutoMigrate(
 		&models.Company{},
+		&models.SubscriptionPlan{},
+		&models.Subscription{},
+		&models.Invoice{},
+		&models.UsageRecord{},
 		&models.Unit{},
 		&models.User{},
 		&models.Role{},
@@ -62,6 +77,10 @@ func main() {
 		&models.Invitation{},
 		&models.MessageTemplate{},
 		&models.DesktopTerminal{},
+		&models.PreRegistration{},
+		&models.ServiceSlot{},
+		&models.DaySchedule{},
+		&models.PasswordResetToken{},
 	)
 
 	// Create seed data

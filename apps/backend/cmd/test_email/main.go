@@ -42,14 +42,15 @@ func main() {
 
 	d := gomail.NewDialer(host, port, user, pass)
 
-	if secureStr == "true" {
+	switch secureStr {
+	case "true":
 		d.SSL = true
 		fmt.Println("Configuring for Implicit SSL/TLS (usually port 465)")
-	} else if secureStr == "false" {
+	case "false":
 		d.SSL = false
 		d.TLSConfig = &tls.Config{InsecureSkipVerify: true}
 		fmt.Println("Configuring for STARTTLS (usually port 587) with InsecureSkipVerify")
-	} else {
+	default:
 		fmt.Println("SMTP_SECURE not set or invalid, using default (STARTTLS if supported)")
 	}
 

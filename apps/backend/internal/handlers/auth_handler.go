@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
+	"log"
 	"net/http"
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/services"
@@ -33,6 +35,14 @@ type ResetPasswordRequest struct {
 	NewPassword string `json:"newPassword"`
 }
 
+type SignupRequest struct {
+	Name        string `json:"name" binding:"required"`
+	Email       string `json:"email" binding:"required"`
+	Password    string `json:"password" binding:"required"`
+	CompanyName string `json:"companyName" binding:"required"`
+	PlanCode    string `json:"planCode"` // optional, defaults to starter with trial
+}
+
 // Login godoc
 // @Summary      User Login
 // @Description  Authenticates a user and returns a JWT token
@@ -57,7 +67,9 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(LoginResponse{Token: token})
+	if err := json.NewEncoder(w).Encode(LoginResponse{Token: token}); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
 }
 
 // GetMe godoc
@@ -85,7 +97,9 @@ func (h *AuthHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 
 	// Map to DTO for proper frontend format
 	response := MapUserToResponse(user)
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
 }
 
 // RequestPasswordReset godoc
@@ -105,14 +119,13 @@ func (h *AuthHandler) RequestPasswordReset(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if err := h.service.RequestPasswordReset(req.Email); err != nil {
-		// Log error but return success to avoid user enumeration
-		// Or return generic error
-		// For now, let's return success
-	}
+	// Intentionally ignore error to avoid user enumeration
+	_ = h.service.RequestPasswordReset(req.Email)
 
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "If an account with that email exists, we sent you a reset link"})
+	if err := json.NewEncoder(w).Encode(map[string]string{"message": "If an account with that email exists, we sent you a reset link"}); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
 }
 
 // ResetPassword godoc
@@ -146,5 +159,54 @@ func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Password reset successfully"})
+	if err := json.NewEncoder(w).Encode(map[string]string{"message": "Password reset successfully"}); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
+}
+
+// Signup godoc
+// @Summary      Sign Up
+// @Description  Register a new user and organization with trial subscription
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        request body SignupRequest true "Signup Information"
+// @Success      201  {object}  LoginResponse "Created"
+// @Failure      400  {string}  string "Bad Request"
+// @Failure      409  {string}  string "Email already exists"
+// @Failure      500  {string}  string "Internal Server Error"
+// @Router       /auth/signup [post]
+func (h *AuthHandler) Signup(w http.ResponseWriter, r *http.Request) {
+	var req SignupRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Validate required fields
+	if req.Name == "" || req.Email == "" || req.Password == "" || req.CompanyName == "" {
+		http.Error(w, "Missing required fields", http.StatusBadRequest)
+		return
+	}
+
+	// Default to starter plan if not specified
+	if req.PlanCode == "" {
+		req.PlanCode = "starter"
+	}
+
+	token, err := h.service.Signup(req.Name, req.Email, req.Password, req.CompanyName, req.PlanCode)
+	if err != nil {
+		if errors.Is(err, services.ErrEmailAlreadyExists) {
+			http.Error(w, "An account with this email already exists", http.StatusConflict)
+			return
+		}
+		log.Printf("Signup: %v", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	if err := json.NewEncoder(w).Encode(LoginResponse{Token: token}); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
 }

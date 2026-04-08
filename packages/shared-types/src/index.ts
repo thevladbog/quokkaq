@@ -302,3 +302,110 @@ export type CallNextRequest = {
   strategy?: 'fifo' | 'by_service';
   serviceId?: string;
 };
+
+// ==========================
+// SaaS Types (Subscription & Billing)
+// ==========================
+
+export const SubscriptionPlanSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  code: z.string(),
+  price: z
+    .number()
+    .describe(
+      'Amount in minor currency units (e.g. cents for USD), matching Stripe amounts.'
+    ),
+  currency: z.string(),
+  interval: z.enum(['month', 'year']),
+  features: z.record(z.string(), z.boolean()).optional(),
+  limits: z.record(z.string(), z.number()).optional(),
+  isActive: z.boolean(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional()
+});
+
+export const SubscriptionSchema = z.object({
+  id: z.string(),
+  companyId: z.string(),
+  planId: z.string(),
+  status: z.enum(['trial', 'active', 'past_due', 'canceled', 'paused']),
+  currentPeriodStart: z.string(),
+  currentPeriodEnd: z.string(),
+  cancelAtPeriodEnd: z.boolean(),
+  trialEnd: z.string().nullable().optional(),
+  stripeSubscriptionId: z.string().optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+  plan: SubscriptionPlanSchema.optional()
+});
+
+export const CompanySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  ownerUserId: z.string().optional(),
+  subscriptionId: z.string().nullable().optional(),
+  billingEmail: z.string().email().optional(),
+  billingAddress: z.record(z.string(), z.any()).optional(),
+  settings: z.record(z.string(), z.any()).optional(),
+  onboardingState: z.record(z.string(), z.any()).optional(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+  subscription: SubscriptionSchema.optional(),
+  units: z.array(UnitModelSchema).optional()
+});
+
+export const InvoiceSchema = z.object({
+  id: z.string(),
+  companyId: z.string().nullable().optional(),
+  subscriptionId: z.string(),
+  amount: z.number(),
+  currency: z.string(),
+  status: z.enum(['draft', 'open', 'paid', 'void', 'uncollectible']),
+  paymentProvider: z.string().optional(),
+  paymentProviderInvoiceId: z.string().optional(),
+  paidAt: z.string().nullable().optional(),
+  dueDate: z.string(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional()
+});
+
+export const UsageMetricSchema = z.object({
+  current: z.number(),
+  limit: z.number()
+});
+
+export const UsageMetricsSchema = z.object({
+  currentPeriod: z.object({
+    start: z.string(),
+    end: z.string()
+  }),
+  metrics: z.object({
+    units: UsageMetricSchema.optional(),
+    users: UsageMetricSchema.optional(),
+    tickets_per_month: UsageMetricSchema.optional(),
+    services: UsageMetricSchema.optional(),
+    counters: UsageMetricSchema.optional()
+  }).catchall(UsageMetricSchema) // Allow any other metric keys
+});
+
+export type SubscriptionPlan = z.infer<typeof SubscriptionPlanSchema>;
+export type Subscription = z.infer<typeof SubscriptionSchema>;
+export type Company = z.infer<typeof CompanySchema>;
+export type Invoice = z.infer<typeof InvoiceSchema>;
+export type UsageMetric = z.infer<typeof UsageMetricSchema>;
+export type UsageMetrics = z.infer<typeof UsageMetricsSchema>;
+
+// Signup Request
+export type SignupRequest = {
+  name: string;
+  email: string;
+  password: string;
+  companyName: string;
+  planCode?: string;
+};
+
+export type SignupResponse = {
+  accessToken: string;
+};

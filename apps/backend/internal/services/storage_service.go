@@ -44,20 +44,11 @@ func NewStorageService() StorageService {
 
 	// Custom endpoint resolver for MinIO or other S3 compatible services
 	if endpoint != "" {
-		customResolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
-			return aws.Endpoint{
-				PartitionID:   "aws",
-				URL:           endpoint,
-				SigningRegion: region,
-			}, nil
-		})
-
 		accessKey := os.Getenv("AWS_ACCESS_KEY_ID")
 		secretKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
 
 		cfg, err = config.LoadDefaultConfig(context.Background(),
 			config.WithRegion(region),
-			config.WithEndpointResolverWithOptions(customResolver),
 			config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKey, secretKey, "")),
 		)
 		if err != nil {
@@ -68,6 +59,7 @@ func NewStorageService() StorageService {
 
 	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
 		if endpoint != "" {
+			o.BaseEndpoint = &endpoint
 			o.UsePathStyle = true // Required for MinIO
 		}
 	})

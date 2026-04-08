@@ -18,6 +18,7 @@ type CounterRepository interface {
 	// Shift related
 	CountActive(unitID string) (int64, error)
 	ReleaseAll(unitID string) (int64, error)
+	ReleaseAllTx(tx *gorm.DB, unitID string) (int64, error)
 }
 
 type counterRepository struct {
@@ -73,7 +74,11 @@ func (r *counterRepository) CountActive(unitID string) (int64, error) {
 }
 
 func (r *counterRepository) ReleaseAll(unitID string) (int64, error) {
-	result := r.db.Model(&models.Counter{}).
+	return r.ReleaseAllTx(r.db, unitID)
+}
+
+func (r *counterRepository) ReleaseAllTx(tx *gorm.DB, unitID string) (int64, error) {
+	result := tx.Model(&models.Counter{}).
 		Where("unit_id = ?", unitID).
 		Update("assigned_to", nil)
 	return result.RowsAffected, result.Error

@@ -1,0 +1,424 @@
+import { Metadata } from 'next';
+import { getTranslations } from 'next-intl/server';
+import Link from 'next/link';
+import { Check } from 'lucide-react';
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle
+} from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { fetchPublicSubscriptionPlans } from '@/lib/subscription-plans-public';
+import { buildPricingRowsFromApiPlan } from '@/lib/pricing-plan-rows';
+import type { SubscriptionPlan } from '@quokkaq/shared-types';
+
+export async function generateMetadata({
+  params
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: 'pricing' });
+  return {
+    title: t('title'),
+    description: t('description')
+  };
+}
+
+type LegacyPricingPlan = {
+  code: string;
+  name: string;
+  price: number | null;
+  currency: string;
+  interval: 'month' | 'year';
+  popular?: boolean;
+  features: string[];
+  featureValues?: Record<string, number>;
+};
+
+const legacyPlans: LegacyPricingPlan[] = [
+  {
+    code: 'starter',
+    name: 'Starter',
+    price: 2900,
+    currency: 'RUB',
+    interval: 'month',
+    features: [
+      'features.units',
+      'features.users',
+      'features.tickets',
+      'features.services',
+      'features.counters',
+      'features.realtimeUpdates',
+      'features.basicReports',
+      'features.emailSupport'
+    ],
+    featureValues: {
+      units: 1,
+      users: 5,
+      tickets: 1000,
+      services: 10,
+      counters: 5
+    }
+  },
+  {
+    code: 'professional',
+    name: 'Professional',
+    price: 9900,
+    currency: 'RUB',
+    interval: 'month',
+    popular: true,
+    features: [
+      'features.units',
+      'features.users',
+      'features.tickets',
+      'features.services',
+      'features.counters',
+      'features.realtimeUpdates',
+      'features.advancedReports',
+      'features.emailSupport',
+      'features.phoneSupport',
+      'features.apiAccess',
+      'features.customBranding',
+      'features.prioritySupport'
+    ],
+    featureValues: {
+      units: 5,
+      users: 20,
+      tickets: 10000,
+      services: 50,
+      counters: 25
+    }
+  },
+  {
+    code: 'enterprise',
+    name: 'Enterprise',
+    price: null,
+    currency: 'RUB',
+    interval: 'month',
+    features: [
+      'features.unlimitedUnits',
+      'features.unlimitedUsers',
+      'features.unlimitedTickets',
+      'features.unlimitedServices',
+      'features.unlimitedCounters',
+      'features.realtimeUpdates',
+      'features.advancedReports',
+      'features.emailSupport',
+      'features.phoneSupport',
+      'features.apiAccess',
+      'features.whiteLabel',
+      'features.dedicatedSupport',
+      'features.slaGuarantee',
+      'features.customIntegrations',
+      'features.teamTraining'
+    ]
+  }
+];
+
+/** API plan amounts use `SubscriptionPlanSchema.price` (minor units); see `@quokkaq/shared-types`. */
+function minorUnitDivisor(currency: string, intlLocale: string): number {
+  try {
+    const digits =
+      new Intl.NumberFormat(intlLocale, {
+        style: 'currency',
+        currency
+      }).resolvedOptions().maximumFractionDigits ?? 2;
+    return 10 ** Math.min(Math.max(digits, 0), 8);
+  } catch {
+    return 100;
+  }
+}
+
+function formatApiPrice(
+  amountMinor: number,
+  currency: string,
+  intlLocale: string
+): string {
+  const divisor = minorUnitDivisor(currency, intlLocale);
+  try {
+    return new Intl.NumberFormat(intlLocale, {
+      style: 'currency',
+      currency
+    }).format(amountMinor / divisor);
+  } catch {
+    return `${(amountMinor / divisor).toFixed(2)} ${currency}`;
+  }
+}
+
+export default async function PricingPage({
+  params
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: 'pricing' });
+  const intlLocale = locale.startsWith('ru') ? 'ru-RU' : 'en-US';
+
+  const apiPlans = await fetchPublicSubscriptionPlans();
+  const plansFromApi = apiPlans ?? [];
+
+  return (
+    <div className='min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 px-4 py-12 sm:px-6 lg:px-8'>
+      <div className='mx-auto max-w-7xl'>
+        {/* Header */}
+        <div className='mb-16 text-center'>
+          <h1 className='mb-4 text-4xl font-bold text-gray-900'>
+            {t('pageTitle')}
+          </h1>
+          <p className='mx-auto max-w-2xl text-xl text-gray-600'>
+            {t('pageSubtitle')}
+          </p>
+        </div>
+
+        {/* Pricing Cards */}
+        <div className='mb-12 grid gap-8 md:grid-cols-3'>
+          {plansFromApi.length > 0
+            ? await Promise.all(
+                plansFromApi.map((plan) => (
+                  <PricingCardApi
+                    key={plan.id}
+                    plan={plan}
+                    locale={locale}
+                    intlLocale={intlLocale}
+                  />
+                ))
+              )
+            : await Promise.all(
+                legacyPlans.map((plan) => (
+                  <PricingCardLegacy
+                    key={plan.code}
+                    plan={plan}
+                    locale={locale}
+                    intlLocale={intlLocale}
+                  />
+                ))
+              )}
+        </div>
+
+        {/* FAQ Section */}
+        <div className='mx-auto max-w-4xl rounded-lg bg-white p-8 shadow-lg'>
+          <h2 className='mb-6 text-center text-2xl font-bold text-gray-900'>
+            {t('faq.title')}
+          </h2>
+          <div className='space-y-6'>
+            <div>
+              <h3 className='mb-2 text-lg font-semibold'>{t('faq.trial.q')}</h3>
+              <p className='text-gray-600'>{t('faq.trial.a')}</p>
+            </div>
+            <div>
+              <h3 className='mb-2 text-lg font-semibold'>
+                {t('faq.changePlan.q')}
+              </h3>
+              <p className='text-gray-600'>{t('faq.changePlan.a')}</p>
+            </div>
+            <div>
+              <h3 className='mb-2 text-lg font-semibold'>
+                {t('faq.payment.q')}
+              </h3>
+              <p className='text-gray-600'>{t('faq.payment.a')}</p>
+            </div>
+            <div>
+              <h3 className='mb-2 text-lg font-semibold'>
+                {t('faq.limits.q')}
+              </h3>
+              <p className='text-gray-600'>{t('faq.limits.a')}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* CTA Section */}
+        <div className='mt-16 text-center'>
+          <h2 className='mb-4 text-3xl font-bold text-gray-900'>
+            {t('cta.title')}
+          </h2>
+          <p className='mb-8 text-xl text-gray-600'>{t('cta.subtitle')}</p>
+          <div className='flex justify-center gap-4'>
+            <Button size='lg' asChild>
+              <Link href={`/${locale}/register`}>{t('cta.tryFree')}</Link>
+            </Button>
+            <Button size='lg' variant='outline' asChild>
+              <a href='mailto:sales@quokkaq.com'>{t('cta.contactSales')}</a>
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+async function PricingCardApi({
+  plan,
+  locale,
+  intlLocale
+}: {
+  plan: SubscriptionPlan;
+  locale: string;
+  intlLocale: string;
+}) {
+  const t = await getTranslations({ locale, namespace: 'pricing' });
+  const popular = plan.code === 'professional';
+  const rows = buildPricingRowsFromApiPlan(plan);
+  const isCustomPricing = plan.code === 'enterprise';
+  const showPaidPrice = plan.price > 0;
+  const intervalLabel = plan.interval === 'year' ? t('perYear') : t('perMonth');
+
+  return (
+    <Card
+      className={`relative ${popular ? 'border-2 border-blue-500 shadow-xl' : ''}`}
+    >
+      {popular && (
+        <div className='absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 transform'>
+          <span className='rounded-full bg-blue-500 px-4 py-1 text-sm font-semibold text-white'>
+            {t('popularChoice')}
+          </span>
+        </div>
+      )}
+
+      <CardHeader className='pt-8 pb-8 text-center'>
+        <CardTitle className='mb-2 text-2xl font-bold'>{plan.name}</CardTitle>
+        <div className='mt-6'>
+          {isCustomPricing ? (
+            <div className='text-3xl font-bold'>{t('customPricing')}</div>
+          ) : (
+            <div className='flex flex-wrap items-baseline justify-center gap-x-1'>
+              <span className='text-5xl font-extrabold'>
+                {formatApiPrice(plan.price, plan.currency, intlLocale)}
+              </span>
+              <span className='ml-2 text-gray-500'>{intervalLabel}</span>
+            </div>
+          )}
+        </div>
+      </CardHeader>
+
+      <CardContent className='space-y-4'>
+        <ul className='space-y-3'>
+          {rows.map((row) => (
+            <li key={row.rowKey} className='flex items-start'>
+              <Check className='mt-0.5 mr-3 h-5 w-5 flex-shrink-0 text-green-500' />
+              <span className='text-gray-700'>
+                {row.count !== undefined
+                  ? t(row.translationKey as Parameters<typeof t>[0], {
+                      count: row.count
+                    })
+                  : t(row.translationKey as Parameters<typeof t>[0])}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+
+      <CardFooter>
+        <Button
+          className='w-full'
+          variant={popular ? 'default' : 'outline'}
+          size='lg'
+          asChild
+        >
+          <Link
+            href={
+              isCustomPricing
+                ? `/${locale}/contact`
+                : showPaidPrice
+                  ? `/${locale}/signup?plan=${encodeURIComponent(plan.code)}`
+                  : `/${locale}/register`
+            }
+          >
+            {isCustomPricing
+              ? t('contactUs')
+              : showPaidPrice
+                ? t('startTrial')
+                : t('cta.tryFree')}
+          </Link>
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+}
+
+async function PricingCardLegacy({
+  plan,
+  locale,
+  intlLocale
+}: {
+  plan: LegacyPricingPlan;
+  locale: string;
+  intlLocale: string;
+}) {
+  const t = await getTranslations({ locale, namespace: 'pricing' });
+  return (
+    <Card
+      className={`relative ${plan.popular ? 'border-2 border-blue-500 shadow-xl' : ''}`}
+    >
+      {plan.popular && (
+        <div className='absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 transform'>
+          <span className='rounded-full bg-blue-500 px-4 py-1 text-sm font-semibold text-white'>
+            {t('popularChoice')}
+          </span>
+        </div>
+      )}
+
+      <CardHeader className='pt-8 pb-8 text-center'>
+        <CardTitle className='mb-2 text-2xl font-bold'>{plan.name}</CardTitle>
+        <div className='mt-6'>
+          {plan.price != null ? (
+            <div className='flex items-baseline justify-center'>
+              <span className='text-5xl font-extrabold'>
+                {plan.price.toLocaleString(intlLocale)}
+              </span>
+              <span className='ml-2 text-2xl font-medium text-gray-500'>₽</span>
+              <span className='ml-2 text-gray-500'>
+                {plan.interval === 'year' ? t('perYear') : t('perMonth')}
+              </span>
+            </div>
+          ) : (
+            <div className='text-3xl font-bold'>{t('customPricing')}</div>
+          )}
+        </div>
+      </CardHeader>
+
+      <CardContent className='space-y-4'>
+        <ul className='space-y-3'>
+          {plan.features.map((featureKey) => {
+            const key = featureKey.split('.').pop() || featureKey;
+            const value =
+              plan.featureValues?.[
+                key as keyof NonNullable<typeof plan.featureValues>
+              ];
+            return (
+              <li key={featureKey} className='flex items-start'>
+                <Check className='mt-0.5 mr-3 h-5 w-5 flex-shrink-0 text-green-500' />
+                <span className='text-gray-700'>
+                  {value !== undefined
+                    ? t(featureKey as Parameters<typeof t>[0], { count: value })
+                    : t(featureKey as Parameters<typeof t>[0])}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      </CardContent>
+
+      <CardFooter>
+        <Button
+          className='w-full'
+          variant={plan.popular ? 'default' : 'outline'}
+          size='lg'
+          asChild
+        >
+          <Link
+            href={
+              plan.price != null
+                ? `/${locale}/signup?plan=${encodeURIComponent(plan.code)}`
+                : `/${locale}/contact`
+            }
+          >
+            {plan.price != null ? t('startTrial') : t('contactUs')}
+          </Link>
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+}

@@ -5,8 +5,9 @@ import * as AvatarPrimitive from '@radix-ui/react-avatar';
 
 import { cn } from '@/lib/utils';
 
-interface AvatarProps
-  extends React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Root> {
+interface AvatarProps extends React.ComponentPropsWithoutRef<
+  typeof AvatarPrimitive.Root
+> {
   size?: 'sm' | 'md' | 'lg';
 }
 
@@ -39,21 +40,18 @@ function AvatarImage({
   );
 }
 
-interface AvatarFallbackProps
-  extends React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Fallback> {
+interface AvatarFallbackProps extends React.ComponentPropsWithoutRef<
+  typeof AvatarPrimitive.Fallback
+> {
   bgColor?: string;
 }
 
-function AvatarFallback({
-  className,
-  bgColor,
-  ...props
-}: AvatarFallbackProps) {
+function AvatarFallback({ className, bgColor, ...props }: AvatarFallbackProps) {
   return (
     <AvatarPrimitive.Fallback
       data-slot='avatar-fallback'
       className={cn(
-        'flex h-full w-full items-center justify-center rounded-full bg-muted text-sm font-medium text-muted-foreground',
+        'bg-muted text-muted-foreground flex h-full w-full items-center justify-center rounded-full text-sm font-medium',
         className
       )}
       style={bgColor ? { backgroundColor: bgColor } : undefined}

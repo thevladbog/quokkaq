@@ -24,3 +24,35 @@ type PreRegistration struct {
 	Service Service `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"service,omitempty"`
 	Ticket  *Ticket `gorm:"constraint:OnUpdate:CASCADE,OnDelete:SET NULL;" json:"ticket,omitempty"`
 }
+
+// PreRegistrationCreateRequest is the JSON body for creating a pre-registration (server sets id, code, status, timestamps).
+type PreRegistrationCreateRequest struct {
+	ServiceID     string `json:"serviceId"`
+	Date          string `json:"date"`
+	Time          string `json:"time"`
+	CustomerName  string `json:"customerName"`
+	CustomerPhone string `json:"customerPhone"`
+	Comment       string `json:"comment,omitempty"`
+}
+
+// PreRegistrationUpdateRequest is the JSON body for updating an existing pre-registration.
+type PreRegistrationUpdateRequest struct {
+	ServiceID     string `json:"serviceId"`
+	Date          string `json:"date"`
+	Time          string `json:"time"`
+	CustomerName  string `json:"customerName"`
+	CustomerPhone string `json:"customerPhone"`
+	Comment       string `json:"comment,omitempty"`
+}
+
+// PreRegistrationCodeRequest is the JSON body for kiosk validate and redeem endpoints.
+type PreRegistrationCodeRequest struct {
+	Code string `json:"code"`
+}
+
+// PreRegistrationRedeemResponse is returned by the redeem endpoint (HTTP 200 for both success and validation failure).
+type PreRegistrationRedeemResponse struct {
+	Success bool    `json:"success"`
+	Ticket  *Ticket `json:"ticket,omitempty"`
+	Message string  `json:"message,omitempty"`
+}

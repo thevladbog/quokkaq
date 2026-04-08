@@ -24,10 +24,11 @@ import type {
   Counter,
   DesktopTerminal,
   Material,
-  LoginCredentials,
-  LoginResponse,
   PreRegistration,
-  UnitConfig
+  UsageMetrics,
+  Subscription,
+  SubscriptionPlan,
+  Invoice
 } from '@quokkaq/shared-types';
 
 import {
@@ -38,7 +39,11 @@ import {
   BookingModelSchema,
   CounterModelSchema,
   DesktopTerminalSchema,
-  CreateDesktopTerminalResponseSchema
+  CreateDesktopTerminalResponseSchema,
+  UsageMetricsSchema,
+  SubscriptionSchema,
+  SubscriptionPlanSchema,
+  InvoiceSchema
 } from '@quokkaq/shared-types';
 
 /** Shape-only summary for logs — never includes raw API payload values. */
@@ -225,6 +230,112 @@ async function apiRequest<T>(
   }
 }
 
+/** Like apiRequest but returns the response body as a Blob (no JSON parse). */
+async function apiRequestBlob(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<Blob> {
+  let token = null;
+  let refreshToken = null;
+  let currentLocale = null;
+
+  if (typeof window !== 'undefined') {
+    token = localStorage.getItem('access_token') || null;
+    refreshToken = localStorage.getItem('refresh_token') || null;
+
+    const lsLocale = localStorage.getItem('NEXT_LOCALE');
+    const navLocale = window.navigator?.language?.split('-')[0] || 'en';
+    const inferredLocale = lsLocale || navLocale;
+    currentLocale = ['en', 'ru'].includes(inferredLocale)
+      ? inferredLocale
+      : 'en';
+  }
+
+  const url = `${API_BASE_URL}${endpoint}`;
+
+  const config: RequestInit = {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
+      ...(currentLocale && { 'Accept-Language': currentLocale }),
+      ...options.headers
+    },
+    ...options
+  };
+
+  const readBodyAsBlob = async (res: Response): Promise<Blob> => {
+    if (res.status === 204 || res.status === 205) {
+      return new Blob();
+    }
+    return res.blob();
+  };
+
+  try {
+    const response = await fetch(url, config);
+
+    if (response.status === 401 && typeof window !== 'undefined') {
+      try {
+        if (refreshToken) {
+          const refreshResponse = await fetch(`${API_BASE_URL}/auth/refresh`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${refreshToken}`
+            }
+          });
+
+          if (refreshResponse.ok) {
+            const refreshData = await refreshResponse.json();
+            localStorage.setItem('access_token', refreshData.accessToken);
+
+            const retryConfig = {
+              ...options,
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${refreshData.accessToken}`,
+                ...options.headers
+              }
+            };
+
+            const retryResponse = await fetch(url, retryConfig);
+            if (!retryResponse.ok) {
+              throw new Error(
+                `API Error: ${retryResponse.status} - ${await retryResponse.text()}`
+              );
+            }
+            return readBodyAsBlob(retryResponse);
+          }
+        }
+      } catch (refreshError) {
+        logger.error('Token refresh failed:', refreshError);
+      }
+
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+
+      try {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('auth:logout'));
+        }
+      } catch (e) {
+        logger.error('Failed to dispatch auth:logout event', e);
+      }
+
+      throw new Error(`Unauthorized: ${await response.text()}`);
+    }
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      throw new Error(`API Error: ${response.status} - ${errorData}`);
+    }
+
+    return readBodyAsBlob(response);
+  } catch (error) {
+    logger.error(`API request failed for ${url}:`, error);
+    throw error;
+  }
+}
+
 // Auth API functions
 export const authApi = {
   login: (credentials: { email: string; password: string }) =>
@@ -374,11 +485,7 @@ export const unitsApi = {
   getAll: () => apiRequest<Unit[]>('/units', {}, z.array(UnitModelSchema)),
 
   getById: (id: string) =>
-    apiRequest<Unit>(
-      `/units/${id}`,
-      { cache: 'no-store' },
-      UnitModelSchema
-    ),
+    apiRequest<Unit>(`/units/${id}`, { cache: 'no-store' }, UnitModelSchema),
 
   getServices: (unitId: string) =>
     apiRequest<Service[]>(
@@ -881,5 +988,75 @@ export const preRegistrationsApi = {
         method: 'POST',
         body: JSON.stringify({ code })
       }
+    )
+};
+
+// Company API functions
+export const companiesApi = {
+  getUsageMetrics: (companyId: string) =>
+    apiRequest<UsageMetrics>(
+      `/companies/${companyId}/usage-metrics`,
+      {},
+      UsageMetricsSchema
+    ),
+
+  getMyUsageMetrics: () =>
+    apiRequest<UsageMetrics>(`/usage-metrics/me`, {}, UsageMetricsSchema)
+};
+
+// Subscription API functions
+export const subscriptionsApi = {
+  getMySubscription: () =>
+    apiRequest<Subscription>(`/subscriptions/me`, {}, SubscriptionSchema),
+
+  getPlans: () =>
+    apiRequest<SubscriptionPlan[]>(
+      `/subscriptions/plans`,
+      {},
+      z.array(SubscriptionPlanSchema)
+    ),
+
+  createCheckout: (planCode: string) =>
+    apiRequest<{ checkoutUrl: string; sessionId: string }>(
+      `/subscriptions/checkout`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planCode })
+      },
+      z.object({
+        checkoutUrl: z.string(),
+        sessionId: z.string()
+      })
+    ),
+
+  cancelSubscription: (subscriptionId: string) =>
+    apiRequest<Subscription>(
+      `/subscriptions/${subscriptionId}/cancel`,
+      {
+        method: 'POST'
+      },
+      SubscriptionSchema
+    )
+};
+
+// Invoice API functions
+export const invoicesApi = {
+  getMyInvoices: () =>
+    apiRequest<Invoice[]>(`/invoices/me`, {}, z.array(InvoiceSchema)),
+
+  downloadInvoice: (invoiceId: string) =>
+    apiRequestBlob(`/invoices/${invoiceId}/download`)
+};
+
+// Company API functions
+export const companiesApiExt = {
+  completeOnboarding: () =>
+    apiRequest<{ success: boolean }>(
+      `/companies/me/complete-onboarding`,
+      {
+        method: 'POST'
+      },
+      z.object({ success: z.boolean() })
     )
 };

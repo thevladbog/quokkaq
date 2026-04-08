@@ -9,6 +9,16 @@ import (
 	"quokkaq-go-backend/internal/repository"
 	"strings"
 	"time"
+
+	"gorm.io/gorm"
+)
+
+// Pre-registration validation errors returned to HTTP layer (kiosk validate / redeem).
+var (
+	ErrPreRegistrationNotFound = errors.New("pre-registration not found")
+	ErrPreRegistrationConsumed = errors.New("pre-registration already used or canceled")
+	ErrPreRegistrationTooEarly = errors.New("too early to redeem ticket")
+	ErrPreRegistrationTooLate  = errors.New("too late to redeem ticket")
 )
 
 type PreRegistrationService struct {
@@ -65,10 +75,11 @@ func (s *PreRegistrationService) generateUniqueCode(date string) (string, error)
 
 		// Check uniqueness for the date
 		_, err = s.repo.GetByCodeAndDate(code, date)
-		if err != nil {
-			// If error is "record not found", then code is unique
-			// GORM returns error on First if not found
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return code, nil
+		}
+		if err != nil {
+			return "", err
 		}
 	}
 	return "", errors.New("failed to generate unique code")
@@ -78,11 +89,14 @@ func (s *PreRegistrationService) ValidateForKiosk(code string) (*models.PreRegis
 	today := time.Now().Format("2006-01-02")
 	preReg, err := s.repo.GetByCodeAndDate(code, today)
 	if err != nil {
-		return nil, errors.New("pre-registration not found")
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrPreRegistrationNotFound
+		}
+		return nil, err
 	}
 
 	if preReg.Status != "created" {
-		return nil, errors.New("pre-registration already used or canceled")
+		return nil, ErrPreRegistrationConsumed
 	}
 
 	// Validate time window: -30m to +5m
@@ -104,10 +118,10 @@ func (s *PreRegistrationService) ValidateForKiosk(code string) (*models.PreRegis
 	// So: -30m <= diff <= 5m
 
 	if diff < -30*time.Minute {
-		return nil, errors.New("too early to redeem ticket")
+		return nil, ErrPreRegistrationTooEarly
 	}
 	if diff > 5*time.Minute {
-		return nil, errors.New("too late to redeem ticket")
+		return nil, ErrPreRegistrationTooLate
 	}
 
 	return preReg, nil

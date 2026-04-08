@@ -47,7 +47,9 @@ func main() {
 			client, err = smtp.NewClient(conn, host)
 			if err != nil {
 				fmt.Printf("❌ SMTP Handshake failed: %v\n", err)
-				conn.Close()
+				if closeErr := conn.Close(); closeErr != nil {
+					fmt.Printf("   Warning: Failed to close connection: %v\n", closeErr)
+				}
 				client = nil
 			}
 		}
@@ -91,7 +93,11 @@ func main() {
 		client = c
 	}
 
-	defer client.Quit()
+	defer func() {
+		if err := client.Quit(); err != nil {
+			fmt.Printf("Warning: Failed to quit SMTP client: %v\n", err)
+		}
+	}()
 	fmt.Println("✅ SMTP Handshake successful!")
 
 	// 3. Authenticate

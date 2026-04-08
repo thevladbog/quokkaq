@@ -46,7 +46,7 @@ func (h *CounterHandler) CreateCounter(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(counter)
+	RespondJSON(w, counter)
 }
 
 // GetCountersByUnit godoc
@@ -65,7 +65,7 @@ func (h *CounterHandler) GetCountersByUnit(w http.ResponseWriter, r *http.Reques
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(counters)
+	RespondJSON(w, counters)
 }
 
 // GetCounterByID godoc
@@ -84,7 +84,7 @@ func (h *CounterHandler) GetCounterByID(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Counter not found", http.StatusNotFound)
 		return
 	}
-	json.NewEncoder(w).Encode(counter)
+	RespondJSON(w, counter)
 }
 
 // UpdateCounter godoc
@@ -113,7 +113,7 @@ func (h *CounterHandler) UpdateCounter(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(counter)
+	RespondJSON(w, counter)
 }
 
 // DeleteCounter godoc
@@ -156,7 +156,7 @@ func (h *CounterHandler) Occupy(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	json.NewEncoder(w).Encode(counter)
+	RespondJSON(w, counter)
 }
 
 // Release godoc
@@ -176,7 +176,7 @@ func (h *CounterHandler) Release(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(counter)
+	RespondJSON(w, counter)
 }
 
 // ForceRelease godoc
@@ -201,7 +201,7 @@ func (h *CounterHandler) ForceRelease(w http.ResponseWriter, r *http.Request) {
 		"counter":         counter,
 		"completedTicket": ticket,
 	}
-	json.NewEncoder(w).Encode(response)
+	RespondJSON(w, response)
 }
 
 // CallNext godoc
@@ -234,5 +234,5 @@ func (h *CounterHandler) CallNext(w http.ResponseWriter, r *http.Request) {
 		"ok":     true,
 		"ticket": ticket,
 	}
-	json.NewEncoder(w).Encode(response)
+	RespondJSON(w, response)
 }

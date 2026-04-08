@@ -1,11 +1,12 @@
 package handlers
 
 import (
-	"encoding/json"
+	"io"
 	"net/http"
 	"path/filepath"
-	"quokkaq-go-backend/internal/services"
 	"strings"
+
+	"quokkaq-go-backend/internal/services"
 )
 
 type UploadHandler struct {
@@ -20,14 +21,17 @@ func NewUploadHandler(storageService services.StorageService) *UploadHandler {
 
 func (h *UploadHandler) UploadLogo(w http.ResponseWriter, r *http.Request) {
 	// Limit upload size to 5MB
-	r.ParseMultipartForm(5 << 20)
+	if err := r.ParseMultipartForm(5 << 20); err != nil {
+		http.Error(w, "Failed to parse form", http.StatusBadRequest)
+		return
+	}
 
 	file, header, err := r.FormFile("file")
 	if err != nil {
 		http.Error(w, "Invalid file", http.StatusBadRequest)
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// Validate file type
 	ext := strings.ToLower(filepath.Ext(header.Filename))
@@ -36,11 +40,13 @@ func (h *UploadHandler) UploadLogo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Read file content
-	fileBytes := make([]byte, header.Size)
-	_, err = file.Read(fileBytes)
+	fileBytes, err := io.ReadAll(file)
 	if err != nil {
 		http.Error(w, "Failed to read file", http.StatusInternalServerError)
+		return
+	}
+	if header.Size > 0 && int64(len(fileBytes)) != header.Size {
+		http.Error(w, "Uploaded file size mismatch", http.StatusBadRequest)
 		return
 	}
 
@@ -53,7 +59,7 @@ func (h *UploadHandler) UploadLogo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
+	RespondJSON(w, map[string]string{
 		"url": url,
 	})
 }

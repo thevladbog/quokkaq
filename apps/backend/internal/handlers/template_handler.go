@@ -41,7 +41,7 @@ func (h *TemplateHandler) CreateTemplate(w http.ResponseWriter, r *http.Request)
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(template)
+	RespondJSON(w, template)
 }
 
 // GetAllTemplates godoc
@@ -58,7 +58,7 @@ func (h *TemplateHandler) GetAllTemplates(w http.ResponseWriter, r *http.Request
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(templates)
+	RespondJSON(w, templates)
 }
 
 // GetTemplateByID godoc
@@ -77,7 +77,7 @@ func (h *TemplateHandler) GetTemplateByID(w http.ResponseWriter, r *http.Request
 		http.Error(w, "Template not found", http.StatusNotFound)
 		return
 	}
-	json.NewEncoder(w).Encode(template)
+	RespondJSON(w, template)
 }
 
 // UpdateTemplate godoc
@@ -106,7 +106,7 @@ func (h *TemplateHandler) UpdateTemplate(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	json.NewEncoder(w).Encode(template)
+	RespondJSON(w, template)
 }
 
 // DeleteTemplate godoc

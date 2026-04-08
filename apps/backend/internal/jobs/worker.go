@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 
+	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
 
 	"github.com/hibiken/asynq"
@@ -21,9 +22,10 @@ type jobWorker struct {
 	server     *asynq.Server
 	mux        *asynq.ServeMux
 	ttsService services.TtsService
+	ticketRepo repository.TicketRepository
 }
 
-func NewJobWorker(ttsService services.TtsService) JobWorker {
+func NewJobWorker(ttsService services.TtsService, ticketRepo repository.TicketRepository) JobWorker {
 	redisHost := os.Getenv("REDIS_HOST")
 	redisPort := os.Getenv("REDIS_PORT")
 	redisPassword := os.Getenv("REDIS_PASSWORD")
@@ -58,6 +60,7 @@ func NewJobWorker(ttsService services.TtsService) JobWorker {
 		server:     server,
 		mux:        mux,
 		ttsService: ttsService,
+		ticketRepo: ticketRepo,
 	}
 
 	mux.HandleFunc(TypeTTSGenerate, w.handleTtsGenerate)
@@ -93,7 +96,19 @@ func (w *jobWorker) handleTtsGenerate(ctx context.Context, t *asynq.Task) error 
 
 	log.Printf("TTS generated successfully: %s", url)
 
-	// TODO: Update ticket with TTS URL if needed (requires TicketService or Repository access)
+	// Update ticket with TTS URL
+	ticket, err := w.ticketRepo.FindByID(p.TicketID)
+	if err != nil {
+		log.Printf("Warning: Failed to find ticket %s to update TTS URL: %v", p.TicketID, err)
+		// Not returning error as TTS was generated successfully
+		return nil
+	}
+
+	ticket.TTSUrl = &url
+	if err := w.ticketRepo.Update(ticket); err != nil {
+		log.Printf("Warning: Failed to update ticket %s with TTS URL: %v", p.TicketID, err)
+		// Not returning error as TTS was generated successfully
+	}
 
 	return nil
 }

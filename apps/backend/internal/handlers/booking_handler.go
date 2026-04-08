@@ -61,8 +61,7 @@ func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(booking)
+	RespondJSONWithStatus(w, http.StatusCreated, booking)
 }
 
 // GetBookingsByUnit godoc
@@ -81,7 +80,7 @@ func (h *BookingHandler) GetBookingsByUnit(w http.ResponseWriter, r *http.Reques
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(bookings)
+	RespondJSON(w, bookings)
 }
 
 // GetBookingByID godoc
@@ -100,7 +99,7 @@ func (h *BookingHandler) GetBookingByID(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Booking not found", http.StatusNotFound)
 		return
 	}
-	json.NewEncoder(w).Encode(booking)
+	RespondJSON(w, booking)
 }
 
 // UpdateBooking godoc
@@ -129,7 +128,7 @@ func (h *BookingHandler) UpdateBooking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(booking)
+	RespondJSON(w, booking)
 }
 
 // DeleteBooking godoc

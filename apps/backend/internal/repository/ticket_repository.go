@@ -27,6 +27,8 @@ type TicketRepository interface {
 	UpdateStatusByUnit(unitID string, oldStatuses []string, newStatus string) (int64, error)
 	GetActiveTicketByCounter(counterID string) (*models.Ticket, error)
 	MarkAsEOD(unitID string) (int64, error)
+	MarkAsEODTx(tx *gorm.DB, unitID string) (int64, error)
+	ResetSequencesTx(tx *gorm.DB, unitID, date string) error
 }
 
 type ticketRepository struct {
@@ -127,7 +129,11 @@ func (r *ticketRepository) GetNextSequence(unitID, serviceID, date string) (int,
 }
 
 func (r *ticketRepository) ResetSequences(unitID, date string) error {
-	return r.db.Model(&models.TicketNumberSequence{}).
+	return r.ResetSequencesTx(r.db, unitID, date)
+}
+
+func (r *ticketRepository) ResetSequencesTx(tx *gorm.DB, unitID, date string) error {
+	return tx.Model(&models.TicketNumberSequence{}).
 		Where("unit_id = ? AND date = ?", unitID, date).
 		Update("last_number", 0).Error
 }
@@ -172,7 +178,11 @@ func (r *ticketRepository) GetActiveTicketByCounter(counterID string) (*models.T
 }
 
 func (r *ticketRepository) MarkAsEOD(unitID string) (int64, error) {
-	result := r.db.Model(&models.Ticket{}).
+	return r.MarkAsEODTx(r.db, unitID)
+}
+
+func (r *ticketRepository) MarkAsEODTx(tx *gorm.DB, unitID string) (int64, error) {
+	result := tx.Model(&models.Ticket{}).
 		Where("unit_id = ? AND is_eod = ?", unitID, false).
 		Update("is_eod", true)
 	return result.RowsAffected, result.Error

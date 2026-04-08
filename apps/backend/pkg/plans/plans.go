@@ -1,0 +1,145 @@
+package plans
+
+import (
+	"encoding/json"
+)
+
+// PlanDefinition represents a subscription plan configuration
+type PlanDefinition struct {
+	Name     string
+	Code     string
+	Price    int64
+	Currency string
+	Interval string
+	Limits   map[string]int
+	Features map[string]bool
+}
+
+// Plans contains all available subscription plans
+var Plans = map[string]PlanDefinition{
+	"starter": {
+		Name:     "Starter",
+		Code:     "starter",
+		Price:    290000, // 2900 руб in kopeks
+		Currency: "RUB",
+		Interval: "month",
+		Limits: map[string]int{
+			"units":              1,
+			"users":              5,
+			"tickets_per_month":  1000,
+			"services":           10,
+			"counters":           5,
+		},
+		Features: map[string]bool{
+			"websocket_updates": true,
+			"basic_reports":     true,
+			"email_support":     true,
+			"api_access":        false,
+			"white_label":       false,
+			"custom_branding":   false,
+			"priority_support":  false,
+		},
+	},
+	"professional": {
+		Name:     "Professional",
+		Code:     "professional",
+		Price:    990000, // 9900 руб in kopeks
+		Currency: "RUB",
+		Interval: "month",
+		Limits: map[string]int{
+			"units":              5,
+			"users":              20,
+			"tickets_per_month":  10000,
+			"services":           50,
+			"counters":           25,
+		},
+		Features: map[string]bool{
+			"websocket_updates": true,
+			"basic_reports":     true,
+			"advanced_reports":  true,
+			"email_support":     true,
+			"phone_support":     true,
+			"api_access":        true,
+			"white_label":       false,
+			"custom_branding":   true,
+			"priority_support":  true,
+		},
+	},
+	"enterprise": {
+		Name:     "Enterprise",
+		Code:     "enterprise",
+		Price:    0, // Custom pricing
+		Currency: "RUB",
+		Interval: "month",
+		Limits: map[string]int{
+			"units":              -1, // unlimited
+			"users":              -1,
+			"tickets_per_month":  -1,
+			"services":           -1,
+			"counters":           -1,
+		},
+		Features: map[string]bool{
+			"websocket_updates":  true,
+			"basic_reports":      true,
+			"advanced_reports":   true,
+			"email_support":      true,
+			"phone_support":      true,
+			"api_access":         true,
+			"white_label":        true,
+			"custom_branding":    true,
+			"priority_support":   true,
+			"dedicated_support":  true,
+			"sla_guarantee":      true,
+			"custom_integrations": true,
+		},
+	},
+	"grandfathered": {
+		Name:     "Grandfathered",
+		Code:     "grandfathered",
+		Price:    0, // Free for existing customers
+		Currency: "RUB",
+		Interval: "month",
+		Limits: map[string]int{
+			"units":              -1, // unlimited
+			"users":              -1,
+			"tickets_per_month":  -1,
+			"services":           -1,
+			"counters":           -1,
+		},
+		Features: map[string]bool{
+			"websocket_updates": true,
+			"basic_reports":     true,
+			"advanced_reports":  true,
+			"email_support":     true,
+			"api_access":        true,
+			"white_label":       false,
+		},
+	},
+}
+
+// GetPlan returns a plan definition by code
+func GetPlan(code string) (PlanDefinition, bool) {
+	plan, exists := Plans[code]
+	return plan, exists
+}
+
+// GetAllPublicPlans returns all plans that should be shown on pricing page
+func GetAllPublicPlans() []PlanDefinition {
+	publicPlans := []PlanDefinition{}
+	for code, plan := range Plans {
+		// Don't show grandfathered plan publicly
+		if code != "grandfathered" {
+			publicPlans = append(publicPlans, plan)
+		}
+	}
+	return publicPlans
+}
+
+// Helper functions to convert to JSON
+func (p *PlanDefinition) LimitsJSON() (json.RawMessage, error) {
+	return json.Marshal(p.Limits)
+}
+
+func (p *PlanDefinition) FeaturesJSON() (json.RawMessage, error) {
+	return json.Marshal(p.Features)
+}

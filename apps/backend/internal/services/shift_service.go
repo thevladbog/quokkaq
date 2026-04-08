@@ -1,18 +1,25 @@
 package services
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"log"
 	"math"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/ws"
+	"quokkaq-go-backend/pkg/database"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 type ShiftService interface {
 	GetDashboardStats(unitID string) (map[string]interface{}, error)
 	GetQueueTickets(unitID string) ([]models.Ticket, error)
 	GetShiftCounters(unitID string) ([]ShiftCounterDTO, error)
-	ExecuteEndOfDay(unitID string, userID *string) (map[string]interface{}, error)
+	ExecuteEndOfDay(ctx context.Context, unitID string, userID *string) (map[string]interface{}, error)
 }
 
 type ShiftCounterDTO struct {
@@ -22,16 +29,23 @@ type ShiftCounterDTO struct {
 }
 
 type shiftService struct {
-	ticketRepo  repository.TicketRepository
-	counterRepo repository.CounterRepository
-	hub         *ws.Hub
+	ticketRepo   repository.TicketRepository
+	counterRepo  repository.CounterRepository
+	auditLogRepo repository.AuditLogRepository
+	hub          *ws.Hub
 }
 
-func NewShiftService(ticketRepo repository.TicketRepository, counterRepo repository.CounterRepository, hub *ws.Hub) ShiftService {
+func NewShiftService(
+	ticketRepo repository.TicketRepository,
+	counterRepo repository.CounterRepository,
+	auditLogRepo repository.AuditLogRepository,
+	hub *ws.Hub,
+) ShiftService {
 	return &shiftService{
-		ticketRepo:  ticketRepo,
-		counterRepo: counterRepo,
-		hub:         hub,
+		ticketRepo:   ticketRepo,
+		counterRepo:  counterRepo,
+		auditLogRepo: auditLogRepo,
+		hub:          hub,
 	}
 }
 
@@ -99,27 +113,50 @@ func (s *shiftService) GetShiftCounters(unitID string) ([]ShiftCounterDTO, error
 	return dtos, nil
 }
 
-func (s *shiftService) ExecuteEndOfDay(unitID string, userID *string) (map[string]interface{}, error) {
-	// 1. Mark all tickets as EOD (preserving their actual status for statistics)
-	ticketsMarked, err := s.ticketRepo.MarkAsEOD(unitID)
-	if err != nil {
-		return nil, err
-	}
-
-	// 2. Release all counters
-	countersReleased, err := s.counterRepo.ReleaseAll(unitID)
-	if err != nil {
-		return nil, err
-	}
-
-	// 3. Reset ticket number sequences
+func (s *shiftService) ExecuteEndOfDay(ctx context.Context, unitID string, userID *string) (map[string]interface{}, error) {
 	today := time.Now().Format("2006-01-02")
-	err = s.ticketRepo.ResetSequences(unitID, today)
+
+	var ticketsMarked int64
+	var countersReleased int64
+
+	err := database.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var err error
+		ticketsMarked, err = s.ticketRepo.MarkAsEODTx(tx, unitID)
+		if err != nil {
+			return err
+		}
+		countersReleased, err = s.counterRepo.ReleaseAllTx(tx, unitID)
+		if err != nil {
+			return err
+		}
+		if err := s.ticketRepo.ResetSequencesTx(tx, unitID, today); err != nil {
+			return err
+		}
+
+		auditPayload := map[string]interface{}{
+			"unitId":           unitID,
+			"ticketsMarked":    ticketsMarked,
+			"countersReleased": countersReleased,
+			"timestamp":        time.Now(),
+		}
+		payloadBytes, err := json.Marshal(auditPayload)
+		if err != nil {
+			return fmt.Errorf("end of day: marshal audit payload: %w", err)
+		}
+		auditLog := models.AuditLog{
+			UserID:  userID,
+			Action:  "unit.eod",
+			Payload: payloadBytes,
+		}
+		if err := s.auditLogRepo.CreateAuditLogTx(ctx, tx, &auditLog); err != nil {
+			return fmt.Errorf("end of day: audit log: %w", err)
+		}
+		return nil
+	})
 	if err != nil {
+		log.Printf("shift eod transaction failed unitId=%s err=%v", unitID, err)
 		return nil, err
 	}
-
-	// TODO: Create audit log (skipping for now as AuditLogRepo is not fully set up)
 
 	result := map[string]interface{}{
 		"success":          true,
@@ -127,7 +164,6 @@ func (s *shiftService) ExecuteEndOfDay(unitID string, userID *string) (map[strin
 		"countersReleased": countersReleased,
 	}
 
-	// Broadcast EOD event to all connected clients in this unit's room
 	s.hub.BroadcastEvent("unit.eod", result, unitID)
 
 	return result, nil

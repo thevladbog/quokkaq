@@ -135,7 +135,12 @@ function PinCodeForm({
       </div>
 
       <div className='flex w-full gap-2'>
-        <Button type='button' variant='outline' className='flex-1' onClick={onClose}>
+        <Button
+          type='button'
+          variant='outline'
+          className='flex-1'
+          onClick={onClose}
+        >
           {t('cancel')}
         </Button>
         <Button type='button' className='flex-1' onClick={handleSubmit}>

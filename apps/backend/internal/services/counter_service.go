@@ -128,20 +128,24 @@ func (s *counterService) ForceRelease(counterID string) (*models.Counter, *model
 		return nil, nil, err
 	}
 
-	// Find active ticket for this counter?
-	// We don't have a direct way to find active ticket for counter in TicketRepository yet?
-	// We can search for tickets with status 'called' or 'in_service' and counterID.
-	// Actually, ForceRelease usually implies finishing the current work.
-
-	// TODO: Implement finding active ticket. For now, let's just release the counter.
-	// We need to add FindActiveByCounter to TicketRepository.
+	// Find active ticket for this counter
+	activeTicket, err := s.ticketRepo.GetActiveTicketByCounter(counterID)
+	if err == nil && activeTicket != nil {
+		// Mark the active ticket as completed when force releasing
+		now := time.Now()
+		activeTicket.Status = "completed"
+		activeTicket.CompletedAt = &now
+		if err := s.ticketRepo.Update(activeTicket); err != nil {
+			return nil, nil, err
+		}
+	}
 
 	counter.AssignedTo = nil
 	if err := s.repo.Update(counter); err != nil {
 		return nil, nil, err
 	}
 
-	return counter, nil, nil
+	return counter, activeTicket, nil
 }
 
 func (s *counterService) CallNext(counterID string, serviceID *string) (*models.Ticket, error) {

@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/services"
@@ -33,7 +32,7 @@ func (h *ShiftHandler) GetDashboardStats(w http.ResponseWriter, r *http.Request)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(stats)
+	RespondJSON(w, stats)
 }
 
 // GetQueueTickets godoc
@@ -52,7 +51,7 @@ func (h *ShiftHandler) GetQueueTickets(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(tickets)
+	RespondJSON(w, tickets)
 }
 
 // GetShiftCounters godoc
@@ -71,7 +70,7 @@ func (h *ShiftHandler) GetShiftCounters(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(counters)
+	RespondJSON(w, counters)
 }
 
 // ExecuteEndOfDay godoc
@@ -93,10 +92,10 @@ func (h *ShiftHandler) ExecuteEndOfDay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	actorID := uid
-	result, err := h.service.ExecuteEndOfDay(unitID, &actorID)
+	result, err := h.service.ExecuteEndOfDay(r.Context(), unitID, &actorID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(result)
+	RespondJSON(w, result)
 }

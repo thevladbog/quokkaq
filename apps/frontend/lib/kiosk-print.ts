@@ -142,11 +142,7 @@ export async function printReceiptViaTauri(
   if (!host) {
     return false;
   }
-  return printKioskJob(
-    'tcp',
-    `${host}:${target.port.trim() || '9100'}`,
-    lines
-  );
+  return printKioskJob('tcp', `${host}:${target.port.trim() || '9100'}`, lines);
 }
 
 /** Lines for a ticket after creation / pre-reg redemption. */

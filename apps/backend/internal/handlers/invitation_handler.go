@@ -53,7 +53,7 @@ func (h *InvitationHandler) CreateInvitation(w http.ResponseWriter, r *http.Requ
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(invitation)
+	RespondJSON(w, invitation)
 }
 
 // GetAllInvitations godoc
@@ -70,7 +70,7 @@ func (h *InvitationHandler) GetAllInvitations(w http.ResponseWriter, r *http.Req
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(invitations)
+	RespondJSON(w, invitations)
 }
 
 // DeleteInvitation godoc
@@ -145,7 +145,7 @@ func (h *InvitationHandler) RegisterUser(w http.ResponseWriter, r *http.Request)
 	}
 
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(user)
+	RespondJSON(w, user)
 }
 
 // GetInvitationByToken godoc
@@ -164,5 +164,5 @@ func (h *InvitationHandler) GetInvitationByToken(w http.ResponseWriter, r *http.
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	json.NewEncoder(w).Encode(invitation)
+	RespondJSON(w, invitation)
 }

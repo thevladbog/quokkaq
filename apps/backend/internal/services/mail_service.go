@@ -39,9 +39,10 @@ func NewMailService() MailService {
 	d := gomail.NewDialer(host, port, user, pass)
 
 	// Explicitly handle SSL/TLS based on configuration
-	if secureStr == "true" {
+	switch secureStr {
+	case "true":
 		d.SSL = true
-	} else if secureStr == "false" {
+	case "false":
 		d.SSL = false
 		// For development/testing with self-signed certs or if specifically requested
 		d.TLSConfig = &tls.Config{InsecureSkipVerify: true}
