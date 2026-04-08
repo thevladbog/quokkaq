@@ -1007,7 +1007,38 @@
       "viewInvoicesDesc": "View and download all your invoices",
       "viewUsage": "Usage",
       "viewUsageDesc": "Track resource usage and quotas",
-      "goTo": "Go to"
+      "goTo": "Go to",
+      "planSelector": {
+        "popularBadge": "Popular choice",
+        "currentPlan": "Current plan",
+        "limitsTitle": "Limits:",
+        "featuresTitle": "Features:",
+        "selectPlan": "Select plan",
+        "contactUs": "Contact us",
+        "customPricing": "Custom pricing",
+        "limits": {
+          "unlimited": "Unlimited",
+          "units": "Units",
+          "users": "Users",
+          "tickets_per_month": "Tickets per month",
+          "services": "Services",
+          "counters": "Counters"
+        },
+        "features": {
+          "websocket_updates": "Real-time updates",
+          "basic_reports": "Basic reports",
+          "advanced_reports": "Advanced analytics",
+          "email_support": "Email support",
+          "phone_support": "Phone support",
+          "api_access": "API access",
+          "white_label": "White-label",
+          "custom_branding": "Custom branding",
+          "priority_support": "Priority support",
+          "dedicated_support": "Dedicated manager",
+          "sla_guarantee": "SLA guarantee",
+          "custom_integrations": "Custom integrations"
+        }
+      }
     },
     "invoices": {
       "title": "Invoice History",

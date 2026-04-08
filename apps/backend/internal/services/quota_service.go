@@ -87,7 +87,7 @@ func (s *quotaService) GetCurrentUsage(companyID string, metric string) (int, er
 		return int(count), nil
 
 	case "tickets_per_month":
-		// Count tickets created this billing month
+		// Sum usage_records for monthly ticket quota (canonical key tickets_per_month; legacy rows used tickets_created)
 		now := time.Now()
 		billingMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
 
@@ -95,7 +95,7 @@ func (s *quotaService) GetCurrentUsage(companyID string, metric string) (int, er
 		query := `
 			SELECT COALESCE(SUM(value), 0) 
 			FROM usage_records 
-			WHERE company_id = ? AND metric_type = 'tickets_created' AND billing_month = ?
+			WHERE company_id = ? AND metric_type IN ('tickets_per_month', 'tickets_created') AND billing_month = ?
 		`
 		if err := db.Raw(query, companyID, billingMonth).Scan(&sum).Error; err != nil {
 			return 0, err

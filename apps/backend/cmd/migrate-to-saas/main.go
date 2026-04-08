@@ -4,16 +4,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"quokkaq-go-backend/internal/config"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/services"
 	"quokkaq-go-backend/pkg/database"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 func main() {
 	config.Load()
 	database.Connect()
+
+	var migrationFailures int
 
 	fmt.Println("Starting SaaS migration...")
 
@@ -44,15 +49,19 @@ func main() {
 			CancelAtPeriodEnd:  false,
 		}
 
-		if err := db.Create(subscription).Error; err != nil {
-			log.Printf("Failed to create subscription for company %s: %v", company.Name, err)
-			continue
-		}
-
-		// Update company with subscription ID
-		company.SubscriptionID = &subscription.ID
-		if err := db.Save(&company).Error; err != nil {
-			log.Printf("Failed to update company %s: %v", company.Name, err)
+		err := db.Transaction(func(tx *gorm.DB) error {
+			if err := tx.Create(subscription).Error; err != nil {
+				return err
+			}
+			company.SubscriptionID = &subscription.ID
+			if err := tx.Save(&company).Error; err != nil {
+				return err
+			}
+			return nil
+		})
+		if err != nil {
+			log.Printf("Failed to migrate company %s (subscription + company link): %v", company.Name, err)
+			migrationFailures++
 			continue
 		}
 
@@ -83,13 +92,19 @@ func main() {
 		`
 		
 		if err := db.Raw(query, company.ID).Scan(&ownerID).Error; err != nil || ownerID == "" {
-			log.Printf("No admin found for company %s, skipping", company.Name)
+			if err != nil {
+				log.Printf("Failed to look up admin for company %s: %v", company.Name, err)
+			} else {
+				log.Printf("No admin found for company %s, skipping", company.Name)
+			}
+			migrationFailures++
 			continue
 		}
 
 		company.OwnerUserID = ownerID
 		if err := db.Save(&company).Error; err != nil {
 			log.Printf("Failed to set owner for company %s: %v", company.Name, err)
+			migrationFailures++
 			continue
 		}
 
@@ -104,6 +119,7 @@ func main() {
 	for _, company := range companies {
 		if err := services.SyncCurrentUsageToRecords(company.ID); err != nil {
 			log.Printf("Failed to sync usage for company %s: %v", company.Name, err)
+			migrationFailures++
 			continue
 		}
 		fmt.Printf("✓ Synced usage for company: %s\n", company.Name)
@@ -142,12 +158,17 @@ func main() {
 		
 		if err := db.Save(&company).Error; err != nil {
 			log.Printf("Failed to set onboarding state for company %s: %v", company.Name, err)
+			migrationFailures++
 			continue
 		}
 
 		fmt.Printf("✓ Set onboarding state for company: %s\n", company.Name)
 	}
 
+	if migrationFailures > 0 {
+		fmt.Printf("\n✗ SaaS migration finished with %d error(s); see logs above for details.\n", migrationFailures)
+		os.Exit(1)
+	}
 	fmt.Println("\n✓ SaaS migration completed successfully!")
 	fmt.Printf("Migrated %d companies to SaaS model\n", len(companies))
 }

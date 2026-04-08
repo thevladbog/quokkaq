@@ -22,17 +22,18 @@ type SubscriptionPlan struct {
 
 // Subscription represents a company's active subscription
 type Subscription struct {
-	ID                 string          `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
-	CompanyID          string          `gorm:"not null;index" json:"companyId"`
-	PlanID             string          `gorm:"not null" json:"planId"`
-	Status             string          `gorm:"not null;default:'trial'" json:"status"` // "trial", "active", "past_due", "canceled", "paused"
-	CurrentPeriodStart time.Time       `gorm:"not null" json:"currentPeriodStart"`
-	CurrentPeriodEnd   time.Time       `gorm:"not null" json:"currentPeriodEnd"`
-	CancelAtPeriodEnd  bool            `gorm:"not null;default:false" json:"cancelAtPeriodEnd"`
-	TrialEnd           *time.Time      `json:"trialEnd,omitempty"`
-	Metadata           json.RawMessage `gorm:"type:jsonb" json:"metadata,omitempty" swaggertype:"object"` // additional data
-	CreatedAt          time.Time       `gorm:"default:now()" json:"createdAt"`
-	UpdatedAt          time.Time       `gorm:"autoUpdateTime" json:"updatedAt"`
+	ID                   string          `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
+	CompanyID            string          `gorm:"not null;index" json:"companyId"`
+	PlanID               string          `gorm:"not null" json:"planId"`
+	Status               string          `gorm:"not null;default:'trial'" json:"status"` // "trial", "active", "past_due", "canceled", "paused"
+	CurrentPeriodStart   time.Time       `gorm:"not null" json:"currentPeriodStart"`
+	CurrentPeriodEnd     time.Time       `gorm:"not null" json:"currentPeriodEnd"`
+	CancelAtPeriodEnd    bool            `gorm:"not null;default:false" json:"cancelAtPeriodEnd"`
+	TrialEnd             *time.Time      `json:"trialEnd,omitempty"`
+	StripeSubscriptionID *string         `gorm:"column:stripe_subscription_id" json:"stripeSubscriptionId,omitempty"` // Stripe sub_… after Checkout completes
+	Metadata             json.RawMessage `gorm:"type:jsonb" json:"metadata,omitempty" swaggertype:"object"`           // additional data
+	CreatedAt            time.Time       `gorm:"default:now()" json:"createdAt"`
+	UpdatedAt            time.Time       `gorm:"autoUpdateTime" json:"updatedAt"`
 
 	// Relations
 	Plan    SubscriptionPlan `gorm:"foreignKey:PlanID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;" json:"plan,omitempty"`

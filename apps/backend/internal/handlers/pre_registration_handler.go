@@ -21,6 +21,15 @@ func NewPreRegistrationHandler(service *services.PreRegistrationService, ticketS
 	}
 }
 
+// GetByUnit godoc
+// @Summary      List pre-registrations for a unit
+// @Description  Returns all pre-registrations associated with the unit (authenticated unit member).
+// @Tags         pre-registrations
+// @Produce      json
+// @Param        unitId path      string  true  "Unit ID"
+// @Success      200    {array}   models.PreRegistration
+// @Failure      500    {string}  string "Internal Server Error"
+// @Router       /units/{unitId}/pre-registrations [get]
 func (h *PreRegistrationHandler) GetByUnit(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
 	preRegs, err := h.service.GetByUnitID(unitID)
@@ -31,6 +40,18 @@ func (h *PreRegistrationHandler) GetByUnit(w http.ResponseWriter, r *http.Reques
 	RespondJSON(w, preRegs)
 }
 
+// Create godoc
+// @Summary      Create a pre-registration
+// @Description  Creates a new pre-registration for the unit; unitId is taken from the path.
+// @Tags         pre-registrations
+// @Accept       json
+// @Produce      json
+// @Param        unitId path      string                   true  "Unit ID"
+// @Param        body   body      models.PreRegistration   true  "Pre-registration payload"
+// @Success      200    {object}  models.PreRegistration
+// @Failure      400    {string}  string "Bad Request"
+// @Failure      500    {string}  string "Internal Server Error"
+// @Router       /units/{unitId}/pre-registrations [post]
 func (h *PreRegistrationHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var preReg models.PreRegistration
 	if err := json.NewDecoder(r.Body).Decode(&preReg); err != nil {
@@ -48,15 +69,22 @@ func (h *PreRegistrationHandler) Create(w http.ResponseWriter, r *http.Request) 
 	RespondJSON(w, preReg)
 }
 
+// Update godoc
+// @Summary      Update a pre-registration
+// @Description  Updates editable fields on an existing pre-registration for the unit.
+// @Tags         pre-registrations
+// @Accept       json
+// @Produce      json
+// @Param        unitId path      string                                true  "Unit ID"
+// @Param        id     path      string                                true  "Pre-registration ID"
+// @Param        body   body      models.PreRegistrationUpdateRequest   true  "Fields to update"
+// @Success      200    {object}  models.PreRegistration
+// @Failure      400    {string}  string "Bad Request"
+// @Failure      404    {string}  string "Not Found"
+// @Failure      500    {string}  string "Internal Server Error"
+// @Router       /units/{unitId}/pre-registrations/{id} [put]
 func (h *PreRegistrationHandler) Update(w http.ResponseWriter, r *http.Request) {
-	var updateData struct {
-		ServiceID     string `json:"serviceId"`
-		Date          string `json:"date"`
-		Time          string `json:"time"`
-		CustomerName  string `json:"customerName"`
-		CustomerPhone string `json:"customerPhone"`
-		Comment       string `json:"comment"`
-	}
+	var updateData models.PreRegistrationUpdateRequest
 	if err := json.NewDecoder(r.Body).Decode(&updateData); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -86,6 +114,18 @@ func (h *PreRegistrationHandler) Update(w http.ResponseWriter, r *http.Request) 
 	RespondJSON(w, existing)
 }
 
+// GetAvailableSlots godoc
+// @Summary      Get available time slots for pre-registration
+// @Description  Returns HH:MM slot strings for a service on a given date, accounting for capacity and existing bookings.
+// @Tags         pre-registrations
+// @Produce      json
+// @Param        unitId    path      string  true  "Unit ID"
+// @Param        serviceId query     string  true  "Service ID"
+// @Param        date      query     string  true  "Date (YYYY-MM-DD)"
+// @Success      200       {array}   string
+// @Failure      400       {string}  string "Bad Request"
+// @Failure      500       {string}  string "Internal Server Error"
+// @Router       /units/{unitId}/pre-registrations/slots [get]
 func (h *PreRegistrationHandler) GetAvailableSlots(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
 	serviceID := r.URL.Query().Get("serviceId")
@@ -104,10 +144,20 @@ func (h *PreRegistrationHandler) GetAvailableSlots(w http.ResponseWriter, r *htt
 	RespondJSON(w, slots)
 }
 
+// Validate godoc
+// @Summary      Validate a pre-registration code (kiosk)
+// @Description  Looks up a pre-registration by code for the unit context; returns the record when valid.
+// @Tags         pre-registrations
+// @Accept       json
+// @Produce      json
+// @Param        unitId path      string                             true  "Unit ID"
+// @Param        body   body      models.PreRegistrationCodeRequest  true  "Six-digit code"
+// @Success      200    {object}  models.PreRegistration
+// @Failure      400    {string}  string "Bad Request"
+// @Failure      404    {string}  string "Not Found"
+// @Router       /units/{unitId}/pre-registrations/validate [post]
 func (h *PreRegistrationHandler) Validate(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Code string `json:"code"`
-	}
+	var req models.PreRegistrationCodeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -121,26 +171,30 @@ func (h *PreRegistrationHandler) Validate(w http.ResponseWriter, r *http.Request
 	RespondJSON(w, preReg)
 }
 
+// Redeem godoc
+// @Summary      Redeem a pre-registration code (kiosk)
+// @Description  Validates the code, creates a ticket, and marks the pre-registration redeemed. Invalid codes return HTTP 200 with success=false and a message; server errors use 5xx.
+// @Tags         pre-registrations
+// @Accept       json
+// @Produce      json
+// @Param        unitId path      string                             true  "Unit ID"
+// @Param        body   body      models.PreRegistrationCodeRequest  true  "Six-digit code"
+// @Success      200    {object}  models.PreRegistrationRedeemResponse
+// @Failure      400    {string}  string "Bad Request"
+// @Failure      500    {string}  string "Internal Server Error"
+// @Router       /units/{unitId}/pre-registrations/redeem [post]
 func (h *PreRegistrationHandler) Redeem(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Code string `json:"code"`
-	}
+	var req models.PreRegistrationCodeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
-	}
-
-	type RedeemResponse struct {
-		Success bool           `json:"success"`
-		Ticket  *models.Ticket `json:"ticket,omitempty"`
-		Message string         `json:"message,omitempty"`
 	}
 
 	// 1. Validate again
 	preReg, err := h.service.ValidateForKiosk(req.Code)
 	if err != nil {
 		// Return 200 OK with error message for validation failures
-		RespondJSON(w, RedeemResponse{
+		RespondJSON(w, models.PreRegistrationRedeemResponse{
 			Success: false,
 			Message: err.Error(),
 		})
@@ -166,7 +220,7 @@ func (h *PreRegistrationHandler) Redeem(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	RespondJSON(w, RedeemResponse{
+	RespondJSON(w, models.PreRegistrationRedeemResponse{
 		Success: true,
 		Ticket:  ticket,
 	})

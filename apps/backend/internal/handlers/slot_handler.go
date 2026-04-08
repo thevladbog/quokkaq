@@ -17,6 +17,15 @@ func NewSlotHandler(service *services.SlotService) *SlotHandler {
 	return &SlotHandler{service: service}
 }
 
+// GetConfig godoc
+// @Summary      Get slot configuration for a unit
+// @Description  Returns weekly slot window settings (start/end time, interval, active days). If none exist, returns defaults scoped to the unit.
+// @Tags         slots
+// @Produce      json
+// @Param        unitId path      string  true  "Unit ID"
+// @Success      200    {object}  models.SlotConfig
+// @Failure      500    {string}  string "Internal Server Error"
+// @Router       /units/{unitId}/slots/config [get]
 func (h *SlotHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
 	config, err := h.service.GetConfig(unitID)
@@ -27,6 +36,18 @@ func (h *SlotHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 	RespondJSON(w, config)
 }
 
+// UpdateConfig godoc
+// @Summary      Update slot configuration for a unit
+// @Description  Creates or updates weekly slot window settings for the unit.
+// @Tags         slots
+// @Accept       json
+// @Produce      json
+// @Param        unitId path      string             true  "Unit ID"
+// @Param        config body      models.SlotConfig  true  "Slot configuration"
+// @Success      200    {object}  models.SlotConfig
+// @Failure      400    {string}  string "Bad Request"
+// @Failure      500    {string}  string "Internal Server Error"
+// @Router       /units/{unitId}/slots/config [put]
 func (h *SlotHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	var config models.SlotConfig
 	if err := json.NewDecoder(r.Body).Decode(&config); err != nil {
@@ -44,6 +65,15 @@ func (h *SlotHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	RespondJSON(w, config)
 }
 
+// GetCapacities godoc
+// @Summary      Get weekly slot capacities for a unit
+// @Description  Returns per-day, per-service capacity definitions used when generating slots.
+// @Tags         slots
+// @Produce      json
+// @Param        unitId path      string  true  "Unit ID"
+// @Success      200    {array}   models.WeeklySlotCapacity
+// @Failure      500    {string}  string "Internal Server Error"
+// @Router       /units/{unitId}/slots/capacities [get]
 func (h *SlotHandler) GetCapacities(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
 	capacities, err := h.service.GetWeeklyCapacities(unitID)
@@ -54,6 +84,18 @@ func (h *SlotHandler) GetCapacities(w http.ResponseWriter, r *http.Request) {
 	RespondJSON(w, capacities)
 }
 
+// UpdateCapacities godoc
+// @Summary      Replace weekly slot capacities for a unit
+// @Description  Updates all weekly capacity rows for the unit; unitId on each item is set from the path.
+// @Tags         slots
+// @Accept       json
+// @Produce      json
+// @Param        unitId      path      string                        true  "Unit ID"
+// @Param        capacities  body      []models.WeeklySlotCapacity   true  "Weekly capacities"
+// @Success      200         {array}   models.WeeklySlotCapacity
+// @Failure      400         {string}  string "Bad Request"
+// @Failure      500         {string}  string "Internal Server Error"
+// @Router       /units/{unitId}/slots/capacities [put]
 func (h *SlotHandler) UpdateCapacities(w http.ResponseWriter, r *http.Request) {
 	var capacities []models.WeeklySlotCapacity
 	if err := json.NewDecoder(r.Body).Decode(&capacities); err != nil {
@@ -74,11 +116,20 @@ func (h *SlotHandler) UpdateCapacities(w http.ResponseWriter, r *http.Request) {
 	RespondJSON(w, capacities)
 }
 
+// Generate godoc
+// @Summary      Generate service slots for a date range
+// @Description  Materializes slots for the unit between the given dates based on config and capacities.
+// @Tags         slots
+// @Accept       json
+// @Produce      json
+// @Param        unitId path      string                      true  "Unit ID"
+// @Param        body   body      models.GenerateSlotsRequest true  "Inclusive from/to dates (YYYY-MM-DD)"
+// @Success      200    {object}  models.SlotSuccessResponse
+// @Failure      400    {string}  string "Bad Request"
+// @Failure      500    {string}  string "Internal Server Error"
+// @Router       /units/{unitId}/slots/generate [post]
 func (h *SlotHandler) Generate(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		From string `json:"from"`
-		To   string `json:"to"`
-	}
+	var req models.GenerateSlotsRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -90,9 +141,20 @@ func (h *SlotHandler) Generate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	RespondJSON(w, map[string]bool{"success": true})
+	RespondJSON(w, models.SlotSuccessResponse{Success: true})
 }
 
+// GetDay godoc
+// @Summary      Get generated slots for a calendar day
+// @Description  Returns the day schedule with per-slot booking counts. Responds 404 if slots have not been generated for that date.
+// @Tags         slots
+// @Produce      json
+// @Param        unitId path      string  true  "Unit ID"
+// @Param        date   path      string  true  "Date (YYYY-MM-DD)"
+// @Success      200    {object}  models.DayScheduleWithBookings
+// @Failure      404    {string}  string "Not Found"
+// @Failure      500    {string}  string "Internal Server Error"
+// @Router       /units/{unitId}/slots/day/{date} [get]
 func (h *SlotHandler) GetDay(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
 	date := chi.URLParam(r, "date")
@@ -113,6 +175,19 @@ func (h *SlotHandler) GetDay(w http.ResponseWriter, r *http.Request) {
 	RespondJSON(w, slots)
 }
 
+// UpdateDay godoc
+// @Summary      Update a single day schedule
+// @Description  Sets day-off flag and replaces service slots for the given date after validation.
+// @Tags         slots
+// @Accept       json
+// @Produce      json
+// @Param        unitId path      string                            true  "Unit ID"
+// @Param        date   path      string                            true  "Date (YYYY-MM-DD)"
+// @Param        body   body      models.UpdateDayScheduleRequest   true  "Day schedule update"
+// @Success      200    {object}  models.SlotSuccessResponse
+// @Failure      400    {string}  string "Bad Request"
+// @Failure      500    {string}  string "Internal Server Error"
+// @Router       /units/{unitId}/slots/day/{date} [put]
 func (h *SlotHandler) UpdateDay(w http.ResponseWriter, r *http.Request) {
 	var req models.UpdateDayScheduleRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -128,5 +203,5 @@ func (h *SlotHandler) UpdateDay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	RespondJSON(w, map[string]bool{"success": true})
+	RespondJSON(w, models.SlotSuccessResponse{Success: true})
 }

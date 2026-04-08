@@ -1,47 +1,100 @@
 package services
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/pkg/database"
+	"strings"
 	"time"
 
 	yookassa "github.com/rvinnie/yookassa-sdk-go/yookassa"
+	"gorm.io/gorm"
 )
 
 type YooKassaProvider struct {
-	client *yookassa.Client
-	shopID string
+	client        *yookassa.Client
+	shopID        string
+	webhookSecret string // HMAC key for HandleWebhook (defaults to API secret if empty at construction)
 }
 
-func NewYooKassaProvider(shopID, secretKey string) PaymentProvider {
+// NewYooKassaProvider builds a YooKassa payment provider.
+// webhookSecret is used to verify HandleWebhook signatures (HMAC-SHA256 over the raw body).
+// Pass empty string to reuse secretKey (shop secret). YooKassa's default HTTP notifications do not
+// include an HMAC header; pass a signature computed the same way at your edge, or a dedicated secret.
+func NewYooKassaProvider(shopID, secretKey, webhookSecret string) PaymentProvider {
+	if webhookSecret == "" {
+		webhookSecret = secretKey
+	}
 	client := yookassa.NewClient(shopID, secretKey)
 	return &YooKassaProvider{
-		client: client,
-		shopID: shopID,
+		client:        client,
+		shopID:        shopID,
+		webhookSecret: webhookSecret,
 	}
 }
 
-func (p *YooKassaProvider) CreateCheckoutSession(subscription *models.Subscription, successURL, cancelURL string) (string, error) {
+// verifyYooKassaSignature checks HMAC-SHA256(payload, secret) against signature.
+// Accepts hex digest, optional "sha256=" prefix, or standard Base64-encoded digest.
+func verifyYooKassaSignature(payload []byte, signature, secret string) error {
+	secret = strings.TrimSpace(secret)
+	if secret == "" {
+		return fmt.Errorf("webhook secret not configured")
+	}
+	sigInput := strings.TrimSpace(signature)
+	if sigInput == "" {
+		return fmt.Errorf("missing webhook signature")
+	}
+	sigInput = strings.TrimPrefix(strings.ToLower(sigInput), "sha256=")
+
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write(payload)
+	expected := mac.Sum(nil)
+
+	if provided, err := hex.DecodeString(sigInput); err == nil && len(provided) == len(expected) {
+		if subtle.ConstantTimeCompare(provided, expected) == 1 {
+			return nil
+		}
+		return fmt.Errorf("invalid webhook signature")
+	}
+	if provided, err := base64.StdEncoding.DecodeString(sigInput); err == nil && len(provided) == len(expected) {
+		if subtle.ConstantTimeCompare(provided, expected) == 1 {
+			return nil
+		}
+		return fmt.Errorf("invalid webhook signature")
+	}
+	return fmt.Errorf("invalid webhook signature format")
+}
+
+func (p *YooKassaProvider) CreateCheckoutSession(subscription *models.Subscription, checkoutPlan *models.SubscriptionPlan, successURL, cancelURL string) (string, string, error) {
 	db := database.DB
 
 	// Load the subscription with plan
 	if err := db.Preload("Plan").Preload("Company").First(subscription, "id = ?", subscription.ID).Error; err != nil {
-		return "", err
+		return "", "", err
+	}
+
+	pricePlan := checkoutPlan
+	if pricePlan == nil {
+		pricePlan = &subscription.Plan
 	}
 
 	// Create payment
 	payment := &yookassa.Payment{
 		Amount: &yookassa.Amount{
-			Value:    fmt.Sprintf("%.2f", float64(subscription.Plan.Price)/100),
-			Currency: subscription.Plan.Currency,
+			Value:    fmt.Sprintf("%.2f", float64(pricePlan.Price)/100),
+			Currency: pricePlan.Currency,
 		},
 		Confirmation: &yookassa.Confirmation{
 			Type:      yookassa.ConfirmationTypeRedirect,
 			ReturnURL: successURL,
 		},
-		Description: fmt.Sprintf("Подписка %s для %s", subscription.Plan.Name, subscription.Company.Name),
+		Description: fmt.Sprintf("Подписка %s для %s", pricePlan.Name, subscription.Company.Name),
 		Metadata: map[string]string{
 			"subscription_id": subscription.ID,
 			"company_id":      subscription.CompanyID,
@@ -51,15 +104,15 @@ func (p *YooKassaProvider) CreateCheckoutSession(subscription *models.Subscripti
 
 	createdPayment, err := p.client.CreatePayment(payment)
 	if err != nil {
-		return "", fmt.Errorf("failed to create payment: %w", err)
+		return "", "", fmt.Errorf("failed to create payment: %w", err)
 	}
 
 	// Store payment ID in invoice
 	invoice := &models.Invoice{
 		CompanyID:                subscription.CompanyID,
 		SubscriptionID:           subscription.ID,
-		Amount:                   subscription.Plan.Price,
-		Currency:                 subscription.Plan.Currency,
+		Amount:                   pricePlan.Price,
+		Currency:                 pricePlan.Currency,
 		Status:                   "open",
 		PaymentProvider:          "yookassa",
 		PaymentProviderInvoiceID: createdPayment.ID,
@@ -67,15 +120,15 @@ func (p *YooKassaProvider) CreateCheckoutSession(subscription *models.Subscripti
 	}
 
 	if err := db.Create(invoice).Error; err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	// Return confirmation URL
 	if createdPayment.Confirmation != nil {
-		return createdPayment.Confirmation.ConfirmationURL, nil
+		return createdPayment.Confirmation.ConfirmationURL, createdPayment.ID, nil
 	}
 
-	return "", fmt.Errorf("no confirmation URL in payment response")
+	return "", "", fmt.Errorf("no confirmation URL in payment response")
 }
 
 func (p *YooKassaProvider) CreateInvoice(subscription *models.Subscription) (*models.Invoice, error) {
@@ -104,6 +157,10 @@ func (p *YooKassaProvider) CreateInvoice(subscription *models.Subscription) (*mo
 }
 
 func (p *YooKassaProvider) HandleWebhook(payload []byte, signature string) error {
+	if err := verifyYooKassaSignature(payload, signature, p.webhookSecret); err != nil {
+		return fmt.Errorf("webhook signature verification failed: %w", err)
+	}
+
 	var notification yookassa.Notification
 	if err := json.Unmarshal(payload, &notification); err != nil {
 		return fmt.Errorf("failed to unmarshal notification: %w", err)
@@ -125,7 +182,7 @@ func (p *YooKassaProvider) HandleWebhook(payload []byte, signature string) error
 
 func (p *YooKassaProvider) CancelSubscription(subscriptionID string) error {
 	db := database.DB
-	
+
 	return db.Model(&models.Subscription{}).
 		Where("id = ?", subscriptionID).
 		Updates(map[string]interface{}{
@@ -149,46 +206,41 @@ func (p *YooKassaProvider) CreateCustomer(companyID, email, name string) (string
 // Helper methods for webhook handlers
 
 func (p *YooKassaProvider) handlePaymentSucceeded(payment *yookassa.Payment) error {
-	db := database.DB
+	return database.DB.Transaction(func(tx *gorm.DB) error {
+		var invoice models.Invoice
+		if err := tx.Where("payment_provider_invoice_id = ?", payment.ID).First(&invoice).Error; err != nil {
+			return err
+		}
 
-	// Find our invoice by YooKassa payment ID
-	var invoice models.Invoice
-	if err := db.Where("payment_provider_invoice_id = ?", payment.ID).First(&invoice).Error; err != nil {
-		return err
-	}
+		now := time.Now()
+		if err := tx.Model(&invoice).Updates(map[string]interface{}{
+			"status":  "paid",
+			"paid_at": &now,
+		}).Error; err != nil {
+			return err
+		}
 
-	now := time.Now()
-	if err := db.Model(&invoice).Updates(map[string]interface{}{
-		"status":  "paid",
-		"paid_at": &now,
-	}).Error; err != nil {
-		return err
-	}
-
-	// Update subscription status to active
-	return db.Model(&models.Subscription{}).
-		Where("id = ?", invoice.SubscriptionID).
-		Update("status", "active").Error
+		return tx.Model(&models.Subscription{}).
+			Where("id = ?", invoice.SubscriptionID).
+			Update("status", "active").Error
+	})
 }
 
 func (p *YooKassaProvider) handlePaymentCanceled(payment *yookassa.Payment) error {
-	db := database.DB
+	return database.DB.Transaction(func(tx *gorm.DB) error {
+		var invoice models.Invoice
+		if err := tx.Where("payment_provider_invoice_id = ?", payment.ID).First(&invoice).Error; err != nil {
+			return err
+		}
 
-	// Find our invoice by YooKassa payment ID
-	var invoice models.Invoice
-	if err := db.Where("payment_provider_invoice_id = ?", payment.ID).First(&invoice).Error; err != nil {
-		return err
-	}
+		if err := tx.Model(&invoice).Update("status", "void").Error; err != nil {
+			return err
+		}
 
-	// Update invoice status
-	if err := db.Model(&invoice).Update("status", "void").Error; err != nil {
-		return err
-	}
-
-	// Update subscription status to past_due if payment failed
-	return db.Model(&models.Subscription{}).
-		Where("id = ?", invoice.SubscriptionID).
-		Update("status", "past_due").Error
+		return tx.Model(&models.Subscription{}).
+			Where("id = ?", invoice.SubscriptionID).
+			Update("status", "past_due").Error
+	})
 }
 
 func (p *YooKassaProvider) handleRefundSucceeded(refund *yookassa.Refund) error {

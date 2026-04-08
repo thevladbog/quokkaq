@@ -92,7 +92,7 @@ func (h *ShiftHandler) ExecuteEndOfDay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	actorID := uid
-	result, err := h.service.ExecuteEndOfDay(unitID, &actorID)
+	result, err := h.service.ExecuteEndOfDay(r.Context(), unitID, &actorID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

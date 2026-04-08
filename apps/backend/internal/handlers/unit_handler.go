@@ -2,14 +2,14 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
-	"quokkaq-go-backend/internal/models"
-	"quokkaq-go-backend/internal/services"
-
 	"path/filepath"
 	"strings"
 
-	"fmt"
+	"quokkaq-go-backend/internal/models"
+	"quokkaq-go-backend/internal/services"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -145,11 +145,13 @@ func (h *UnitHandler) AddMaterial(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Read file content
-	fileBytes := make([]byte, header.Size)
-	_, err = file.Read(fileBytes)
+	fileBytes, err := io.ReadAll(file)
 	if err != nil {
 		http.Error(w, "Failed to read file", http.StatusInternalServerError)
+		return
+	}
+	if header.Size > 0 && int64(len(fileBytes)) != header.Size {
+		http.Error(w, "Uploaded file size mismatch", http.StatusBadRequest)
 		return
 	}
 

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/services"
@@ -194,7 +195,7 @@ func (h *AuthHandler) Signup(w http.ResponseWriter, r *http.Request) {
 	token, err := h.service.Signup(req.Name, req.Email, req.Password, req.CompanyName, req.PlanCode)
 	if err != nil {
 		status := http.StatusBadRequest
-		if err.Error() == "email already exists" {
+		if errors.Is(err, services.ErrEmailAlreadyExists) {
 			status = http.StatusConflict
 		}
 		http.Error(w, err.Error(), status)

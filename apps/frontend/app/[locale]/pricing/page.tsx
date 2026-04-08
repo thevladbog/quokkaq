@@ -147,12 +147,21 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
               </CardContent>
 
               <CardFooter>
-                <Button 
-                  className="w-full" 
+                <Button
+                  className="w-full"
                   variant={plan.popular ? 'default' : 'outline'}
                   size="lg"
+                  asChild
                 >
-                  {plan.price ? t('startTrial') : t('contactUs')}
+                  <Link
+                    href={
+                      plan.price != null
+                        ? `/${locale}/signup?plan=${encodeURIComponent(plan.code)}`
+                        : `/${locale}/contact`
+                    }
+                  >
+                    {plan.price != null ? t('startTrial') : t('contactUs')}
+                  </Link>
                 </Button>
               </CardFooter>
             </Card>

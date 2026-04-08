@@ -53,10 +53,7 @@ func main() {
 
 	// Recreate tables with auto-migration
 	fmt.Println("Creating tables...")
-	
-	// Create tables in correct order without auto foreign keys first
-	database.DB.Exec("SET CONSTRAINTS ALL DEFERRED")
-	
+
 	database.AutoMigrate(
 		&models.Company{},
 		&models.SubscriptionPlan{},
@@ -85,8 +82,6 @@ func main() {
 		&models.DaySchedule{},
 		&models.PasswordResetToken{},
 	)
-	
-	database.DB.Exec("SET CONSTRAINTS ALL IMMEDIATE")
 
 	// Create seed data
 	fmt.Println("Seeding data...")

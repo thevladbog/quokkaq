@@ -8,8 +8,15 @@ import (
 	"gorm.io/gorm"
 )
 
+// UserUnitResult is the first user_units row joined to units for a user.
+type UserUnitResult struct {
+	UnitID    string
+	CompanyID string
+}
+
 type UserRepository interface {
 	Create(user *models.User) error
+	CreateTx(tx *gorm.DB, user *models.User) error
 	FindAll(search string) ([]models.User, error)
 	FindByID(id string) (*models.User, error)
 	FindByEmail(email string) (*models.User, error)
@@ -18,16 +25,22 @@ type UserRepository interface {
 	AssignUnit(userID, unitID string, permissions []string) error
 	RemoveUnit(userID, unitID string) error
 	AssignRole(userID, roleID string) error
+	AssignRoleTx(tx *gorm.DB, userID, roleID string) error
 	FindRoleByName(name string) (*models.Role, error)
 	CreatePasswordResetToken(token *models.PasswordResetToken) error
 	FindPasswordResetToken(token string) (*models.PasswordResetToken, error)
 	DeletePasswordResetToken(id string) error
 	Count() (int64, error)
 	EnsureRoleExists(name string) (*models.Role, error)
+	EnsureRoleExistsTx(tx *gorm.DB, name string) (*models.Role, error)
 	IsAdmin(userID string) (bool, error)
 	IsAdminOrHasUnitAccess(userID, unitID string) (bool, error)
 	HasCompanyAccess(userID, companyID string) (bool, error)
 	IsCompanyOwner(userID, companyID string) (bool, error)
+	// GetCompanyIDByUserID returns company_id from the user's first assigned unit (user_units → units).
+	GetCompanyIDByUserID(userID string) (companyID string, err error)
+	// GetFirstUserUnit returns the first user_units row joined to units for the user (same shape as legacy usage handler query).
+	GetFirstUserUnit(userID string) (UserUnitResult, error)
 }
 
 type userRepository struct {
@@ -40,6 +53,10 @@ func NewUserRepository() UserRepository {
 
 func (r *userRepository) Create(user *models.User) error {
 	return r.db.Create(user).Error
+}
+
+func (r *userRepository) CreateTx(tx *gorm.DB, user *models.User) error {
+	return tx.Create(user).Error
 }
 
 func (r *userRepository) FindAll(search string) ([]models.User, error) {
@@ -98,6 +115,14 @@ func (r *userRepository) AssignRole(userID, roleID string) error {
 	return r.db.Create(&userRole).Error
 }
 
+func (r *userRepository) AssignRoleTx(tx *gorm.DB, userID, roleID string) error {
+	userRole := models.UserRole{
+		UserID: userID,
+		RoleID: roleID,
+	}
+	return tx.Create(&userRole).Error
+}
+
 func (r *userRepository) FindRoleByName(name string) (*models.Role, error) {
 	var role models.Role
 	err := r.db.First(&role, "name = ?", name).Error
@@ -137,6 +162,15 @@ func (r *userRepository) Count() (int64, error) {
 func (r *userRepository) EnsureRoleExists(name string) (*models.Role, error) {
 	var role models.Role
 	err := r.db.FirstOrCreate(&role, models.Role{Name: name}).Error
+	if err != nil {
+		return nil, err
+	}
+	return &role, nil
+}
+
+func (r *userRepository) EnsureRoleExistsTx(tx *gorm.DB, name string) (*models.Role, error) {
+	var role models.Role
+	err := tx.FirstOrCreate(&role, models.Role{Name: name}).Error
 	if err != nil {
 		return nil, err
 	}
@@ -198,6 +232,14 @@ func (r *userRepository) HasCompanyAccess(userID, companyID string) (bool, error
 		return true, nil
 	}
 
+	isOwner, err := r.IsCompanyOwner(userID, companyID)
+	if err != nil {
+		return false, err
+	}
+	if isOwner {
+		return true, nil
+	}
+
 	// Check if user has access to any unit belonging to this company
 	var count int64
 	err = r.db.Table("user_units").
@@ -228,4 +270,30 @@ func (r *userRepository) IsCompanyOwner(userID, companyID string) (bool, error) 
 	}
 
 	return true, nil
+}
+
+func (r *userRepository) GetCompanyIDByUserID(userID string) (string, error) {
+	type row struct {
+		CompanyID string
+	}
+	var res row
+	err := r.db.Table("user_units").
+		Select("units.company_id").
+		Joins("LEFT JOIN units ON user_units.unit_id = units.id").
+		Where("user_units.user_id = ?", userID).
+		First(&res).Error
+	if err != nil {
+		return "", err
+	}
+	return res.CompanyID, nil
+}
+
+func (r *userRepository) GetFirstUserUnit(userID string) (UserUnitResult, error) {
+	var res UserUnitResult
+	err := r.db.Table("user_units").
+		Select("user_units.unit_id, units.company_id").
+		Joins("LEFT JOIN units ON user_units.unit_id = units.id").
+		Where("user_units.user_id = ?", userID).
+		First(&res).Error
+	return res, err
 }

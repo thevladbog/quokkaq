@@ -1,13 +1,15 @@
 package handlers
 
 import (
+	"errors"
+	"log"
 	"net/http"
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
-	"quokkaq-go-backend/pkg/database"
 
 	"github.com/go-chi/chi/v5"
+	"gorm.io/gorm"
 )
 
 type UsageHandler struct {
@@ -84,22 +86,14 @@ func (h *UsageHandler) GetMyUsageMetrics(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Get user's first unit to determine company
-	db := database.DB
-	type UserUnitResult struct {
-		UnitID    string
-		CompanyID string
-	}
-
-	var result UserUnitResult
-	err := db.Table("user_units").
-		Select("user_units.unit_id, units.company_id").
-		Joins("LEFT JOIN units ON user_units.unit_id = units.id").
-		Where("user_units.user_id = ?", userID).
-		First(&result).Error
-
+	result, err := h.userRepo.GetFirstUserUnit(userID)
 	if err != nil {
-		http.Error(w, "User has no associated units or company", http.StatusNotFound)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "User has no associated units or company", http.StatusNotFound)
+			return
+		}
+		log.Printf("GetMyUsageMetrics userRepo.GetFirstUserUnit: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 

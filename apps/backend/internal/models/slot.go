@@ -65,6 +65,17 @@ type UpdateDayScheduleRequest struct {
 	Slots    []ServiceSlot `json:"slots"`
 }
 
+// GenerateSlotsRequest is the JSON body for generating service slots for a date range.
+type GenerateSlotsRequest struct {
+	From string `json:"from"` // inclusive start date (YYYY-MM-DD)
+	To   string `json:"to"`   // inclusive end date (YYYY-MM-DD)
+}
+
+// SlotSuccessResponse is returned when slot generation or a day schedule update succeeds.
+type SlotSuccessResponse struct {
+	Success bool `json:"success"`
+}
+
 type ServiceSlotWithBooking struct {
 	ServiceSlot
 	Booked int `json:"booked"`

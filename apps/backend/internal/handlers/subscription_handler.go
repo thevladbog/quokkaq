@@ -2,24 +2,50 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
+	"log"
 	"net/http"
+	"os"
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/repository"
+	"quokkaq-go-backend/internal/services"
 	"quokkaq-go-backend/pkg/database"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"gorm.io/gorm"
 )
 
 type SubscriptionHandler struct {
 	subscriptionRepo repository.SubscriptionRepository
 	userRepo         repository.UserRepository
+	paymentProvider  services.PaymentProvider
 }
 
-func NewSubscriptionHandler(subscriptionRepo repository.SubscriptionRepository, userRepo repository.UserRepository) *SubscriptionHandler {
+func NewSubscriptionHandler(subscriptionRepo repository.SubscriptionRepository, userRepo repository.UserRepository, paymentProvider services.PaymentProvider) *SubscriptionHandler {
 	return &SubscriptionHandler{
 		subscriptionRepo: subscriptionRepo,
 		userRepo:         userRepo,
+		paymentProvider:  paymentProvider,
 	}
+}
+
+// billingMockCheckoutAllowed returns true when BILLING_MOCK_CHECKOUT is set and APP_ENV is not production.
+// Used only for local/tests; never enable in production.
+func billingMockCheckoutAllowed() bool {
+	if strings.EqualFold(strings.TrimSpace(os.Getenv("APP_ENV")), "production") {
+		return false
+	}
+	v := strings.ToLower(strings.TrimSpace(os.Getenv("BILLING_MOCK_CHECKOUT")))
+	return v == "true" || v == "1" || v == "yes"
+}
+
+func checkoutBaseURL() string {
+	base := strings.TrimSpace(os.Getenv("APP_BASE_URL"))
+	if base == "" {
+		base = "http://localhost:3000"
+	}
+	return strings.TrimRight(base, "/")
 }
 
 // GetMySubscription godoc
@@ -55,13 +81,23 @@ func (h *SubscriptionHandler) GetMySubscription(w http.ResponseWriter, r *http.R
 		First(&result).Error
 
 	if err != nil {
-		http.Error(w, "User has no associated company", http.StatusNotFound)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "User has no associated company", http.StatusNotFound)
+			return
+		}
+		log.Printf("GetMySubscription user_units lookup for user %q: %v", userID, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	subscription, err := h.subscriptionRepo.FindByCompanyID(result.CompanyID)
 	if err != nil {
-		http.Error(w, "No subscription found", http.StatusNotFound)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "No subscription found", http.StatusNotFound)
+			return
+		}
+		log.Printf("GetMySubscription subscriptionRepo.FindByCompanyID(%q): %v", result.CompanyID, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -80,7 +116,8 @@ func (h *SubscriptionHandler) GetMySubscription(w http.ResponseWriter, r *http.R
 func (h *SubscriptionHandler) GetPlans(w http.ResponseWriter, r *http.Request) {
 	plans, err := h.subscriptionRepo.GetActivePlans()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("GetPlans subscriptionRepo.GetActivePlans: %v", err)
+		http.Error(w, "Failed to fetch subscription plans", http.StatusInternalServerError)
 		return
 	}
 
@@ -110,6 +147,8 @@ type CreateCheckoutResponse struct {
 // @Success      200  {object}  CreateCheckoutResponse
 // @Failure      400  {string}  string "Bad Request"
 // @Failure      401  {string}  string "Unauthorized"
+// @Failure      404  {string}  string "Not Found"
+// @Failure      501  {string}  string "Billing checkout not configured"
 // @Failure      500  {string}  string "Internal Server Error"
 // @Router       /subscriptions/checkout [post]
 func (h *SubscriptionHandler) CreateCheckout(w http.ResponseWriter, r *http.Request) {
@@ -125,6 +164,27 @@ func (h *SubscriptionHandler) CreateCheckout(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	planCode := strings.TrimSpace(req.PlanCode)
+	if planCode == "" {
+		http.Error(w, "planCode is required", http.StatusBadRequest)
+		return
+	}
+
+	plan, err := h.subscriptionRepo.FindPlanByCode(planCode)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "Unknown plan code", http.StatusBadRequest)
+			return
+		}
+		log.Printf("CreateCheckout subscriptionRepo.FindPlanByCode(%q): %v", planCode, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if !plan.IsActive {
+		http.Error(w, "Plan is not available", http.StatusBadRequest)
+		return
+	}
+
 	// Get user's company
 	db := database.DB
 	type Result struct {
@@ -132,26 +192,58 @@ func (h *SubscriptionHandler) CreateCheckout(w http.ResponseWriter, r *http.Requ
 	}
 
 	var result Result
-	err := db.Table("user_units").
+	err = db.Table("user_units").
 		Select("units.company_id").
 		Joins("LEFT JOIN units ON user_units.unit_id = units.id").
 		Where("user_units.user_id = ?", userID).
 		First(&result).Error
 
 	if err != nil {
-		http.Error(w, "User has no associated company", http.StatusNotFound)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "User has no associated company", http.StatusNotFound)
+			return
+		}
+		log.Printf("CreateCheckout user_units lookup for user %q: %v", userID, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	// TODO: Integrate with payment provider (Stripe/YooKassa)
-	// For now, return mock checkout URL
-	response := CreateCheckoutResponse{
-		CheckoutURL: "/organization/billing?checkout=success",
-		SessionID:   "mock-session-id",
+	subscription, err := h.subscriptionRepo.FindByCompanyID(result.CompanyID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "No subscription found", http.StatusNotFound)
+			return
+		}
+		log.Printf("CreateCheckout subscriptionRepo.FindByCompanyID(%q): %v", result.CompanyID, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	base := checkoutBaseURL()
+	successURL := base + "/organization/billing?checkout=success"
+	cancelURL := base + "/organization/billing?checkout=cancel"
+
+	if h.paymentProvider != nil {
+		checkoutURL, sessionID, cerr := h.paymentProvider.CreateCheckoutSession(r.Context(), subscription, plan, successURL, cancelURL)
+		if cerr != nil {
+			http.Error(w, "Failed to create checkout session", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		RespondJSON(w, CreateCheckoutResponse{CheckoutURL: checkoutURL, SessionID: sessionID})
+		return
+	}
+
+	if !billingMockCheckoutAllowed() {
+		http.Error(w, "Billing checkout is not configured (payment provider unavailable). Set STRIPE_SECRET_KEY and do not set BILLING_ENABLED=false, or set BILLING_MOCK_CHECKOUT=true for non-production testing only.", http.StatusNotImplemented)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	RespondJSON(w, response)
+	RespondJSON(w, CreateCheckoutResponse{
+		CheckoutURL: successURL,
+		SessionID:   "mock-session-id",
+	})
 }
 
 // CancelSubscription godoc
@@ -178,21 +270,53 @@ func (h *SubscriptionHandler) CancelSubscription(w http.ResponseWriter, r *http.
 
 	subscription, err := h.subscriptionRepo.FindByID(subscriptionID)
 	if err != nil {
-		http.Error(w, "Subscription not found", http.StatusNotFound)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "Subscription not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("CancelSubscription subscriptionRepo.FindByID(%q): %v", subscriptionID, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	// Verify user has access to this subscription's company
 	hasAccess, err := h.userRepo.HasCompanyAccess(userID, subscription.CompanyID)
-	if err != nil || !hasAccess {
+	if err != nil {
+		log.Printf("CancelSubscription userRepo.HasCompanyAccess: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if !hasAccess {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 
-	// Mark for cancellation at period end
+	stripeLinked := subscription.StripeSubscriptionID != nil && strings.TrimSpace(*subscription.StripeSubscriptionID) != ""
+	if h.paymentProvider != nil && stripeLinked {
+		if err := h.paymentProvider.CancelSubscription(r.Context(), subscriptionID); err != nil {
+			log.Printf("CancelSubscription (payment provider): %v", err)
+			http.Error(w, "Failed to cancel subscription with payment provider", http.StatusBadGateway)
+			return
+		}
+		updated, err := h.subscriptionRepo.FindByID(subscriptionID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				http.Error(w, "Subscription not found", http.StatusNotFound)
+				return
+			}
+			log.Printf("CancelSubscription subscriptionRepo.FindByID(%q) after provider cancel: %v", subscriptionID, err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		RespondJSON(w, updated)
+		return
+	}
+
 	subscription.CancelAtPeriodEnd = true
 	if err := h.subscriptionRepo.Update(subscription); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("CancelSubscription subscriptionRepo.Update(%q): %v", subscription.ID, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 

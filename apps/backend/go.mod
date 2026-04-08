@@ -1,6 +1,6 @@
 module quokkaq-go-backend
 
-go 1.25.0
+go 1.26.0
 
 require (
 	github.com/MarceloPetrucio/go-scalar-api-reference v0.0.0-20240521013641-ce5d2efe0e06

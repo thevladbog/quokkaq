@@ -15,6 +15,7 @@ import (
 	"quokkaq-go-backend/internal/ws"
 	"quokkaq-go-backend/pkg/database"
 	"strconv"
+	"strings"
 
 	"github.com/MarceloPetrucio/go-scalar-api-reference"
 	"github.com/go-chi/chi/v5"
@@ -60,7 +61,7 @@ func main() {
 			&models.Company{},
 			&models.SubscriptionPlan{},
 			&models.Role{},
-			
+
 			// Models with foreign keys (in dependency order)
 			&models.Subscription{},
 			&models.Invoice{},
@@ -127,13 +128,14 @@ func main() {
 
 	userService := services.NewUserService(userRepo)
 	mailService := services.NewMailService()
-	authService := services.NewAuthService(userRepo, mailService)
+	authService := services.NewAuthService(userRepo, mailService, subscriptionRepo)
 	unitService := services.NewUnitService(unitRepo)
 	ticketService := services.NewTicketService(ticketRepo, counterRepo, serviceRepo, hub, jobClient)
 	serviceService := services.NewServiceService(serviceRepo)
 	counterService := services.NewCounterService(counterRepo, ticketRepo, userRepo)
 	bookingService := services.NewBookingService(bookingRepo)
-	shiftService := services.NewShiftService(ticketRepo, counterRepo, hub)
+	auditLogRepo := repository.NewAuditLogRepository()
+	shiftService := services.NewShiftService(ticketRepo, counterRepo, auditLogRepo, hub)
 	templateService := services.NewTemplateService(templateRepo)
 	invitationService := services.NewInvitationService(invitationRepo, mailService, userRepo, templateService)
 	slotService := services.NewSlotService(slotRepo, preRegRepo)
@@ -156,7 +158,20 @@ func main() {
 	uploadHandler := handlers.NewUploadHandler(storageService)
 	desktopTerminalHandler := handlers.NewDesktopTerminalHandler(desktopTerminalService)
 	usageHandler := handlers.NewUsageHandler(quotaService, userRepo)
-	subscriptionHandler := handlers.NewSubscriptionHandler(subscriptionRepo, userRepo)
+
+	var paymentProvider services.PaymentProvider
+	stripeKey := strings.TrimSpace(os.Getenv("STRIPE_SECRET_KEY"))
+	if stripeKey != "" {
+		billingOff := false
+		switch strings.ToLower(strings.TrimSpace(os.Getenv("BILLING_ENABLED"))) {
+		case "false", "0", "no":
+			billingOff = true
+		}
+		if !billingOff {
+			paymentProvider = services.NewStripeProvider(stripeKey, strings.TrimSpace(os.Getenv("STRIPE_WEBHOOK_SECRET")))
+		}
+	}
+	subscriptionHandler := handlers.NewSubscriptionHandler(subscriptionRepo, userRepo, paymentProvider)
 	invoiceHandler := handlers.NewInvoiceHandler(invoiceRepo, userRepo)
 	companyHandler := handlers.NewCompanyHandler(companyRepo, userRepo)
 
@@ -423,6 +438,6 @@ func main() {
 
 	fmt.Printf("Server starting on port %s\n", port)
 	if err := http.ListenAndServe(":"+port, r); err != nil {
-		fmt.Printf("Server failed: %v\n", err)
+		log.Fatalf("ListenAndServe: %v", err)
 	}
 }

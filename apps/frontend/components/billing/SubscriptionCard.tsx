@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Subscription } from '@quokkaq/shared-types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,7 +24,13 @@ export function SubscriptionCard({
   onManageBilling 
 }: SubscriptionCardProps) {
   const t = useTranslations('organization.billing');
-  
+
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+
   const getStatusBadge = (status: string) => {
     return <Badge variant={
       status === 'trial' ? 'secondary' :
@@ -45,10 +51,13 @@ export function SubscriptionCard({
   };
 
   const daysUntilEnd = useMemo(() => {
+    if (!subscription.trialEnd) {
+      return 0;
+    }
     return Math.ceil(
-      (new Date(subscription.currentPeriodEnd).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
+      (new Date(subscription.trialEnd).getTime() - nowMs) / (1000 * 60 * 60 * 24)
     );
-  }, [subscription.currentPeriodEnd]);
+  }, [subscription.trialEnd, nowMs]);
 
   return (
     <Card className="w-full">

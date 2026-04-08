@@ -30,7 +30,7 @@
     "lint": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "golangci-lint run",
+        "command": "go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4 run ./...",
         "cwd": "apps/backend"
       }
     },

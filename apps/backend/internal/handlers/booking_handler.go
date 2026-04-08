@@ -61,10 +61,7 @@ func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	if err := json.NewEncoder(w).Encode(booking); err != nil {
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-	}
+	RespondJSONWithStatus(w, http.StatusCreated, booking)
 }
 
 // GetBookingsByUnit godoc

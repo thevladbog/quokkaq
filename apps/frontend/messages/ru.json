@@ -1008,7 +1008,38 @@
       "viewInvoicesDesc": "Просмотр и скачивание всех ваших счетов",
       "viewUsage": "Использование",
       "viewUsageDesc": "Отслеживание использования ресурсов и квот",
-      "goTo": "Перейти"
+      "goTo": "Перейти",
+      "planSelector": {
+        "popularBadge": "Популярный выбор",
+        "currentPlan": "Текущий план",
+        "limitsTitle": "Лимиты:",
+        "featuresTitle": "Возможности:",
+        "selectPlan": "Выбрать план",
+        "contactUs": "Связаться с нами",
+        "customPricing": "По запросу",
+        "limits": {
+          "unlimited": "Безлимитно",
+          "units": "Подразделений",
+          "users": "Пользователей",
+          "tickets_per_month": "Талонов в месяц",
+          "services": "Услуг",
+          "counters": "Окон"
+        },
+        "features": {
+          "websocket_updates": "Обновления в реальном времени",
+          "basic_reports": "Базовые отчеты",
+          "advanced_reports": "Продвинутая аналитика",
+          "email_support": "Email поддержка",
+          "phone_support": "Телефонная поддержка",
+          "api_access": "API доступ",
+          "white_label": "White-label решение",
+          "custom_branding": "Кастомная раскраска",
+          "priority_support": "Приоритетная поддержка",
+          "dedicated_support": "Выделенный менеджер",
+          "sla_guarantee": "SLA гарантия",
+          "custom_integrations": "Кастомные интеграции"
+        }
+      }
     },
     "invoices": {
       "title": "История счетов",

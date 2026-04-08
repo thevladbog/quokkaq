@@ -2,10 +2,10 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/repository"
-	"quokkaq-go-backend/pkg/database"
 )
 
 type CompanyHandler struct {
@@ -39,27 +39,25 @@ func (h *CompanyHandler) CompleteOnboarding(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Get user's company through their units
-	db := database.DB
-	type Result struct {
-		CompanyID string
-	}
-
-	var result Result
-	err := db.Table("user_units").
-		Select("units.company_id").
-		Joins("LEFT JOIN units ON user_units.unit_id = units.id").
-		Where("user_units.user_id = ?", userID).
-		First(&result).Error
-
+	companyID, err := h.userRepo.GetCompanyIDByUserID(userID)
 	if err != nil {
-		http.Error(w, "User has no associated company", http.StatusNotFound)
+		if repository.IsNotFound(err) {
+			http.Error(w, "User has no associated company", http.StatusNotFound)
+			return
+		}
+		log.Printf("company CompleteOnboarding: GetCompanyIDByUserID: %v", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	company, err := h.companyRepo.FindByID(result.CompanyID)
+	company, err := h.companyRepo.FindByID(companyID)
 	if err != nil {
-		http.Error(w, "Company not found", http.StatusNotFound)
+		if repository.IsNotFound(err) {
+			http.Error(w, "Company not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("company CompleteOnboarding: FindByID: %v", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -67,16 +65,18 @@ func (h *CompanyHandler) CompleteOnboarding(w http.ResponseWriter, r *http.Reque
 	onboardingState := map[string]interface{}{
 		"completed": true,
 	}
-	
+
 	onboardingJSON, err := json.Marshal(onboardingState)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("company CompleteOnboarding: json.Marshal onboarding state: %v", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
-
 	company.OnboardingState = onboardingJSON
+
 	if err := h.companyRepo.Update(company); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("company CompleteOnboarding: Update: %v", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 

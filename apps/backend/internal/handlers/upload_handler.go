@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"io"
 	"net/http"
 	"path/filepath"
-	"quokkaq-go-backend/internal/services"
 	"strings"
+
+	"quokkaq-go-backend/internal/services"
 )
 
 type UploadHandler struct {
@@ -38,11 +40,13 @@ func (h *UploadHandler) UploadLogo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Read file content
-	fileBytes := make([]byte, header.Size)
-	_, err = file.Read(fileBytes)
+	fileBytes, err := io.ReadAll(file)
 	if err != nil {
 		http.Error(w, "Failed to read file", http.StatusInternalServerError)
+		return
+	}
+	if header.Size > 0 && int64(len(fileBytes)) != header.Size {
+		http.Error(w, "Uploaded file size mismatch", http.StatusBadRequest)
 		return
 	}
 

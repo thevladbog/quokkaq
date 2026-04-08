@@ -16,6 +16,18 @@ definitions:
       serviceId:
         type: string
     type: object
+  handlers.CreateCheckoutRequest:
+    properties:
+      planCode:
+        type: string
+    type: object
+  handlers.CreateCheckoutResponse:
+    properties:
+      checkoutUrl:
+        type: string
+      sessionId:
+        type: string
+    type: object
   handlers.CreateInvitationRequest:
     properties:
       email:
@@ -37,6 +49,11 @@ definitions:
   handlers.ForgotPasswordRequest:
     properties:
       email:
+        type: string
+    type: object
+  handlers.InvoicePDFNotImplementedResponse:
+    properties:
+      error:
         type: string
     type: object
   handlers.LoginRequest:
@@ -77,6 +94,20 @@ definitions:
       token:
         type: string
     type: object
+  handlers.SignupRequest:
+    properties:
+      companyName:
+        type: string
+      email:
+        type: string
+      name:
+        type: string
+      password:
+        type: string
+      planCode:
+        description: optional, defaults to starter with trial
+        type: string
+    type: object
   handlers.TransferRequest:
     properties:
       toCounterId:
@@ -87,6 +118,15 @@ definitions:
   handlers.UpdateStatusRequest:
     properties:
       status:
+        type: string
+    type: object
+  handlers.setupFirstAdminRequest:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+      password:
         type: string
     type: object
   models.Booking:
@@ -123,6 +163,39 @@ definitions:
       unitId:
         type: string
     type: object
+  models.DayScheduleWithBookings:
+    properties:
+      createdAt:
+        type: string
+      date:
+        description: YYYY-MM-DD
+        type: string
+      id:
+        type: string
+      isDayOff:
+        type: boolean
+      serviceSlots:
+        items:
+          $ref: '#/definitions/models.ServiceSlot'
+        type: array
+      slots:
+        items:
+          $ref: '#/definitions/models.ServiceSlotWithBooking'
+        type: array
+      unitId:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  models.GenerateSlotsRequest:
+    properties:
+      from:
+        description: inclusive start date (YYYY-MM-DD)
+        type: string
+      to:
+        description: inclusive end date (YYYY-MM-DD)
+        type: string
+    type: object
   models.Invitation:
     properties:
       createdAt:
@@ -146,6 +219,42 @@ definitions:
       updatedAt:
         type: string
       userId:
+        type: string
+    type: object
+  models.Invoice:
+    properties:
+      amount:
+        description: amount in minor units
+        type: integer
+      companyId:
+        type: string
+      createdAt:
+        type: string
+      currency:
+        description: '"RUB", "USD"'
+        type: string
+      dueDate:
+        description: payment due date
+        type: string
+      id:
+        type: string
+      paidAt:
+        description: when payment was received
+        type: string
+      paymentProvider:
+        description: '"stripe", "yookassa", "manual"'
+        type: string
+      paymentProviderInvoiceId:
+        description: external invoice ID
+        type: string
+      status:
+        description: '"draft", "open", "paid", "void", "uncollectible"'
+        type: string
+      subscription:
+        $ref: '#/definitions/models.Subscription'
+      subscriptionId:
+        type: string
+      updatedAt:
         type: string
     type: object
   models.MessageTemplate:
@@ -200,6 +309,35 @@ definitions:
       unitId:
         type: string
       updatedAt:
+        type: string
+    type: object
+  models.PreRegistrationCodeRequest:
+    properties:
+      code:
+        type: string
+    type: object
+  models.PreRegistrationRedeemResponse:
+    properties:
+      message:
+        type: string
+      success:
+        type: boolean
+      ticket:
+        $ref: '#/definitions/models.Ticket'
+    type: object
+  models.PreRegistrationUpdateRequest:
+    properties:
+      comment:
+        type: string
+      customerName:
+        type: string
+      customerPhone:
+        type: string
+      date:
+        type: string
+      serviceId:
+        type: string
+      time:
         type: string
     type: object
   models.Role:
@@ -263,6 +401,44 @@ definitions:
       unitId:
         type: string
     type: object
+  models.ServiceSlot:
+    properties:
+      capacity:
+        type: integer
+      createdAt:
+        type: string
+      dayScheduleId:
+        type: string
+      id:
+        type: string
+      serviceId:
+        type: string
+      startTime:
+        description: HH:MM
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  models.ServiceSlotWithBooking:
+    properties:
+      booked:
+        type: integer
+      capacity:
+        type: integer
+      createdAt:
+        type: string
+      dayScheduleId:
+        type: string
+      id:
+        type: string
+      serviceId:
+        type: string
+      startTime:
+        description: HH:MM
+        type: string
+      updatedAt:
+        type: string
+    type: object
   models.SlotConfig:
     properties:
       createdAt:
@@ -285,6 +461,77 @@ definitions:
         type: string
       unitId:
         type: string
+      updatedAt:
+        type: string
+    type: object
+  models.SlotSuccessResponse:
+    properties:
+      success:
+        type: boolean
+    type: object
+  models.Subscription:
+    properties:
+      cancelAtPeriodEnd:
+        type: boolean
+      companyId:
+        type: string
+      createdAt:
+        type: string
+      currentPeriodEnd:
+        type: string
+      currentPeriodStart:
+        type: string
+      id:
+        type: string
+      metadata:
+        description: additional data
+        type: object
+      plan:
+        allOf:
+        - $ref: '#/definitions/models.SubscriptionPlan'
+        description: Relations
+      planId:
+        type: string
+      status:
+        description: '"trial", "active", "past_due", "canceled", "paused"'
+        type: string
+      stripeSubscriptionId:
+        description: Stripe sub_… after Checkout completes
+        type: string
+      trialEnd:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  models.SubscriptionPlan:
+    properties:
+      code:
+        description: unique plan code like "starter", "professional"
+        type: string
+      createdAt:
+        type: string
+      currency:
+        description: '"RUB", "USD"'
+        type: string
+      features:
+        description: feature flags
+        type: object
+      id:
+        type: string
+      interval:
+        description: '"month", "year"'
+        type: string
+      isActive:
+        type: boolean
+      limits:
+        description: quota limits
+        type: object
+      name:
+        description: '"Starter", "Professional", "Enterprise"'
+        type: string
+      price:
+        description: price in minor units (cents/kopeks)
+        type: integer
       updatedAt:
         type: string
     type: object
@@ -316,7 +563,10 @@ definitions:
         description: Snapshot from Service at creation
         type: integer
       preRegistration:
-        $ref: '#/definitions/models.PreRegistration'
+        allOf:
+        - $ref: '#/definitions/models.PreRegistration'
+        description: 'No DB FK: avoids AutoMigrate cycle with pre_registrations.ticket_id
+          → tickets.id'
       preRegistrationId:
         type: string
       priority:
@@ -328,6 +578,9 @@ definitions:
       serviceId:
         type: string
       status:
+        type: string
+      ttsUrl:
+        description: URL to the generated TTS audio file
         type: string
       unitId:
         type: string
@@ -384,6 +637,15 @@ definitions:
       url:
         type: string
     type: object
+  models.UpdateDayScheduleRequest:
+    properties:
+      isDayOff:
+        type: boolean
+      slots:
+        items:
+          $ref: '#/definitions/models.ServiceSlot'
+        type: array
+    type: object
   models.User:
     properties:
       createdAt:
@@ -435,6 +697,50 @@ definitions:
         type: string
       userId:
         type: string
+    type: object
+  models.WeeklySlotCapacity:
+    properties:
+      capacity:
+        type: integer
+      createdAt:
+        type: string
+      dayOfWeek:
+        description: monday, tuesday, ...
+        type: string
+      id:
+        type: string
+      serviceId:
+        type: string
+      startTime:
+        description: HH:MM
+        type: string
+      unitId:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  services.Period:
+    properties:
+      end:
+        type: string
+      start:
+        type: string
+    type: object
+  services.UsageMetricInfo:
+    properties:
+      current:
+        type: integer
+      limit:
+        type: integer
+    type: object
+  services.UsageMetrics:
+    properties:
+      currentPeriod:
+        $ref: '#/definitions/services.Period'
+      metrics:
+        additionalProperties:
+          $ref: '#/definitions/services.UsageMetricInfo'
+        type: object
     type: object
 host: localhost:3001
 info:
@@ -559,6 +865,36 @@ paths:
       summary: Reset Password
       tags:
       - auth
+  /auth/signup:
+    post:
+      consumes:
+      - application/json
+      description: Register a new user and organization with trial subscription
+      parameters:
+      - description: Signup Information
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.SignupRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.LoginResponse'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "409":
+          description: Email already exists
+          schema:
+            type: string
+      summary: Sign Up
+      tags:
+      - auth
   /bookings:
     post:
       consumes:
@@ -664,6 +1000,74 @@ paths:
       summary: Update a booking
       tags:
       - bookings
+  /companies/{companyId}/usage-metrics:
+    get:
+      description: Returns current resource usage and limits for the company
+      parameters:
+      - description: Company ID
+        in: path
+        name: companyId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/services.UsageMetrics'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Get Usage Metrics
+      tags:
+      - usage
+  /companies/me/complete-onboarding:
+    post:
+      consumes:
+      - application/json
+      description: Marks onboarding as complete for the user's company
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: boolean
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "404":
+          description: No company found
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Complete Onboarding
+      tags:
+      - companies
   /counters:
     post:
       consumes:
@@ -1019,6 +1423,73 @@ paths:
       summary: Get invitation by token
       tags:
       - invitations
+  /invoices/{id}/download:
+    get:
+      description: Invoice PDF download is not implemented yet; returns 501 with a
+        JSON error after authorization.
+      parameters:
+      - description: Invoice ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+        "501":
+          description: PDF export not implemented
+          schema:
+            $ref: '#/definitions/handlers.InvoicePDFNotImplementedResponse'
+      security:
+      - BearerAuth: []
+      summary: Download Invoice
+      tags:
+      - invoices
+  /invoices/me:
+    get:
+      description: Returns invoices for the authenticated user's company
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Invoice'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "404":
+          description: No company found
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Get Current User's Invoices
+      tags:
+      - invoices
   /services:
     post:
       consumes:
@@ -1142,18 +1613,145 @@ paths:
       summary: Update a service
       tags:
       - services
+  /subscription-plans:
+    get:
+      description: Returns all active subscription plans
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.SubscriptionPlan'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Get Available Subscription Plans
+      tags:
+      - subscriptions
+  /subscriptions/{id}/cancel:
+    post:
+      description: Cancels the subscription at the end of billing period
+      parameters:
+      - description: Subscription ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Subscription'
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Cancel Subscription
+      tags:
+      - subscriptions
+  /subscriptions/checkout:
+    post:
+      consumes:
+      - application/json
+      description: Creates a checkout session for subscription upgrade
+      parameters:
+      - description: Checkout Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateCheckoutRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.CreateCheckoutResponse'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+        "501":
+          description: Billing checkout not configured
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Create Checkout Session
+      tags:
+      - subscriptions
+  /subscriptions/me:
+    get:
+      description: Returns subscription for the authenticated user's company
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Subscription'
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "404":
+          description: No subscription found
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Get Current User's Subscription
+      tags:
+      - subscriptions
   /system/setup:
     post:
       consumes:
       - application/json
       description: Creates the first administrator if the system is not initialized
       parameters:
-      - description: User Data
+      - description: Admin user
         in: body
-        name: user
+        name: request
         required: true
         schema:
-          $ref: '#/definitions/models.User'
+          $ref: '#/definitions/handlers.setupFirstAdminRequest'
       produces:
       - application/json
       responses:
@@ -1817,6 +2415,225 @@ paths:
       summary: Delete material
       tags:
       - units
+  /units/{unitId}/pre-registrations:
+    get:
+      description: Returns all pre-registrations associated with the unit (authenticated
+        unit member).
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.PreRegistration'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: List pre-registrations for a unit
+      tags:
+      - pre-registrations
+    post:
+      consumes:
+      - application/json
+      description: Creates a new pre-registration for the unit; unitId is taken from
+        the path.
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        type: string
+      - description: Pre-registration payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.PreRegistration'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.PreRegistration'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Create a pre-registration
+      tags:
+      - pre-registrations
+  /units/{unitId}/pre-registrations/{id}:
+    put:
+      consumes:
+      - application/json
+      description: Updates editable fields on an existing pre-registration for the
+        unit.
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        type: string
+      - description: Pre-registration ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.PreRegistrationUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.PreRegistration'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Update a pre-registration
+      tags:
+      - pre-registrations
+  /units/{unitId}/pre-registrations/redeem:
+    post:
+      consumes:
+      - application/json
+      description: Validates the code, creates a ticket, and marks the pre-registration
+        redeemed. Invalid codes return HTTP 200 with success=false and a message;
+        server errors use 5xx.
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        type: string
+      - description: Six-digit code
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.PreRegistrationCodeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.PreRegistrationRedeemResponse'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Redeem a pre-registration code (kiosk)
+      tags:
+      - pre-registrations
+  /units/{unitId}/pre-registrations/slots:
+    get:
+      description: Returns HH:MM slot strings for a service on a given date, accounting
+        for capacity and existing bookings.
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        type: string
+      - description: Service ID
+        in: query
+        name: serviceId
+        required: true
+        type: string
+      - description: Date (YYYY-MM-DD)
+        in: query
+        name: date
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              type: string
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Get available time slots for pre-registration
+      tags:
+      - pre-registrations
+  /units/{unitId}/pre-registrations/validate:
+    post:
+      consumes:
+      - application/json
+      description: Looks up a pre-registration by code for the unit context; returns
+        the record when valid.
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        type: string
+      - description: Six-digit code
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.PreRegistrationCodeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.PreRegistration'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+      summary: Validate a pre-registration code (kiosk)
+      tags:
+      - pre-registrations
   /units/{unitId}/services:
     get:
       description: Retrieves all services for a specific unit
@@ -1946,6 +2763,238 @@ paths:
       summary: Get queue tickets
       tags:
       - shift
+  /units/{unitId}/slots/capacities:
+    get:
+      description: Returns per-day, per-service capacity definitions used when generating
+        slots.
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.WeeklySlotCapacity'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Get weekly slot capacities for a unit
+      tags:
+      - slots
+    put:
+      consumes:
+      - application/json
+      description: Updates all weekly capacity rows for the unit; unitId on each item
+        is set from the path.
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        type: string
+      - description: Weekly capacities
+        in: body
+        name: capacities
+        required: true
+        schema:
+          items:
+            $ref: '#/definitions/models.WeeklySlotCapacity'
+          type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.WeeklySlotCapacity'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Replace weekly slot capacities for a unit
+      tags:
+      - slots
+  /units/{unitId}/slots/config:
+    get:
+      description: Returns weekly slot window settings (start/end time, interval,
+        active days). If none exist, returns defaults scoped to the unit.
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.SlotConfig'
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Get slot configuration for a unit
+      tags:
+      - slots
+    put:
+      consumes:
+      - application/json
+      description: Creates or updates weekly slot window settings for the unit.
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        type: string
+      - description: Slot configuration
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/models.SlotConfig'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.SlotConfig'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Update slot configuration for a unit
+      tags:
+      - slots
+  /units/{unitId}/slots/day/{date}:
+    get:
+      description: Returns the day schedule with per-slot booking counts. Responds
+        404 if slots have not been generated for that date.
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        type: string
+      - description: Date (YYYY-MM-DD)
+        in: path
+        name: date
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.DayScheduleWithBookings'
+        "404":
+          description: Not Found
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Get generated slots for a calendar day
+      tags:
+      - slots
+    put:
+      consumes:
+      - application/json
+      description: Sets day-off flag and replaces service slots for the given date
+        after validation.
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        type: string
+      - description: Date (YYYY-MM-DD)
+        in: path
+        name: date
+        required: true
+        type: string
+      - description: Day schedule update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateDayScheduleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.SlotSuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Update a single day schedule
+      tags:
+      - slots
+  /units/{unitId}/slots/generate:
+    post:
+      consumes:
+      - application/json
+      description: Materializes slots for the unit between the given dates based on
+        config and capacities.
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        type: string
+      - description: Inclusive from/to dates (YYYY-MM-DD)
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.GenerateSlotsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.SlotSuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Generate service slots for a date range
+      tags:
+      - slots
   /units/{unitId}/tickets:
     get:
       description: Retrieves all tickets for a specific unit
@@ -2000,6 +3049,34 @@ paths:
       summary: Create a new ticket
       tags:
       - tickets
+  /usage-metrics/me:
+    get:
+      description: Returns current resource usage and limits for the authenticated
+        user's company
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/services.UsageMetrics'
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "404":
+          description: User has no units or company
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Get Current User's Usage Metrics
+      tags:
+      - usage
   /users:
     get:
       description: Retrieves a list of all users

@@ -14,7 +14,11 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
+
+// ErrEmailAlreadyExists is returned from Signup when the email is already registered.
+var ErrEmailAlreadyExists = errors.New("email already exists")
 
 type AuthService interface {
 	Login(email, password string) (string, error)
@@ -25,14 +29,16 @@ type AuthService interface {
 }
 
 type authService struct {
-	userRepo    repository.UserRepository
-	mailService MailService
+	userRepo         repository.UserRepository
+	mailService      MailService
+	subscriptionRepo repository.SubscriptionRepository
 }
 
-func NewAuthService(userRepo repository.UserRepository, mailService MailService) AuthService {
+func NewAuthService(userRepo repository.UserRepository, mailService MailService, subscriptionRepo repository.SubscriptionRepository) AuthService {
 	return &authService{
-		userRepo:    userRepo,
-		mailService: mailService,
+		userRepo:         userRepo,
+		mailService:      mailService,
+		subscriptionRepo: subscriptionRepo,
 	}
 }
 
@@ -140,7 +146,7 @@ func (s *authService) Signup(name, email, password, companyName, planCode string
 	// Check if user already exists
 	existingUser, _ := s.userRepo.FindByEmail(email)
 	if existingUser != nil {
-		return "", errors.New("email already exists")
+		return "", ErrEmailAlreadyExists
 	}
 
 	// Hash password
@@ -150,28 +156,19 @@ func (s *authService) Signup(name, email, password, companyName, planCode string
 	}
 	hashedPasswordStr := string(hashedPassword)
 
-	// Get subscription plan
-	subscriptionRepo := repository.NewSubscriptionRepository()
-	plan, err := subscriptionRepo.FindPlanByCode(planCode)
+	// Get subscription plan (read-only; outside transaction)
+	plan, err := s.subscriptionRepo.FindPlanByCode(planCode)
 	if err != nil {
 		return "", fmt.Errorf("invalid plan code: %w", err)
 	}
 
-	// Create company
 	company := &models.Company{
 		Name:         companyName,
 		BillingEmail: email,
 	}
 
-	db := database.DB
-	if err := db.Create(company).Error; err != nil {
-		return "", fmt.Errorf("failed to create company: %w", err)
-	}
-
-	// Create trial subscription (14 days)
 	trialEnd := time.Now().AddDate(0, 0, 14)
 	subscription := &models.Subscription{
-		CompanyID:          company.ID,
 		PlanID:             plan.ID,
 		Status:             "trial",
 		CurrentPeriodStart: time.Now(),
@@ -179,14 +176,6 @@ func (s *authService) Signup(name, email, password, companyName, planCode string
 		TrialEnd:           &trialEnd,
 	}
 
-	if err := db.Create(subscription).Error; err != nil {
-		return "", fmt.Errorf("failed to create subscription: %w", err)
-	}
-
-	// Update company with subscription and owner
-	company.SubscriptionID = &subscription.ID
-
-	// Create user
 	user := &models.User{
 		Name:     name,
 		Email:    &email,
@@ -194,26 +183,45 @@ func (s *authService) Signup(name, email, password, companyName, planCode string
 		Type:     "staff",
 	}
 
-	if err := s.userRepo.Create(user); err != nil {
-		return "", fmt.Errorf("failed to create user: %w", err)
-	}
+	var token string
+	err = database.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(company).Error; err != nil {
+			return fmt.Errorf("failed to create company: %w", err)
+		}
 
-	// Set user as company owner
-	company.OwnerUserID = user.ID
-	if err := db.Save(company).Error; err != nil {
-		return "", fmt.Errorf("failed to update company owner: %w", err)
-	}
+		subscription.CompanyID = company.ID
+		if err := tx.Create(subscription).Error; err != nil {
+			return fmt.Errorf("failed to create subscription: %w", err)
+		}
 
-	// Assign admin role
-	adminRole, err := s.userRepo.EnsureRoleExists("admin")
+		company.SubscriptionID = &subscription.ID
+		if err := s.userRepo.CreateTx(tx, user); err != nil {
+			return fmt.Errorf("failed to create user: %w", err)
+		}
+
+		company.OwnerUserID = user.ID
+		if err := tx.Save(company).Error; err != nil {
+			return fmt.Errorf("failed to update company owner: %w", err)
+		}
+
+		adminRole, err := s.userRepo.EnsureRoleExistsTx(tx, "admin")
+		if err != nil {
+			return fmt.Errorf("failed to get admin role: %w", err)
+		}
+
+		if err := s.userRepo.AssignRoleTx(tx, user.ID, adminRole.ID); err != nil {
+			return fmt.Errorf("failed to assign admin role: %w", err)
+		}
+
+		var genErr error
+		token, genErr = s.generateToken(user)
+		if genErr != nil {
+			return fmt.Errorf("failed to generate token: %w", genErr)
+		}
+		return nil
+	})
 	if err != nil {
-		return "", fmt.Errorf("failed to get admin role: %w", err)
+		return "", err
 	}
-
-	if err := s.userRepo.AssignRole(user.ID, adminRole.ID); err != nil {
-		return "", fmt.Errorf("failed to assign admin role: %w", err)
-	}
-
-	// Generate JWT token
-	return s.generateToken(user)
+	return token, nil
 }

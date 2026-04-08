@@ -59,7 +59,7 @@ func (r *subscriptionRepository) GetActivePlans() ([]models.SubscriptionPlan, er
 
 func (r *subscriptionRepository) FindPlanByCode(code string) (*models.SubscriptionPlan, error) {
 	var plan models.SubscriptionPlan
-	err := database.DB.Where("code = ?", code).First(&plan).Error
+	err := database.DB.Where("code = ?", code).Where("is_active = ?", true).First(&plan).Error
 	if err != nil {
 		return nil, err
 	}

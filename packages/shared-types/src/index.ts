@@ -330,6 +330,7 @@ export const SubscriptionSchema = z.object({
   currentPeriodEnd: z.string(),
   cancelAtPeriodEnd: z.boolean(),
   trialEnd: z.string().nullable().optional(),
+  stripeSubscriptionId: z.string().optional(),
   metadata: z.record(z.string(), z.any()).optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
@@ -353,7 +354,7 @@ export const CompanySchema = z.object({
 
 export const InvoiceSchema = z.object({
   id: z.string(),
-  companyId: z.string(),
+  companyId: z.string().nullable().optional(),
   subscriptionId: z.string(),
   amount: z.number(),
   currency: z.string(),

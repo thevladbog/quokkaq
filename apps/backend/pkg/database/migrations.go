@@ -53,27 +53,40 @@ func (m *MigrationManager) GetAppliedMigrations() ([]Migration, error) {
 	return migrations, err
 }
 
-// RunMigration runs a migration function if it hasn't been applied yet
+// RunMigration runs a migration function if it hasn't been applied yet.
+// It uses a single DB transaction and a PostgreSQL transaction-scoped advisory lock
+// (pg_advisory_xact_lock) so concurrent processes cannot pass the applied check and
+// run the same migration; migrationFunc receives the transactional *gorm.DB.
 func (m *MigrationManager) RunMigration(version string, migrationFunc func(*gorm.DB) error) error {
-	applied, err := m.IsMigrationApplied(version)
-	if err != nil {
-		return fmt.Errorf("failed to check migration status: %w", err)
-	}
+	return m.db.Transaction(func(tx *gorm.DB) error {
+		// Serialize runners for this version; released automatically on commit/rollback.
+		if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?::text), 0)", version).Error; err != nil {
+			return fmt.Errorf("migration %s: acquire lock: %w", version, err)
+		}
 
-	if applied {
-		log.Printf("Migration %s already applied, skipping", version)
+		var count int64
+		if err := tx.Model(&Migration{}).Where("version = ?", version).Count(&count).Error; err != nil {
+			return fmt.Errorf("failed to check migration status: %w", err)
+		}
+		if count > 0 {
+			log.Printf("Migration %s already applied, skipping", version)
+			return nil
+		}
+
+		log.Printf("Applying migration %s...", version)
+		if err := migrationFunc(tx); err != nil {
+			return fmt.Errorf("failed to apply migration %s: %w", version, err)
+		}
+
+		migration := &Migration{
+			Version:   version,
+			AppliedAt: time.Now(),
+		}
+		if err := tx.Create(migration).Error; err != nil {
+			return fmt.Errorf("failed to mark migration %s as applied: %w", version, err)
+		}
+
+		log.Printf("Migration %s applied successfully", version)
 		return nil
-	}
-
-	log.Printf("Applying migration %s...", version)
-	if err := migrationFunc(m.db); err != nil {
-		return fmt.Errorf("failed to apply migration %s: %w", version, err)
-	}
-
-	if err := m.MarkMigrationApplied(version); err != nil {
-		return fmt.Errorf("failed to mark migration %s as applied: %w", version, err)
-	}
-
-	log.Printf("Migration %s applied successfully", version)
-	return nil
+	})
 }

@@ -1,9 +1,12 @@
 package services
 
 import (
+	"errors"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/pkg/database"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 // AnalyticsService tracks events and usage for billing and analytics
@@ -38,7 +41,7 @@ func (s *analyticsService) TrackEvent(companyID, event string, properties map[st
 }
 
 func (s *analyticsService) TrackTicketCreated(companyID string) error {
-	if err := s.quotaService.IncrementUsage(companyID, "tickets_created", 1); err != nil {
+	if err := s.quotaService.IncrementUsage(companyID, "tickets_per_month", 1); err != nil {
 		return err
 	}
 	return s.TrackEvent(companyID, "ticket_created", nil)
@@ -98,13 +101,10 @@ func SyncCurrentUsageToRecords(companyID string) error {
 			companyID, metric, billingMonth).
 			First(&existingRecord).Error
 
-		if err == nil {
-			// Update existing record
-			existingRecord.Value = current
-			existingRecord.Timestamp = now
-			db.Save(&existingRecord)
-		} else {
-			// Create new record
+		if err != nil {
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
 			record := &models.UsageRecord{
 				CompanyID:    companyID,
 				MetricType:   metric,
@@ -112,7 +112,16 @@ func SyncCurrentUsageToRecords(companyID string) error {
 				Timestamp:    now,
 				BillingMonth: billingMonth,
 			}
-			db.Create(record)
+			if err := db.Create(record).Error; err != nil {
+				return err
+			}
+			continue
+		}
+
+		existingRecord.Value = current
+		existingRecord.Timestamp = now
+		if err := db.Save(&existingRecord).Error; err != nil {
+			return err
 		}
 	}
 
