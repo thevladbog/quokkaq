@@ -60,17 +60,17 @@ export function OnboardingWizard() {
 
   const handleNext = (data?: Partial<OnboardingState>) => {
     if (data) {
-      setState(prev => ({ ...prev, ...data }));
+      setState((prev) => ({ ...prev, ...data }));
     }
-    
+
     if (currentStep < steps.length - 1) {
-      setCurrentStep(prev => prev + 1);
+      setCurrentStep((prev) => prev + 1);
     }
   };
 
   const handleBack = () => {
     if (currentStep > 0) {
-      setCurrentStep(prev => prev - 1);
+      setCurrentStep((prev) => prev - 1);
     }
   };
 
@@ -83,22 +83,20 @@ export function OnboardingWizard() {
   };
 
   return (
-    <div className="container max-w-4xl mx-auto py-12 px-4">
+    <div className='container mx-auto max-w-4xl px-4 py-12'>
       {/* Progress Bar */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-medium text-gray-700">
+      <div className='mb-8'>
+        <div className='mb-2 flex items-center justify-between'>
+          <span className='text-sm font-medium text-gray-700'>
             {t('step')} {currentStep + 1} {t('of')} {steps.length}
           </span>
-          <span className="text-sm text-gray-500">
-            {currentStepData.title}
-          </span>
+          <span className='text-sm text-gray-500'>{currentStepData.title}</span>
         </div>
-        <Progress value={progress} className="h-2" />
+        <Progress value={progress} className='h-2' />
       </div>
 
       {/* Step Content */}
-      <Card className="shadow-xl">
+      <Card className='shadow-xl'>
         <StepComponent
           state={state}
           onNext={handleNext}

@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
+	"log"
 	"net/http"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/services"
@@ -172,6 +174,7 @@ func (h *PreRegistrationHandler) GetAvailableSlots(w http.ResponseWriter, r *htt
 // @Success      200    {object}  models.PreRegistration
 // @Failure      400    {string}  string "Bad Request"
 // @Failure      404    {string}  string "Not Found"
+// @Failure      500    {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/pre-registrations/validate [post]
 func (h *PreRegistrationHandler) Validate(w http.ResponseWriter, r *http.Request) {
 	var req models.PreRegistrationCodeRequest
@@ -182,7 +185,15 @@ func (h *PreRegistrationHandler) Validate(w http.ResponseWriter, r *http.Request
 
 	preReg, err := h.service.ValidateForKiosk(req.Code)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound) // Or 400 depending on error
+		if errors.Is(err, services.ErrPreRegistrationNotFound) ||
+			errors.Is(err, services.ErrPreRegistrationConsumed) ||
+			errors.Is(err, services.ErrPreRegistrationTooEarly) ||
+			errors.Is(err, services.ErrPreRegistrationTooLate) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		log.Printf("ValidateForKiosk: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	RespondJSON(w, preReg)
@@ -210,11 +221,18 @@ func (h *PreRegistrationHandler) Redeem(w http.ResponseWriter, r *http.Request) 
 	// 1. Validate again
 	preReg, err := h.service.ValidateForKiosk(req.Code)
 	if err != nil {
-		// Return 200 OK with error message for validation failures
-		RespondJSON(w, models.PreRegistrationRedeemResponse{
-			Success: false,
-			Message: err.Error(),
-		})
+		if errors.Is(err, services.ErrPreRegistrationNotFound) ||
+			errors.Is(err, services.ErrPreRegistrationConsumed) ||
+			errors.Is(err, services.ErrPreRegistrationTooEarly) ||
+			errors.Is(err, services.ErrPreRegistrationTooLate) {
+			RespondJSON(w, models.PreRegistrationRedeemResponse{
+				Success: false,
+				Message: err.Error(),
+			})
+			return
+		}
+		log.Printf("Redeem ValidateForKiosk: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 

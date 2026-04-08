@@ -148,7 +148,7 @@ func (s *quotaService) GetLimit(companyID string, metric string) (int, error) {
 	}
 
 	plan := company.Subscription.Plan
-	if plan.Limits == nil || len(plan.Limits) == 0 {
+	if len(plan.Limits) == 0 {
 		return s.getDefaultLimit(metric), nil
 	}
 

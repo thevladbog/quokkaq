@@ -1,5 +1,8 @@
 import { z } from 'zod';
-import { SubscriptionPlanSchema, type SubscriptionPlan } from '@quokkaq/shared-types';
+import {
+  SubscriptionPlanSchema,
+  type SubscriptionPlan
+} from '@quokkaq/shared-types';
 import { logger } from '@/lib/logger';
 
 const plansResponseSchema = z.array(SubscriptionPlanSchema);
@@ -16,7 +19,9 @@ function sortPlans(a: SubscriptionPlan, b: SubscriptionPlan): number {
  * Fetches public subscription plans from the API (server-side).
  * Returns null if the URL is missing, the request fails, or parsing fails.
  */
-export async function fetchPublicSubscriptionPlans(): Promise<SubscriptionPlan[] | null> {
+export async function fetchPublicSubscriptionPlans(): Promise<
+  SubscriptionPlan[] | null
+> {
   const base = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '');
   if (!base) {
     return null;
@@ -32,7 +37,9 @@ export async function fetchPublicSubscriptionPlans(): Promise<SubscriptionPlan[]
     if (!parsed.success) {
       return null;
     }
-    return parsed.data.filter((p) => p.isActive && p.code !== 'grandfathered').sort(sortPlans);
+    return parsed.data
+      .filter((p) => p.isActive && p.code !== 'grandfathered')
+      .sort(sortPlans);
   } catch (err) {
     logger.error('fetchPublicSubscriptionPlans failed', { error: err });
     return null;

@@ -68,6 +68,13 @@ definitions:
       token:
         type: string
     type: object
+  handlers.PeriodResponse:
+    properties:
+      end:
+        type: string
+      start:
+        type: string
+    type: object
   handlers.PickRequest:
     properties:
       counterId:
@@ -119,6 +126,22 @@ definitions:
     properties:
       status:
         type: string
+    type: object
+  handlers.UsageMetricInfoResponse:
+    properties:
+      current:
+        type: integer
+      limit:
+        type: integer
+    type: object
+  handlers.UsageMetricsResponse:
+    properties:
+      currentPeriod:
+        $ref: '#/definitions/handlers.PeriodResponse'
+      metrics:
+        additionalProperties:
+          $ref: '#/definitions/handlers.UsageMetricInfoResponse'
+        type: object
     type: object
   handlers.setupFirstAdminRequest:
     properties:
@@ -734,29 +757,6 @@ definitions:
       updatedAt:
         type: string
     type: object
-  services.Period:
-    properties:
-      end:
-        type: string
-      start:
-        type: string
-    type: object
-  services.UsageMetricInfo:
-    properties:
-      current:
-        type: integer
-      limit:
-        type: integer
-    type: object
-  services.UsageMetrics:
-    properties:
-      currentPeriod:
-        $ref: '#/definitions/services.Period'
-      metrics:
-        additionalProperties:
-          $ref: '#/definitions/services.UsageMetricInfo'
-        type: object
-    type: object
 host: localhost:3001
 info:
   contact:
@@ -895,8 +895,8 @@ paths:
       produces:
       - application/json
       responses:
-        "200":
-          description: OK
+        "201":
+          description: Created
           schema:
             $ref: '#/definitions/handlers.LoginResponse'
         "400":
@@ -1030,7 +1030,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/services.UsageMetrics'
+            $ref: '#/definitions/handlers.UsageMetricsResponse'
         "400":
           description: Bad Request
           schema:
@@ -1440,8 +1440,10 @@ paths:
       - invitations
   /invoices/{id}/download:
     get:
-      description: Invoice PDF download is not implemented yet; returns 501 with a
-        JSON error after authorization.
+      description: Currently returns HTTP 501 with JSON after authorization. When
+        PDF export is implemented, a successful response will be 200 with body as
+        application/pdf (binary PDF bytes). Until then, clients should treat 501 and
+        handlers.InvoicePDFNotImplementedResponse as the expected outcome.
       parameters:
       - description: Invoice ID
         in: path
@@ -1450,7 +1452,13 @@ paths:
         type: string
       produces:
       - application/json
+      - application/pdf
       responses:
+        "200":
+          description: 'Invoice PDF binary (Content-Type: application/pdf) once generation
+            is implemented'
+          schema:
+            type: file
         "401":
           description: Unauthorized
           schema:
@@ -1473,7 +1481,7 @@ paths:
             $ref: '#/definitions/handlers.InvoicePDFNotImplementedResponse'
       security:
       - BearerAuth: []
-      summary: Download Invoice
+      summary: Download Invoice (PDF when implemented)
       tags:
       - invoices
   /invoices/me:
@@ -2686,6 +2694,10 @@ paths:
           description: Not Found
           schema:
             type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
       summary: Validate a pre-registration code (kiosk)
       tags:
       - pre-registrations
@@ -3184,7 +3196,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/services.UsageMetrics'
+            $ref: '#/definitions/handlers.UsageMetricsResponse'
         "401":
           description: Unauthorized
           schema:

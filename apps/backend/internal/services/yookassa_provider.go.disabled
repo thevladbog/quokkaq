@@ -15,6 +15,10 @@ import (
 	"time"
 
 	yookassa "github.com/rvinnie/yookassa-sdk-go/yookassa"
+	yoocommon "github.com/rvinnie/yookassa-sdk-go/yookassa/common"
+	yoopayment "github.com/rvinnie/yookassa-sdk-go/yookassa/payment"
+	yoorefund "github.com/rvinnie/yookassa-sdk-go/yookassa/refund"
+	yoowebhook "github.com/rvinnie/yookassa-sdk-go/yookassa/webhook"
 	"gorm.io/gorm"
 )
 
@@ -103,13 +107,13 @@ func (p *YooKassaProvider) CreateCheckoutSession(ctx context.Context, subscripti
 		return "", "", err
 	}
 
-	payment := &yookassa.Payment{
-		Amount: &yookassa.Amount{
+	payment := &yoopayment.Payment{
+		Amount: &yoocommon.Amount{
 			Value:    fmt.Sprintf("%.2f", float64(pricePlan.Price)/100),
-			Currency: pricePlan.Currency,
+			Currency: strings.ToUpper(pricePlan.Currency),
 		},
-		Confirmation: &yookassa.Confirmation{
-			Type:      yookassa.ConfirmationTypeRedirect,
+		Confirmation: &yoopayment.Redirect{
+			Type:      yoopayment.TypeRedirect,
 			ReturnURL: successURL,
 		},
 		Description: fmt.Sprintf("Подписка %s для %s", pricePlan.Name, subscription.Company.Name),
@@ -121,7 +125,9 @@ func (p *YooKassaProvider) CreateCheckoutSession(ctx context.Context, subscripti
 		Capture: true,
 	}
 
-	createdPayment, err := p.client.CreatePayment(payment)
+	// Idempotency key = local invoice id so retries after a successful CreatePayment do not create duplicate YooKassa payments.
+	payHandler := yookassa.NewPaymentHandler(p.client).WithIdempotencyKey(invoice.ID)
+	createdPayment, err := payHandler.CreatePayment(ctx, payment)
 	if err != nil {
 		_ = db.Model(invoice).Update("status", "void").Error
 		return "", "", fmt.Errorf("failed to create payment: %w", err)
@@ -131,11 +137,21 @@ func (p *YooKassaProvider) CreateCheckoutSession(ctx context.Context, subscripti
 		return "", "", err
 	}
 
-	if createdPayment.Confirmation != nil {
-		return createdPayment.Confirmation.ConfirmationURL, createdPayment.ID, nil
+	if url := yooPaymentRedirectURL(createdPayment); url != "" {
+		return url, createdPayment.ID, nil
 	}
 
 	return "", "", fmt.Errorf("no confirmation URL in payment response")
+}
+
+func yooPaymentRedirectURL(p *yoopayment.Payment) string {
+	if p == nil || p.Confirmation == nil {
+		return ""
+	}
+	if redir, ok := p.Confirmation.(*yoopayment.Redirect); ok && redir != nil {
+		return redir.ConfirmationURL
+	}
+	return ""
 }
 
 func (p *YooKassaProvider) CreateInvoice(ctx context.Context, subscription *models.Subscription) (*models.Invoice, error) {
@@ -168,20 +184,35 @@ func (p *YooKassaProvider) HandleWebhook(ctx context.Context, payload []byte, si
 		return fmt.Errorf("webhook signature verification failed: %w", err)
 	}
 
-	var notification yookassa.Notification
-	if err := json.Unmarshal(payload, &notification); err != nil {
+	var envelope struct {
+		Event  yoowebhook.WebhookEventType `json:"event"`
+		Object json.RawMessage             `json:"object"`
+	}
+	if err := json.Unmarshal(payload, &envelope); err != nil {
 		return fmt.Errorf("failed to unmarshal notification: %w", err)
 	}
 
-	switch notification.Event {
-	case yookassa.EventPaymentSucceeded:
-		return p.handlePaymentSucceeded(ctx, notification.Object)
+	switch envelope.Event {
+	case yoowebhook.EventPaymentSucceeded:
+		var pay yoopayment.Payment
+		if err := json.Unmarshal(envelope.Object, &pay); err != nil {
+			return fmt.Errorf("unmarshal payment object: %w", err)
+		}
+		return p.handlePaymentSucceeded(ctx, &pay)
 
-	case yookassa.EventPaymentCanceled:
-		return p.handlePaymentCanceled(ctx, notification.Object)
+	case yoowebhook.EventPaymentCanceled:
+		var pay yoopayment.Payment
+		if err := json.Unmarshal(envelope.Object, &pay); err != nil {
+			return fmt.Errorf("unmarshal payment object: %w", err)
+		}
+		return p.handlePaymentCanceled(ctx, &pay)
 
-	case yookassa.EventRefundSucceeded:
-		return p.handleRefundSucceeded(ctx, notification.Object)
+	case yoowebhook.EventRefundSucceeded:
+		var ref yoorefund.Refund
+		if err := json.Unmarshal(envelope.Object, &ref); err != nil {
+			return fmt.Errorf("unmarshal refund object: %w", err)
+		}
+		return p.handleRefundSucceeded(ctx, &ref)
 	}
 
 	return nil
@@ -209,7 +240,7 @@ func (p *YooKassaProvider) CreateCustomer(ctx context.Context, companyID, email,
 	return companyID, nil
 }
 
-func (p *YooKassaProvider) handlePaymentSucceeded(ctx context.Context, payment *yookassa.Payment) error {
+func (p *YooKassaProvider) handlePaymentSucceeded(ctx context.Context, payment *yoopayment.Payment) error {
 	return database.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var invoice models.Invoice
 		if err := tx.Where("payment_provider_invoice_id = ?", payment.ID).First(&invoice).Error; err != nil {
@@ -230,7 +261,7 @@ func (p *YooKassaProvider) handlePaymentSucceeded(ctx context.Context, payment *
 	})
 }
 
-func (p *YooKassaProvider) handlePaymentCanceled(ctx context.Context, payment *yookassa.Payment) error {
+func (p *YooKassaProvider) handlePaymentCanceled(ctx context.Context, payment *yoopayment.Payment) error {
 	return database.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var invoice models.Invoice
 		if err := tx.Where("payment_provider_invoice_id = ?", payment.ID).First(&invoice).Error; err != nil {
@@ -247,11 +278,11 @@ func (p *YooKassaProvider) handlePaymentCanceled(ctx context.Context, payment *y
 	})
 }
 
-func (p *YooKassaProvider) handleRefundSucceeded(ctx context.Context, refund *yookassa.Refund) error {
+func (p *YooKassaProvider) handleRefundSucceeded(ctx context.Context, refund *yoorefund.Refund) error {
 	db := database.DB.WithContext(ctx)
 
 	var invoice models.Invoice
-	if err := db.Where("payment_provider_invoice_id = ?", refund.PaymentID).First(&invoice).Error; err != nil {
+	if err := db.Where("payment_provider_invoice_id = ?", refund.PaymentId).First(&invoice).Error; err != nil {
 		return err
 	}
 

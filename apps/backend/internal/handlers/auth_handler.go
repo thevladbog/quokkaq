@@ -170,7 +170,7 @@ func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 // @Accept       json
 // @Produce      json
 // @Param        request body SignupRequest true "Signup Information"
-// @Success      200  {object}  LoginResponse
+// @Success      201  {object}  LoginResponse "Created"
 // @Failure      400  {string}  string "Bad Request"
 // @Failure      409  {string}  string "Email already exists"
 // @Router       /auth/signup [post]
@@ -202,6 +202,7 @@ func (h *AuthHandler) Signup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.WriteHeader(http.StatusCreated)
 	if err := json.NewEncoder(w).Encode(LoginResponse{Token: token}); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 	}

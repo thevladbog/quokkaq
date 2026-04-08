@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/pkg/database"
@@ -16,6 +17,8 @@ import (
 	"github.com/stripe/stripe-go/v76/invoiceitem"
 	stripesub "github.com/stripe/stripe-go/v76/subscription"
 	"github.com/stripe/stripe-go/v76/webhook"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type StripeProvider struct {
@@ -278,7 +281,7 @@ func (p *StripeProvider) GetCustomerID(ctx context.Context, companyID string) (s
 	return "", fmt.Errorf("customer not found")
 }
 
-func (p *StripeProvider) CreateCustomer(ctx context.Context, companyID, email, name string) (string, error) {
+func (p *StripeProvider) CreateCustomer(ctx context.Context, companyID, email, name string) (createdID string, err error) {
 	params := &stripe.CustomerParams{
 		Params: stripe.Params{
 			Context: ctx,
@@ -290,37 +293,42 @@ func (p *StripeProvider) CreateCustomer(ctx context.Context, companyID, email, n
 		},
 	}
 
-	cust, err := customer.New(params)
-	if err != nil {
-		return "", err
-	}
+	err = database.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var company models.Company
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ?", companyID).First(&company).Error; err != nil {
+			return err
+		}
 
-	// Store customer ID in company metadata
-	db := database.DB.WithContext(ctx)
-	var company models.Company
-	if err := db.Where("id = ?", companyID).First(&company).Error; err != nil {
-		return "", err
-	}
-
-	var settings map[string]interface{}
-	if company.Settings != nil {
-		if err := json.Unmarshal(company.Settings, &settings); err != nil {
+		var settings map[string]interface{}
+		if company.Settings != nil {
+			if err := json.Unmarshal(company.Settings, &settings); err != nil {
+				settings = make(map[string]interface{})
+			}
+		} else {
 			settings = make(map[string]interface{})
 		}
-	} else {
-		settings = make(map[string]interface{})
-	}
-	settings["stripe_customer_id"] = cust.ID
+		if id, ok := settings["stripe_customer_id"].(string); ok && id != "" {
+			createdID = id
+			return nil
+		}
 
-	settingsJSON, err := json.Marshal(settings)
-	if err != nil {
-		return "", fmt.Errorf("marshal company settings: %w", err)
-	}
-	if err := db.Model(&company).Update("settings", settingsJSON).Error; err != nil {
-		return "", fmt.Errorf("update company settings: %w", err)
-	}
-
-	return cust.ID, nil
+		cust, err := customer.New(params)
+		if err != nil {
+			return err
+		}
+		settings["stripe_customer_id"] = cust.ID
+		settingsJSON, err := json.Marshal(settings)
+		if err != nil {
+			return fmt.Errorf("marshal company settings: %w", err)
+		}
+		if err := tx.Model(&company).Update("settings", settingsJSON).Error; err != nil {
+			return fmt.Errorf("update company settings: %w", err)
+		}
+		createdID = cust.ID
+		return nil
+	})
+	return createdID, err
 }
 
 // Helper methods for webhook handlers
@@ -345,14 +353,13 @@ func (p *StripeProvider) handleCheckoutCompleted(ctx context.Context, session *s
 func (p *StripeProvider) handleInvoicePaymentSucceeded(ctx context.Context, stripeInvoice *stripe.Invoice) error {
 	db := database.DB.WithContext(ctx)
 
-	// Find our invoice by Stripe invoice ID
-	var invoice models.Invoice
-	if err := db.Where("payment_provider_invoice_id = ?", stripeInvoice.ID).First(&invoice).Error; err != nil {
+	invoice, err := p.ensureLocalInvoiceForStripeWebhook(ctx, db, stripeInvoice)
+	if err != nil {
 		return err
 	}
 
 	now := time.Now()
-	return db.Model(&invoice).Updates(map[string]interface{}{
+	return db.Model(invoice).Updates(map[string]interface{}{
 		"status":  "paid",
 		"paid_at": &now,
 	}).Error
@@ -361,18 +368,15 @@ func (p *StripeProvider) handleInvoicePaymentSucceeded(ctx context.Context, stri
 func (p *StripeProvider) handleInvoicePaymentFailed(ctx context.Context, stripeInvoice *stripe.Invoice) error {
 	db := database.DB.WithContext(ctx)
 
-	// Find our invoice by Stripe invoice ID
-	var invoice models.Invoice
-	if err := db.Where("payment_provider_invoice_id = ?", stripeInvoice.ID).First(&invoice).Error; err != nil {
+	invoice, err := p.ensureLocalInvoiceForStripeWebhook(ctx, db, stripeInvoice)
+	if err != nil {
 		return err
 	}
 
-	// Update invoice status
-	if err := db.Model(&invoice).Update("status", "uncollectible").Error; err != nil {
+	if err := db.Model(invoice).Update("status", "uncollectible").Error; err != nil {
 		return err
 	}
 
-	// Update subscription status to past_due
 	return db.Model(&models.Subscription{}).
 		Where("id = ?", invoice.SubscriptionID).
 		Update("status", "past_due").Error
@@ -388,4 +392,79 @@ func (p *StripeProvider) handleSubscriptionDeleted(ctx context.Context, stripeSu
 	return db.Model(&models.Subscription{}).
 		Where("company_id = ?", companyID).
 		Update("status", "canceled").Error
+}
+
+func stripeInvoiceSubscriptionID(inv *stripe.Invoice) string {
+	if inv == nil || inv.Subscription == nil {
+		return ""
+	}
+	return inv.Subscription.ID
+}
+
+func stripeInvoiceDueDate(inv *stripe.Invoice) time.Time {
+	if inv.DueDate > 0 {
+		return time.Unix(inv.DueDate, 0).UTC()
+	}
+	if inv.Created > 0 {
+		return time.Unix(inv.Created, 0).UTC()
+	}
+	return time.Now().UTC()
+}
+
+func stripeInvoiceAmountMinor(inv *stripe.Invoice) int64 {
+	if inv == nil {
+		return 0
+	}
+	if inv.Total > 0 {
+		return inv.Total
+	}
+	if inv.AmountDue > 0 {
+		return inv.AmountDue
+	}
+	return inv.AmountPaid
+}
+
+// ensureLocalInvoiceForStripeWebhook returns an invoice row keyed by Stripe invoice id, creating one from the Stripe payload and local subscription when missing.
+func (p *StripeProvider) ensureLocalInvoiceForStripeWebhook(ctx context.Context, db *gorm.DB, stripeInvoice *stripe.Invoice) (*models.Invoice, error) {
+	_ = ctx
+	var existing models.Invoice
+	err := db.Where("payment_provider_invoice_id = ?", stripeInvoice.ID).First(&existing).Error
+	if err == nil {
+		return &existing, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
+	stripeSubID := stripeInvoiceSubscriptionID(stripeInvoice)
+	if stripeSubID == "" {
+		return nil, fmt.Errorf("stripe invoice %s has no subscription id", stripeInvoice.ID)
+	}
+
+	var sub models.Subscription
+	if err := db.Where("stripe_subscription_id = ?", stripeSubID).First(&sub).Error; err != nil {
+		return nil, fmt.Errorf("local subscription for stripe sub %s: %w", stripeSubID, err)
+	}
+
+	cid := sub.CompanyID
+	amount := stripeInvoiceAmountMinor(stripeInvoice)
+	cur := strings.ToUpper(string(stripeInvoice.Currency))
+
+	rec := models.Invoice{
+		CompanyID:                &cid,
+		SubscriptionID:           sub.ID,
+		Amount:                   amount,
+		Currency:                 cur,
+		Status:                   "open",
+		PaymentProvider:          "stripe",
+		PaymentProviderInvoiceID: stripeInvoice.ID,
+		DueDate:                  stripeInvoiceDueDate(stripeInvoice),
+	}
+	if err := db.Create(&rec).Error; err != nil {
+		if err2 := db.Where("payment_provider_invoice_id = ?", stripeInvoice.ID).First(&existing).Error; err2 == nil {
+			return &existing, nil
+		}
+		return nil, err
+	}
+	return &rec, nil
 }

@@ -101,7 +101,10 @@ function KioskSettingsForm({
   );
   const inferPrinterConnection = (): 'network' | 'system' => {
     const k = currentConfig?.kiosk;
-    if (k?.printerConnection === 'system' || k?.printerConnection === 'network') {
+    if (
+      k?.printerConnection === 'system' ||
+      k?.printerConnection === 'network'
+    ) {
       return k.printerConnection;
     }
     if (k?.systemPrinterName?.trim()) {

@@ -933,11 +933,11 @@
       "contactSales": "Contact Sales"
     },
     "features": {
-      "units": "Up to {count} units",
-      "users": "Up to {count} users",
-      "tickets": "Up to {count} tickets per month",
-      "services": "{count} services",
-      "counters": "{count} service counters",
+      "units": "{count, plural, one {Up to # unit} other {Up to # units}}",
+      "users": "{count, plural, one {Up to # user} other {Up to # users}}",
+      "tickets": "{count, plural, one {Up to # ticket per month} other {Up to # tickets per month}}",
+      "services": "{count, plural, one {# service} other {# services}}",
+      "counters": "{count, plural, one {# service counter} other {# service counters}}",
       "unlimitedUnits": "Unlimited units",
       "unlimitedUsers": "Unlimited users",
       "unlimitedTickets": "Unlimited tickets",
@@ -995,7 +995,7 @@
       "status": {
         "trial": "Trial",
         "active": "Active",
-        "pastDue": "Past Due",
+        "past_due": "Past Due",
         "canceled": "Canceled",
         "paused": "Paused"
       },
@@ -1003,7 +1003,7 @@
       "nextRenewal": "Next Renewal",
       "cancelingOn": "Canceling on",
       "trialEnding": "Trial period ending",
-      "trialEndingDesc": "{days} days remaining. Add a payment method to continue using the service.",
+      "trialEndingDesc": "{days, plural, one {# day remaining. Add a payment method to continue using the service.} other {# days remaining. Add a payment method to continue using the service.}}",
       "trialExpiredTitle": "Trial has ended",
       "trialExpiredDesc": "Your trial period is over. Add a payment method to continue using the service.",
       "pastDueWarning": "Payment issue",

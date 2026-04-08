@@ -485,11 +485,7 @@ export const unitsApi = {
   getAll: () => apiRequest<Unit[]>('/units', {}, z.array(UnitModelSchema)),
 
   getById: (id: string) =>
-    apiRequest<Unit>(
-      `/units/${id}`,
-      { cache: 'no-store' },
-      UnitModelSchema
-    ),
+    apiRequest<Unit>(`/units/${id}`, { cache: 'no-store' }, UnitModelSchema),
 
   getServices: (unitId: string) =>
     apiRequest<Service[]>(
@@ -1003,31 +999,23 @@ export const companiesApi = {
       {},
       UsageMetricsSchema
     ),
-  
+
   getMyUsageMetrics: () =>
-    apiRequest<UsageMetrics>(
-      `/usage-metrics/me`,
-      {},
-      UsageMetricsSchema
-    )
+    apiRequest<UsageMetrics>(`/usage-metrics/me`, {}, UsageMetricsSchema)
 };
 
 // Subscription API functions
 export const subscriptionsApi = {
   getMySubscription: () =>
-    apiRequest<Subscription>(
-      `/subscriptions/me`,
-      {},
-      SubscriptionSchema
-    ),
-  
+    apiRequest<Subscription>(`/subscriptions/me`, {}, SubscriptionSchema),
+
   getPlans: () =>
     apiRequest<SubscriptionPlan[]>(
       `/subscriptions/plans`,
       {},
       z.array(SubscriptionPlanSchema)
     ),
-  
+
   createCheckout: (planCode: string) =>
     apiRequest<{ checkoutUrl: string; sessionId: string }>(
       `/subscriptions/checkout`,
@@ -1041,7 +1029,7 @@ export const subscriptionsApi = {
         sessionId: z.string()
       })
     ),
-  
+
   cancelSubscription: (subscriptionId: string) =>
     apiRequest<Subscription>(
       `/subscriptions/${subscriptionId}/cancel`,
@@ -1055,12 +1043,8 @@ export const subscriptionsApi = {
 // Invoice API functions
 export const invoicesApi = {
   getMyInvoices: () =>
-    apiRequest<Invoice[]>(
-      `/invoices/me`,
-      {},
-      z.array(InvoiceSchema)
-    ),
-  
+    apiRequest<Invoice[]>(`/invoices/me`, {}, z.array(InvoiceSchema)),
+
   downloadInvoice: (invoiceId: string) =>
     apiRequestBlob(`/invoices/${invoiceId}/download`)
 };

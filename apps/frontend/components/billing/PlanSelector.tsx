@@ -1,7 +1,13 @@
 'use client';
 
 import { SubscriptionPlan } from '@quokkaq/shared-types';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Check, Sparkles } from 'lucide-react';
@@ -21,7 +27,12 @@ interface PlanSelectorProps {
   isLoading?: boolean;
 }
 
-export function PlanSelector({ plans, currentPlanId, onSelect, isLoading }: PlanSelectorProps) {
+export function PlanSelector({
+  plans,
+  currentPlanId,
+  onSelect,
+  isLoading
+}: PlanSelectorProps) {
   const locale = useLocale();
   const t = useTranslations('organization.billing.planSelector');
   const tBilling = useTranslations('organization.billing');
@@ -69,62 +80,69 @@ export function PlanSelector({ plans, currentPlanId, onSelect, isLoading }: Plan
   const isPopular = (code: string) => code === PLAN_CODES.PROFESSIONAL;
 
   return (
-    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className='grid gap-6 md:grid-cols-2 lg:grid-cols-3'>
       {plans
         .filter((plan) => plan.code !== PLAN_CODES.GRANDFATHERED)
         .map((plan) => (
           <Card
             key={plan.id}
-            className={`relative ${isPopular(plan.code) ? 'border-blue-500 border-2 shadow-xl' : ''} ${isCurrentPlan(plan.id) ? 'bg-blue-50' : ''}`}
+            className={`relative ${isPopular(plan.code) ? 'border-2 border-blue-500 shadow-xl' : ''} ${isCurrentPlan(plan.id) ? 'bg-blue-50' : ''}`}
           >
             {isPopular(plan.code) && (
-              <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-                <Badge className="bg-blue-500">
-                  <Sparkles className="h-3 w-3 mr-1" />
+              <div className='absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 transform'>
+                <Badge className='bg-blue-500'>
+                  <Sparkles className='mr-1 h-3 w-3' />
                   {t('popularBadge')}
                 </Badge>
               </div>
             )}
 
             {isCurrentPlan(plan.id) && (
-              <div className="absolute top-4 right-4">
-                <Badge variant="outline">{t('currentPlan')}</Badge>
+              <div className='absolute top-4 right-4'>
+                <Badge variant='outline'>{t('currentPlan')}</Badge>
               </div>
             )}
 
-            <CardHeader className="pb-4">
-              <CardTitle className="text-2xl">{plan.name}</CardTitle>
-              <div className="mt-4">
+            <CardHeader className='pb-4'>
+              <CardTitle className='text-2xl'>{plan.name}</CardTitle>
+              <div className='mt-4'>
                 {plan.price > 0 ? (
-                  <div className="flex items-baseline">
-                    <span className="text-4xl font-bold">
+                  <div className='flex items-baseline'>
+                    <span className='text-4xl font-bold'>
                       {formatPrice(plan.price, plan.currency)}
                     </span>
-                    <span className="text-gray-500 ml-2">
-                      {plan.interval === 'month' ? tBilling('perMonth') : tBilling('perYear')}
+                    <span className='ml-2 text-gray-500'>
+                      {plan.interval === 'month'
+                        ? tBilling('perMonth')
+                        : tBilling('perYear')}
                     </span>
                   </div>
                 ) : (
-                  <div className="text-2xl font-bold">{t('customPricing')}</div>
+                  <div className='text-2xl font-bold'>{t('customPricing')}</div>
                 )}
               </div>
             </CardHeader>
 
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <p className="text-sm font-semibold text-gray-700">{t('limitsTitle')}</p>
-                <ul className="space-y-1">
+            <CardContent className='space-y-4'>
+              <div className='space-y-2'>
+                <p className='text-sm font-semibold text-gray-700'>
+                  {t('limitsTitle')}
+                </p>
+                <ul className='space-y-1'>
                   {getLimitsText(plan.limits).map((limit) => (
-                    <li key={limit.key} className="text-sm text-gray-600">
-                      <span className="font-medium">{limit.value}</span> {limit.label}
+                    <li key={limit.key} className='text-sm text-gray-600'>
+                      <span className='font-medium'>{limit.value}</span>{' '}
+                      {limit.label}
                     </li>
                   ))}
                 </ul>
               </div>
 
-              <div className="space-y-2">
-                <p className="text-sm font-semibold text-gray-700">{t('featuresTitle')}</p>
-                <ul className="space-y-2">
+              <div className='space-y-2'>
+                <p className='text-sm font-semibold text-gray-700'>
+                  {t('featuresTitle')}
+                </p>
+                <ul className='space-y-2'>
                   {(() => {
                     const all = getFeaturesList(plan.features);
                     const head = all.slice(0, 6);
@@ -132,13 +150,18 @@ export function PlanSelector({ plans, currentPlanId, onSelect, isLoading }: Plan
                     return (
                       <>
                         {head.map((feature) => (
-                          <li key={feature.key} className="flex items-start gap-2 text-sm">
-                            <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                          <li
+                            key={feature.key}
+                            className='flex items-start gap-2 text-sm'
+                          >
+                            <Check className='mt-0.5 h-4 w-4 flex-shrink-0 text-green-500' />
                             <span>{feature.text}</span>
                           </li>
                         ))}
                         {rest > 0 ? (
-                          <li className="text-sm text-gray-500 pl-6">{t('moreFeatures', { count: rest })}</li>
+                          <li className='pl-6 text-sm text-gray-500'>
+                            {t('moreFeatures', { count: rest })}
+                          </li>
                         ) : null}
                       </>
                     );
@@ -152,13 +175,13 @@ export function PlanSelector({ plans, currentPlanId, onSelect, isLoading }: Plan
                 <Button
                   onClick={() => onSelect(plan)}
                   disabled={isLoading}
-                  className="w-full"
+                  className='w-full'
                   variant={isPopular(plan.code) ? 'default' : 'outline'}
                 >
                   {plan.price > 0 ? t('selectPlan') : t('contactUs')}
                 </Button>
               ) : (
-                <Button variant="outline" className="w-full" disabled>
+                <Button variant='outline' className='w-full' disabled>
                   {t('currentPlan')}
                 </Button>
               )}

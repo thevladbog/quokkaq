@@ -1,6 +1,12 @@
 import type { SubscriptionPlan } from '@quokkaq/shared-types';
 
-const LIMIT_KEYS_ORDER = ['units', 'users', 'tickets_per_month', 'services', 'counters'] as const;
+const LIMIT_KEYS_ORDER = [
+  'units',
+  'users',
+  'tickets_per_month',
+  'services',
+  'counters'
+] as const;
 
 const UNLIMITED_BY_LIMIT: Record<(typeof LIMIT_KEYS_ORDER)[number], string> = {
   units: 'unlimitedUnits',
@@ -10,7 +16,9 @@ const UNLIMITED_BY_LIMIT: Record<(typeof LIMIT_KEYS_ORDER)[number], string> = {
   counters: 'unlimitedCounters'
 };
 
-function limitToPricingFeatureKey(limitKey: (typeof LIMIT_KEYS_ORDER)[number]): string {
+function limitToPricingFeatureKey(
+  limitKey: (typeof LIMIT_KEYS_ORDER)[number]
+): string {
   if (limitKey === 'tickets_per_month') return 'tickets';
   return limitKey;
 }
@@ -41,7 +49,9 @@ export type PricingFeatureRow = {
 };
 
 /** Rows for the public pricing page from an API plan (limits + enabled flags). */
-export function buildPricingRowsFromApiPlan(plan: SubscriptionPlan): PricingFeatureRow[] {
+export function buildPricingRowsFromApiPlan(
+  plan: SubscriptionPlan
+): PricingFeatureRow[] {
   const rows: PricingFeatureRow[] = [];
   const limits = plan.limits ?? {};
 

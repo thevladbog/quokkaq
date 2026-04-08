@@ -218,8 +218,8 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
+                    "201": {
+                        "description": "Created",
                         "schema": {
                             "$ref": "#/definitions/handlers.LoginResponse"
                         }
@@ -475,7 +475,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/services.UsageMetrics"
+                            "$ref": "#/definitions/handlers.UsageMetricsResponse"
                         }
                     },
                     "400": {
@@ -1095,14 +1095,15 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Invoice PDF download is not implemented yet; returns 501 with a JSON error after authorization.",
+                "description": "Currently returns HTTP 501 with JSON after authorization. When PDF export is implemented, a successful response will be 200 with body as application/pdf (binary PDF bytes). Until then, clients should treat 501 and handlers.InvoicePDFNotImplementedResponse as the expected outcome.",
                 "produces": [
-                    "application/json"
+                    "application/json",
+                    "application/pdf"
                 ],
                 "tags": [
                     "invoices"
                 ],
-                "summary": "Download Invoice",
+                "summary": "Download Invoice (PDF when implemented)",
                 "parameters": [
                     {
                         "type": "string",
@@ -1113,6 +1114,12 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
+                    "200": {
+                        "description": "Invoice PDF binary (Content-Type: application/pdf) once generation is implemented",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
@@ -2853,6 +2860,12 @@ const docTemplate = `{
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 }
             }
@@ -3695,7 +3708,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/services.UsageMetrics"
+                            "$ref": "#/definitions/handlers.UsageMetricsResponse"
                         }
                     },
                     "401": {
@@ -4164,6 +4177,17 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.PeriodResponse": {
+            "type": "object",
+            "properties": {
+                "end": {
+                    "type": "string"
+                },
+                "start": {
+                    "type": "string"
+                }
+            }
+        },
         "handlers.PickRequest": {
             "type": "object",
             "properties": {
@@ -4242,6 +4266,31 @@ const docTemplate = `{
             "properties": {
                 "status": {
                     "type": "string"
+                }
+            }
+        },
+        "handlers.UsageMetricInfoResponse": {
+            "type": "object",
+            "properties": {
+                "current": {
+                    "type": "integer"
+                },
+                "limit": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handlers.UsageMetricsResponse": {
+            "type": "object",
+            "properties": {
+                "currentPeriod": {
+                    "$ref": "#/definitions/handlers.PeriodResponse"
+                },
+                "metrics": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/handlers.UsageMetricInfoResponse"
+                    }
                 }
             }
         },
@@ -5159,42 +5208,6 @@ const docTemplate = `{
                 },
                 "updatedAt": {
                     "type": "string"
-                }
-            }
-        },
-        "services.Period": {
-            "type": "object",
-            "properties": {
-                "end": {
-                    "type": "string"
-                },
-                "start": {
-                    "type": "string"
-                }
-            }
-        },
-        "services.UsageMetricInfo": {
-            "type": "object",
-            "properties": {
-                "current": {
-                    "type": "integer"
-                },
-                "limit": {
-                    "type": "integer"
-                }
-            }
-        },
-        "services.UsageMetrics": {
-            "type": "object",
-            "properties": {
-                "currentPeriod": {
-                    "$ref": "#/definitions/services.Period"
-                },
-                "metrics": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "$ref": "#/definitions/services.UsageMetricInfo"
-                    }
                 }
             }
         }

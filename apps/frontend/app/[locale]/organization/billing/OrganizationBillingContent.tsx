@@ -38,7 +38,8 @@ export function OrganizationBillingContent() {
   });
 
   const cancelMutation = useMutation({
-    mutationFn: (subscriptionId: string) => subscriptionsApi.cancelSubscription(subscriptionId),
+    mutationFn: (subscriptionId: string) =>
+      subscriptionsApi.cancelSubscription(subscriptionId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['subscription-me'] });
     }
@@ -67,7 +68,7 @@ export function OrganizationBillingContent() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className='space-y-8'>
       {/* Current Subscription */}
       {subscription && !showPlanSelector && (
         <SubscriptionCard
@@ -80,10 +81,10 @@ export function OrganizationBillingContent() {
 
       {/* Plan Selector */}
       {showPlanSelector && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold">{t('upgradePlan')}</h2>
-            <Button variant="ghost" onClick={() => setShowPlanSelector(false)}>
+        <div className='space-y-4'>
+          <div className='flex items-center justify-between'>
+            <h2 className='text-2xl font-bold'>{t('upgradePlan')}</h2>
+            <Button variant='ghost' onClick={() => setShowPlanSelector(false)}>
               {tGeneral('cancel')}
             </Button>
           </div>
@@ -97,37 +98,41 @@ export function OrganizationBillingContent() {
       )}
 
       {/* Quick Links */}
-      <div className="grid md:grid-cols-2 gap-4">
-        <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => router.push('/organization/billing/invoices')}>
+      <div className='grid gap-4 md:grid-cols-2'>
+        <Card
+          className='cursor-pointer transition-shadow hover:shadow-lg'
+          onClick={() => router.push('/organization/billing/invoices')}
+        >
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Receipt className="h-5 w-5" />
+            <CardTitle className='flex items-center gap-2 text-lg'>
+              <Receipt className='h-5 w-5' />
               {t('viewInvoices')}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-gray-600 mb-3">
+            <p className='mb-3 text-sm text-gray-600'>
               {t('viewInvoicesDesc')}
             </p>
-            <Button variant="ghost" size="sm" className="p-0 h-auto">
-              {t('goTo')} <ArrowRight className="ml-1 h-4 w-4" />
+            <Button variant='ghost' size='sm' className='h-auto p-0'>
+              {t('goTo')} <ArrowRight className='ml-1 h-4 w-4' />
             </Button>
           </CardContent>
         </Card>
 
-        <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => router.push('/organization/billing/usage')}>
+        <Card
+          className='cursor-pointer transition-shadow hover:shadow-lg'
+          onClick={() => router.push('/organization/billing/usage')}
+        >
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <CreditCard className="h-5 w-5" />
+            <CardTitle className='flex items-center gap-2 text-lg'>
+              <CreditCard className='h-5 w-5' />
               {t('viewUsage')}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-gray-600 mb-3">
-              {t('viewUsageDesc')}
-            </p>
-            <Button variant="ghost" size="sm" className="p-0 h-auto">
-              {t('goTo')} <ArrowRight className="ml-1 h-4 w-4" />
+            <p className='mb-3 text-sm text-gray-600'>{t('viewUsageDesc')}</p>
+            <Button variant='ghost' size='sm' className='h-auto p-0'>
+              {t('goTo')} <ArrowRight className='ml-1 h-4 w-4' />
             </Button>
           </CardContent>
         </Card>

@@ -25,7 +25,10 @@ export function OrganizationUsageContent() {
     // Prepare CSV data
     const headers = ['Metric', 'Current Usage', 'Limit', 'Usage %'];
     const rows = Object.entries(usageMetrics.metrics).map(([key, value]) => {
-      const percentage = value.limit > 0 ? ((value.current / value.limit) * 100).toFixed(1) : '0';
+      const percentage =
+        value.limit > 0
+          ? ((value.current / value.limit) * 100).toFixed(1)
+          : '0';
       return [
         t(`metrics.${key}`),
         value.current.toString(),
@@ -35,30 +38,39 @@ export function OrganizationUsageContent() {
     });
 
     // Add period information
-    const periodStart = new Date(usageMetrics.currentPeriod.start).toLocaleDateString();
-    const periodEnd = new Date(usageMetrics.currentPeriod.end).toLocaleDateString();
-    
+    const periodStart = new Date(
+      usageMetrics.currentPeriod.start
+    ).toLocaleDateString();
+    const periodEnd = new Date(
+      usageMetrics.currentPeriod.end
+    ).toLocaleDateString();
+
     const csvContent = [
       `Usage Report - ${periodStart} to ${periodEnd}`,
       '',
       headers.join(','),
-      ...rows.map(row => row.join(','))
+      ...rows.map((row) => row.join(','))
     ].join('\n');
 
     // Add BOM for UTF-8 encoding (fixes encoding in Excel)
     const BOM = '\uFEFF';
-    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([BOM + csvContent], {
+      type: 'text/csv;charset=utf-8;'
+    });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
-    
+
     link.setAttribute('href', url);
-    link.setAttribute('download', `usage-report-${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute(
+      'download',
+      `usage-report-${new Date().toISOString().split('T')[0]}.csv`
+    );
     link.style.visibility = 'hidden';
-    
+
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
+
     URL.revokeObjectURL(url);
   };
 
@@ -67,15 +79,18 @@ export function OrganizationUsageContent() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <Button variant="ghost" onClick={() => router.push('/organization/billing')}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
+    <div className='space-y-6'>
+      <div className='flex items-center justify-between'>
+        <Button
+          variant='ghost'
+          onClick={() => router.push('/organization/billing')}
+        >
+          <ArrowLeft className='mr-2 h-4 w-4' />
           {t('backToBilling')}
         </Button>
 
-        <Button variant="outline" onClick={handleExportUsage}>
-          <Download className="mr-2 h-4 w-4" />
+        <Button variant='outline' onClick={handleExportUsage}>
+          <Download className='mr-2 h-4 w-4' />
           {t('exportReport')}
         </Button>
       </div>
@@ -87,24 +102,25 @@ export function OrganizationUsageContent() {
           {/* Additional Info Card */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5" />
+              <CardTitle className='flex items-center gap-2'>
+                <TrendingUp className='h-5 w-5' />
                 {t('recommendations')}
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-gray-600">
+            <CardContent className='space-y-4'>
+              <p className='text-sm text-gray-600'>
                 {t('recommendationsDesc')}
               </p>
-              
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p className="font-medium text-blue-900 mb-2">💡 {t('tip')}</p>
-                <p className="text-sm text-blue-800">
-                  {t('tipDesc')}
-                </p>
+
+              <div className='rounded-lg border border-blue-200 bg-blue-50 p-4'>
+                <p className='mb-2 font-medium text-blue-900'>💡 {t('tip')}</p>
+                <p className='text-sm text-blue-800'>{t('tipDesc')}</p>
               </div>
 
-              <Button onClick={() => router.push('/organization/billing')} className="w-full">
+              <Button
+                onClick={() => router.push('/organization/billing')}
+                className='w-full'
+              >
                 {t('viewPlans')}
               </Button>
             </CardContent>

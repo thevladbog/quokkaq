@@ -31,7 +31,7 @@ func NewUsageHandler(quotaService services.QuotaService, userRepo repository.Use
 // @Produce      json
 // @Security     BearerAuth
 // @Param        companyId path string true "Company ID"
-// @Success      200  {object}  services.UsageMetrics
+// @Success      200  {object}  handlers.UsageMetricsResponse
 // @Failure      400  {string}  string "Bad Request"
 // @Failure      401  {string}  string "Unauthorized"
 // @Failure      403  {string}  string "Forbidden"
@@ -67,7 +67,7 @@ func (h *UsageHandler) GetUsageMetrics(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	RespondJSON(w, metrics)
+	RespondJSON(w, usageMetricsToResponse(metrics))
 }
 
 // GetMyUsageMetrics godoc
@@ -76,7 +76,7 @@ func (h *UsageHandler) GetUsageMetrics(w http.ResponseWriter, r *http.Request) {
 // @Tags         usage
 // @Produce      json
 // @Security     BearerAuth
-// @Success      200  {object}  services.UsageMetrics
+// @Success      200  {object}  handlers.UsageMetricsResponse
 // @Failure      401  {string}  string "Unauthorized"
 // @Failure      404  {string}  string "User has no units or company"
 // @Failure      500  {string}  string "Internal Server Error"
@@ -107,5 +107,5 @@ func (h *UsageHandler) GetMyUsageMetrics(w http.ResponseWriter, r *http.Request)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	RespondJSON(w, metrics)
+	RespondJSON(w, usageMetricsToResponse(metrics))
 }

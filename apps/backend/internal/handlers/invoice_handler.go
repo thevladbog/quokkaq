@@ -66,12 +66,14 @@ func (h *InvoiceHandler) GetMyInvoices(w http.ResponseWriter, r *http.Request) {
 }
 
 // DownloadInvoice godoc
-// @Summary      Download Invoice
-// @Description  Invoice PDF download is not implemented yet; returns 501 with a JSON error after authorization.
+// @Summary      Download Invoice (PDF when implemented)
+// @Description  Currently returns HTTP 501 with JSON after authorization. When PDF export is implemented, a successful response will be 200 with body as application/pdf (binary PDF bytes). Until then, clients should treat 501 and handlers.InvoicePDFNotImplementedResponse as the expected outcome.
 // @Tags         invoices
 // @Produce      json
+// @Produce      application/pdf
 // @Security     BearerAuth
 // @Param        id path string true "Invoice ID"
+// @Success      200  {file}  file  "Invoice PDF binary (Content-Type: application/pdf) once generation is implemented"
 // @Failure      401  {string}  string "Unauthorized"
 // @Failure      403  {string}  string "Forbidden"
 // @Failure      404  {string}  string "Not Found"

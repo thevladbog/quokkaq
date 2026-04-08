@@ -249,9 +249,7 @@ export default function DesktopTerminalsPage() {
                           {t('status_revoked')}
                         </Badge>
                       ) : (
-                        <Badge variant='secondary'>
-                          {t('status_active')}
-                        </Badge>
+                        <Badge variant='secondary'>{t('status_active')}</Badge>
                       )}
                     </TableCell>
                     <TableCell className='text-muted-foreground text-sm'>
@@ -397,7 +395,9 @@ export default function DesktopTerminalsPage() {
             </div>
             <div className='flex items-center justify-between gap-4 rounded-lg border p-3'>
               <div className='space-y-0.5'>
-                <Label htmlFor='dt-edit-kiosk-fs'>{t('kiosk_fullscreen')}</Label>
+                <Label htmlFor='dt-edit-kiosk-fs'>
+                  {t('kiosk_fullscreen')}
+                </Label>
                 <p className='text-muted-foreground text-xs'>
                   {t('kiosk_fullscreen_hint')}
                 </p>

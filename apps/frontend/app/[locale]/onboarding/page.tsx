@@ -18,8 +18,14 @@ export async function generateMetadata({
 
 export default function OnboardingPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <Suspense fallback={<div className="flex items-center justify-center h-screen">Загрузка...</div>}>
+    <div className='min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100'>
+      <Suspense
+        fallback={
+          <div className='flex h-screen items-center justify-center'>
+            Загрузка...
+          </div>
+        }
+      >
         <OnboardingWizard />
       </Suspense>
     </div>

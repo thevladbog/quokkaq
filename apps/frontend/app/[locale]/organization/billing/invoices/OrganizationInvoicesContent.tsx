@@ -12,7 +12,7 @@ export function OrganizationInvoicesContent() {
   const router = useRouter();
   const t = useTranslations('organization.invoices');
   const tCommon = useTranslations('common');
-  
+
   const { data: invoices, isLoading } = useQuery({
     queryKey: ['invoices-me'],
     queryFn: () => invoicesApi.getMyInvoices()
@@ -37,9 +37,12 @@ export function OrganizationInvoicesContent() {
   }
 
   return (
-    <div className="space-y-6">
-      <Button variant="ghost" onClick={() => router.push('/organization/billing')}>
-        <ArrowLeft className="mr-2 h-4 w-4" />
+    <div className='space-y-6'>
+      <Button
+        variant='ghost'
+        onClick={() => router.push('/organization/billing')}
+      >
+        <ArrowLeft className='mr-2 h-4 w-4' />
         {t('backToBilling')}
       </Button>
 

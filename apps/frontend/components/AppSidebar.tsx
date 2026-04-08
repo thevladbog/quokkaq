@@ -124,7 +124,9 @@ const AppSidebar = () => {
       icon: CreditCard,
       label: tOrg('billing.title', { defaultValue: 'Billing' }),
       href: '/organization/billing',
-      active: isActive('/organization/billing') || isActiveSub('/organization/billing'),
+      active:
+        isActive('/organization/billing') ||
+        isActiveSub('/organization/billing'),
       roles: ['admin']
     }
   ];
@@ -271,10 +273,12 @@ const AppSidebar = () => {
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const hasSubmenu = item.hasSubmenu;
-                const submenuItems = 
-                  item.submenuKey === 'settings' ? filteredSettingsSubItems :
-                  item.submenuKey === 'organization' ? filteredOrganizationSubItems :
-                  [];
+                const submenuItems =
+                  item.submenuKey === 'settings'
+                    ? filteredSettingsSubItems
+                    : item.submenuKey === 'organization'
+                      ? filteredOrganizationSubItems
+                      : [];
 
                 return (
                   <SidebarMenuItem key={item.href}>
@@ -327,7 +331,9 @@ const AppSidebar = () => {
                             )}
                             className='text-white'
                           >
-                            {getInitials(user?.name || user?.email || undefined)}
+                            {getInitials(
+                              user?.name || user?.email || undefined
+                            )}
                           </AvatarFallback>
                         </Avatar>
                         <div className='flex flex-col items-start overflow-hidden'>
@@ -356,9 +362,11 @@ const AppSidebar = () => {
                             bgColor={getAvatarColor(
                               user?.name || user?.email || undefined
                             )}
-                            className='text-white text-lg'
+                            className='text-lg text-white'
                           >
-                            {getInitials(user?.name || user?.email || undefined)}
+                            {getInitials(
+                              user?.name || user?.email || undefined
+                            )}
                           </AvatarFallback>
                         </Avatar>
                         <div className='flex flex-1 flex-col overflow-hidden'>
@@ -396,7 +404,7 @@ const AppSidebar = () => {
                       {/* Logout */}
                       <Button
                         variant='ghost'
-                        className='hover:text-destructive mt-2 w-full justify-start text-destructive'
+                        className='hover:text-destructive text-destructive mt-2 w-full justify-start'
                         onClick={logout}
                       >
                         <LogOut className='mr-2 h-4 w-4' />

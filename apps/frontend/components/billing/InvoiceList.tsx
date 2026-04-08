@@ -16,14 +16,25 @@ interface InvoiceListProps {
 
 export function InvoiceList({ invoices, onDownload }: InvoiceListProps) {
   const t = useTranslations('organization.invoices');
-  
+
   const getStatusBadge = (status: string) => {
-    return <Badge variant={
-      status === 'draft' ? 'outline' :
-      status === 'open' ? 'secondary' :
-      status === 'paid' ? 'default' :
-      status === 'uncollectible' ? 'destructive' : 'outline'
-    }>{t(`statuses.${status}`)}</Badge>;
+    return (
+      <Badge
+        variant={
+          status === 'draft'
+            ? 'outline'
+            : status === 'open'
+              ? 'secondary'
+              : status === 'paid'
+                ? 'default'
+                : status === 'uncollectible'
+                  ? 'destructive'
+                  : 'outline'
+        }
+      >
+        {t(`statuses.${status}`)}
+      </Badge>
+    );
   };
 
   const formatPrice = (price: number, currency: string) => {
@@ -44,9 +55,9 @@ export function InvoiceList({ invoices, onDownload }: InvoiceListProps) {
   if (invoices.length === 0) {
     return (
       <Card>
-        <CardContent className="flex flex-col items-center justify-center py-12">
-          <Receipt className="h-12 w-12 text-gray-400 mb-4" />
-          <p className="text-gray-500">{t('noInvoices')}</p>
+        <CardContent className='flex flex-col items-center justify-center py-12'>
+          <Receipt className='mb-4 h-12 w-12 text-gray-400' />
+          <p className='text-gray-500'>{t('noInvoices')}</p>
         </CardContent>
       </Card>
     );
@@ -55,56 +66,71 @@ export function InvoiceList({ invoices, onDownload }: InvoiceListProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Receipt className="h-5 w-5" />
+        <CardTitle className='flex items-center gap-2'>
+          <Receipt className='h-5 w-5' />
           {t('title')}
         </CardTitle>
       </CardHeader>
 
       <CardContent>
-        <div className="overflow-x-auto">
-          <table className="w-full">
+        <div className='overflow-x-auto'>
+          <table className='w-full'>
             <thead>
-              <tr className="border-b">
-                <th className="text-left py-3 px-4 font-medium text-sm text-gray-600">{t('invoice')}</th>
-                <th className="text-left py-3 px-4 font-medium text-sm text-gray-600">{t('date')}</th>
-                <th className="text-left py-3 px-4 font-medium text-sm text-gray-600">{t('amount')}</th>
-                <th className="text-left py-3 px-4 font-medium text-sm text-gray-600">{t('paymentMethod')}</th>
-                <th className="text-left py-3 px-4 font-medium text-sm text-gray-600">{t('status')}</th>
-                <th className="text-right py-3 px-4 font-medium text-sm text-gray-600">{t('actions')}</th>
+              <tr className='border-b'>
+                <th className='px-4 py-3 text-left text-sm font-medium text-gray-600'>
+                  {t('invoice')}
+                </th>
+                <th className='px-4 py-3 text-left text-sm font-medium text-gray-600'>
+                  {t('date')}
+                </th>
+                <th className='px-4 py-3 text-left text-sm font-medium text-gray-600'>
+                  {t('amount')}
+                </th>
+                <th className='px-4 py-3 text-left text-sm font-medium text-gray-600'>
+                  {t('paymentMethod')}
+                </th>
+                <th className='px-4 py-3 text-left text-sm font-medium text-gray-600'>
+                  {t('status')}
+                </th>
+                <th className='px-4 py-3 text-right text-sm font-medium text-gray-600'>
+                  {t('actions')}
+                </th>
               </tr>
             </thead>
             <tbody>
               {invoices.map((invoice) => (
-                <tr key={invoice.id} className="border-b last:border-0 hover:bg-gray-50">
-                  <td className="py-3 px-4">
-                    <span className="font-mono text-sm">
+                <tr
+                  key={invoice.id}
+                  className='border-b last:border-0 hover:bg-gray-50'
+                >
+                  <td className='px-4 py-3'>
+                    <span className='font-mono text-sm'>
                       #{invoice.id.slice(0, 8)}
                     </span>
                   </td>
-                  <td className="py-3 px-4 text-sm">
-                    {invoice.paidAt 
-                      ? formatDate(invoice.paidAt) 
-                      : formatDate(invoice.dueDate)
-                    }
+                  <td className='px-4 py-3 text-sm'>
+                    {invoice.paidAt
+                      ? formatDate(invoice.paidAt)
+                      : formatDate(invoice.dueDate)}
                   </td>
-                  <td className="py-3 px-4 font-medium">
+                  <td className='px-4 py-3 font-medium'>
                     {formatPrice(invoice.amount, invoice.currency)}
                   </td>
-                  <td className="py-3 px-4 text-sm">
-                    {invoice.paymentProvider && getPaymentProviderLabel(invoice.paymentProvider)}
+                  <td className='px-4 py-3 text-sm'>
+                    {invoice.paymentProvider &&
+                      getPaymentProviderLabel(invoice.paymentProvider)}
                   </td>
-                  <td className="py-3 px-4">
+                  <td className='px-4 py-3'>
                     {getStatusBadge(invoice.status)}
                   </td>
-                  <td className="py-3 px-4 text-right">
+                  <td className='px-4 py-3 text-right'>
                     {invoice.status === 'paid' && onDownload && (
                       <Button
-                        variant="ghost"
-                        size="sm"
+                        variant='ghost'
+                        size='sm'
                         onClick={() => onDownload(invoice.id)}
                       >
-                        <Download className="h-4 w-4 mr-1" />
+                        <Download className='mr-1 h-4 w-4' />
                         {t('download')}
                       </Button>
                     )}

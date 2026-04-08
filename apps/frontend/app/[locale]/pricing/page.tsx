@@ -2,13 +2,23 @@ import { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import Link from 'next/link';
 import { Check } from 'lucide-react';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { fetchPublicSubscriptionPlans } from '@/lib/subscription-plans-public';
 import { buildPricingRowsFromApiPlan } from '@/lib/pricing-plan-rows';
 import type { SubscriptionPlan } from '@quokkaq/shared-types';
 
-export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
+export async function generateMetadata({
+  params
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'pricing' });
   return {
@@ -45,7 +55,13 @@ const legacyPlans: LegacyPricingPlan[] = [
       'features.basicReports',
       'features.emailSupport'
     ],
-    featureValues: { units: 1, users: 5, tickets: 1000, services: 10, counters: 5 }
+    featureValues: {
+      units: 1,
+      users: 5,
+      tickets: 1000,
+      services: 10,
+      counters: 5
+    }
   },
   {
     code: 'professional',
@@ -68,7 +84,13 @@ const legacyPlans: LegacyPricingPlan[] = [
       'features.customBranding',
       'features.prioritySupport'
     ],
-    featureValues: { units: 5, users: 20, tickets: 10000, services: 50, counters: 25 }
+    featureValues: {
+      units: 5,
+      users: 20,
+      tickets: 10000,
+      services: 50,
+      counters: 25
+    }
   },
   {
     code: 'enterprise',
@@ -99,14 +121,21 @@ const legacyPlans: LegacyPricingPlan[] = [
 function minorUnitDivisor(currency: string, intlLocale: string): number {
   try {
     const digits =
-      new Intl.NumberFormat(intlLocale, { style: 'currency', currency }).resolvedOptions().maximumFractionDigits ?? 2;
+      new Intl.NumberFormat(intlLocale, {
+        style: 'currency',
+        currency
+      }).resolvedOptions().maximumFractionDigits ?? 2;
     return 10 ** Math.min(Math.max(digits, 0), 8);
   } catch {
     return 100;
   }
 }
 
-function formatApiPrice(amountMinor: number, currency: string, intlLocale: string): string {
+function formatApiPrice(
+  amountMinor: number,
+  currency: string,
+  intlLocale: string
+): string {
   const divisor = minorUnitDivisor(currency, intlLocale);
   try {
     return new Intl.NumberFormat(intlLocale, {
@@ -118,7 +147,11 @@ function formatApiPrice(amountMinor: number, currency: string, intlLocale: strin
   }
 }
 
-export default async function PricingPage({ params }: { params: Promise<{ locale: string }> }) {
+export default async function PricingPage({
+  params
+}: {
+  params: Promise<{ locale: string }>;
+}) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'pricing' });
   const intlLocale = locale.startsWith('ru') ? 'ru-RU' : 'en-US';
@@ -127,72 +160,86 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
   const plansFromApi = apiPlans ?? [];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto">
+    <div className='min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 px-4 py-12 sm:px-6 lg:px-8'>
+      <div className='mx-auto max-w-7xl'>
         {/* Header */}
-        <div className="text-center mb-16">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
+        <div className='mb-16 text-center'>
+          <h1 className='mb-4 text-4xl font-bold text-gray-900'>
             {t('pageTitle')}
           </h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+          <p className='mx-auto max-w-2xl text-xl text-gray-600'>
             {t('pageSubtitle')}
           </p>
         </div>
 
         {/* Pricing Cards */}
-        <div className="grid md:grid-cols-3 gap-8 mb-12">
+        <div className='mb-12 grid gap-8 md:grid-cols-3'>
           {plansFromApi.length > 0
             ? await Promise.all(
                 plansFromApi.map((plan) => (
-                  <PricingCardApi key={plan.id} plan={plan} locale={locale} intlLocale={intlLocale} />
+                  <PricingCardApi
+                    key={plan.id}
+                    plan={plan}
+                    locale={locale}
+                    intlLocale={intlLocale}
+                  />
                 ))
               )
             : await Promise.all(
                 legacyPlans.map((plan) => (
-                  <PricingCardLegacy key={plan.code} plan={plan} locale={locale} intlLocale={intlLocale} />
+                  <PricingCardLegacy
+                    key={plan.code}
+                    plan={plan}
+                    locale={locale}
+                    intlLocale={intlLocale}
+                  />
                 ))
               )}
         </div>
 
         {/* FAQ Section */}
-        <div className="bg-white rounded-lg shadow-lg p-8 max-w-4xl mx-auto">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">
+        <div className='mx-auto max-w-4xl rounded-lg bg-white p-8 shadow-lg'>
+          <h2 className='mb-6 text-center text-2xl font-bold text-gray-900'>
             {t('faq.title')}
           </h2>
-          <div className="space-y-6">
+          <div className='space-y-6'>
             <div>
-              <h3 className="font-semibold text-lg mb-2">{t('faq.trial.q')}</h3>
-              <p className="text-gray-600">{t('faq.trial.a')}</p>
+              <h3 className='mb-2 text-lg font-semibold'>{t('faq.trial.q')}</h3>
+              <p className='text-gray-600'>{t('faq.trial.a')}</p>
             </div>
             <div>
-              <h3 className="font-semibold text-lg mb-2">{t('faq.changePlan.q')}</h3>
-              <p className="text-gray-600">{t('faq.changePlan.a')}</p>
+              <h3 className='mb-2 text-lg font-semibold'>
+                {t('faq.changePlan.q')}
+              </h3>
+              <p className='text-gray-600'>{t('faq.changePlan.a')}</p>
             </div>
             <div>
-              <h3 className="font-semibold text-lg mb-2">{t('faq.payment.q')}</h3>
-              <p className="text-gray-600">{t('faq.payment.a')}</p>
+              <h3 className='mb-2 text-lg font-semibold'>
+                {t('faq.payment.q')}
+              </h3>
+              <p className='text-gray-600'>{t('faq.payment.a')}</p>
             </div>
             <div>
-              <h3 className="font-semibold text-lg mb-2">{t('faq.limits.q')}</h3>
-              <p className="text-gray-600">{t('faq.limits.a')}</p>
+              <h3 className='mb-2 text-lg font-semibold'>
+                {t('faq.limits.q')}
+              </h3>
+              <p className='text-gray-600'>{t('faq.limits.a')}</p>
             </div>
           </div>
         </div>
 
         {/* CTA Section */}
-        <div className="text-center mt-16">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">
+        <div className='mt-16 text-center'>
+          <h2 className='mb-4 text-3xl font-bold text-gray-900'>
             {t('cta.title')}
           </h2>
-          <p className="text-xl text-gray-600 mb-8">
-            {t('cta.subtitle')}
-          </p>
-          <div className="flex justify-center gap-4">
-            <Button size="lg" asChild>
+          <p className='mb-8 text-xl text-gray-600'>{t('cta.subtitle')}</p>
+          <div className='flex justify-center gap-4'>
+            <Button size='lg' asChild>
               <Link href={`/${locale}/register`}>{t('cta.tryFree')}</Link>
             </Button>
-            <Button size="lg" variant="outline" asChild>
-              <a href="mailto:sales@quokkaq.com">{t('cta.contactSales')}</a>
+            <Button size='lg' variant='outline' asChild>
+              <a href='mailto:sales@quokkaq.com'>{t('cta.contactSales')}</a>
             </Button>
           </div>
         </div>
@@ -218,37 +265,43 @@ async function PricingCardApi({
   const intervalLabel = plan.interval === 'year' ? t('perYear') : t('perMonth');
 
   return (
-    <Card className={`relative ${popular ? 'border-blue-500 border-2 shadow-xl' : ''}`}>
+    <Card
+      className={`relative ${popular ? 'border-2 border-blue-500 shadow-xl' : ''}`}
+    >
       {popular && (
-        <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-          <span className="bg-blue-500 text-white px-4 py-1 rounded-full text-sm font-semibold">
+        <div className='absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 transform'>
+          <span className='rounded-full bg-blue-500 px-4 py-1 text-sm font-semibold text-white'>
             {t('popularChoice')}
           </span>
         </div>
       )}
 
-      <CardHeader className="text-center pb-8 pt-8">
-        <CardTitle className="text-2xl font-bold mb-2">{plan.name}</CardTitle>
-        <div className="mt-6">
+      <CardHeader className='pt-8 pb-8 text-center'>
+        <CardTitle className='mb-2 text-2xl font-bold'>{plan.name}</CardTitle>
+        <div className='mt-6'>
           {isCustomPricing ? (
-            <div className="text-3xl font-bold">{t('customPricing')}</div>
+            <div className='text-3xl font-bold'>{t('customPricing')}</div>
           ) : (
-            <div className="flex items-baseline justify-center flex-wrap gap-x-1">
-              <span className="text-5xl font-extrabold">{formatApiPrice(plan.price, plan.currency, intlLocale)}</span>
-              <span className="text-gray-500 ml-2">{intervalLabel}</span>
+            <div className='flex flex-wrap items-baseline justify-center gap-x-1'>
+              <span className='text-5xl font-extrabold'>
+                {formatApiPrice(plan.price, plan.currency, intlLocale)}
+              </span>
+              <span className='ml-2 text-gray-500'>{intervalLabel}</span>
             </div>
           )}
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-4">
-        <ul className="space-y-3">
+      <CardContent className='space-y-4'>
+        <ul className='space-y-3'>
           {rows.map((row) => (
-            <li key={row.rowKey} className="flex items-start">
-              <Check className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" />
-              <span className="text-gray-700">
+            <li key={row.rowKey} className='flex items-start'>
+              <Check className='mt-0.5 mr-3 h-5 w-5 flex-shrink-0 text-green-500' />
+              <span className='text-gray-700'>
                 {row.count !== undefined
-                  ? t(row.translationKey as Parameters<typeof t>[0], { count: row.count })
+                  ? t(row.translationKey as Parameters<typeof t>[0], {
+                      count: row.count
+                    })
                   : t(row.translationKey as Parameters<typeof t>[0])}
               </span>
             </li>
@@ -257,7 +310,12 @@ async function PricingCardApi({
       </CardContent>
 
       <CardFooter>
-        <Button className="w-full" variant={popular ? 'default' : 'outline'} size="lg" asChild>
+        <Button
+          className='w-full'
+          variant={popular ? 'default' : 'outline'}
+          size='lg'
+          asChild
+        >
           <Link
             href={
               isCustomPricing
@@ -267,7 +325,11 @@ async function PricingCardApi({
                   : `/${locale}/register`
             }
           >
-            {isCustomPricing ? t('contactUs') : showPaidPrice ? t('startTrial') : t('cta.tryFree')}
+            {isCustomPricing
+              ? t('contactUs')
+              : showPaidPrice
+                ? t('startTrial')
+                : t('cta.tryFree')}
           </Link>
         </Button>
       </CardFooter>
@@ -286,41 +348,48 @@ async function PricingCardLegacy({
 }) {
   const t = await getTranslations({ locale, namespace: 'pricing' });
   return (
-    <Card className={`relative ${plan.popular ? 'border-blue-500 border-2 shadow-xl' : ''}`}>
+    <Card
+      className={`relative ${plan.popular ? 'border-2 border-blue-500 shadow-xl' : ''}`}
+    >
       {plan.popular && (
-        <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-          <span className="bg-blue-500 text-white px-4 py-1 rounded-full text-sm font-semibold">
+        <div className='absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 transform'>
+          <span className='rounded-full bg-blue-500 px-4 py-1 text-sm font-semibold text-white'>
             {t('popularChoice')}
           </span>
         </div>
       )}
 
-      <CardHeader className="text-center pb-8 pt-8">
-        <CardTitle className="text-2xl font-bold mb-2">{plan.name}</CardTitle>
-        <div className="mt-6">
+      <CardHeader className='pt-8 pb-8 text-center'>
+        <CardTitle className='mb-2 text-2xl font-bold'>{plan.name}</CardTitle>
+        <div className='mt-6'>
           {plan.price != null ? (
-            <div className="flex items-baseline justify-center">
-              <span className="text-5xl font-extrabold">
+            <div className='flex items-baseline justify-center'>
+              <span className='text-5xl font-extrabold'>
                 {plan.price.toLocaleString(intlLocale)}
               </span>
-              <span className="text-2xl font-medium text-gray-500 ml-2">₽</span>
-              <span className="text-gray-500 ml-2">{plan.interval === 'year' ? t('perYear') : t('perMonth')}</span>
+              <span className='ml-2 text-2xl font-medium text-gray-500'>₽</span>
+              <span className='ml-2 text-gray-500'>
+                {plan.interval === 'year' ? t('perYear') : t('perMonth')}
+              </span>
             </div>
           ) : (
-            <div className="text-3xl font-bold">{t('customPricing')}</div>
+            <div className='text-3xl font-bold'>{t('customPricing')}</div>
           )}
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-4">
-        <ul className="space-y-3">
+      <CardContent className='space-y-4'>
+        <ul className='space-y-3'>
           {plan.features.map((featureKey) => {
             const key = featureKey.split('.').pop() || featureKey;
-            const value = plan.featureValues?.[key as keyof NonNullable<typeof plan.featureValues>];
+            const value =
+              plan.featureValues?.[
+                key as keyof NonNullable<typeof plan.featureValues>
+              ];
             return (
-              <li key={featureKey} className="flex items-start">
-                <Check className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" />
-                <span className="text-gray-700">
+              <li key={featureKey} className='flex items-start'>
+                <Check className='mt-0.5 mr-3 h-5 w-5 flex-shrink-0 text-green-500' />
+                <span className='text-gray-700'>
                   {value !== undefined
                     ? t(featureKey as Parameters<typeof t>[0], { count: value })
                     : t(featureKey as Parameters<typeof t>[0])}
@@ -333,9 +402,9 @@ async function PricingCardLegacy({
 
       <CardFooter>
         <Button
-          className="w-full"
+          className='w-full'
           variant={plan.popular ? 'default' : 'outline'}
-          size="lg"
+          size='lg'
           asChild
         >
           <Link
