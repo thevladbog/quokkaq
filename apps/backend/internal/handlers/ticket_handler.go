@@ -48,7 +48,7 @@ func (h *TicketHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(ticket)
+	RespondJSON(w, ticket)
 }
 
 // GetTicketByID godoc
@@ -67,7 +67,7 @@ func (h *TicketHandler) GetTicketByID(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	json.NewEncoder(w).Encode(ticket)
+	RespondJSON(w, ticket)
 }
 
 // GetTicketsByUnit godoc
@@ -86,7 +86,7 @@ func (h *TicketHandler) GetTicketsByUnit(w http.ResponseWriter, r *http.Request)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(tickets)
+	RespondJSON(w, tickets)
 }
 
 type CallNextRequest struct {
@@ -120,7 +120,7 @@ func (h *TicketHandler) CallNext(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(ticket)
+	RespondJSON(w, ticket)
 }
 
 type UpdateStatusRequest struct {
@@ -153,7 +153,7 @@ func (h *TicketHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(ticket)
+	RespondJSON(w, ticket)
 }
 
 // Recall godoc
@@ -173,7 +173,7 @@ func (h *TicketHandler) Recall(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	json.NewEncoder(w).Encode(ticket)
+	RespondJSON(w, ticket)
 }
 
 type PickRequest struct {
@@ -204,7 +204,7 @@ func (h *TicketHandler) Pick(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	json.NewEncoder(w).Encode(ticket)
+	RespondJSON(w, ticket)
 }
 
 type TransferRequest struct {
@@ -236,7 +236,7 @@ func (h *TicketHandler) Transfer(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(ticket)
+	RespondJSON(w, ticket)
 }
 
 // ReturnToQueue godoc
@@ -256,5 +256,5 @@ func (h *TicketHandler) ReturnToQueue(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(ticket)
+	RespondJSON(w, ticket)
 }

@@ -49,6 +49,27 @@ const ConditionalLayout = ({ children }: ConditionalLayoutProps) => {
       };
     }
 
+    // Organization pages - admin only
+    if (
+      pathWithoutLocale === '/organization' ||
+      pathWithoutLocale.startsWith('/organization/')
+    ) {
+      return { useSidebar: true, protected: true, roles: ['admin'] };
+    }
+
+    // Pricing page - public but with sidebar
+    if (pathWithoutLocale === '/pricing') {
+      return { useSidebar: true, protected: false };
+    }
+
+    // Onboarding - admin only
+    if (
+      pathWithoutLocale === '/onboarding' ||
+      pathWithoutLocale.startsWith('/onboarding/')
+    ) {
+      return { useSidebar: true, protected: true, roles: ['admin'] };
+    }
+
     // Check if it's a subpage of admin that should use the same layout
     if (pathWithoutLocale.startsWith('/admin')) {
       // All admin subpages use sidebar layout

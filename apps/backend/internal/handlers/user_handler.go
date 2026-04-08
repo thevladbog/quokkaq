@@ -41,7 +41,7 @@ func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(user)
+	RespondJSON(w, user)
 }
 
 // GetAllUsers godoc
@@ -59,7 +59,7 @@ func (h *UserHandler) GetAllUsers(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(users)
+	RespondJSON(w, users)
 }
 
 // GetUserByID godoc
@@ -78,7 +78,7 @@ func (h *UserHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
-	json.NewEncoder(w).Encode(user)
+	RespondJSON(w, user)
 }
 
 // DeleteUser godoc
@@ -124,7 +124,7 @@ func (h *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(user)
+	RespondJSON(w, user)
 }
 
 type AssignUnitRequest struct {
@@ -157,7 +157,7 @@ func (h *UserHandler) AssignUnit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+	RespondJSON(w, map[string]bool{"success": true})
 }
 
 type RemoveUnitRequest struct {
@@ -189,7 +189,7 @@ func (h *UserHandler) RemoveUnit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+	RespondJSON(w, map[string]bool{"success": true})
 }
 
 // GetUserUnits godoc
@@ -208,7 +208,7 @@ func (h *UserHandler) GetUserUnits(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
-	json.NewEncoder(w).Encode(user.Units)
+	RespondJSON(w, user.Units)
 }
 
 // GetSystemStatus godoc
@@ -225,7 +225,7 @@ func (h *UserHandler) GetSystemStatus(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(map[string]bool{"initialized": initialized})
+	RespondJSON(w, map[string]bool{"initialized": initialized})
 }
 
 type setupFirstAdminRequest struct {
@@ -274,5 +274,5 @@ func (h *UserHandler) SetupFirstAdmin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(user)
+	RespondJSON(w, user)
 }

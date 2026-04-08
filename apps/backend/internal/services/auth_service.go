@@ -9,6 +9,7 @@ import (
 
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
+	"quokkaq-go-backend/pkg/database"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -20,6 +21,7 @@ type AuthService interface {
 	GetMe(userID string) (*models.User, error)
 	RequestPasswordReset(email string) error
 	ResetPassword(token, newPassword string) error
+	Signup(name, email, password, companyName, planCode string) (string, error)
 }
 
 type authService struct {
@@ -101,7 +103,7 @@ func (s *authService) RequestPasswordReset(email string) error {
 	// Send email
 	resetLink := fmt.Sprintf("%s/reset-password?token=%s", baseURL, token)
 	subject := "Сброс пароля | QuokkaQ"
-	html := strings.Replace(PasswordResetEmailTemplate, "{{reset_link}}", resetLink, -1)
+	html := strings.ReplaceAll(PasswordResetEmailTemplate, "{{reset_link}}", resetLink)
 
 	return s.mailService.SendMail(email, subject, html)
 }
@@ -132,4 +134,86 @@ func (s *authService) ResetPassword(token, newPassword string) error {
 
 	// Delete token
 	return s.userRepo.DeletePasswordResetToken(resetToken.ID)
+}
+
+func (s *authService) Signup(name, email, password, companyName, planCode string) (string, error) {
+	// Check if user already exists
+	existingUser, _ := s.userRepo.FindByEmail(email)
+	if existingUser != nil {
+		return "", errors.New("email already exists")
+	}
+
+	// Hash password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", fmt.Errorf("failed to hash password: %w", err)
+	}
+	hashedPasswordStr := string(hashedPassword)
+
+	// Get subscription plan
+	subscriptionRepo := repository.NewSubscriptionRepository()
+	plan, err := subscriptionRepo.FindPlanByCode(planCode)
+	if err != nil {
+		return "", fmt.Errorf("invalid plan code: %w", err)
+	}
+
+	// Create company
+	company := &models.Company{
+		Name:         companyName,
+		BillingEmail: email,
+	}
+
+	db := database.DB
+	if err := db.Create(company).Error; err != nil {
+		return "", fmt.Errorf("failed to create company: %w", err)
+	}
+
+	// Create trial subscription (14 days)
+	trialEnd := time.Now().AddDate(0, 0, 14)
+	subscription := &models.Subscription{
+		CompanyID:          company.ID,
+		PlanID:             plan.ID,
+		Status:             "trial",
+		CurrentPeriodStart: time.Now(),
+		CurrentPeriodEnd:   trialEnd,
+		TrialEnd:           &trialEnd,
+	}
+
+	if err := db.Create(subscription).Error; err != nil {
+		return "", fmt.Errorf("failed to create subscription: %w", err)
+	}
+
+	// Update company with subscription and owner
+	company.SubscriptionID = &subscription.ID
+
+	// Create user
+	user := &models.User{
+		Name:     name,
+		Email:    &email,
+		Password: &hashedPasswordStr,
+		Type:     "staff",
+	}
+
+	if err := s.userRepo.Create(user); err != nil {
+		return "", fmt.Errorf("failed to create user: %w", err)
+	}
+
+	// Set user as company owner
+	company.OwnerUserID = user.ID
+	if err := db.Save(company).Error; err != nil {
+		return "", fmt.Errorf("failed to update company owner: %w", err)
+	}
+
+	// Assign admin role
+	adminRole, err := s.userRepo.EnsureRoleExists("admin")
+	if err != nil {
+		return "", fmt.Errorf("failed to get admin role: %w", err)
+	}
+
+	if err := s.userRepo.AssignRole(user.ID, adminRole.ID); err != nil {
+		return "", fmt.Errorf("failed to assign admin role: %w", err)
+	}
+
+	// Generate JWT token
+	return s.generateToken(user)
 }

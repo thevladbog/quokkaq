@@ -12,6 +12,8 @@ __pycache__/
 api.exe
 quokkaq-backend
 quokkaq-backend.exe
+quokkaq-api
+quokkaq-api.exe
 
 # Test binary, built with `go test -c`
 *.test

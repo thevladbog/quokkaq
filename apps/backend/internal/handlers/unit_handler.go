@@ -50,7 +50,7 @@ func (h *UnitHandler) CreateUnit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(unit)
+	RespondJSON(w, unit)
 }
 
 // GetAllUnits godoc
@@ -67,7 +67,7 @@ func (h *UnitHandler) GetAllUnits(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(units)
+	RespondJSON(w, units)
 }
 
 // GetUnitByID godoc
@@ -88,7 +88,7 @@ func (h *UnitHandler) GetUnitByID(w http.ResponseWriter, r *http.Request) {
 	}
 	// Kiosk config (e.g. PIN) must not be served from stale HTTP caches (desktop WebViews cache aggressively).
 	w.Header().Set("Cache-Control", "no-store")
-	json.NewEncoder(w).Encode(unit)
+	RespondJSON(w, unit)
 }
 
 // DeleteUnit godoc
@@ -134,7 +134,7 @@ func (h *UnitHandler) AddMaterial(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid file", http.StatusBadRequest)
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	fmt.Printf("Uploading file: %s, Size: %d\n", header.Filename, header.Size)
 
@@ -179,7 +179,7 @@ func (h *UnitHandler) AddMaterial(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(material)
+	RespondJSON(w, material)
 }
 
 // GetMaterials godoc
@@ -198,7 +198,7 @@ func (h *UnitHandler) GetMaterials(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(materials)
+	RespondJSON(w, materials)
 }
 
 // DeleteMaterial godoc
@@ -244,7 +244,7 @@ func (h *UnitHandler) UpdateAdSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+	RespondJSON(w, map[string]bool{"success": true})
 }
 
 // UpdateUnit godoc
@@ -297,5 +297,5 @@ func (h *UnitHandler) UpdateUnit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(existingUnit)
+	RespondJSON(w, existingUnit)
 }

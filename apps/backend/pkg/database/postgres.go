@@ -7,6 +7,7 @@ import (
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 var DB *gorm.DB
@@ -39,7 +40,10 @@ func Connect() {
 	}
 
 	var err error
-	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
+		Logger:                                   logger.Default.LogMode(logger.Silent), // Suppress migration logs
+		DisableForeignKeyConstraintWhenMigrating: true,                                  // Disable FK constraints during migration
+	})
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
 	}
@@ -47,10 +51,37 @@ func Connect() {
 	fmt.Println("Database connected successfully")
 }
 
+// AutoMigrate runs auto-migrations for the given models
+// This is kept for backward compatibility but should be replaced with versioned migrations
 func AutoMigrate(models ...interface{}) {
 	err := DB.AutoMigrate(models...)
 	if err != nil {
 		log.Fatal("Failed to migrate database:", err)
 	}
 	fmt.Println("Database migration completed")
+}
+
+// RunVersionedMigrations initializes migration tracking and runs all migrations
+func RunVersionedMigrations(models ...interface{}) error {
+	fmt.Println("Initializing migration system...")
+	
+	// Create migration manager
+	manager := NewMigrationManager(DB)
+	
+	// Initialize migration tracking table
+	if err := manager.Initialize(); err != nil {
+		return fmt.Errorf("failed to initialize migration tracking: %w", err)
+	}
+
+	// Run all tables migration
+	err := manager.RunMigration("v1.0.0_core_tables", func(db *gorm.DB) error {
+		return db.AutoMigrate(models...)
+	})
+	
+	if err != nil {
+		return fmt.Errorf("failed to run core tables migration: %w", err)
+	}
+
+	fmt.Println("All migrations completed successfully")
+	return nil
 }

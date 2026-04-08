@@ -121,7 +121,7 @@ func (s *invitationService) AcceptInvitation(token string, userID string) error 
 
 	if invitation.ExpiresAt.Before(time.Now()) {
 		invitation.Status = "inactive"
-		s.repo.Update(invitation)
+		_ = s.repo.Update(invitation) // Best effort update, error not critical
 		return errors.New("invitation expired")
 	}
 

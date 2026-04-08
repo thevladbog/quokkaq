@@ -895,5 +895,300 @@
     "language": "Language",
     "theme": "Theme",
     "logout": "Logout"
+  },
+  "pricing": {
+    "title": "Pricing Plans",
+    "description": "Choose the right plan for you",
+    "pageTitle": "Choose the Right Plan for You",
+    "pageSubtitle": "Start with a free 14-day trial. Cancel anytime.",
+    "popularChoice": "Popular Choice",
+    "perMonth": "/mo",
+    "perYear": "/yr",
+    "startTrial": "Start Free Trial",
+    "contactUs": "Contact Us",
+    "customPricing": "Custom Pricing",
+    "faq": {
+      "title": "Frequently Asked Questions",
+      "trial": {
+        "q": "What's included in the trial?",
+        "a": "The 14-day trial includes full access to all features of the selected plan without requiring payment details."
+      },
+      "changePlan": {
+        "q": "Can I change plans?",
+        "a": "Yes, you can upgrade or downgrade at any time. Changes take effect immediately, and we'll prorate the payment."
+      },
+      "payment": {
+        "q": "What payment methods are available?",
+        "a": "We accept credit cards through YooKassa. Enterprise clients can pay by invoice."
+      },
+      "limits": {
+        "q": "What happens if I exceed limits?",
+        "a": "We'll notify you by email. You can upgrade your plan, or some features will be temporarily limited until the next billing period."
+      }
+    },
+    "cta": {
+      "title": "Ready to Get Started?",
+      "subtitle": "Join hundreds of organizations already using QuokkaQ",
+      "tryFree": "Try for Free",
+      "contactSales": "Contact Sales"
+    },
+    "features": {
+      "units": "Up to {count} units",
+      "users": "Up to {count} users",
+      "tickets": "Up to {count} tickets per month",
+      "services": "{count} services",
+      "counters": "{count} service counters",
+      "unlimitedUnits": "Unlimited units",
+      "unlimitedUsers": "Unlimited users",
+      "unlimitedTickets": "Unlimited tickets",
+      "unlimitedServices": "Unlimited services",
+      "unlimitedCounters": "Unlimited counters",
+      "realtimeUpdates": "Real-time updates",
+      "basicReports": "Basic reports",
+      "advancedReports": "Advanced analytics",
+      "emailSupport": "Email support",
+      "phoneSupport": "Phone support",
+      "apiAccess": "API access",
+      "customBranding": "Custom branding",
+      "whiteLabel": "White-label solution",
+      "prioritySupport": "Priority support",
+      "dedicatedSupport": "Dedicated manager",
+      "slaGuarantee": "SLA guarantee",
+      "customIntegrations": "Custom integrations",
+      "teamTraining": "Team training"
+    }
+  },
+  "organization": {
+    "title": "Organization Management",
+    "description": "Your organization settings and preferences",
+    "companyInfo": "Company Information",
+    "companyInfoDesc": "Basic information about your organization",
+    "companyName": "Company Name",
+    "billingEmail": "Billing Email",
+    "address": "Address",
+    "notSet": "Not set",
+    "edit": "Edit",
+    "save": "Save",
+    "cancel": "Cancel",
+    "quickLinks": {
+      "billing": "Billing",
+      "billingDesc": "Manage subscription and payments",
+      "team": "Team",
+      "teamDesc": "Manage users and permissions",
+      "units": "Units",
+      "unitsDesc": "Manage branches and departments"
+    },
+    "billing": {
+      "title": "Billing & Subscription",
+      "description": "Manage your plan, payments, and invoices",
+      "currentPlan": "Current Plan",
+      "upgradePlan": "Upgrade Plan",
+      "cancelSubscription": "Cancel Subscription",
+      "manageBilling": "Manage Billing",
+      "addPaymentMethod": "Add Payment Method",
+      "perMonth": "/mo",
+      "perYear": "/yr",
+      "status": {
+        "trial": "Trial",
+        "active": "Active",
+        "pastDue": "Past Due",
+        "canceled": "Canceled",
+        "paused": "Paused"
+      },
+      "currentPeriod": "Current Period",
+      "nextRenewal": "Next Renewal",
+      "cancelingOn": "Canceling on",
+      "trialEnding": "Trial period ending",
+      "trialEndingDesc": "{days} days remaining. Add a payment method to continue using the service.",
+      "pastDueWarning": "Payment issue",
+      "pastDueDesc": "Failed to charge payment method. Please update your payment details.",
+      "cancelWarning": "Your subscription will be canceled on {date}. Access will remain until that date.",
+      "viewInvoices": "Invoice History",
+      "viewInvoicesDesc": "View and download all your invoices",
+      "viewUsage": "Usage",
+      "viewUsageDesc": "Track resource usage and quotas",
+      "goTo": "Go to"
+    },
+    "invoices": {
+      "title": "Invoice History",
+      "description": "All your payments and invoices in one place",
+      "backToBilling": "Back to Billing",
+      "noInvoices": "No invoices yet",
+      "invoice": "Invoice",
+      "date": "Date",
+      "amount": "Amount",
+      "paymentMethod": "Method",
+      "status": "Status",
+      "actions": "Actions",
+      "download": "PDF",
+      "statuses": {
+        "draft": "Draft",
+        "open": "Pending",
+        "paid": "Paid",
+        "void": "Voided",
+        "uncollectible": "Uncollectible"
+      },
+      "providers": {
+        "stripe": "Stripe",
+        "yookassa": "YooKassa",
+        "manual": "Manual Payment"
+      }
+    },
+    "usage": {
+      "title": "Resource Usage",
+      "description": "Track usage and quotas for your plan",
+      "backToBilling": "Back to Billing",
+      "exportReport": "Export Report",
+      "currentPeriod": "Current Period",
+      "metrics": {
+        "units": "Units",
+        "users": "Users",
+        "ticketsPerMonth": "Tickets (monthly)",
+        "tickets_per_month": "Tickets (monthly)",
+        "services": "Services",
+        "counters": "Service Counters"
+      },
+      "unlimited": "Unlimited",
+      "used": "used",
+      "approaching": "Approaching limit",
+      "approachingWarning": "Approaching Limits",
+      "approachingDesc": "Consider upgrading your plan to increase limits.",
+      "recommendations": "Recommendations",
+      "recommendationsDesc": "Resource usage is tracked daily. You'll be notified when reaching 90% of any limit.",
+      "tip": "Tip",
+      "tipDesc": "If you regularly approach limits, consider upgrading your plan for more comfortable usage.",
+      "viewPlans": "View Available Plans"
+    }
+  },
+  "onboarding": {
+    "title": "System Setup",
+    "description": "Initial QuokkaQ setup",
+    "step": "Step",
+    "of": "of",
+    "welcome": {
+      "title": "Welcome to QuokkaQ!",
+      "subtitle": "Let's set up your queue management system in a few simple steps",
+      "steps": {
+        "unit": {
+          "title": "Create a Unit",
+          "desc": "Set up your first branch or location"
+        },
+        "services": {
+          "title": "Configure Services",
+          "desc": "Add services you provide to customers"
+        },
+        "team": {
+          "title": "Invite Your Team",
+          "desc": "Add staff members to work with the system"
+        },
+        "complete": {
+          "title": "Done!",
+          "desc": "Start using QuokkaQ"
+        }
+      },
+      "tip": "Tip",
+      "tipDesc": "You can configure all settings later. We'll only do the basic setup now.",
+      "start": "Start Setup"
+    },
+    "unit": {
+      "title": "Create Your First Unit",
+      "subtitle": "A unit is your branch, office, or service location",
+      "nameLabel": "Unit Name",
+      "namePlaceholder": "e.g. Main Office, Branch #1",
+      "nameRequired": "Enter unit name",
+      "nameHelp": "This name will be displayed on screens and tickets",
+      "codeLabel": "Unit Code",
+      "codePlaceholder": "MOW01",
+      "codeRequired": "Enter unit code",
+      "codeInvalid": "Code must contain 2-6 uppercase letters or numbers",
+      "codeHelp": "Unique code of 2-6 characters (letters and numbers)",
+      "timezoneLabel": "Timezone",
+      "timezoneHelp": "Used for scheduling and reports",
+      "tip": "Hint",
+      "tipDesc": "You can add more units later in the admin panel.",
+      "back": "Back",
+      "continue": "Continue",
+      "required": "*"
+    },
+    "services": {
+      "title": "Add Services",
+      "subtitle": "What services do you provide to customers? Add the main ones to start.",
+      "nameLabel": "Service Name",
+      "namePlaceholder": "e.g. Consultation, Document Processing",
+      "descLabel": "Description (optional)",
+      "descPlaceholder": "Brief service description",
+      "addAnother": "Add Another Service",
+      "canSkip": "Can Skip",
+      "canSkipDesc": "You can add services later in the admin panel.",
+      "back": "Back",
+      "skip": "Skip",
+      "continue": "Continue"
+    },
+    "team": {
+      "title": "Invite Your Team",
+      "subtitle": "Add email addresses of employees who will work with the system",
+      "emailLabel": "Email",
+      "emailPlaceholder": "colleague@example.com",
+      "roleLabel": "Role",
+      "roles": {
+        "staff": "Staff",
+        "supervisor": "Supervisor"
+      },
+      "rolesHelp": {
+        "title": "User Roles:",
+        "staff": "Staff - can call and serve customers",
+        "supervisor": "Supervisor - can view statistics and manage queue"
+      },
+      "addAnother": "Add Another Member",
+      "canSkip": "Can Skip",
+      "canSkipDesc": "You can invite staff members later.",
+      "back": "Back",
+      "skip": "Skip",
+      "continue": "Continue",
+      "required": "*"
+    },
+    "complete": {
+      "title": "Setup Complete!",
+      "subtitle": "Your queue management system is ready to use",
+      "summary": "What was configured:",
+      "summaryUnit": "Unit",
+      "summaryServices": "Services",
+      "summaryTeam": "Team",
+      "servicesAdded": "Added {count} services",
+      "teamInvited": "Invited {count} staff members",
+      "canAddLater": "Can add later",
+      "nextSteps": "What's next?",
+      "steps": {
+        "counters": "Set up service counters in the admin panel",
+        "kiosk": "Configure kiosk for ticket issuance",
+        "printer": "Connect thermal printer for ticket printing",
+        "screen": "Set up queue display screen"
+      },
+      "trialActive": "Trial period active!",
+      "trialDesc": "You have 14 days of full access to all features. Add a payment method anytime to continue after the trial period.",
+      "goToDashboard": "Go to Dashboard"
+    }
+  },
+  "billing": {
+    "upgradeModal": {
+      "title": "Limit Reached",
+      "description": "You've reached the {feature} limit on your current plan",
+      "currentUsage": "Used:",
+      "descriptions": {
+        "units": "Create more units to manage multiple branches",
+        "users": "Invite more staff members to your team",
+        "ticketsPerMonth": "Serve more customers each month",
+        "services": "Add more service types for your customers",
+        "counters": "Open more service counters for faster service"
+      },
+      "upgradeTitle": "Upgrade to get:",
+      "benefits": {
+        "increased": "Increased limits on all resources",
+        "features": "Additional features",
+        "support": "Priority support"
+      },
+      "later": "Later",
+      "upgrade": "Upgrade Plan"
+    }
   }
 }

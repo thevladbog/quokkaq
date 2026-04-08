@@ -1,10 +1,12 @@
 package services
 
 import (
+	"encoding/json"
 	"math"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/ws"
+	"quokkaq-go-backend/pkg/database"
 	"time"
 )
 
@@ -119,7 +121,21 @@ func (s *shiftService) ExecuteEndOfDay(unitID string, userID *string) (map[strin
 		return nil, err
 	}
 
-	// TODO: Create audit log (skipping for now as AuditLogRepo is not fully set up)
+	// Create audit log for End of Day operation
+	auditPayload := map[string]interface{}{
+		"unitId":           unitID,
+		"ticketsMarked":    ticketsMarked,
+		"countersReleased": countersReleased,
+		"timestamp":        time.Now(),
+	}
+	payloadBytes, _ := json.Marshal(auditPayload)
+	
+	auditLog := models.AuditLog{
+		UserID:  userID,
+		Action:  "unit.eod",
+		Payload: payloadBytes,
+	}
+	database.DB.Create(&auditLog)
 
 	result := map[string]interface{}{
 		"success":          true,

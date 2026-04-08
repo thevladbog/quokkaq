@@ -18,7 +18,6 @@ import {
   Home,
   Settings,
   Users,
-  User,
   Building,
   UserRound,
   Grid3X3,
@@ -28,7 +27,10 @@ import {
   CalendarClock,
   Monitor,
   LogOut,
-  Globe
+  Globe,
+  Building2,
+  CreditCard,
+  DollarSign
 } from 'lucide-react';
 import Image from 'next/image';
 import { useAuthContext } from '@/contexts/AuthContext';
@@ -50,6 +52,8 @@ const AppSidebar = () => {
   const tAdmin = useTranslations('admin');
   const tNav = useTranslations('nav');
   const tProfile = useTranslations('profile');
+  const tOrg = useTranslations('organization');
+  const tPricing = useTranslations('pricing');
   const { user, isAuthenticated, logout } = useAuthContext();
   const pathname = usePathname();
 
@@ -107,6 +111,24 @@ const AppSidebar = () => {
     }
   ];
 
+  // Define organization submenu items
+  const organizationSubItems = [
+    {
+      icon: Building2,
+      label: tOrg('title', { defaultValue: 'Organization' }),
+      href: '/organization',
+      active: isActive('/organization'),
+      roles: ['admin']
+    },
+    {
+      icon: CreditCard,
+      label: tOrg('billing.title', { defaultValue: 'Billing' }),
+      href: '/organization/billing',
+      active: isActive('/organization/billing') || isActiveSub('/organization/billing'),
+      roles: ['admin']
+    }
+  ];
+
   // Helper to check if user has specific permission in ANY unit
   const hasPermissionInAnyUnit = (permission: string) => {
     if (!user?.permissions) return false;
@@ -125,12 +147,29 @@ const AppSidebar = () => {
       roles: ['admin', 'staff', 'supervisor', 'user'] // All users can access home
     },
     {
+      icon: Building2,
+      label: tOrg('title', { defaultValue: 'Organization' }),
+      href: '/organization',
+      active: pathname.startsWith('/organization'),
+      roles: ['admin'], // Only admins can access organization settings
+      hasSubmenu: true,
+      submenuKey: 'organization'
+    },
+    {
+      icon: DollarSign,
+      label: tPricing('title', { defaultValue: 'Pricing' }),
+      href: '/pricing',
+      active: isActive('/pricing'),
+      roles: ['admin', 'staff', 'supervisor', 'user'] // All users can view pricing
+    },
+    {
       icon: Settings,
       label: tAdmin('navigation.settings', { defaultValue: 'Settings' }),
       href: '/admin/units',
       active: pathname.startsWith('/admin'),
       roles: ['admin'], // Only admins can access admin panel
-      hasSubmenu: true
+      hasSubmenu: true,
+      submenuKey: 'settings'
     },
     {
       icon: Users,
@@ -185,6 +224,14 @@ const AppSidebar = () => {
         user?.roles?.some((role: string) => item.roles?.includes(role))) // User has required role
   );
 
+  const filteredOrganizationSubItems = organizationSubItems.filter(
+    (item) =>
+      !item.roles || // No role restriction
+      (isAuthenticated && user?.roles?.includes('admin')) || // Admin has access to everything
+      (isAuthenticated &&
+        user?.roles?.some((role: string) => item.roles?.includes(role))) // User has required role
+  );
+
   return (
     <Sidebar>
       <SidebarHeader>
@@ -223,27 +270,23 @@ const AppSidebar = () => {
             <SidebarMenu>
               {navItems.map((item) => {
                 const Icon = item.icon;
-                const isSettingsItem =
-                  item.href === '/admin/units' && item.hasSubmenu;
+                const hasSubmenu = item.hasSubmenu;
+                const submenuItems = 
+                  item.submenuKey === 'settings' ? filteredSettingsSubItems :
+                  item.submenuKey === 'organization' ? filteredOrganizationSubItems :
+                  [];
 
                 return (
                   <SidebarMenuItem key={item.href}>
                     <SidebarMenuButton asChild isActive={item.active}>
-                      {isSettingsItem ? (
-                        <Link href={item.href}>
-                          <Icon />
-                          <span>{item.label}</span>
-                        </Link>
-                      ) : (
-                        <Link href={item.href}>
-                          <Icon />
-                          <span>{item.label}</span>
-                        </Link>
-                      )}
+                      <Link href={item.href}>
+                        <Icon />
+                        <span>{item.label}</span>
+                      </Link>
                     </SidebarMenuButton>
-                    {isSettingsItem && filteredSettingsSubItems.length > 0 && (
+                    {hasSubmenu && submenuItems.length > 0 && (
                       <SidebarMenuSub>
-                        {filteredSettingsSubItems.map((subItem) => {
+                        {submenuItems.map((subItem) => {
                           const SubIcon = subItem.icon;
                           return (
                             <SidebarMenuSubItem key={subItem.href}>

@@ -26,6 +26,8 @@ type UserRepository interface {
 	EnsureRoleExists(name string) (*models.Role, error)
 	IsAdmin(userID string) (bool, error)
 	IsAdminOrHasUnitAccess(userID, unitID string) (bool, error)
+	HasCompanyAccess(userID, companyID string) (bool, error)
+	IsCompanyOwner(userID, companyID string) (bool, error)
 }
 
 type userRepository struct {
@@ -179,4 +181,51 @@ func (r *userRepository) IsAdminOrHasUnitAccess(userID, unitID string) (bool, er
 		}
 	}
 	return false, nil
+}
+
+// HasCompanyAccess checks if user has access to any unit within a company
+func (r *userRepository) HasCompanyAccess(userID, companyID string) (bool, error) {
+	if companyID == "" {
+		return false, nil
+	}
+
+	// Check if user is admin (admins have access to all companies)
+	isAdmin, err := r.IsAdmin(userID)
+	if err != nil {
+		return false, err
+	}
+	if isAdmin {
+		return true, nil
+	}
+
+	// Check if user has access to any unit belonging to this company
+	var count int64
+	err = r.db.Table("user_units").
+		Joins("INNER JOIN units ON units.id = user_units.unit_id").
+		Where("user_units.user_id = ? AND units.company_id = ?", userID, companyID).
+		Count(&count).Error
+
+	if err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
+}
+
+// IsCompanyOwner checks if user is the owner of the company
+func (r *userRepository) IsCompanyOwner(userID, companyID string) (bool, error) {
+	if companyID == "" || userID == "" {
+		return false, nil
+	}
+
+	var company models.Company
+	err := r.db.Where("id = ? AND owner_user_id = ?", companyID, userID).First(&company).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	return true, nil
 }

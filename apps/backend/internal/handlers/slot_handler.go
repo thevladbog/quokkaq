@@ -24,7 +24,7 @@ func (h *SlotHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(config)
+	RespondJSON(w, config)
 }
 
 func (h *SlotHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
@@ -41,7 +41,7 @@ func (h *SlotHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(config)
+	RespondJSON(w, config)
 }
 
 func (h *SlotHandler) GetCapacities(w http.ResponseWriter, r *http.Request) {
@@ -51,7 +51,7 @@ func (h *SlotHandler) GetCapacities(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(capacities)
+	RespondJSON(w, capacities)
 }
 
 func (h *SlotHandler) UpdateCapacities(w http.ResponseWriter, r *http.Request) {
@@ -71,7 +71,7 @@ func (h *SlotHandler) UpdateCapacities(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(capacities)
+	RespondJSON(w, capacities)
 }
 
 func (h *SlotHandler) Generate(w http.ResponseWriter, r *http.Request) {
@@ -90,7 +90,7 @@ func (h *SlotHandler) Generate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+	RespondJSON(w, map[string]bool{"success": true})
 }
 
 func (h *SlotHandler) GetDay(w http.ResponseWriter, r *http.Request) {
@@ -110,7 +110,7 @@ func (h *SlotHandler) GetDay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(slots)
+	RespondJSON(w, slots)
 }
 
 func (h *SlotHandler) UpdateDay(w http.ResponseWriter, r *http.Request) {
@@ -128,5 +128,5 @@ func (h *SlotHandler) UpdateDay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+	RespondJSON(w, map[string]bool{"success": true})
 }

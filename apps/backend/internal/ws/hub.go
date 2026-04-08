@@ -55,9 +55,7 @@ func (h *Hub) Run() {
 			if _, ok := h.clients[client]; ok {
 				// Remove from all rooms
 				for _, clients := range h.rooms {
-					if _, ok := clients[client]; ok {
-						delete(clients, client)
-					}
+					delete(clients, client)
 				}
 				delete(h.clients, client)
 				close(client.send)

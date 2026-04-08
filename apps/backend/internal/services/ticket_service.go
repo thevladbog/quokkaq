@@ -235,9 +235,7 @@ func (s *ticketService) ReturnToQueue(ticketID string) (*models.Ticket, error) {
 }
 
 func (s *ticketService) enqueueTTS(ticket *models.Ticket, counterID string) {
-	// TODO: Fetch counter name if counterID is UUID
-	// For now assuming counterID might be name or we need to fetch it.
-	// Ideally we should fetch the counter to get its name.
+	// Fetch counter name from repository
 	counterName := counterID
 	if counter, err := s.counterRepo.FindByID(counterID); err == nil {
 		counterName = counter.Name

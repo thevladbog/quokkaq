@@ -28,7 +28,7 @@ func (h *PreRegistrationHandler) GetByUnit(w http.ResponseWriter, r *http.Reques
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(preRegs)
+	RespondJSON(w, preRegs)
 }
 
 func (h *PreRegistrationHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -45,7 +45,7 @@ func (h *PreRegistrationHandler) Create(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(preReg)
+	RespondJSON(w, preReg)
 }
 
 func (h *PreRegistrationHandler) Update(w http.ResponseWriter, r *http.Request) {
@@ -83,7 +83,7 @@ func (h *PreRegistrationHandler) Update(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(existing)
+	RespondJSON(w, existing)
 }
 
 func (h *PreRegistrationHandler) GetAvailableSlots(w http.ResponseWriter, r *http.Request) {
@@ -101,7 +101,7 @@ func (h *PreRegistrationHandler) GetAvailableSlots(w http.ResponseWriter, r *htt
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(slots)
+	RespondJSON(w, slots)
 }
 
 func (h *PreRegistrationHandler) Validate(w http.ResponseWriter, r *http.Request) {
@@ -118,7 +118,7 @@ func (h *PreRegistrationHandler) Validate(w http.ResponseWriter, r *http.Request
 		http.Error(w, err.Error(), http.StatusNotFound) // Or 400 depending on error
 		return
 	}
-	json.NewEncoder(w).Encode(preReg)
+	RespondJSON(w, preReg)
 }
 
 func (h *PreRegistrationHandler) Redeem(w http.ResponseWriter, r *http.Request) {
@@ -140,7 +140,7 @@ func (h *PreRegistrationHandler) Redeem(w http.ResponseWriter, r *http.Request) 
 	preReg, err := h.service.ValidateForKiosk(req.Code)
 	if err != nil {
 		// Return 200 OK with error message for validation failures
-		json.NewEncoder(w).Encode(RedeemResponse{
+		RespondJSON(w, RedeemResponse{
 			Success: false,
 			Message: err.Error(),
 		})
@@ -166,7 +166,7 @@ func (h *PreRegistrationHandler) Redeem(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	json.NewEncoder(w).Encode(RedeemResponse{
+	RespondJSON(w, RedeemResponse{
 		Success: true,
 		Ticket:  ticket,
 	})

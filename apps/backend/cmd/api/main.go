@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"quokkaq-go-backend/internal/config"
@@ -53,11 +54,19 @@ func main() {
 		}
 	}
 	if runAutoMigrate {
-		database.AutoMigrate(
+		// Use versioned migrations with tracking
+		err := database.RunVersionedMigrations(
+			// Core models (no dependencies)
 			&models.Company{},
+			&models.SubscriptionPlan{},
+			&models.Role{},
+			
+			// Models with foreign keys (in dependency order)
+			&models.Subscription{},
+			&models.Invoice{},
+			&models.UsageRecord{},
 			&models.Unit{},
 			&models.User{},
-			&models.Role{},
 			&models.UserRole{},
 			&models.UserUnit{},
 			&models.Service{},
@@ -79,20 +88,23 @@ func main() {
 			&models.ServiceSlot{},
 			&models.DesktopTerminal{},
 		)
+		if err != nil {
+			log.Fatalf("Failed to run migrations: %v", err)
+		}
 	}
 
 	hub := ws.NewHub()
 	go hub.Run()
 
 	jobClient := jobs.NewJobClient()
-	defer jobClient.Close()
+	defer func() {
+		if err := jobClient.Close(); err != nil {
+			fmt.Printf("Error closing job client: %v\n", err)
+		}
+	}()
 
 	storageService := services.NewStorageService()
 	ttsService := services.NewTtsService(storageService)
-
-	jobWorker := jobs.NewJobWorker(ttsService)
-	jobWorker.Start()
-	defer jobWorker.Stop()
 
 	userRepo := repository.NewUserRepository()
 	unitRepo := repository.NewUnitRepository()
@@ -105,6 +117,13 @@ func main() {
 	slotRepo := repository.NewSlotRepository()
 	preRegRepo := repository.NewPreRegistrationRepository()
 	desktopTerminalRepo := repository.NewDesktopTerminalRepository()
+	subscriptionRepo := repository.NewSubscriptionRepository()
+	invoiceRepo := repository.NewInvoiceRepository()
+	companyRepo := repository.NewCompanyRepository()
+
+	jobWorker := jobs.NewJobWorker(ttsService, ticketRepo)
+	jobWorker.Start()
+	defer jobWorker.Stop()
 
 	userService := services.NewUserService(userRepo)
 	mailService := services.NewMailService()
@@ -120,6 +139,7 @@ func main() {
 	slotService := services.NewSlotService(slotRepo, preRegRepo)
 	preRegService := services.NewPreRegistrationService(preRegRepo, slotRepo, ticketRepo, serviceRepo)
 	desktopTerminalService := services.NewDesktopTerminalService(desktopTerminalRepo, unitRepo)
+	quotaService := services.NewQuotaService()
 
 	userHandler := handlers.NewUserHandler(userService)
 	authHandler := handlers.NewAuthHandler(authService)
@@ -135,6 +155,10 @@ func main() {
 	preRegHandler := handlers.NewPreRegistrationHandler(preRegService, ticketService)
 	uploadHandler := handlers.NewUploadHandler(storageService)
 	desktopTerminalHandler := handlers.NewDesktopTerminalHandler(desktopTerminalService)
+	usageHandler := handlers.NewUsageHandler(quotaService, userRepo)
+	subscriptionHandler := handlers.NewSubscriptionHandler(subscriptionRepo, userRepo)
+	invoiceHandler := handlers.NewInvoiceHandler(invoiceRepo, userRepo)
+	companyHandler := handlers.NewCompanyHandler(companyRepo, userRepo)
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -161,7 +185,9 @@ func main() {
 	}))
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Hello from QuokkaQ Go Backend!"))
+		if _, err := w.Write([]byte("Hello from QuokkaQ Go Backend!")); err != nil {
+			fmt.Printf("Error writing response: %v\n", err)
+		}
 	})
 
 	r.Get("/ws", func(w http.ResponseWriter, r *http.Request) {
@@ -188,7 +214,9 @@ func main() {
 			return
 		}
 
-		fmt.Fprintln(w, htmlContent)
+		if _, err := fmt.Fprintln(w, htmlContent); err != nil {
+			fmt.Printf("Error writing API reference: %v\n", err)
+		}
 	})
 
 	r.Get("/docs/swagger.json", func(w http.ResponseWriter, r *http.Request) {
@@ -348,6 +376,33 @@ func main() {
 		r.Post("/upload", uploadHandler.UploadLogo)
 	})
 
+	r.Route("/companies", func(r chi.Router) {
+		r.Use(authmiddleware.JWTAuth)
+		r.Get("/{companyId}/usage-metrics", usageHandler.GetUsageMetrics)
+		r.Post("/me/complete-onboarding", companyHandler.CompleteOnboarding)
+	})
+
+	r.Route("/usage-metrics", func(r chi.Router) {
+		r.Use(authmiddleware.JWTAuth)
+		r.Get("/me", usageHandler.GetMyUsageMetrics)
+	})
+
+	r.Route("/subscriptions", func(r chi.Router) {
+		r.Group(func(r chi.Router) {
+			r.Use(authmiddleware.JWTAuth)
+			r.Get("/me", subscriptionHandler.GetMySubscription)
+			r.Post("/checkout", subscriptionHandler.CreateCheckout)
+			r.Post("/{id}/cancel", subscriptionHandler.CancelSubscription)
+		})
+		r.Get("/plans", subscriptionHandler.GetPlans)
+	})
+
+	r.Route("/invoices", func(r chi.Router) {
+		r.Use(authmiddleware.JWTAuth)
+		r.Get("/me", invoiceHandler.GetMyInvoices)
+		r.Get("/{id}/download", invoiceHandler.DownloadInvoice)
+	})
+
 	r.Route("/tickets", func(r chi.Router) {
 		r.Get("/{id}", ticketHandler.GetTicketByID)
 		r.Group(func(r chi.Router) {
@@ -367,5 +422,7 @@ func main() {
 	}
 
 	fmt.Printf("Server starting on port %s\n", port)
-	http.ListenAndServe(":"+port, r)
+	if err := http.ListenAndServe(":"+port, r); err != nil {
+		fmt.Printf("Server failed: %v\n", err)
+	}
 }

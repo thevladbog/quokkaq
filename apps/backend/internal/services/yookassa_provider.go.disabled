@@ -1,0 +1,205 @@
+package services
+
+import (
+	"encoding/json"
+	"fmt"
+	"quokkaq-go-backend/internal/models"
+	"quokkaq-go-backend/pkg/database"
+	"time"
+
+	yookassa "github.com/rvinnie/yookassa-sdk-go/yookassa"
+)
+
+type YooKassaProvider struct {
+	client *yookassa.Client
+	shopID string
+}
+
+func NewYooKassaProvider(shopID, secretKey string) PaymentProvider {
+	client := yookassa.NewClient(shopID, secretKey)
+	return &YooKassaProvider{
+		client: client,
+		shopID: shopID,
+	}
+}
+
+func (p *YooKassaProvider) CreateCheckoutSession(subscription *models.Subscription, successURL, cancelURL string) (string, error) {
+	db := database.DB
+
+	// Load the subscription with plan
+	if err := db.Preload("Plan").Preload("Company").First(subscription, "id = ?", subscription.ID).Error; err != nil {
+		return "", err
+	}
+
+	// Create payment
+	payment := &yookassa.Payment{
+		Amount: &yookassa.Amount{
+			Value:    fmt.Sprintf("%.2f", float64(subscription.Plan.Price)/100),
+			Currency: subscription.Plan.Currency,
+		},
+		Confirmation: &yookassa.Confirmation{
+			Type:      yookassa.ConfirmationTypeRedirect,
+			ReturnURL: successURL,
+		},
+		Description: fmt.Sprintf("Подписка %s для %s", subscription.Plan.Name, subscription.Company.Name),
+		Metadata: map[string]string{
+			"subscription_id": subscription.ID,
+			"company_id":      subscription.CompanyID,
+		},
+		Capture: true,
+	}
+
+	createdPayment, err := p.client.CreatePayment(payment)
+	if err != nil {
+		return "", fmt.Errorf("failed to create payment: %w", err)
+	}
+
+	// Store payment ID in invoice
+	invoice := &models.Invoice{
+		CompanyID:                subscription.CompanyID,
+		SubscriptionID:           subscription.ID,
+		Amount:                   subscription.Plan.Price,
+		Currency:                 subscription.Plan.Currency,
+		Status:                   "open",
+		PaymentProvider:          "yookassa",
+		PaymentProviderInvoiceID: createdPayment.ID,
+		DueDate:                  subscription.CurrentPeriodEnd,
+	}
+
+	if err := db.Create(invoice).Error; err != nil {
+		return "", err
+	}
+
+	// Return confirmation URL
+	if createdPayment.Confirmation != nil {
+		return createdPayment.Confirmation.ConfirmationURL, nil
+	}
+
+	return "", fmt.Errorf("no confirmation URL in payment response")
+}
+
+func (p *YooKassaProvider) CreateInvoice(subscription *models.Subscription) (*models.Invoice, error) {
+	db := database.DB
+
+	// Load subscription with plan
+	if err := db.Preload("Plan").First(subscription, "id = ?", subscription.ID).Error; err != nil {
+		return nil, err
+	}
+
+	invoice := &models.Invoice{
+		CompanyID:       subscription.CompanyID,
+		SubscriptionID:  subscription.ID,
+		Amount:          subscription.Plan.Price,
+		Currency:        subscription.Plan.Currency,
+		Status:          "open",
+		PaymentProvider: "yookassa",
+		DueDate:         subscription.CurrentPeriodEnd,
+	}
+
+	if err := db.Create(invoice).Error; err != nil {
+		return nil, err
+	}
+
+	return invoice, nil
+}
+
+func (p *YooKassaProvider) HandleWebhook(payload []byte, signature string) error {
+	var notification yookassa.Notification
+	if err := json.Unmarshal(payload, &notification); err != nil {
+		return fmt.Errorf("failed to unmarshal notification: %w", err)
+	}
+
+	switch notification.Event {
+	case yookassa.EventPaymentSucceeded:
+		return p.handlePaymentSucceeded(notification.Object)
+
+	case yookassa.EventPaymentCanceled:
+		return p.handlePaymentCanceled(notification.Object)
+
+	case yookassa.EventRefundSucceeded:
+		return p.handleRefundSucceeded(notification.Object)
+	}
+
+	return nil
+}
+
+func (p *YooKassaProvider) CancelSubscription(subscriptionID string) error {
+	db := database.DB
+	
+	return db.Model(&models.Subscription{}).
+		Where("id = ?", subscriptionID).
+		Updates(map[string]interface{}{
+			"status":               "canceled",
+			"cancel_at_period_end": true,
+		}).Error
+}
+
+func (p *YooKassaProvider) GetCustomerID(companyID string) (string, error) {
+	// YooKassa doesn't have a customer concept like Stripe
+	// Return companyID as identifier
+	return companyID, nil
+}
+
+func (p *YooKassaProvider) CreateCustomer(companyID, email, name string) (string, error) {
+	// YooKassa doesn't have a customer concept like Stripe
+	// Return companyID as identifier
+	return companyID, nil
+}
+
+// Helper methods for webhook handlers
+
+func (p *YooKassaProvider) handlePaymentSucceeded(payment *yookassa.Payment) error {
+	db := database.DB
+
+	// Find our invoice by YooKassa payment ID
+	var invoice models.Invoice
+	if err := db.Where("payment_provider_invoice_id = ?", payment.ID).First(&invoice).Error; err != nil {
+		return err
+	}
+
+	now := time.Now()
+	if err := db.Model(&invoice).Updates(map[string]interface{}{
+		"status":  "paid",
+		"paid_at": &now,
+	}).Error; err != nil {
+		return err
+	}
+
+	// Update subscription status to active
+	return db.Model(&models.Subscription{}).
+		Where("id = ?", invoice.SubscriptionID).
+		Update("status", "active").Error
+}
+
+func (p *YooKassaProvider) handlePaymentCanceled(payment *yookassa.Payment) error {
+	db := database.DB
+
+	// Find our invoice by YooKassa payment ID
+	var invoice models.Invoice
+	if err := db.Where("payment_provider_invoice_id = ?", payment.ID).First(&invoice).Error; err != nil {
+		return err
+	}
+
+	// Update invoice status
+	if err := db.Model(&invoice).Update("status", "void").Error; err != nil {
+		return err
+	}
+
+	// Update subscription status to past_due if payment failed
+	return db.Model(&models.Subscription{}).
+		Where("id = ?", invoice.SubscriptionID).
+		Update("status", "past_due").Error
+}
+
+func (p *YooKassaProvider) handleRefundSucceeded(refund *yookassa.Refund) error {
+	db := database.DB
+
+	// Find invoice by payment ID
+	var invoice models.Invoice
+	if err := db.Where("payment_provider_invoice_id = ?", refund.PaymentID).First(&invoice).Error; err != nil {
+		return err
+	}
+
+	// Mark invoice as void
+	return db.Model(&invoice).Update("status", "void").Error
+}

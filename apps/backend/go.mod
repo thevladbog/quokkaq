@@ -1,6 +1,6 @@
 module quokkaq-go-backend
 
-go 1.26.0
+go 1.25.0
 
 require (
 	github.com/MarceloPetrucio/go-scalar-api-reference v0.0.0-20240521013641-ce5d2efe0e06
@@ -14,6 +14,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/hibiken/asynq v0.26.0
 	github.com/joho/godotenv v1.5.1
+	github.com/stripe/stripe-go/v76 v76.25.0
 	github.com/swaggo/swag v1.16.6
 	golang.org/x/crypto v0.49.0
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df

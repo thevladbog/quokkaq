@@ -66,7 +66,7 @@ func (h *ServiceHandler) CreateService(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(service)
+	RespondJSON(w, service)
 }
 
 // GetServicesByUnit godoc
@@ -85,7 +85,7 @@ func (h *ServiceHandler) GetServicesByUnit(w http.ResponseWriter, r *http.Reques
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(services)
+	RespondJSON(w, services)
 }
 
 // GetServiceByID godoc
@@ -104,7 +104,7 @@ func (h *ServiceHandler) GetServiceByID(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Service not found", http.StatusNotFound)
 		return
 	}
-	json.NewEncoder(w).Encode(service)
+	RespondJSON(w, service)
 }
 
 // UpdateService godoc
@@ -143,7 +143,7 @@ func (h *ServiceHandler) UpdateService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(service)
+	RespondJSON(w, service)
 }
 
 // DeleteService godoc

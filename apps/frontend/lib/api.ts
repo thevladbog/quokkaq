@@ -24,10 +24,11 @@ import type {
   Counter,
   DesktopTerminal,
   Material,
-  LoginCredentials,
-  LoginResponse,
   PreRegistration,
-  UnitConfig
+  UsageMetrics,
+  Subscription,
+  SubscriptionPlan,
+  Invoice
 } from '@quokkaq/shared-types';
 
 import {
@@ -38,7 +39,11 @@ import {
   BookingModelSchema,
   CounterModelSchema,
   DesktopTerminalSchema,
-  CreateDesktopTerminalResponseSchema
+  CreateDesktopTerminalResponseSchema,
+  UsageMetricsSchema,
+  SubscriptionSchema,
+  SubscriptionPlanSchema,
+  InvoiceSchema
 } from '@quokkaq/shared-types';
 
 /** Shape-only summary for logs — never includes raw API payload values. */
@@ -881,5 +886,91 @@ export const preRegistrationsApi = {
         method: 'POST',
         body: JSON.stringify({ code })
       }
+    )
+};
+
+// Company API functions
+export const companiesApi = {
+  getUsageMetrics: (companyId: string) =>
+    apiRequest<UsageMetrics>(
+      `/companies/${companyId}/usage-metrics`,
+      {},
+      UsageMetricsSchema
+    ),
+  
+  getMyUsageMetrics: () =>
+    apiRequest<UsageMetrics>(
+      `/usage-metrics/me`,
+      {},
+      UsageMetricsSchema
+    )
+};
+
+// Subscription API functions
+export const subscriptionsApi = {
+  getMySubscription: () =>
+    apiRequest<Subscription>(
+      `/subscriptions/me`,
+      {},
+      SubscriptionSchema
+    ),
+  
+  getPlans: () =>
+    apiRequest<SubscriptionPlan[]>(
+      `/subscriptions/plans`,
+      {},
+      z.array(SubscriptionPlanSchema)
+    ),
+  
+  createCheckout: (planCode: string) =>
+    apiRequest<{ checkoutUrl: string; sessionId: string }>(
+      `/subscriptions/checkout`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planCode })
+      },
+      z.object({
+        checkoutUrl: z.string(),
+        sessionId: z.string()
+      })
+    ),
+  
+  cancelSubscription: (subscriptionId: string) =>
+    apiRequest<Subscription>(
+      `/subscriptions/${subscriptionId}/cancel`,
+      {
+        method: 'POST'
+      },
+      SubscriptionSchema
+    )
+};
+
+// Invoice API functions
+export const invoicesApi = {
+  getMyInvoices: () =>
+    apiRequest<Invoice[]>(
+      `/invoices/me`,
+      {},
+      z.array(InvoiceSchema)
+    ),
+  
+  downloadInvoice: (invoiceId: string) =>
+    apiRequest<Blob>(
+      `/invoices/${invoiceId}/download`,
+      {},
+      z.any()
+    )
+};
+
+// Company API functions
+export const companiesApiExt = {
+  completeOnboarding: () =>
+    apiRequest<{ success: boolean }>(
+      `/companies/me/complete-onboarding`,
+      {
+        method: 'POST'
+      },
+      z.object({ success: z.boolean() })
     )
 };
