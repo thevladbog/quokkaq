@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { SubscriptionPlanSchema, type SubscriptionPlan } from '@quokkaq/shared-types';
+import { logger } from '@/lib/logger';
 
 const plansResponseSchema = z.array(SubscriptionPlanSchema);
 
@@ -32,7 +33,8 @@ export async function fetchPublicSubscriptionPlans(): Promise<SubscriptionPlan[]
       return null;
     }
     return parsed.data.filter((p) => p.isActive && p.code !== 'grandfathered').sort(sortPlans);
-  } catch {
+  } catch (err) {
+    logger.error('fetchPublicSubscriptionPlans failed', { error: err });
     return null;
   }
 }

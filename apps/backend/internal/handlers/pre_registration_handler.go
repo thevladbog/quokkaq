@@ -89,11 +89,14 @@ func (h *PreRegistrationHandler) Create(w http.ResponseWriter, r *http.Request) 
 // @Tags         pre-registrations
 // @Accept       json
 // @Produce      json
+// @Security     BearerAuth
 // @Param        unitId path      string                                true  "Unit ID"
 // @Param        id     path      string                                true  "Pre-registration ID"
 // @Param        body   body      models.PreRegistrationUpdateRequest   true  "Fields to update"
 // @Success      200    {object}  models.PreRegistration
 // @Failure      400    {string}  string "Bad Request"
+// @Failure      401    {string}  string "Unauthorized"
+// @Failure      403    {string}  string "Forbidden"
 // @Failure      404    {string}  string "Not Found"
 // @Failure      500    {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/pre-registrations/{id} [put]

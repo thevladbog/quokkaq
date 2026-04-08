@@ -1400,7 +1400,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Bad Request (e.g. missing public APP_BASE_URL for real checkout)",
                         "schema": {
                             "type": "string"
                         }
@@ -1489,6 +1489,9 @@ const docTemplate = `{
                     }
                 ],
                 "description": "Cancels the subscription at the end of billing period",
+                "consumes": [
+                    "application/json"
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -2856,6 +2859,11 @@ const docTemplate = `{
         },
         "/units/{unitId}/pre-registrations/{id}": {
             "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Updates editable fields on an existing pre-registration for the unit.",
                 "consumes": [
                     "application/json"
@@ -2901,6 +2909,18 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "type": "string"
                         }

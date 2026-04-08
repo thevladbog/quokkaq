@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"quokkaq-go-backend/internal/billing"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/pkg/database"
 	"strings"
@@ -38,10 +37,6 @@ func (p *StripeProvider) CreateCheckoutSession(ctx context.Context, subscription
 	// Load the subscription with plan and company
 	if err := db.Preload("Plan").Preload("Company").First(subscription, "id = ?", subscription.ID).Error; err != nil {
 		return "", "", err
-	}
-	billing.NormalizePlanPriceMinorUnits(&subscription.Plan)
-	if checkoutPlan != nil {
-		billing.NormalizePlanPriceMinorUnits(checkoutPlan)
 	}
 
 	pricePlan := checkoutPlan
@@ -115,7 +110,6 @@ func (p *StripeProvider) CreateInvoice(ctx context.Context, subscription *models
 	if err := db.Preload("Plan").Preload("Company").First(subscription, "id = ?", subscription.ID).Error; err != nil {
 		return nil, err
 	}
-	billing.NormalizePlanPriceMinorUnits(&subscription.Plan)
 
 	customerID, err := p.GetCustomerID(ctx, subscription.CompanyID)
 	if err != nil {

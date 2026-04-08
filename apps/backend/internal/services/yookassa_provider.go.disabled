@@ -193,7 +193,6 @@ func (p *YooKassaProvider) CancelSubscription(ctx context.Context, subscriptionI
 	return db.Model(&models.Subscription{}).
 		Where("id = ?", subscriptionID).
 		Updates(map[string]interface{}{
-			"status":               "canceled",
 			"cancel_at_period_end": true,
 		}).Error
 }

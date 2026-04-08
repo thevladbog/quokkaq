@@ -68,7 +68,7 @@ export function SubscriptionCard({
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-2xl">{subscription.plan?.name}</CardTitle>
+            <CardTitle className="text-2xl">{subscription.plan?.name ?? t('planUnknown')}</CardTitle>
             <CardDescription>{t('currentPlan')}</CardDescription>
           </div>
           {getStatusBadge(subscription.status)}

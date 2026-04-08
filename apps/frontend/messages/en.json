@@ -983,6 +983,7 @@
       "title": "Billing & Subscription",
       "description": "Manage your plan, payments, and invoices",
       "currentPlan": "Current Plan",
+      "planUnknown": "Plan",
       "upgradePlan": "Upgrade Plan",
       "cancelSubscription": "Cancel Subscription",
       "manageBilling": "Manage Billing",

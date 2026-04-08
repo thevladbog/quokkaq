@@ -90,7 +90,7 @@ func SyncCurrentUsageToRecords(companyID string) error {
 	quotaService := NewQuotaService()
 
 	// Metrics to track
-	metrics := []string{"units", "users", "services", "counters"}
+	metrics := []string{"units", "users", "tickets_per_month", "services", "counters"}
 
 	var syncErrs []error
 	for _, metric := range metrics {

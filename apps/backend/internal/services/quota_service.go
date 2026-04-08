@@ -88,8 +88,8 @@ func (s *quotaService) GetCurrentUsage(companyID string, metric string) (int, er
 
 	case "tickets_per_month":
 		// Sum usage_records for monthly ticket quota (canonical key tickets_per_month; legacy rows used tickets_created)
-		now := time.Now()
-		billingMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+		nowUTC := time.Now().UTC()
+		billingMonth := time.Date(nowUTC.Year(), nowUTC.Month(), 1, 0, 0, 0, 0, time.UTC)
 
 		var sum int
 		query := `
@@ -186,14 +186,14 @@ func (s *quotaService) getDefaultLimit(metric string) int {
 func (s *quotaService) IncrementUsage(companyID string, metric string, delta int) error {
 	db := database.DB
 
-	now := time.Now()
-	billingMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+	nowUTC := time.Now().UTC()
+	billingMonth := time.Date(nowUTC.Year(), nowUTC.Month(), 1, 0, 0, 0, 0, time.UTC)
 
 	usageRecord := &models.UsageRecord{
 		CompanyID:    companyID,
 		MetricType:   metric,
 		Value:        delta,
-		Timestamp:    now,
+		Timestamp:    nowUTC,
 		BillingMonth: billingMonth,
 	}
 
@@ -202,8 +202,8 @@ func (s *quotaService) IncrementUsage(companyID string, metric string, delta int
 
 // GetUsageMetrics returns a comprehensive view of current usage
 func (s *quotaService) GetUsageMetrics(companyID string) (*UsageMetrics, error) {
-	now := time.Now()
-	billingMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+	nowUTC := time.Now().UTC()
+	billingMonth := time.Date(nowUTC.Year(), nowUTC.Month(), 1, 0, 0, 0, 0, time.UTC)
 	nextMonth := billingMonth.AddDate(0, 1, 0)
 
 	metrics := []string{"units", "users", "tickets_per_month", "services", "counters"}

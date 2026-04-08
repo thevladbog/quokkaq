@@ -82,6 +82,20 @@ func RunVersionedMigrations(models ...interface{}) error {
 		return fmt.Errorf("failed to run core tables migration: %w", err)
 	}
 
+	// One-time: legacy rows stored RUB plan price as whole rubles (e.g. 2900) instead of kopeks (290000).
+	err = manager.RunMigration("v1.0.1_subscription_plan_prices_kopeks", func(db *gorm.DB) error {
+		return db.Exec(`
+			UPDATE subscription_plans
+			SET price = price * 100, updated_at = NOW()
+			WHERE price > 0
+			  AND price < 10000
+			  AND (UPPER(TRIM(COALESCE(currency, ''))) = 'RUB' OR TRIM(COALESCE(currency, '')) = '')
+		`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run subscription plan prices migration: %w", err)
+	}
+
 	fmt.Println("All migrations completed successfully")
 	return nil
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/repository"
@@ -39,12 +40,32 @@ func billingMockCheckoutAllowed() bool {
 	return v == "true" || v == "1" || v == "yes"
 }
 
-func checkoutBaseURL() string {
+// mockCheckoutBaseURL returns APP_BASE_URL with a localhost default for BILLING_MOCK_CHECKOUT / local dev only.
+func mockCheckoutBaseURL() string {
 	base := strings.TrimSpace(os.Getenv("APP_BASE_URL"))
 	if base == "" {
 		base = "http://localhost:3000"
 	}
 	return strings.TrimRight(base, "/")
+}
+
+// checkoutBaseURLValidForPaymentProvider returns a trimmed base URL suitable for real payment redirects.
+// Empty APP_BASE_URL, invalid URL, or localhost / loopback hosts are rejected (ok == false).
+func checkoutBaseURLValidForPaymentProvider() (base string, ok bool) {
+	raw := strings.TrimSpace(os.Getenv("APP_BASE_URL"))
+	if raw == "" {
+		return "", false
+	}
+	base = strings.TrimRight(raw, "/")
+	u, err := url.Parse(base)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return "", false
+	}
+	host := strings.ToLower(u.Hostname())
+	if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+		return "", false
+	}
+	return base, true
 }
 
 // requireBillingAdmin allows platform admins or the company owner to perform billing mutations.
@@ -155,7 +176,7 @@ type CreateCheckoutResponse struct {
 // @Security     BearerAuth
 // @Param        request body CreateCheckoutRequest true "Checkout Request"
 // @Success      200  {object}  CreateCheckoutResponse
-// @Failure      400  {string}  string "Bad Request"
+// @Failure      400  {string}  string "Bad Request (e.g. missing public APP_BASE_URL for real checkout)"
 // @Failure      401  {string}  string "Unauthorized"
 // @Failure      403  {string}  string "Forbidden"
 // @Failure      404  {string}  string "Not Found"
@@ -221,11 +242,14 @@ func (h *SubscriptionHandler) CreateCheckout(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	base := checkoutBaseURL()
-	successURL := base + "/organization/billing?checkout=success"
-	cancelURL := base + "/organization/billing?checkout=cancel"
-
 	if h.paymentProvider != nil {
+		base, valid := checkoutBaseURLValidForPaymentProvider()
+		if !valid {
+			http.Error(w, "APP_BASE_URL must be set to a public HTTPS (or HTTP) origin for billing checkout; localhost and loopback are not allowed. Configure APP_BASE_URL (e.g. https://app.example.com) or use BILLING_MOCK_CHECKOUT for non-production testing.", http.StatusBadRequest)
+			return
+		}
+		successURL := base + "/organization/billing?checkout=success"
+		cancelURL := base + "/organization/billing?checkout=cancel"
 		checkoutURL, sessionID, cerr := h.paymentProvider.CreateCheckoutSession(r.Context(), subscription, plan, successURL, cancelURL)
 		if cerr != nil {
 			http.Error(w, "Failed to create checkout session", http.StatusInternalServerError)
@@ -241,9 +265,11 @@ func (h *SubscriptionHandler) CreateCheckout(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	mockBase := mockCheckoutBaseURL()
+	mockSuccess := mockBase + "/organization/billing?checkout=success"
 	w.Header().Set("Content-Type", "application/json")
 	RespondJSON(w, CreateCheckoutResponse{
-		CheckoutURL: successURL,
+		CheckoutURL: mockSuccess,
 		SessionID:   "mock-session-id",
 	})
 }
@@ -252,6 +278,7 @@ func (h *SubscriptionHandler) CreateCheckout(w http.ResponseWriter, r *http.Requ
 // @Summary      Cancel Subscription
 // @Description  Cancels the subscription at the end of billing period
 // @Tags         subscriptions
+// @Accept       json
 // @Produce      json
 // @Security     BearerAuth
 // @Param        id path string true "Subscription ID"

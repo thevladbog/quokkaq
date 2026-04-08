@@ -1,7 +1,6 @@
 package repository
 
 import (
-	"quokkaq-go-backend/internal/billing"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/pkg/database"
 )
@@ -32,7 +31,6 @@ func (r *subscriptionRepository) FindByID(id string) (*models.Subscription, erro
 	if err != nil {
 		return nil, err
 	}
-	billing.NormalizePlanPriceMinorUnits(&subscription.Plan)
 	return &subscription, nil
 }
 
@@ -42,7 +40,6 @@ func (r *subscriptionRepository) FindByCompanyID(companyID string) (*models.Subs
 	if err != nil {
 		return nil, err
 	}
-	billing.NormalizePlanPriceMinorUnits(&subscription.Plan)
 	return &subscription, nil
 }
 
@@ -57,13 +54,7 @@ func (r *subscriptionRepository) Delete(id string) error {
 func (r *subscriptionRepository) GetActivePlans() ([]models.SubscriptionPlan, error) {
 	var plans []models.SubscriptionPlan
 	err := database.DB.Where("is_active = ?", true).Find(&plans).Error
-	if err != nil {
-		return nil, err
-	}
-	for i := range plans {
-		billing.NormalizePlanPriceMinorUnits(&plans[i])
-	}
-	return plans, nil
+	return plans, err
 }
 
 func (r *subscriptionRepository) FindPlanByCode(code string) (*models.SubscriptionPlan, error) {
@@ -72,6 +63,5 @@ func (r *subscriptionRepository) FindPlanByCode(code string) (*models.Subscripti
 	if err != nil {
 		return nil, err
 	}
-	billing.NormalizePlanPriceMinorUnits(&plan)
 	return &plan, nil
 }

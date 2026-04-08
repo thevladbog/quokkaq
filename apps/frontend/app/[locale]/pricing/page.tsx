@@ -96,14 +96,25 @@ const legacyPlans: LegacyPricingPlan[] = [
   }
 ];
 
+function minorUnitDivisor(currency: string, intlLocale: string): number {
+  try {
+    const digits =
+      new Intl.NumberFormat(intlLocale, { style: 'currency', currency }).resolvedOptions().maximumFractionDigits ?? 2;
+    return 10 ** Math.min(Math.max(digits, 0), 8);
+  } catch {
+    return 100;
+  }
+}
+
 function formatApiPrice(amountMinor: number, currency: string, intlLocale: string): string {
+  const divisor = minorUnitDivisor(currency, intlLocale);
   try {
     return new Intl.NumberFormat(intlLocale, {
       style: 'currency',
       currency
-    }).format(amountMinor / 100);
+    }).format(amountMinor / divisor);
   } catch {
-    return `${(amountMinor / 100).toFixed(2)} ${currency}`;
+    return `${(amountMinor / divisor).toFixed(2)} ${currency}`;
   }
 }
 
@@ -202,7 +213,8 @@ async function PricingCardApi({
   const t = await getTranslations({ locale, namespace: 'pricing' });
   const popular = plan.code === 'professional';
   const rows = buildPricingRowsFromApiPlan(plan);
-  const isPaid = plan.price > 0;
+  const isCustomPricing = plan.code === 'enterprise';
+  const showPaidPrice = plan.price > 0;
   const intervalLabel = plan.interval === 'year' ? t('perYear') : t('perMonth');
 
   return (
@@ -218,13 +230,13 @@ async function PricingCardApi({
       <CardHeader className="text-center pb-8 pt-8">
         <CardTitle className="text-2xl font-bold mb-2">{plan.name}</CardTitle>
         <div className="mt-6">
-          {isPaid ? (
+          {isCustomPricing ? (
+            <div className="text-3xl font-bold">{t('customPricing')}</div>
+          ) : (
             <div className="flex items-baseline justify-center flex-wrap gap-x-1">
               <span className="text-5xl font-extrabold">{formatApiPrice(plan.price, plan.currency, intlLocale)}</span>
               <span className="text-gray-500 ml-2">{intervalLabel}</span>
             </div>
-          ) : (
-            <div className="text-3xl font-bold">{t('customPricing')}</div>
           )}
         </div>
       </CardHeader>
@@ -248,12 +260,14 @@ async function PricingCardApi({
         <Button className="w-full" variant={popular ? 'default' : 'outline'} size="lg" asChild>
           <Link
             href={
-              isPaid
-                ? `/${locale}/signup?plan=${encodeURIComponent(plan.code)}`
-                : `/${locale}/contact`
+              isCustomPricing
+                ? `/${locale}/contact`
+                : showPaidPrice
+                  ? `/${locale}/signup?plan=${encodeURIComponent(plan.code)}`
+                  : `/${locale}/register`
             }
           >
-            {isPaid ? t('startTrial') : t('contactUs')}
+            {isCustomPricing ? t('contactUs') : showPaidPrice ? t('startTrial') : t('cta.tryFree')}
           </Link>
         </Button>
       </CardFooter>
