@@ -50,7 +50,7 @@ export function AddServicesStep({
 
     if (validServices.length === 0) {
       // Can skip if no services
-      onSkip();
+      onSkip?.();
       return;
     }
 

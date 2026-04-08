@@ -30,8 +30,6 @@ const TIMEZONES = [
   { value: 'Asia/Vladivostok', labelKey: 'vladivostok' }
 ] as const;
 
-const TIMEZONE_VALUES = TIMEZONES.map((z) => z.value);
-
 const unitFormSchema = z.object({
   name: z.string().trim().min(1, { message: 'nameRequired' }),
   code: z
@@ -39,11 +37,9 @@ const unitFormSchema = z.object({
     .trim()
     .min(1, { message: 'codeRequired' })
     .regex(/^[A-Z0-9]{2,6}$/, { message: 'codeInvalid' }),
-  timezone: z
-    .string()
-    .refine((v) => TIMEZONE_VALUES.includes(v), {
-      message: 'timezoneRequired'
-    })
+  timezone: z.string().refine((v) => TIMEZONES.some((tz) => tz.value === v), {
+    message: 'timezoneRequired'
+  })
 });
 
 export function CreateUnitStep({

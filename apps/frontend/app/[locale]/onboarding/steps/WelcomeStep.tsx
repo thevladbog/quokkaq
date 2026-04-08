@@ -83,7 +83,7 @@ export function WelcomeStep({ onNext }: OnboardingWizardStepProps) {
       </CardContent>
 
       <CardFooter className='flex justify-end'>
-        <Button onClick={onNext} size='lg'>
+        <Button type='button' onClick={() => onNext()} size='lg'>
           {t('start')}
         </Button>
       </CardFooter>

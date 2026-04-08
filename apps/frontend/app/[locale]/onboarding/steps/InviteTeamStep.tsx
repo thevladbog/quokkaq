@@ -60,7 +60,7 @@ export function InviteTeamStep({
     const validInvites = invites.filter((inv) => inv.email.trim() !== '');
 
     if (validInvites.length === 0) {
-      onSkip();
+      onSkip?.();
       return;
     }
 
