@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"time"
 
 	"quokkaq-go-backend/internal/models"
 )
@@ -37,5 +38,5 @@ type PaymentWebhookEvent struct {
 	Status         string
 	Amount         int64
 	Currency       string
-	PaidAt         *string
+	PaidAt         *time.Time
 }

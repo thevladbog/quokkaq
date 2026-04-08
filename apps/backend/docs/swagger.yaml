@@ -316,6 +316,21 @@ definitions:
       code:
         type: string
     type: object
+  models.PreRegistrationCreateRequest:
+    properties:
+      comment:
+        type: string
+      customerName:
+        type: string
+      customerPhone:
+        type: string
+      date:
+        type: string
+      serviceId:
+        type: string
+      time:
+        type: string
+    type: object
   models.PreRegistrationRedeemResponse:
     properties:
       message:
@@ -1664,6 +1679,10 @@ paths:
           description: Internal Server Error
           schema:
             type: string
+        "502":
+          description: Bad Gateway - payment provider failure
+          schema:
+            type: string
       security:
       - BearerAuth: []
       summary: Cancel Subscription
@@ -1694,6 +1713,10 @@ paths:
             type: string
         "401":
           description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
           schema:
             type: string
         "404":
@@ -2434,10 +2457,20 @@ paths:
             items:
               $ref: '#/definitions/models.PreRegistration'
             type: array
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
         "500":
           description: Internal Server Error
           schema:
             type: string
+      security:
+      - BearerAuth: []
       summary: List pre-registrations for a unit
       tags:
       - pre-registrations
@@ -2457,7 +2490,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/models.PreRegistration'
+          $ref: '#/definitions/models.PreRegistrationCreateRequest'
       produces:
       - application/json
       responses:
@@ -2469,10 +2502,20 @@ paths:
           description: Bad Request
           schema:
             type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
         "500":
           description: Internal Server Error
           schema:
             type: string
+      security:
+      - BearerAuth: []
       summary: Create a pre-registration
       tags:
       - pre-registrations
@@ -2782,10 +2825,20 @@ paths:
             items:
               $ref: '#/definitions/models.WeeklySlotCapacity'
             type: array
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
         "500":
           description: Internal Server Error
           schema:
             type: string
+      security:
+      - BearerAuth: []
       summary: Get weekly slot capacities for a unit
       tags:
       - slots
@@ -2821,10 +2874,20 @@ paths:
           description: Bad Request
           schema:
             type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
         "500":
           description: Internal Server Error
           schema:
             type: string
+      security:
+      - BearerAuth: []
       summary: Replace weekly slot capacities for a unit
       tags:
       - slots
@@ -2845,10 +2908,20 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/models.SlotConfig'
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
         "500":
           description: Internal Server Error
           schema:
             type: string
+      security:
+      - BearerAuth: []
       summary: Get slot configuration for a unit
       tags:
       - slots
@@ -2879,10 +2952,20 @@ paths:
           description: Bad Request
           schema:
             type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
         "500":
           description: Internal Server Error
           schema:
             type: string
+      security:
+      - BearerAuth: []
       summary: Update slot configuration for a unit
       tags:
       - slots
@@ -2908,6 +2991,14 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/models.DayScheduleWithBookings'
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
         "404":
           description: Not Found
           schema:
@@ -2916,6 +3007,8 @@ paths:
           description: Internal Server Error
           schema:
             type: string
+      security:
+      - BearerAuth: []
       summary: Get generated slots for a calendar day
       tags:
       - slots
@@ -2952,10 +3045,20 @@ paths:
           description: Bad Request
           schema:
             type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
         "500":
           description: Internal Server Error
           schema:
             type: string
+      security:
+      - BearerAuth: []
       summary: Update a single day schedule
       tags:
       - slots
@@ -2988,10 +3091,20 @@ paths:
           description: Bad Request
           schema:
             type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
         "500":
           description: Internal Server Error
           schema:
             type: string
+      security:
+      - BearerAuth: []
       summary: Generate service slots for a date range
       tags:
       - slots

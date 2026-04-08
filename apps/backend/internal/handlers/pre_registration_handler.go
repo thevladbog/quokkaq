@@ -26,8 +26,11 @@ func NewPreRegistrationHandler(service *services.PreRegistrationService, ticketS
 // @Description  Returns all pre-registrations associated with the unit (authenticated unit member).
 // @Tags         pre-registrations
 // @Produce      json
+// @Security     BearerAuth
 // @Param        unitId path      string  true  "Unit ID"
 // @Success      200    {array}   models.PreRegistration
+// @Failure      401    {string}  string "Unauthorized"
+// @Failure      403    {string}  string "Forbidden"
 // @Failure      500    {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/pre-registrations [get]
 func (h *PreRegistrationHandler) GetByUnit(w http.ResponseWriter, r *http.Request) {
@@ -46,21 +49,32 @@ func (h *PreRegistrationHandler) GetByUnit(w http.ResponseWriter, r *http.Reques
 // @Tags         pre-registrations
 // @Accept       json
 // @Produce      json
-// @Param        unitId path      string                   true  "Unit ID"
-// @Param        body   body      models.PreRegistration   true  "Pre-registration payload"
+// @Security     BearerAuth
+// @Param        unitId path      string                           true  "Unit ID"
+// @Param        body   body      models.PreRegistrationCreateRequest   true  "Pre-registration payload"
 // @Success      200    {object}  models.PreRegistration
 // @Failure      400    {string}  string "Bad Request"
+// @Failure      401    {string}  string "Unauthorized"
+// @Failure      403    {string}  string "Forbidden"
 // @Failure      500    {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/pre-registrations [post]
 func (h *PreRegistrationHandler) Create(w http.ResponseWriter, r *http.Request) {
-	var preReg models.PreRegistration
-	if err := json.NewDecoder(r.Body).Decode(&preReg); err != nil {
+	var req models.PreRegistrationCreateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	unitID := chi.URLParam(r, "unitId")
-	preReg.UnitID = unitID
+	preReg := models.PreRegistration{
+		UnitID:        unitID,
+		ServiceID:     req.ServiceID,
+		Date:          req.Date,
+		Time:          req.Time,
+		CustomerName:  req.CustomerName,
+		CustomerPhone: req.CustomerPhone,
+		Comment:       req.Comment,
+	}
 
 	if err := h.service.Create(&preReg); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

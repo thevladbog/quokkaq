@@ -147,9 +147,14 @@ func (s *quotaService) GetLimit(companyID string, metric string) (int, error) {
 		return s.getDefaultLimit(metric), nil
 	}
 
+	plan := company.Subscription.Plan
+	if plan.Limits == nil || len(plan.Limits) == 0 {
+		return s.getDefaultLimit(metric), nil
+	}
+
 	// Parse limits from subscription plan
 	var limits map[string]int
-	if err := json.Unmarshal(company.Subscription.Plan.Limits, &limits); err != nil {
+	if err := json.Unmarshal(plan.Limits, &limits); err != nil {
 		return 0, err
 	}
 
@@ -249,8 +254,14 @@ func EnsureQuota(companyID string, metric string, quotaSvc QuotaService) error {
 	}
 
 	if !allowed {
-		current, _ := quotaSvc.GetCurrentUsage(companyID, metric)
-		limit, _ := quotaSvc.GetLimit(companyID, metric)
+		current, errU := quotaSvc.GetCurrentUsage(companyID, metric)
+		if errU != nil {
+			return fmt.Errorf("quota check failed for %s: get current usage: %w", metric, errU)
+		}
+		limit, errL := quotaSvc.GetLimit(companyID, metric)
+		if errL != nil {
+			return fmt.Errorf("quota check failed for %s: get limit: %w", metric, errL)
+		}
 		return &QuotaError{
 			Metric:  metric,
 			Current: current,

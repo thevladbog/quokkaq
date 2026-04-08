@@ -34,6 +34,13 @@
         "cwd": "apps/backend"
       }
     },
+    "lint:ci": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "bash -lc 'REF=\"${LINT_BASE_REF:-origin/main}\"; go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4 run ./... --new-from-rev=\"$REF\"'",
+        "cwd": "apps/backend"
+      }
+    },
     "docker-build": {
       "executor": "nx:run-commands",
       "options": {

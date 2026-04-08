@@ -22,8 +22,11 @@ func NewSlotHandler(service *services.SlotService) *SlotHandler {
 // @Description  Returns weekly slot window settings (start/end time, interval, active days). If none exist, returns defaults scoped to the unit.
 // @Tags         slots
 // @Produce      json
+// @Security     BearerAuth
 // @Param        unitId path      string  true  "Unit ID"
 // @Success      200    {object}  models.SlotConfig
+// @Failure      401    {string}  string "Unauthorized"
+// @Failure      403    {string}  string "Forbidden"
 // @Failure      500    {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/slots/config [get]
 func (h *SlotHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
@@ -42,10 +45,13 @@ func (h *SlotHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 // @Tags         slots
 // @Accept       json
 // @Produce      json
+// @Security     BearerAuth
 // @Param        unitId path      string             true  "Unit ID"
 // @Param        config body      models.SlotConfig  true  "Slot configuration"
 // @Success      200    {object}  models.SlotConfig
 // @Failure      400    {string}  string "Bad Request"
+// @Failure      401    {string}  string "Unauthorized"
+// @Failure      403    {string}  string "Forbidden"
 // @Failure      500    {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/slots/config [put]
 func (h *SlotHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
@@ -70,8 +76,11 @@ func (h *SlotHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 // @Description  Returns per-day, per-service capacity definitions used when generating slots.
 // @Tags         slots
 // @Produce      json
+// @Security     BearerAuth
 // @Param        unitId path      string  true  "Unit ID"
 // @Success      200    {array}   models.WeeklySlotCapacity
+// @Failure      401    {string}  string "Unauthorized"
+// @Failure      403    {string}  string "Forbidden"
 // @Failure      500    {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/slots/capacities [get]
 func (h *SlotHandler) GetCapacities(w http.ResponseWriter, r *http.Request) {
@@ -90,10 +99,13 @@ func (h *SlotHandler) GetCapacities(w http.ResponseWriter, r *http.Request) {
 // @Tags         slots
 // @Accept       json
 // @Produce      json
+// @Security     BearerAuth
 // @Param        unitId      path      string                        true  "Unit ID"
 // @Param        capacities  body      []models.WeeklySlotCapacity   true  "Weekly capacities"
 // @Success      200         {array}   models.WeeklySlotCapacity
 // @Failure      400         {string}  string "Bad Request"
+// @Failure      401         {string}  string "Unauthorized"
+// @Failure      403         {string}  string "Forbidden"
 // @Failure      500         {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/slots/capacities [put]
 func (h *SlotHandler) UpdateCapacities(w http.ResponseWriter, r *http.Request) {
@@ -122,10 +134,13 @@ func (h *SlotHandler) UpdateCapacities(w http.ResponseWriter, r *http.Request) {
 // @Tags         slots
 // @Accept       json
 // @Produce      json
+// @Security     BearerAuth
 // @Param        unitId path      string                      true  "Unit ID"
 // @Param        body   body      models.GenerateSlotsRequest true  "Inclusive from/to dates (YYYY-MM-DD)"
 // @Success      200    {object}  models.SlotSuccessResponse
 // @Failure      400    {string}  string "Bad Request"
+// @Failure      401    {string}  string "Unauthorized"
+// @Failure      403    {string}  string "Forbidden"
 // @Failure      500    {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/slots/generate [post]
 func (h *SlotHandler) Generate(w http.ResponseWriter, r *http.Request) {
@@ -149,9 +164,12 @@ func (h *SlotHandler) Generate(w http.ResponseWriter, r *http.Request) {
 // @Description  Returns the day schedule with per-slot booking counts. Responds 404 if slots have not been generated for that date.
 // @Tags         slots
 // @Produce      json
+// @Security     BearerAuth
 // @Param        unitId path      string  true  "Unit ID"
 // @Param        date   path      string  true  "Date (YYYY-MM-DD)"
 // @Success      200    {object}  models.DayScheduleWithBookings
+// @Failure      401    {string}  string "Unauthorized"
+// @Failure      403    {string}  string "Forbidden"
 // @Failure      404    {string}  string "Not Found"
 // @Failure      500    {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/slots/day/{date} [get]
@@ -181,11 +199,14 @@ func (h *SlotHandler) GetDay(w http.ResponseWriter, r *http.Request) {
 // @Tags         slots
 // @Accept       json
 // @Produce      json
+// @Security     BearerAuth
 // @Param        unitId path      string                            true  "Unit ID"
 // @Param        date   path      string                            true  "Date (YYYY-MM-DD)"
 // @Param        body   body      models.UpdateDayScheduleRequest   true  "Day schedule update"
 // @Success      200    {object}  models.SlotSuccessResponse
 // @Failure      400    {string}  string "Bad Request"
+// @Failure      401    {string}  string "Unauthorized"
+// @Failure      403    {string}  string "Forbidden"
 // @Failure      500    {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/slots/day/{date} [put]
 func (h *SlotHandler) UpdateDay(w http.ResponseWriter, r *http.Request) {

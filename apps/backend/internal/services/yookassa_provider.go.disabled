@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/subtle"
@@ -40,7 +41,8 @@ func NewYooKassaProvider(shopID, secretKey, webhookSecret string) PaymentProvide
 }
 
 // verifyYooKassaSignature checks HMAC-SHA256(payload, secret) against signature.
-// Accepts hex digest, optional "sha256=" prefix, or standard Base64-encoded digest.
+// Accepts hex digest, optional "sha256=" prefix (any case), or standard Base64-encoded digest.
+// The digest portion is not lowercased, so Base64 remains valid.
 func verifyYooKassaSignature(payload []byte, signature, secret string) error {
 	secret = strings.TrimSpace(secret)
 	if secret == "" {
@@ -50,7 +52,9 @@ func verifyYooKassaSignature(payload []byte, signature, secret string) error {
 	if sigInput == "" {
 		return fmt.Errorf("missing webhook signature")
 	}
-	sigInput = strings.TrimPrefix(strings.ToLower(sigInput), "sha256=")
+	if len(sigInput) >= 7 && strings.EqualFold(sigInput[:7], "sha256=") {
+		sigInput = strings.TrimSpace(sigInput[7:])
+	}
 
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write(payload)
@@ -71,10 +75,9 @@ func verifyYooKassaSignature(payload []byte, signature, secret string) error {
 	return fmt.Errorf("invalid webhook signature format")
 }
 
-func (p *YooKassaProvider) CreateCheckoutSession(subscription *models.Subscription, checkoutPlan *models.SubscriptionPlan, successURL, cancelURL string) (string, string, error) {
-	db := database.DB
+func (p *YooKassaProvider) CreateCheckoutSession(ctx context.Context, subscription *models.Subscription, checkoutPlan *models.SubscriptionPlan, successURL, cancelURL string) (string, string, error) {
+	db := database.DB.WithContext(ctx)
 
-	// Load the subscription with plan
 	if err := db.Preload("Plan").Preload("Company").First(subscription, "id = ?", subscription.ID).Error; err != nil {
 		return "", "", err
 	}
@@ -84,7 +87,22 @@ func (p *YooKassaProvider) CreateCheckoutSession(subscription *models.Subscripti
 		pricePlan = &subscription.Plan
 	}
 
-	// Create payment
+	companyID := subscription.CompanyID
+	invoice := &models.Invoice{
+		CompanyID:                &companyID,
+		SubscriptionID:           subscription.ID,
+		Amount:                   pricePlan.Price,
+		Currency:                 pricePlan.Currency,
+		Status:                   "open",
+		PaymentProvider:          "yookassa",
+		PaymentProviderInvoiceID: "",
+		DueDate:                  subscription.CurrentPeriodEnd,
+	}
+
+	if err := db.Create(invoice).Error; err != nil {
+		return "", "", err
+	}
+
 	payment := &yookassa.Payment{
 		Amount: &yookassa.Amount{
 			Value:    fmt.Sprintf("%.2f", float64(pricePlan.Price)/100),
@@ -98,32 +116,21 @@ func (p *YooKassaProvider) CreateCheckoutSession(subscription *models.Subscripti
 		Metadata: map[string]string{
 			"subscription_id": subscription.ID,
 			"company_id":      subscription.CompanyID,
+			"invoice_id":      invoice.ID,
 		},
 		Capture: true,
 	}
 
 	createdPayment, err := p.client.CreatePayment(payment)
 	if err != nil {
+		_ = db.Model(invoice).Update("status", "void").Error
 		return "", "", fmt.Errorf("failed to create payment: %w", err)
 	}
 
-	// Store payment ID in invoice
-	invoice := &models.Invoice{
-		CompanyID:                subscription.CompanyID,
-		SubscriptionID:           subscription.ID,
-		Amount:                   pricePlan.Price,
-		Currency:                 pricePlan.Currency,
-		Status:                   "open",
-		PaymentProvider:          "yookassa",
-		PaymentProviderInvoiceID: createdPayment.ID,
-		DueDate:                  subscription.CurrentPeriodEnd,
-	}
-
-	if err := db.Create(invoice).Error; err != nil {
+	if err := db.Model(invoice).Update("payment_provider_invoice_id", createdPayment.ID).Error; err != nil {
 		return "", "", err
 	}
 
-	// Return confirmation URL
 	if createdPayment.Confirmation != nil {
 		return createdPayment.Confirmation.ConfirmationURL, createdPayment.ID, nil
 	}
@@ -131,16 +138,16 @@ func (p *YooKassaProvider) CreateCheckoutSession(subscription *models.Subscripti
 	return "", "", fmt.Errorf("no confirmation URL in payment response")
 }
 
-func (p *YooKassaProvider) CreateInvoice(subscription *models.Subscription) (*models.Invoice, error) {
-	db := database.DB
+func (p *YooKassaProvider) CreateInvoice(ctx context.Context, subscription *models.Subscription) (*models.Invoice, error) {
+	db := database.DB.WithContext(ctx)
 
-	// Load subscription with plan
 	if err := db.Preload("Plan").First(subscription, "id = ?", subscription.ID).Error; err != nil {
 		return nil, err
 	}
 
+	companyID := subscription.CompanyID
 	invoice := &models.Invoice{
-		CompanyID:       subscription.CompanyID,
+		CompanyID:       &companyID,
 		SubscriptionID:  subscription.ID,
 		Amount:          subscription.Plan.Price,
 		Currency:        subscription.Plan.Currency,
@@ -156,7 +163,7 @@ func (p *YooKassaProvider) CreateInvoice(subscription *models.Subscription) (*mo
 	return invoice, nil
 }
 
-func (p *YooKassaProvider) HandleWebhook(payload []byte, signature string) error {
+func (p *YooKassaProvider) HandleWebhook(ctx context.Context, payload []byte, signature string) error {
 	if err := verifyYooKassaSignature(payload, signature, p.webhookSecret); err != nil {
 		return fmt.Errorf("webhook signature verification failed: %w", err)
 	}
@@ -168,20 +175,20 @@ func (p *YooKassaProvider) HandleWebhook(payload []byte, signature string) error
 
 	switch notification.Event {
 	case yookassa.EventPaymentSucceeded:
-		return p.handlePaymentSucceeded(notification.Object)
+		return p.handlePaymentSucceeded(ctx, notification.Object)
 
 	case yookassa.EventPaymentCanceled:
-		return p.handlePaymentCanceled(notification.Object)
+		return p.handlePaymentCanceled(ctx, notification.Object)
 
 	case yookassa.EventRefundSucceeded:
-		return p.handleRefundSucceeded(notification.Object)
+		return p.handleRefundSucceeded(ctx, notification.Object)
 	}
 
 	return nil
 }
 
-func (p *YooKassaProvider) CancelSubscription(subscriptionID string) error {
-	db := database.DB
+func (p *YooKassaProvider) CancelSubscription(ctx context.Context, subscriptionID string) error {
+	db := database.DB.WithContext(ctx)
 
 	return db.Model(&models.Subscription{}).
 		Where("id = ?", subscriptionID).
@@ -191,22 +198,20 @@ func (p *YooKassaProvider) CancelSubscription(subscriptionID string) error {
 		}).Error
 }
 
-func (p *YooKassaProvider) GetCustomerID(companyID string) (string, error) {
-	// YooKassa doesn't have a customer concept like Stripe
-	// Return companyID as identifier
+func (p *YooKassaProvider) GetCustomerID(ctx context.Context, companyID string) (string, error) {
+	_ = ctx
 	return companyID, nil
 }
 
-func (p *YooKassaProvider) CreateCustomer(companyID, email, name string) (string, error) {
-	// YooKassa doesn't have a customer concept like Stripe
-	// Return companyID as identifier
+func (p *YooKassaProvider) CreateCustomer(ctx context.Context, companyID, email, name string) (string, error) {
+	_ = ctx
+	_ = email
+	_ = name
 	return companyID, nil
 }
 
-// Helper methods for webhook handlers
-
-func (p *YooKassaProvider) handlePaymentSucceeded(payment *yookassa.Payment) error {
-	return database.DB.Transaction(func(tx *gorm.DB) error {
+func (p *YooKassaProvider) handlePaymentSucceeded(ctx context.Context, payment *yookassa.Payment) error {
+	return database.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var invoice models.Invoice
 		if err := tx.Where("payment_provider_invoice_id = ?", payment.ID).First(&invoice).Error; err != nil {
 			return err
@@ -226,8 +231,8 @@ func (p *YooKassaProvider) handlePaymentSucceeded(payment *yookassa.Payment) err
 	})
 }
 
-func (p *YooKassaProvider) handlePaymentCanceled(payment *yookassa.Payment) error {
-	return database.DB.Transaction(func(tx *gorm.DB) error {
+func (p *YooKassaProvider) handlePaymentCanceled(ctx context.Context, payment *yookassa.Payment) error {
+	return database.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var invoice models.Invoice
 		if err := tx.Where("payment_provider_invoice_id = ?", payment.ID).First(&invoice).Error; err != nil {
 			return err
@@ -243,15 +248,13 @@ func (p *YooKassaProvider) handlePaymentCanceled(payment *yookassa.Payment) erro
 	})
 }
 
-func (p *YooKassaProvider) handleRefundSucceeded(refund *yookassa.Refund) error {
-	db := database.DB
+func (p *YooKassaProvider) handleRefundSucceeded(ctx context.Context, refund *yookassa.Refund) error {
+	db := database.DB.WithContext(ctx)
 
-	// Find invoice by payment ID
 	var invoice models.Invoice
 	if err := db.Where("payment_provider_invoice_id = ?", refund.PaymentID).First(&invoice).Error; err != nil {
 		return err
 	}
 
-	// Mark invoice as void
 	return db.Model(&invoice).Update("status", "void").Error
 }

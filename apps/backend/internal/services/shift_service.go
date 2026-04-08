@@ -9,7 +9,10 @@ import (
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/ws"
+	"quokkaq-go-backend/pkg/database"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 type ShiftService interface {
@@ -111,47 +114,48 @@ func (s *shiftService) GetShiftCounters(unitID string) ([]ShiftCounterDTO, error
 }
 
 func (s *shiftService) ExecuteEndOfDay(ctx context.Context, unitID string, userID *string) (map[string]interface{}, error) {
-	// 1. Mark all tickets as EOD (preserving their actual status for statistics)
-	ticketsMarked, err := s.ticketRepo.MarkAsEOD(unitID)
-	if err != nil {
-		return nil, err
-	}
-
-	// 2. Release all counters
-	countersReleased, err := s.counterRepo.ReleaseAll(unitID)
-	if err != nil {
-		return nil, err
-	}
-
-	// 3. Reset ticket number sequences
 	today := time.Now().Format("2006-01-02")
-	err = s.ticketRepo.ResetSequences(unitID, today)
+
+	var ticketsMarked int64
+	var countersReleased int64
+
+	err := database.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var err error
+		ticketsMarked, err = s.ticketRepo.MarkAsEODTx(tx, unitID)
+		if err != nil {
+			return err
+		}
+		countersReleased, err = s.counterRepo.ReleaseAllTx(tx, unitID)
+		if err != nil {
+			return err
+		}
+		if err := s.ticketRepo.ResetSequencesTx(tx, unitID, today); err != nil {
+			return err
+		}
+
+		auditPayload := map[string]interface{}{
+			"unitId":           unitID,
+			"ticketsMarked":    ticketsMarked,
+			"countersReleased": countersReleased,
+			"timestamp":        time.Now(),
+		}
+		payloadBytes, err := json.Marshal(auditPayload)
+		if err != nil {
+			return fmt.Errorf("end of day: marshal audit payload: %w", err)
+		}
+		auditLog := models.AuditLog{
+			UserID:  userID,
+			Action:  "unit.eod",
+			Payload: payloadBytes,
+		}
+		if err := s.auditLogRepo.CreateAuditLogTx(ctx, tx, &auditLog); err != nil {
+			return fmt.Errorf("end of day: audit log: %w", err)
+		}
+		return nil
+	})
 	if err != nil {
+		log.Printf("shift eod transaction failed unitId=%s err=%v", unitID, err)
 		return nil, err
-	}
-
-	// Create audit log for End of Day operation
-	auditPayload := map[string]interface{}{
-		"unitId":           unitID,
-		"ticketsMarked":    ticketsMarked,
-		"countersReleased": countersReleased,
-		"timestamp":        time.Now(),
-	}
-	payloadBytes, err := json.Marshal(auditPayload)
-	if err != nil {
-		return nil, fmt.Errorf("end of day: marshal audit payload: %w", err)
-	}
-
-	auditLog := models.AuditLog{
-		UserID:  userID,
-		Action:  "unit.eod",
-		Payload: payloadBytes,
-	}
-	if err := s.auditLogRepo.CreateAuditLog(ctx, &auditLog); err != nil {
-		// Mutations above are already committed; log for ops visibility and surface error to the caller.
-		log.Printf("shift eod audit_log failed unitId=%s ticketsMarked=%d countersReleased=%d err=%v",
-			unitID, ticketsMarked, countersReleased, err)
-		return nil, fmt.Errorf("end of day: audit log: %w", err)
 	}
 
 	result := map[string]interface{}{
@@ -160,7 +164,6 @@ func (s *shiftService) ExecuteEndOfDay(ctx context.Context, unitID string, userI
 		"countersReleased": countersReleased,
 	}
 
-	// Broadcast EOD event to all connected clients in this unit's room
 	s.hub.BroadcastEvent("unit.eod", result, unitID)
 
 	return result, nil

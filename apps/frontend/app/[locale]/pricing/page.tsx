@@ -4,6 +4,9 @@ import Link from 'next/link';
 import { Check } from 'lucide-react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { fetchPublicSubscriptionPlans } from '@/lib/subscription-plans-public';
+import { buildPricingRowsFromApiPlan } from '@/lib/pricing-plan-rows';
+import type { SubscriptionPlan } from '@quokkaq/shared-types';
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
@@ -14,7 +17,18 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   };
 }
 
-const plans = [
+type LegacyPricingPlan = {
+  code: string;
+  name: string;
+  price: number | null;
+  currency: string;
+  interval: 'month' | 'year';
+  popular?: boolean;
+  features: string[];
+  featureValues?: Record<string, number>;
+};
+
+const legacyPlans: LegacyPricingPlan[] = [
   {
     code: 'starter',
     name: 'Starter',
@@ -82,9 +96,24 @@ const plans = [
   }
 ];
 
+function formatApiPrice(amountMinor: number, currency: string, intlLocale: string): string {
+  try {
+    return new Intl.NumberFormat(intlLocale, {
+      style: 'currency',
+      currency
+    }).format(amountMinor / 100);
+  } catch {
+    return `${(amountMinor / 100).toFixed(2)} ${currency}`;
+  }
+}
+
 export default async function PricingPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'pricing' });
+  const intlLocale = locale.startsWith('ru') ? 'ru-RU' : 'en-US';
+
+  const apiPlans = await fetchPublicSubscriptionPlans();
+  const plansFromApi = apiPlans ?? [];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4 sm:px-6 lg:px-8">
@@ -101,71 +130,17 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
 
         {/* Pricing Cards */}
         <div className="grid md:grid-cols-3 gap-8 mb-12">
-          {plans.map((plan) => (
-            <Card 
-              key={plan.code}
-              className={`relative ${plan.popular ? 'border-blue-500 border-2 shadow-xl' : ''}`}
-            >
-              {plan.popular && (
-                <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-                  <span className="bg-blue-500 text-white px-4 py-1 rounded-full text-sm font-semibold">
-                    {t('popularChoice')}
-                  </span>
-                </div>
+          {plansFromApi.length > 0
+            ? await Promise.all(
+                plansFromApi.map((plan) => (
+                  <PricingCardApi key={plan.id} plan={plan} locale={locale} intlLocale={intlLocale} />
+                ))
+              )
+            : await Promise.all(
+                legacyPlans.map((plan) => (
+                  <PricingCardLegacy key={plan.code} plan={plan} locale={locale} intlLocale={intlLocale} />
+                ))
               )}
-              
-              <CardHeader className="text-center pb-8 pt-8">
-                <CardTitle className="text-2xl font-bold mb-2">{plan.name}</CardTitle>
-                <div className="mt-6">
-                  {plan.price ? (
-                    <div className="flex items-baseline justify-center">
-                      <span className="text-5xl font-extrabold">{plan.price.toLocaleString('ru-RU')}</span>
-                      <span className="text-2xl font-medium text-gray-500 ml-2">₽</span>
-                      <span className="text-gray-500 ml-2">{t('perMonth')}</span>
-                    </div>
-                  ) : (
-                    <div className="text-3xl font-bold">{t('customPricing')}</div>
-                  )}
-                </div>
-              </CardHeader>
-
-              <CardContent className="space-y-4">
-                <ul className="space-y-3">
-                  {plan.features.map((featureKey, index) => {
-                    const key = featureKey.split('.').pop() || featureKey;
-                    const value = plan.featureValues?.[key as keyof typeof plan.featureValues];
-                    return (
-                      <li key={index} className="flex items-start">
-                        <Check className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" />
-                        <span className="text-gray-700">
-                          {value !== undefined ? t(featureKey, { count: value }) : t(featureKey)}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </CardContent>
-
-              <CardFooter>
-                <Button
-                  className="w-full"
-                  variant={plan.popular ? 'default' : 'outline'}
-                  size="lg"
-                  asChild
-                >
-                  <Link
-                    href={
-                      plan.price != null
-                        ? `/${locale}/signup?plan=${encodeURIComponent(plan.code)}`
-                        : `/${locale}/contact`
-                    }
-                  >
-                    {plan.price != null ? t('startTrial') : t('contactUs')}
-                  </Link>
-                </Button>
-              </CardFooter>
-            </Card>
-          ))}
         </div>
 
         {/* FAQ Section */}
@@ -212,5 +187,154 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
         </div>
       </div>
     </div>
+  );
+}
+
+async function PricingCardApi({
+  plan,
+  locale,
+  intlLocale
+}: {
+  plan: SubscriptionPlan;
+  locale: string;
+  intlLocale: string;
+}) {
+  const t = await getTranslations({ locale, namespace: 'pricing' });
+  const popular = plan.code === 'professional';
+  const rows = buildPricingRowsFromApiPlan(plan);
+  const isPaid = plan.price > 0;
+  const intervalLabel = plan.interval === 'year' ? t('perYear') : t('perMonth');
+
+  return (
+    <Card className={`relative ${popular ? 'border-blue-500 border-2 shadow-xl' : ''}`}>
+      {popular && (
+        <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+          <span className="bg-blue-500 text-white px-4 py-1 rounded-full text-sm font-semibold">
+            {t('popularChoice')}
+          </span>
+        </div>
+      )}
+
+      <CardHeader className="text-center pb-8 pt-8">
+        <CardTitle className="text-2xl font-bold mb-2">{plan.name}</CardTitle>
+        <div className="mt-6">
+          {isPaid ? (
+            <div className="flex items-baseline justify-center flex-wrap gap-x-1">
+              <span className="text-5xl font-extrabold">{formatApiPrice(plan.price, plan.currency, intlLocale)}</span>
+              <span className="text-gray-500 ml-2">{intervalLabel}</span>
+            </div>
+          ) : (
+            <div className="text-3xl font-bold">{t('customPricing')}</div>
+          )}
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-4">
+        <ul className="space-y-3">
+          {rows.map((row) => (
+            <li key={row.rowKey} className="flex items-start">
+              <Check className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" />
+              <span className="text-gray-700">
+                {row.count !== undefined
+                  ? t(row.translationKey as Parameters<typeof t>[0], { count: row.count })
+                  : t(row.translationKey as Parameters<typeof t>[0])}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+
+      <CardFooter>
+        <Button className="w-full" variant={popular ? 'default' : 'outline'} size="lg" asChild>
+          <Link
+            href={
+              isPaid
+                ? `/${locale}/signup?plan=${encodeURIComponent(plan.code)}`
+                : `/${locale}/contact`
+            }
+          >
+            {isPaid ? t('startTrial') : t('contactUs')}
+          </Link>
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+}
+
+async function PricingCardLegacy({
+  plan,
+  locale,
+  intlLocale
+}: {
+  plan: LegacyPricingPlan;
+  locale: string;
+  intlLocale: string;
+}) {
+  const t = await getTranslations({ locale, namespace: 'pricing' });
+  return (
+    <Card className={`relative ${plan.popular ? 'border-blue-500 border-2 shadow-xl' : ''}`}>
+      {plan.popular && (
+        <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+          <span className="bg-blue-500 text-white px-4 py-1 rounded-full text-sm font-semibold">
+            {t('popularChoice')}
+          </span>
+        </div>
+      )}
+
+      <CardHeader className="text-center pb-8 pt-8">
+        <CardTitle className="text-2xl font-bold mb-2">{plan.name}</CardTitle>
+        <div className="mt-6">
+          {plan.price != null ? (
+            <div className="flex items-baseline justify-center">
+              <span className="text-5xl font-extrabold">
+                {plan.price.toLocaleString(intlLocale)}
+              </span>
+              <span className="text-2xl font-medium text-gray-500 ml-2">₽</span>
+              <span className="text-gray-500 ml-2">{plan.interval === 'year' ? t('perYear') : t('perMonth')}</span>
+            </div>
+          ) : (
+            <div className="text-3xl font-bold">{t('customPricing')}</div>
+          )}
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-4">
+        <ul className="space-y-3">
+          {plan.features.map((featureKey) => {
+            const key = featureKey.split('.').pop() || featureKey;
+            const value = plan.featureValues?.[key as keyof NonNullable<typeof plan.featureValues>];
+            return (
+              <li key={featureKey} className="flex items-start">
+                <Check className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" />
+                <span className="text-gray-700">
+                  {value !== undefined
+                    ? t(featureKey as Parameters<typeof t>[0], { count: value })
+                    : t(featureKey as Parameters<typeof t>[0])}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      </CardContent>
+
+      <CardFooter>
+        <Button
+          className="w-full"
+          variant={plan.popular ? 'default' : 'outline'}
+          size="lg"
+          asChild
+        >
+          <Link
+            href={
+              plan.price != null
+                ? `/${locale}/signup?plan=${encodeURIComponent(plan.code)}`
+                : `/${locale}/contact`
+            }
+          >
+            {plan.price != null ? t('startTrial') : t('contactUs')}
+          </Link>
+        </Button>
+      </CardFooter>
+    </Card>
   );
 }

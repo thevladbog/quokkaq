@@ -2,6 +2,8 @@ package services
 
 import (
 	"errors"
+	"fmt"
+	"log"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/pkg/database"
 	"time"
@@ -81,17 +83,21 @@ func GetCompanyIDForUnit(unitID string) (string, error) {
 // Useful for initial data migration or periodic snapshots
 func SyncCurrentUsageToRecords(companyID string) error {
 	db := database.DB
-	now := time.Now()
-	billingMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+	nowUTC := time.Now().UTC()
+	billingMonth := time.Date(nowUTC.Year(), nowUTC.Month(), 1, 0, 0, 0, 0, time.UTC)
+	now := nowUTC
 
 	quotaService := NewQuotaService()
 
 	// Metrics to track
 	metrics := []string{"units", "users", "services", "counters"}
 
+	var syncErrs []error
 	for _, metric := range metrics {
 		current, err := quotaService.GetCurrentUsage(companyID, metric)
 		if err != nil {
+			log.Printf("SyncCurrentUsageToRecords company=%s metric=%s: %v", companyID, metric, err)
+			syncErrs = append(syncErrs, fmt.Errorf("metric %q: %w", metric, err))
 			continue
 		}
 
@@ -125,5 +131,8 @@ func SyncCurrentUsageToRecords(companyID string) error {
 		}
 	}
 
+	if len(syncErrs) > 0 {
+		return fmt.Errorf("SyncCurrentUsageToRecords company %s: %w", companyID, errors.Join(syncErrs...))
+	}
 	return nil
 }

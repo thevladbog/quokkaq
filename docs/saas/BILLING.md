@@ -8,7 +8,7 @@ QuokkaQ использует модель подписки (subscription-based) 
 
 ## 🔄 Жизненный цикл подписки
 
-```
+```text
 Регистрация → Trial (14 дней) → Active → Renewal/Cancel
                                     ↓
                               Past Due (при проблеме с оплатой)
@@ -110,7 +110,7 @@ QuokkaQ использует модель подписки (subscription-based) 
 
 ### Содержимое счета
 
-```
+```text
 Счет #INV-2026-04-001
 Дата: 8 апреля 2026
 
@@ -152,7 +152,7 @@ QuokkaQ использует модель подписки (subscription-based) 
 - Осталось: 20 дней
 
 **Расчет**:
-```
+```text
 Возврат за неиспользованные дни Starter:
 2,900 ₽ × (20/30) = 1,933 ₽
 
@@ -190,7 +190,7 @@ QuokkaQ использует модель подписки (subscription-based) 
 - **Процент использования** - визуализация в дашборде
 
 **Пример дашборда использования**:
-```
+```text
 Подразделения:     2/5   [=========>     ] 40%
 Пользователи:     15/20  [===============>   ] 75%
 Талоны (месяц): 7,234/10,000 [===============> ] 72%
@@ -271,7 +271,7 @@ QuokkaQ использует модель подписки (subscription-based) 
 
 ### Защита от мошенничества и ограничения
 - **Radar, блок-листы, риск-правила и типичные антифрод-сигналы** задаются в **Stripe Dashboard**, если не внедрены дополнительные проверки в коде QuokkaQ.
-- В текущем коде **нет** отдельного rate limiting, привязанного к созданию checkout-сессии, и **нет** явной передачи IP клиента в Stripe для кастомной геофильтрации; при необходимости это настраивается в Stripe или добавляется отдельной задачей в продукт.
+- В текущем коде **нет** отдельного rate limiting, привязанного к созданию checkout-сессии, и **нет** явной передачи IP клиента в Stripe для кастомной геофильтрации; при необходимости это настраивается в Stripe или добавляется отдельной задачей в продукт. **Бэклог:** завести тикет на rate limiting для `POST /subscriptions/checkout` (приоритет security, ориентир по срокам — уточнять в roadmap, напр. `BILLING-RL-001`, ETA по кварталам).
 - Уведомления о платежах — по email и в продукте согласно настроенным сценариям.
 
 ---
@@ -299,7 +299,7 @@ QuokkaQ использует модель подписки (subscription-based) 
 - Одним платежом
 
 **Пример экономии**:
-```
+```text
 Starter:
 Месячная: 2,900 × 12 = 34,800 ₽/год
 Годовая:  2,900 × 10 = 29,000 ₽/год
@@ -348,8 +348,8 @@ Professional:
 ### Доступные endpoints
 
 ```javascript
-// Получить текущую подписку
-GET /api/companies/{id}/subscription
+// Получить текущую подписку (компания из JWT)
+GET /api/subscriptions/me
 
 // Получить доступные планы
 GET /api/subscription-plans
@@ -357,22 +357,24 @@ GET /api/subscription-plans
 // Создать checkout сессию
 POST /api/subscriptions/checkout
 {
-  "planCode": "professional",
-  "interval": "month"
+  "planCode": "professional"
 }
 
-// Получить историю счетов
-GET /api/companies/{id}/invoices
+// Получить историю счетов текущей компании
+GET /api/invoices/me
 
-// Получить использование квот
-GET /api/companies/{id}/usage
+// Скачать конкретный счёт по ID (тот же префикс `/api`, что и у остальных маршрутов)
+// Path-параметр: invoiceId — UUID счёта из списка `GET /api/invoices/me`.
+// Query (опционально): format=pdf — зарезервировано на будущее; пока эндпоинт может отвечать 501 JSON, пока не реализована выдача PDF.
+// Успешный ответ (когда PDF включён): 200, Content-Type: application/pdf,
+//   Content-Disposition: attachment; filename="invoice_<invoiceId>.pdf", тело — бинарный PDF.
+GET /api/invoices/{invoiceId}/download
+
+// Получить использование квот по companyId (при доступе к компании)
+GET /api/companies/{companyId}/usage-metrics
 
 // Отменить подписку
-POST /api/subscriptions/{id}/cancel
-{
-  "cancelAtPeriodEnd": true,
-  "reason": "too expensive"
-}
+POST /api/subscriptions/{subscriptionId}/cancel
 ```
 
 ---

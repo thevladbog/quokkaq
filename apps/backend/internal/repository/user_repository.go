@@ -273,27 +273,41 @@ func (r *userRepository) IsCompanyOwner(userID, companyID string) (bool, error) 
 }
 
 func (r *userRepository) GetCompanyIDByUserID(userID string) (string, error) {
-	type row struct {
-		CompanyID string
-	}
-	var res row
-	err := r.db.Table("user_units").
-		Select("units.company_id").
-		Joins("LEFT JOIN units ON user_units.unit_id = units.id").
-		Where("user_units.user_id = ?", userID).
-		First(&res).Error
+	// Use Raw+Scan: GORM's Table(...).First(&{CompanyID}) maps CompanyID to user_units.company_id,
+	// which does not exist — only units.company_id is valid after the join.
+	var companyID string
+	err := r.db.Raw(`
+		SELECT u.company_id
+		FROM user_units uu
+		INNER JOIN units u ON u.id = uu.unit_id
+		WHERE uu.user_id = ?
+		ORDER BY uu.id ASC
+		LIMIT 1
+	`, userID).Scan(&companyID).Error
 	if err != nil {
 		return "", err
 	}
-	return res.CompanyID, nil
+	if companyID == "" {
+		return "", gorm.ErrRecordNotFound
+	}
+	return companyID, nil
 }
 
 func (r *userRepository) GetFirstUserUnit(userID string) (UserUnitResult, error) {
 	var res UserUnitResult
-	err := r.db.Table("user_units").
-		Select("user_units.unit_id, units.company_id").
-		Joins("LEFT JOIN units ON user_units.unit_id = units.id").
-		Where("user_units.user_id = ?", userID).
-		First(&res).Error
-	return res, err
+	err := r.db.Raw(`
+		SELECT uu.unit_id, u.company_id
+		FROM user_units uu
+		LEFT JOIN units u ON u.id = uu.unit_id
+		WHERE uu.user_id = ?
+		ORDER BY uu.id ASC
+		LIMIT 1
+	`, userID).Scan(&res).Error
+	if err != nil {
+		return UserUnitResult{}, err
+	}
+	if res.UnitID == "" {
+		return UserUnitResult{}, gorm.ErrRecordNotFound
+	}
+	return res, nil
 }

@@ -1411,6 +1411,12 @@ const docTemplate = `{
                             "type": "string"
                         }
                     },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     "404": {
                         "description": "Not Found",
                         "schema": {
@@ -1526,6 +1532,12 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway - payment provider failure",
                         "schema": {
                             "type": "string"
                         }
@@ -2557,6 +2569,11 @@ const docTemplate = `{
         },
         "/units/{unitId}/pre-registrations": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Returns all pre-registrations associated with the unit (authenticated unit member).",
                 "produces": [
                     "application/json"
@@ -2584,6 +2601,18 @@ const docTemplate = `{
                             }
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -2593,6 +2622,11 @@ const docTemplate = `{
                 }
             },
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Creates a new pre-registration for the unit; unitId is taken from the path.",
                 "consumes": [
                     "application/json"
@@ -2618,7 +2652,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.PreRegistration"
+                            "$ref": "#/definitions/models.PreRegistrationCreateRequest"
                         }
                     }
                 ],
@@ -2631,6 +2665,18 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "type": "string"
                         }
@@ -3071,6 +3117,11 @@ const docTemplate = `{
         },
         "/units/{unitId}/slots/capacities": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Returns per-day, per-service capacity definitions used when generating slots.",
                 "produces": [
                     "application/json"
@@ -3098,6 +3149,18 @@ const docTemplate = `{
                             }
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -3107,6 +3170,11 @@ const docTemplate = `{
                 }
             },
             "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Updates all weekly capacity rows for the unit; unitId on each item is set from the path.",
                 "consumes": [
                     "application/json"
@@ -3155,6 +3223,18 @@ const docTemplate = `{
                             "type": "string"
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -3166,6 +3246,11 @@ const docTemplate = `{
         },
         "/units/{unitId}/slots/config": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Returns weekly slot window settings (start/end time, interval, active days). If none exist, returns defaults scoped to the unit.",
                 "produces": [
                     "application/json"
@@ -3190,6 +3275,18 @@ const docTemplate = `{
                             "$ref": "#/definitions/models.SlotConfig"
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -3199,6 +3296,11 @@ const docTemplate = `{
                 }
             },
             "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Creates or updates weekly slot window settings for the unit.",
                 "consumes": [
                     "application/json"
@@ -3241,6 +3343,18 @@ const docTemplate = `{
                             "type": "string"
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -3252,6 +3366,11 @@ const docTemplate = `{
         },
         "/units/{unitId}/slots/day/{date}": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Returns the day schedule with per-slot booking counts. Responds 404 if slots have not been generated for that date.",
                 "produces": [
                     "application/json"
@@ -3283,6 +3402,18 @@ const docTemplate = `{
                             "$ref": "#/definitions/models.DayScheduleWithBookings"
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     "404": {
                         "description": "Not Found",
                         "schema": {
@@ -3298,6 +3429,11 @@ const docTemplate = `{
                 }
             },
             "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Sets day-off flag and replaces service slots for the given date after validation.",
                 "consumes": [
                     "application/json"
@@ -3347,6 +3483,18 @@ const docTemplate = `{
                             "type": "string"
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -3358,6 +3506,11 @@ const docTemplate = `{
         },
         "/units/{unitId}/slots/generate": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Materializes slots for the unit between the given dates based on config and capacities.",
                 "consumes": [
                     "application/json"
@@ -3396,6 +3549,18 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "type": "string"
                         }
@@ -4346,6 +4511,29 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "code": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.PreRegistrationCreateRequest": {
+            "type": "object",
+            "properties": {
+                "comment": {
+                    "type": "string"
+                },
+                "customerName": {
+                    "type": "string"
+                },
+                "customerPhone": {
+                    "type": "string"
+                },
+                "date": {
+                    "type": "string"
+                },
+                "serviceId": {
+                    "type": "string"
+                },
+                "time": {
                     "type": "string"
                 }
             }

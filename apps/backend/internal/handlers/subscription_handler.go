@@ -9,7 +9,6 @@ import (
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
-	"quokkaq-go-backend/pkg/database"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -48,6 +47,30 @@ func checkoutBaseURL() string {
 	return strings.TrimRight(base, "/")
 }
 
+// requireBillingAdmin allows platform admins or the company owner to perform billing mutations.
+func (h *SubscriptionHandler) requireBillingAdmin(w http.ResponseWriter, userID, companyID string) bool {
+	isAdmin, err := h.userRepo.IsAdmin(userID)
+	if err != nil {
+		log.Printf("subscription billing auth IsAdmin: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return false
+	}
+	if isAdmin {
+		return true
+	}
+	isOwner, err := h.userRepo.IsCompanyOwner(userID, companyID)
+	if err != nil {
+		log.Printf("subscription billing auth IsCompanyOwner: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return false
+	}
+	if !isOwner {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return false
+	}
+	return true
+}
+
 // GetMySubscription godoc
 // @Summary      Get Current User's Subscription
 // @Description  Returns subscription for the authenticated user's company
@@ -66,37 +89,24 @@ func (h *SubscriptionHandler) GetMySubscription(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Get user's company through their units
-	db := database.DB
-	type Result struct {
-		UnitID    string
-		CompanyID string
-	}
-
-	var result Result
-	err := db.Table("user_units").
-		Select("user_units.unit_id, units.company_id").
-		Joins("LEFT JOIN units ON user_units.unit_id = units.id").
-		Where("user_units.user_id = ?", userID).
-		First(&result).Error
-
+	companyID, err := h.userRepo.GetCompanyIDByUserID(userID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if repository.IsNotFound(err) {
 			http.Error(w, "User has no associated company", http.StatusNotFound)
 			return
 		}
-		log.Printf("GetMySubscription user_units lookup for user %q: %v", userID, err)
+		log.Printf("GetMySubscription userRepo.GetCompanyIDByUserID(%q): %v", userID, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	subscription, err := h.subscriptionRepo.FindByCompanyID(result.CompanyID)
+	subscription, err := h.subscriptionRepo.FindByCompanyID(companyID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			http.Error(w, "No subscription found", http.StatusNotFound)
 			return
 		}
-		log.Printf("GetMySubscription subscriptionRepo.FindByCompanyID(%q): %v", result.CompanyID, err)
+		log.Printf("GetMySubscription subscriptionRepo.FindByCompanyID(%q): %v", companyID, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -147,6 +157,7 @@ type CreateCheckoutResponse struct {
 // @Success      200  {object}  CreateCheckoutResponse
 // @Failure      400  {string}  string "Bad Request"
 // @Failure      401  {string}  string "Unauthorized"
+// @Failure      403  {string}  string "Forbidden"
 // @Failure      404  {string}  string "Not Found"
 // @Failure      501  {string}  string "Billing checkout not configured"
 // @Failure      500  {string}  string "Internal Server Error"
@@ -185,36 +196,27 @@ func (h *SubscriptionHandler) CreateCheckout(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Get user's company
-	db := database.DB
-	type Result struct {
-		CompanyID string
-	}
-
-	var result Result
-	err = db.Table("user_units").
-		Select("units.company_id").
-		Joins("LEFT JOIN units ON user_units.unit_id = units.id").
-		Where("user_units.user_id = ?", userID).
-		First(&result).Error
-
+	companyID, err := h.userRepo.GetCompanyIDByUserID(userID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if repository.IsNotFound(err) {
 			http.Error(w, "User has no associated company", http.StatusNotFound)
 			return
 		}
-		log.Printf("CreateCheckout user_units lookup for user %q: %v", userID, err)
+		log.Printf("CreateCheckout userRepo.GetCompanyIDByUserID(%q): %v", userID, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
+	if !h.requireBillingAdmin(w, userID, companyID) {
+		return
+	}
 
-	subscription, err := h.subscriptionRepo.FindByCompanyID(result.CompanyID)
+	subscription, err := h.subscriptionRepo.FindByCompanyID(companyID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			http.Error(w, "No subscription found", http.StatusNotFound)
 			return
 		}
-		log.Printf("CreateCheckout subscriptionRepo.FindByCompanyID(%q): %v", result.CompanyID, err)
+		log.Printf("CreateCheckout subscriptionRepo.FindByCompanyID(%q): %v", companyID, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -258,6 +260,7 @@ func (h *SubscriptionHandler) CreateCheckout(w http.ResponseWriter, r *http.Requ
 // @Failure      403  {string}  string "Forbidden"
 // @Failure      404  {string}  string "Not Found"
 // @Failure      500  {string}  string "Internal Server Error"
+// @Failure      502  {string}  string "Bad Gateway - payment provider failure"
 // @Router       /subscriptions/{id}/cancel [post]
 func (h *SubscriptionHandler) CancelSubscription(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserIDFromContext(r.Context())
@@ -279,15 +282,7 @@ func (h *SubscriptionHandler) CancelSubscription(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// Verify user has access to this subscription's company
-	hasAccess, err := h.userRepo.HasCompanyAccess(userID, subscription.CompanyID)
-	if err != nil {
-		log.Printf("CancelSubscription userRepo.HasCompanyAccess: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	if !hasAccess {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+	if !h.requireBillingAdmin(w, userID, subscription.CompanyID) {
 		return
 	}
 

@@ -944,6 +944,7 @@
       "unlimitedServices": "Unlimited services",
       "unlimitedCounters": "Unlimited counters",
       "realtimeUpdates": "Real-time updates",
+      "basicSupport": "Basic support",
       "basicReports": "Basic reports",
       "advancedReports": "Advanced analytics",
       "emailSupport": "Email support",
@@ -988,6 +989,8 @@
       "addPaymentMethod": "Add Payment Method",
       "perMonth": "/mo",
       "perYear": "/yr",
+      "intervalMonth": "mo",
+      "intervalYear": "yr",
       "status": {
         "trial": "Trial",
         "active": "Active",
@@ -1000,6 +1003,8 @@
       "cancelingOn": "Canceling on",
       "trialEnding": "Trial period ending",
       "trialEndingDesc": "{days} days remaining. Add a payment method to continue using the service.",
+      "trialExpiredTitle": "Trial has ended",
+      "trialExpiredDesc": "Your trial period is over. Add a payment method to continue using the service.",
       "pastDueWarning": "Payment issue",
       "pastDueDesc": "Failed to charge payment method. Please update your payment details.",
       "cancelWarning": "Your subscription will be canceled on {date}. Access will remain until that date.",
@@ -1016,6 +1021,7 @@
         "selectPlan": "Select plan",
         "contactUs": "Contact us",
         "customPricing": "Custom pricing",
+        "moreFeatures": "+{count} more",
         "limits": {
           "unlimited": "Unlimited",
           "units": "Units",
@@ -1025,6 +1031,7 @@
           "counters": "Counters"
         },
         "features": {
+          "basic_support": "Basic support",
           "websocket_updates": "Real-time updates",
           "basic_reports": "Basic reports",
           "advanced_reports": "Advanced analytics",

@@ -25,6 +25,16 @@ type PreRegistration struct {
 	Ticket  *Ticket `gorm:"constraint:OnUpdate:CASCADE,OnDelete:SET NULL;" json:"ticket,omitempty"`
 }
 
+// PreRegistrationCreateRequest is the JSON body for creating a pre-registration (server sets id, code, status, timestamps).
+type PreRegistrationCreateRequest struct {
+	ServiceID     string `json:"serviceId"`
+	Date          string `json:"date"`
+	Time          string `json:"time"`
+	CustomerName  string `json:"customerName"`
+	CustomerPhone string `json:"customerPhone"`
+	Comment       string `json:"comment,omitempty"`
+}
+
 // PreRegistrationUpdateRequest is the JSON body for updating an existing pre-registration.
 type PreRegistrationUpdateRequest struct {
 	ServiceID     string `json:"serviceId"`

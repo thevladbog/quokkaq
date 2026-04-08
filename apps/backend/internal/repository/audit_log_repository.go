@@ -11,6 +11,7 @@ import (
 // AuditLogRepository persists audit trail entries (GORM).
 type AuditLogRepository interface {
 	CreateAuditLog(ctx context.Context, log *models.AuditLog) error
+	CreateAuditLogTx(ctx context.Context, tx *gorm.DB, log *models.AuditLog) error
 }
 
 type auditLogRepository struct {
@@ -24,4 +25,8 @@ func NewAuditLogRepository() AuditLogRepository {
 
 func (r *auditLogRepository) CreateAuditLog(ctx context.Context, log *models.AuditLog) error {
 	return r.db.WithContext(ctx).Create(log).Error
+}
+
+func (r *auditLogRepository) CreateAuditLogTx(ctx context.Context, tx *gorm.DB, log *models.AuditLog) error {
+	return tx.WithContext(ctx).Create(log).Error
 }

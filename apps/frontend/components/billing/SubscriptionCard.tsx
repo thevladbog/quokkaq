@@ -7,8 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { CalendarDays, CreditCard, TrendingUp, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
-import { ru } from 'date-fns/locale';
-import { useTranslations } from 'next-intl';
+import { enUS, ru } from 'date-fns/locale';
+import { useLocale, useTranslations } from 'next-intl';
 
 interface SubscriptionCardProps {
   subscription: Subscription;
@@ -24,6 +24,9 @@ export function SubscriptionCard({
   onManageBilling 
 }: SubscriptionCardProps) {
   const t = useTranslations('organization.billing');
+  const locale = useLocale();
+  const intlLocale = locale.startsWith('ru') ? 'ru-RU' : 'en-US';
+  const dateFnsLocale = locale.startsWith('ru') ? ru : enUS;
 
   const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
@@ -40,23 +43,24 @@ export function SubscriptionCard({
   };
 
   const formatPrice = (price: number, currency: string) => {
-    return new Intl.NumberFormat('ru-RU', {
+    return new Intl.NumberFormat(intlLocale, {
       style: 'currency',
       currency: currency
     }).format(price / 100);
   };
 
   const formatDate = (dateString: string) => {
-    return format(new Date(dateString), 'dd MMMM yyyy', { locale: ru });
+    return format(new Date(dateString), 'dd MMMM yyyy', { locale: dateFnsLocale });
   };
 
   const daysUntilEnd = useMemo(() => {
     if (!subscription.trialEnd) {
       return 0;
     }
-    return Math.ceil(
+    const raw = Math.ceil(
       (new Date(subscription.trialEnd).getTime() - nowMs) / (1000 * 60 * 60 * 24)
     );
+    return Math.max(0, raw);
   }, [subscription.trialEnd, nowMs]);
 
   return (
@@ -78,7 +82,9 @@ export function SubscriptionCard({
             <span className="text-4xl font-bold">
               {formatPrice(subscription.plan.price, subscription.plan.currency)}
             </span>
-            <span className="text-gray-500">/ {subscription.plan.interval === 'month' ? t('perMonth').replace('/', '') : t('perYear').replace('/', '')}</span>
+            <span className="text-gray-500">
+              / {subscription.plan.interval === 'month' ? t('intervalMonth') : t('intervalYear')}
+            </span>
           </div>
         )}
 
@@ -87,10 +93,19 @@ export function SubscriptionCard({
           <div className="flex items-start gap-3 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
             <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5" />
             <div className="flex-1">
-              <p className="font-medium text-yellow-900">{t('trialEnding')}</p>
-              <p className="text-sm text-yellow-700 mt-1">
-                {t('trialEndingDesc', { days: daysUntilEnd })}
-              </p>
+              {daysUntilEnd > 0 ? (
+                <>
+                  <p className="font-medium text-yellow-900">{t('trialEnding')}</p>
+                  <p className="text-sm text-yellow-700 mt-1">
+                    {t('trialEndingDesc', { days: daysUntilEnd })}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="font-medium text-yellow-900">{t('trialExpiredTitle')}</p>
+                  <p className="text-sm text-yellow-700 mt-1">{t('trialExpiredDesc')}</p>
+                </>
+              )}
             </div>
           </div>
         )}

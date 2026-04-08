@@ -7,6 +7,13 @@ import { Badge } from '@/components/ui/badge';
 import { Check, Sparkles } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 
+export const PLAN_CODES = {
+  STARTER: 'starter',
+  PROFESSIONAL: 'professional',
+  ENTERPRISE: 'enterprise',
+  GRANDFATHERED: 'grandfathered'
+} as const;
+
 interface PlanSelectorProps {
   plans: SubscriptionPlan[];
   currentPlanId?: string;
@@ -20,10 +27,14 @@ export function PlanSelector({ plans, currentPlanId, onSelect, isLoading }: Plan
   const tBilling = useTranslations('organization.billing');
 
   const formatPrice = (price: number, currency: string) => {
-    return new Intl.NumberFormat(locale, {
-      style: 'currency',
-      currency
-    }).format(price / 100);
+    try {
+      return new Intl.NumberFormat(locale, {
+        style: 'currency',
+        currency
+      }).format(price / 100);
+    } catch {
+      return `${(price / 100).toFixed(2)} ${currency}`;
+    }
   };
 
   const getFeaturesList = (features: Record<string, boolean> | undefined) => {
@@ -32,10 +43,8 @@ export function PlanSelector({ plans, currentPlanId, onSelect, isLoading }: Plan
       .filter(([, enabled]) => enabled)
       .map(([key]) => {
         const k = `features.${key}` as Parameters<typeof t>[0];
-        if (t.has(k)) {
-          return t(k);
-        }
-        return key;
+        const text = t.has(k) ? t(k) : key;
+        return { key: `feature-${key}`, text };
       });
   };
 
@@ -49,6 +58,7 @@ export function PlanSelector({ plans, currentPlanId, onSelect, isLoading }: Plan
       const k = `limits.${key}` as Parameters<typeof t>[0];
       const label = t.has(k) ? t(k) : key;
       return {
+        key: `limit-${key}-${value}`,
         label,
         value: formatLimit(value)
       };
@@ -56,12 +66,12 @@ export function PlanSelector({ plans, currentPlanId, onSelect, isLoading }: Plan
   };
 
   const isCurrentPlan = (planId: string) => planId === currentPlanId;
-  const isPopular = (code: string) => code === 'professional';
+  const isPopular = (code: string) => code === PLAN_CODES.PROFESSIONAL;
 
   return (
     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
       {plans
-        .filter((plan) => plan.code !== 'grandfathered')
+        .filter((plan) => plan.code !== PLAN_CODES.GRANDFATHERED)
         .map((plan) => (
           <Card
             key={plan.id}
@@ -104,8 +114,8 @@ export function PlanSelector({ plans, currentPlanId, onSelect, isLoading }: Plan
               <div className="space-y-2">
                 <p className="text-sm font-semibold text-gray-700">{t('limitsTitle')}</p>
                 <ul className="space-y-1">
-                  {getLimitsText(plan.limits).map((limit, index) => (
-                    <li key={index} className="text-sm text-gray-600">
+                  {getLimitsText(plan.limits).map((limit) => (
+                    <li key={limit.key} className="text-sm text-gray-600">
                       <span className="font-medium">{limit.value}</span> {limit.label}
                     </li>
                   ))}
@@ -115,14 +125,24 @@ export function PlanSelector({ plans, currentPlanId, onSelect, isLoading }: Plan
               <div className="space-y-2">
                 <p className="text-sm font-semibold text-gray-700">{t('featuresTitle')}</p>
                 <ul className="space-y-2">
-                  {getFeaturesList(plan.features)
-                    .slice(0, 6)
-                    .map((feature, index) => (
-                      <li key={index} className="flex items-start gap-2 text-sm">
-                        <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                        <span>{feature}</span>
-                      </li>
-                    ))}
+                  {(() => {
+                    const all = getFeaturesList(plan.features);
+                    const head = all.slice(0, 6);
+                    const rest = all.length - head.length;
+                    return (
+                      <>
+                        {head.map((feature) => (
+                          <li key={feature.key} className="flex items-start gap-2 text-sm">
+                            <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                            <span>{feature.text}</span>
+                          </li>
+                        ))}
+                        {rest > 0 ? (
+                          <li className="text-sm text-gray-500 pl-6">{t('moreFeatures', { count: rest })}</li>
+                        ) : null}
+                      </>
+                    );
+                  })()}
                 </ul>
               </div>
             </CardContent>

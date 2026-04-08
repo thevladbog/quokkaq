@@ -1,12 +1,15 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"quokkaq-go-backend/internal/config"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/pkg/database"
 	"quokkaq-go-backend/pkg/plans"
+
+	"gorm.io/gorm"
 )
 
 func main() {
@@ -30,31 +33,44 @@ func main() {
 			continue
 		}
 
-		plan := &models.SubscriptionPlan{
-			Name:     planDef.Name,
-			Code:     planDef.Code,
-			Price:    planDef.Price,
-			Currency: planDef.Currency,
-			Interval: planDef.Interval,
-			Limits:   limitsJSON,
-			Features: featuresJSON,
-			IsActive: true,
+		var existing models.SubscriptionPlan
+		err = db.Where("code = ?", planDef.Code).First(&existing).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			plan := &models.SubscriptionPlan{
+				Name:     planDef.Name,
+				Code:     planDef.Code,
+				Price:    planDef.Price,
+				Currency: planDef.Currency,
+				Interval: planDef.Interval,
+				Limits:   limitsJSON,
+				Features: featuresJSON,
+				IsActive: true,
+			}
+			if err := db.Create(plan).Error; err != nil {
+				log.Printf("Failed to create plan %s: %v", planDef.Code, err)
+				continue
+			}
+			fmt.Printf("✓ Created plan: %s (%s)\n", planDef.Name, planDef.Code)
+			continue
 		}
-
-		// Use FirstOrCreate to avoid duplicates
-		var existingPlan models.SubscriptionPlan
-		result := db.Where("code = ?", plan.Code).FirstOrCreate(&existingPlan, plan)
-		
-		if result.Error != nil {
-			log.Printf("Failed to create/find plan %s: %v", planDef.Code, result.Error)
+		if err != nil {
+			log.Printf("Failed to look up plan %s: %v", planDef.Code, err)
 			continue
 		}
 
-		if result.RowsAffected > 0 {
-			fmt.Printf("✓ Created plan: %s (%s)\n", planDef.Name, planDef.Code)
-		} else {
-			fmt.Printf("- Plan already exists: %s (%s)\n", planDef.Name, planDef.Code)
+		// Keep DB in sync with pkg/plans (price is minor units: kopeks for RUB).
+		existing.Name = planDef.Name
+		existing.Price = planDef.Price
+		existing.Currency = planDef.Currency
+		existing.Interval = planDef.Interval
+		existing.Limits = limitsJSON
+		existing.Features = featuresJSON
+		existing.IsActive = true
+		if err := db.Save(&existing).Error; err != nil {
+			log.Printf("Failed to update plan %s: %v", planDef.Code, err)
+			continue
 		}
+		fmt.Printf("✓ Updated plan: %s (%s)\n", planDef.Name, planDef.Code)
 	}
 
 	fmt.Println("Subscription plans seeding completed!")

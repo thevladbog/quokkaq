@@ -50,7 +50,8 @@ func (h *UsageHandler) GetUsageMetrics(w http.ResponseWriter, r *http.Request) {
 	// Verify user has access to this company by checking their units
 	hasAccess, err := h.userRepo.HasCompanyAccess(userID, companyID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("GetUsageMetrics userRepo.HasCompanyAccess: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 	if !hasAccess {
@@ -60,7 +61,8 @@ func (h *UsageHandler) GetUsageMetrics(w http.ResponseWriter, r *http.Request) {
 
 	metrics, err := h.quotaService.GetUsageMetrics(companyID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("GetUsageMetrics quotaService.GetUsageMetrics(%q): %v", companyID, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -99,7 +101,8 @@ func (h *UsageHandler) GetMyUsageMetrics(w http.ResponseWriter, r *http.Request)
 
 	metrics, err := h.quotaService.GetUsageMetrics(result.CompanyID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("GetMyUsageMetrics quotaService.GetUsageMetrics(%q): %v", result.CompanyID, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
