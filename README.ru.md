@@ -333,14 +333,17 @@ docker-compose up -d postgres redis minio
 **2. Создайте файл `.env` для backend:**
 
 ```bash
-cp apps/backend/.env.example apps/backend/.env
+# Из директории apps/backend/
+cp .env.example .env
 # Отредактируйте .env с вашей конфигурацией
 ```
+
+> ⚠️ **ПРЕДУПРЕЖДЕНИЕ БЕЗОПАСНОСТИ**: Файл `.env.example` содержит примерные значения. **Замените все секреты на сильные, случайно сгенерированные значения** перед развертыванием в production. Никогда не коммитьте реальные секреты в систему контроля версий.
 
 **3. Запустите backend API:**
 
 ```bash
-cd apps/backend
+# Из директории apps/backend/
 go run cmd/api/main.go
 ```
 
@@ -352,11 +355,18 @@ Backend API будет доступен по адресу <http://localhost:3001
 **4. Создайте файл `.env.local` для frontend:**
 
 ```bash
-# Создайте apps/frontend/.env.local
+# Создайте .env.local из шаблона
+cp apps/frontend/env.local apps/frontend/.env.local
+```
+
+Шаблон содержит:
+```env
 NEXT_PUBLIC_API_URL=http://localhost:3001
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 NEXT_PUBLIC_WS_URL=http://localhost:3001
 ```
+
+> **Примечание:** Файл `env.local` (без точки) — это шаблон, отслеживаемый в git. Файл `.env.local` (с точкой) — ваша локальная конфигурация, которая игнорируется git.
 
 **5. Запустите frontend:**
 
@@ -598,7 +608,9 @@ docker-compose down -v
 
 - **API**: <http://localhost:3001>
 - **Документация API**: <http://localhost:3001/swagger/>
-- **MinIO консоль**: <http://localhost:9001> (логин: minioadmin/minioadmin)
+- **MinIO консоль**: <http://localhost:9001>
+  - ⚠️ **СТАНДАРТНЫЕ УЧЕТНЫЕ ДАННЫЕ (ТОЛЬКО ДЛЯ РАЗРАБОТКИ)**: `minioadmin/minioadmin`
+  - **НЕ ИСПОЛЬЗУЙТЕ В ПРОДАКШН** - Немедленно смените эти учетные данные в production окружении
 
 #### Сборка Frontend Docker
 
@@ -645,6 +657,13 @@ NEXT_PUBLIC_WS_URL=http://localhost:3001
 
 #### Backend (`.env`)
 
+> ⚠️ **ПРЕДУПРЕЖДЕНИЕ БЕЗОПАСНОСТИ**: Это **примерные значения только для локальной разработки**. В production:
+> - Сгенерируйте сильные случайные секреты для `JWT_SECRET` (используйте `openssl rand -base64 32`)
+> - Используйте безопасные пароли для всех сервисов (PostgreSQL, Redis, MinIO, SMTP)
+> - Никогда не используйте стандартные учетные данные типа `postgres/postgres` или `minioadmin/minioadmin`
+> - Храните секреты в защищенном хранилище (HashiCorp Vault, AWS Secrets Manager и т.д.) или в переменных окружения
+> - Регулярно меняйте учетные данные
+
 ```env
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/quokkaq?sslmode=disable
 PORT=3001
@@ -664,7 +683,7 @@ SMTP_PASS=your-password
 
 Для полных примеров конфигурации см.:
 
-- Frontend: `apps/frontend/.env.local` (создайте из использования)
+- Frontend: `apps/frontend/env.local` (шаблон - скопируйте в `.env.local`)
 - Backend: `apps/backend/.env.example`
 
 ---

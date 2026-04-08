@@ -280,11 +280,11 @@ const AppSidebar = () => {
                         <Avatar size='sm'>
                           <AvatarFallback
                             bgColor={getAvatarColor(
-                              user?.name || user?.email
+                              user?.name || user?.email || undefined
                             )}
                             className='text-white'
                           >
-                            {getInitials(user?.name || user?.email)}
+                            {getInitials(user?.name || user?.email || undefined)}
                           </AvatarFallback>
                         </Avatar>
                         <div className='flex flex-col items-start overflow-hidden'>
@@ -311,11 +311,11 @@ const AppSidebar = () => {
                         <Avatar size='lg'>
                           <AvatarFallback
                             bgColor={getAvatarColor(
-                              user?.name || user?.email
+                              user?.name || user?.email || undefined
                             )}
                             className='text-white text-lg'
                           >
-                            {getInitials(user?.name || user?.email)}
+                            {getInitials(user?.name || user?.email || undefined)}
                           </AvatarFallback>
                         </Avatar>
                         <div className='flex flex-1 flex-col overflow-hidden'>

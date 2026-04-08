@@ -320,14 +320,17 @@ docker-compose up -d postgres redis minio
 **2. Create backend `.env` file:**
 
 ```bash
-cp apps/backend/.env.example apps/backend/.env
+# From apps/backend/ directory
+cp .env.example .env
 # Edit .env with your configuration
 ```
+
+> ⚠️ **SECURITY WARNING**: The `.env.example` contains placeholder values. **Replace all secrets with strong, randomly generated values** before deploying to production. Never commit real secrets to version control.
 
 **3. Start backend API:**
 
 ```bash
-cd apps/backend
+# From apps/backend/ directory
 go run cmd/api/main.go
 ```
 
@@ -339,11 +342,18 @@ The backend API will be available at <http://localhost:3001>
 **4. Create frontend `.env.local` file:**
 
 ```bash
-# Create apps/frontend/.env.local
+# Create .env.local from the template
+cp apps/frontend/env.local apps/frontend/.env.local
+```
+
+The template contains:
+```env
 NEXT_PUBLIC_API_URL=http://localhost:3001
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 NEXT_PUBLIC_WS_URL=http://localhost:3001
 ```
+
+> **Note:** The `env.local` (without dot) is a template file tracked in git. The `.env.local` (with dot) is your local configuration and is gitignored.
 
 **5. Start frontend:**
 
@@ -580,7 +590,9 @@ After starting, services will be available at:
 
 - **API**: <http://localhost:3001>
 - **API Documentation**: <http://localhost:3001/swagger/>
-- **MinIO Console**: <http://localhost:9001> (login: minioadmin/minioadmin)
+- **MinIO Console**: <http://localhost:9001>
+  - ⚠️ **DEFAULT CREDENTIALS (DEV ONLY)**: `minioadmin/minioadmin`
+  - **DO NOT USE IN PRODUCTION** - Change these credentials immediately in production environments
 
 #### Frontend Docker Build
 
@@ -627,6 +639,13 @@ NEXT_PUBLIC_WS_URL=http://localhost:3001
 
 #### Backend (`.env`)
 
+> ⚠️ **SECURITY WARNING**: These are **example values for local development only**. In production:
+> - Generate strong random secrets for `JWT_SECRET` (use `openssl rand -base64 32`)
+> - Use secure passwords for all services (PostgreSQL, Redis, MinIO, SMTP)
+> - Never use default credentials like `postgres/postgres` or `minioadmin/minioadmin`
+> - Store secrets in a secure vault (HashiCorp Vault, AWS Secrets Manager, etc.) or environment variables
+> - Rotate credentials regularly
+
 ```env
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/quokkaq?sslmode=disable
 PORT=3001
@@ -645,7 +664,7 @@ SMTP_PASS=your-password
 ```
 
 For complete configuration examples, see:
-- Frontend: `apps/frontend/.env.local` (create from usage)
+- Frontend: `apps/frontend/env.local` (template - copy to `.env.local`)
 - Backend: `apps/backend/.env.example`
 
 ---
