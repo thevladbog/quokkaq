@@ -135,20 +135,23 @@ func (h *SubscriptionHandler) GetMySubscription(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	if err := subscriptions.ApplyPendingPlanIfDue(database.DB, subscription, time.Now().UTC()); err != nil {
+	promoted, err := subscriptions.ApplyPendingPlanIfDue(database.DB, subscription, time.Now().UTC())
+	if err != nil {
 		log.Printf("GetMySubscription ApplyPendingPlanIfDue: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-	subscription, err = h.subscriptionRepo.FindByCompanyID(companyID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			http.Error(w, "No subscription found", http.StatusNotFound)
+	if promoted {
+		subscription, err = h.subscriptionRepo.FindByCompanyID(companyID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				http.Error(w, "No subscription found", http.StatusNotFound)
+				return
+			}
+			log.Printf("GetMySubscription subscriptionRepo.FindByCompanyID reload: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		log.Printf("GetMySubscription subscriptionRepo.FindByCompanyID reload: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")

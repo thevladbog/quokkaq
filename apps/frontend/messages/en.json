@@ -911,6 +911,7 @@
       "status": "Status",
       "periodStart": "Period start",
       "periodEnd": "Period end",
+      "subscriptionPeriodDateInvalid": "Enter a valid period start and end.",
       "saveSubscription": "Save subscription",
       "manualInvoice": "Manual invoice",
       "invoiceNeedsSub": "Requires an active subscription row.",

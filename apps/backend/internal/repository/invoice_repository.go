@@ -3,7 +3,27 @@ package repository
 import (
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/pkg/database"
+
+	"gorm.io/gorm"
 )
+
+const (
+	invoiceListDefaultLimit = 50
+	invoiceListMaxLimit     = 100
+)
+
+func clampInvoiceListPagination(limit, offset int) (int, int) {
+	if offset < 0 {
+		offset = 0
+	}
+	if limit <= 0 {
+		limit = invoiceListDefaultLimit
+	}
+	if limit > invoiceListMaxLimit {
+		limit = invoiceListMaxLimit
+	}
+	return limit, offset
+}
 
 type InvoiceRepository interface {
 	Create(invoice *models.Invoice) error
@@ -42,23 +62,25 @@ func (r *invoiceRepository) FindByCompanyID(companyID string) ([]models.Invoice,
 }
 
 func (r *invoiceRepository) ListPaginated(companyID *string, limit, offset int) ([]models.Invoice, int64, error) {
-	q := database.DB.Model(&models.Invoice{})
+	limit, offset = clampInvoiceListPagination(limit, offset)
+
+	base := database.DB.Model(&models.Invoice{})
 	if companyID != nil && *companyID != "" {
-		q = q.Where("company_id = ?", *companyID)
+		base = base.Where("company_id = ?", *companyID)
 	}
+
 	var total int64
-	if err := q.Count(&total).Error; err != nil {
+	countQ := base.Session(&gorm.Session{})
+	if err := countQ.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
-	listQ := database.DB.Model(&models.Invoice{}).
+
+	var invoices []models.Invoice
+	listQ := base.Session(&gorm.Session{}).
 		Preload("Subscription.Plan").
 		Order("created_at DESC, id DESC").
 		Limit(limit).
 		Offset(offset)
-	if companyID != nil && *companyID != "" {
-		listQ = listQ.Where("company_id = ?", *companyID)
-	}
-	var invoices []models.Invoice
 	err := listQ.Find(&invoices).Error
 	return invoices, total, err
 }

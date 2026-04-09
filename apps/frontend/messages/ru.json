@@ -912,6 +912,7 @@
       "status": "Статус",
       "periodStart": "Начало периода",
       "periodEnd": "Конец периода",
+      "subscriptionPeriodDateInvalid": "Укажите корректные дату и время начала и конца периода.",
       "saveSubscription": "Сохранить подписку",
       "manualInvoice": "Ручной счёт",
       "invoiceNeedsSub": "Нужна запись подписки.",

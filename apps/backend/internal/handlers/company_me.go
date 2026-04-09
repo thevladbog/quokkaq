@@ -38,8 +38,8 @@ func dadataCleanerConfigured() bool {
 // @Security     BearerAuth
 // @Success      200  {object}  companyMeResponse
 // @Failure      401  {string}  string "Unauthorized"
-// @Failure      403  {string}  string "Forbidden"
 // @Failure      404  {string}  string "No company found"
+// @Failure      500  {string}  string "Internal Server Error"
 // @Router       /companies/me [get]
 func (h *CompanyHandler) GetMyCompany(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserIDFromContext(r.Context())
@@ -99,6 +99,7 @@ type patchMyCompanyBody struct {
 // @Failure      400  {string}  string "Bad request"
 // @Failure      401  {string}  string "Unauthorized"
 // @Failure      404  {string}  string "No company found"
+// @Failure      500  {string}  string "Internal Server Error"
 // @Router       /companies/me [patch]
 func (h *CompanyHandler) PatchMyCompany(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserIDFromContext(r.Context())

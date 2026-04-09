@@ -106,10 +106,18 @@ function PlatformSubscriptionEditor({
       const body: Record<string, unknown> = {};
       if (status && status !== sub.status) body.status = status;
       if (periodStart) {
-        body.currentPeriodStart = new Date(periodStart).toISOString();
+        const d = new Date(periodStart);
+        if (Number.isNaN(d.getTime())) {
+          throw new Error(t('subscriptionPeriodDateInvalid'));
+        }
+        body.currentPeriodStart = d.toISOString();
       }
       if (periodEnd) {
-        body.currentPeriodEnd = new Date(periodEnd).toISOString();
+        const d = new Date(periodEnd);
+        if (Number.isNaN(d.getTime())) {
+          throw new Error(t('subscriptionPeriodDateInvalid'));
+        }
+        body.currentPeriodEnd = d.toISOString();
       }
 
       if (planMode === 'immediate') {

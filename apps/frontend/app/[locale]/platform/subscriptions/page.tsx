@@ -50,6 +50,24 @@ const SUB_STATUSES = [
 
 const STATUS_SELECT_DEFAULT = '__default__';
 
+/** Next calendar month, clamping the day to the last day of the target month (avoids Jan 31 → Mar 3). */
+function addOneCalendarMonthClamped(from: Date): Date {
+  const y = from.getFullYear();
+  const m = from.getMonth();
+  const day = from.getDate();
+  const lastDayOfTargetMonth = new Date(y, m + 2, 0).getDate();
+  const clampedDay = Math.min(day, lastDayOfTargetMonth);
+  return new Date(
+    y,
+    m + 1,
+    clampedDay,
+    from.getHours(),
+    from.getMinutes(),
+    from.getSeconds(),
+    from.getMilliseconds()
+  );
+}
+
 function subscriptionStatusLabel(
   tBilling: ReturnType<typeof useTranslations<'organization.billing'>>,
   code: string
@@ -179,8 +197,7 @@ export default function PlatformSubscriptionsPage() {
           currentPeriodEnd = body.currentPeriodEnd;
         } else {
           const now = new Date();
-          const endDefault = new Date(now);
-          endDefault.setMonth(endDefault.getMonth() + 1);
+          const endDefault = addOneCalendarMonthClamped(now);
           currentPeriodStart = now.toISOString();
           currentPeriodEnd = endDefault.toISOString();
         }

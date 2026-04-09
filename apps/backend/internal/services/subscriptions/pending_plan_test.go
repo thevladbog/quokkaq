@@ -14,9 +14,12 @@ func TestApplyPendingPlanIfDue_NotYetEffective_NoDBChange(t *testing.T) {
 	db := newPendingPlanTestDB(t)
 	planA, planB, sub := seedSubscriptionWithPending(t, db, time.Now().UTC().Add(24*time.Hour))
 
-	err := ApplyPendingPlanIfDue(db, sub, time.Now().UTC())
+	promoted, err := ApplyPendingPlanIfDue(db, sub, time.Now().UTC())
 	if err != nil {
 		t.Fatal(err)
+	}
+	if promoted {
+		t.Fatal("expected no promotion when effective date is in the future")
 	}
 
 	var got models.Subscription
@@ -38,9 +41,12 @@ func TestApplyPendingPlanIfDue_PastEffective_PromotesPlanAndClearsPending(t *tes
 	db := newPendingPlanTestDB(t)
 	_, planB, sub := seedSubscriptionWithPending(t, db, time.Now().UTC().Add(-time.Hour))
 
-	err := ApplyPendingPlanIfDue(db, sub, time.Now().UTC())
+	promoted, err := ApplyPendingPlanIfDue(db, sub, time.Now().UTC())
 	if err != nil {
 		t.Fatal(err)
+	}
+	if !promoted {
+		t.Fatal("expected promotion when effective date is in the past")
 	}
 
 	var got models.Subscription

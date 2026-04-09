@@ -10,15 +10,16 @@ import (
 
 // ApplyPendingPlanIfDue promotes a scheduled plan to current when PendingEffectiveAt has passed (UTC).
 // It updates the row and mutates sub in memory (PlanID, clears pending fields; PendingPlan set nil).
-func ApplyPendingPlanIfDue(db *gorm.DB, sub *models.Subscription, now time.Time) error {
+// The returned bool is true when the subscription row was updated in the database.
+func ApplyPendingPlanIfDue(db *gorm.DB, sub *models.Subscription, now time.Time) (bool, error) {
 	if sub == nil || sub.ID == "" {
-		return nil
+		return false, nil
 	}
 	if sub.PendingPlanID == nil || sub.PendingEffectiveAt == nil {
-		return nil
+		return false, nil
 	}
 	if now.Before(*sub.PendingEffectiveAt) {
-		return nil
+		return false, nil
 	}
 	newPlanID := *sub.PendingPlanID
 	if err := db.Model(&models.Subscription{}).Where("id = ?", sub.ID).Updates(map[string]interface{}{
@@ -26,13 +27,13 @@ func ApplyPendingPlanIfDue(db *gorm.DB, sub *models.Subscription, now time.Time)
 		"pending_plan_id":      nil,
 		"pending_effective_at": nil,
 	}).Error; err != nil {
-		return err
+		return false, err
 	}
 	sub.PlanID = newPlanID
 	sub.PendingPlanID = nil
 	sub.PendingEffectiveAt = nil
 	sub.PendingPlan = nil
-	return nil
+	return true, nil
 }
 
 // ApplyPendingPlanIfDueBeforeQuota loads the subscription for companyID and promotes a scheduled plan when PendingEffectiveAt has passed (UTC).
@@ -46,5 +47,6 @@ func ApplyPendingPlanIfDueBeforeQuota(db *gorm.DB, companyID string, now time.Ti
 		}
 		return err
 	}
-	return ApplyPendingPlanIfDue(db, &sub, now)
+	_, err = ApplyPendingPlanIfDue(db, &sub, now)
+	return err
 }
