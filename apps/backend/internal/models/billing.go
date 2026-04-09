@@ -4,12 +4,12 @@ import (
 	"time"
 )
 
-// Invoice represents a billing invoice for a subscription.
+// Invoice represents a billing invoice; subscriptionId may be nil until linked (manual platform flow).
 // CompanyID is optional after the company is removed: FK uses ON DELETE SET NULL so historical invoices are retained (retention/archival) instead of cascading away with the company.
 type Invoice struct {
 	ID                       string     `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
 	CompanyID                *string    `gorm:"index" json:"companyId,omitempty"`
-	SubscriptionID           string     `gorm:"not null" json:"subscriptionId"`
+	SubscriptionID           *string    `gorm:"index" json:"subscriptionId"`
 	Amount                   int64      `gorm:"not null" json:"amount"`                  // amount in minor units
 	Currency                 string     `gorm:"not null;default:'RUB'" json:"currency"`  // "RUB", "USD"
 	Status                   string     `gorm:"not null;default:'draft'" json:"status"`  // "draft", "open", "paid", "void", "uncollectible"
@@ -20,9 +20,9 @@ type Invoice struct {
 	CreatedAt                time.Time  `gorm:"default:now()" json:"createdAt"`
 	UpdatedAt                time.Time  `gorm:"autoUpdateTime" json:"updatedAt"`
 
-	// Relations — OnDelete:SET NULL keeps invoice rows when a company is deleted; CompanyID becomes nil.
-	Company      Company      `gorm:"foreignKey:CompanyID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;" json:"-" swaggerignore:"true"`
-	Subscription Subscription `gorm:"foreignKey:SubscriptionID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"subscription,omitempty"`
+	// Relations — OnDelete:SET NULL on subscription keeps paid/open manual history if subscription row is removed.
+	Company      Company       `gorm:"foreignKey:CompanyID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;" json:"-" swaggerignore:"true"`
+	Subscription *Subscription `gorm:"foreignKey:SubscriptionID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;" json:"subscription,omitempty"`
 }
 
 // UsageRecord tracks resource usage for quota management and billing.

@@ -518,7 +518,7 @@ pnpm nx affected -t lint
 
 #### 2. **Deploy Frontend** (`.github/workflows/deploy-frontend.yml`)
 
-Срабатывает при изменениях в `apps/frontend/` или `packages/`:
+Запускается при push в ветку **`release`**, если менялись `apps/frontend/` или `packages/`:
 
 - Автоматически повышает версию в `apps/frontend/package.json`
 - Собирает Docker-образ с Next.js standalone выводом
@@ -528,7 +528,7 @@ pnpm nx affected -t lint
 
 #### 3. **Deploy Backend** (`.github/workflows/deploy-backend.yml`)
 
-Срабатывает при изменениях в `apps/backend/`:
+Запускается при push в **`release`**, если менялся `apps/backend/`:
 
 - Повышает версию в `apps/backend/VERSION`
 - Собирает Go-бинарник в Docker
@@ -538,7 +538,7 @@ pnpm nx affected -t lint
 
 #### 4. **Release Kiosk** (`.github/workflows/release-kiosk.yml`)
 
-Срабатывает при изменениях в `apps/kiosk-desktop/` или `packages/`:
+Запускается при push в **`release`**, если менялись `apps/kiosk-desktop/` или `packages/`:
 
 - Повышает версию в `package.json`, `Cargo.toml` и `tauri.conf.json`
 - Собирает для macOS, Windows и Linux параллельно
@@ -557,12 +557,7 @@ pnpm nx affected -t lint
 | `[minor]` или `feat:` | Minor (1.0.0 → 1.1.0) |
 | По умолчанию | Patch (1.0.0 → 1.0.1) |
 
-**Пример:**
-
-```bash
-git commit -m "feat: добавить новую функцию [minor]"
-git push origin main
-```
+**Типичный процесс:** изменения вливаются в `main` через pull request. Когда готовы к выкладке, влейте `main` в **`release`** (отдельный PR). Тип bump берётся из **последнего коммита на `release`** (часто merge commit): укажите в сообщении merge `[minor]`, `feat:` или `BREAKING CHANGE`, если нужен не только patch.
 
 ---
 
@@ -822,7 +817,7 @@ CI автоматически:
 - Соберет затронутые приложения
 - Сообщит статус проверок
 
-После merge в `main`, затронутые приложения будут развернуты автоматически.
+После merge в `main` на транке проходит CI. Чтобы развернуть приложения или выпустить киоск, влейте `main` в **`release`** — тогда сработают релизные workflow (bump, теги, деплой).
 
 ---
 

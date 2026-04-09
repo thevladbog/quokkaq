@@ -3,7 +3,9 @@ package middleware
 import (
 	"log"
 	"net/http"
+	"os"
 	"quokkaq-go-backend/internal/repository"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -35,6 +37,57 @@ func RequireAdmin(userRepo repository.UserRepository) func(http.Handler) http.Ha
 			if err != nil {
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
+			}
+			if !allowed {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// platformAllowTenantAdmin is true when tenant "admin" may call /platform APIs (never when APP_ENV=production).
+// - PLATFORM_ALLOW_TENANT_ADMIN=true|1|yes: allow (non-production only).
+// - PLATFORM_ALLOW_TENANT_ADMIN=false|0|no: never allow.
+// - unset: allow only for typical local dev (APP_ENV empty, development, dev, local) so `go run` without .env works.
+//   Staging should set APP_ENV=staging and either assign platform_admin or set PLATFORM_ALLOW_TENANT_ADMIN=true.
+func platformAllowTenantAdmin() bool {
+	app := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV")))
+	if app == "production" {
+		return false
+	}
+	v := strings.ToLower(strings.TrimSpace(os.Getenv("PLATFORM_ALLOW_TENANT_ADMIN")))
+	if v == "false" || v == "0" || v == "no" {
+		return false
+	}
+	if v == "true" || v == "1" || v == "yes" {
+		return true
+	}
+	return app == "" || app == "development" || app == "dev" || app == "local"
+}
+
+// RequirePlatformAdmin allows users with the "platform_admin" role (SaaS operator).
+// When PLATFORM_ALLOW_TENANT_ADMIN is enabled and APP_ENV is not production, tenant "admin" is also allowed (local dev).
+func RequirePlatformAdmin(userRepo repository.UserRepository) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			userID, ok := GetUserIDFromContext(r.Context())
+			if !ok {
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				return
+			}
+			allowed, err := userRepo.IsPlatformAdmin(userID)
+			if err != nil {
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+			if !allowed && platformAllowTenantAdmin() {
+				allowed, err = userRepo.IsAdmin(userID)
+				if err != nil {
+					http.Error(w, "Internal server error", http.StatusInternalServerError)
+					return
+				}
 			}
 			if !allowed {
 				http.Error(w, "Forbidden", http.StatusForbidden)

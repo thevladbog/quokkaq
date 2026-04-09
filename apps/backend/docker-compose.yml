@@ -74,6 +74,8 @@ services:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/quokkaq
       PORT: 3001
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
+      # Local dev: let tenant "admin" use /platform APIs (never enable in production)
+      PLATFORM_ALLOW_TENANT_ADMIN: ${PLATFORM_ALLOW_TENANT_ADMIN:-true}
       
       # MinIO Configuration
       AWS_ACCESS_KEY_ID: minioadmin

@@ -1,7 +1,13 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
+import { useMemo } from 'react';
+import {
+  formatAppDate,
+  formatAppTime,
+  intlLocaleFromAppLocale
+} from '@/lib/format-datetime';
 import { Ticket, ticketsApi, unitsApi, Material, UnitConfig } from '@/lib/api';
 import { logger } from '@/lib/logger';
 import { useUnit } from '@/lib/hooks';
@@ -18,6 +24,8 @@ interface ScreenUnitClientProps {
 
 export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
   const t = useTranslations('screen');
+  const locale = useLocale();
+  const intlLocale = useMemo(() => intlLocaleFromAppLocale(locale), [locale]);
 
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -204,18 +212,10 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
         </div>
         <div className='text-right'>
           <div className='font-mono text-3xl font-bold'>
-            {currentTime.toLocaleTimeString([], {
-              hour: '2-digit',
-              minute: '2-digit'
-            })}
+            {formatAppTime(currentTime, intlLocale)}
           </div>
           <div className='text-muted-foreground text-lg'>
-            {currentTime.toLocaleDateString(undefined, {
-              weekday: 'long',
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric'
-            })}
+            {formatAppDate(currentTime, intlLocale, 'full')}
           </div>
         </div>
       </div>

@@ -6,13 +6,20 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Download, TrendingUp } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
+import { useMemo } from 'react';
+import {
+  formatAppDate,
+  intlLocaleFromAppLocale
+} from '@/lib/format-datetime';
 import { companiesApi } from '@/lib/api';
 
 export function OrganizationUsageContent() {
   const router = useRouter();
   const t = useTranslations('organization.usage');
   const tCommon = useTranslations('common');
+  const locale = useLocale();
+  const intlLocale = useMemo(() => intlLocaleFromAppLocale(locale), [locale]);
 
   const { data: usageMetrics, isLoading } = useQuery({
     queryKey: ['usage-metrics-me'],
@@ -38,12 +45,14 @@ export function OrganizationUsageContent() {
     });
 
     // Add period information
-    const periodStart = new Date(
-      usageMetrics.currentPeriod.start
-    ).toLocaleDateString();
-    const periodEnd = new Date(
-      usageMetrics.currentPeriod.end
-    ).toLocaleDateString();
+    const periodStart = formatAppDate(
+      usageMetrics.currentPeriod.start,
+      intlLocale
+    );
+    const periodEnd = formatAppDate(
+      usageMetrics.currentPeriod.end,
+      intlLocale
+    );
 
     const csvContent = [
       `Usage Report - ${periodStart} to ${periodEnd}`,

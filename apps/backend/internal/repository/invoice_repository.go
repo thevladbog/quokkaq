@@ -9,6 +9,7 @@ type InvoiceRepository interface {
 	Create(invoice *models.Invoice) error
 	FindByID(id string) (*models.Invoice, error)
 	FindByCompanyID(companyID string) ([]models.Invoice, error)
+	ListPaginated(companyID *string, limit, offset int) ([]models.Invoice, int64, error)
 	Update(invoice *models.Invoice) error
 	Delete(id string) error
 }
@@ -38,6 +39,24 @@ func (r *invoiceRepository) FindByCompanyID(companyID string) ([]models.Invoice,
 		Order("created_at DESC").
 		Find(&invoices).Error
 	return invoices, err
+}
+
+func (r *invoiceRepository) ListPaginated(companyID *string, limit, offset int) ([]models.Invoice, int64, error) {
+	q := database.DB.Model(&models.Invoice{})
+	if companyID != nil && *companyID != "" {
+		q = q.Where("company_id = ?", *companyID)
+	}
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	listQ := database.DB.Preload("Subscription.Plan").Order("created_at DESC").Limit(limit).Offset(offset)
+	if companyID != nil && *companyID != "" {
+		listQ = listQ.Where("company_id = ?", *companyID)
+	}
+	var invoices []models.Invoice
+	err := listQ.Find(&invoices).Error
+	return invoices, total, err
 }
 
 func (r *invoiceRepository) Update(invoice *models.Invoice) error {

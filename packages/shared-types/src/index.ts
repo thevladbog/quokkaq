@@ -307,6 +307,179 @@ export type CallNextRequest = {
 // SaaS Types (Subscription & Billing)
 // ==========================
 
+export const partyTypeSchema = z.enum([
+  'legal_entity',
+  'sole_proprietor',
+  'individual'
+]);
+
+const digits10 = /^\d{10}$/;
+const digits12 = /^\d{12}$/;
+const digits9 = /^\d{9}$/;
+const digits13 = /^\d{13}$/;
+const digits15 = /^\d{15}$/;
+
+const addressPartSchema = z
+  .object({
+    unrestricted: z.string().optional(),
+    postalCode: z.string().optional(),
+    fiasId: z.string().optional()
+  })
+  .optional();
+
+/** RU counterparty profile (JSON stored in companies.counterparty). */
+export const CounterpartySchema = z
+  .object({
+    schemaVersion: z.number().int().optional(),
+    partyType: partyTypeSchema,
+    inn: z.string().optional(),
+    kpp: z.string().optional(),
+    ogrn: z.string().optional(),
+    ogrnip: z.string().optional(),
+    fullName: z.string().optional(),
+    shortName: z.string().optional(),
+    passport: z
+      .object({
+        series: z.string().optional(),
+        number: z.string().optional(),
+        issuedBy: z.string().optional(),
+        issueDate: z.string().optional()
+      })
+      .optional(),
+    addresses: z
+      .object({
+        legal: addressPartSchema,
+        actual: addressPartSchema,
+        postal: addressPartSchema
+      })
+      .optional(),
+    phone: z.string().optional(),
+    email: z.union([z.string().email(), z.literal('')]).optional(),
+    contacts: z
+      .array(
+        z.object({
+          fullName: z.string().optional(),
+          position: z.string().optional(),
+          phone: z.string().optional(),
+          email: z.string().optional()
+        })
+      )
+      .optional(),
+    edo: z
+      .object({
+        operator: z.string().optional(),
+        participantId: z.string().optional()
+      })
+      .optional()
+  })
+  .superRefine((val, ctx) => {
+    const inn = (val.inn ?? '').trim();
+    const kpp = (val.kpp ?? '').trim();
+    const ogrn = (val.ogrn ?? '').trim();
+    const ogrnip = (val.ogrnip ?? '').trim();
+    switch (val.partyType) {
+      case 'legal_entity':
+        if (inn && !digits10.test(inn)) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['inn'],
+            message: 'INN must be 10 digits for legal entity'
+          });
+        }
+        if (kpp && !digits9.test(kpp)) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['kpp'],
+            message: 'KPP must be 9 digits'
+          });
+        }
+        if (ogrn && !digits13.test(ogrn)) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['ogrn'],
+            message: 'OGRN must be 13 digits'
+          });
+        }
+        break;
+      case 'sole_proprietor':
+        if (inn && !digits12.test(inn)) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['inn'],
+            message: 'INN must be 12 digits for sole proprietor'
+          });
+        }
+        if (kpp) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['kpp'],
+            message: 'KPP must not be set for sole proprietor'
+          });
+        }
+        if (ogrnip && !digits15.test(ogrnip)) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['ogrnip'],
+            message: 'OGRNIP must be 15 digits'
+          });
+        }
+        break;
+      case 'individual':
+        if (inn && !digits12.test(inn)) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['inn'],
+            message: 'INN must be 12 digits when set'
+          });
+        }
+        if (kpp) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['kpp'],
+            message: 'KPP must not be set for individual'
+          });
+        }
+        if (ogrn || ogrnip) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['ogrn'],
+            message: 'OGRN/OGRNIP must not be set for individual'
+          });
+        }
+        break;
+      default:
+        break;
+    }
+  });
+
+export type Counterparty = z.infer<typeof CounterpartySchema>;
+export type PartyType = z.infer<typeof partyTypeSchema>;
+
+/**
+ * Billing period for subscription plans. API/DB may send empty, null, or legacy
+ * spellings; we coerce so nested `subscription.pendingPlan` in company payloads
+ * does not break Zod (e.g. after PATCH /platform/companies/:id).
+ */
+export const subscriptionPlanIntervalSchema = z.unknown().transform(
+  (v): 'month' | 'year' => {
+    if (v === null || v === undefined) return 'month';
+    const s = String(v).trim().toLowerCase();
+    if (s === '' || s === 'month' || s === 'monthly' || s === 'mo') {
+      return 'month';
+    }
+    if (
+      s === 'year' ||
+      s === 'yearly' ||
+      s === 'annual' ||
+      s === 'yr' ||
+      s === 'y'
+    ) {
+      return 'year';
+    }
+    return 'month';
+  }
+);
+
 export const SubscriptionPlanSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -317,7 +490,7 @@ export const SubscriptionPlanSchema = z.object({
       'Amount in minor currency units (e.g. cents for USD), matching Stripe amounts.'
     ),
   currency: z.string(),
-  interval: z.enum(['month', 'year']),
+  interval: subscriptionPlanIntervalSchema,
   features: z.record(z.string(), z.boolean()).optional(),
   limits: z.record(z.string(), z.number()).optional(),
   isActive: z.boolean(),
@@ -334,11 +507,14 @@ export const SubscriptionSchema = z.object({
   currentPeriodEnd: z.string(),
   cancelAtPeriodEnd: z.boolean(),
   trialEnd: z.string().nullable().optional(),
+  pendingPlanId: z.string().nullable().optional(),
+  pendingEffectiveAt: z.string().nullable().optional(),
   stripeSubscriptionId: z.string().optional(),
   metadata: z.record(z.string(), z.any()).optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
-  plan: SubscriptionPlanSchema.optional()
+  plan: SubscriptionPlanSchema.optional(),
+  pendingPlan: SubscriptionPlanSchema.optional()
 });
 
 export const CompanySchema = z.object({
@@ -346,8 +522,10 @@ export const CompanySchema = z.object({
   name: z.string(),
   ownerUserId: z.string().optional(),
   subscriptionId: z.string().nullable().optional(),
-  billingEmail: z.string().email().optional(),
+  isSaasOperator: z.boolean().optional(),
+  billingEmail: z.union([z.string().email(), z.literal('')]).optional(),
   billingAddress: z.record(z.string(), z.any()).optional(),
+  counterparty: z.any().optional(),
   settings: z.record(z.string(), z.any()).optional(),
   onboardingState: z.record(z.string(), z.any()).optional(),
   createdAt: z.string().optional(),
@@ -356,10 +534,20 @@ export const CompanySchema = z.object({
   units: z.array(UnitModelSchema).optional()
 });
 
+export const CompanyMeFeaturesSchema = z.object({
+  dadata: z.boolean(),
+  dadataCleaner: z.boolean()
+});
+
+export const CompanyMeResponseSchema = z.object({
+  company: CompanySchema,
+  features: CompanyMeFeaturesSchema
+});
+
 export const InvoiceSchema = z.object({
   id: z.string(),
   companyId: z.string().nullable().optional(),
-  subscriptionId: z.string(),
+  subscriptionId: z.string().nullable().optional(),
   amount: z.number(),
   currency: z.string(),
   status: z.enum(['draft', 'open', 'paid', 'void', 'uncollectible']),
@@ -368,7 +556,8 @@ export const InvoiceSchema = z.object({
   paidAt: z.string().nullable().optional(),
   dueDate: z.string(),
   createdAt: z.string().optional(),
-  updatedAt: z.string().optional()
+  updatedAt: z.string().optional(),
+  subscription: SubscriptionSchema.optional()
 });
 
 export const UsageMetricSchema = z.object({
@@ -393,6 +582,7 @@ export const UsageMetricsSchema = z.object({
 export type SubscriptionPlan = z.infer<typeof SubscriptionPlanSchema>;
 export type Subscription = z.infer<typeof SubscriptionSchema>;
 export type Company = z.infer<typeof CompanySchema>;
+export type CompanyMeResponse = z.infer<typeof CompanyMeResponseSchema>;
 export type Invoice = z.infer<typeof InvoiceSchema>;
 export type UsageMetric = z.infer<typeof UsageMetricSchema>;
 export type UsageMetrics = z.infer<typeof UsageMetricsSchema>;

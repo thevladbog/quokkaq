@@ -30,12 +30,15 @@ type Subscription struct {
 	CurrentPeriodEnd     time.Time       `gorm:"not null" json:"currentPeriodEnd"`
 	CancelAtPeriodEnd    bool            `gorm:"not null;default:false" json:"cancelAtPeriodEnd"`
 	TrialEnd             *time.Time      `json:"trialEnd,omitempty"`
+	PendingPlanID        *string         `gorm:"index" json:"pendingPlanId,omitempty"` // scheduled plan change (platform)
+	PendingEffectiveAt   *time.Time      `json:"pendingEffectiveAt,omitempty"`        // UTC; when reached, PlanID moves to pending plan
 	StripeSubscriptionID *string         `gorm:"column:stripe_subscription_id" json:"stripeSubscriptionId,omitempty"` // Stripe sub_… after Checkout completes
 	Metadata             json.RawMessage `gorm:"type:jsonb" json:"metadata,omitempty" swaggertype:"object"`           // additional data
 	CreatedAt            time.Time       `gorm:"default:now()" json:"createdAt"`
 	UpdatedAt            time.Time       `gorm:"autoUpdateTime" json:"updatedAt"`
 
 	// Relations
-	Plan    SubscriptionPlan `gorm:"foreignKey:PlanID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;" json:"plan,omitempty"`
-	Company Company          `gorm:"foreignKey:CompanyID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-" swaggerignore:"true"`
+	Plan        SubscriptionPlan `gorm:"foreignKey:PlanID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;" json:"plan,omitempty"`
+	PendingPlan SubscriptionPlan `gorm:"foreignKey:PendingPlanID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;" json:"pendingPlan,omitempty"`
+	Company     Company          `gorm:"foreignKey:CompanyID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-" swaggerignore:"true"`
 }

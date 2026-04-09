@@ -3,8 +3,10 @@
 import { ReactNode, useMemo } from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import AppSidebar from '@/components/AppSidebar';
+import PlatformSidebar from '@/components/PlatformSidebar';
 import { usePathname } from 'next/navigation';
 import ProtectedSidebarLayout from '@/components/ProtectedSidebarLayout';
+import { platformRouteAllowsTenantAdmin } from '@/lib/platform-access';
 import Image from 'next/image';
 
 interface ConditionalLayoutProps {
@@ -20,6 +22,18 @@ const ConditionalLayout = ({ children }: ConditionalLayoutProps) => {
     const pathWithoutLocale = pathname
       .replace(/^\/[a-z]{2}\//, '/')
       .replace(/^\/[a-z]{2}$/, '/');
+
+    if (pathWithoutLocale.startsWith('/platform')) {
+      const allowTenantAdmin = platformRouteAllowsTenantAdmin();
+      return {
+        useSidebar: true,
+        protected: true,
+        roles: allowTenantAdmin
+          ? ['platform_admin', 'admin']
+          : ['platform_admin'],
+        SidebarComponent: PlatformSidebar
+      };
+    }
 
     if (pathWithoutLocale === '/') {
       return { useSidebar: true, protected: false };
@@ -131,6 +145,7 @@ const ConditionalLayout = ({ children }: ConditionalLayoutProps) => {
           <ProtectedSidebarLayout
             allowedRoles={layoutConfig.roles || []}
             requiredPermission={layoutConfig.requiredPermission}
+            SidebarComponent={layoutConfig.SidebarComponent}
             fallbackComponent={
               <div className='flex min-h-screen items-center justify-center p-4'>
                 <div className='text-center'>

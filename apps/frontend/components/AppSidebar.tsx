@@ -30,7 +30,8 @@ import {
   Globe,
   Building2,
   CreditCard,
-  DollarSign
+  DollarSign,
+  Layers
 } from 'lucide-react';
 import Image from 'next/image';
 import { useAuthContext } from '@/contexts/AuthContext';
@@ -47,6 +48,7 @@ import LanguageSwitcher from '@/components/LanguageSwitcher';
 import ThemeToggle from '@/components/ThemeToggle';
 import { useTranslations } from 'next-intl';
 import { getInitials, getAvatarColor } from '@/lib/utils';
+import { userCanOpenPlatformOperatorUI } from '@/lib/platform-access';
 
 function filterSubItemsByRole<T extends { roles?: string[] }>(
   items: T[],
@@ -408,6 +410,24 @@ const AppSidebar = () => {
                           <ThemeToggle />
                         </div>
                       </div>
+
+                      {userCanOpenPlatformOperatorUI(user) && (
+                        <>
+                          <Separator />
+                          <Button
+                            variant='outline'
+                            className='w-full justify-start'
+                            asChild
+                          >
+                            <Link href='/platform'>
+                              <Layers className='mr-2 h-4 w-4' />
+                              {tProfile('openOperatorConsole', {
+                                defaultValue: 'Operator console'
+                              })}
+                            </Link>
+                          </Button>
+                        </>
+                      )}
 
                       <Separator />
 

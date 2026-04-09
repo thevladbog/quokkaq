@@ -3,12 +3,20 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useUnits } from '@/lib/hooks';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
+import { useMemo } from 'react';
+import {
+  formatAppDate,
+  formatAppTime,
+  intlLocaleFromAppLocale
+} from '@/lib/format-datetime';
 import { useRouter } from '@/src/i18n/navigation';
 import KioskLanguageSwitcher from '@/components/KioskLanguageSwitcher';
 import ThemeToggle from '@/components/ThemeToggle';
 
 export default function KioskPage() {
+  const locale = useLocale();
+  const intlLocale = useMemo(() => intlLocaleFromAppLocale(locale), [locale]);
   const {
     data: units = [],
     isLoading: unitsLoading,
@@ -23,18 +31,10 @@ export default function KioskPage() {
         <div className='mb-4 flex items-center justify-between'>
           <div className='text-center'>
             <div className='text-3xl font-bold'>
-              {new Date().toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit'
-              })}
+              {formatAppTime(new Date(), intlLocale)}
             </div>
             <div className='mt-1 text-sm'>
-              {new Date().toLocaleDateString(undefined, {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-              })}
+              {formatAppDate(new Date(), intlLocale, 'full')}
             </div>
           </div>
 
@@ -60,18 +60,10 @@ export default function KioskPage() {
         <div className='mb-4 flex items-center justify-between'>
           <div className='text-center'>
             <div className='text-3xl font-bold'>
-              {new Date().toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit'
-              })}
+              {formatAppTime(new Date(), intlLocale)}
             </div>
             <div className='mt-1 text-sm'>
-              {new Date().toLocaleDateString(undefined, {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-              })}
+              {formatAppDate(new Date(), intlLocale, 'full')}
             </div>
           </div>
 
@@ -107,18 +99,10 @@ export default function KioskPage() {
       <div className='mb-4 flex items-center justify-between'>
         <div className='text-center'>
           <div className='text-3xl font-bold'>
-            {new Date().toLocaleTimeString([], {
-              hour: '2-digit',
-              minute: '2-digit'
-            })}
+            {formatAppTime(new Date(), intlLocale)}
           </div>
           <div className='mt-1 text-sm'>
-            {new Date().toLocaleDateString(undefined, {
-              weekday: 'long',
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric'
-            })}
+            {formatAppDate(new Date(), intlLocale, 'full')}
           </div>
         </div>
 

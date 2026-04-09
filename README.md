@@ -504,7 +504,7 @@ Runs on every PR and push to `main`:
 
 #### 2. **Deploy Frontend** (`.github/workflows/deploy-frontend.yml`)
 
-Triggers when `apps/frontend/` or `packages/` change:
+Runs on push to the **`release`** branch when `apps/frontend/` or `packages/` change:
 - Automatically bumps version in `apps/frontend/package.json`
 - Builds Docker image with Next.js standalone output
 - Pushes to Yandex Container Registry
@@ -513,7 +513,7 @@ Triggers when `apps/frontend/` or `packages/` change:
 
 #### 3. **Deploy Backend** (`.github/workflows/deploy-backend.yml`)
 
-Triggers when `apps/backend/` changes:
+Runs on push to **`release`** when `apps/backend/` changes:
 - Bumps version in `apps/backend/VERSION`
 - Builds Go binary in Docker
 - Pushes to Yandex Container Registry
@@ -522,7 +522,7 @@ Triggers when `apps/backend/` changes:
 
 #### 4. **Release Kiosk** (`.github/workflows/release-kiosk.yml`)
 
-Triggers when `apps/kiosk-desktop/` or `packages/` change:
+Runs on push to **`release`** when `apps/kiosk-desktop/` or `packages/` change:
 - Bumps version in `package.json`, `Cargo.toml`, and `tauri.conf.json`
 - Builds for macOS, Windows, and Linux in parallel
 - Creates GitHub Release with installers
@@ -540,11 +540,7 @@ Versions are bumped automatically based on commit messages:
 | `[minor]` or `feat:` | Minor (1.0.0 → 1.1.0) |
 | Default | Patch (1.0.0 → 1.0.1) |
 
-**Example:**
-```bash
-git commit -m "feat: add new feature [minor]"
-git push origin main
-```
+**Typical flow:** merge feature work into `main` via pull request. When you are ready to ship, merge `main` into **`release`** (pull request or equivalent). The version bump reads the **latest commit on `release`** (often the merge commit), so put `[minor]`, `feat:`, or `BREAKING CHANGE` in that merge message if you need more than a patch bump.
 
 ---
 
@@ -802,7 +798,7 @@ CI will automatically:
 - Build affected applications
 - Report status checks
 
-After merge to `main`, affected apps will be deployed automatically.
+After merge to `main`, CI runs on the trunk. To deploy or publish a kiosk release, merge `main` into **`release`** (via pull request); affected apps are then version-bumped, tagged, and deployed by the release workflows.
 
 ---
 

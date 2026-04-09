@@ -10,8 +10,10 @@ type Company struct {
 	Name            string          `gorm:"not null" json:"name"`
 	OwnerUserID     string          `gorm:"index" json:"ownerUserId,omitempty"`                     // owner of the organization
 	SubscriptionID  *string         `gorm:"index" json:"subscriptionId,omitempty"`                  // FK to Subscription
+	IsSaaSOperator  bool            `gorm:"column:is_saas_operator;not null;default:false" json:"isSaasOperator"` // single operator tenant per deployment; quotas bypassed
 	BillingEmail    string          `json:"billingEmail,omitempty"`                                 // billing contact email
 	BillingAddress  json.RawMessage `gorm:"type:jsonb" json:"billingAddress,omitempty" swaggertype:"object"` // billing address details
+	Counterparty    json.RawMessage `gorm:"type:jsonb" json:"counterparty,omitempty" swaggertype:"object"`   // legal profile (RU): partyType, inn, addresses, etc.
 	Settings        json.RawMessage `gorm:"type:jsonb" json:"settings,omitempty" swaggertype:"object"`       // company settings
 	OnboardingState json.RawMessage `gorm:"type:jsonb" json:"onboardingState,omitempty" swaggertype:"object"` // onboarding progress
 	CreatedAt       time.Time       `gorm:"default:now()" json:"createdAt"`

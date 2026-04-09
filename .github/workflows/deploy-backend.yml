@@ -3,10 +3,17 @@ name: Deploy Backend
 on:
   push:
     branches:
-      - main
+      - release
     paths:
       - 'apps/backend/**'
       - '.github/workflows/deploy-backend.yml'
+
+concurrency:
+  group: quokkaq-release-writes-${{ github.repository }}
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 permissions:
   contents: write
@@ -18,15 +25,15 @@ jobs:
     outputs:
       affected: ${{ steps.check.outputs.affected }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@v4
         with:
           version: 10
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: 'pnpm'
@@ -39,7 +46,7 @@ jobs:
         run: |
           BASE=${{ github.event.before }}
           HEAD=${{ github.sha }}
-          
+
           if pnpm nx show projects --affected --base=$BASE --head=$HEAD | grep -q "backend"; then
             echo "affected=true" >> $GITHUB_OUTPUT
           else
@@ -54,11 +61,13 @@ jobs:
     outputs:
       new_version: ${{ steps.bump.outputs.new_version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
+          ref: release
+          fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
 
@@ -67,7 +76,7 @@ jobs:
         run: |
           COMMIT_MSG=$(git log -1 --pretty=%B)
           echo "Commit message: $COMMIT_MSG"
-          
+
           if [[ "$COMMIT_MSG" == *"[major]"* ]] || [[ "$COMMIT_MSG" == *"BREAKING CHANGE"* ]]; then
             echo "type=major" >> $GITHUB_OUTPUT
           elif [[ "$COMMIT_MSG" == *"[minor]"* ]] || [[ "$COMMIT_MSG" == *"feat:"* ]]; then
@@ -80,12 +89,13 @@ jobs:
         id: bump
         working-directory: apps/backend
         run: |
+          set -euo pipefail
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          
+
           TYPE=${{ steps.version_type.outputs.type }}
           echo "Bumping version type: $TYPE"
-          
+
           CURRENT_VERSION=$(cat VERSION)
           IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
           MAJOR=${VERSION_PARTS[0]}
@@ -105,23 +115,41 @@ jobs:
 
           NEW_VERSION="$MAJOR.$MINOR.$PATCH"
           echo "New version: $NEW_VERSION"
-          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-          
+          echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+
           echo "$NEW_VERSION" > VERSION
-          
+
           cd ../..
+          RELEASE_BRANCH=release
+          TAG_NAME="v${NEW_VERSION}-backend"
+
           git add apps/backend/VERSION
           git commit -m "chore(backend): bump version to $NEW_VERSION [skip ci]"
-          git tag v$NEW_VERSION-backend
-          git push origin main
-          git push origin v$NEW_VERSION-backend
+
+          for attempt in 1 2 3 4 5; do
+            git fetch origin "$RELEASE_BRANCH"
+            if ! git rebase "origin/$RELEASE_BRANCH"; then
+              echo "::error::Rebase onto origin/${RELEASE_BRANCH} failed (resolve conflicts locally if this persists)"
+              git rebase --abort || true
+              exit 1
+            fi
+            git tag -f "$TAG_NAME"
+            if git push origin "HEAD:refs/heads/${RELEASE_BRANCH}" && git push -f origin "$TAG_NAME"; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 5 ]; then
+              echo "::error::Push failed after 5 attempts"
+              exit 1
+            fi
+            sleep $((attempt * 5))
+          done
 
   build-and-deploy:
     name: Build and deploy to Yandex Cloud
     needs: version-bump
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: v${{ needs.version-bump.outputs.new_version }}-backend
 
@@ -165,7 +193,7 @@ jobs:
           script: |
             export YC_REGISTRY_ID=${{ secrets.YC_REGISTRY_ID }}
             export TAG=${{ needs.version-bump.outputs.new_version }}
-            
+
             # Export secrets as env vars for docker-compose
             export POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
             export REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
@@ -183,15 +211,15 @@ jobs:
             export ACME_EMAIL=${{ secrets.ACME_EMAIL }}
 
             echo "Deploying backend version $TAG"
-            
+
             echo "$YC_SA_JSON_CREDENTIALS" | docker login --username json_key --password-stdin cr.yandex
-            
+
             docker pull cr.yandex/$YC_REGISTRY_ID/quokkaq-backend:$TAG
-            
+
             cd ~/quokkaq-backend
-            
+
             docker network create traefik-public || true
-            
+
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
-            
+
             docker image prune -f

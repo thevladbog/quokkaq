@@ -86,9 +86,10 @@ func main() {
 	// Create seed data
 	fmt.Println("Seeding data...")
 
-	// Create company
+	// Create company (SaaS operator tenant for this deployment)
 	company := models.Company{
-		Name: "QuokkaQ Demo",
+		Name:           "QuokkaQ Demo",
+		IsSaaSOperator: true,
 	}
 	database.DB.Create(&company)
 	fmt.Printf("Created company: %s (ID: %s)\n", company.Name, company.ID)
@@ -107,10 +108,12 @@ func main() {
 	adminRole := models.Role{Name: "admin"}
 	supervisorRole := models.Role{Name: "supervisor"}
 	operatorRole := models.Role{Name: "operator"}
+	platformAdminRole := models.Role{Name: "platform_admin"}
 	database.DB.Create(&adminRole)
 	database.DB.Create(&supervisorRole)
 	database.DB.Create(&operatorRole)
-	fmt.Println("Created roles: admin, supervisor, operator")
+	database.DB.Create(&platformAdminRole)
+	fmt.Println("Created roles: admin, supervisor, operator, platform_admin")
 
 	// Create admin user
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("admin123"), bcrypt.DefaultCost)
@@ -128,6 +131,12 @@ func main() {
 	database.DB.Create(&models.UserRole{
 		UserID: adminUser.ID,
 		RoleID: adminRole.ID,
+	})
+
+	// SaaS operator UI/API (`/platform/*`); no env hacks needed for local demo admin
+	database.DB.Create(&models.UserRole{
+		UserID: adminUser.ID,
+		RoleID: platformAdminRole.ID,
 	})
 
 	// Assign user to unit
@@ -245,7 +254,7 @@ func main() {
 
 	fmt.Println("\n✅ Database seeding completed successfully!")
 	fmt.Println("\nTest credentials:")
-	fmt.Println("  Admin: admin@quokkaq.com / admin123")
+	fmt.Println("  Admin: admin@quokkaq.com / admin123 (tenant admin + platform_admin)")
 	fmt.Println("  Operator: operator@quokkaq.com / operator123")
 }
 

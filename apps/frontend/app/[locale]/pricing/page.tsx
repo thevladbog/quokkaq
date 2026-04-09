@@ -12,6 +12,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { fetchPublicSubscriptionPlans } from '@/lib/subscription-plans-public';
 import { buildPricingRowsFromApiPlan } from '@/lib/pricing-plan-rows';
+import { formatPriceMinorUnits } from '@/lib/format-price';
+import { intlLocaleFromAppLocale } from '@/lib/format-datetime';
 import type { SubscriptionPlan } from '@quokkaq/shared-types';
 
 export async function generateMetadata({
@@ -119,34 +121,6 @@ const legacyPlans: LegacyPricingPlan[] = [
 ];
 
 /** API plan amounts use `SubscriptionPlanSchema.price` (minor units); see `@quokkaq/shared-types`. */
-function minorUnitDivisor(currency: string, intlLocale: string): number {
-  try {
-    const digits =
-      new Intl.NumberFormat(intlLocale, {
-        style: 'currency',
-        currency
-      }).resolvedOptions().maximumFractionDigits ?? 2;
-    return 10 ** Math.min(Math.max(digits, 0), 8);
-  } catch {
-    return 100;
-  }
-}
-
-function formatApiPrice(
-  amountMinor: number,
-  currency: string,
-  intlLocale: string
-): string {
-  const divisor = minorUnitDivisor(currency, intlLocale);
-  try {
-    return new Intl.NumberFormat(intlLocale, {
-      style: 'currency',
-      currency
-    }).format(amountMinor / divisor);
-  } catch {
-    return `${(amountMinor / divisor).toFixed(2)} ${currency}`;
-  }
-}
 
 export default async function PricingPage({
   params
@@ -155,7 +129,7 @@ export default async function PricingPage({
 }) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'pricing' });
-  const intlLocale = locale.startsWith('ru') ? 'ru-RU' : 'en-US';
+  const intlLocale = intlLocaleFromAppLocale(locale);
 
   const apiPlans = await fetchPublicSubscriptionPlans();
   const plansFromApi = apiPlans ?? [];
@@ -285,7 +259,7 @@ async function PricingCardApi({
           ) : (
             <div className='flex flex-wrap items-baseline justify-center gap-x-1'>
               <span className='text-5xl font-extrabold'>
-                {formatApiPrice(plan.price, plan.currency, intlLocale)}
+                {formatPriceMinorUnits(plan.price, plan.currency, intlLocale)}
               </span>
               <span className='ml-2 text-gray-500'>{intervalLabel}</span>
             </div>

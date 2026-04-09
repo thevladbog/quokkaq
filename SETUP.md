@@ -346,13 +346,68 @@ go test ./...
 
 ## Deployment
 
-Deployment happens automatically via GitHub Actions when you push to `main`:
+`main` is the trunk branch (merge via pull requests). Production releases run only after you merge into the **`release`** branch (for example a PR from `main` into `release`).
 
-1. **Frontend** - Deployed if `apps/frontend/` or `packages/` changed
-2. **Backend** - Deployed if `apps/backend/` changed
-3. **Kiosk** - Released if `apps/kiosk-desktop/` or `packages/` changed
+Deployment happens automatically via GitHub Actions on push to **`release`** when paths change:
 
-See [README.md](README.md#cicd) for details.
+1. **Frontend** — if `apps/frontend/` or `packages/` changed
+2. **Backend** — if `apps/backend/` changed
+3. **Kiosk** — if `apps/kiosk-desktop/` or `packages/` changed
+
+Create `release` once from `main` if it does not exist yet, then keep it updated with merges from `main`. See [README.md](README.md#cicd) for details.
+
+## SaaS platform admin (product owner)
+
+The operator UI lives at **`/{locale}/platform`** (for example `/en/platform`). It uses a **separate sidebar** from the tenant admin panel (`/admin`). Access requires the **`platform_admin`** role on the user (this is not the same as the tenant **`admin`** role).
+
+### Grant `platform_admin`
+
+From [`apps/backend`](apps/backend) with `DATABASE_URL` (or your usual backend env) loaded:
+
+```bash
+go run ./cmd/assign-platform-admin -email=you@example.com
+```
+
+The command creates the `platform_admin` role in the database if it is missing, then assigns it to the user with that email. Fresh dev databases created with [`cmd/seed`](apps/backend/cmd/seed/main.go) or [`cmd/seed-simple`](apps/backend/cmd/seed-simple/main.go) grant **`platform_admin` to the seeded demo admin** (`admin@quokkaq.com`) alongside the tenant `admin` role, so local `/platform` works without `PLATFORM_ALLOW_TENANT_ADMIN`.
+
+### Local dev: tenant `admin` without `platform_admin`
+
+If you log in as the usual organization **admin** (not `platform_admin`), the UI and API still allow `/platform` **only in non-production** when:
+
+- **Backend:** Tenant `admin` can call `/platform/*` when `APP_ENV` is **not** `production` and either `PLATFORM_ALLOW_TENANT_ADMIN=true` is set, or `PLATFORM_ALLOW_TENANT_ADMIN` is **unset** and `APP_ENV` is empty, `development`, `dev`, or `local` (typical `go run` / local Docker without extra env). Set `PLATFORM_ALLOW_TENANT_ADMIN=false` to turn that off. Staging with e.g. `APP_ENV=staging` does **not** get tenant-admin platform access unless you set `PLATFORM_ALLOW_TENANT_ADMIN=true` or assign `platform_admin`.
+- **Frontend:** `next dev` treats tenant admins as allowed on `/platform`. For `next start` or preview builds, set `NEXT_PUBLIC_PLATFORM_ALLOW_TENANT_ADMIN=true` in the frontend env.
+
+In **production** (`APP_ENV=production`), only users with **`platform_admin`** can use `/platform`; set `PLATFORM_ALLOW_TENANT_ADMIN=false` if you ever run a non-production build with a loose `APP_ENV`.
+
+### API
+
+Operator endpoints are under **`/platform/*`** on the Go API (JWT + `platform_admin`, or tenant `admin` when allowed as above). The Next.js app calls them via `/api` (proxied to the Go server). Use **`POST /platform/subscriptions`** with `companyId`, `planId`, and optional `currentPeriodStart` / `currentPeriodEnd` to create a subscription for an organization. **Multiple subscriptions per company are allowed** (e.g. for future billing periods); the operator is responsible for ensuring periods don't overlap or align with billing logic. The latest created subscription updates `company.subscription_id`. The operator UI exposes this on the **Subscriptions** page with a combobox search (by company name or ID) and date/time pickers for the billing period.
+
+If the browser shows **`API Error: 404`** for `/api/platform/...`, the running API binary is older than the repo: rebuild and restart the Go backend so it registers the `/platform` route group. Check `NEXT_PUBLIC_API_URL` points at that server.
+
+### Billing notes
+
+- **Manual invoices** created in the platform UI are stored in the application database (`paymentProvider: manual`). They do **not** create corresponding objects in Stripe unless you add that integration. An invoice may exist **without** a `subscriptionId` until an operator links it. **`POST /platform/invoices`** accepts optional `subscriptionId`, or `createSubscriptionWithInvoice` plus a `subscription` block (plan and period) to create the company’s subscription and the invoice in one transaction. **`PATCH /platform/invoices/:id`** can set `subscriptionId` when the subscription belongs to the same company; use `clearSubscriptionId: true` to unlink **manual** invoices only (Stripe-linked rows stay consistent with webhooks).
+- **Stripe** remains the source of truth for customer self-serve Checkout subscriptions. Patching subscription fields via the platform API/UI can intentionally diverge from Stripe for support cases; use with care.
+- **Plan changes from the platform:** `PATCH /platform/subscriptions/:id` accepts `planId` (immediate tier change; clears any scheduled change) or paired `pendingPlanId` + `pendingEffectiveAt` (RFC3339, must be in the future) to defer the switch. Until that instant (UTC), **quotas** still use the current plan; after it, the new plan applies on the next quota or `/subscriptions/me` read. Use `clearPending: true` to drop a scheduled change without changing the current plan.
+- **Stripe-linked subscriptions:** If the row has a non-empty `stripeSubscriptionId`, the same `PATCH` returns **409 Conflict** when the body tries to change tier scheduling (`planId`, `pendingPlanId`/`pendingEffectiveAt`, or `clearPending`). Patches that only adjust status, billing period, `trialEnd`, or `cancelAtPeriodEnd` are still allowed for support workflows.
+
+### DaData (optional, RU counterparty)
+
+Legal / billing counterparty details for Russian organizations live in **`companies.counterparty`** (JSONB). Tenant admins use **`GET` / `PATCH /companies/me`**; operators use **`PATCH /platform/companies/:id`**. The backend can proxy [DaData](https://dadata.ru/api/) Suggestions and Cleaner APIs so API keys never reach the browser: **`POST /companies/dadata/...`** (tenant admin JWT) and **`POST /platform/dadata/...`** (platform admin JWT). Configure **`DADATA_API_KEY`** (and optionally **`DADATA_SECRET`**, **`DADATA_CLEANER_API_KEY`**) in `apps/backend/.env`; see [docs/third-party/dadata/README.md](docs/third-party/dadata/README.md). **`GET /companies/me`** and **`GET /platform/features`** expose **`features.dadata`** and **`features.dadataCleaner`** for the UI.
+
+### SaaS operator tenant (on-prem)
+
+Exactly **one** company per deployment can be marked as the **SaaS operator** (`companies.is_saas_operator`, exposed as **`isSaasOperator`** in JSON). Fresh seeds set this on the demo company.
+
+- **Platform UI:** Companies list shows an **Operator** badge; company detail has a switch. Setting it **on** clears the flag on every other company (enforced in DB with a partial unique index on `true`).
+- **Quotas:** That company **always has unlimited quotas** (`-1` limits in [`QuotaService`](apps/backend/internal/services/quota_service.go)), independent of subscription or plan JSON — so a missing Stripe subscription cannot lock out the installation owner.
+- **Legal profile:** Reuse the same `counterparty` / billing fields as any tenant. Resolve the operator row via **`GET /platform/saas-operator-company`** (platform JWT) or `CompanyRepository.FindSaaSOperatorCompany()` when implementing invoice PDFs, email footers, or branding (not all wired yet).
+- **After restore from backup:** Confirm exactly one operator company is marked; otherwise run the platform switch once or set the flag via SQL.
+
+### CORS
+
+If you host the operator UI on a separate origin (for example `https://platform.example.com` while the app is `https://app.example.com`), add that origin to the backend **`CORS_ALLOWED_ORIGINS`** list.
 
 ## Getting Help
 

@@ -7,9 +7,11 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"time"
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
+	"quokkaq-go-backend/pkg/database"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -128,6 +130,22 @@ func (h *SubscriptionHandler) GetMySubscription(w http.ResponseWriter, r *http.R
 			return
 		}
 		log.Printf("GetMySubscription subscriptionRepo.FindByCompanyID(%q): %v", companyID, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if err := services.ApplyPendingPlanIfDue(database.DB, subscription, time.Now().UTC()); err != nil {
+		log.Printf("GetMySubscription ApplyPendingPlanIfDue: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	subscription, err = h.subscriptionRepo.FindByCompanyID(companyID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "No subscription found", http.StatusNotFound)
+			return
+		}
+		log.Printf("GetMySubscription subscriptionRepo.FindByCompanyID reload: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}

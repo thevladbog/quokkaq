@@ -138,8 +138,21 @@ func (s *quotaService) GetLimit(companyID string, metric string) (int, error) {
 	db := database.DB
 
 	var company models.Company
-	if err := db.Preload("Subscription.Plan").Where("id = ?", companyID).First(&company).Error; err != nil {
+	if err := db.Preload("Subscription.Plan").Preload("Subscription.PendingPlan").Where("id = ?", companyID).First(&company).Error; err != nil {
 		return 0, err
+	}
+
+	if company.IsSaaSOperator {
+		return -1, nil
+	}
+
+	if company.Subscription != nil {
+		if err := ApplyPendingPlanIfDue(db, company.Subscription, time.Now().UTC()); err != nil {
+			return 0, err
+		}
+		if err := db.Preload("Plan").First(company.Subscription, "id = ?", company.Subscription.ID).Error; err != nil {
+			return 0, err
+		}
 	}
 
 	// If no subscription, use default (very limited)
@@ -174,8 +187,25 @@ func (s *quotaService) limitsMapForCompany(companyID string) (map[string]int, er
 	db := database.DB
 
 	var company models.Company
-	if err := db.Preload("Subscription.Plan").Where("id = ?", companyID).First(&company).Error; err != nil {
+	if err := db.Preload("Subscription.Plan").Preload("Subscription.PendingPlan").Where("id = ?", companyID).First(&company).Error; err != nil {
 		return nil, err
+	}
+
+	if company.IsSaaSOperator {
+		out := make(map[string]int, len(quotaMetricKeys))
+		for _, m := range quotaMetricKeys {
+			out[m] = -1
+		}
+		return out, nil
+	}
+
+	if company.Subscription != nil {
+		if err := ApplyPendingPlanIfDue(db, company.Subscription, time.Now().UTC()); err != nil {
+			return nil, err
+		}
+		if err := db.Preload("Plan").First(company.Subscription, "id = ?", company.Subscription.ID).Error; err != nil {
+			return nil, err
+		}
 	}
 
 	var fromPlan map[string]int

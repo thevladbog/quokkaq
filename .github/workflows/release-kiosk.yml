@@ -3,15 +3,18 @@ name: Release Kiosk Desktop
 on:
   push:
     branches:
-      - main
+      - release
     paths:
       - 'apps/kiosk-desktop/**'
       - 'packages/**'
       - '.github/workflows/release-kiosk.yml'
 
 concurrency:
-  group: release-kiosk-${{ github.repository }}
+  group: quokkaq-release-writes-${{ github.repository }}
   cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 permissions:
   contents: write
@@ -23,15 +26,15 @@ jobs:
     outputs:
       affected: ${{ steps.check.outputs.affected }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@v4
         with:
           version: 10
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: 'pnpm'
@@ -44,7 +47,7 @@ jobs:
         run: |
           BASE=${{ github.event.before }}
           HEAD=${{ github.sha }}
-          
+
           if pnpm nx show projects --affected --base=$BASE --head=$HEAD | grep -q "kiosk-desktop"; then
             echo "affected=true" >> $GITHUB_OUTPUT
           else
@@ -62,12 +65,13 @@ jobs:
       version: ${{ steps.tag.outputs.version }}
       tag: ${{ steps.tag.outputs.tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
+          ref: release
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
 
@@ -109,15 +113,12 @@ jobs:
           NEW_VERSION="$MAJOR.$MINOR.$PATCH"
           echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
           echo "Bumped to $NEW_VERSION"
-          
-          # Update package.json
+
           npm version $NEW_VERSION --no-git-tag-version
-          
-          # Update Cargo.toml
+
           sed -i.bak "s/^version = .*/version = \"$NEW_VERSION\"/" src-tauri/Cargo.toml
           rm src-tauri/Cargo.toml.bak || true
-          
-          # Update tauri.conf.json
+
           node -e "const fs=require('fs');const conf=JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json'));conf.version='$NEW_VERSION';fs.writeFileSync('src-tauri/tauri.conf.json',JSON.stringify(conf,null,2));"
 
       - name: Commit, push, tag
@@ -125,15 +126,34 @@ jobs:
         env:
           VERSION: ${{ steps.bump_run.outputs.new_version }}
         run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add apps/kiosk-desktop/package.json apps/kiosk-desktop/src-tauri/Cargo.toml apps/kiosk-desktop/src-tauri/tauri.conf.json
           git commit -m "chore(kiosk): bump version to ${VERSION} [skip ci]"
-          git tag "v${VERSION}-kiosk"
-          git push origin main
-          git push origin "v${VERSION}-kiosk"
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "tag=v${VERSION}-kiosk" >> "$GITHUB_OUTPUT"
+
+          RELEASE_BRANCH=release
+          TAG_NAME="v${VERSION}-kiosk"
+
+          for attempt in 1 2 3 4 5; do
+            git fetch origin "$RELEASE_BRANCH"
+            if ! git rebase "origin/$RELEASE_BRANCH"; then
+              echo "::error::Rebase onto origin/${RELEASE_BRANCH} failed (resolve conflicts locally if this persists)"
+              git rebase --abort || true
+              exit 1
+            fi
+            git tag -f "$TAG_NAME"
+            if git push origin "HEAD:refs/heads/${RELEASE_BRANCH}" && git push -f origin "$TAG_NAME"; then
+              echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+              echo "tag=${TAG_NAME}" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            if [ "$attempt" -eq 5 ]; then
+              echo "::error::Push failed after 5 attempts"
+              exit 1
+            fi
+            sleep $((attempt * 5))
+          done
 
   build:
     name: Build (${{ matrix.os }})
@@ -148,16 +168,16 @@ jobs:
           - os: ubuntu-latest
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
-          ref: main
+          ref: release
           fetch-depth: 0
 
-      - uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@v4
         with:
           version: 10
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: 'pnpm'
@@ -209,9 +229,9 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
-          ref: main
+          ref: release
           fetch-depth: 0
 
       - name: Get version

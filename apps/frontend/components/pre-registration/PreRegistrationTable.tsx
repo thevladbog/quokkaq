@@ -2,8 +2,10 @@
 
 import { useTranslations, useLocale } from 'next-intl';
 import { useQuery } from '@tanstack/react-query';
-import { format } from 'date-fns';
-import { enUS, ru } from 'date-fns/locale';
+import {
+  formatAppDate,
+  intlLocaleFromAppLocale
+} from '@/lib/format-datetime';
 import { Edit, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -34,7 +36,7 @@ export function PreRegistrationTable({
   const t = useTranslations('admin.pre_registrations');
   const tCommon = useTranslations('common');
   const locale = useLocale();
-  const dateLocale = locale === 'ru' ? ru : enUS;
+  const intlLocale = intlLocaleFromAppLocale(locale);
 
   const { data: preRegistrations, isLoading } = useQuery({
     queryKey: ['pre-registrations', unitId],
@@ -154,9 +156,7 @@ export function PreRegistrationTable({
               <TableCell>
                 <div className='flex flex-col'>
                   <span className='font-medium'>
-                    {format(new Date(preReg.date), 'PPP', {
-                      locale: dateLocale
-                    })}
+                    {formatAppDate(preReg.date, intlLocale, 'long')}
                   </span>
                   <span className='text-muted-foreground text-xs'>
                     {preReg.time}

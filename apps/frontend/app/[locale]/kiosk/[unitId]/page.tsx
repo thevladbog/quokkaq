@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import { useUnitServicesTree, useCreateTicketInUnit } from '@/lib/hooks';
 import type { Ticket, Service } from '@/lib/api';
@@ -32,6 +32,11 @@ import {
   printReceiptFromKioskConfig,
   ticketReceiptLines
 } from '@/lib/kiosk-print';
+import {
+  formatAppDate,
+  formatAppTime,
+  intlLocaleFromAppLocale
+} from '@/lib/format-datetime';
 
 export default function UnitKioskPage() {
   const params = useParams() as { unitId?: string };
@@ -49,6 +54,7 @@ export default function UnitKioskPage() {
   const [countdown, setCountdown] = useState<number>(5);
   const router = useRouter();
   const locale = useLocale();
+  const intlLocale = useMemo(() => intlLocaleFromAppLocale(locale), [locale]);
   const t = useTranslations('kiosk');
   const [baseAppUrl] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -240,18 +246,10 @@ export default function UnitKioskPage() {
           {/* Date and Time in two rows - time first, date second */}
           <div className='text-center'>
             <div className='text-3xl font-bold'>
-              {new Date().toLocaleTimeString(locale, {
-                hour: '2-digit',
-                minute: '2-digit'
-              })}
+              {formatAppTime(new Date(), intlLocale)}
             </div>
             <div className='mt-1 text-sm'>
-              {new Date().toLocaleDateString(locale, {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-              })}
+              {formatAppDate(new Date(), intlLocale, 'full')}
             </div>
           </div>
 
@@ -286,18 +284,10 @@ export default function UnitKioskPage() {
           {/* Date and Time in two rows - time first, date second */}
           <div className='text-center'>
             <div className='text-3xl font-bold'>
-              {new Date().toLocaleTimeString(locale, {
-                hour: '2-digit',
-                minute: '2-digit'
-              })}
+              {formatAppTime(new Date(), intlLocale)}
             </div>
             <div className='mt-1 text-sm'>
-              {new Date().toLocaleDateString(locale, {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-              })}
+              {formatAppDate(new Date(), intlLocale, 'full')}
             </div>
           </div>
 
@@ -351,18 +341,10 @@ export default function UnitKioskPage() {
           onClick={handleClockClick}
         >
           <div className='text-3xl font-bold'>
-            {currentTime.toLocaleTimeString(locale, {
-              hour: '2-digit',
-              minute: '2-digit'
-            })}
+            {formatAppTime(currentTime, intlLocale)}
           </div>
           <div className='mt-1 text-sm'>
-            {currentTime.toLocaleDateString(locale, {
-              weekday: 'long',
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric'
-            })}
+            {formatAppDate(currentTime, intlLocale, 'full')}
           </div>
         </div>
 
