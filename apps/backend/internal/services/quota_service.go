@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"quokkaq-go-backend/internal/models"
+	"quokkaq-go-backend/internal/services/subscriptions"
 	"quokkaq-go-backend/pkg/database"
 	"time"
 )
@@ -42,6 +43,11 @@ type UsageMetricInfo struct {
 
 // CheckQuota verifies if the company can perform an action based on their quota
 func (s *quotaService) CheckQuota(companyID string, metric string) (bool, error) {
+	db := database.DB
+	if err := subscriptions.ApplyPendingPlanIfDueBeforeQuota(db, companyID, time.Now().UTC()); err != nil {
+		return false, err
+	}
+
 	currentUsage, err := s.GetCurrentUsage(companyID, metric)
 	if err != nil {
 		return false, err
@@ -133,13 +139,18 @@ func (s *quotaService) GetCurrentUsage(companyID string, metric string) (int, er
 	}
 }
 
-// GetLimit returns the quota limit for a specific metric based on the subscription plan
+// GetLimit returns the quota limit for a specific metric based on the subscription plan.
+// It is read-only (no DB writes). Quota enforcement paths call ApplyPendingPlanIfDueBeforeQuota via CheckQuota so scheduled plan changes are applied before limits are read.
 func (s *quotaService) GetLimit(companyID string, metric string) (int, error) {
 	db := database.DB
 
 	var company models.Company
-	if err := db.Preload("Subscription.Plan").Where("id = ?", companyID).First(&company).Error; err != nil {
+	if err := db.Preload("Subscription.Plan").Preload("Subscription.PendingPlan").Where("id = ?", companyID).First(&company).Error; err != nil {
 		return 0, err
+	}
+
+	if company.IsSaaSOperator {
+		return -1, nil
 	}
 
 	// If no subscription, use default (very limited)
@@ -174,8 +185,16 @@ func (s *quotaService) limitsMapForCompany(companyID string) (map[string]int, er
 	db := database.DB
 
 	var company models.Company
-	if err := db.Preload("Subscription.Plan").Where("id = ?", companyID).First(&company).Error; err != nil {
+	if err := db.Preload("Subscription.Plan").Preload("Subscription.PendingPlan").Where("id = ?", companyID).First(&company).Error; err != nil {
 		return nil, err
+	}
+
+	if company.IsSaaSOperator {
+		out := make(map[string]int, len(quotaMetricKeys))
+		for _, m := range quotaMetricKeys {
+			out[m] = -1
+		}
+		return out, nil
 	}
 
 	var fromPlan map[string]int

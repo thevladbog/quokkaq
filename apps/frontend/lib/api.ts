@@ -28,7 +28,9 @@ import type {
   UsageMetrics,
   Subscription,
   SubscriptionPlan,
-  Invoice
+  Invoice,
+  Company,
+  CompanyMeResponse
 } from '@quokkaq/shared-types';
 
 import {
@@ -43,7 +45,9 @@ import {
   UsageMetricsSchema,
   SubscriptionSchema,
   SubscriptionPlanSchema,
-  InvoiceSchema
+  InvoiceSchema,
+  CompanySchema,
+  CompanyMeResponseSchema
 } from '@quokkaq/shared-types';
 
 /** Shape-only summary for logs — never includes raw API payload values. */
@@ -89,6 +93,60 @@ function summarizeZodErrorForLog(err: unknown): Record<string, unknown> {
   return { message: String(err) };
 }
 
+/**
+ * Defaults first, then caller headers on top — so explicit `Authorization` (refresh/me)
+ * wins over the access token from localStorage, while `Content-Type` from callers no longer
+ * wipes auth (the old `...options` after `headers` bug).
+ */
+function mergeRequestInitHeaders(
+  callerHeaders: HeadersInit | undefined,
+  authHeaders: Record<string, string>
+): Record<string, string> {
+  const fromCaller: Record<string, string> = {};
+  if (callerHeaders instanceof Headers) {
+    callerHeaders.forEach((value, key) => {
+      fromCaller[key] = value;
+    });
+  } else if (Array.isArray(callerHeaders)) {
+    for (const pair of callerHeaders) {
+      if (pair.length >= 2) fromCaller[pair[0]] = String(pair[1]);
+    }
+  } else if (callerHeaders && typeof callerHeaders === 'object') {
+    Object.assign(fromCaller, callerHeaders as Record<string, string>);
+  }
+  return { ...authHeaders, ...fromCaller };
+}
+
+/** Caller headers without Authorization so retry merges keep the refreshed Bearer token. */
+function headersInitWithoutAuthorization(
+  callerHeaders: HeadersInit | undefined
+): HeadersInit | undefined {
+  if (callerHeaders === undefined) {
+    return undefined;
+  }
+  if (callerHeaders instanceof Headers) {
+    const h = new Headers();
+    callerHeaders.forEach((value, key) => {
+      if (key.toLowerCase() !== 'authorization') {
+        h.set(key, value);
+      }
+    });
+    return h;
+  }
+  if (Array.isArray(callerHeaders)) {
+    return callerHeaders.filter(
+      (pair) => pair.length >= 2 && pair[0].toLowerCase() !== 'authorization'
+    );
+  }
+  const o = { ...(callerHeaders as Record<string, string>) };
+  for (const k of Object.keys(o)) {
+    if (k.toLowerCase() === 'authorization') {
+      delete o[k];
+    }
+  }
+  return o;
+}
+
 // Base API configuration
 const API_BASE_URL = '/api';
 
@@ -117,15 +175,17 @@ async function apiRequest<T>(
   }
 
   const url = `${API_BASE_URL}${endpoint}`;
+  const { headers: callerHeaders, ...restOptions } = options;
+
+  const authHeaders: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(token && { Authorization: `Bearer ${token}` }),
+    ...(currentLocale && { 'Accept-Language': currentLocale })
+  };
 
   const config: RequestInit = {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }), // Add token if available
-      ...(currentLocale && { 'Accept-Language': currentLocale }), // Add locale to headers
-      ...options.headers
-    },
-    ...options
+    ...restOptions,
+    headers: mergeRequestInitHeaders(callerHeaders, authHeaders)
   };
 
   try {
@@ -149,13 +209,17 @@ async function apiRequest<T>(
             localStorage.setItem('access_token', refreshData.accessToken);
 
             // Retry the original request with the new token
-            const retryConfig = {
-              ...options,
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${refreshData.accessToken}`,
-                ...options.headers
-              }
+            const retryAuthHeaders: Record<string, string> = {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${refreshData.accessToken}`,
+              ...(currentLocale && { 'Accept-Language': currentLocale })
+            };
+            const retryConfig: RequestInit = {
+              ...restOptions,
+              headers: mergeRequestInitHeaders(
+                headersInitWithoutAuthorization(callerHeaders),
+                retryAuthHeaders
+              )
             };
 
             const retryResponse = await fetch(url, retryConfig);
@@ -165,10 +229,34 @@ async function apiRequest<T>(
               );
             }
 
-            const retryData = await retryResponse.json();
-            if (schema) {
-              return schema.parse(retryData);
+            if (retryResponse.status === 204 || retryResponse.status === 205) {
+              return undefined as T;
             }
+
+            if (retryResponse.headers.get('Content-Length') === '0') {
+              return undefined as T;
+            }
+
+            const retryText = await retryResponse.text();
+            if (!retryText.trim()) {
+              return undefined as T;
+            }
+
+            const retryData = JSON.parse(retryText);
+
+            if (schema) {
+              try {
+                return schema.parse(retryData);
+              } catch (zodError) {
+                logger.error('Zod parse error while validating API response', {
+                  url,
+                  zod: summarizeZodErrorForLog(zodError),
+                  responseSummary: summarizeApiResponseForLog(retryData)
+                });
+                throw zodError;
+              }
+            }
+
             return retryData;
           }
         }
@@ -252,15 +340,17 @@ async function apiRequestBlob(
   }
 
   const url = `${API_BASE_URL}${endpoint}`;
+  const { headers: callerHeadersBlob, ...restOptionsBlob } = options;
+
+  const authHeadersBlob: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(token && { Authorization: `Bearer ${token}` }),
+    ...(currentLocale && { 'Accept-Language': currentLocale })
+  };
 
   const config: RequestInit = {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
-      ...(currentLocale && { 'Accept-Language': currentLocale }),
-      ...options.headers
-    },
-    ...options
+    ...restOptionsBlob,
+    headers: mergeRequestInitHeaders(callerHeadersBlob, authHeadersBlob)
   };
 
   const readBodyAsBlob = async (res: Response): Promise<Blob> => {
@@ -288,13 +378,17 @@ async function apiRequestBlob(
             const refreshData = await refreshResponse.json();
             localStorage.setItem('access_token', refreshData.accessToken);
 
-            const retryConfig = {
-              ...options,
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${refreshData.accessToken}`,
-                ...options.headers
-              }
+            const retryAuthHeadersBlob: Record<string, string> = {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${refreshData.accessToken}`,
+              ...(currentLocale && { 'Accept-Language': currentLocale })
+            };
+            const retryConfig: RequestInit = {
+              ...restOptionsBlob,
+              headers: mergeRequestInitHeaders(
+                headersInitWithoutAuthorization(callerHeadersBlob),
+                retryAuthHeadersBlob
+              )
             };
 
             const retryResponse = await fetch(url, retryConfig);
@@ -1058,5 +1152,338 @@ export const companiesApiExt = {
         method: 'POST'
       },
       z.object({ success: z.boolean() })
+    ),
+
+  getMe: () =>
+    apiRequest<CompanyMeResponse>(`/companies/me`, {}, CompanyMeResponseSchema),
+
+  patchMe: (body: {
+    name?: string;
+    billingEmail?: string;
+    billingAddress?: unknown;
+    clearBillingAddress?: boolean;
+    counterparty?: unknown;
+    clearCounterparty?: boolean;
+  }) =>
+    apiRequest<Company>(
+      `/companies/me`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      },
+      CompanySchema
+    )
+};
+
+function dadataPath(scope: 'tenant' | 'platform', sub: string): string {
+  const base = scope === 'tenant' ? '/companies/dadata' : '/platform/dadata';
+  return `${base}${sub}`;
+}
+
+/** Proxied DaData (Suggestions / Cleaner); requires tenant admin or platform admin JWT. */
+export const dadataApi = {
+  findPartyByInn: (
+    scope: 'tenant' | 'platform',
+    inn: string,
+    opts?: { kpp?: string; type?: 'LEGAL' | 'INDIVIDUAL' }
+  ) =>
+    apiRequest<unknown>(
+      dadataPath(scope, '/party/find-by-inn'),
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inn, ...opts })
+      },
+      z.unknown()
+    ),
+
+  suggestParty: (scope: 'tenant' | 'platform', body: Record<string, unknown>) =>
+    apiRequest<unknown>(
+      dadataPath(scope, '/party/suggest'),
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      },
+      z.unknown()
+    ),
+
+  suggestAddress: (
+    scope: 'tenant' | 'platform',
+    body: Record<string, unknown>
+  ) =>
+    apiRequest<unknown>(
+      dadataPath(scope, '/address/suggest'),
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      },
+      z.unknown()
+    ),
+
+  cleanAddress: (scope: 'tenant' | 'platform', body: string[]) =>
+    apiRequest<unknown>(
+      dadataPath(scope, '/address/clean'),
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      },
+      z.unknown()
+    )
+};
+
+export const PlatformFeaturesSchema = z.object({
+  dadata: z.boolean(),
+  dadataCleaner: z.boolean()
+});
+
+export type PlatformListResponse<T> = {
+  items: T[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
+function platformListResponseSchema<T extends z.ZodTypeAny>(itemSchema: T) {
+  return z.object({
+    items: z.array(itemSchema),
+    total: z.number(),
+    limit: z.number(),
+    offset: z.number()
+  });
+}
+
+function platformQueryString(
+  params: Record<string, string | number | undefined>
+): string {
+  const sp = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v === undefined || v === '') continue;
+    sp.set(k, String(v));
+  }
+  const q = sp.toString();
+  return q ? `?${q}` : '';
+}
+
+/** SaaS operator APIs (`platform_admin` role only). */
+export const platformApi = {
+  getFeatures: () =>
+    apiRequest<{ dadata: boolean; dadataCleaner: boolean }>(
+      `/platform/features`,
+      {},
+      PlatformFeaturesSchema
+    ),
+
+  listCompanies: (opts?: {
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }) =>
+    apiRequest<PlatformListResponse<Company>>(
+      `/platform/companies${platformQueryString({
+        search: opts?.search,
+        limit: opts?.limit,
+        offset: opts?.offset
+      })}`,
+      {},
+      platformListResponseSchema(CompanySchema)
+    ),
+
+  getCompany: (id: string) =>
+    apiRequest<Company>(
+      `/platform/companies/${encodeURIComponent(id)}`,
+      {},
+      CompanySchema
+    ),
+
+  getSaaSOperatorCompany: () =>
+    apiRequest<Company>(`/platform/saas-operator-company`, {}, CompanySchema),
+
+  patchCompany: (
+    id: string,
+    body: {
+      name?: string;
+      billingEmail?: string;
+      billingAddress?: unknown;
+      clearBillingAddress?: boolean;
+      counterparty?: unknown;
+      clearCounterparty?: boolean;
+      isSaasOperator?: boolean;
+    }
+  ) =>
+    apiRequest<Company>(
+      `/platform/companies/${encodeURIComponent(id)}`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      },
+      CompanySchema
+    ),
+
+  listSubscriptions: (opts?: { limit?: number; offset?: number }) =>
+    apiRequest<PlatformListResponse<Subscription>>(
+      `/platform/subscriptions${platformQueryString({
+        limit: opts?.limit,
+        offset: opts?.offset
+      })}`,
+      {},
+      platformListResponseSchema(SubscriptionSchema)
+    ),
+
+  createSubscription: (body: {
+    companyId: string;
+    planId: string;
+    status?: string;
+    currentPeriodStart?: string;
+    currentPeriodEnd?: string;
+    trialEnd?: string | null;
+  }) =>
+    apiRequest<Subscription>(
+      `/platform/subscriptions`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      },
+      SubscriptionSchema
+    ),
+
+  patchSubscription: (
+    id: string,
+    body: Partial<{
+      status: string;
+      currentPeriodStart: string;
+      currentPeriodEnd: string;
+      cancelAtPeriodEnd: boolean;
+      trialEnd: string | null;
+      planId: string;
+      pendingPlanId: string;
+      pendingEffectiveAt: string;
+      clearPending: boolean;
+    }>
+  ) =>
+    apiRequest<Subscription>(
+      `/platform/subscriptions/${encodeURIComponent(id)}`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      },
+      SubscriptionSchema
+    ),
+
+  listSubscriptionPlans: () =>
+    apiRequest<SubscriptionPlan[]>(
+      `/platform/subscription-plans`,
+      {},
+      z.array(SubscriptionPlanSchema)
+    ),
+
+  createSubscriptionPlan: (body: {
+    name: string;
+    code: string;
+    price: number;
+    currency?: string;
+    interval?: string;
+    features?: unknown;
+    limits?: unknown;
+    isActive?: boolean;
+  }) =>
+    apiRequest<SubscriptionPlan>(
+      `/platform/subscription-plans`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      },
+      SubscriptionPlanSchema
+    ),
+
+  updateSubscriptionPlan: (
+    id: string,
+    body: {
+      name: string;
+      code: string;
+      price: number;
+      currency?: string;
+      interval?: string;
+      features?: unknown;
+      limits?: unknown;
+      isActive?: boolean;
+    }
+  ) =>
+    apiRequest<SubscriptionPlan>(
+      `/platform/subscription-plans/${encodeURIComponent(id)}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      },
+      SubscriptionPlanSchema
+    ),
+
+  listInvoices: (opts?: {
+    companyId?: string;
+    limit?: number;
+    offset?: number;
+  }) =>
+    apiRequest<PlatformListResponse<Invoice & { subscription?: Subscription }>>(
+      `/platform/invoices${platformQueryString({
+        companyId: opts?.companyId,
+        limit: opts?.limit,
+        offset: opts?.offset
+      })}`,
+      {},
+      platformListResponseSchema(InvoiceSchema)
+    ),
+
+  createInvoice: (body: {
+    companyId: string;
+    subscriptionId?: string;
+    amount: number;
+    currency?: string;
+    dueDate: string;
+    status?: string;
+    paymentProvider?: string;
+    createSubscriptionWithInvoice?: boolean;
+    subscription?: {
+      planId: string;
+      currentPeriodStart: string;
+      currentPeriodEnd: string;
+      status?: string;
+      trialEnd?: string | null;
+    };
+  }) =>
+    apiRequest<Invoice>(
+      `/platform/invoices`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      },
+      InvoiceSchema
+    ),
+
+  patchInvoice: (
+    id: string,
+    body: Partial<{
+      status: string;
+      paidAt: string | null;
+      subscriptionId: string;
+      clearSubscriptionId: boolean;
+    }>
+  ) =>
+    apiRequest<Invoice>(
+      `/platform/invoices/${encodeURIComponent(id)}`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      },
+      InvoiceSchema
     )
 };

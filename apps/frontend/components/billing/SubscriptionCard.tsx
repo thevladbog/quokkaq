@@ -16,11 +16,11 @@ import {
   CalendarDays,
   CreditCard,
   TrendingUp,
-  AlertCircle
+  AlertCircle,
+  Info
 } from 'lucide-react';
-import { format } from 'date-fns';
-import { enUS, ru } from 'date-fns/locale';
 import { useLocale, useTranslations } from 'next-intl';
+import { formatAppDate, intlLocaleFromAppLocale } from '@/lib/format-datetime';
 
 interface SubscriptionCardProps {
   subscription: Subscription;
@@ -37,8 +37,7 @@ export function SubscriptionCard({
 }: SubscriptionCardProps) {
   const t = useTranslations('organization.billing');
   const locale = useLocale();
-  const intlLocale = locale.startsWith('ru') ? 'ru-RU' : 'en-US';
-  const dateFnsLocale = locale.startsWith('ru') ? ru : enUS;
+  const intlLocale = intlLocaleFromAppLocale(locale);
 
   const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
@@ -71,11 +70,8 @@ export function SubscriptionCard({
     }).format(price / 100);
   };
 
-  const formatDate = (dateString: string) => {
-    return format(new Date(dateString), 'dd MMMM yyyy', {
-      locale: dateFnsLocale
-    });
-  };
+  const formatDate = (dateString: string) =>
+    formatAppDate(dateString, intlLocale, 'long');
 
   const daysUntilEnd = useMemo(() => {
     if (!subscription.trialEnd) {
@@ -153,6 +149,32 @@ export function SubscriptionCard({
             <div className='flex-1'>
               <p className='font-medium text-red-900'>{t('pastDueWarning')}</p>
               <p className='mt-1 text-sm text-red-700'>{t('pastDueDesc')}</p>
+            </div>
+          </div>
+        )}
+
+        {subscription.pendingPlanId && subscription.pendingEffectiveAt && (
+          <div className='flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4'>
+            <Info className='mt-0.5 h-5 w-5 shrink-0 text-blue-600' />
+            <div className='flex-1'>
+              <p className='font-medium text-blue-900'>
+                {t('pendingPlanChangeTitle')}
+              </p>
+              <p className='mt-1 text-sm text-blue-800'>
+                {t('pendingPlanChangeDesc', {
+                  plan:
+                    subscription.pendingPlan?.name ??
+                    subscription.pendingPlanId,
+                  date: new Intl.DateTimeFormat(intlLocale, {
+                    dateStyle: 'medium',
+                    timeStyle: 'short',
+                    timeZone: 'UTC'
+                  }).format(new Date(subscription.pendingEffectiveAt))
+                })}
+              </p>
+              <p className='mt-1 text-xs text-blue-700/80'>
+                {t('pendingPlanChangeUtcNote')}
+              </p>
             </div>
           </div>
         )}

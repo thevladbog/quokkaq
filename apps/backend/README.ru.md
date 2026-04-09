@@ -337,6 +337,8 @@ docker-compose down -v
 2. Создайте bucket с именем `quokkaq-materials`
 3. API автоматически выполнит миграции при первом запуске
 
+**Платформенный UI (`/platform`):** в `docker-compose.yml` по умолчанию **`PLATFORM_ALLOW_TENANT_ADMIN=false`** (роль tenant `admin` не может вызывать `/platform/*`, если у пользователя нет `platform_admin`). Чтобы разрешить tenant-админам `/platform` только в этом dev-стеке, задайте `PLATFORM_ALLOW_TENANT_ADMIN=true` в окружении или `.env` для Compose. Подробнее о ролях и продакшене — [SETUP.md](../../SETUP.md#saas-platform-admin-product-owner).
+
 #### Сборка только Docker образа
 
 ```bash

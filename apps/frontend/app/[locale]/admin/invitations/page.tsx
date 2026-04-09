@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useTranslations } from 'next-intl';
+import { useState, useEffect, useMemo } from 'react';
+import { useLocale, useTranslations } from 'next-intl';
+import { formatAppDate, intlLocaleFromAppLocale } from '@/lib/format-datetime';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -46,6 +47,8 @@ interface Invitation {
 
 export default function InvitationsPage() {
   const t = useTranslations('invitations');
+  const locale = useLocale();
+  const intlLocale = useMemo(() => intlLocaleFromAppLocale(locale), [locale]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
@@ -185,7 +188,7 @@ export default function InvitationsPage() {
                     <TableCell>{invitation.email}</TableCell>
                     <TableCell>{getStatusBadge(invitation.status)}</TableCell>
                     <TableCell>
-                      {new Date(invitation.expiresAt).toLocaleDateString()}
+                      {formatAppDate(invitation.expiresAt, intlLocale)}
                     </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <div className='flex gap-2'>

@@ -31,7 +31,7 @@ export function DatePicker({
   className
 }: DatePickerProps) {
   const locale = useLocale();
-  const dateLocale = locale === 'ru' ? ru : enUS;
+  const dateLocale = locale.toLowerCase().startsWith('ru') ? ru : enUS;
 
   const [date, setDate] = React.useState<Date | undefined>(
     value ? new Date(value) : undefined

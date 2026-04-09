@@ -142,6 +142,13 @@ To rollback to a previous version:
    TAG=previous_version docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
    ```
 
+## SaaS platform admin (operator UI)
+
+- The product-owner console is served by the same Next.js app at **`/{locale}/platform`** and calls the API under **`/platform/*`**. Users need the **`platform_admin`** role (distinct from the tenant **`admin`** role).
+- Grant the role on the server or locally: from the backend module, run `go run ./cmd/assign-platform-admin -email=user@example.com` with `DATABASE_URL` set (see monorepo [SETUP.md](../../../SETUP.md) for details).
+- If the operator UI uses a **dedicated hostname** (for example `platform.example.com`), add that origin to **`CORS_ALLOWED_ORIGINS`** on the API.
+- **Manual invoices** created via the platform API are stored in the application database only; they do not create Stripe invoices unless you add that workflow. Prefer Stripe as the source of truth for self-serve Checkout while using manual rows for offline or custom billing.
+
 ## Security Considerations
 
 - All sensitive credentials are stored as encrypted environment variables

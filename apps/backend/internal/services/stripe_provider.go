@@ -177,9 +177,10 @@ func (p *StripeProvider) CreateInvoice(ctx context.Context, subscription *models
 	}
 
 	cid := subscription.CompanyID
+	sid := subscription.ID
 	local := &models.Invoice{
 		CompanyID:                &cid,
-		SubscriptionID:           subscription.ID,
+		SubscriptionID:           &sid,
 		Amount:                   subscription.Plan.Price,
 		Currency:                 subscription.Plan.Currency,
 		Status:                   status,
@@ -384,8 +385,11 @@ func (p *StripeProvider) handleInvoicePaymentFailed(ctx context.Context, stripeI
 		return err
 	}
 
+	if invoice.SubscriptionID == nil || strings.TrimSpace(*invoice.SubscriptionID) == "" {
+		return nil
+	}
 	return db.Model(&models.Subscription{}).
-		Where("id = ?", invoice.SubscriptionID).
+		Where("id = ?", *invoice.SubscriptionID).
 		Update("status", "past_due").Error
 }
 
@@ -457,12 +461,13 @@ func (p *StripeProvider) ensureLocalInvoiceForStripeWebhook(ctx context.Context,
 	}
 
 	cid := sub.CompanyID
+	sid := sub.ID
 	amount := stripeInvoiceAmountMinor(stripeInvoice)
 	cur := strings.ToUpper(string(stripeInvoice.Currency))
 
 	rec := models.Invoice{
 		CompanyID:                &cid,
-		SubscriptionID:           sub.ID,
+		SubscriptionID:           &sid,
 		Amount:                   amount,
 		Currency:                 cur,
 		Status:                   "open",

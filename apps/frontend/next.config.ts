@@ -22,15 +22,8 @@ const nextConfig: NextConfig = {
         pathname: '/**'
       }
     ]
-  },
-  async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/:path*`
-      }
-    ];
   }
+  // API is proxied by app/api/[[...path]]/route.ts (reliable with Turbopack; rewrites alone were flaky).
 };
 
 export default withNextIntl(nextConfig);

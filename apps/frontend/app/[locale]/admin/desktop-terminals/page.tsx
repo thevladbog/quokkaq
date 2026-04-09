@@ -1,7 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLocale, useTranslations } from 'next-intl';
+import {
+  formatAppDateTime,
+  intlLocaleFromAppLocale
+} from '@/lib/format-datetime';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -58,6 +62,8 @@ import {
 
 export default function DesktopTerminalsPage() {
   const t = useTranslations('admin.desktop_terminals');
+  const locale = useLocale();
+  const intlLocale = useMemo(() => intlLocaleFromAppLocale(locale), [locale]);
   const [rows, setRows] = useState<DesktopTerminal[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(true);
@@ -253,9 +259,7 @@ export default function DesktopTerminalsPage() {
                       )}
                     </TableCell>
                     <TableCell className='text-muted-foreground text-sm'>
-                      {row.lastSeenAt
-                        ? new Date(row.lastSeenAt).toLocaleString()
-                        : '—'}
+                      {formatAppDateTime(row.lastSeenAt, intlLocale)}
                     </TableCell>
                     <TableCell className='text-right'>
                       <Button

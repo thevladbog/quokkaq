@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode } from 'react';
+import { ComponentType, ReactNode } from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import AppSidebar from '@/components/AppSidebar';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -11,6 +11,8 @@ interface ProtectedSidebarLayoutProps {
   requiredPermission?: string;
   fallbackComponent?: ReactNode;
   loadingComponent?: ReactNode;
+  /** Defaults to AppSidebar (tenant). Use PlatformSidebar for /platform routes. */
+  SidebarComponent?: ComponentType<{ className?: string }>;
 }
 
 const ProtectedSidebarLayout = ({
@@ -18,7 +20,8 @@ const ProtectedSidebarLayout = ({
   allowedRoles,
   requiredPermission,
   fallbackComponent,
-  loadingComponent
+  loadingComponent,
+  SidebarComponent = AppSidebar
 }: ProtectedSidebarLayoutProps) => {
   return (
     <ProtectedRoute
@@ -28,7 +31,7 @@ const ProtectedSidebarLayout = ({
       loadingComponent={loadingComponent}
     >
       <SidebarProvider>
-        <AppSidebar />
+        <SidebarComponent />
         <SidebarInset>
           <div className='p-4 md:p-8'>{children}</div>
         </SidebarInset>

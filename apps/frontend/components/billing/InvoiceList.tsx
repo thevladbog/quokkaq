@@ -5,9 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Download, Receipt } from 'lucide-react';
-import { format } from 'date-fns';
-import { ru } from 'date-fns/locale';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
+import { useMemo } from 'react';
+import { formatPriceMinorUnits } from '@/lib/format-price';
+import { formatAppDate, intlLocaleFromAppLocale } from '@/lib/format-datetime';
 
 interface InvoiceListProps {
   invoices: Invoice[];
@@ -16,6 +17,8 @@ interface InvoiceListProps {
 
 export function InvoiceList({ invoices, onDownload }: InvoiceListProps) {
   const t = useTranslations('organization.invoices');
+  const locale = useLocale();
+  const intlLocale = useMemo(() => intlLocaleFromAppLocale(locale), [locale]);
 
   const getStatusBadge = (status: string) => {
     return (
@@ -35,17 +38,6 @@ export function InvoiceList({ invoices, onDownload }: InvoiceListProps) {
         {t(`statuses.${status}`)}
       </Badge>
     );
-  };
-
-  const formatPrice = (price: number, currency: string) => {
-    return new Intl.NumberFormat('ru-RU', {
-      style: 'currency',
-      currency: currency
-    }).format(price / 100);
-  };
-
-  const formatDate = (dateString: string) => {
-    return format(new Date(dateString), 'dd MMM yyyy', { locale: ru });
   };
 
   const getPaymentProviderLabel = (provider: string) => {
@@ -109,12 +101,18 @@ export function InvoiceList({ invoices, onDownload }: InvoiceListProps) {
                     </span>
                   </td>
                   <td className='px-4 py-3 text-sm'>
-                    {invoice.paidAt
-                      ? formatDate(invoice.paidAt)
-                      : formatDate(invoice.dueDate)}
+                    {formatAppDate(
+                      invoice.paidAt ?? invoice.dueDate,
+                      intlLocale,
+                      'medium'
+                    )}
                   </td>
                   <td className='px-4 py-3 font-medium'>
-                    {formatPrice(invoice.amount, invoice.currency)}
+                    {formatPriceMinorUnits(
+                      invoice.amount,
+                      invoice.currency || 'RUB',
+                      intlLocale
+                    )}
                   </td>
                   <td className='px-4 py-3 text-sm'>
                     {invoice.paymentProvider &&

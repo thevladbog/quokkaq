@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	dbmodels "quokkaq-go-backend/internal/models"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -94,6 +95,70 @@ func RunVersionedMigrations(models ...interface{}) error {
 	})
 	if err != nil {
 		return fmt.Errorf("failed to run subscription plan prices migration: %w", err)
+	}
+
+	// Add pending plan scheduling columns on subscriptions (platform deferred tier changes).
+	err = manager.RunMigration("v1.0.2_subscription_pending_plan", func(db *gorm.DB) error {
+		return db.AutoMigrate(&dbmodels.Subscription{})
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run subscription pending plan migration: %w", err)
+	}
+
+	// Invoices may exist without a subscription until linked; FK uses ON DELETE SET NULL.
+	err = manager.RunMigration("v1.0.3_invoices_subscription_nullable", func(db *gorm.DB) error {
+		if err := db.Exec(`
+			DO $$
+			DECLARE r RECORD;
+			BEGIN
+				FOR r IN (
+					SELECT c.conname
+					FROM pg_constraint c
+					JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY (c.conkey)
+					WHERE c.conrelid = 'invoices'::regclass
+					  AND c.contype = 'f'
+					  AND a.attname = 'subscription_id'
+				) LOOP
+					EXECUTE format('ALTER TABLE invoices DROP CONSTRAINT IF EXISTS %I', r.conname);
+				END LOOP;
+			END $$;
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`ALTER TABLE invoices ALTER COLUMN subscription_id DROP NOT NULL`).Error; err != nil {
+			return err
+		}
+		return db.Exec(`
+			ALTER TABLE invoices
+			ADD CONSTRAINT invoices_subscription_id_fkey
+			FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON UPDATE CASCADE ON DELETE SET NULL
+		`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run invoices subscription nullable migration: %w", err)
+	}
+
+	// Counterparty (legal entity profile) JSON for tenant and platform billing forms.
+	err = manager.RunMigration("v1.0.4_companies_counterparty", func(db *gorm.DB) error {
+		return db.Exec(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS counterparty JSONB`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run companies counterparty migration: %w", err)
+	}
+
+	// Single SaaS operator tenant per deployment (on-prem); unlimited quotas bypass in QuotaService.
+	err = manager.RunMigration("v1.0.5_companies_saas_operator", func(db *gorm.DB) error {
+		if err := db.Exec(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS is_saas_operator BOOLEAN NOT NULL DEFAULT false`).Error; err != nil {
+			return err
+		}
+		return db.Exec(`
+			CREATE UNIQUE INDEX IF NOT EXISTS companies_one_saas_operator_true
+			ON companies (is_saas_operator)
+			WHERE is_saas_operator = true
+		`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run companies saas operator migration: %w", err)
 	}
 
 	fmt.Println("All migrations completed successfully")

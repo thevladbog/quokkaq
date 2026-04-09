@@ -174,6 +174,8 @@ func main() {
 	subscriptionHandler := handlers.NewSubscriptionHandler(subscriptionRepo, userRepo, paymentProvider)
 	invoiceHandler := handlers.NewInvoiceHandler(invoiceRepo, userRepo)
 	companyHandler := handlers.NewCompanyHandler(companyRepo, userRepo)
+	platformHandler := handlers.NewPlatformHandler(companyRepo, subscriptionRepo, invoiceRepo)
+	dadataHandler := handlers.NewDaDataHandler()
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -393,8 +395,17 @@ func main() {
 
 	r.Route("/companies", func(r chi.Router) {
 		r.Use(authmiddleware.JWTAuth)
-		r.Get("/{companyId}/usage-metrics", usageHandler.GetUsageMetrics)
+		r.Group(func(r chi.Router) {
+			r.Use(authmiddleware.RequireAdmin(userRepo))
+			r.Get("/me", companyHandler.GetMyCompany)
+			r.Patch("/me", companyHandler.PatchMyCompany)
+			r.Post("/dadata/party/find-by-inn", dadataHandler.FindPartyByInn)
+			r.Post("/dadata/party/suggest", dadataHandler.SuggestParty)
+			r.Post("/dadata/address/suggest", dadataHandler.SuggestAddress)
+			r.Post("/dadata/address/clean", dadataHandler.CleanAddress)
+		})
 		r.Post("/me/complete-onboarding", companyHandler.CompleteOnboarding)
+		r.Get("/{companyId}/usage-metrics", usageHandler.GetUsageMetrics)
 	})
 
 	r.Route("/usage-metrics", func(r chi.Router) {
@@ -416,6 +427,29 @@ func main() {
 		r.Use(authmiddleware.JWTAuth)
 		r.Get("/me", invoiceHandler.GetMyInvoices)
 		r.Get("/{id}/download", invoiceHandler.DownloadInvoice)
+	})
+
+	r.Route("/platform", func(r chi.Router) {
+		r.Use(authmiddleware.JWTAuth)
+		r.Use(authmiddleware.RequirePlatformAdmin(userRepo))
+		r.Get("/features", platformHandler.GetFeatures)
+		r.Get("/saas-operator-company", platformHandler.GetSaaSOperatorCompany)
+		r.Get("/companies", platformHandler.ListCompanies)
+		r.Get("/companies/{id}", platformHandler.GetCompany)
+		r.Patch("/companies/{id}", platformHandler.PatchCompany)
+		r.Post("/dadata/party/find-by-inn", dadataHandler.FindPartyByInn)
+		r.Post("/dadata/party/suggest", dadataHandler.SuggestParty)
+		r.Post("/dadata/address/suggest", dadataHandler.SuggestAddress)
+		r.Post("/dadata/address/clean", dadataHandler.CleanAddress)
+		r.Get("/subscriptions", platformHandler.ListSubscriptions)
+		r.Post("/subscriptions", platformHandler.CreateSubscription)
+		r.Patch("/subscriptions/{id}", platformHandler.PatchSubscription)
+		r.Get("/subscription-plans", platformHandler.ListSubscriptionPlans)
+		r.Post("/subscription-plans", platformHandler.CreateSubscriptionPlan)
+		r.Put("/subscription-plans/{id}", platformHandler.UpdateSubscriptionPlan)
+		r.Get("/invoices", platformHandler.ListInvoices)
+		r.Post("/invoices", platformHandler.CreateInvoice)
+		r.Patch("/invoices/{id}", platformHandler.PatchInvoice)
 	})
 
 	r.Route("/tickets", func(r chi.Router) {

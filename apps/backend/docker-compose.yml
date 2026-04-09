@@ -74,6 +74,9 @@ services:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/quokkaq
       PORT: 3001
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
+      # Fail closed: tenant "admin" must not use /platform APIs unless you opt in.
+      # Safe default for docker-compose; for local convenience set PLATFORM_ALLOW_TENANT_ADMIN=true in your shell or .env (never in production).
+      PLATFORM_ALLOW_TENANT_ADMIN: ${PLATFORM_ALLOW_TENANT_ADMIN:-false}
       
       # MinIO Configuration
       AWS_ACCESS_KEY_ID: minioadmin

@@ -10,9 +10,9 @@ import {
 } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { AlertCircle, TrendingUp } from 'lucide-react';
-import { format } from 'date-fns';
-import { ru } from 'date-fns/locale';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
+import { useMemo } from 'react';
+import { formatAppDate, intlLocaleFromAppLocale } from '@/lib/format-datetime';
 
 interface UsageMetricsProps {
   metrics: UsageMetricsType;
@@ -20,6 +20,8 @@ interface UsageMetricsProps {
 
 export function UsageMetrics({ metrics }: UsageMetricsProps) {
   const t = useTranslations('organization.usage');
+  const locale = useLocale();
+  const intlLocale = useMemo(() => intlLocaleFromAppLocale(locale), [locale]);
   const getProgressColor = (percentage: number) => {
     if (percentage >= 90) return 'bg-red-500';
     if (percentage >= 75) return 'bg-yellow-500';
@@ -28,10 +30,6 @@ export function UsageMetrics({ metrics }: UsageMetricsProps) {
 
   const getMetricLabel = (key: string) => {
     return t(`metrics.${key}`);
-  };
-
-  const formatDate = (dateString: string) => {
-    return format(new Date(dateString), 'dd MMMM yyyy', { locale: ru });
   };
 
   const metricsArray = Object.entries(metrics.metrics).map(([key, value]) => ({
@@ -50,8 +48,9 @@ export function UsageMetrics({ metrics }: UsageMetricsProps) {
           {t('title')}
         </CardTitle>
         <CardDescription>
-          {t('currentPeriod')}: {formatDate(metrics.currentPeriod.start)} -{' '}
-          {formatDate(metrics.currentPeriod.end)}
+          {t('currentPeriod')}:{' '}
+          {formatAppDate(metrics.currentPeriod.start, intlLocale, 'long')} -{' '}
+          {formatAppDate(metrics.currentPeriod.end, intlLocale, 'long')}
         </CardDescription>
       </CardHeader>
 

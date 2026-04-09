@@ -3,11 +3,18 @@ name: Deploy Frontend
 on:
   push:
     branches:
-      - main
+      - release
     paths:
       - 'apps/frontend/**'
       - 'packages/**'
       - '.github/workflows/deploy-frontend.yml'
+
+concurrency:
+  group: quokkaq-release-writes-${{ github.repository }}
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 permissions:
   contents: write
@@ -19,15 +26,15 @@ jobs:
     outputs:
       affected: ${{ steps.check.outputs.affected }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@v5
         with:
           version: 10
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: 'pnpm'
@@ -40,11 +47,14 @@ jobs:
         run: |
           BASE=${{ github.event.before }}
           HEAD=${{ github.sha }}
-          
-          if pnpm nx show projects --affected --base=$BASE --head=$HEAD | grep -q "frontend"; then
-            echo "affected=true" >> $GITHUB_OUTPUT
+          if [[ -z "$BASE" || "$BASE" =~ ^0{40}$ ]]; then
+            BASE=$(git rev-parse "$HEAD^" 2>/dev/null || echo "$HEAD")
+          fi
+
+          if pnpm nx show projects --affected --base="$BASE" --head="$HEAD" | grep -q "frontend"; then
+            echo "affected=true" >> "$GITHUB_OUTPUT"
           else
-            echo "affected=false" >> $GITHUB_OUTPUT
+            echo "affected=false" >> "$GITHUB_OUTPUT"
           fi
 
   version-bump:
@@ -55,11 +65,13 @@ jobs:
     outputs:
       new_version: ${{ steps.bump.outputs.new_version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
 
@@ -70,21 +82,22 @@ jobs:
           echo "Commit message: $COMMIT_MSG"
 
           if [[ "$COMMIT_MSG" == *"[major]"* ]] || [[ "$COMMIT_MSG" == *"BREAKING CHANGE"* ]]; then
-            echo "type=major" >> $GITHUB_OUTPUT
+            echo "type=major" >> "$GITHUB_OUTPUT"
           elif [[ "$COMMIT_MSG" == *"[minor]"* ]] || [[ "$COMMIT_MSG" == *"feat:"* ]]; then
-            echo "type=minor" >> $GITHUB_OUTPUT
+            echo "type=minor" >> "$GITHUB_OUTPUT"
           else
-            echo "type=patch" >> $GITHUB_OUTPUT
+            echo "type=patch" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Bump version
         id: bump
         working-directory: apps/frontend
         run: |
+          set -euo pipefail
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
 
-          TYPE=${{ steps.version_type.outputs.type }}
+          TYPE="${{ steps.version_type.outputs.type }}"
           echo "Bumping version type: $TYPE"
 
           CURRENT_VERSION=$(node -p "require('./package.json').version")
@@ -106,23 +119,41 @@ jobs:
 
           NEW_VERSION="$MAJOR.$MINOR.$PATCH"
           echo "New version: $NEW_VERSION"
-          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
 
           npm version $NEW_VERSION --no-git-tag-version
-          
+
           cd ../..
+          RELEASE_BRANCH=release
+          TAG_NAME="v${NEW_VERSION}-frontend"
+
           git add apps/frontend/package.json
           git commit -m "chore(frontend): bump version to $NEW_VERSION [skip ci]"
-          git tag v$NEW_VERSION-frontend
-          git push origin main
-          git push origin v$NEW_VERSION-frontend
+
+          for attempt in 1 2 3 4 5; do
+            git fetch origin "$RELEASE_BRANCH"
+            if ! git rebase "origin/$RELEASE_BRANCH"; then
+              echo "::error::Rebase onto origin/${RELEASE_BRANCH} failed (resolve conflicts locally if this persists)"
+              git rebase --abort || true
+              exit 1
+            fi
+            git tag -f "$TAG_NAME"
+            if git push origin "HEAD:refs/heads/${RELEASE_BRANCH}" && git push -f origin "$TAG_NAME"; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 5 ]; then
+              echo "::error::Push failed after 5 attempts"
+              exit 1
+            fi
+            sleep $((attempt * 5))
+          done
 
   build-and-deploy:
     name: Build and deploy to Yandex Cloud
     needs: version-bump
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: v${{ needs.version-bump.outputs.new_version }}-frontend
 
