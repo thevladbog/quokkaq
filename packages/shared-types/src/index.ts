@@ -423,13 +423,6 @@ export const CounterpartySchema = z
             message: 'KPP must not be set for sole proprietor'
           });
         }
-        if (ogrn) {
-          ctx.addIssue({
-            code: 'custom',
-            path: ['ogrn'],
-            message: 'OGRN must not be set for sole proprietor'
-          });
-        }
         if (ogrnip && !digits15.test(ogrnip)) {
           ctx.addIssue({
             code: 'custom',
@@ -474,10 +467,12 @@ export type PartyType = z.infer<typeof partyTypeSchema>;
  * spellings; we coerce so nested `subscription.pendingPlan` in company payloads
  * does not break Zod (e.g. after PATCH /platform/companies/:id).
  */
-export const subscriptionPlanIntervalSchema = z.unknown().transform(
-  (v): 'month' | 'year' => {
-    if (v === null || v === undefined) return 'month';
-    const s = String(v).trim().toLowerCase();
+export const subscriptionPlanIntervalSchema = z.preprocess(
+  (val) => {
+    if (val === null || val === undefined) {
+      return 'month';
+    }
+    const s = String(val).trim().toLowerCase();
     if (s === '' || s === 'month' || s === 'monthly' || s === 'mo') {
       return 'month';
     }
@@ -490,8 +485,11 @@ export const subscriptionPlanIntervalSchema = z.unknown().transform(
     ) {
       return 'year';
     }
-    return 'month';
-  }
+    return val;
+  },
+  z.enum(['month', 'year'], {
+    message: 'Invalid subscription plan interval'
+  })
 );
 
 export const SubscriptionPlanSchema = z.object({

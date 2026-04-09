@@ -36,7 +36,7 @@ func (r *invoiceRepository) FindByID(id string) (*models.Invoice, error) {
 func (r *invoiceRepository) FindByCompanyID(companyID string) ([]models.Invoice, error) {
 	var invoices []models.Invoice
 	err := database.DB.Where("company_id = ?", companyID).
-		Order("created_at DESC").
+		Order("created_at DESC, id DESC").
 		Find(&invoices).Error
 	return invoices, err
 }
@@ -52,7 +52,7 @@ func (r *invoiceRepository) ListPaginated(companyID *string, limit, offset int) 
 	}
 	listQ := database.DB.Model(&models.Invoice{}).
 		Preload("Subscription.Plan").
-		Order("created_at DESC").
+		Order("created_at DESC, id DESC").
 		Limit(limit).
 		Offset(offset)
 	if companyID != nil && *companyID != "" {

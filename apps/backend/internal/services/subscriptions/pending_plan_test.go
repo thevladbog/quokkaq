@@ -1,4 +1,4 @@
-package services
+package subscriptions
 
 import (
 	"testing"
@@ -56,7 +56,6 @@ func TestApplyPendingPlanIfDue_PastEffective_PromotesPlanAndClearsPending(t *tes
 	if got.PendingEffectiveAt != nil {
 		t.Fatalf("pending_effective_at: want nil, got %v", got.PendingEffectiveAt)
 	}
-	// In-memory sub should match what ApplyPendingPlanIfDue documents
 	if sub.PlanID != planB.ID {
 		t.Fatalf("in-memory PlanID: want %q, got %q", planB.ID, sub.PlanID)
 	}
@@ -76,7 +75,6 @@ func newPendingPlanTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Manual DDL: GORM AutoMigrate emits Postgres-only defaults (e.g. gen_random_uuid()) unsuitable for SQLite.
 	stmts := []string{
 		`CREATE TABLE subscription_plans (
 			id TEXT PRIMARY KEY NOT NULL,

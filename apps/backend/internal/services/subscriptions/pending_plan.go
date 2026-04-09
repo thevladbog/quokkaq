@@ -1,4 +1,4 @@
-package services
+package subscriptions
 
 import (
 	"errors"

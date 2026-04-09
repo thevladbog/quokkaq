@@ -409,12 +409,21 @@ export default function PlatformCompanyDetailPage() {
   const createInv = useMutation({
     mutationFn: () => {
       if (!company) throw new Error(t('notFound'));
-      const amount = parseInt(invAmount, 10);
-      if (!Number.isFinite(amount) || amount <= 0) {
+      const amount = Number.parseFloat(invAmount.trim());
+      if (
+        !Number.isFinite(amount) ||
+        !Number.isInteger(amount) ||
+        amount <= 0
+      ) {
         throw new Error(t('invoiceAmountInvalid'));
       }
-      const due = invDue ? new Date(invDue).toISOString() : '';
-      if (!due) throw new Error(t('invoiceDueRequired'));
+      const dueTrim = invDue.trim();
+      if (!dueTrim) throw new Error(t('invoiceDueRequired'));
+      const dueDate = new Date(dueTrim);
+      if (Number.isNaN(dueDate.getTime())) {
+        throw new Error(t('invoiceDueRequired'));
+      }
+      const due = dueDate.toISOString();
 
       if (invCreateWithSub) {
         if (sub) {

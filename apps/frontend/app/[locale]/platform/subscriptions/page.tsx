@@ -101,7 +101,7 @@ export default function PlatformSubscriptionsPage() {
           ? `${c.name} (${idShort}) — ${t('companyHasSubscription')}`
           : `${c.name} (${idShort})`,
         keywords: [c.name, c.id],
-        disabled: false
+        disabled: hasSub
       };
     });
   }, [companiesData?.items, t]);
@@ -121,6 +121,9 @@ export default function PlatformSubscriptionsPage() {
     mutationFn: async () => {
       if (!companyId || !planId) {
         throw new Error(t('validationCompanyPlan'));
+      }
+      if (selectedCompanyHasSubscription) {
+        throw new Error(t('createSubCompanyHasSubscription'));
       }
 
       const body: {
@@ -154,14 +157,13 @@ export default function PlatformSubscriptionsPage() {
         body.currentPeriodEnd = e.toISOString();
       }
 
-      const sub = await platformApi.createSubscription(body);
-
       if (createWithInvoice) {
-        const amount = parseInt(invAmount, 10);
+        const amount = Number.parseFloat(invAmount.trim());
         const dueRaw = invDue.trim();
         const dueDate = new Date(dueRaw);
         if (
           !Number.isFinite(amount) ||
+          !Number.isInteger(amount) ||
           amount <= 0 ||
           dueRaw === '' ||
           Number.isNaN(dueDate.getTime())
@@ -169,17 +171,39 @@ export default function PlatformSubscriptionsPage() {
           throw new Error(t('invoiceWithSubValidation'));
         }
         const due = dueDate.toISOString();
-        await platformApi.createInvoice({
+
+        let currentPeriodStart: string;
+        let currentPeriodEnd: string;
+        if (body.currentPeriodStart && body.currentPeriodEnd) {
+          currentPeriodStart = body.currentPeriodStart;
+          currentPeriodEnd = body.currentPeriodEnd;
+        } else {
+          const now = new Date();
+          const endDefault = new Date(now);
+          endDefault.setMonth(endDefault.getMonth() + 1);
+          currentPeriodStart = now.toISOString();
+          currentPeriodEnd = endDefault.toISOString();
+        }
+
+        return platformApi.createInvoice({
           companyId,
-          subscriptionId: sub.id,
           amount,
           dueDate: due,
           status: 'open',
-          paymentProvider: 'manual'
+          paymentProvider: 'manual',
+          createSubscriptionWithInvoice: true,
+          subscription: {
+            planId,
+            currentPeriodStart,
+            currentPeriodEnd,
+            ...(subStatusSelect !== STATUS_SELECT_DEFAULT
+              ? { status: subStatusSelect }
+              : {})
+          }
         });
       }
 
-      return sub;
+      return platformApi.createSubscription(body);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['platform-subscriptions'] });

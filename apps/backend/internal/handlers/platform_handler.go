@@ -132,9 +132,30 @@ func applyPlatformPatchSubscriptionCore(sub *models.Subscription, body patchSubs
 	return nil
 }
 
-// platformCreateSubscriptionForCompanyTx creates a subscription for company and updates company.subscription_id to the new row (same tx).
-// Allows creating multiple subscriptions per company (e.g. future periods); operator is responsible for non-overlapping periods.
-func platformCreateSubscriptionForCompanyTx(tx *gorm.DB, companyID, planID string, status string, start, end time.Time, trialEnd *time.Time) (*models.Subscription, error) {
+// companyShouldPointSubscriptionID decides whether companies.subscription_id should reference a newly created subscription.
+// If the company has no primary subscription yet, always point. Otherwise only repoint when the new row is the current
+// billing window (now in [start, end)) and status is not canceled, so future-dated subscriptions do not steal the pointer.
+func companyShouldPointSubscriptionID(company *models.Company, sub *models.Subscription, now time.Time) bool {
+	now = now.UTC()
+	sid := ""
+	if company.SubscriptionID != nil {
+		sid = strings.TrimSpace(*company.SubscriptionID)
+	}
+	if sid == "" {
+		return true
+	}
+	if sub.Status == "canceled" {
+		return false
+	}
+	if now.Before(sub.CurrentPeriodStart) || !now.Before(sub.CurrentPeriodEnd) {
+		return false
+	}
+	return true
+}
+
+// platformCreateSubscriptionForCompanyTx creates a subscription for company and optionally updates company.subscription_id (same tx).
+// Allows multiple subscriptions per company (e.g. future periods); the company pointer is only updated when appropriate.
+func platformCreateSubscriptionForCompanyTx(tx *gorm.DB, now time.Time, companyID, planID string, status string, start, end time.Time, trialEnd *time.Time) (*models.Subscription, error) {
 	start = start.UTC()
 	end = end.UTC()
 	var trialEndUTC *time.Time
@@ -154,6 +175,11 @@ func platformCreateSubscriptionForCompanyTx(tx *gorm.DB, companyID, planID strin
 		return nil, errors.New("subscription period is invalid: when trialEnd is before currentPeriodEnd, trialEnd must still be after currentPeriodStart")
 	}
 
+	var company models.Company
+	if err := tx.Where("id = ?", companyID).First(&company).Error; err != nil {
+		return nil, err
+	}
+
 	sub := &models.Subscription{
 		CompanyID:            companyID,
 		PlanID:               planID,
@@ -167,8 +193,10 @@ func platformCreateSubscriptionForCompanyTx(tx *gorm.DB, companyID, planID strin
 	if err := tx.Create(sub).Error; err != nil {
 		return nil, err
 	}
-	if err := tx.Model(&models.Company{}).Where("id = ?", companyID).Update("subscription_id", sub.ID).Error; err != nil {
-		return nil, err
+	if companyShouldPointSubscriptionID(&company, sub, now) {
+		if err := tx.Model(&models.Company{}).Where("id = ?", companyID).Update("subscription_id", sub.ID).Error; err != nil {
+			return nil, err
+		}
 	}
 	return sub, nil
 }
@@ -378,12 +406,12 @@ func (h *PlatformHandler) PatchCompany(w http.ResponseWriter, r *http.Request) {
 	if body.ClearBillingAddress != nil && *body.ClearBillingAddress {
 		company.BillingAddress = nil
 	} else if body.BillingAddress != nil {
-		raw := *body.BillingAddress
-		if len(raw) == 0 || string(raw) == "null" {
-			company.BillingAddress = nil
-		} else {
-			company.BillingAddress = raw
+		out, err := normalizeBillingAddressJSON(*body.BillingAddress)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
 		}
+		company.BillingAddress = out
 	}
 	if body.ClearCounterparty != nil && *body.ClearCounterparty {
 		company.Counterparty = nil
@@ -750,7 +778,16 @@ func (h *PlatformHandler) PatchSubscription(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	log.Printf("platform_admin subscription patch user=%s subscription=%s", userID, id)
-	updated, _ := h.subscriptionRepo.FindByID(id)
+	updated, err := h.subscriptionRepo.FindByID(id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "subscription not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("Platform PatchSubscription FindByID: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	RespondJSON(w, updated)
 }
@@ -807,8 +844,13 @@ func (h *PlatformHandler) CreateSubscriptionPlan(w http.ResponseWriter, r *http.
 	if body.Currency == "" {
 		body.Currency = "RUB"
 	}
+	body.Interval = strings.ToLower(strings.TrimSpace(body.Interval))
 	if body.Interval == "" {
 		body.Interval = "month"
+	}
+	if body.Interval != "month" && body.Interval != "year" {
+		http.Error(w, "interval must be month or year", http.StatusBadRequest)
+		return
 	}
 	plan := models.SubscriptionPlan{
 		Name:     body.Name,
@@ -874,8 +916,13 @@ func (h *PlatformHandler) UpdateSubscriptionPlan(w http.ResponseWriter, r *http.
 	if body.Currency == "" {
 		body.Currency = "RUB"
 	}
+	body.Interval = strings.ToLower(strings.TrimSpace(body.Interval))
 	if body.Interval == "" {
 		body.Interval = "month"
+	}
+	if body.Interval != "month" && body.Interval != "year" {
+		http.Error(w, "interval must be month or year", http.StatusBadRequest)
+		return
 	}
 	plan.Name = body.Name
 	plan.Code = body.Code
@@ -1092,7 +1139,7 @@ func (h *PlatformHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 
 		var inv models.Invoice
 		err = database.DB.Transaction(func(tx *gorm.DB) error {
-			sub, err := platformCreateSubscriptionForCompanyTx(tx, body.CompanyID, planID, status, start, end, trialEnd)
+			sub, err := platformCreateSubscriptionForCompanyTx(tx, now, body.CompanyID, planID, status, start, end, trialEnd)
 			if err != nil {
 				return err
 			}
@@ -1272,7 +1319,16 @@ func (h *PlatformHandler) PatchInvoice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Printf("platform_admin invoice patch user=%s invoice=%s", userID, id)
-	updated, _ := h.invoiceRepo.FindByID(id)
+	updated, err := h.invoiceRepo.FindByID(id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "invoice not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("Platform PatchInvoice FindByID: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	RespondJSON(w, updated)
 }

@@ -11,6 +11,7 @@ import (
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
+	"quokkaq-go-backend/internal/services/subscriptions"
 	"quokkaq-go-backend/pkg/database"
 	"strings"
 
@@ -134,7 +135,7 @@ func (h *SubscriptionHandler) GetMySubscription(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	if err := services.ApplyPendingPlanIfDue(database.DB, subscription, time.Now().UTC()); err != nil {
+	if err := subscriptions.ApplyPendingPlanIfDue(database.DB, subscription, time.Now().UTC()); err != nil {
 		log.Printf("GetMySubscription ApplyPendingPlanIfDue: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return

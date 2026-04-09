@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"quokkaq-go-backend/internal/models"
+	"quokkaq-go-backend/internal/services/subscriptions"
 	"quokkaq-go-backend/pkg/database"
 	"time"
 )
@@ -43,7 +44,7 @@ type UsageMetricInfo struct {
 // CheckQuota verifies if the company can perform an action based on their quota
 func (s *quotaService) CheckQuota(companyID string, metric string) (bool, error) {
 	db := database.DB
-	if err := ApplyPendingPlanIfDueBeforeQuota(db, companyID, time.Now().UTC()); err != nil {
+	if err := subscriptions.ApplyPendingPlanIfDueBeforeQuota(db, companyID, time.Now().UTC()); err != nil {
 		return false, err
 	}
 

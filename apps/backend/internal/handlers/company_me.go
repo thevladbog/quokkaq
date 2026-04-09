@@ -149,12 +149,12 @@ func (h *CompanyHandler) PatchMyCompany(w http.ResponseWriter, r *http.Request) 
 	if body.ClearBillingAddress != nil && *body.ClearBillingAddress {
 		company.BillingAddress = nil
 	} else if body.BillingAddress != nil {
-		raw := *body.BillingAddress
-		if len(raw) == 0 || string(raw) == "null" {
-			company.BillingAddress = nil
-		} else {
-			company.BillingAddress = raw
+		out, err := normalizeBillingAddressJSON(*body.BillingAddress)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
 		}
+		company.BillingAddress = out
 	}
 	if body.ClearCounterparty != nil && *body.ClearCounterparty {
 		company.Counterparty = nil
