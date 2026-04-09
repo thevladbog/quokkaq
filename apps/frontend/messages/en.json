@@ -753,7 +753,7 @@
     "cancel": "Cancel",
     "confirm": "Confirm",
     "pre_registration": {
-      "badge": "Запись"
+      "badge": "PRE"
     }
   },
   "invitations": {
@@ -1153,6 +1153,14 @@
       "email": "Email",
       "edoOperator": "EDI operator",
       "edoId": "EDI participant ID",
+      "contactsSection": "Contact persons",
+      "addContact": "Add contact",
+      "removeContact": "Remove",
+      "contactIndex": "Contact {index}",
+      "contactFullName": "Full name",
+      "contactPosition": "Position",
+      "contactPhone": "Phone",
+      "contactEmail": "Email",
       "loading": "Loading…"
     },
     "companyName": "Company Name",

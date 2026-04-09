@@ -51,7 +51,7 @@ jobs:
             BASE=$(git rev-parse "$HEAD^" 2>/dev/null || echo "$HEAD")
           fi
 
-          if pnpm nx show projects --affected --base=$BASE --head=$HEAD | grep -q "frontend"; then
+          if pnpm nx show projects --affected --base="$BASE" --head="$HEAD" | grep -q "frontend"; then
             echo "affected=true" >> "$GITHUB_OUTPUT"
           else
             echo "affected=false" >> "$GITHUB_OUTPUT"
@@ -97,7 +97,7 @@ jobs:
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
 
-          TYPE=${{ steps.version_type.outputs.type }}
+          TYPE="${{ steps.version_type.outputs.type }}"
           echo "Bumping version type: $TYPE"
 
           CURRENT_VERSION=$(node -p "require('./package.json').version")

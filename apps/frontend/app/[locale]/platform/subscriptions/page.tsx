@@ -419,7 +419,11 @@ export default function PlatformSubscriptionsPage() {
             <Button
               type='button'
               disabled={
-                createMut.isPending || !companyId || !planId || companiesLoading
+                createMut.isPending ||
+                !companyId ||
+                !planId ||
+                companiesLoading ||
+                selectedCompanyHasSubscription
               }
               onClick={() => createMut.mutate()}
             >

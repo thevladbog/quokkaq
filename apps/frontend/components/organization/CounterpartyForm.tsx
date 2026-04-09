@@ -30,6 +30,17 @@ const PARTY_TYPES: PartyType[] = [
   'individual'
 ];
 
+const COUNTERPARTY_CONTACTS_MAX = 30;
+
+type ContactRow = NonNullable<Counterparty['contacts']>[number];
+
+const emptyContactRow = (): ContactRow => ({
+  fullName: '',
+  position: '',
+  phone: '',
+  email: ''
+});
+
 export function emptyCounterparty(): Counterparty {
   return {
     schemaVersion: 1,
@@ -252,6 +263,27 @@ export function CounterpartyForm({
   };
 
   const pt = value.partyType;
+
+  const contactsList = value.contacts ?? [];
+
+  const setContacts = (next: ContactRow[]) => {
+    onChange({ ...value, contacts: next });
+  };
+
+  const addContact = () => {
+    if (contactsList.length >= COUNTERPARTY_CONTACTS_MAX) return;
+    setContacts([...contactsList, emptyContactRow()]);
+  };
+
+  const updateContact = (index: number, patch: Partial<ContactRow>) => {
+    setContacts(
+      contactsList.map((c, i) => (i === index ? { ...c, ...patch } : c))
+    );
+  };
+
+  const removeContact = (index: number) => {
+    setContacts(contactsList.filter((_, i) => i !== index));
+  };
 
   return (
     <div className='space-y-4'>
@@ -569,6 +601,85 @@ export function CounterpartyForm({
             onChange={(e) => setField({ email: e.target.value })}
           />
         </div>
+      </div>
+
+      <div className='space-y-3 border-t pt-4'>
+        <p className='text-muted-foreground text-sm font-medium'>
+          {t('contactsSection')}
+        </p>
+        {contactsList.map((contact, index) => (
+          <div key={index} className='space-y-3 rounded-md border p-3'>
+            <div className='flex flex-wrap items-center justify-between gap-2'>
+              <p className='text-sm font-medium'>
+                {t('contactIndex', { index: index + 1 })}
+              </p>
+              <Button
+                type='button'
+                variant='ghost'
+                size='sm'
+                className='text-destructive hover:text-destructive'
+                disabled={disabled}
+                onClick={() => removeContact(index)}
+              >
+                {t('removeContact')}
+              </Button>
+            </div>
+            <div className='grid gap-2 sm:grid-cols-2'>
+              <div className='grid gap-2 sm:col-span-2'>
+                <Label>{t('contactFullName')}</Label>
+                <Input
+                  disabled={disabled}
+                  value={contact.fullName ?? ''}
+                  onChange={(e) =>
+                    updateContact(index, { fullName: e.target.value })
+                  }
+                />
+              </div>
+              <div className='grid gap-2 sm:col-span-2'>
+                <Label>{t('contactPosition')}</Label>
+                <Input
+                  disabled={disabled}
+                  value={contact.position ?? ''}
+                  onChange={(e) =>
+                    updateContact(index, { position: e.target.value })
+                  }
+                />
+              </div>
+              <div className='grid gap-2'>
+                <Label>{t('contactPhone')}</Label>
+                <Input
+                  disabled={disabled}
+                  value={contact.phone ?? ''}
+                  onChange={(e) =>
+                    updateContact(index, { phone: e.target.value })
+                  }
+                />
+              </div>
+              <div className='grid gap-2'>
+                <Label>{t('contactEmail')}</Label>
+                <Input
+                  disabled={disabled}
+                  type='email'
+                  value={contact.email ?? ''}
+                  onChange={(e) =>
+                    updateContact(index, { email: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+          </div>
+        ))}
+        <Button
+          type='button'
+          variant='outline'
+          size='sm'
+          disabled={
+            disabled || contactsList.length >= COUNTERPARTY_CONTACTS_MAX
+          }
+          onClick={addContact}
+        >
+          {t('addContact')}
+        </Button>
       </div>
 
       <div className='grid gap-2 sm:grid-cols-2'>

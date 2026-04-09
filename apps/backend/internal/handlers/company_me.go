@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -130,9 +131,29 @@ func (h *CompanyHandler) PatchMyCompany(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
 	var body patchMyCompanyBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := dec.Decode(&body); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+	var tail any
+	if err := dec.Decode(&tail); err != io.EOF {
+		if err == nil {
+			http.Error(w, "request body must contain a single JSON object", http.StatusBadRequest)
+			return
+		}
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if body.ClearBillingAddress != nil && *body.ClearBillingAddress && body.BillingAddress != nil {
+		http.Error(w, "cannot set billingAddress and clearBillingAddress together", http.StatusBadRequest)
+		return
+	}
+	if body.ClearCounterparty != nil && *body.ClearCounterparty && body.Counterparty != nil {
+		http.Error(w, "cannot set counterparty and clearCounterparty together", http.StatusBadRequest)
 		return
 	}
 

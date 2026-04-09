@@ -22,12 +22,21 @@ func ApplyPendingPlanIfDue(db *gorm.DB, sub *models.Subscription, now time.Time)
 		return false, nil
 	}
 	newPlanID := *sub.PendingPlanID
-	if err := db.Model(&models.Subscription{}).Where("id = ?", sub.ID).Updates(map[string]interface{}{
-		"plan_id":              newPlanID,
-		"pending_plan_id":      nil,
-		"pending_effective_at": nil,
-	}).Error; err != nil {
-		return false, err
+	pendingAt := *sub.PendingEffectiveAt
+	res := db.Model(&models.Subscription{}).
+		Where("id = ?", sub.ID).
+		Where("pending_plan_id = ?", newPlanID).
+		Where("pending_effective_at = ?", pendingAt).
+		Updates(map[string]interface{}{
+			"plan_id":              newPlanID,
+			"pending_plan_id":      nil,
+			"pending_effective_at": nil,
+		})
+	if res.Error != nil {
+		return false, res.Error
+	}
+	if res.RowsAffected == 0 {
+		return false, nil
 	}
 	sub.PlanID = newPlanID
 	sub.PendingPlanID = nil
