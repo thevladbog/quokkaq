@@ -393,6 +393,13 @@ export const CounterpartySchema = z
             message: 'KPP must be 9 digits'
           });
         }
+        if (ogrnip) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['ogrnip'],
+            message: 'OGRNIP must not be set for legal entity'
+          });
+        }
         if (ogrn && !digits13.test(ogrn)) {
           ctx.addIssue({
             code: 'custom',
@@ -414,6 +421,13 @@ export const CounterpartySchema = z
             code: 'custom',
             path: ['kpp'],
             message: 'KPP must not be set for sole proprietor'
+          });
+        }
+        if (ogrn) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['ogrn'],
+            message: 'OGRN must not be set for sole proprietor'
           });
         }
         if (ogrnip && !digits15.test(ogrnip)) {
@@ -525,7 +539,7 @@ export const CompanySchema = z.object({
   isSaasOperator: z.boolean().optional(),
   billingEmail: z.union([z.string().email(), z.literal('')]).optional(),
   billingAddress: z.record(z.string(), z.any()).optional(),
-  counterparty: z.any().optional(),
+  counterparty: CounterpartySchema.optional(),
   settings: z.record(z.string(), z.any()).optional(),
   onboardingState: z.record(z.string(), z.any()).optional(),
   createdAt: z.string().optional(),

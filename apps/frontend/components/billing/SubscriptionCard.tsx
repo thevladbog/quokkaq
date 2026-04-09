@@ -20,10 +20,7 @@ import {
   Info
 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import {
-  formatAppDate,
-  intlLocaleFromAppLocale
-} from '@/lib/format-datetime';
+import { formatAppDate, intlLocaleFromAppLocale } from '@/lib/format-datetime';
 
 interface SubscriptionCardProps {
   subscription: Subscription;
@@ -166,7 +163,8 @@ export function SubscriptionCard({
               <p className='mt-1 text-sm text-blue-800'>
                 {t('pendingPlanChangeDesc', {
                   plan:
-                    subscription.pendingPlan?.name ?? subscription.pendingPlanId,
+                    subscription.pendingPlan?.name ??
+                    subscription.pendingPlanId,
                   date: new Intl.DateTimeFormat(intlLocale, {
                     dateStyle: 'medium',
                     timeStyle: 'short',

@@ -594,9 +594,7 @@ export default function PlatformCompanyDetailPage() {
                   <Checkbox
                     id='inv-create-sub'
                     checked={invCreateWithSub}
-                    onCheckedChange={(v) =>
-                      setInvCreateWithSub(v === true)
-                    }
+                    onCheckedChange={(v) => setInvCreateWithSub(v === true)}
                   />
                   <div className='grid gap-1 leading-none'>
                     <Label
@@ -604,7 +602,8 @@ export default function PlatformCompanyDetailPage() {
                       className='cursor-pointer text-sm font-medium'
                     >
                       {t('createSubscriptionWithInvoice', {
-                        defaultValue: 'Create subscription together with invoice'
+                        defaultValue:
+                          'Create subscription together with invoice'
                       })}
                     </Label>
                     <p className='text-muted-foreground text-xs'>
@@ -646,7 +645,9 @@ export default function PlatformCompanyDetailPage() {
               {invCreateWithSub && !sub && (
                 <div className='space-y-4 border-t pt-4'>
                   <div className='space-y-2'>
-                    <Label>{t('selectPlan', { defaultValue: 'Target plan' })}</Label>
+                    <Label>
+                      {t('selectPlan', { defaultValue: 'Target plan' })}
+                    </Label>
                     <Select value={invPlanId} onValueChange={setInvPlanId}>
                       <SelectTrigger>
                         <SelectValue

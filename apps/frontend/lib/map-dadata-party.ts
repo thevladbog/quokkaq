@@ -33,16 +33,12 @@ export function mapDaDataPartySuggestionToCounterparty(suggestion: {
     '';
 
   const shortName =
-    (nameBlock?.short_with_opf as string) ||
-    (nameBlock?.short as string) ||
-    '';
+    (nameBlock?.short_with_opf as string) || (nameBlock?.short as string) || '';
 
   const addr = d.address as Record<string, unknown> | undefined;
   const addrData = (addr?.data as Record<string, unknown> | undefined) ?? {};
   const legalUnrestricted =
-    (addr?.unrestricted_value as string) ||
-    (addr?.value as string) ||
-    '';
+    (addr?.unrestricted_value as string) || (addr?.value as string) || '';
 
   const base: Partial<Counterparty> = {
     schemaVersion: 1,
@@ -57,8 +53,7 @@ export function mapDaDataPartySuggestionToCounterparty(suggestion: {
           addrData.postal_code != null
             ? String(addrData.postal_code)
             : undefined,
-        fiasId:
-          addrData.fias_id != null ? String(addrData.fias_id) : undefined
+        fiasId: addrData.fias_id != null ? String(addrData.fias_id) : undefined
       }
     }
   };
@@ -98,8 +93,7 @@ export function addressFieldsFromDaDataSuggestion(s: {
   const data = s.data ?? {};
   return {
     unrestricted: String(s.unrestricted_value || s.value || '').trim(),
-    postalCode:
-      data.postal_code != null ? String(data.postal_code) : undefined,
+    postalCode: data.postal_code != null ? String(data.postal_code) : undefined,
     fiasId: data.fias_id != null ? String(data.fias_id) : undefined
   };
 }

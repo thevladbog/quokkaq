@@ -122,7 +122,9 @@ export default function PlatformPlansPage() {
         />
       </div>
       <div className='grid gap-2'>
-        <Label>{t('priceMinor', { defaultValue: 'Price (minor units)' })}</Label>
+        <Label>
+          {t('priceMinor', { defaultValue: 'Price (minor units)' })}
+        </Label>
         <Input
           type='number'
           value={form.price}
@@ -216,7 +218,9 @@ export default function PlatformPlansPage() {
               <TableHead>
                 {t('priceColumn', { defaultValue: 'Price' })}
               </TableHead>
-              <TableHead>{t('interval', { defaultValue: 'Interval' })}</TableHead>
+              <TableHead>
+                {t('interval', { defaultValue: 'Interval' })}
+              </TableHead>
               <TableHead>{t('active', { defaultValue: 'Active' })}</TableHead>
               <TableHead />
             </TableRow>
@@ -232,7 +236,11 @@ export default function PlatformPlansPage() {
                 <TableCell>{p.interval}</TableCell>
                 <TableCell>{p.isActive ? '✓' : '—'}</TableCell>
                 <TableCell className='text-right'>
-                  <Button variant='outline' size='sm' onClick={() => openEdit(p)}>
+                  <Button
+                    variant='outline'
+                    size='sm'
+                    onClick={() => openEdit(p)}
+                  >
                     {t('edit', { defaultValue: 'Edit' })}
                   </Button>
                 </TableCell>

@@ -390,6 +390,8 @@ After starting, the services will be available at:
 2. Create a bucket named `quokkaq-materials`
 3. The API will automatically run migrations on first start
 
+**Platform operator UI (`/platform`):** Compose sets `PLATFORM_ALLOW_TENANT_ADMIN` to **`false` by default** (tenant `admin` cannot call `/platform/*` unless they have `platform_admin`). To allow tenant admins on `/platform` in this dev stack only, set `PLATFORM_ALLOW_TENANT_ADMIN=true` in your environment or Compose `.env`. See [SETUP.md](../../SETUP.md#saas-platform-admin-product-owner) for roles and production behavior.
+
 #### Building Docker Image Only
 
 ```bash

@@ -39,6 +39,6 @@ type Subscription struct {
 
 	// Relations
 	Plan        SubscriptionPlan `gorm:"foreignKey:PlanID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;" json:"plan,omitempty"`
-	PendingPlan SubscriptionPlan `gorm:"foreignKey:PendingPlanID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;" json:"pendingPlan,omitempty"`
+	PendingPlan *SubscriptionPlan `gorm:"foreignKey:PendingPlanID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;" json:"pendingPlan,omitempty"`
 	Company     Company          `gorm:"foreignKey:CompanyID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-" swaggerignore:"true"`
 }

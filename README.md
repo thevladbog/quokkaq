@@ -590,6 +590,8 @@ After starting, services will be available at:
   - ⚠️ **DEFAULT CREDENTIALS (DEV ONLY)**: `minioadmin/minioadmin`
   - **DO NOT USE IN PRODUCTION** - Change these credentials immediately in production environments
 
+The backend Compose file defaults `PLATFORM_ALLOW_TENANT_ADMIN` to **`false`**. Set `PLATFORM_ALLOW_TENANT_ADMIN=true` in your environment only when you deliberately want tenant `admin` users to access `/platform/*` in that dev stack (see [SETUP.md](SETUP.md#saas-platform-admin-product-owner)).
+
 #### Frontend Docker Build
 
 ```bash

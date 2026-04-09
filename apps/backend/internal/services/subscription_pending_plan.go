@@ -1,6 +1,7 @@
 package services
 
 import (
+	"errors"
 	"quokkaq-go-backend/internal/models"
 	"time"
 
@@ -8,7 +9,7 @@ import (
 )
 
 // ApplyPendingPlanIfDue promotes a scheduled plan to current when PendingEffectiveAt has passed (UTC).
-// It updates the row and mutates sub in memory (PlanID, clears pending fields; PendingPlan zeroed).
+// It updates the row and mutates sub in memory (PlanID, clears pending fields; PendingPlan set nil).
 func ApplyPendingPlanIfDue(db *gorm.DB, sub *models.Subscription, now time.Time) error {
 	if sub == nil || sub.ID == "" {
 		return nil
@@ -30,6 +31,20 @@ func ApplyPendingPlanIfDue(db *gorm.DB, sub *models.Subscription, now time.Time)
 	sub.PlanID = newPlanID
 	sub.PendingPlanID = nil
 	sub.PendingEffectiveAt = nil
-	sub.PendingPlan = models.SubscriptionPlan{}
+	sub.PendingPlan = nil
 	return nil
+}
+
+// ApplyPendingPlanIfDueBeforeQuota loads the subscription for companyID and promotes a scheduled plan when PendingEffectiveAt has passed (UTC).
+// Call this before quota enforcement (e.g. CheckQuota) so limits match the promoted plan. GetLimit stays read-only and does not perform this write.
+func ApplyPendingPlanIfDueBeforeQuota(db *gorm.DB, companyID string, now time.Time) error {
+	var sub models.Subscription
+	err := db.Where("company_id = ?", companyID).First(&sub).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		return err
+	}
+	return ApplyPendingPlanIfDue(db, &sub, now)
 }

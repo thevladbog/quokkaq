@@ -158,10 +158,17 @@ export default function PlatformSubscriptionsPage() {
 
       if (createWithInvoice) {
         const amount = parseInt(invAmount, 10);
-        const due = invDue ? new Date(invDue).toISOString() : '';
-        if (!Number.isFinite(amount) || amount <= 0 || !due) {
+        const dueRaw = invDue.trim();
+        const dueDate = new Date(dueRaw);
+        if (
+          !Number.isFinite(amount) ||
+          amount <= 0 ||
+          dueRaw === '' ||
+          Number.isNaN(dueDate.getTime())
+        ) {
           throw new Error(t('invoiceWithSubValidation'));
         }
+        const due = dueDate.toISOString();
         await platformApi.createInvoice({
           companyId,
           subscriptionId: sub.id,
@@ -237,7 +244,9 @@ export default function PlatformSubscriptionsPage() {
               <p className='text-destructive text-sm'>{t('loadPlansError')}</p>
             )}
             <div className='space-y-2'>
-              <Label>{t('selectCompany', { defaultValue: 'Organization' })}</Label>
+              <Label>
+                {t('selectCompany', { defaultValue: 'Organization' })}
+              </Label>
               <Combobox
                 options={companyOptions}
                 value={companyId || undefined}
@@ -285,7 +294,7 @@ export default function PlatformSubscriptionsPage() {
               <DateTimePicker value={periodStart} onChange={setPeriodStart} />
             </div>
             <div className='grid gap-2'>
-              <Label>{t('periodEnd')}</Label>
+              <Label>{t('periodEndUtc')}</Label>
               <DateTimePicker value={periodEnd} onChange={setPeriodEnd} />
             </div>
 

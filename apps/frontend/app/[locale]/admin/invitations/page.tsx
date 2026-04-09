@@ -2,10 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import {
-  formatAppDate,
-  intlLocaleFromAppLocale
-} from '@/lib/format-datetime';
+import { formatAppDate, intlLocaleFromAppLocale } from '@/lib/format-datetime';
 import { Button } from '@/components/ui/button';
 import {
   Card,

@@ -135,9 +135,7 @@ export default function PlatformInvoicesPage() {
                     intlLocale
                   )}
                 </TableCell>
-                <TableCell>
-                  {invoiceStatusLabel(tOrgInv, inv.status)}
-                </TableCell>
+                <TableCell>{invoiceStatusLabel(tOrgInv, inv.status)}</TableCell>
                 <TableCell className='text-sm'>
                   {formatAppDateTime(inv.dueDate, intlLocale)}
                 </TableCell>
@@ -152,7 +150,7 @@ export default function PlatformInvoicesPage() {
                         })
                       }
                     >
-                      <SelectTrigger className='h-8 min-w-[10rem] max-w-[220px]'>
+                      <SelectTrigger className='h-8 max-w-[220px] min-w-[10rem]'>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>

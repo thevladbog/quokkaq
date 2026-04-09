@@ -10,10 +10,18 @@ import {
   CardHeader,
   CardTitle
 } from '@/components/ui/card';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Building2, MapPin, CreditCard, Users, Settings } from 'lucide-react';
+import {
+  AlertCircle,
+  Building2,
+  MapPin,
+  CreditCard,
+  Users,
+  Settings
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { companiesApiExt } from '@/lib/api';
@@ -36,16 +44,27 @@ export function OrganizationPageContent() {
     emptyCounterparty()
   );
 
-  const { data: me, isLoading } = useQuery({
+  const {
+    data: me,
+    isLoading,
+    isError,
+    error,
+    refetch
+  } = useQuery({
     queryKey: ['company-me'],
     queryFn: () => companiesApiExt.getMe()
   });
 
-  const company = me?.company;
-  const features = me?.features ?? {
-    dadata: false,
-    dadataCleaner: false
-  };
+  const company = !isError ? me?.company : undefined;
+  const features = !isError
+    ? (me?.features ?? {
+        dadata: false,
+        dadataCleaner: false
+      })
+    : { dadata: false, dadataCleaner: false };
+
+  const showReadOnly = !isLoading && !isError && !isEditing;
+  const showEditForm = !isLoading && !isError && isEditing;
 
   const updateCompanyMutation = useMutation({
     mutationFn: async () => {
@@ -88,7 +107,30 @@ export function OrganizationPageContent() {
         <CardContent>
           {isLoading ? (
             <p className='text-muted-foreground text-sm'>{t('loading')}</p>
-          ) : !isEditing ? (
+          ) : isError ? (
+            <Alert variant='destructive'>
+              <AlertCircle />
+              <AlertTitle>{t('loadErrorTitle')}</AlertTitle>
+              <AlertDescription className='mt-2 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
+                <span className='space-y-1'>
+                  <span className='block'>{t('loadError')}</span>
+                  {error instanceof Error && error.message ? (
+                    <span className='text-destructive/80 block text-xs'>
+                      {error.message}
+                    </span>
+                  ) : null}
+                </span>
+                <Button
+                  type='button'
+                  variant='outline'
+                  size='sm'
+                  onClick={() => void refetch()}
+                >
+                  {t('retry')}
+                </Button>
+              </AlertDescription>
+            </Alert>
+          ) : showReadOnly ? (
             <div className='space-y-4'>
               <div>
                 <Label className='text-gray-500'>{t('companyName')}</Label>
@@ -112,7 +154,7 @@ export function OrganizationPageContent() {
                 </p>
               </div>
             </div>
-          ) : (
+          ) : showEditForm ? (
             <form
               className='space-y-6'
               onSubmit={(e) => {
@@ -151,7 +193,7 @@ export function OrganizationPageContent() {
                     name='address'
                     value={billingAddressLine}
                     onChange={(e) => setBillingAddressLine(e.target.value)}
-                    placeholder='г. Москва, ул. Примерная, д. 1'
+                    placeholder={t('addressPlaceholder')}
                   />
                 </div>
               </div>
@@ -190,10 +232,10 @@ export function OrganizationPageContent() {
                 </p>
               )}
             </form>
-          )}
+          ) : null}
         </CardContent>
 
-        {!isLoading && !isEditing && (
+        {showReadOnly && (
           <CardFooter>
             <Button
               onClick={() => {
@@ -207,7 +249,9 @@ export function OrganizationPageContent() {
                   setBillingAddressLine(
                     typeof addr?.address === 'string' ? addr.address : ''
                   );
-                  setCounterparty(parseCounterpartyFromApi(company.counterparty));
+                  setCounterparty(
+                    parseCounterpartyFromApi(company.counterparty)
+                  );
                 }
                 setIsEditing(true);
               }}

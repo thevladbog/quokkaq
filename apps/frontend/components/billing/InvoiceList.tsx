@@ -8,10 +8,7 @@ import { Download, Receipt } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useMemo } from 'react';
 import { formatPriceMinorUnits } from '@/lib/format-price';
-import {
-  formatAppDate,
-  intlLocaleFromAppLocale
-} from '@/lib/format-datetime';
+import { formatAppDate, intlLocaleFromAppLocale } from '@/lib/format-datetime';
 
 interface InvoiceListProps {
   invoices: Invoice[];

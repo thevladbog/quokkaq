@@ -8,22 +8,35 @@ export function intlLocaleFromAppLocale(locale: string): string {
 
 export type AppDateStyle = 'short' | 'medium' | 'long' | 'full';
 
+const ISO_DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
 function parseDate(value: string | Date | null | undefined): Date | null {
   if (value === null || value === undefined || value === '') return null;
-  const d = typeof value === 'string' ? new Date(value) : value;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+  const m = ISO_DATE_ONLY.exec(value);
+  if (m) {
+    const year = Number(m[1]);
+    const monthIndex = Number(m[2]) - 1;
+    const day = Number(m[3]);
+    const d = new Date(year, monthIndex, day);
+    if (Number.isNaN(d.getTime())) return null;
+    if (
+      d.getFullYear() !== year ||
+      d.getMonth() !== monthIndex ||
+      d.getDate() !== day
+    ) {
+      return null;
+    }
+    return d;
+  }
+  const d = new Date(value);
   if (Number.isNaN(d.getTime())) return null;
   return d;
 }
 
-const fullOptions: Intl.DateTimeFormatOptions = {
-  weekday: 'long',
-  year: 'numeric',
-  month: 'long',
-  day: 'numeric'
-};
-
 function dateStyleOptions(style: AppDateStyle): Intl.DateTimeFormatOptions {
-  if (style === 'full') return fullOptions;
   return { dateStyle: style };
 }
 
@@ -64,8 +77,8 @@ export function formatAppTime(
   value: string | Date,
   intlLocale: string
 ): string {
-  const d = typeof value === 'string' ? new Date(value) : value;
-  if (Number.isNaN(d.getTime())) return '';
+  const d = parseDate(value);
+  if (!d) return '';
   return new Intl.DateTimeFormat(intlLocale, {
     hour: '2-digit',
     minute: '2-digit'
@@ -79,9 +92,8 @@ export function formatAppTime(
 export function toDateTimeLocalString(
   value: string | Date | null | undefined
 ): string {
-  if (value === null || value === undefined || value === '') return '';
-  const d = typeof value === 'string' ? new Date(value) : value;
-  if (Number.isNaN(d.getTime())) return '';
+  const d = parseDate(value);
+  if (!d) return '';
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');

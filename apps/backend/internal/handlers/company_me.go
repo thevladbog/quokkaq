@@ -28,7 +28,7 @@ func dadataConfigured() bool {
 }
 
 func dadataCleanerConfigured() bool {
-	return strings.TrimSpace(os.Getenv("DADATA_CLEANER_API_KEY")) != "" || dadataConfigured()
+	return strings.TrimSpace(os.Getenv("DADATA_CLEANER_API_KEY")) != ""
 }
 
 // GetMyCompany godoc

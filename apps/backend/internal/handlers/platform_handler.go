@@ -21,9 +21,139 @@ import (
 const platformDefaultLimit = 50
 const platformMaxLimit = 100
 
+// platformInvoiceStatuses is the allowed set for models.Invoice.Status on platform create/patch.
+var platformInvoiceStatuses = map[string]struct{}{
+	"draft": {}, "open": {}, "paid": {}, "void": {}, "uncollectible": {},
+}
+
+func isValidPlatformInvoiceStatus(s string) bool {
+	_, ok := platformInvoiceStatuses[s]
+	return ok
+}
+
+// invoicePaidAtForCreate enforces paidAt only when status is paid; otherwise paidAt must be omitted.
+func invoicePaidAtForCreate(status string, paidAt *time.Time, nowUTC time.Time) (*time.Time, error) {
+	if status == "paid" {
+		if paidAt != nil {
+			t := paidAt.UTC()
+			return &t, nil
+		}
+		t := nowUTC
+		return &t, nil
+	}
+	if paidAt != nil {
+		return nil, errors.New("paidAt is only allowed when status is paid")
+	}
+	return nil, nil
+}
+
+// platformSubscriptionStatuses is the allowed set for models.Subscription.Status on platform create/patch.
+var platformSubscriptionStatuses = map[string]struct{}{
+	"trial": {}, "active": {}, "past_due": {}, "canceled": {}, "paused": {},
+}
+
+// resolvePlatformSubscriptionStatusForCreate returns "active" when omitted or blank; otherwise validates against platformSubscriptionStatuses.
+func resolvePlatformSubscriptionStatusForCreate(in *string) (string, error) {
+	if in == nil || strings.TrimSpace(*in) == "" {
+		return "active", nil
+	}
+	s := strings.TrimSpace(*in)
+	if _, ok := platformSubscriptionStatuses[s]; !ok {
+		return "", errors.New("invalid status")
+	}
+	return s, nil
+}
+
+// applyPlatformPatchSubscriptionCore merges status, billing window, cancel-at-period-end, and trialEnd from body into sub
+// and enforces the same invariants as CreateSubscription for those fields.
+func applyPlatformPatchSubscriptionCore(sub *models.Subscription, body patchSubscriptionBody, now time.Time) error {
+	if (body.CurrentPeriodStart == nil) != (body.CurrentPeriodEnd == nil) {
+		return errors.New("currentPeriodStart and currentPeriodEnd must both be set or both omitted")
+	}
+	if body.CurrentPeriodStart != nil && body.CurrentPeriodEnd != nil {
+		start := body.CurrentPeriodStart.UTC()
+		end := body.CurrentPeriodEnd.UTC()
+		if !end.After(start) {
+			return errors.New("currentPeriodEnd must be after currentPeriodStart")
+		}
+		sub.CurrentPeriodStart = start
+		sub.CurrentPeriodEnd = end
+	}
+
+	if body.Status != nil {
+		s := strings.TrimSpace(*body.Status)
+		if s == "" {
+			return errors.New("invalid status")
+		}
+		if _, ok := platformSubscriptionStatuses[s]; !ok {
+			return errors.New("invalid status")
+		}
+		sub.Status = s
+	}
+
+	if body.CancelAtPeriodEnd != nil {
+		sub.CancelAtPeriodEnd = *body.CancelAtPeriodEnd
+	}
+
+	if body.TrialEnd != nil {
+		t := body.TrialEnd.UTC()
+		sub.TrialEnd = &t
+	}
+
+	if sub.Status == "trial" {
+		if sub.TrialEnd == nil {
+			te := now.AddDate(0, 0, 14)
+			sub.TrialEnd = &te
+		}
+		sub.CurrentPeriodEnd = *sub.TrialEnd
+	}
+
+	if !sub.CurrentPeriodEnd.After(sub.CurrentPeriodStart) {
+		return errors.New("currentPeriodEnd must be after currentPeriodStart")
+	}
+
+	if sub.CancelAtPeriodEnd {
+		switch sub.Status {
+		case "trial", "active", "past_due":
+		default:
+			return errors.New("cancelAtPeriodEnd is only valid when status is trial, active, or past_due")
+		}
+	}
+
+	if sub.TrialEnd != nil {
+		if sub.TrialEnd.Before(sub.CurrentPeriodStart) {
+			return errors.New("trialEnd must not be before currentPeriodStart")
+		}
+		if sub.Status == "trial" && !sub.TrialEnd.After(now) {
+			return errors.New("trialEnd must be in the future for trial status")
+		}
+	}
+
+	return nil
+}
+
 // platformCreateSubscriptionForCompanyTx creates a subscription for company and updates company.subscription_id to the new row (same tx).
 // Allows creating multiple subscriptions per company (e.g. future periods); operator is responsible for non-overlapping periods.
 func platformCreateSubscriptionForCompanyTx(tx *gorm.DB, companyID, planID string, status string, start, end time.Time, trialEnd *time.Time) (*models.Subscription, error) {
+	start = start.UTC()
+	end = end.UTC()
+	var trialEndUTC *time.Time
+	if trialEnd != nil {
+		t := trialEnd.UTC()
+		trialEndUTC = &t
+	}
+
+	if !end.After(start) {
+		return nil, errors.New("subscription currentPeriodEnd must be after currentPeriodStart")
+	}
+	effectiveEnd := end
+	if trialEndUTC != nil && trialEndUTC.Before(end) {
+		effectiveEnd = *trialEndUTC
+	}
+	if !effectiveEnd.After(start) {
+		return nil, errors.New("subscription period is invalid: when trialEnd is before currentPeriodEnd, trialEnd must still be after currentPeriodStart")
+	}
+
 	sub := &models.Subscription{
 		CompanyID:            companyID,
 		PlanID:               planID,
@@ -31,7 +161,7 @@ func platformCreateSubscriptionForCompanyTx(tx *gorm.DB, companyID, planID strin
 		CurrentPeriodStart:   start,
 		CurrentPeriodEnd:     end,
 		CancelAtPeriodEnd:    false,
-		TrialEnd:             trialEnd,
+		TrialEnd:             trialEndUTC,
 		StripeSubscriptionID: nil,
 	}
 	if err := tx.Create(sub).Error; err != nil {
@@ -416,15 +546,14 @@ func (h *PlatformHandler) CreateSubscription(w http.ResponseWriter, r *http.Requ
 	if body.CurrentPeriodStart != nil && body.CurrentPeriodEnd != nil {
 		start = body.CurrentPeriodStart.UTC()
 		end = body.CurrentPeriodEnd.UTC()
+		if !end.After(start) {
+			http.Error(w, "currentPeriodEnd must be after currentPeriodStart", http.StatusBadRequest)
+			return
+		}
 	}
 
-	status := "active"
-	if body.Status != nil && strings.TrimSpace(*body.Status) != "" {
-		status = strings.TrimSpace(*body.Status)
-	}
-	switch status {
-	case "trial", "active", "past_due", "canceled", "paused":
-	default:
+	status, err := resolvePlatformSubscriptionStatusForCreate(body.Status)
+	if err != nil {
 		http.Error(w, "invalid status", http.StatusBadRequest)
 		return
 	}
@@ -441,6 +570,16 @@ func (h *PlatformHandler) CreateSubscription(w http.ResponseWriter, r *http.Requ
 		}
 		end = *trialEnd
 	}
+	if trialEnd != nil {
+		if trialEnd.Before(start) {
+			http.Error(w, "trialEnd must not be before currentPeriodStart", http.StatusBadRequest)
+			return
+		}
+		if status == "trial" && !trialEnd.After(now) {
+			http.Error(w, "trialEnd must be in the future for trial status", http.StatusBadRequest)
+			return
+		}
+	}
 
 	sub := &models.Subscription{
 		CompanyID:            companyID,
@@ -453,7 +592,7 @@ func (h *PlatformHandler) CreateSubscription(w http.ResponseWriter, r *http.Requ
 		StripeSubscriptionID: nil,
 	}
 
-	err := database.DB.Transaction(func(tx *gorm.DB) error {
+	err = database.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(sub).Error; err != nil {
 			return err
 		}
@@ -542,23 +681,11 @@ func (h *PlatformHandler) PatchSubscription(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	if body.Status != nil {
-		sub.Status = strings.TrimSpace(*body.Status)
-	}
-	if body.CurrentPeriodStart != nil {
-		sub.CurrentPeriodStart = *body.CurrentPeriodStart
-	}
-	if body.CurrentPeriodEnd != nil {
-		sub.CurrentPeriodEnd = *body.CurrentPeriodEnd
-	}
-	if body.CancelAtPeriodEnd != nil {
-		sub.CancelAtPeriodEnd = *body.CancelAtPeriodEnd
-	}
-	if body.TrialEnd != nil {
-		sub.TrialEnd = body.TrialEnd
-	}
-
 	now := time.Now().UTC()
+	if err := applyPlatformPatchSubscriptionCore(sub, body, now); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	if body.PlanID != nil {
 		pid := strings.TrimSpace(*body.PlanID)
@@ -578,6 +705,7 @@ func (h *PlatformHandler) PatchSubscription(w http.ResponseWriter, r *http.Reque
 		sub.PlanID = pid
 		sub.PendingPlanID = nil
 		sub.PendingEffectiveAt = nil
+		sub.PendingPlan = nil
 	}
 
 	scheduling := body.PendingPlanID != nil && body.PendingEffectiveAt != nil
@@ -609,9 +737,11 @@ func (h *PlatformHandler) PatchSubscription(w http.ResponseWriter, r *http.Reque
 		}
 		sub.PendingPlanID = &ppid
 		sub.PendingEffectiveAt = &t
+		sub.PendingPlan = nil
 	} else if body.ClearPending != nil && *body.ClearPending {
 		sub.PendingPlanID = nil
 		sub.PendingEffectiveAt = nil
+		sub.PendingPlan = nil
 	}
 
 	if err := h.subscriptionRepo.Update(sub); err != nil {
@@ -819,6 +949,7 @@ type createInvoiceBody struct {
 	Currency                      string                         `json:"currency"`
 	DueDate                       string                         `json:"dueDate"` // RFC3339
 	Status                        string                         `json:"status"`
+	PaidAt                        *time.Time                     `json:"paidAt,omitempty"`
 	PaymentProvider               string                         `json:"paymentProvider"`
 	CreateSubscriptionWithInvoice bool                           `json:"createSubscriptionWithInvoice"`
 	Subscription                  *createInvoiceSubscriptionOpts `json:"subscription"`
@@ -866,11 +997,22 @@ func (h *PlatformHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 	if body.Currency == "" {
 		body.Currency = "RUB"
 	}
+	body.Status = strings.TrimSpace(body.Status)
 	if body.Status == "" {
 		body.Status = "open"
 	}
 	if body.PaymentProvider == "" {
 		body.PaymentProvider = "manual"
+	}
+	if !isValidPlatformInvoiceStatus(body.Status) {
+		http.Error(w, "invalid invoice status", http.StatusBadRequest)
+		return
+	}
+	nowUTC := time.Now().UTC()
+	paidAtPtr, err := invoicePaidAtForCreate(body.Status, body.PaidAt, nowUTC)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 	due, err := time.Parse(time.RFC3339, strings.TrimSpace(body.DueDate))
 	if err != nil {
@@ -918,13 +1060,8 @@ func (h *PlatformHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 
-		status := "active"
-		if body.Subscription.Status != nil && strings.TrimSpace(*body.Subscription.Status) != "" {
-			status = strings.TrimSpace(*body.Subscription.Status)
-		}
-		switch status {
-		case "trial", "active", "past_due", "canceled", "paused":
-		default:
+		status, err := resolvePlatformSubscriptionStatusForCreate(body.Subscription.Status)
+		if err != nil {
 			http.Error(w, "invalid subscription.status", http.StatusBadRequest)
 			return
 		}
@@ -942,9 +1079,19 @@ func (h *PlatformHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 			}
 			end = *trialEnd
 		}
+		if trialEnd != nil {
+			if trialEnd.Before(start) {
+				http.Error(w, "subscription.trialEnd must not be before currentPeriodStart", http.StatusBadRequest)
+				return
+			}
+			if status == "trial" && !trialEnd.After(now) {
+				http.Error(w, "subscription.trialEnd must be in the future for trial status", http.StatusBadRequest)
+				return
+			}
+		}
 
 		var inv models.Invoice
-		err := database.DB.Transaction(func(tx *gorm.DB) error {
+		err = database.DB.Transaction(func(tx *gorm.DB) error {
 			sub, err := platformCreateSubscriptionForCompanyTx(tx, body.CompanyID, planID, status, start, end, trialEnd)
 			if err != nil {
 				return err
@@ -957,6 +1104,7 @@ func (h *PlatformHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 				Currency:        body.Currency,
 				Status:          body.Status,
 				PaymentProvider: body.PaymentProvider,
+				PaidAt:          paidAtPtr,
 				DueDate:         due,
 			}
 			return tx.Create(&inv).Error
@@ -994,6 +1142,7 @@ func (h *PlatformHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 			Currency:        body.Currency,
 			Status:          body.Status,
 			PaymentProvider: body.PaymentProvider,
+			PaidAt:          paidAtPtr,
 			DueDate:         due,
 		}
 		if err := h.invoiceRepo.Create(&inv); err != nil {
@@ -1054,22 +1203,29 @@ func (h *PlatformHandler) PatchInvoice(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.Status != nil {
 		st := strings.TrimSpace(*body.Status)
+		if !isValidPlatformInvoiceStatus(st) {
+			http.Error(w, "invalid invoice status", http.StatusBadRequest)
+			return
+		}
 		inv.Status = st
 		if st == "paid" {
 			if body.PaidAt != nil {
-				inv.PaidAt = body.PaidAt
+				t := body.PaidAt.UTC()
+				inv.PaidAt = &t
 			} else if inv.PaidAt == nil {
 				now := time.Now().UTC()
 				inv.PaidAt = &now
 			}
-		}
-		if st == "void" || st == "draft" || st == "open" || st == "uncollectible" {
-			if st != "paid" {
-				inv.PaidAt = nil
-			}
+		} else {
+			inv.PaidAt = nil
 		}
 	} else if body.PaidAt != nil {
-		inv.PaidAt = body.PaidAt
+		if strings.TrimSpace(inv.Status) != "paid" {
+			http.Error(w, "paidAt may only be set when invoice status is paid", http.StatusBadRequest)
+			return
+		}
+		t := body.PaidAt.UTC()
+		inv.PaidAt = &t
 	}
 
 	wantClear := body.ClearSubscriptionID != nil && *body.ClearSubscriptionID

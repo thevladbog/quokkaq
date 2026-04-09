@@ -15,6 +15,11 @@ const (
 	cleanerBaseURL     = "https://cleaner.dadata.ru/api/v1"
 )
 
+// cleanerHTTPClient is shared for Cleaner API calls so connections are pooled (http.Client is safe for concurrent use).
+var cleanerHTTPClient = &http.Client{
+	Timeout: 15 * time.Second,
+}
+
 // Client calls DaData Suggestions and Cleaner APIs (keys stay on the server).
 type Client struct {
 	httpClient *http.Client
@@ -35,12 +40,9 @@ func NewClientFromEnv() (*Client, error) {
 	}, nil
 }
 
-// CleanerAPIKey returns key for Cleaner API: DADATA_CLEANER_API_KEY or main API key.
+// CleanerAPIKey returns DADATA_CLEANER_API_KEY for POST /clean/ADDRESS. Empty if unset (main suggestions key is not accepted as a fallback).
 func CleanerAPIKey() string {
-	if s := strings.TrimSpace(os.Getenv("DADATA_CLEANER_API_KEY")); s != "" {
-		return s
-	}
-	return strings.TrimSpace(os.Getenv("DADATA_API_KEY"))
+	return strings.TrimSpace(os.Getenv("DADATA_CLEANER_API_KEY"))
 }
 
 func (c *Client) postJSON(url string, body []byte, authToken string) ([]byte, int, error) {
@@ -89,7 +91,6 @@ func CleanAddress(body []byte) ([]byte, int, error) {
 	if token == "" {
 		return nil, 0, fmt.Errorf("no API key for Cleaner")
 	}
-	cl := &http.Client{Timeout: 15 * time.Second}
 	url := cleanerBaseURL + "/clean/ADDRESS"
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
@@ -100,7 +101,7 @@ func CleanAddress(body []byte) ([]byte, int, error) {
 	if s := strings.TrimSpace(os.Getenv("DADATA_SECRET")); s != "" {
 		req.Header.Set("X-Secret", s)
 	}
-	resp, err := cl.Do(req)
+	resp, err := cleanerHTTPClient.Do(req)
 	if err != nil {
 		return nil, 0, err
 	}

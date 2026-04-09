@@ -108,7 +108,11 @@ export function CounterpartyForm({
   const [addrQ, setAddrQ] = useState('');
   const [addrDebounced, setAddrDebounced] = useState('');
   const [addrHits, setAddrHits] = useState<
-    { value?: string; unrestricted_value?: string; data?: Record<string, unknown> }[]
+    {
+      value?: string;
+      unrestricted_value?: string;
+      data?: Record<string, unknown>;
+    }[]
   >([]);
   const [addrBusy, setAddrBusy] = useState(false);
   const [cleanBusy, setCleanBusy] = useState(false);
@@ -232,7 +236,10 @@ export function CounterpartyForm({
     try {
       const res = await dadataApi.cleanAddress(dadataScope, [line]);
       const arr = res as unknown[];
-      const row = Array.isArray(arr) && arr[0] && typeof arr[0] === 'object' ? (arr[0] as Record<string, unknown>) : null;
+      const row =
+        Array.isArray(arr) && arr[0] && typeof arr[0] === 'object'
+          ? (arr[0] as Record<string, unknown>)
+          : null;
       if (row) {
         const unrestricted = String(row.result ?? row.source ?? line);
         const postalCode =
@@ -253,9 +260,7 @@ export function CounterpartyForm({
         <Select
           disabled={disabled}
           value={pt}
-          onValueChange={(v) =>
-            setField({ partyType: v as PartyType })
-          }
+          onValueChange={(v) => setField({ partyType: v as PartyType })}
         >
           <SelectTrigger>
             <SelectValue />
@@ -324,7 +329,14 @@ export function CounterpartyForm({
                       setPartyQ('');
                     }}
                   >
-                    {h.value ?? formatAddressSuggestionLabel(h as { value?: string; unrestricted_value?: string; data?: Record<string, unknown> })}
+                    {h.value ??
+                      formatAddressSuggestionLabel(
+                        h as {
+                          value?: string;
+                          unrestricted_value?: string;
+                          data?: Record<string, unknown>;
+                        }
+                      )}
                   </button>
                 </li>
               ))}
@@ -483,9 +495,7 @@ export function CounterpartyForm({
           <Input
             disabled={disabled}
             value={value.addresses?.legal?.unrestricted ?? ''}
-            onChange={(e) =>
-              setAddr('legal', { unrestricted: e.target.value })
-            }
+            onChange={(e) => setAddr('legal', { unrestricted: e.target.value })}
           />
         </div>
         <div className='grid gap-2 sm:grid-cols-2'>
@@ -494,9 +504,7 @@ export function CounterpartyForm({
             <Input
               disabled={disabled}
               value={value.addresses?.legal?.postalCode ?? ''}
-              onChange={(e) =>
-                setAddr('legal', { postalCode: e.target.value })
-              }
+              onChange={(e) => setAddr('legal', { postalCode: e.target.value })}
             />
           </div>
           <div className='grid gap-2'>
@@ -528,9 +536,7 @@ export function CounterpartyForm({
         <Input
           disabled={disabled}
           value={value.addresses?.actual?.unrestricted ?? ''}
-          onChange={(e) =>
-            setAddr('actual', { unrestricted: e.target.value })
-          }
+          onChange={(e) => setAddr('actual', { unrestricted: e.target.value })}
         />
       </div>
 
@@ -541,9 +547,7 @@ export function CounterpartyForm({
         <Input
           disabled={disabled}
           value={value.addresses?.postal?.unrestricted ?? ''}
-          onChange={(e) =>
-            setAddr('postal', { unrestricted: e.target.value })
-          }
+          onChange={(e) => setAddr('postal', { unrestricted: e.target.value })}
         />
       </div>
 

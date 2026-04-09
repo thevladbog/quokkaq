@@ -63,6 +63,9 @@ func TestApplyPendingPlanIfDue_PastEffective_PromotesPlanAndClearsPending(t *tes
 	if sub.PendingPlanID != nil {
 		t.Fatal("in-memory pending should be cleared")
 	}
+	if sub.PendingPlan != nil {
+		t.Fatal("in-memory PendingPlan should be nil after promotion")
+	}
 }
 
 func newPendingPlanTestDB(t *testing.T) *gorm.DB {

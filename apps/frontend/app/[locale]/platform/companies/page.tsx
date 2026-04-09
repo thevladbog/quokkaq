@@ -17,10 +17,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { Badge } from '@/components/ui/badge';
 import { Link } from '@/src/i18n/navigation';
 import { useLocale, useTranslations } from 'next-intl';
-import {
-  formatAppDate,
-  intlLocaleFromAppLocale
-} from '@/lib/format-datetime';
+import { formatAppDate, intlLocaleFromAppLocale } from '@/lib/format-datetime';
 
 export default function PlatformCompaniesPage() {
   const t = useTranslations('platform.companies');
@@ -67,7 +64,7 @@ export default function PlatformCompaniesPage() {
           {(error as Error).message || 'Failed to load'}
         </p>
       )}
-      {data && (
+      {data && data.items.length > 0 && (
         <Table>
           <TableHeader>
             <TableRow>
@@ -95,9 +92,7 @@ export default function PlatformCompaniesPage() {
                 <TableCell className='text-muted-foreground font-mono text-xs'>
                   {c.id.slice(0, 8)}…
                 </TableCell>
-                <TableCell>
-                  {formatAppDate(c.createdAt, intlLocale)}
-                </TableCell>
+                <TableCell>{formatAppDate(c.createdAt, intlLocale)}</TableCell>
                 <TableCell className='text-right'>
                   <Button variant='outline' size='sm' asChild>
                     <Link href={`/platform/companies/${c.id}`}>

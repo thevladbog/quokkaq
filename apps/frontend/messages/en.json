@@ -875,7 +875,10 @@
       "companies": "Companies",
       "subscriptions": "Subscriptions",
       "plans": "Plans",
-      "invoices": "Invoices"
+      "invoices": "Invoices",
+      "loadErrorTitle": "Unable to load overview",
+      "loadError": "Could not load platform overview. Check your connection or try again.",
+      "retry": "Retry"
     },
     "companies": {
       "title": "Companies",
@@ -983,7 +986,7 @@
       "companyHasSubscriptionInfo": "This organization already has a subscription. You can create another one (e.g. for a future period) — ensure the periods don't overlap or align with your billing logic.",
       "periodOptionalHint": "Leave both empty to use the default billing period (now through +1 month, UTC).",
       "periodStart": "Period start (UTC)",
-      "periodEnd": "Period end (UTC)",
+      "periodEndUtc": "Period end (UTC)",
       "periodBothOrNeither": "Set both period start and end, or leave both empty.",
       "periodOrderInvalid": "Period end must be after start.",
       "subscriptionStatusOptional": "Subscription status",
@@ -1109,6 +1112,9 @@
     "companyInfo": "Company Information",
     "companyInfoDesc": "Basic information about your organization",
     "loading": "Loading…",
+    "loadErrorTitle": "Could not load organization",
+    "loadError": "We could not load your company profile. Check your connection or sign in again.",
+    "retry": "Retry",
     "counterpartySectionTitle": "Counterparty (Russia)",
     "counterparty": {
       "partyType": "Party type",
@@ -1150,6 +1156,7 @@
     "companyName": "Company Name",
     "billingEmail": "Billing Email",
     "address": "Address",
+    "addressPlaceholder": "e.g. 123 Main Street, City, Postal code",
     "notSet": "Not set",
     "edit": "Edit",
     "save": "Save",

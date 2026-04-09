@@ -50,7 +50,11 @@ func (r *invoiceRepository) ListPaginated(companyID *string, limit, offset int) 
 	if err := q.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
-	listQ := database.DB.Preload("Subscription.Plan").Order("created_at DESC").Limit(limit).Offset(offset)
+	listQ := database.DB.Model(&models.Invoice{}).
+		Preload("Subscription.Plan").
+		Order("created_at DESC").
+		Limit(limit).
+		Offset(offset)
 	if companyID != nil && *companyID != "" {
 		listQ = listQ.Where("company_id = ?", *companyID)
 	}

@@ -16,7 +16,7 @@ Official OpenAPI descriptions are published by DaData (e.g. `suggestions.yml`, `
 |----------|---------|
 | `DADATA_API_KEY` | Suggestions API (`Authorization: Token …`). If unset, DaData proxy routes return **503**. |
 | `DADATA_SECRET` | Optional `X-Secret` header when your project requires it. |
-| `DADATA_CLEANER_API_KEY` | Cleaner API token; if unset, Cleaner falls back to `DADATA_API_KEY`. |
+| `DADATA_CLEANER_API_KEY` | Cleaner API token for `/clean/ADDRESS`. If unset, Cleaner proxy returns **503** and `features.dadataCleaner` is false (no fallback to `DADATA_API_KEY`). |
 
 Tenant admins call proxied routes under `/companies/dadata/*`; platform admins use `/platform/dadata/*` (same handlers).
 

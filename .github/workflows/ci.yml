@@ -5,12 +5,15 @@ on:
   push:
     branches:
       - main
+      - master
 
 permissions:
   contents: read
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  NEXT_PUBLIC_API_URL: http://localhost:3001
+  NEXT_PUBLIC_WS_URL: ws://localhost:3001
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -122,6 +125,10 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Prettier (frontend)
+        if: needs.affected.outputs.frontend == 'true'
+        run: pnpm nx run frontend:format:check
 
       - name: Build affected
         run: pnpm nx affected -t build --base=$NX_BASE --head=$NX_HEAD

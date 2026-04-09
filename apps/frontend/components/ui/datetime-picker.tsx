@@ -7,16 +7,22 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 
+/** Hours 00–23 and minutes 00–59 (leading zeros required). */
+const TIME_HH_MM_RE = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+
 function splitDateTime(v: string): { date: string; time: string } {
   if (!v.trim()) return { date: '', time: '00:00' };
   const [d, t] = v.split('T');
   const timePart = (t || '00:00').slice(0, 5);
-  return { date: d || '', time: /^\d{2}:\d{2}$/.test(timePart) ? timePart : '00:00' };
+  return {
+    date: d || '',
+    time: TIME_HH_MM_RE.test(timePart) ? timePart : '00:00'
+  };
 }
 
 function joinDateTime(date: string, time: string): string {
   if (!date) return '';
-  const tm = /^\d{2}:\d{2}$/.test(time) ? time : '00:00';
+  const tm = TIME_HH_MM_RE.test(time) ? time : '00:00';
   return `${date}T${tm}`;
 }
 
@@ -38,6 +44,7 @@ export function DateTimePicker({
   className
 }: DateTimePickerProps) {
   const t = useTranslations('common');
+  const timeInputId = React.useId();
   const { date, time } = React.useMemo(() => splitDateTime(value), [value]);
 
   const handleDate = (d: string) => {
@@ -50,10 +57,7 @@ export function DateTimePicker({
 
   return (
     <div
-      className={cn(
-        'flex flex-col gap-2 sm:flex-row sm:items-end',
-        className
-      )}
+      className={cn('flex flex-col gap-2 sm:flex-row sm:items-end', className)}
     >
       <div className='min-w-0 flex-1'>
         <DatePicker
@@ -64,10 +68,11 @@ export function DateTimePicker({
         />
       </div>
       <div className='flex w-full flex-col gap-1.5 sm:w-[9rem]'>
-        <Label className='text-muted-foreground text-xs'>
+        <Label htmlFor={timeInputId} className='text-muted-foreground text-xs'>
           {t('time', { defaultValue: 'Time' })}
         </Label>
         <Input
+          id={timeInputId}
           type='time'
           step={60}
           value={date ? time : ''}

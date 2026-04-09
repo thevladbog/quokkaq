@@ -12,10 +12,7 @@ import { Progress } from '@/components/ui/progress';
 import { AlertCircle, TrendingUp } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useMemo } from 'react';
-import {
-  formatAppDate,
-  intlLocaleFromAppLocale
-} from '@/lib/format-datetime';
+import { formatAppDate, intlLocaleFromAppLocale } from '@/lib/format-datetime';
 
 interface UsageMetricsProps {
   metrics: UsageMetricsType;

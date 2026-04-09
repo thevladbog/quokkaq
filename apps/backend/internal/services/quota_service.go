@@ -42,6 +42,11 @@ type UsageMetricInfo struct {
 
 // CheckQuota verifies if the company can perform an action based on their quota
 func (s *quotaService) CheckQuota(companyID string, metric string) (bool, error) {
+	db := database.DB
+	if err := ApplyPendingPlanIfDueBeforeQuota(db, companyID, time.Now().UTC()); err != nil {
+		return false, err
+	}
+
 	currentUsage, err := s.GetCurrentUsage(companyID, metric)
 	if err != nil {
 		return false, err
@@ -133,7 +138,8 @@ func (s *quotaService) GetCurrentUsage(companyID string, metric string) (int, er
 	}
 }
 
-// GetLimit returns the quota limit for a specific metric based on the subscription plan
+// GetLimit returns the quota limit for a specific metric based on the subscription plan.
+// It is read-only (no DB writes). Quota enforcement paths call ApplyPendingPlanIfDueBeforeQuota via CheckQuota so scheduled plan changes are applied before limits are read.
 func (s *quotaService) GetLimit(companyID string, metric string) (int, error) {
 	db := database.DB
 
@@ -144,15 +150,6 @@ func (s *quotaService) GetLimit(companyID string, metric string) (int, error) {
 
 	if company.IsSaaSOperator {
 		return -1, nil
-	}
-
-	if company.Subscription != nil {
-		if err := ApplyPendingPlanIfDue(db, company.Subscription, time.Now().UTC()); err != nil {
-			return 0, err
-		}
-		if err := db.Preload("Plan").First(company.Subscription, "id = ?", company.Subscription.ID).Error; err != nil {
-			return 0, err
-		}
 	}
 
 	// If no subscription, use default (very limited)
@@ -197,15 +194,6 @@ func (s *quotaService) limitsMapForCompany(companyID string) (map[string]int, er
 			out[m] = -1
 		}
 		return out, nil
-	}
-
-	if company.Subscription != nil {
-		if err := ApplyPendingPlanIfDue(db, company.Subscription, time.Now().UTC()); err != nil {
-			return nil, err
-		}
-		if err := db.Preload("Plan").First(company.Subscription, "id = ?", company.Subscription.ID).Error; err != nil {
-			return nil, err
-		}
 	}
 
 	var fromPlan map[string]int

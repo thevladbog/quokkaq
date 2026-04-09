@@ -8,10 +8,7 @@ import { ArrowLeft, Download, TrendingUp } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useMemo } from 'react';
-import {
-  formatAppDate,
-  intlLocaleFromAppLocale
-} from '@/lib/format-datetime';
+import { formatAppDate, intlLocaleFromAppLocale } from '@/lib/format-datetime';
 import { companiesApi } from '@/lib/api';
 
 export function OrganizationUsageContent() {
@@ -49,10 +46,7 @@ export function OrganizationUsageContent() {
       usageMetrics.currentPeriod.start,
       intlLocale
     );
-    const periodEnd = formatAppDate(
-      usageMetrics.currentPeriod.end,
-      intlLocale
-    );
+    const periodEnd = formatAppDate(usageMetrics.currentPeriod.end, intlLocale);
 
     const csvContent = [
       `Usage Report - ${periodStart} to ${periodEnd}`,

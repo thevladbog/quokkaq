@@ -10,6 +10,22 @@ import (
 	"quokkaq-go-backend/internal/integrations/dadata"
 )
 
+// maxDaDataRequestBodyBytes caps proxied DaData JSON bodies (defense in depth vs unbounded ReadAll).
+const maxDaDataRequestBodyBytes = 1 << 20 // 1 MiB
+
+func readDaDataRequestBody(w http.ResponseWriter, r *http.Request) ([]byte, error) {
+	if r.Body == nil {
+		return nil, nil
+	}
+	limited := http.MaxBytesReader(w, r.Body, maxDaDataRequestBodyBytes)
+	return io.ReadAll(limited)
+}
+
+// maxBytesReaderExceeded matches net/http MaxBytesReader's error when the body is larger than the limit.
+func maxBytesReaderExceeded(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "request body too large")
+}
+
 // DaDataHandler proxies DaData Suggestions/Cleaner (no keys to the browser).
 type DaDataHandler struct{}
 
@@ -36,8 +52,12 @@ func (h *DaDataHandler) FindPartyByInn(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "DaData is not configured", http.StatusServiceUnavailable)
 		return
 	}
-	b, err := io.ReadAll(r.Body)
+	b, err := readDaDataRequestBody(w, r)
 	if err != nil {
+		if maxBytesReaderExceeded(err) {
+			http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
+			return
+		}
 		http.Error(w, "Bad request", http.StatusBadRequest)
 		return
 	}
@@ -82,8 +102,12 @@ func (h *DaDataHandler) SuggestParty(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "DaData is not configured", http.StatusServiceUnavailable)
 		return
 	}
-	b, err := io.ReadAll(r.Body)
+	b, err := readDaDataRequestBody(w, r)
 	if err != nil {
+		if maxBytesReaderExceeded(err) {
+			http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
+			return
+		}
 		http.Error(w, "Bad request", http.StatusBadRequest)
 		return
 	}
@@ -111,8 +135,12 @@ func (h *DaDataHandler) SuggestAddress(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "DaData is not configured", http.StatusServiceUnavailable)
 		return
 	}
-	b, err := io.ReadAll(r.Body)
+	b, err := readDaDataRequestBody(w, r)
 	if err != nil {
+		if maxBytesReaderExceeded(err) {
+			http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
+			return
+		}
 		http.Error(w, "Bad request", http.StatusBadRequest)
 		return
 	}
@@ -139,8 +167,12 @@ func (h *DaDataHandler) CleanAddress(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "DaData Cleaner is not configured", http.StatusServiceUnavailable)
 		return
 	}
-	b, err := io.ReadAll(r.Body)
+	b, err := readDaDataRequestBody(w, r)
 	if err != nil {
+		if maxBytesReaderExceeded(err) {
+			http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
+			return
+		}
 		http.Error(w, "Bad request", http.StatusBadRequest)
 		return
 	}

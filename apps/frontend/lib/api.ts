@@ -117,6 +117,36 @@ function mergeRequestInitHeaders(
   return { ...authHeaders, ...fromCaller };
 }
 
+/** Caller headers without Authorization so retry merges keep the refreshed Bearer token. */
+function headersInitWithoutAuthorization(
+  callerHeaders: HeadersInit | undefined
+): HeadersInit | undefined {
+  if (callerHeaders === undefined) {
+    return undefined;
+  }
+  if (callerHeaders instanceof Headers) {
+    const h = new Headers();
+    callerHeaders.forEach((value, key) => {
+      if (key.toLowerCase() !== 'authorization') {
+        h.set(key, value);
+      }
+    });
+    return h;
+  }
+  if (Array.isArray(callerHeaders)) {
+    return callerHeaders.filter(
+      (pair) => pair.length >= 2 && pair[0].toLowerCase() !== 'authorization'
+    );
+  }
+  const o = { ...(callerHeaders as Record<string, string>) };
+  for (const k of Object.keys(o)) {
+    if (k.toLowerCase() === 'authorization') {
+      delete o[k];
+    }
+  }
+  return o;
+}
+
 // Base API configuration
 const API_BASE_URL = '/api';
 
@@ -186,7 +216,10 @@ async function apiRequest<T>(
             };
             const retryConfig: RequestInit = {
               ...restOptions,
-              headers: mergeRequestInitHeaders(callerHeaders, retryAuthHeaders)
+              headers: mergeRequestInitHeaders(
+                headersInitWithoutAuthorization(callerHeaders),
+                retryAuthHeaders
+              )
             };
 
             const retryResponse = await fetch(url, retryConfig);
@@ -196,10 +229,34 @@ async function apiRequest<T>(
               );
             }
 
-            const retryData = await retryResponse.json();
-            if (schema) {
-              return schema.parse(retryData);
+            if (retryResponse.status === 204 || retryResponse.status === 205) {
+              return undefined as T;
             }
+
+            if (retryResponse.headers.get('Content-Length') === '0') {
+              return undefined as T;
+            }
+
+            const retryText = await retryResponse.text();
+            if (!retryText.trim()) {
+              return undefined as T;
+            }
+
+            const retryData = JSON.parse(retryText);
+
+            if (schema) {
+              try {
+                return schema.parse(retryData);
+              } catch (zodError) {
+                logger.error('Zod parse error while validating API response', {
+                  url,
+                  zod: summarizeZodErrorForLog(zodError),
+                  responseSummary: summarizeApiResponseForLog(retryData)
+                });
+                throw zodError;
+              }
+            }
+
             return retryData;
           }
         }
@@ -329,7 +386,7 @@ async function apiRequestBlob(
             const retryConfig: RequestInit = {
               ...restOptionsBlob,
               headers: mergeRequestInitHeaders(
-                callerHeadersBlob,
+                headersInitWithoutAuthorization(callerHeadersBlob),
                 retryAuthHeadersBlob
               )
             };
@@ -1152,7 +1209,10 @@ export const dadataApi = {
       z.unknown()
     ),
 
-  suggestAddress: (scope: 'tenant' | 'platform', body: Record<string, unknown>) =>
+  suggestAddress: (
+    scope: 'tenant' | 'platform',
+    body: Record<string, unknown>
+  ) =>
     apiRequest<unknown>(
       dadataPath(scope, '/address/suggest'),
       {
@@ -1187,6 +1247,15 @@ export type PlatformListResponse<T> = {
   offset: number;
 };
 
+function platformListResponseSchema<T extends z.ZodTypeAny>(itemSchema: T) {
+  return z.object({
+    items: z.array(itemSchema),
+    total: z.number(),
+    limit: z.number(),
+    offset: z.number()
+  });
+}
+
 function platformQueryString(
   params: Record<string, string | number | undefined>
 ): string {
@@ -1208,18 +1277,27 @@ export const platformApi = {
       PlatformFeaturesSchema
     ),
 
-  listCompanies: (opts?: { search?: string; limit?: number; offset?: number }) =>
+  listCompanies: (opts?: {
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }) =>
     apiRequest<PlatformListResponse<Company>>(
       `/platform/companies${platformQueryString({
         search: opts?.search,
         limit: opts?.limit,
         offset: opts?.offset
       })}`,
-      {}
+      {},
+      platformListResponseSchema(CompanySchema)
     ),
 
   getCompany: (id: string) =>
-    apiRequest<Company>(`/platform/companies/${encodeURIComponent(id)}`, {}),
+    apiRequest<Company>(
+      `/platform/companies/${encodeURIComponent(id)}`,
+      {},
+      CompanySchema
+    ),
 
   getSaaSOperatorCompany: () =>
     apiRequest<Company>(`/platform/saas-operator-company`, {}, CompanySchema),
@@ -1236,11 +1314,15 @@ export const platformApi = {
       isSaasOperator?: boolean;
     }
   ) =>
-    apiRequest<Company>(`/platform/companies/${encodeURIComponent(id)}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    }, CompanySchema),
+    apiRequest<Company>(
+      `/platform/companies/${encodeURIComponent(id)}`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      },
+      CompanySchema
+    ),
 
   listSubscriptions: (opts?: { limit?: number; offset?: number }) =>
     apiRequest<PlatformListResponse<Subscription>>(
@@ -1248,7 +1330,8 @@ export const platformApi = {
         limit: opts?.limit,
         offset: opts?.offset
       })}`,
-      {}
+      {},
+      platformListResponseSchema(SubscriptionSchema)
     ),
 
   createSubscription: (body: {
@@ -1283,14 +1366,22 @@ export const platformApi = {
       clearPending: boolean;
     }>
   ) =>
-    apiRequest<Subscription>(`/platform/subscriptions/${encodeURIComponent(id)}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    }),
+    apiRequest<Subscription>(
+      `/platform/subscriptions/${encodeURIComponent(id)}`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      },
+      SubscriptionSchema
+    ),
 
   listSubscriptionPlans: () =>
-    apiRequest<SubscriptionPlan[]>(`/platform/subscription-plans`, {}),
+    apiRequest<SubscriptionPlan[]>(
+      `/platform/subscription-plans`,
+      {},
+      z.array(SubscriptionPlanSchema)
+    ),
 
   createSubscriptionPlan: (body: {
     name: string;
@@ -1302,11 +1393,15 @@ export const platformApi = {
     limits?: unknown;
     isActive?: boolean;
   }) =>
-    apiRequest<SubscriptionPlan>(`/platform/subscription-plans`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    }),
+    apiRequest<SubscriptionPlan>(
+      `/platform/subscription-plans`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      },
+      SubscriptionPlanSchema
+    ),
 
   updateSubscriptionPlan: (
     id: string,
@@ -1327,7 +1422,8 @@ export const platformApi = {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
-      }
+      },
+      SubscriptionPlanSchema
     ),
 
   listInvoices: (opts?: {
@@ -1341,7 +1437,8 @@ export const platformApi = {
         limit: opts?.limit,
         offset: opts?.offset
       })}`,
-      {}
+      {},
+      platformListResponseSchema(InvoiceSchema)
     ),
 
   createInvoice: (body: {
@@ -1361,11 +1458,15 @@ export const platformApi = {
       trialEnd?: string | null;
     };
   }) =>
-    apiRequest<Invoice>(`/platform/invoices`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    }),
+    apiRequest<Invoice>(
+      `/platform/invoices`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      },
+      InvoiceSchema
+    ),
 
   patchInvoice: (
     id: string,
@@ -1376,9 +1477,13 @@ export const platformApi = {
       clearSubscriptionId: boolean;
     }>
   ) =>
-    apiRequest<Invoice>(`/platform/invoices/${encodeURIComponent(id)}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    })
+    apiRequest<Invoice>(
+      `/platform/invoices/${encodeURIComponent(id)}`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      },
+      InvoiceSchema
+    )
 };

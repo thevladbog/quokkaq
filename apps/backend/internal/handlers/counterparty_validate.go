@@ -64,6 +64,9 @@ func validateCounterparty(raw []byte) error {
 		if ogrn != "" && !ogrn13.MatchString(ogrn) {
 			return errors.New("counterparty.ogrn must be 13 digits when set")
 		}
+		if ogrnip != "" {
+			return errors.New("counterparty.ogrnip must not be set for legal_entity")
+		}
 	case partyTypeSoleProprietor:
 		if inn != "" && !inn12.MatchString(inn) {
 			return errors.New("counterparty.inn must be 12 digits for sole_proprietor")

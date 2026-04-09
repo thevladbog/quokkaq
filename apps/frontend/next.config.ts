@@ -22,7 +22,7 @@ const nextConfig: NextConfig = {
         pathname: '/**'
       }
     ]
-  },
+  }
   // API is proxied by app/api/[[...path]]/route.ts (reliable with Turbopack; rewrites alone were flaky).
 };
 
