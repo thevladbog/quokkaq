@@ -12,9 +12,13 @@ import (
 )
 
 // companyShouldPointSubscriptionID decides whether companies.subscription_id should reference a newly created subscription.
-func companyShouldPointSubscriptionID(company *models.Company, sub *models.Subscription, now time.Time) bool {
+func companyShouldPointSubscriptionID(tx *gorm.DB, company *models.Company, sub *models.Subscription, now time.Time) bool {
 	now = now.UTC()
 	if sub.Status == "canceled" {
+		return false
+	}
+	// New subscription must be active at `now` (start <= now < end).
+	if now.Before(sub.CurrentPeriodStart) || !now.Before(sub.CurrentPeriodEnd) {
 		return false
 	}
 	sid := ""
@@ -24,10 +28,20 @@ func companyShouldPointSubscriptionID(company *models.Company, sub *models.Subsc
 	if sid == "" {
 		return true
 	}
-	if now.Before(sub.CurrentPeriodStart) || !now.Before(sub.CurrentPeriodEnd) {
+	var existing models.Subscription
+	if err := tx.Where("id = ?", sid).First(&existing).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return true
+		}
 		return false
 	}
-	return true
+	if existing.CurrentPeriodEnd.Before(now) {
+		return true
+	}
+	if existing.Status == "canceled" && sub.CurrentPeriodEnd.After(existing.CurrentPeriodEnd) {
+		return true
+	}
+	return false
 }
 
 // CreateSubscriptionForCompanyTx creates a subscription for company and optionally updates company.subscription_id (same tx).
@@ -70,7 +84,7 @@ func CreateSubscriptionForCompanyTx(tx *gorm.DB, now time.Time, companyID, planI
 	if err := tx.Create(sub).Error; err != nil {
 		return nil, err
 	}
-	if companyShouldPointSubscriptionID(&company, sub, now) {
+	if companyShouldPointSubscriptionID(tx, &company, sub, now) {
 		if err := tx.Model(&models.Company{}).Where("id = ?", companyID).Update("subscription_id", sub.ID).Error; err != nil {
 			return nil, err
 		}

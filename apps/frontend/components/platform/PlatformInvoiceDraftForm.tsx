@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   Invoice,
+  InvoiceDraftCreateBody,
   InvoiceDraftLineInput,
   InvoiceDraftUpsertBody,
   InvoiceLine
@@ -126,10 +127,11 @@ function buildDraftBody(
   dueLocal: string,
   currency: string,
   allowYookassa: boolean,
+  allowStripe: boolean,
   provision: boolean,
   rows: DraftLineRow[],
   intlLocale: string
-): InvoiceDraftUpsertBody {
+): InvoiceDraftCreateBody {
   const due = new Date(dueLocal.trim());
   if (Number.isNaN(due.getTime())) {
     throw new Error('dueInvalid');
@@ -194,7 +196,7 @@ function buildDraftBody(
       line.discountAmountMinor = m;
     }
 
-    if (provision && r.isLicenseLine) {
+    if (r.isLicenseLine) {
       const planId = r.subscriptionPlanId.trim();
       if (!planId) {
         throw new Error('planRequired');
@@ -203,12 +205,14 @@ function buildDraftBody(
       if (Number.isNaN(st.getTime())) {
         throw new Error('periodStartInvalid');
       }
-      licenseRows++;
-      if (licenseRows > 1) {
-        throw new Error('tooManyLicenseLines');
-      }
       line.subscriptionPlanId = planId;
       line.subscriptionPeriodStart = st.toISOString();
+      if (provision) {
+        licenseRows++;
+        if (licenseRows > 1) {
+          throw new Error('tooManyLicenseLines');
+        }
+      }
     }
 
     return line;
@@ -219,7 +223,7 @@ function buildDraftBody(
     dueDate: due.toISOString(),
     currency: cur,
     allowYookassaPaymentLink: allowYookassa,
-    allowStripePaymentLink: false,
+    allowStripePaymentLink: allowStripe,
     provisionSubscriptionsOnPayment: provision,
     lines
   };
@@ -343,6 +347,9 @@ export function PlatformInvoiceDraftForm({
   const [allowYookassa, setAllowYookassa] = useState(
     initialInvoice?.allowYookassaPaymentLink ?? false
   );
+  const [allowStripe, setAllowStripe] = useState(
+    initialInvoice?.allowStripePaymentLink ?? false
+  );
   const [provision, setProvision] = useState(
     initialInvoice?.provisionSubscriptionsOnPayment ?? false
   );
@@ -374,6 +381,7 @@ export function PlatformInvoiceDraftForm({
         );
         setCurrency(snapshot.currency?.trim() || 'RUB');
         setAllowYookassa(snapshot.allowYookassaPaymentLink ?? false);
+        setAllowStripe(snapshot.allowStripePaymentLink ?? false);
         setProvision(snapshot.provisionSubscriptionsOnPayment ?? false);
         setRows(
           rowsFromLines(
@@ -394,6 +402,7 @@ export function PlatformInvoiceDraftForm({
         setDueLocal('');
         setCurrency('RUB');
         setAllowYookassa(false);
+        setAllowStripe(false);
         setProvision(false);
         setRows(rowsFromLines(undefined, 'RUB', appLocale));
       });
@@ -606,6 +615,7 @@ export function PlatformInvoiceDraftForm({
         dueLocal,
         currency,
         allowYookassa,
+        allowStripe,
         provision,
         rows,
         intlLocale
@@ -630,6 +640,7 @@ export function PlatformInvoiceDraftForm({
         dueLocal,
         currency,
         allowYookassa,
+        allowStripe,
         provision,
         rows,
         intlLocale
@@ -657,6 +668,7 @@ export function PlatformInvoiceDraftForm({
         dueLocal,
         currency,
         allowYookassa,
+        allowStripe,
         provision,
         rows,
         intlLocale
@@ -822,7 +834,7 @@ export function PlatformInvoiceDraftForm({
           <Checkbox
             className='mt-0.5'
             id='allow-stripe'
-            checked={false}
+            checked={allowStripe}
             disabled
           />
           <Label htmlFor='allow-stripe' className='font-normal'>

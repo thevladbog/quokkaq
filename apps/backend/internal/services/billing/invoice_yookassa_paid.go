@@ -42,11 +42,26 @@ func ProvisionInvoiceSubscriptionFromLines(tx *gorm.DB, inv *models.Invoice, now
 			lic = &lcopy
 		}
 	}
-	if lic == nil || lic.SubscriptionPeriodStart == nil || lic.SubscriptionPeriodEnd == nil {
-		return nil
+	if lic == nil {
+		return fmt.Errorf(
+			"invoice %s: provisionSubscriptionsOnPayment is set but no line with subscriptionPlanId",
+			locked.ID,
+		)
+	}
+	if lic.SubscriptionPeriodStart == nil {
+		return fmt.Errorf(
+			"invoice %s: license line missing subscription period start",
+			locked.ID,
+		)
+	}
+	if lic.SubscriptionPeriodEnd == nil {
+		return fmt.Errorf(
+			"invoice %s: license line missing subscription period end",
+			locked.ID,
+		)
 	}
 	if locked.CompanyID == nil {
-		return nil
+		return fmt.Errorf("invoice %s: company id is required for provisioning", locked.ID)
 	}
 	companyID := *locked.CompanyID
 	planID := strings.TrimSpace(*lic.SubscriptionPlanID)
@@ -76,6 +91,9 @@ func ApplyYooKassaInvoicePaid(tx *gorm.DB, invoiceID, paymentID string, paidAt t
 			return db.Order("position ASC")
 		}).
 		First(&inv, "id = ?", invoiceID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("invoice %s: %w", invoiceID, err)
+		}
 		return err
 	}
 	if strings.TrimSpace(inv.YookassaPaymentID) != "" && inv.YookassaPaymentID != paymentID {

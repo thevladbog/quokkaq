@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -9,6 +10,10 @@ import (
 
 	"gorm.io/gorm"
 )
+
+// ErrInvoiceYooKassaPaymentAlreadyLinked is returned when UpdateYookassaPayment cannot persist
+// because the invoice is already linked to a different external payment id.
+var ErrInvoiceYooKassaPaymentAlreadyLinked = errors.New("invoice already linked to a different payment")
 
 const (
 	invoiceListDefaultLimit = 50
@@ -143,13 +148,31 @@ func (r *invoiceRepository) Update(invoice *models.Invoice) error {
 }
 
 // UpdateYookassaPayment persists YooKassa payment id, confirmation URL, and provider fields after CreatePayment.
+// It only succeeds when the row has no payment ids yet or is already linked to the same paymentID.
 func (r *invoiceRepository) UpdateYookassaPayment(id, paymentID, confirmationURL string) error {
-	return database.DB.Model(&models.Invoice{}).Where("id = ?", id).Updates(map[string]interface{}{
-		"yookassa_payment_id":         paymentID,
-		"yookassa_confirmation_url":   confirmationURL,
-		"payment_provider":            "yookassa",
-		"payment_provider_invoice_id": paymentID,
-	}).Error
+	if id == "" || paymentID == "" {
+		return fmt.Errorf("UpdateYookassaPayment: empty id or paymentID")
+	}
+	result := database.DB.Model(&models.Invoice{}).
+		Where("id = ?", id).
+		Where(`(
+			(yookassa_payment_id IS NULL OR yookassa_payment_id = '')
+			AND (payment_provider_invoice_id IS NULL OR payment_provider_invoice_id = '')
+		) OR yookassa_payment_id = ? OR payment_provider_invoice_id = ?`,
+			paymentID, paymentID).
+		Updates(map[string]interface{}{
+			"yookassa_payment_id":         paymentID,
+			"yookassa_confirmation_url":   confirmationURL,
+			"payment_provider":            "yookassa",
+			"payment_provider_invoice_id": paymentID,
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return ErrInvoiceYooKassaPaymentAlreadyLinked
+	}
+	return nil
 }
 
 func (r *invoiceRepository) Delete(id string) error {

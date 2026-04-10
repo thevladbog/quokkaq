@@ -25,6 +25,8 @@ const platformMaxLimit = 100
 const platformCatalogDefaultLimit = 50
 const platformCatalogMaxLimit = 200
 
+var errPlatformCompanyAlreadyHasSubscription = errors.New("company already has a subscription")
+
 // platformInvoiceStatuses is the allowed set for models.Invoice.Status on platform create/patch.
 var platformInvoiceStatuses = map[string]struct{}{
 	"draft": {}, "open": {}, "paid": {}, "void": {}, "uncollectible": {},
@@ -575,12 +577,23 @@ func (h *PlatformHandler) CreateSubscription(w http.ResponseWriter, r *http.Requ
 	}
 
 	err = database.DB.Transaction(func(tx *gorm.DB) error {
+		var company models.Company
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", companyID).First(&company).Error; err != nil {
+			return err
+		}
+		if company.SubscriptionID != nil && strings.TrimSpace(*company.SubscriptionID) != "" {
+			return errPlatformCompanyAlreadyHasSubscription
+		}
 		if err := tx.Create(sub).Error; err != nil {
 			return err
 		}
 		return tx.Model(&models.Company{}).Where("id = ?", companyID).Update("subscription_id", sub.ID).Error
 	})
 	if err != nil {
+		if errors.Is(err, errPlatformCompanyAlreadyHasSubscription) {
+			http.Error(w, "Company already has a subscription", http.StatusConflict)
+			return
+		}
 		log.Printf("Platform CreateSubscription transaction: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
@@ -1051,13 +1064,18 @@ func (h *PlatformHandler) PatchInvoice(w http.ResponseWriter, r *http.Request) {
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&dbInv, "id = ?", id).Error; err != nil {
 			return err
 		}
+		prevStatus := strings.TrimSpace(dbInv.Status)
+		prevProvider := strings.TrimSpace(dbInv.PaymentProvider)
+
 		dbInv.Status = inv.Status
 		dbInv.PaidAt = inv.PaidAt
 		dbInv.SubscriptionID = inv.SubscriptionID
 		if err := tx.Save(&dbInv).Error; err != nil {
 			return err
 		}
-		if strings.TrimSpace(dbInv.Status) == "paid" {
+		manual := prevProvider == "" || prevProvider == "manual"
+		becamePaid := prevStatus != "paid" && strings.TrimSpace(dbInv.Status) == "paid"
+		if becamePaid && manual {
 			return maybeProvisionAfterManualPaid(tx, id, time.Now().UTC())
 		}
 		return nil

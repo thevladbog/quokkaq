@@ -109,7 +109,7 @@ export default function PlatformCatalogItemsPage() {
         item.currency || 'RUB',
         appLocale
       ),
-      currency: item.currency,
+      currency: item.currency || 'RUB',
       vatExempt: item.vatExempt,
       vatRatePercent:
         typeof item.vatRatePercent === 'number' &&
@@ -124,7 +124,7 @@ export default function PlatformCatalogItemsPage() {
 
   const saveMut = useMutation({
     mutationFn: async () => {
-      const cur = form.currency.trim() || 'RUB';
+      const cur = String(form.currency ?? 'RUB').trim() || 'RUB';
       const price = parseAmountStringToMinorUnits(
         form.defaultPriceInput,
         cur,

@@ -82,6 +82,11 @@ func ServeYooKassaWebhook(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Bad request", http.StatusBadRequest)
 			return
 		}
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Printf("YooKassa webhook: invoice not found for notification (acknowledging): %v", err)
+			w.WriteHeader(http.StatusOK)
+			return
+		}
 		log.Printf("YooKassa webhook: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return

@@ -209,18 +209,20 @@ func (h *InvoiceHandler) RequestYooKassaPaymentLink(w http.ResponseWriter, r *ht
 	}
 	if err := h.invoiceRepo.UpdateYookassaPayment(inv.ID, payID, url); err != nil {
 		log.Printf("RequestYooKassaPaymentLink Updates: %v", err)
+		if errors.Is(err, repository.ErrInvoiceYooKassaPaymentAlreadyLinked) {
+			http.Error(w, "Invoice is already linked to a different payment", http.StatusConflict)
+			return
+		}
 		fresh, ferr := h.invoiceRepo.FindByIDWithLinesForCompany(id, companyID)
-		if ferr == nil && strings.TrimSpace(fresh.YookassaConfirmationURL) != "" {
+		if ferr == nil && strings.TrimSpace(fresh.YookassaPaymentID) == payID &&
+			strings.TrimSpace(fresh.YookassaConfirmationURL) != "" {
 			RespondJSON(w, map[string]string{
 				"confirmationUrl": fresh.YookassaConfirmationURL,
 				"paymentId":       fresh.YookassaPaymentID,
 			})
 			return
 		}
-		RespondJSON(w, map[string]string{
-			"confirmationUrl": url,
-			"paymentId":       payID,
-		})
+		http.Error(w, "Could not persist payment link", http.StatusInternalServerError)
 		return
 	}
 	RespondJSON(w, map[string]string{
