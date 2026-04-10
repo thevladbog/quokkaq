@@ -90,7 +90,7 @@ export default function StaffSelectionPage() {
       router.push(`/staff/${selectedUnitId}/${counterId}`);
     },
     onError: (error: Error) => {
-      toast.error(`Failed to occupy counter: ${error.message}`);
+      toast.error(t('occupyCounterError', { message: error.message }));
     }
   });
 

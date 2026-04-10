@@ -25,11 +25,14 @@ import {
   DialogTitle
 } from '@/components/ui/dialog';
 import { useRouter } from '@/src/i18n/navigation';
+import { formatApiToastErrorMessage } from '@/lib/format-api-toast-error';
+import { toast } from 'sonner';
 
 export default function UnitsIndexPage() {
   const { data: units = [], isLoading } = useUnits();
   const createUnitMutation = useCreateUnit();
   const t = useTranslations('admin');
+  const tCommon = useTranslations('common');
   const router = useRouter();
   const { user } = useAuthContext();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -49,8 +52,14 @@ export default function UnitsIndexPage() {
       setCreateDialogOpen(false);
       setNewUnitName('');
       setNewUnitCode('');
+      toast.success(t('units.create_success'));
     } catch (error) {
       console.error('Failed to create unit:', error);
+      toast.error(
+        t('units.create_error', {
+          message: formatApiToastErrorMessage(error, tCommon('error'))
+        })
+      );
     }
   };
 

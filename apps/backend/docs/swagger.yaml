@@ -157,6 +157,17 @@ definitions:
     - dueDate
     - lines
     type: object
+  handlers.InvoicePDFPrerequisiteError:
+    properties:
+      code:
+        example: invoice_pdf_prerequisites
+        type: string
+      message:
+        type: string
+    required:
+    - code
+    - message
+    type: object
   handlers.LoginRequest:
     properties:
       email:
@@ -2370,11 +2381,9 @@ paths:
           schema:
             type: string
         "422":
-          description: QR / vendor prerequisites missing
+          description: invoice_pdf_prerequisites + localized message
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/handlers.InvoicePDFPrerequisiteError'
         "500":
           description: Internal Server Error
           schema:

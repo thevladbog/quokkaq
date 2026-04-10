@@ -171,6 +171,7 @@ export default function PlatformCatalogItemsPage() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['platform-catalog-items'] });
       setDialogOpen(false);
+      toast.success(t('toastItemSaved'));
     }
   });
 

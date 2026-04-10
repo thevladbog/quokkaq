@@ -25,6 +25,7 @@ import { Switch } from '@/components/ui/switch';
 import { Spinner } from '@/components/ui/spinner';
 import { useLocale, useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import { formatPriceMinorUnits } from '@/lib/format-price';
 import { intlLocaleFromAppLocale } from '@/lib/format-datetime';
 
@@ -69,6 +70,10 @@ export default function PlatformPlansPage() {
       qc.invalidateQueries({ queryKey: ['platform-plans'] });
       setOpenCreate(false);
       setForm(emptyForm());
+      toast.success(t('toastCreated'));
+    },
+    onError: (err: Error) => {
+      toast.error(t('toastError', { message: err.message }));
     }
   });
 
@@ -90,6 +95,10 @@ export default function PlatformPlansPage() {
       qc.invalidateQueries({ queryKey: ['platform-plans'] });
       setEditPlan(null);
       setForm(emptyForm());
+      toast.success(t('toastUpdated'));
+    },
+    onError: (err: Error) => {
+      toast.error(t('toastError', { message: err.message }));
     }
   });
 
@@ -150,8 +159,8 @@ export default function PlatformPlansPage() {
             }))
           }
         >
-          <option value='month'>month</option>
-          <option value='year'>year</option>
+          <option value='month'>{t('intervalMonth')}</option>
+          <option value='year'>{t('intervalYear')}</option>
         </select>
       </div>
       <div className='flex items-center gap-2'>

@@ -101,6 +101,62 @@ function summarizeZodErrorForLog(err: unknown): Record<string, unknown> {
 }
 
 /**
+ * Non-OK HTTP response. `message` is a short user-facing summary (never the raw response body).
+ * Full body is in `rawBody` when provided (for logging / debugging only).
+ */
+export class ApiHttpError extends Error {
+  readonly status: number;
+  readonly code?: string;
+  readonly rawBody?: string;
+
+  constructor(
+    message: string,
+    status: number,
+    code?: string,
+    rawBody?: string
+  ) {
+    super(message);
+    this.name = 'ApiHttpError';
+    this.status = status;
+    this.code = code;
+    this.rawBody = rawBody;
+  }
+}
+
+function throwApiHttpErrorFromBody(status: number, errorData: string): never {
+  let parsedCode: string | undefined;
+  try {
+    const j = JSON.parse(errorData) as Record<string, unknown>;
+    parsedCode = typeof j.code === 'string' ? j.code : undefined;
+    const msg = typeof j.message === 'string' ? j.message.trim() : '';
+    if (msg) {
+      throw new ApiHttpError(msg, status, parsedCode, errorData);
+    }
+  } catch (e) {
+    if (e instanceof ApiHttpError) {
+      throw e;
+    }
+  }
+  const summary = parsedCode
+    ? `API Error: ${status} (${parsedCode})`
+    : `API Error: ${status}`;
+  throw new ApiHttpError(summary, status, parsedCode, errorData);
+}
+
+function clearClientAuthSession(): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('refresh_token');
+  try {
+    window.dispatchEvent(new CustomEvent('auth:logout'));
+  } catch (e) {
+    logger.error('Failed to dispatch auth:logout event', e);
+  }
+}
+
+/**
  * Defaults first, then caller headers on top — so explicit `Authorization` (refresh/me)
  * wins over the access token from localStorage, while `Content-Type` from callers no longer
  * wipes auth (the old `...options` after `headers` bug).
@@ -421,35 +477,32 @@ async function apiRequestBlob(
 
             const retryResponse = await fetch(url, retryConfig);
             if (!retryResponse.ok) {
-              throw new Error(
-                `API Error: ${retryResponse.status} - ${await retryResponse.text()}`
-              );
+              const retryErrText = await retryResponse.text();
+              throwApiHttpErrorFromBody(retryResponse.status, retryErrText);
             }
             const retryBlob = await readBodyAsBlob(retryResponse);
             return { blob: retryBlob, headers: retryResponse.headers };
           }
         }
       } catch (refreshError) {
+        if (refreshError instanceof ApiHttpError) {
+          if (refreshError.status === 401) {
+            clearClientAuthSession();
+          }
+          throw refreshError;
+        }
         logger.error('Token refresh failed:', refreshError);
       }
 
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
+      clearClientAuthSession();
 
-      try {
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('auth:logout'));
-        }
-      } catch (e) {
-        logger.error('Failed to dispatch auth:logout event', e);
-      }
-
-      throw new Error(`Unauthorized: ${await response.text()}`);
+      const unauthorizedBody = await response.text();
+      throwApiHttpErrorFromBody(401, unauthorizedBody);
     }
 
     if (!response.ok) {
       const errorData = await response.text();
-      throw new Error(`API Error: ${response.status} - ${errorData}`);
+      throwApiHttpErrorFromBody(response.status, errorData);
     }
 
     const blob = await readBodyAsBlob(response);

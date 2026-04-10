@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import { toast } from 'sonner';
 import { companiesApiExt } from '@/lib/api';
 import {
   CounterpartyForm,
@@ -101,6 +102,10 @@ export function OrganizationPageContent() {
     onSuccess: () => {
       setIsEditing(false);
       void qc.invalidateQueries({ queryKey: ['company-me'] });
+      toast.success(t('toastProfileSaved'));
+    },
+    onError: (err: Error) => {
+      toast.error(t('toastProfileSaveError', { message: err.message }));
     }
   });
 

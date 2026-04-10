@@ -37,6 +37,7 @@
         "prefix": "Префикс талона",
         "number_sequence": "Последовательность номеров",
         "max_duration": "Макс. длительность обслуживания",
+        "max_waiting_time": "Максимальное время ожидания",
         "parent_service": "Родительская услуга",
         "no_parent": "Нет родителя (корневая услуга)",
         "allow_prebooking": "Разрешить предварительную запись",
@@ -75,7 +76,9 @@
       "save_changes": "Сохранить изменения",
       "saving": "Сохранение...",
       "update_success": "Подразделение успешно обновлено",
-      "update_error": "Не удалось обновить подразделение"
+      "update_error": "Не удалось обновить подразделение",
+      "create_success": "Подразделение создано",
+      "create_error": "Не удалось создать подразделение: {message}"
     },
     "counters": {
       "title": "Рабочие места",
@@ -507,6 +510,7 @@
     "you": "Вы",
     "occupiedByYou": "Занято вами (Продолжить)",
     "occupiedUnknown": "Занято",
+    "occupyCounterError": "Не удалось занять рабочее место: {message}",
     "pre_registration": {
       "badge": "ЗАПИСЬ",
       "title": "Предварительная запись",
@@ -620,7 +624,9 @@
       "show_unit_in_header_desc": "Слева рядом с логотипом. Выключите, чтобы скрыть подпись.",
       "kiosk_unit_label_text": "Текст в шапке (необязательно)",
       "kiosk_unit_label_placeholder": "По умолчанию: {unitName}",
-      "kiosk_unit_label_help": "Пустое поле — подставляется название подразделения."
+      "kiosk_unit_label_help": "Пустое поле — подставляется название подразделения.",
+      "printerListError": "Не удалось загрузить список принтеров: {message}",
+      "printerTestError": "Тестовая печать не удалась: {message}"
     },
     "lock_screen": {
       "kiosk_locked": "Киоск заблокирован",
@@ -668,6 +674,24 @@
     "actions": "Действия",
     "pickDate": "Выберите дату",
     "time": "Время"
+  },
+  "components": {
+    "upload": {
+      "invalidType": "Загрузите файл изображения",
+      "fileTooLarge": "Размер файла не должен превышать 5 МБ",
+      "imageSuccess": "Изображение загружено",
+      "imageFailed": "Не удалось загрузить изображение",
+      "logoSuccess": "Логотип загружен",
+      "logoFailed": "Не удалось загрузить логотип",
+      "uploading": "Загрузка...",
+      "uploadImage": "Загрузить изображение",
+      "changeImage": "Сменить изображение",
+      "uploadLogo": "Загрузить логотип",
+      "changeLogo": "Сменить логотип",
+      "hint": "Форматы: JPG, PNG, SVG, WebP. Максимум 5 МБ.",
+      "defaultImageLabel": "Изображение",
+      "defaultLogoLabel": "Логотип"
+    }
   },
   "general": {
     "delete": "Удалить",
@@ -727,7 +751,8 @@
     "submit": "Отправить ссылку",
     "submitting": "Отправка...",
     "success": "Если аккаунт с таким email существует, мы отправили вам ссылку для сброса.",
-    "backToLogin": "Вернуться ко входу"
+    "backToLogin": "Вернуться ко входу",
+    "requestError": "Что-то пошло не так. Попробуйте ещё раз."
   },
   "resetPassword": {
     "title": "Сброс пароля",
@@ -871,6 +896,7 @@
     "status": "Статус",
     "ticket_id": "ID талона",
     "your_ticket_called": "Талон {number} вызван в {counter}",
+    "counterUnknown": "окно",
     "printer_type_label": "Этикетка",
     "feedback_url": "Ссылка для опроса",
     "feedback_url_help": "Ссылка на форму опроса. Используйте {{ticketId}} для подстановки ID талона.",
@@ -972,7 +998,17 @@
       "saasOperatorTitle": "Тенант оператора SaaS",
       "saasOperatorDesc": "Одна организация на развёртывание: безлимитные квоты ресурсов и основной юридический профиль для счетов и платформы. Включение снимает признак оператора со всех остальных компаний.",
       "invoiceWizardHint": "Создайте многострочный черновик, укажите НДС и способы оплаты, затем выставьте счёт с номером QQ-ГГГГ-NNNNN.",
-      "openInvoiceWizard": "Новый счёт"
+      "openInvoiceWizard": "Новый счёт",
+      "toastSubscriptionSaved": "Подписка обновлена",
+      "toastSubscriptionError": "Не удалось обновить подписку: {message}",
+      "toastPendingCleared": "Запланированная смена тарифа отменена",
+      "toastPendingClearError": "Не удалось снять запланированное изменение: {message}",
+      "toastCounterpartySaved": "Реквизиты контрагента сохранены",
+      "toastCounterpartyError": "Не удалось сохранить реквизиты: {message}",
+      "toastPaymentAccountsSaved": "Расчётные счета сохранены",
+      "toastPaymentAccountsError": "Не удалось сохранить расчётные счета: {message}",
+      "toastSaasOperatorUpdated": "Настройка оператора SaaS обновлена",
+      "toastSaasOperatorError": "Не удалось обновить настройку оператора SaaS: {message}"
     },
     "plans": {
       "title": "Тарифные планы",
@@ -987,7 +1023,12 @@
       "interval": "Интервал",
       "active": "Активен",
       "edit": "Изменить",
-      "submit": "Сохранить"
+      "submit": "Сохранить",
+      "toastCreated": "План создан",
+      "toastUpdated": "План обновлён",
+      "toastError": "Не удалось сохранить план: {message}",
+      "intervalMonth": "месяц",
+      "intervalYear": "год"
     },
     "invoices": {
       "title": "Счета",
@@ -1148,7 +1189,8 @@
       "loadPlansErrorCatalog": "Не удалось загрузить тарифные планы.",
       "deleteFailed": "Не удалось удалить позицию номенклатуры",
       "deleteFailedGeneric": "Ошибка запроса",
-      "backInvoices": "К списку счетов"
+      "backInvoices": "К списку счетов",
+      "toastItemSaved": "Позиция каталога сохранена"
     },
     "subscriptions": {
       "title": "Подписки",
@@ -1378,6 +1420,8 @@
     "edit": "Редактировать",
     "save": "Сохранить",
     "cancel": "Отмена",
+    "toastProfileSaved": "Профиль организации сохранён",
+    "toastProfileSaveError": "Не удалось сохранить профиль: {message}",
     "quickLinks": {
       "billing": "Биллинг",
       "billingDesc": "Управление подпиской и платежами",
@@ -1456,7 +1500,10 @@
           "sla_guarantee": "SLA гарантия",
           "custom_integrations": "Кастомные интеграции"
         }
-      }
+      },
+      "toastCheckoutFailed": "Не удалось начать оплату: {message}",
+      "toastSubscriptionCanceled": "Подписка отменена",
+      "toastCancelFailed": "Не удалось отменить подписку: {message}"
     },
     "invoices": {
       "title": "История счетов",

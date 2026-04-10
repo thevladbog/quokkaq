@@ -197,7 +197,7 @@ function KioskSettingsForm({
     try {
       const { printers: list, error } = await listPrintersViaTauri();
       if (error) {
-        toast.error(error);
+        toast.error(t('printerListError', { message: error }));
       }
       setPrinters(list);
       setSystemPrinterName((prev) => {
@@ -208,7 +208,8 @@ function KioskSettingsForm({
         return def ?? '';
       });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : String(e));
+      const message = e instanceof Error ? e.message : String(e);
+      toast.error(t('printerListError', { message }));
     } finally {
       setLoadingPrinters(false);
     }
@@ -261,7 +262,8 @@ function KioskSettingsForm({
         );
       }
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : String(e));
+      const message = e instanceof Error ? e.message : String(e);
+      toast.error(t('printerTestError', { message }));
     }
   };
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useId } from 'react';
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,9 +22,11 @@ export function ImageUpload({
   value,
   onChange,
   onRemove,
-  label = 'Image',
+  label,
   className
 }: ImageUploadProps) {
+  const t = useTranslations('components.upload');
+  const displayLabel = label ?? t('defaultImageLabel');
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputId = useId();
@@ -32,15 +35,13 @@ export function ImageUpload({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
-      toast.error('Please upload an image file');
+      toast.error(t('invalidType'));
       return;
     }
 
-    // Validate file size (5MB)
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('File size must be less than 5MB');
+      toast.error(t('fileTooLarge'));
       return;
     }
 
@@ -68,10 +69,10 @@ export function ImageUpload({
 
       const data = await response.json();
       onChange(data.url);
-      toast.success('Image uploaded successfully');
+      toast.success(t('imageSuccess'));
     } catch (error) {
       logger.error('Upload error:', error);
-      toast.error('Failed to upload image');
+      toast.error(t('imageFailed'));
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) {
@@ -81,14 +82,14 @@ export function ImageUpload({
   };
 
   return (
-    <div className={`space-y-2 ${className}`}>
-      {label && <Label htmlFor={inputId}>{label}</Label>}
+    <div className={`space-y-2 ${className ?? ''}`}>
+      <Label htmlFor={inputId}>{displayLabel}</Label>
       <div className='flex items-center gap-4'>
         {value ? (
           <div className='bg-muted/50 relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-md border'>
             <Image
               src={value}
-              alt={label}
+              alt={displayLabel}
               fill
               unoptimized
               className='object-contain p-1'
@@ -128,18 +129,16 @@ export function ImageUpload({
             {isUploading ? (
               <>
                 <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                Uploading...
+                {t('uploading')}
               </>
             ) : (
               <>
                 <Upload className='mr-2 h-4 w-4' />
-                {value ? 'Change Image' : 'Upload Image'}
+                {value ? t('changeImage') : t('uploadImage')}
               </>
             )}
           </Button>
-          <p className='text-muted-foreground mt-1 text-xs'>
-            Supported formats: JPG, PNG, SVG, WebP. Max 5MB.
-          </p>
+          <p className='text-muted-foreground mt-1 text-xs'>{t('hint')}</p>
         </div>
       </div>
     </div>

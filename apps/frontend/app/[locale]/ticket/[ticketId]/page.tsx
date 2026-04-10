@@ -51,7 +51,7 @@ export default function TicketPage() {
                 const counterName =
                   data.ticket?.counter?.name ||
                   (data.ticket as { counterId?: string })?.counterId ||
-                  'the counter';
+                  t('counterUnknown');
                 toast.success(
                   t('your_ticket_called', {
                     number: t_data.queueNumber,

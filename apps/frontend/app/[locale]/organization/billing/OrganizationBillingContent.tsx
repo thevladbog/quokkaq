@@ -9,8 +9,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CreditCard, Receipt, ArrowRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import { toast } from 'sonner';
 import type { SubscriptionPlan } from '@quokkaq/shared-types';
 import { subscriptionsApi } from '@/lib/api';
+import { formatApiToastErrorMessage } from '@/lib/format-api-toast-error';
 
 export function OrganizationBillingContent() {
   const router = useRouter();
@@ -34,6 +36,13 @@ export function OrganizationBillingContent() {
     mutationFn: (planCode: string) => subscriptionsApi.createCheckout(planCode),
     onSuccess: (data) => {
       window.location.href = data.checkoutUrl;
+    },
+    onError: (err: unknown) => {
+      toast.error(
+        t('toastCheckoutFailed', {
+          message: formatApiToastErrorMessage(err, tCommon('error'))
+        })
+      );
     }
   });
 
@@ -42,6 +51,14 @@ export function OrganizationBillingContent() {
       subscriptionsApi.cancelSubscription(subscriptionId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['subscription-me'] });
+      toast.success(t('toastSubscriptionCanceled'));
+    },
+    onError: (err: unknown) => {
+      toast.error(
+        t('toastCancelFailed', {
+          message: formatApiToastErrorMessage(err, tCommon('error'))
+        })
+      );
     }
   });
 

@@ -7,7 +7,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { invoicesApi } from '@/lib/api';
-import { downloadInvoicePdf } from '@/lib/invoice-pdf-download';
+import {
+  downloadInvoicePdf,
+  invoicePdfDownloadErrorToastMessage
+} from '@/lib/invoice-pdf-download';
 import { logger } from '@/lib/logger';
 import { pickDefaultPaymentAccount } from '@/lib/default-payment-account';
 import { formatAppDate, intlLocaleFromAppLocale } from '@/lib/format-datetime';
@@ -99,7 +102,9 @@ export function OrganizationInvoiceDetailContent() {
       await downloadInvoicePdf(inv);
     } catch (error) {
       logger.error('downloadInvoicePdf failed', error);
-      toast.error(tDetail('downloadPdfError'));
+      toast.error(
+        invoicePdfDownloadErrorToastMessage(error, tDetail('downloadPdfError'))
+      );
     } finally {
       setPdfBusy(false);
     }

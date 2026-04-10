@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useId, useRef, useState } from 'react';
 import { Button } from './button';
 import { Input } from './input';
 import { Label } from './label';
@@ -8,20 +8,32 @@ import { Upload, X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import Image from 'next/image';
 import { logger } from '../lib/logger';
+import {
+  type LogoUploadMessages,
+  defaultLogoUploadMessages
+} from './upload-messages';
+
+export type { LogoUploadMessages } from './upload-messages';
+export { defaultLogoUploadMessages } from './upload-messages';
 
 interface LogoUploadProps {
   currentLogoUrl?: string;
   onLogoUploaded: (url: string) => void;
   onLogoRemoved: () => void;
   label?: string;
+  messages?: Partial<LogoUploadMessages>;
 }
 
 export function LogoUpload({
   currentLogoUrl,
   onLogoUploaded,
   onLogoRemoved,
-  label = 'Logo'
+  label,
+  messages: messagesProp
 }: LogoUploadProps) {
+  const m = { ...defaultLogoUploadMessages, ...messagesProp };
+  const displayLabel = label ?? m.defaultLabel;
+  const fileInputId = useId();
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -29,15 +41,13 @@ export function LogoUpload({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
-      toast.error('Please upload an image file');
+      toast.error(m.invalidType);
       return;
     }
 
-    // Validate file size (5MB)
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('File size must be less than 5MB');
+      toast.error(m.fileTooLarge);
       return;
     }
 
@@ -65,10 +75,10 @@ export function LogoUpload({
 
       const data = await response.json();
       onLogoUploaded(data.url);
-      toast.success('Logo uploaded successfully');
+      toast.success(m.success);
     } catch (error) {
       logger.error('Upload error:', error);
-      toast.error('Failed to upload logo');
+      toast.error(m.failed);
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) {
@@ -79,13 +89,13 @@ export function LogoUpload({
 
   return (
     <div className='space-y-2'>
-      <Label>{label}</Label>
+      <Label htmlFor={fileInputId}>{displayLabel}</Label>
       <div className='flex items-center gap-4'>
         {currentLogoUrl ? (
           <div className='bg-muted/50 relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-md border'>
             <Image
               src={currentLogoUrl}
-              alt='Logo'
+              alt={displayLabel}
               fill
               unoptimized
               className='object-contain p-1'
@@ -112,7 +122,7 @@ export function LogoUpload({
             accept='image/*'
             className='hidden'
             onChange={handleFileChange}
-            id='logo-upload'
+            id={fileInputId}
           />
           <Button
             variant='outline'
@@ -123,18 +133,16 @@ export function LogoUpload({
             {isUploading ? (
               <>
                 <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                Uploading...
+                {m.uploading}
               </>
             ) : (
               <>
                 <Upload className='mr-2 h-4 w-4' />
-                {currentLogoUrl ? 'Change Logo' : 'Upload Logo'}
+                {currentLogoUrl ? m.change : m.upload}
               </>
             )}
           </Button>
-          <p className='text-muted-foreground mt-1 text-xs'>
-            Supported formats: JPG, PNG, SVG, WebP. Max 5MB.
-          </p>
+          <p className='text-muted-foreground mt-1 text-xs'>{m.hint}</p>
         </div>
       </div>
     </div>

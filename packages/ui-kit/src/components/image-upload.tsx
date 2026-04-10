@@ -8,6 +8,13 @@ import { Upload, X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import Image from 'next/image';
 import { logger } from '../lib/logger';
+import {
+  type ImageUploadMessages,
+  defaultImageUploadMessages
+} from './upload-messages';
+
+export type { ImageUploadMessages } from './upload-messages';
+export { defaultImageUploadMessages } from './upload-messages';
 
 interface ImageUploadProps {
   value?: string | null;
@@ -15,15 +22,19 @@ interface ImageUploadProps {
   onRemove: () => void;
   label?: string;
   className?: string;
+  messages?: Partial<ImageUploadMessages>;
 }
 
 export function ImageUpload({
   value,
   onChange,
   onRemove,
-  label = 'Image',
-  className
+  label,
+  className,
+  messages: messagesProp
 }: ImageUploadProps) {
+  const m = { ...defaultImageUploadMessages, ...messagesProp };
+  const displayLabel = label ?? m.defaultLabel;
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputId = useId();
@@ -32,15 +43,13 @@ export function ImageUpload({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
-      toast.error('Please upload an image file');
+      toast.error(m.invalidType);
       return;
     }
 
-    // Validate file size (5MB)
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('File size must be less than 5MB');
+      toast.error(m.fileTooLarge);
       return;
     }
 
@@ -68,10 +77,10 @@ export function ImageUpload({
 
       const data = await response.json();
       onChange(data.url);
-      toast.success('Image uploaded successfully');
+      toast.success(m.success);
     } catch (error) {
       logger.error('Upload error:', error);
-      toast.error('Failed to upload image');
+      toast.error(m.failed);
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) {
@@ -81,14 +90,14 @@ export function ImageUpload({
   };
 
   return (
-    <div className={`space-y-2 ${className}`}>
-      {label && <Label htmlFor={inputId}>{label}</Label>}
+    <div className={`space-y-2 ${className ?? ''}`}>
+      {displayLabel ? <Label htmlFor={inputId}>{displayLabel}</Label> : null}
       <div className='flex items-center gap-4'>
         {value ? (
           <div className='bg-muted/50 relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-md border'>
             <Image
               src={value}
-              alt={label}
+              alt={displayLabel}
               fill
               unoptimized
               className='object-contain p-1'
@@ -128,18 +137,16 @@ export function ImageUpload({
             {isUploading ? (
               <>
                 <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                Uploading...
+                {m.uploading}
               </>
             ) : (
               <>
                 <Upload className='mr-2 h-4 w-4' />
-                {value ? 'Change Image' : 'Upload Image'}
+                {value ? m.change : m.upload}
               </>
             )}
           </Button>
-          <p className='text-muted-foreground mt-1 text-xs'>
-            Supported formats: JPG, PNG, SVG, WebP. Max 5MB.
-          </p>
+          <p className='text-muted-foreground mt-1 text-xs'>{m.hint}</p>
         </div>
       </div>
     </div>
