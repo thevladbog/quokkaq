@@ -30,7 +30,12 @@ import type {
   SubscriptionPlan,
   Invoice,
   Company,
-  CompanyMeResponse
+  SaasVendor,
+  CompanyMeResponse,
+  CatalogItem,
+  InvoiceDraftUpsertBody,
+  InvoiceDraftCreateBody,
+  PaymentAccount
 } from '@quokkaq/shared-types';
 
 import {
@@ -47,7 +52,9 @@ import {
   SubscriptionPlanSchema,
   InvoiceSchema,
   CompanySchema,
-  CompanyMeResponseSchema
+  SaasVendorSchema,
+  CompanyMeResponseSchema,
+  CatalogItemSchema
 } from '@quokkaq/shared-types';
 
 /** Shape-only summary for logs — never includes raw API payload values. */
@@ -151,10 +158,16 @@ function headersInitWithoutAuthorization(
 const API_BASE_URL = '/api';
 
 // Create a base fetch function with proper error handling and authentication
+type ApiRequestExtra<T> = {
+  /** When the server returns 404, return this value instead of throwing (no JSON parse). */
+  notFoundValue?: T;
+};
+
 async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {},
-  schema?: z.ZodType<T>
+  schema?: z.ZodType<T>,
+  extra?: ApiRequestExtra<T>
 ): Promise<T> {
   let token = null;
   let refreshToken = null;
@@ -223,6 +236,13 @@ async function apiRequest<T>(
             };
 
             const retryResponse = await fetch(url, retryConfig);
+            if (
+              retryResponse.status === 404 &&
+              extra &&
+              Object.prototype.hasOwnProperty.call(extra, 'notFoundValue')
+            ) {
+              return extra.notFoundValue as T;
+            }
             if (!retryResponse.ok) {
               throw new Error(
                 `API Error: ${retryResponse.status} - ${await retryResponse.text()}`
@@ -281,6 +301,14 @@ async function apiRequest<T>(
       throw new Error(`Unauthorized: ${await response.text()}`);
     }
 
+    if (
+      response.status === 404 &&
+      extra &&
+      Object.prototype.hasOwnProperty.call(extra, 'notFoundValue')
+    ) {
+      return extra.notFoundValue as T;
+    }
+
     if (!response.ok) {
       const errorData = await response.text();
       throw new Error(`API Error: ${response.status} - ${errorData}`);
@@ -322,7 +350,7 @@ async function apiRequest<T>(
 async function apiRequestBlob(
   endpoint: string,
   options: RequestInit = {}
-): Promise<Blob> {
+): Promise<{ blob: Blob; headers: Headers }> {
   let token = null;
   let refreshToken = null;
   let currentLocale = null;
@@ -397,7 +425,8 @@ async function apiRequestBlob(
                 `API Error: ${retryResponse.status} - ${await retryResponse.text()}`
               );
             }
-            return readBodyAsBlob(retryResponse);
+            const retryBlob = await readBodyAsBlob(retryResponse);
+            return { blob: retryBlob, headers: retryResponse.headers };
           }
         }
       } catch (refreshError) {
@@ -423,7 +452,8 @@ async function apiRequestBlob(
       throw new Error(`API Error: ${response.status} - ${errorData}`);
     }
 
-    return readBodyAsBlob(response);
+    const blob = await readBodyAsBlob(response);
+    return { blob, headers: response.headers };
   } catch (error) {
     logger.error(`API request failed for ${url}:`, error);
     throw error;
@@ -1139,8 +1169,38 @@ export const invoicesApi = {
   getMyInvoices: () =>
     apiRequest<Invoice[]>(`/invoices/me`, {}, z.array(InvoiceSchema)),
 
-  downloadInvoice: (invoiceId: string) =>
-    apiRequestBlob(`/invoices/${invoiceId}/download`)
+  getMyInvoiceById: (invoiceId: string) =>
+    apiRequest<Invoice>(
+      `/invoices/${encodeURIComponent(invoiceId)}`,
+      {},
+      InvoiceSchema
+    ),
+
+  requestYooKassaPaymentLink: (invoiceId: string) =>
+    apiRequest<{ confirmationUrl: string; paymentId: string }>(
+      `/invoices/${encodeURIComponent(invoiceId)}/yookassa-payment-link`,
+      { method: 'POST' },
+      z.object({
+        confirmationUrl: z.string(),
+        paymentId: z.string()
+      })
+    ),
+
+  downloadInvoice: async (invoiceId: string) => {
+    const { blob, headers } = await apiRequestBlob(
+      `/invoices/${encodeURIComponent(invoiceId)}/download`
+    );
+    return {
+      blob,
+      contentDisposition: headers.get('Content-Disposition')
+    };
+  },
+
+  /** SaaS operator company for invoice header / bank QR (tenant). `null` if not configured (404). */
+  getSaaSVendor: () =>
+    apiRequest<SaasVendor | null>(`/invoices/me/vendor`, {}, SaasVendorSchema, {
+      notFoundValue: null
+    })
 };
 
 // Company API functions
@@ -1164,6 +1224,8 @@ export const companiesApiExt = {
     clearBillingAddress?: boolean;
     counterparty?: unknown;
     clearCounterparty?: boolean;
+    /** Shape matches PaymentAccountsSchema in @quokkaq/shared-types; validate client-side when needed. */
+    paymentAccounts?: PaymentAccount[];
   }) =>
     apiRequest<Company>(
       `/companies/me`,
@@ -1215,6 +1277,17 @@ export const dadataApi = {
   ) =>
     apiRequest<unknown>(
       dadataPath(scope, '/address/suggest'),
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      },
+      z.unknown()
+    ),
+
+  suggestBank: (scope: 'tenant' | 'platform', body: Record<string, unknown>) =>
+    apiRequest<unknown>(
+      dadataPath(scope, '/bank/suggest'),
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1311,6 +1384,8 @@ export const platformApi = {
       clearBillingAddress?: boolean;
       counterparty?: unknown;
       clearCounterparty?: boolean;
+      /** Shape matches PaymentAccountsSchema in @quokkaq/shared-types; validate client-side when needed. */
+      paymentAccounts?: PaymentAccount[];
       isSaasOperator?: boolean;
     }
   ) =>
@@ -1426,6 +1501,75 @@ export const platformApi = {
       SubscriptionPlanSchema
     ),
 
+  listCatalogItems: (opts?: { limit?: number; offset?: number }) =>
+    apiRequest<PlatformListResponse<CatalogItem>>(
+      `/platform/catalog-items${platformQueryString({
+        limit: opts?.limit,
+        offset: opts?.offset
+      })}`,
+      {},
+      platformListResponseSchema(CatalogItemSchema)
+    ),
+
+  getCatalogItem: (id: string) =>
+    apiRequest<CatalogItem>(
+      `/platform/catalog-items/${encodeURIComponent(id)}`,
+      {},
+      CatalogItemSchema
+    ),
+
+  createCatalogItem: (body: {
+    name: string;
+    printName?: string;
+    unit?: string;
+    article?: string;
+    defaultPriceMinor: number;
+    currency?: string;
+    vatExempt?: boolean;
+    vatRatePercent?: number | null;
+    subscriptionPlanId?: string | null;
+    isActive?: boolean;
+  }) =>
+    apiRequest<CatalogItem>(
+      `/platform/catalog-items`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      },
+      CatalogItemSchema
+    ),
+
+  patchCatalogItem: (
+    id: string,
+    body: Partial<{
+      name: string;
+      printName: string;
+      unit: string;
+      article: string;
+      defaultPriceMinor: number;
+      currency: string;
+      vatExempt: boolean;
+      vatRatePercent: number | null;
+      subscriptionPlanId: string | null;
+      isActive: boolean;
+    }>
+  ) =>
+    apiRequest<CatalogItem>(
+      `/platform/catalog-items/${encodeURIComponent(id)}`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      },
+      CatalogItemSchema
+    ),
+
+  deleteCatalogItem: (id: string) =>
+    apiRequest<void>(`/platform/catalog-items/${encodeURIComponent(id)}`, {
+      method: 'DELETE'
+    }),
+
   listInvoices: (opts?: {
     companyId?: string;
     limit?: number;
@@ -1441,23 +1585,7 @@ export const platformApi = {
       platformListResponseSchema(InvoiceSchema)
     ),
 
-  createInvoice: (body: {
-    companyId: string;
-    subscriptionId?: string;
-    amount: number;
-    currency?: string;
-    dueDate: string;
-    status?: string;
-    paymentProvider?: string;
-    createSubscriptionWithInvoice?: boolean;
-    subscription?: {
-      planId: string;
-      currentPeriodStart: string;
-      currentPeriodEnd: string;
-      status?: string;
-      trialEnd?: string | null;
-    };
-  }) =>
+  createInvoice: (body: InvoiceDraftCreateBody) =>
     apiRequest<Invoice>(
       `/platform/invoices`,
       {
@@ -1465,6 +1593,31 @@ export const platformApi = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       },
+      InvoiceSchema
+    ),
+
+  getPlatformInvoice: (id: string) =>
+    apiRequest<Invoice>(
+      `/platform/invoices/${encodeURIComponent(id)}`,
+      {},
+      InvoiceSchema
+    ),
+
+  patchInvoiceDraft: (id: string, body: InvoiceDraftUpsertBody) =>
+    apiRequest<Invoice>(
+      `/platform/invoices/${encodeURIComponent(id)}/draft`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      },
+      InvoiceSchema
+    ),
+
+  issueInvoice: (id: string) =>
+    apiRequest<Invoice>(
+      `/platform/invoices/${encodeURIComponent(id)}/issue`,
+      { method: 'POST' },
       InvoiceSchema
     ),
 

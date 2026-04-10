@@ -35,6 +35,8 @@ import { Combobox } from '@/components/ui/combobox';
 import { Link } from '@/src/i18n/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
+import { logger } from '@/lib/logger';
 import {
   formatAppDateTime,
   intlLocaleFromAppLocale
@@ -50,23 +52,14 @@ const SUB_STATUSES = [
 
 const STATUS_SELECT_DEFAULT = '__default__';
 
-/** Next calendar month, clamping the day to the last day of the target month (avoids Jan 31 → Mar 3). */
-function addOneCalendarMonthClamped(from: Date): Date {
-  const y = from.getFullYear();
-  const m = from.getMonth();
-  const day = from.getDate();
-  const lastDayOfTargetMonth = new Date(y, m + 2, 0).getDate();
-  const clampedDay = Math.min(day, lastDayOfTargetMonth);
-  return new Date(
-    y,
-    m + 1,
-    clampedDay,
-    from.getHours(),
-    from.getMinutes(),
-    from.getSeconds(),
-    from.getMilliseconds()
-  );
-}
+type CreateSubscriptionMutationResult =
+  | { outcome: 'subscription-only' }
+  | { outcome: 'subscription-and-invoice' }
+  | { outcome: 'subscription-only-invoice-failed' }
+  | {
+      outcome: 'subscription-draft-invoice';
+      invoiceId: string;
+    };
 
 function subscriptionStatusLabel(
   tBilling: ReturnType<typeof useTranslations<'organization.billing'>>,
@@ -136,7 +129,7 @@ export default function PlatformSubscriptionsPage() {
   });
 
   const createMut = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (): Promise<CreateSubscriptionMutationResult> => {
       if (!companyId || !planId) {
         throw new Error(t('validationCompanyPlan'));
       }
@@ -176,12 +169,15 @@ export default function PlatformSubscriptionsPage() {
       }
 
       if (createWithInvoice) {
-        const amount = Number.parseFloat(invAmount.trim());
+        const amountRaw = invAmount.trim();
+        if (!/^\d+$/.test(amountRaw)) {
+          throw new Error(t('invoiceWithSubValidation'));
+        }
+        const amount = Number.parseInt(amountRaw, 10);
         const dueRaw = invDue.trim();
         const dueDate = new Date(dueRaw);
         if (
           !Number.isFinite(amount) ||
-          !Number.isInteger(amount) ||
           amount <= 0 ||
           dueRaw === '' ||
           Number.isNaN(dueDate.getTime())
@@ -190,39 +186,76 @@ export default function PlatformSubscriptionsPage() {
         }
         const due = dueDate.toISOString();
 
-        let currentPeriodStart: string;
-        let currentPeriodEnd: string;
-        if (body.currentPeriodStart && body.currentPeriodEnd) {
-          currentPeriodStart = body.currentPeriodStart;
-          currentPeriodEnd = body.currentPeriodEnd;
-        } else {
-          const now = new Date();
-          const endDefault = addOneCalendarMonthClamped(now);
-          currentPeriodStart = now.toISOString();
-          currentPeriodEnd = endDefault.toISOString();
-        }
+        await platformApi.createSubscription(body);
 
-        return platformApi.createInvoice({
-          companyId,
-          amount,
-          dueDate: due,
-          status: 'open',
-          paymentProvider: 'manual',
-          createSubscriptionWithInvoice: true,
-          subscription: {
-            planId,
-            currentPeriodStart,
-            currentPeriodEnd,
-            ...(subStatusSelect !== STATUS_SELECT_DEFAULT
-              ? { status: subStatusSelect }
-              : {})
-          }
-        });
+        const plan = plans.find((p) => p.id === planId);
+        let inv;
+        try {
+          inv = await platformApi.createInvoice({
+            companyId,
+            dueDate: due,
+            currency: (plan?.currency ?? 'RUB').trim() || 'RUB',
+            allowYookassaPaymentLink: false,
+            allowStripePaymentLink: false,
+            provisionSubscriptionsOnPayment: false,
+            lines: [
+              {
+                descriptionPrint: plan?.name?.trim() || 'Subscription',
+                quantity: 1,
+                unitPriceInclVatMinor: amount,
+                vatExempt: true,
+                vatRatePercent: 0
+              }
+            ]
+          });
+        } catch (invoiceErr) {
+          logger.error(
+            'createInvoice after createSubscription (with invoice flow)',
+            invoiceErr
+          );
+          return { outcome: 'subscription-only-invoice-failed' };
+        }
+        try {
+          await platformApi.issueInvoice(inv.id);
+        } catch (issueErr) {
+          logger.error(
+            'issueInvoice after createSubscription+createInvoice',
+            issueErr
+          );
+          return {
+            outcome: 'subscription-draft-invoice',
+            invoiceId: inv.id
+          };
+        }
+        return { outcome: 'subscription-and-invoice' };
       }
 
-      return platformApi.createSubscription(body);
+      await platformApi.createSubscription(body);
+      return { outcome: 'subscription-only' };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
+      if (result.outcome === 'subscription-and-invoice') {
+        toast.success(
+          t('toastCreatedWithInvoice', {
+            defaultValue: 'Subscription and invoice created.'
+          })
+        );
+      } else if (result.outcome === 'subscription-draft-invoice') {
+        toast.warning(
+          t('toastSubCreatedInvoiceIssueFailed', {
+            invoiceId: result.invoiceId
+          }),
+          { duration: 12_000 }
+        );
+      } else if (result.outcome === 'subscription-only-invoice-failed') {
+        toast.warning(t('toastSubCreatedInvoiceCreateFailed'), {
+          duration: 12_000
+        });
+      } else {
+        toast.success(
+          t('toastCreated', { defaultValue: 'Subscription created.' })
+        );
+      }
       qc.invalidateQueries({ queryKey: ['platform-subscriptions'] });
       qc.invalidateQueries({ queryKey: ['platform-company'] });
       qc.invalidateQueries({ queryKey: ['platform-invoices'] });
@@ -235,6 +268,10 @@ export default function PlatformSubscriptionsPage() {
       setCreateWithInvoice(false);
       setInvAmount('');
       setInvDue('');
+    },
+    onError: (err) => {
+      logger.error('platform create subscription', err);
+      toast.error(t('toastCreateFailed'), { duration: 6000 });
     }
   });
 

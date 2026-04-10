@@ -81,55 +81,13 @@ func newPendingPlanTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatal(err)
 	}
-	stmts := []string{
-		`CREATE TABLE subscription_plans (
-			id TEXT PRIMARY KEY NOT NULL,
-			name TEXT NOT NULL,
-			code TEXT NOT NULL UNIQUE,
-			price INTEGER NOT NULL,
-			currency TEXT NOT NULL DEFAULT 'RUB',
-			"interval" TEXT NOT NULL DEFAULT 'month',
-			features TEXT,
-			limits TEXT,
-			is_active INTEGER NOT NULL DEFAULT 1,
-			created_at DATETIME,
-			updated_at DATETIME
-		)`,
-		`CREATE TABLE companies (
-			id TEXT PRIMARY KEY NOT NULL,
-			name TEXT NOT NULL,
-			owner_user_id TEXT,
-			subscription_id TEXT,
-			is_saas_operator INTEGER NOT NULL DEFAULT 0,
-			billing_email TEXT,
-			billing_address TEXT,
-			counterparty TEXT,
-			settings TEXT,
-			onboarding_state TEXT,
-			created_at DATETIME,
-			updated_at DATETIME
-		)`,
-		`CREATE TABLE subscriptions (
-			id TEXT PRIMARY KEY NOT NULL,
-			company_id TEXT NOT NULL,
-			plan_id TEXT NOT NULL,
-			status TEXT NOT NULL,
-			current_period_start DATETIME NOT NULL,
-			current_period_end DATETIME NOT NULL,
-			cancel_at_period_end INTEGER NOT NULL DEFAULT 0,
-			trial_end DATETIME,
-			pending_plan_id TEXT,
-			pending_effective_at DATETIME,
-			stripe_subscription_id TEXT,
-			metadata TEXT,
-			created_at DATETIME,
-			updated_at DATETIME
-		)`,
-	}
-	for _, q := range stmts {
-		if err := db.Exec(q).Error; err != nil {
-			t.Fatal(err)
-		}
+	// Schema from the same GORM models as production (no hand-written CREATE TABLE).
+	if err := db.AutoMigrate(
+		&models.SubscriptionPlan{},
+		&models.Company{},
+		&models.Subscription{},
+	); err != nil {
+		t.Fatal(err)
 	}
 	return db
 }

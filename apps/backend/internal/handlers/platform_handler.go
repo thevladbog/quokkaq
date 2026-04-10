@@ -16,10 +16,16 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const platformDefaultLimit = 50
 const platformMaxLimit = 100
+
+const platformCatalogDefaultLimit = 50
+const platformCatalogMaxLimit = 200
+
+var errPlatformCompanyAlreadyHasSubscription = errors.New("company already has a subscription")
 
 // platformInvoiceStatuses is the allowed set for models.Invoice.Status on platform create/patch.
 var platformInvoiceStatuses = map[string]struct{}{
@@ -29,22 +35,6 @@ var platformInvoiceStatuses = map[string]struct{}{
 func isValidPlatformInvoiceStatus(s string) bool {
 	_, ok := platformInvoiceStatuses[s]
 	return ok
-}
-
-// invoicePaidAtForCreate enforces paidAt only when status is paid; otherwise paidAt must be omitted.
-func invoicePaidAtForCreate(status string, paidAt *time.Time, nowUTC time.Time) (*time.Time, error) {
-	if status == "paid" {
-		if paidAt != nil {
-			t := paidAt.UTC()
-			return &t, nil
-		}
-		t := nowUTC
-		return &t, nil
-	}
-	if paidAt != nil {
-		return nil, errors.New("paidAt is only allowed when status is paid")
-	}
-	return nil, nil
 }
 
 // platformSubscriptionStatuses is the allowed set for models.Subscription.Status on platform create/patch.
@@ -66,7 +56,7 @@ func resolvePlatformSubscriptionStatusForCreate(in *string) (string, error) {
 
 // applyPlatformPatchSubscriptionCore merges status, billing window, cancel-at-period-end, and trialEnd from body into sub
 // and enforces the same invariants as CreateSubscription for those fields.
-func applyPlatformPatchSubscriptionCore(sub *models.Subscription, body patchSubscriptionBody, now time.Time) error {
+func applyPlatformPatchSubscriptionCore(sub *models.Subscription, body PatchPlatformSubscriptionBody, now time.Time) error {
 	if (body.CurrentPeriodStart == nil) != (body.CurrentPeriodEnd == nil) {
 		return errors.New("currentPeriodStart and currentPeriodEnd must both be set or both omitted")
 	}
@@ -132,91 +122,25 @@ func applyPlatformPatchSubscriptionCore(sub *models.Subscription, body patchSubs
 	return nil
 }
 
-// companyShouldPointSubscriptionID decides whether companies.subscription_id should reference a newly created subscription.
-// If the company has no primary subscription yet, always point. Otherwise only repoint when the new row is the current
-// billing window (now in [start, end)) and status is not canceled, so future-dated subscriptions do not steal the pointer.
-func companyShouldPointSubscriptionID(company *models.Company, sub *models.Subscription, now time.Time) bool {
-	now = now.UTC()
-	sid := ""
-	if company.SubscriptionID != nil {
-		sid = strings.TrimSpace(*company.SubscriptionID)
-	}
-	if sid == "" {
-		return true
-	}
-	if sub.Status == "canceled" {
-		return false
-	}
-	if now.Before(sub.CurrentPeriodStart) || !now.Before(sub.CurrentPeriodEnd) {
-		return false
-	}
-	return true
-}
-
-// platformCreateSubscriptionForCompanyTx creates a subscription for company and optionally updates company.subscription_id (same tx).
-// Allows multiple subscriptions per company (e.g. future periods); the company pointer is only updated when appropriate.
-func platformCreateSubscriptionForCompanyTx(tx *gorm.DB, now time.Time, companyID, planID string, status string, start, end time.Time, trialEnd *time.Time) (*models.Subscription, error) {
-	start = start.UTC()
-	end = end.UTC()
-	var trialEndUTC *time.Time
-	if trialEnd != nil {
-		t := trialEnd.UTC()
-		trialEndUTC = &t
-	}
-
-	if !end.After(start) {
-		return nil, errors.New("subscription currentPeriodEnd must be after currentPeriodStart")
-	}
-	effectiveEnd := end
-	if trialEndUTC != nil && trialEndUTC.Before(end) {
-		effectiveEnd = *trialEndUTC
-	}
-	if !effectiveEnd.After(start) {
-		return nil, errors.New("subscription period is invalid: when trialEnd is before currentPeriodEnd, trialEnd must still be after currentPeriodStart")
-	}
-
-	var company models.Company
-	if err := tx.Where("id = ?", companyID).First(&company).Error; err != nil {
-		return nil, err
-	}
-
-	sub := &models.Subscription{
-		CompanyID:            companyID,
-		PlanID:               planID,
-		Status:               status,
-		CurrentPeriodStart:   start,
-		CurrentPeriodEnd:     end,
-		CancelAtPeriodEnd:    false,
-		TrialEnd:             trialEndUTC,
-		StripeSubscriptionID: nil,
-	}
-	if err := tx.Create(sub).Error; err != nil {
-		return nil, err
-	}
-	if companyShouldPointSubscriptionID(&company, sub, now) {
-		if err := tx.Model(&models.Company{}).Where("id = ?", companyID).Update("subscription_id", sub.ID).Error; err != nil {
-			return nil, err
-		}
-	}
-	return sub, nil
-}
-
 // PlatformHandler exposes SaaS operator (platform_admin) APIs.
 type PlatformHandler struct {
 	companyRepo      repository.CompanyRepository
 	subscriptionRepo repository.SubscriptionRepository
 	invoiceRepo      repository.InvoiceRepository
+	catalogRepo      repository.CatalogRepository
 }
 
 func NewPlatformHandler(
 	companyRepo repository.CompanyRepository,
 	subscriptionRepo repository.SubscriptionRepository,
 	invoiceRepo repository.InvoiceRepository,
+	catalogRepo repository.CatalogRepository,
 ) *PlatformHandler {
 	return &PlatformHandler{
 		companyRepo:      companyRepo,
 		subscriptionRepo: subscriptionRepo,
 		invoiceRepo:      invoiceRepo,
+		catalogRepo:      catalogRepo,
 	}
 }
 
@@ -229,6 +153,25 @@ func platformParseLimitOffset(r *http.Request) (limit, offset int) {
 	}
 	if limit > platformMaxLimit {
 		limit = platformMaxLimit
+	}
+	if v := strings.TrimSpace(r.URL.Query().Get("offset")); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			offset = n
+		}
+	}
+	return limit, offset
+}
+
+// platformParseCatalogLimitOffset matches repository/catalog max page size (200).
+func platformParseCatalogLimitOffset(r *http.Request) (limit, offset int) {
+	limit = platformCatalogDefaultLimit
+	if v := strings.TrimSpace(r.URL.Query().Get("limit")); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			limit = n
+		}
+	}
+	if limit > platformCatalogMaxLimit {
+		limit = platformCatalogMaxLimit
 	}
 	if v := strings.TrimSpace(r.URL.Query().Get("offset")); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
@@ -287,13 +230,13 @@ func toCompanyPtrSlice(in []models.Company) []*models.Company {
 // @Tags         platform
 // @Produce      json
 // @Security     BearerAuth
-// @Success      200  {object}  map[string]bool
+// @Success      200  {object}  FeaturesFlags
 // @Router       /platform/features [get]
 func (h *PlatformHandler) GetFeatures(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	RespondJSON(w, map[string]bool{
-		"dadata":        dadataConfigured(),
-		"dadataCleaner": dadataCleanerConfigured(),
+	RespondJSON(w, FeaturesFlags{
+		DaData:        dadataConfigured(),
+		DaDataCleaner: dadataCleanerConfigured(),
 	})
 }
 
@@ -344,13 +287,15 @@ func (h *PlatformHandler) GetCompany(w http.ResponseWriter, r *http.Request) {
 	RespondJSON(w, company)
 }
 
-type patchPlatformCompanyBody struct {
+// PatchPlatformCompanyBody is the JSON body for PATCH /platform/companies/{id}.
+type PatchPlatformCompanyBody struct {
 	Name                *string          `json:"name"`
 	BillingEmail        *string          `json:"billingEmail"`
-	Counterparty        *json.RawMessage `json:"counterparty"`
+	Counterparty        *json.RawMessage `json:"counterparty" swaggertype:"object"`
 	ClearCounterparty   *bool            `json:"clearCounterparty"`
-	BillingAddress      *json.RawMessage `json:"billingAddress"`
+	BillingAddress      *json.RawMessage `json:"billingAddress" swaggertype:"object"`
 	ClearBillingAddress *bool            `json:"clearBillingAddress"`
+	PaymentAccounts     *json.RawMessage `json:"paymentAccounts" swaggertype:"array,object"`
 	IsSaasOperator      *bool            `json:"isSaasOperator"`
 }
 
@@ -360,7 +305,8 @@ type patchPlatformCompanyBody struct {
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
-// @Param        id path string true "Company ID"
+// @Param        id   path  string                    true  "Company ID"
+// @Param        body body  PatchPlatformCompanyBody  true  "Fields to update"
 // @Success      200  {object}  models.Company
 // @Router       /platform/companies/{id} [patch]
 func (h *PlatformHandler) PatchCompany(w http.ResponseWriter, r *http.Request) {
@@ -386,7 +332,7 @@ func (h *PlatformHandler) PatchCompany(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var body patchPlatformCompanyBody
+	var body PatchPlatformCompanyBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
@@ -426,6 +372,14 @@ func (h *PlatformHandler) PatchCompany(w http.ResponseWriter, r *http.Request) {
 			}
 			company.Counterparty = raw
 		}
+	}
+	if body.PaymentAccounts != nil {
+		out, err := normalizePaymentAccountsJSON(*body.PaymentAccounts)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		company.PaymentAccounts = out
 	}
 
 	if body.IsSaasOperator != nil {
@@ -503,9 +457,10 @@ func toSubscriptionPtrSlice(in []models.Subscription) []*models.Subscription {
 	return out
 }
 
-type createSubscriptionBody struct {
-	CompanyID          string     `json:"companyId"`
-	PlanID             string     `json:"planId"`
+// PlatformCreateSubscriptionBody is the JSON body for POST /platform/subscriptions.
+type PlatformCreateSubscriptionBody struct {
+	CompanyID          string     `json:"companyId" binding:"required"`
+	PlanID             string     `json:"planId" binding:"required"`
 	Status             *string    `json:"status"`
 	CurrentPeriodStart *time.Time `json:"currentPeriodStart"`
 	CurrentPeriodEnd   *time.Time `json:"currentPeriodEnd"`
@@ -518,6 +473,7 @@ type createSubscriptionBody struct {
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
+// @Param        body body  PlatformCreateSubscriptionBody  true  "New subscription"
 // @Success      201  {object}  models.Subscription
 // @Failure      400  {string}  string "Bad request"
 // @Failure      404  {string}  string "Company not found"
@@ -530,7 +486,7 @@ func (h *PlatformHandler) CreateSubscription(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	var body createSubscriptionBody
+	var body PlatformCreateSubscriptionBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
@@ -621,12 +577,23 @@ func (h *PlatformHandler) CreateSubscription(w http.ResponseWriter, r *http.Requ
 	}
 
 	err = database.DB.Transaction(func(tx *gorm.DB) error {
+		var company models.Company
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", companyID).First(&company).Error; err != nil {
+			return err
+		}
+		if company.SubscriptionID != nil && strings.TrimSpace(*company.SubscriptionID) != "" {
+			return errPlatformCompanyAlreadyHasSubscription
+		}
 		if err := tx.Create(sub).Error; err != nil {
 			return err
 		}
 		return tx.Model(&models.Company{}).Where("id = ?", companyID).Update("subscription_id", sub.ID).Error
 	})
 	if err != nil {
+		if errors.Is(err, errPlatformCompanyAlreadyHasSubscription) {
+			http.Error(w, "Company already has a subscription", http.StatusConflict)
+			return
+		}
 		log.Printf("Platform CreateSubscription transaction: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
@@ -644,7 +611,8 @@ func (h *PlatformHandler) CreateSubscription(w http.ResponseWriter, r *http.Requ
 	RespondJSONWithStatus(w, http.StatusCreated, created)
 }
 
-type patchSubscriptionBody struct {
+// PatchPlatformSubscriptionBody is the JSON body for PATCH /platform/subscriptions/{id}.
+type PatchPlatformSubscriptionBody struct {
 	Status             *string    `json:"status"`
 	CurrentPeriodStart *time.Time `json:"currentPeriodStart"`
 	CurrentPeriodEnd   *time.Time `json:"currentPeriodEnd"`
@@ -661,7 +629,7 @@ func subscriptionStripeLinked(sub *models.Subscription) bool {
 }
 
 // patchSubscriptionRequestsTierChange is true when the body attempts to change plan, schedule a plan, or clear a scheduled plan.
-func patchSubscriptionRequestsTierChange(body patchSubscriptionBody) bool {
+func patchSubscriptionRequestsTierChange(body PatchPlatformSubscriptionBody) bool {
 	if body.PlanID != nil {
 		return true
 	}
@@ -677,7 +645,8 @@ func patchSubscriptionRequestsTierChange(body patchSubscriptionBody) bool {
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
-// @Param        id path string true "Subscription ID"
+// @Param        id   path  string                         true  "Subscription ID"
+// @Param        body body  PatchPlatformSubscriptionBody  true  "Fields to update"
 // @Success      200  {object}  models.Subscription
 // @Router       /platform/subscriptions/{id} [patch]
 func (h *PlatformHandler) PatchSubscription(w http.ResponseWriter, r *http.Request) {
@@ -698,7 +667,7 @@ func (h *PlatformHandler) PatchSubscription(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	var body patchSubscriptionBody
+	var body PatchPlatformSubscriptionBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
@@ -810,14 +779,15 @@ func (h *PlatformHandler) ListSubscriptionPlans(w http.ResponseWriter, r *http.R
 	RespondJSON(w, plans)
 }
 
-type createPlanBody struct {
+// PlatformCreateSubscriptionPlanBody is the JSON body for POST /platform/subscription-plans.
+type PlatformCreateSubscriptionPlanBody struct {
 	Name     string          `json:"name"`
 	Code     string          `json:"code"`
 	Price    int64           `json:"price"`
 	Currency string          `json:"currency"`
 	Interval string          `json:"interval"`
-	Features json.RawMessage `json:"features"`
-	Limits   json.RawMessage `json:"limits"`
+	Features json.RawMessage `json:"features" swaggertype:"object"`
+	Limits   json.RawMessage `json:"limits" swaggertype:"object"`
 	IsActive bool            `json:"isActive"`
 }
 
@@ -827,10 +797,11 @@ type createPlanBody struct {
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
+// @Param        body body  PlatformCreateSubscriptionPlanBody  true  "New plan"
 // @Success      201  {object}  models.SubscriptionPlan
 // @Router       /platform/subscription-plans [post]
 func (h *PlatformHandler) CreateSubscriptionPlan(w http.ResponseWriter, r *http.Request) {
-	var body createPlanBody
+	var body PlatformCreateSubscriptionPlanBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
@@ -870,14 +841,15 @@ func (h *PlatformHandler) CreateSubscriptionPlan(w http.ResponseWriter, r *http.
 	RespondJSONWithStatus(w, http.StatusCreated, plan)
 }
 
-type updatePlanBody struct {
+// PlatformUpdateSubscriptionPlanBody is the JSON body for PUT /platform/subscription-plans/{id}.
+type PlatformUpdateSubscriptionPlanBody struct {
 	Name     string          `json:"name"`
 	Code     string          `json:"code"`
 	Price    int64           `json:"price"`
 	Currency string          `json:"currency"`
 	Interval string          `json:"interval"`
-	Features json.RawMessage `json:"features"`
-	Limits   json.RawMessage `json:"limits"`
+	Features json.RawMessage `json:"features" swaggertype:"object"`
+	Limits   json.RawMessage `json:"limits" swaggertype:"object"`
 	IsActive bool            `json:"isActive"`
 }
 
@@ -887,7 +859,8 @@ type updatePlanBody struct {
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
-// @Param        id path string true "Plan ID"
+// @Param        id   path  string                              true  "Plan ID"
+// @Param        body body  PlatformUpdateSubscriptionPlanBody  true  "Full plan replacement"
 // @Success      200  {object}  models.SubscriptionPlan
 // @Router       /platform/subscription-plans/{id} [put]
 func (h *PlatformHandler) UpdateSubscriptionPlan(w http.ResponseWriter, r *http.Request) {
@@ -902,7 +875,7 @@ func (h *PlatformHandler) UpdateSubscriptionPlan(w http.ResponseWriter, r *http.
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-	var body updatePlanBody
+	var body PlatformUpdateSubscriptionPlanBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
@@ -981,236 +954,8 @@ func toInvoicePtrSlice(in []models.Invoice) []*models.Invoice {
 	return out
 }
 
-type createInvoiceSubscriptionOpts struct {
-	PlanID               string     `json:"planId"`
-	CurrentPeriodStart   *time.Time `json:"currentPeriodStart"`
-	CurrentPeriodEnd     *time.Time `json:"currentPeriodEnd"`
-	Status               *string    `json:"status"`
-	TrialEnd             *time.Time `json:"trialEnd"`
-}
-
-type createInvoiceBody struct {
-	CompanyID                     string                         `json:"companyId"`
-	SubscriptionID                string                         `json:"subscriptionId"`
-	Amount                        int64                          `json:"amount"`
-	Currency                      string                         `json:"currency"`
-	DueDate                       string                         `json:"dueDate"` // RFC3339
-	Status                        string                         `json:"status"`
-	PaidAt                        *time.Time                     `json:"paidAt,omitempty"`
-	PaymentProvider               string                         `json:"paymentProvider"`
-	CreateSubscriptionWithInvoice bool                           `json:"createSubscriptionWithInvoice"`
-	Subscription                  *createInvoiceSubscriptionOpts `json:"subscription"`
-}
-
-// CreateInvoice godoc
-// @Summary      Create manual invoice (platform)
-// @Tags         platform
-// @Accept       json
-// @Produce      json
-// @Security     BearerAuth
-// @Success      201  {object}  models.Invoice
-// @Router       /platform/invoices [post]
-func (h *PlatformHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.GetUserIDFromContext(r.Context())
-	if !ok {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-	var body createInvoiceBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
-		return
-	}
-	body.CompanyID = strings.TrimSpace(body.CompanyID)
-	body.SubscriptionID = strings.TrimSpace(body.SubscriptionID)
-	if body.CompanyID == "" {
-		http.Error(w, "companyId is required", http.StatusBadRequest)
-		return
-	}
-	if _, err := h.companyRepo.FindByID(body.CompanyID); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			http.Error(w, "Company not found", http.StatusNotFound)
-			return
-		}
-		log.Printf("Platform CreateInvoice FindByID company: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	if body.Amount <= 0 {
-		http.Error(w, "amount must be positive", http.StatusBadRequest)
-		return
-	}
-	if body.Currency == "" {
-		body.Currency = "RUB"
-	}
-	body.Status = strings.TrimSpace(body.Status)
-	if body.Status == "" {
-		body.Status = "open"
-	}
-	if body.PaymentProvider == "" {
-		body.PaymentProvider = "manual"
-	}
-	if !isValidPlatformInvoiceStatus(body.Status) {
-		http.Error(w, "invalid invoice status", http.StatusBadRequest)
-		return
-	}
-	nowUTC := time.Now().UTC()
-	paidAtPtr, err := invoicePaidAtForCreate(body.Status, body.PaidAt, nowUTC)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	due, err := time.Parse(time.RFC3339, strings.TrimSpace(body.DueDate))
-	if err != nil {
-		http.Error(w, "dueDate must be RFC3339", http.StatusBadRequest)
-		return
-	}
-
-	withSub := body.CreateSubscriptionWithInvoice
-	explicitSubID := body.SubscriptionID
-	if withSub && explicitSubID != "" {
-		http.Error(w, "cannot set subscriptionId when createSubscriptionWithInvoice is true", http.StatusBadRequest)
-		return
-	}
-
-	cid := body.CompanyID
-	var createdInv *models.Invoice
-
-	if withSub {
-		if body.Subscription == nil {
-			http.Error(w, "subscription options required when createSubscriptionWithInvoice is true", http.StatusBadRequest)
-			return
-		}
-		planID := strings.TrimSpace(body.Subscription.PlanID)
-		if planID == "" {
-			http.Error(w, "subscription.planId is required", http.StatusBadRequest)
-			return
-		}
-		if body.Subscription.CurrentPeriodStart == nil || body.Subscription.CurrentPeriodEnd == nil {
-			http.Error(w, "subscription.currentPeriodStart and subscription.currentPeriodEnd are required", http.StatusBadRequest)
-			return
-		}
-		start := body.Subscription.CurrentPeriodStart.UTC()
-		end := body.Subscription.CurrentPeriodEnd.UTC()
-		if !end.After(start) {
-			http.Error(w, "subscription period end must be after start", http.StatusBadRequest)
-			return
-		}
-		if _, err := h.subscriptionRepo.FindPlanByID(planID); err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				http.Error(w, "Unknown subscription.planId", http.StatusBadRequest)
-				return
-			}
-			log.Printf("Platform CreateInvoice FindPlanByID: %v", err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
-
-		status, err := resolvePlatformSubscriptionStatusForCreate(body.Subscription.Status)
-		if err != nil {
-			http.Error(w, "invalid subscription.status", http.StatusBadRequest)
-			return
-		}
-
-		now := time.Now().UTC()
-		var trialEnd *time.Time
-		if body.Subscription.TrialEnd != nil {
-			t := body.Subscription.TrialEnd.UTC()
-			trialEnd = &t
-		}
-		if status == "trial" {
-			if trialEnd == nil {
-				te := now.AddDate(0, 0, 14)
-				trialEnd = &te
-			}
-			end = *trialEnd
-		}
-		if trialEnd != nil {
-			if trialEnd.Before(start) {
-				http.Error(w, "subscription.trialEnd must not be before currentPeriodStart", http.StatusBadRequest)
-				return
-			}
-			if status == "trial" && !trialEnd.After(now) {
-				http.Error(w, "subscription.trialEnd must be in the future for trial status", http.StatusBadRequest)
-				return
-			}
-		}
-
-		var inv models.Invoice
-		err = database.DB.Transaction(func(tx *gorm.DB) error {
-			sub, err := platformCreateSubscriptionForCompanyTx(tx, now, body.CompanyID, planID, status, start, end, trialEnd)
-			if err != nil {
-				return err
-			}
-			sid := sub.ID
-			inv = models.Invoice{
-				CompanyID:       &cid,
-				SubscriptionID:  &sid,
-				Amount:          body.Amount,
-				Currency:        body.Currency,
-				Status:          body.Status,
-				PaymentProvider: body.PaymentProvider,
-				PaidAt:          paidAtPtr,
-				DueDate:         due,
-			}
-			return tx.Create(&inv).Error
-		})
-		if err != nil {
-			log.Printf("Platform CreateInvoice transaction (with subscription): %v", err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
-		createdInv = &inv
-	} else {
-		var subIDPtr *string
-		if explicitSubID != "" {
-			sub, err := h.subscriptionRepo.FindByID(explicitSubID)
-			if err != nil {
-				if errors.Is(err, gorm.ErrRecordNotFound) {
-					http.Error(w, "subscription not found", http.StatusBadRequest)
-					return
-				}
-				log.Printf("Platform CreateInvoice FindSubscription: %v", err)
-				http.Error(w, "Internal server error", http.StatusInternalServerError)
-				return
-			}
-			if sub.CompanyID != body.CompanyID {
-				http.Error(w, "subscription does not belong to company", http.StatusBadRequest)
-				return
-			}
-			subIDPtr = &explicitSubID
-		}
-
-		inv := models.Invoice{
-			CompanyID:       &cid,
-			SubscriptionID:  subIDPtr,
-			Amount:          body.Amount,
-			Currency:        body.Currency,
-			Status:          body.Status,
-			PaymentProvider: body.PaymentProvider,
-			PaidAt:          paidAtPtr,
-			DueDate:         due,
-		}
-		if err := h.invoiceRepo.Create(&inv); err != nil {
-			log.Printf("Platform CreateInvoice: %v", err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
-		createdInv = &inv
-	}
-
-	log.Printf("platform_admin invoice create user=%s invoice=%s company=%s", userID, createdInv.ID, body.CompanyID)
-	out, err := h.invoiceRepo.FindByID(createdInv.ID)
-	if err != nil {
-		log.Printf("Platform CreateInvoice FindByID: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	RespondJSONWithStatus(w, http.StatusCreated, out)
-}
-
-type patchInvoiceBody struct {
+// PatchPlatformInvoiceBody is the JSON body for PATCH /platform/invoices/{id}.
+type PatchPlatformInvoiceBody struct {
 	Status              *string    `json:"status"`
 	PaidAt              *time.Time `json:"paidAt"`
 	SubscriptionID      *string    `json:"subscriptionId"`
@@ -1223,7 +968,8 @@ type patchInvoiceBody struct {
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
-// @Param        id path string true "Invoice ID"
+// @Param        id   path  string                   true  "Invoice ID"
+// @Param        body body  PatchPlatformInvoiceBody true  "Fields to update"
 // @Success      200  {object}  models.Invoice
 // @Router       /platform/invoices/{id} [patch]
 func (h *PlatformHandler) PatchInvoice(w http.ResponseWriter, r *http.Request) {
@@ -1243,7 +989,7 @@ func (h *PlatformHandler) PatchInvoice(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-	var body patchInvoiceBody
+	var body PatchPlatformInvoiceBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
@@ -1313,8 +1059,28 @@ func (h *PlatformHandler) PatchInvoice(w http.ResponseWriter, r *http.Request) {
 		inv.SubscriptionID = &sid
 	}
 
-	if err := h.invoiceRepo.Update(inv); err != nil {
-		log.Printf("Platform PatchInvoice Update: %v", err)
+	if err := database.DB.Transaction(func(tx *gorm.DB) error {
+		var dbInv models.Invoice
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&dbInv, "id = ?", id).Error; err != nil {
+			return err
+		}
+		prevStatus := strings.TrimSpace(dbInv.Status)
+		prevProvider := strings.TrimSpace(dbInv.PaymentProvider)
+
+		dbInv.Status = inv.Status
+		dbInv.PaidAt = inv.PaidAt
+		dbInv.SubscriptionID = inv.SubscriptionID
+		if err := tx.Save(&dbInv).Error; err != nil {
+			return err
+		}
+		manual := prevProvider == "" || prevProvider == "manual"
+		becamePaid := prevStatus != "paid" && strings.TrimSpace(dbInv.Status) == "paid"
+		if becamePaid && manual {
+			return maybeProvisionAfterManualPaid(tx, id, time.Now().UTC())
+		}
+		return nil
+	}); err != nil {
+		log.Printf("Platform PatchInvoice transaction: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}

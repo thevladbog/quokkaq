@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Card,
@@ -30,7 +30,16 @@ import {
   emptyCounterparty,
   parseCounterpartyFromApi
 } from '@/components/organization/CounterpartyForm';
-import { CounterpartySchema, type Counterparty } from '@quokkaq/shared-types';
+import {
+  PaymentAccountsForm,
+  parsePaymentAccountsFromApi
+} from '@/components/organization/PaymentAccountsForm';
+import {
+  CounterpartySchema,
+  PaymentAccountsSchema,
+  type Counterparty,
+  type PaymentAccount
+} from '@quokkaq/shared-types';
 
 export function OrganizationPageContent() {
   const router = useRouter();
@@ -43,6 +52,7 @@ export function OrganizationPageContent() {
   const [counterparty, setCounterparty] = useState<Counterparty>(() =>
     emptyCounterparty()
   );
+  const [paymentAccounts, setPaymentAccounts] = useState<PaymentAccount[]>([]);
 
   const {
     data: me,
@@ -73,13 +83,19 @@ export function OrganizationPageContent() {
         const msg = cpParsed.error.issues.map((i) => i.message).join('; ');
         throw new Error(msg);
       }
+      const paParsed = PaymentAccountsSchema.safeParse(paymentAccounts);
+      if (!paParsed.success) {
+        const msg = paParsed.error.issues.map((i) => i.message).join('; ');
+        throw new Error(msg);
+      }
       return companiesApiExt.patchMe({
         name: name.trim(),
         billingEmail: billingEmail.trim(),
         ...(billingAddressLine.trim()
           ? { billingAddress: { address: billingAddressLine.trim() } }
           : { clearBillingAddress: true }),
-        counterparty: cpParsed.data
+        counterparty: cpParsed.data,
+        paymentAccounts: paParsed.data
       });
     },
     onSuccess: () => {
@@ -92,6 +108,11 @@ export function OrganizationPageContent() {
     | { address?: string }
     | undefined
     | null;
+
+  const displayPaymentAccounts = useMemo(
+    () => parsePaymentAccountsFromApi(company?.paymentAccounts),
+    [company?.paymentAccounts]
+  );
 
   return (
     <div className='space-y-6'>
@@ -153,6 +174,58 @@ export function OrganizationPageContent() {
                     : t('notSet')}
                 </p>
               </div>
+
+              <div className='border-t pt-4'>
+                <h3 className='mb-3 text-lg font-medium'>
+                  {t('paymentAccountsReadonlyTitle')}
+                </h3>
+                {displayPaymentAccounts.length === 0 ? (
+                  <p className='text-muted-foreground text-sm'>
+                    {t('paymentAccountsReadonlyEmpty')}
+                  </p>
+                ) : (
+                  <ul className='space-y-3 text-sm'>
+                    {displayPaymentAccounts.map((a) => (
+                      <li key={a.id} className='rounded-md border p-3'>
+                        <div className='flex flex-wrap items-center justify-between gap-2'>
+                          <span className='font-medium'>
+                            {a.bankName?.trim() || '—'}
+                          </span>
+                          {a.isDefault ? (
+                            <span className='text-muted-foreground text-xs'>
+                              {t('paymentAccountsReadonlyDefault')}
+                            </span>
+                          ) : null}
+                        </div>
+                        <dl className='text-muted-foreground mt-2 grid gap-1 sm:grid-cols-2'>
+                          <div>
+                            <dt className='inline'>
+                              {t('paymentAccountsBic')}:{' '}
+                            </dt>
+                            <dd className='inline'>{a.bic?.trim() || '—'}</dd>
+                          </div>
+                          <div>
+                            <dt className='inline'>
+                              {t('paymentAccountsCorrespondent')}:{' '}
+                            </dt>
+                            <dd className='inline'>
+                              {a.correspondentAccount?.trim() || '—'}
+                            </dd>
+                          </div>
+                          <div className='sm:col-span-2'>
+                            <dt className='inline'>
+                              {t('paymentAccountsNumber')}:{' '}
+                            </dt>
+                            <dd className='inline'>
+                              {a.accountNumber?.trim() || '—'}
+                            </dd>
+                          </div>
+                        </dl>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
           ) : showEditForm ? (
             <form
@@ -211,6 +284,19 @@ export function OrganizationPageContent() {
                 />
               </div>
 
+              <div className='border-t pt-4'>
+                <h3 className='mb-3 text-lg font-medium'>
+                  {t('paymentAccountsSectionTitle')}
+                </h3>
+                <PaymentAccountsForm
+                  value={paymentAccounts}
+                  onChange={setPaymentAccounts}
+                  disabled={updateCompanyMutation.isPending}
+                  canUseDadata={features.dadata}
+                  dadataScope='tenant'
+                />
+              </div>
+
               <div className='flex gap-2'>
                 <Button
                   type='submit'
@@ -251,6 +337,9 @@ export function OrganizationPageContent() {
                   );
                   setCounterparty(
                     parseCounterpartyFromApi(company.counterparty)
+                  );
+                  setPaymentAccounts(
+                    parsePaymentAccountsFromApi(company.paymentAccounts)
                   );
                 }
                 setIsEditing(true);

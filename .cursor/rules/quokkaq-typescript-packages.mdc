@@ -1,0 +1,25 @@
+---
+description: Shared TypeScript packages — Zod types, Nx build, no Next coupling (QuokkaQ)
+globs: packages/**/*.ts, packages/**/*.tsx
+alwaysApply: false
+---
+
+# TypeScript packages (`packages/*`)
+
+For **Nx lint/format commands and CI expectations**, use `quokkaq-agent-workflow.mdc`. This rule covers **what belongs in each package** and **how to keep contracts aligned**.
+
+## Layout
+
+Libraries today: `shared-types`, `ui-kit`, `kiosk-lib`. Builds are **`tsc` via Nx `build`** (see each package’s `project.json`). Nx `lint` targets for these packages are stubs; real type safety comes from `build` and from frontend ESLint when code is consumed in `apps/frontend`.
+
+## `shared-types`
+
+- Zod schemas are the **source of truth** for API shapes shared with the Go backend. When contracts move, coordinate with backend handlers/models and any consumers.
+
+## `ui-kit` and `kiosk-lib`
+
+- Treat as **library code**: no Next.js app assumptions unless the package already depends on them. Keep exports and public API small and stable.
+
+## Verification
+
+- After substantive edits: `pnpm nx run <project>:build` for the touched package(s).

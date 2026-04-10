@@ -161,6 +161,59 @@ func RunVersionedMigrations(models ...interface{}) error {
 		return fmt.Errorf("failed to run companies saas operator migration: %w", err)
 	}
 
+	// Payment accounts (RU): bank name, BIC, correspondent and settlement account numbers.
+	err = manager.RunMigration("v1.0.6_companies_payment_accounts", func(db *gorm.DB) error {
+		return db.Exec(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS payment_accounts JSONB`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run companies payment accounts migration: %w", err)
+	}
+
+	// Platform catalog, multi-line invoices, document numbers, YooKassa link fields.
+	err = manager.RunMigration("v1.0.7_platform_invoices_v2", func(db *gorm.DB) error {
+		if err := db.AutoMigrate(
+			&dbmodels.CatalogItem{},
+			&dbmodels.InvoiceLine{},
+			&dbmodels.InvoiceNumberSequence{},
+			&dbmodels.Invoice{},
+		); err != nil {
+			return err
+		}
+		// Legacy single-amount rows: treat amount as net with no VAT until edited.
+		if err := db.Exec(`
+			UPDATE invoices i
+			SET subtotal_excl_vat_minor = i.amount,
+			    vat_total_minor = 0
+			WHERE NOT EXISTS (SELECT 1 FROM invoice_lines l WHERE l.invoice_id = i.id)
+			  AND (subtotal_excl_vat_minor = 0 AND vat_total_minor = 0 AND i.amount > 0)
+		`).Error; err != nil {
+			return err
+		}
+		return db.Exec(`
+			CREATE UNIQUE INDEX IF NOT EXISTS invoices_document_number_uq
+			ON invoices (document_number)
+			WHERE document_number IS NOT NULL AND btrim(document_number::text) <> ''
+		`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run platform invoices v2 migration: %w", err)
+	}
+
+	// invoice_lines.unit: v1.0.7 may have created the table before the column existed in the model;
+	// versioned migrations do not re-run AutoMigrate, so add the column explicitly.
+	err = manager.RunMigration("v1.0.8_invoice_lines_unit_column", func(db *gorm.DB) error {
+		if err := db.Exec(`
+			ALTER TABLE invoice_lines
+			ADD COLUMN IF NOT EXISTS unit TEXT NOT NULL DEFAULT ''
+		`).Error; err != nil {
+			return err
+		}
+		return db.AutoMigrate(&dbmodels.InvoiceLine{})
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run invoice_lines unit column migration: %w", err)
+	}
+
 	fmt.Println("All migrations completed successfully")
 	return nil
 }

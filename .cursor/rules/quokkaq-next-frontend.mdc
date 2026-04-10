@@ -1,0 +1,39 @@
+---
+description: Next.js frontend — App Router, i18n, API client, UI stack (QuokkaQ)
+globs: apps/frontend/**
+alwaysApply: false
+---
+
+# Next.js frontend (`apps/frontend`)
+
+For **ESLint, Prettier, tests, and dev-server restarts**, use `quokkaq-agent-workflow.mdc`. This rule covers **structure and patterns** only.
+
+## Stack
+
+- Next.js 16+ (App Router), React 19, TypeScript
+- Tailwind CSS 4, shadcn/ui (Radix), TanStack Query, next-intl, Zod
+
+## Routing and locale
+
+- App routes live under [`app/[locale]/`](apps/frontend/app/[locale]/); zones use their own `layout.tsx` where the repo already does.
+- Locale and API rewrites: root [`proxy.ts`](apps/frontend/proxy.ts) (Next 16; not legacy `middleware.ts`).
+
+## Data and API
+
+- Prefer TanStack Query plus helpers in [`lib/api.ts`](apps/frontend/lib/api.ts). Avoid one-off `fetch` to the API base that bypasses established patterns.
+
+## UI
+
+- Reuse `components/ui` and existing layout/sidebar patterns before adding new primitives.
+
+## i18n
+
+- User-visible strings: `next-intl` keys under [`messages/`](apps/frontend/messages/). Add keys in both locales when the project already mirrors `en` / `ru`.
+
+## React / ESLint
+
+- Follow [`eslint.config.mjs`](apps/frontend/eslint.config.mjs) (Next core-web-vitals + TypeScript + Prettier flat config). Respect hook-related rules (e.g. avoid problematic synchronous `setState` in `useEffect`); prefer patterns already used in the codebase (remount/`key`, derived state).
+
+## Deeper context
+
+- [`apps/frontend/AGENTS.md`](apps/frontend/AGENTS.md)

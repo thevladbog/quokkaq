@@ -17,7 +17,8 @@ import {
   FileText,
   Home,
   Layers,
-  LogOut
+  LogOut,
+  Package
 } from 'lucide-react';
 import Image from 'next/image';
 import { useAuthContext } from '@/contexts/AuthContext';
@@ -57,6 +58,12 @@ export default function PlatformSidebar() {
       label: t('plans', { defaultValue: 'Plans' }),
       icon: Layers,
       match: (p: string) => p.includes('/platform/plans')
+    },
+    {
+      href: '/platform/catalog-items',
+      label: t('catalog', { defaultValue: 'Catalog' }),
+      icon: Package,
+      match: (p: string) => p.includes('/platform/catalog-items')
     },
     {
       href: '/platform/invoices',

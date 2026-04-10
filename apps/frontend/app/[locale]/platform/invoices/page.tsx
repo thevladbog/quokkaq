@@ -24,6 +24,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { Link } from '@/src/i18n/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useMemo } from 'react';
+import { toast } from 'sonner';
 import { formatPriceMinorUnits } from '@/lib/format-price';
 import {
   formatAppDateTime,
@@ -70,14 +71,36 @@ export default function PlatformInvoicesPage() {
       id: string;
       status: (typeof INV_STATUSES)[number];
     }) => platformApi.patchInvoice(id, { status }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['platform-invoices'] })
+    onSuccess: () => {
+      toast.success(
+        t('toastStatusUpdated', { defaultValue: 'Invoice status updated.' })
+      );
+      void qc.invalidateQueries({ queryKey: ['platform-invoices'] });
+    },
+    onError: (err) => {
+      const raw = err instanceof Error ? err.message : String(err);
+      toast.error(
+        t('toastStatusError', {
+          message: raw,
+          defaultValue: raw
+        }),
+        { duration: 6000 }
+      );
+    }
   });
 
   return (
     <div>
-      <h1 className='mb-6 text-3xl font-bold'>
-        {t('title', { defaultValue: 'Invoices' })}
-      </h1>
+      <div className='mb-6 flex flex-wrap items-center justify-between gap-4'>
+        <h1 className='text-3xl font-bold'>
+          {t('title', { defaultValue: 'Invoices' })}
+        </h1>
+        <Button asChild>
+          <Link href='/platform/invoices/new'>
+            {t('newInvoice', { defaultValue: 'New invoice' })}
+          </Link>
+        </Button>
+      </div>
       <div className='mb-4 flex max-w-xl flex-wrap gap-2'>
         <Input
           placeholder={t('companyIdFilter', {
@@ -102,6 +125,9 @@ export default function PlatformInvoicesPage() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>
+                {t('documentNumber', { defaultValue: 'Document №' })}
+              </TableHead>
               <TableHead>{t('id', { defaultValue: 'ID' })}</TableHead>
               <TableHead>{t('company', { defaultValue: 'Company' })}</TableHead>
               <TableHead>{t('amount', { defaultValue: 'Amount' })}</TableHead>
@@ -114,7 +140,29 @@ export default function PlatformInvoicesPage() {
             {data.items.map((inv) => (
               <TableRow key={inv.id}>
                 <TableCell className='font-mono text-xs'>
-                  {inv.id.slice(0, 8)}…
+                  {inv.documentNumber?.trim() ? (
+                    <Link
+                      href={`/platform/invoices/${inv.id}`}
+                      className='text-primary underline'
+                    >
+                      {inv.documentNumber}
+                    </Link>
+                  ) : (
+                    <Link
+                      href={`/platform/invoices/${inv.id}`}
+                      className='text-primary underline'
+                    >
+                      {t('draft', { defaultValue: 'Draft' })}
+                    </Link>
+                  )}
+                </TableCell>
+                <TableCell className='font-mono text-xs'>
+                  <Link
+                    href={`/platform/invoices/${inv.id}`}
+                    className='text-primary underline'
+                  >
+                    {inv.id.slice(0, 8)}…
+                  </Link>
                 </TableCell>
                 <TableCell>
                   {inv.companyId ? (

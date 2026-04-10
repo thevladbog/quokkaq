@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -9,6 +10,22 @@ import (
 
 	"quokkaq-go-backend/internal/integrations/dadata"
 )
+
+// DaDataPassthroughRequest is JSON forwarded verbatim to DaData Suggestions (shape per DaData docs: query, count, filters, etc.).
+type DaDataPassthroughRequest map[string]interface{}
+
+// DaDataCleanRequest is JSON forwarded to DaData Cleaner (array payload per DaData Cleaner API).
+type DaDataCleanRequest []interface{}
+
+// DaDataUpstreamResponse is the JSON body returned from DaData; structure depends on endpoint.
+type DaDataUpstreamResponse map[string]interface{}
+
+// DaDataFindPartyByInnRequest is the JSON body for find-by-INN; the handler builds DaData findById/party payload from it.
+type DaDataFindPartyByInnRequest struct {
+	Inn  string  `json:"inn" binding:"required" example:"7707083893"`
+	KPP  *string `json:"kpp,omitempty"`
+	Type *string `json:"type,omitempty"`
+}
 
 // maxDaDataRequestBodyBytes caps proxied DaData JSON bodies (defense in depth vs unbounded ReadAll).
 const maxDaDataRequestBodyBytes = 1 << 20 // 1 MiB
@@ -23,7 +40,8 @@ func readDaDataRequestBody(w http.ResponseWriter, r *http.Request) ([]byte, erro
 
 // maxBytesReaderExceeded matches net/http MaxBytesReader's error when the body is larger than the limit.
 func maxBytesReaderExceeded(err error) bool {
-	return err != nil && strings.Contains(err.Error(), "request body too large")
+	var maxErr *http.MaxBytesError
+	return err != nil && errors.As(err, &maxErr)
 }
 
 // DaDataHandler proxies DaData Suggestions/Cleaner (no keys to the browser).
@@ -33,19 +51,23 @@ func NewDaDataHandler() *DaDataHandler {
 	return &DaDataHandler{}
 }
 
-type findPartyByInnBody struct {
-	Inn  string  `json:"inn"`
-	KPP  *string `json:"kpp"`
-	Type *string `json:"type"`
-}
-
 // FindPartyByInn godoc
 // @Summary      DaData: organization by INN (findById/party)
+// @Description  Authenticated proxy to DaData findById/party. Requires JSON field inn; optional kpp and type are forwarded to DaData when set.
 // @Tags         dadata
 // @Accept       json
 // @Produce      json
+// @Param        body  body      DaDataFindPartyByInnRequest  true  "INN and optional KPP/type"
+// @Success      200   {object}  DaDataUpstreamResponse         "Raw DaData JSON (HTTP status may mirror upstream)"
+// @Failure      400   {string}  string                         "Bad request or inn is required"
+// @Failure      401   {string}  string                         "Unauthorized"
+// @Failure      413   {string}  string                         "request body too large"
+// @Failure      500   {string}  string                         "Internal error"
+// @Failure      502   {string}  string                         "Upstream error"
+// @Failure      503   {string}  string                         "DaData is not configured"
 // @Security     BearerAuth
 // @Router       /companies/dadata/party/find-by-inn [post]
+// @Router       /platform/dadata/party/find-by-inn [post]
 func (h *DaDataHandler) FindPartyByInn(w http.ResponseWriter, r *http.Request) {
 	dc, err := dadata.NewClientFromEnv()
 	if err != nil {
@@ -61,7 +83,7 @@ func (h *DaDataHandler) FindPartyByInn(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Bad request", http.StatusBadRequest)
 		return
 	}
-	var body findPartyByInnBody
+	var body DaDataFindPartyByInnRequest
 	if err := json.Unmarshal(b, &body); err != nil || strings.TrimSpace(body.Inn) == "" {
 		http.Error(w, "inn is required", http.StatusBadRequest)
 		return
@@ -91,11 +113,20 @@ func (h *DaDataHandler) FindPartyByInn(w http.ResponseWriter, r *http.Request) {
 
 // SuggestParty godoc
 // @Summary      DaData: party suggestions (passthrough body)
+// @Description  Authenticated proxy to DaData party suggestions; request body is forwarded unchanged (see DaData Suggestions API).
 // @Tags         dadata
 // @Accept       json
 // @Produce      json
+// @Param        body  body      DaDataPassthroughRequest  true  "DaData party suggest JSON"
+// @Success      200   {object}  DaDataUpstreamResponse    "Raw DaData JSON (HTTP status may mirror upstream)"
+// @Failure      400   {string}  string                    "Bad request"
+// @Failure      401   {string}  string                    "Unauthorized"
+// @Failure      413   {string}  string                    "request body too large"
+// @Failure      502   {string}  string                    "Upstream error"
+// @Failure      503   {string}  string                    "DaData is not configured"
 // @Security     BearerAuth
 // @Router       /companies/dadata/party/suggest [post]
+// @Router       /platform/dadata/party/suggest [post]
 func (h *DaDataHandler) SuggestParty(w http.ResponseWriter, r *http.Request) {
 	dc, err := dadata.NewClientFromEnv()
 	if err != nil {
@@ -124,11 +155,20 @@ func (h *DaDataHandler) SuggestParty(w http.ResponseWriter, r *http.Request) {
 
 // SuggestAddress godoc
 // @Summary      DaData: address suggestions (passthrough body)
+// @Description  Authenticated proxy to DaData address suggestions; request body is forwarded unchanged (see DaData Suggestions API).
 // @Tags         dadata
 // @Accept       json
 // @Produce      json
+// @Param        body  body      DaDataPassthroughRequest  true  "DaData address suggest JSON"
+// @Success      200   {object}  DaDataUpstreamResponse    "Raw DaData JSON (HTTP status may mirror upstream)"
+// @Failure      400   {string}  string                    "Bad request"
+// @Failure      401   {string}  string                    "Unauthorized"
+// @Failure      413   {string}  string                    "request body too large"
+// @Failure      502   {string}  string                    "Upstream error"
+// @Failure      503   {string}  string                    "DaData is not configured"
 // @Security     BearerAuth
 // @Router       /companies/dadata/address/suggest [post]
+// @Router       /platform/dadata/address/suggest [post]
 func (h *DaDataHandler) SuggestAddress(w http.ResponseWriter, r *http.Request) {
 	dc, err := dadata.NewClientFromEnv()
 	if err != nil {
@@ -155,13 +195,64 @@ func (h *DaDataHandler) SuggestAddress(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(raw)
 }
 
-// CleanAddress godoc
-// @Summary      DaData Cleaner: standardize address strings
+// SuggestBank godoc
+// @Summary      DaData: bank suggestions by BIC/name (passthrough body)
+// @Description  Authenticated proxy to DaData bank suggestions; request body is forwarded unchanged (see DaData Suggestions API).
 // @Tags         dadata
 // @Accept       json
 // @Produce      json
+// @Param        body  body      DaDataPassthroughRequest  true  "DaData bank suggest JSON"
+// @Success      200   {object}  DaDataUpstreamResponse    "Raw DaData JSON (HTTP status may mirror upstream)"
+// @Failure      400   {string}  string                    "Bad request"
+// @Failure      401   {string}  string                    "Unauthorized"
+// @Failure      413   {string}  string                    "request body too large"
+// @Failure      502   {string}  string                    "Upstream error"
+// @Failure      503   {string}  string                    "DaData is not configured"
+// @Security     BearerAuth
+// @Router       /companies/dadata/bank/suggest [post]
+// @Router       /platform/dadata/bank/suggest [post]
+func (h *DaDataHandler) SuggestBank(w http.ResponseWriter, r *http.Request) {
+	dc, err := dadata.NewClientFromEnv()
+	if err != nil {
+		http.Error(w, "DaData is not configured", http.StatusServiceUnavailable)
+		return
+	}
+	b, err := readDaDataRequestBody(w, r)
+	if err != nil {
+		if maxBytesReaderExceeded(err) {
+			http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
+			return
+		}
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+	raw, status, err := dc.SuggestBank(b)
+	if err != nil {
+		log.Printf("DaData SuggestBank: %v", err)
+		http.Error(w, "Upstream error", http.StatusBadGateway)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCodeOr200(status))
+	_, _ = w.Write(raw)
+}
+
+// CleanAddress godoc
+// @Summary      DaData Cleaner: standardize address strings
+// @Description  Authenticated proxy to DaData Cleaner; request body is forwarded unchanged (see DaData Cleaner API). Requires cleaner API key on the server.
+// @Tags         dadata
+// @Accept       json
+// @Produce      json
+// @Param        body  body      DaDataCleanRequest        true  "DaData cleaner request JSON"
+// @Success      200   {object}  DaDataUpstreamResponse    "Raw DaData JSON (HTTP status may mirror upstream)"
+// @Failure      400   {string}  string                    "Bad request"
+// @Failure      401   {string}  string                    "Unauthorized"
+// @Failure      413   {string}  string                    "request body too large"
+// @Failure      502   {string}  string                    "Upstream error"
+// @Failure      503   {string}  string                    "DaData Cleaner is not configured"
 // @Security     BearerAuth
 // @Router       /companies/dadata/address/clean [post]
+// @Router       /platform/dadata/address/clean [post]
 func (h *DaDataHandler) CleanAddress(w http.ResponseWriter, r *http.Request) {
 	if strings.TrimSpace(dadata.CleanerAPIKey()) == "" {
 		http.Error(w, "DaData Cleaner is not configured", http.StatusServiceUnavailable)

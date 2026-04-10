@@ -5,7 +5,6 @@ import { useParams } from 'next/navigation';
 import { platformApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { DateTimePicker } from '@/components/ui/datetime-picker';
 import {
@@ -16,7 +15,6 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Link } from '@/src/i18n/navigation';
 import { useLocale, useTranslations } from 'next-intl';
@@ -27,7 +25,10 @@ import {
 } from '@/lib/format-datetime';
 import {
   CounterpartySchema,
+  PaymentAccountsSchema,
+  type Company,
   type Counterparty,
+  type PaymentAccount,
   type Subscription,
   type SubscriptionPlan
 } from '@quokkaq/shared-types';
@@ -35,6 +36,10 @@ import {
   CounterpartyForm,
   parseCounterpartyFromApi
 } from '@/components/organization/CounterpartyForm';
+import {
+  PaymentAccountsForm,
+  parsePaymentAccountsFromApi
+} from '@/components/organization/PaymentAccountsForm';
 
 const SUB_STATUSES = [
   'trial',
@@ -310,6 +315,74 @@ type PlatformCounterpartySectionProps = {
   t: ReturnType<typeof useTranslations<'platform.companyDetail'>>;
 };
 
+type PlatformPaymentAccountsSectionProps = {
+  companyId: string;
+  initialPaymentAccounts: Company['paymentAccounts'];
+  canUseDadata: boolean;
+  t: ReturnType<typeof useTranslations<'platform.companyDetail'>>;
+};
+
+function PlatformCompanyPaymentAccountsSection({
+  companyId,
+  initialPaymentAccounts,
+  canUseDadata,
+  t
+}: PlatformPaymentAccountsSectionProps) {
+  const qc = useQueryClient();
+  const [accounts, setAccounts] = useState<PaymentAccount[]>(() =>
+    parsePaymentAccountsFromApi(initialPaymentAccounts)
+  );
+
+  const savePaymentAccounts = useMutation({
+    mutationFn: async () => {
+      const p = PaymentAccountsSchema.safeParse(accounts);
+      if (!p.success) {
+        const msg = p.error.issues.map((i) => i.message).join('; ');
+        throw new Error(msg);
+      }
+      return platformApi.patchCompany(companyId, {
+        paymentAccounts: p.data
+      });
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['platform-company', companyId] });
+    }
+  });
+
+  return (
+    <Card className='mt-6'>
+      <CardHeader>
+        <CardTitle>
+          {t('paymentAccountsTitle', {
+            defaultValue: 'Payment accounts (Russia)'
+          })}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className='space-y-4'>
+        <PaymentAccountsForm
+          value={accounts}
+          onChange={setAccounts}
+          canUseDadata={canUseDadata}
+          dadataScope='platform'
+        />
+        <Button
+          disabled={savePaymentAccounts.isPending}
+          onClick={() => savePaymentAccounts.mutate()}
+        >
+          {t('savePaymentAccounts', {
+            defaultValue: 'Save payment accounts'
+          })}
+        </Button>
+        {savePaymentAccounts.isError && (
+          <p className='text-destructive text-sm'>
+            {(savePaymentAccounts.error as Error).message}
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function PlatformCompanyCounterpartySection({
   companyId,
   initialCounterparty,
@@ -400,93 +473,11 @@ export default function PlatformCompanyDetailPage() {
   });
 
   const sub = company?.subscription;
-  const [invAmount, setInvAmount] = useState('');
-  const [invDue, setInvDue] = useState('');
-  const [invCreateWithSub, setInvCreateWithSub] = useState(false);
-  const [invLinkToSub, setInvLinkToSub] = useState(false);
-  const [invPlanId, setInvPlanId] = useState('');
-  const [invSubStart, setInvSubStart] = useState('');
-  const [invSubEnd, setInvSubEnd] = useState('');
 
   const { data: subscriptionPlans = [] } = useQuery({
     queryKey: ['platform-subscription-plans'],
     queryFn: () => platformApi.listSubscriptionPlans(),
     enabled: !!company
-  });
-
-  const createInv = useMutation({
-    mutationFn: () => {
-      if (!company) throw new Error(t('notFound'));
-      const amount = Number.parseFloat(invAmount.trim());
-      if (
-        !Number.isFinite(amount) ||
-        !Number.isInteger(amount) ||
-        amount <= 0
-      ) {
-        throw new Error(t('invoiceAmountInvalid'));
-      }
-      const dueTrim = invDue.trim();
-      if (!dueTrim) throw new Error(t('invoiceDueRequired'));
-      const dueDate = new Date(dueTrim);
-      if (Number.isNaN(dueDate.getTime())) {
-        throw new Error(t('invoiceDueRequired'));
-      }
-      const due = dueDate.toISOString();
-
-      if (invCreateWithSub) {
-        if (sub) {
-          throw new Error(t('invoiceCreateSubConflict'));
-        }
-        if (!invPlanId) {
-          throw new Error(t('planSelectRequired'));
-        }
-        if (!invSubStart || !invSubEnd) {
-          throw new Error(t('invoiceSubscriptionPeriodRequired'));
-        }
-        const pStart = new Date(invSubStart);
-        const pEnd = new Date(invSubEnd);
-        if (
-          Number.isNaN(pStart.getTime()) ||
-          Number.isNaN(pEnd.getTime()) ||
-          pEnd.getTime() <= pStart.getTime()
-        ) {
-          throw new Error(t('invoiceSubscriptionPeriodOrder'));
-        }
-        return platformApi.createInvoice({
-          companyId: company.id,
-          amount,
-          dueDate: due,
-          status: 'open',
-          paymentProvider: 'manual',
-          createSubscriptionWithInvoice: true,
-          subscription: {
-            planId: invPlanId,
-            currentPeriodStart: pStart.toISOString(),
-            currentPeriodEnd: pEnd.toISOString()
-          }
-        });
-      }
-
-      return platformApi.createInvoice({
-        companyId: company.id,
-        ...(invLinkToSub && sub ? { subscriptionId: sub.id } : {}),
-        amount,
-        dueDate: due,
-        status: 'open',
-        paymentProvider: 'manual'
-      });
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['platform-invoices'] });
-      qc.invalidateQueries({ queryKey: ['platform-company', id] });
-      setInvAmount('');
-      setInvDue('');
-      setInvCreateWithSub(false);
-      setInvLinkToSub(false);
-      setInvPlanId('');
-      setInvSubStart('');
-      setInvSubEnd('');
-    }
   });
 
   if (!id) return null;
@@ -584,138 +575,20 @@ export default function PlatformCompanyDetailPage() {
               {t('manualInvoice', { defaultValue: 'Manual invoice' })}
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className='space-y-4'>
-              <p className='text-muted-foreground text-xs'>
-                {t('amountHint', {
-                  defaultValue:
-                    'Amount in minor units (e.g. 10000 = 100.00 RUB).'
-                })}
-              </p>
-              <div className='grid gap-2'>
-                <Label>{t('amount', { defaultValue: 'Amount' })}</Label>
-                <Input
-                  type='number'
-                  min={1}
-                  value={invAmount}
-                  onChange={(e) => setInvAmount(e.target.value)}
-                />
-              </div>
-              <div className='grid gap-2'>
-                <Label>{t('dueDate', { defaultValue: 'Due date' })}</Label>
-                <DateTimePicker value={invDue} onChange={setInvDue} />
-              </div>
-
-              {!sub && (
-                <div className='flex items-start space-x-2'>
-                  <Checkbox
-                    id='inv-create-sub'
-                    checked={invCreateWithSub}
-                    onCheckedChange={(v) => setInvCreateWithSub(v === true)}
-                  />
-                  <div className='grid gap-1 leading-none'>
-                    <Label
-                      htmlFor='inv-create-sub'
-                      className='cursor-pointer text-sm font-medium'
-                    >
-                      {t('createSubscriptionWithInvoice', {
-                        defaultValue:
-                          'Create subscription together with invoice'
-                      })}
-                    </Label>
-                    <p className='text-muted-foreground text-xs'>
-                      {t('createSubscriptionWithInvoiceHint', {
-                        defaultValue:
-                          'Creates one subscription row for this company and links the invoice in a single step.'
-                      })}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {sub && (
-                <div className='flex items-start space-x-2'>
-                  <Checkbox
-                    id='inv-link-sub'
-                    checked={invLinkToSub}
-                    onCheckedChange={(v) => setInvLinkToSub(v === true)}
-                  />
-                  <div className='grid gap-1 leading-none'>
-                    <Label
-                      htmlFor='inv-link-sub'
-                      className='cursor-pointer text-sm font-medium'
-                    >
-                      {t('linkToExistingSubscription', {
-                        defaultValue: 'Link invoice to current subscription'
-                      })}
-                    </Label>
-                    <p className='text-muted-foreground text-xs'>
-                      {t('linkToExistingSubscriptionHint', {
-                        defaultValue:
-                          'If unchecked, the invoice is created without a subscription link (you can attach it later via API).'
-                      })}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {invCreateWithSub && !sub && (
-                <div className='space-y-4 border-t pt-4'>
-                  <div className='space-y-2'>
-                    <Label>
-                      {t('selectPlan', { defaultValue: 'Target plan' })}
-                    </Label>
-                    <Select value={invPlanId} onValueChange={setInvPlanId}>
-                      <SelectTrigger>
-                        <SelectValue
-                          placeholder={t('invoicePlanPlaceholder', {
-                            defaultValue: 'Select plan…'
-                          })}
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {subscriptionPlans.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className='grid gap-2'>
-                    <Label>
-                      {t('subscriptionPeriodStart', {
-                        defaultValue: 'Subscription period start (UTC)'
-                      })}
-                    </Label>
-                    <DateTimePicker
-                      value={invSubStart}
-                      onChange={setInvSubStart}
-                    />
-                  </div>
-                  <div className='grid gap-2'>
-                    <Label>
-                      {t('subscriptionPeriodEnd', {
-                        defaultValue: 'Subscription period end (UTC)'
-                      })}
-                    </Label>
-                    <DateTimePicker value={invSubEnd} onChange={setInvSubEnd} />
-                  </div>
-                </div>
-              )}
-
-              <Button
-                disabled={createInv.isPending}
-                onClick={() => createInv.mutate()}
+          <CardContent className='space-y-3'>
+            <p className='text-muted-foreground text-sm'>
+              {t('invoiceWizardHint', {
+                defaultValue:
+                  'Create a multi-line draft, set VAT and payment options, then issue a numbered invoice (QQ-YYYY-NNNNN).'
+              })}
+            </p>
+            <Button asChild>
+              <Link
+                href={`/platform/invoices/new?companyId=${encodeURIComponent(company.id)}`}
               >
-                {t('createInvoice', { defaultValue: 'Create invoice' })}
-              </Button>
-              {createInv.isError && (
-                <p className='text-destructive text-sm'>
-                  {(createInv.error as Error).message}
-                </p>
-              )}
-            </div>
+                {t('openInvoiceWizard', { defaultValue: 'New invoice' })}
+              </Link>
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -726,6 +599,14 @@ export default function PlatformCompanyDetailPage() {
         initialCounterparty={company.counterparty}
         canUseDadata={platFeatures?.dadata ?? false}
         canUseCleaner={platFeatures?.dadataCleaner ?? false}
+        t={t}
+      />
+
+      <PlatformCompanyPaymentAccountsSection
+        key={`${company.id}-pa-${company.updatedAt ?? ''}`}
+        companyId={company.id}
+        initialPaymentAccounts={company.paymentAccounts}
+        canUseDadata={platFeatures?.dadata ?? false}
         t={t}
       />
 

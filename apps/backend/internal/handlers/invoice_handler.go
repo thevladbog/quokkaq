@@ -1,28 +1,42 @@
 package handlers
 
 import (
+	"errors"
 	"log"
 	"net/http"
+	"net/url"
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/repository"
+	"quokkaq-go-backend/internal/services"
+	"quokkaq-go-backend/internal/services/billing"
 
 	"github.com/go-chi/chi/v5"
 )
 
-// InvoicePDFNotImplementedResponse is the JSON body for DownloadInvoice until PDF export exists.
-type InvoicePDFNotImplementedResponse struct {
-	Error string `json:"error"`
-}
-
 type InvoiceHandler struct {
-	invoiceRepo repository.InvoiceRepository
-	userRepo    repository.UserRepository
+	invoiceRepo  repository.InvoiceRepository
+	companyRepo  repository.CompanyRepository
+	userRepo     repository.UserRepository
+	yooKassa     *billing.YooKassaInvoiceClient
+	yooReturnURL string
+	publicAppURL string
 }
 
-func NewInvoiceHandler(invoiceRepo repository.InvoiceRepository, userRepo repository.UserRepository) *InvoiceHandler {
+func NewInvoiceHandler(
+	invoiceRepo repository.InvoiceRepository,
+	companyRepo repository.CompanyRepository,
+	userRepo repository.UserRepository,
+	yooKassa *billing.YooKassaInvoiceClient,
+	yooReturnURL string,
+	publicAppURL string,
+) *InvoiceHandler {
 	return &InvoiceHandler{
-		invoiceRepo: invoiceRepo,
-		userRepo:    userRepo,
+		invoiceRepo:  invoiceRepo,
+		companyRepo:  companyRepo,
+		userRepo:     userRepo,
+		yooKassa:     yooKassa,
+		yooReturnURL: yooReturnURL,
+		publicAppURL: publicAppURL,
 	}
 }
 
@@ -55,7 +69,7 @@ func (h *InvoiceHandler) GetMyInvoices(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	invoices, err := h.invoiceRepo.FindByCompanyID(companyID)
+	invoices, err := h.invoiceRepo.FindByCompanyIDNonDraft(companyID)
 	if err != nil {
 		log.Printf("GetMyInvoices invoiceRepo.FindByCompanyID: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -67,19 +81,19 @@ func (h *InvoiceHandler) GetMyInvoices(w http.ResponseWriter, r *http.Request) {
 }
 
 // DownloadInvoice godoc
-// @Summary      Download Invoice (PDF when implemented)
-// @Description  Currently returns HTTP 501 with JSON after authorization. When PDF export is implemented, a successful response will be 200 with body as application/pdf (binary PDF bytes). Until then, clients should treat 501 and handlers.InvoicePDFNotImplementedResponse as the expected outcome.
+// @Summary      Download invoice PDF
+// @Description  Returns application/pdf (A4 счёт на оплату with ST00012 QR). 422 if SaaS operator bank details cannot form a valid QR.
 // @Tags         invoices
 // @Produce      json
 // @Produce      application/pdf
 // @Security     BearerAuth
 // @Param        id path string true "Invoice ID"
-// @Success      200  {file}  file  "Invoice PDF binary (Content-Type: application/pdf) once generation is implemented"
+// @Success      200  {file}  file  "Invoice PDF"
 // @Failure      401  {string}  string "Unauthorized"
 // @Failure      403  {string}  string "Forbidden"
 // @Failure      404  {string}  string "Not Found"
+// @Failure      422  {object}  map[string]string "QR / vendor prerequisites missing"
 // @Failure      500  {string}  string "Internal Server Error"
-// @Failure      501  {object}  handlers.InvoicePDFNotImplementedResponse "PDF export not implemented"
 // @Router       /invoices/{id}/download [get]
 func (h *InvoiceHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserIDFromContext(r.Context())
@@ -90,13 +104,20 @@ func (h *InvoiceHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request)
 
 	invoiceID := chi.URLParam(r, "id")
 
-	invoice, err := h.invoiceRepo.FindByID(invoiceID)
+	platformAdmin, err := h.userRepo.IsPlatformAdmin(userID)
+	if err != nil {
+		log.Printf("DownloadInvoice IsPlatformAdmin: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	invoice, err := h.invoiceRepo.FindByIDWithLines(invoiceID)
 	if err != nil {
 		if repository.IsNotFound(err) {
 			http.Error(w, "Invoice not found", http.StatusNotFound)
 			return
 		}
-		log.Printf("DownloadInvoice invoiceRepo.FindByID(%s): %v", invoiceID, err)
+		log.Printf("DownloadInvoice invoiceRepo.FindByIDWithLines(%s): %v", invoiceID, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -105,10 +126,13 @@ func (h *InvoiceHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// CompanyID may be nil after company deletion (SET NULL); only admins can access those retained rows.
+	if invoice.Status == "draft" && !platformAdmin {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
 	var hasAccess bool
 	if invoice.CompanyID != nil && *invoice.CompanyID != "" {
-		var err error
 		hasAccess, err = h.userRepo.HasCompanyAccess(userID, *invoice.CompanyID)
 		if err != nil {
 			log.Printf("DownloadInvoice userRepo.HasCompanyAccess: %v", err)
@@ -116,19 +140,57 @@ func (h *InvoiceHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request)
 			return
 		}
 	} else {
-		var err error
 		hasAccess, err = h.userRepo.IsAdmin(userID)
 		if err != nil {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 	}
+	hasAccess = hasAccess || platformAdmin
 	if !hasAccess {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 
-	RespondJSONWithStatus(w, http.StatusNotImplemented, InvoicePDFNotImplementedResponse{
-		Error: "Invoice PDF generation is not implemented yet",
-	})
+	vendor, err := h.companyRepo.FindSaaSOperatorCompany()
+	if err != nil {
+		log.Printf("DownloadInvoice FindSaaSOperatorCompany: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if vendor == nil {
+		RespondJSONWithStatus(w, http.StatusUnprocessableEntity, map[string]string{
+			"error": services.ErrInvoicePDFQRPrerequisites.Error(),
+		})
+		return
+	}
+
+	pdfBytes, err := services.BuildInvoicePDF(invoice, vendor)
+	if errors.Is(err, services.ErrInvoicePDFQRPrerequisites) {
+		RespondJSONWithStatus(w, http.StatusUnprocessableEntity, map[string]string{
+			"error": err.Error(),
+		})
+		return
+	}
+	if err != nil {
+		log.Printf("DownloadInvoice BuildInvoicePDF: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	suffix, err := services.InvoicePDFDownloadSuffix()
+	if err != nil {
+		log.Printf("DownloadInvoice InvoicePDFDownloadSuffix: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	asciiName := services.InvoicePDFASCIIFilename(invoice, suffix)
+	utf8Name := services.InvoicePDFUTF8Filename(invoice, suffix)
+	cd := `attachment; filename="` + asciiName + `"; filename*=UTF-8''` + url.PathEscape(utf8Name)
+	w.Header().Set("Content-Disposition", cd)
+	w.Header().Set("Content-Type", "application/pdf")
+	w.WriteHeader(http.StatusOK)
+	if _, err := w.Write(pdfBytes); err != nil {
+		log.Printf("DownloadInvoice write body: %v", err)
+	}
 }

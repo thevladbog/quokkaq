@@ -1,0 +1,22 @@
+---
+description: Tauri v2 kiosk desktop — Rust conventions and Nx Clippy (QuokkaQ)
+globs: apps/kiosk-desktop/**/*.rs
+alwaysApply: false
+---
+
+# Rust / Tauri kiosk (`apps/kiosk-desktop`)
+
+For **Clippy and Nx wiring**, use `quokkaq-agent-workflow.mdc` (`pnpm nx run kiosk-desktop:lint`). This rule covers **where code lives** and **coordination** with the rest of the monorepo.
+
+## Stack
+
+- Tauri v2; primary Rust sources under [`src-tauri/`](apps/kiosk-desktop/src-tauri/).
+- `dev` / `build` Nx targets depend on `build:agent` (see [`apps/kiosk-desktop/project.json`](apps/kiosk-desktop/project.json)).
+
+## Style
+
+- Run `cargo fmt` and keep error handling idiomatic and consistent with existing `src-tauri` code.
+
+## Shared contracts
+
+- When changing IPC, kiosk behavior, or types shared with the web app, align with [`packages/kiosk-lib`](packages/kiosk-lib) and the frontend only as needed—avoid one-off duplicated contract definitions.

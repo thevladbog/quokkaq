@@ -85,6 +85,12 @@ func (c *Client) SuggestAddress(body []byte) ([]byte, int, error) {
 	return c.postJSON(url, body, c.apiKey)
 }
 
+// SuggestBank proxies suggest/bank (BIC and bank name hints).
+func (c *Client) SuggestBank(body []byte) ([]byte, int, error) {
+	url := suggestionsBaseURL + "/suggest/bank"
+	return c.postJSON(url, body, c.apiKey)
+}
+
 // CleanAddress calls POST /clean/ADDRESS with an array of strings (Cleaner API).
 func CleanAddress(body []byte) ([]byte, int, error) {
 	token := CleanerAPIKey()

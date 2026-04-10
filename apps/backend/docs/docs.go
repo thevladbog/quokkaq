@@ -404,6 +404,461 @@ const docTemplate = `{
                 }
             }
         },
+        "/companies/dadata/address/clean": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authenticated proxy to DaData Cleaner; request body is forwarded unchanged (see DaData Cleaner API). Requires cleaner API key on the server.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dadata"
+                ],
+                "summary": "DaData Cleaner: standardize address strings",
+                "parameters": [
+                    {
+                        "description": "DaData cleaner request JSON",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "array",
+                            "items": {}
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Raw DaData JSON (HTTP status may mirror upstream)",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.DaDataUpstreamResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "413": {
+                        "description": "request body too large",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "502": {
+                        "description": "Upstream error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "503": {
+                        "description": "DaData Cleaner is not configured",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/companies/dadata/address/suggest": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authenticated proxy to DaData address suggestions; request body is forwarded unchanged (see DaData Suggestions API).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dadata"
+                ],
+                "summary": "DaData: address suggestions (passthrough body)",
+                "parameters": [
+                    {
+                        "description": "DaData address suggest JSON",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.DaDataPassthroughRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Raw DaData JSON (HTTP status may mirror upstream)",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.DaDataUpstreamResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "413": {
+                        "description": "request body too large",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "502": {
+                        "description": "Upstream error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "503": {
+                        "description": "DaData is not configured",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/companies/dadata/bank/suggest": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authenticated proxy to DaData bank suggestions; request body is forwarded unchanged (see DaData Suggestions API).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dadata"
+                ],
+                "summary": "DaData: bank suggestions by BIC/name (passthrough body)",
+                "parameters": [
+                    {
+                        "description": "DaData bank suggest JSON",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.DaDataPassthroughRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Raw DaData JSON (HTTP status may mirror upstream)",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.DaDataUpstreamResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "413": {
+                        "description": "request body too large",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "502": {
+                        "description": "Upstream error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "503": {
+                        "description": "DaData is not configured",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/companies/dadata/party/find-by-inn": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authenticated proxy to DaData findById/party. Requires JSON field inn; optional kpp and type are forwarded to DaData when set.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dadata"
+                ],
+                "summary": "DaData: organization by INN (findById/party)",
+                "parameters": [
+                    {
+                        "description": "INN and optional KPP/type",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.DaDataFindPartyByInnRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Raw DaData JSON (HTTP status may mirror upstream)",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.DaDataUpstreamResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request or inn is required",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "413": {
+                        "description": "request body too large",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "502": {
+                        "description": "Upstream error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "503": {
+                        "description": "DaData is not configured",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/companies/dadata/party/suggest": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authenticated proxy to DaData party suggestions; request body is forwarded unchanged (see DaData Suggestions API).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dadata"
+                ],
+                "summary": "DaData: party suggestions (passthrough body)",
+                "parameters": [
+                    {
+                        "description": "DaData party suggest JSON",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.DaDataPassthroughRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Raw DaData JSON (HTTP status may mirror upstream)",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.DaDataUpstreamResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "413": {
+                        "description": "request body too large",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "502": {
+                        "description": "Upstream error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "503": {
+                        "description": "DaData is not configured",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/companies/me": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "companies"
+                ],
+                "summary": "Get current user's company (tenant admin)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.companyMeResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "No company found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Partial update: JSON body matches models.CompanyPatch at the root (not wrapped in a \"company\" property). Only send fields to change. Cannot combine clearBillingAddress with billingAddress (same for counterparty).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "companies"
+                ],
+                "summary": "Update current user's company (tenant admin)",
+                "parameters": [
+                    {
+                        "description": "Patch payload",
+                        "name": "company",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.CompanyPatch"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.Company"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "No company found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/companies/me/complete-onboarding": {
             "post": {
                 "security": [
@@ -1094,22 +1549,70 @@ const docTemplate = `{
                 }
             }
         },
-        "/invoices/{id}/download": {
+        "/invoices/me/vendor": {
             "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Currently returns HTTP 501 with JSON after authorization. When PDF export is implemented, a successful response will be 200 with body as application/pdf (binary PDF bytes). Until then, clients should treat 501 and handlers.InvoicePDFNotImplementedResponse as the expected outcome.",
+                "description": "Returns the SaaS operator company (legal and payment accounts) for invoice display. Responds with 404 when no operator company is marked.",
+                "consumes": [
+                    "application/json"
+                ],
                 "produces": [
-                    "application/json",
-                    "application/pdf"
+                    "application/json"
                 ],
                 "tags": [
                     "invoices"
                 ],
-                "summary": "Download Invoice (PDF when implemented)",
+                "summary": "Get SaaS vendor company for invoices",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.SaasVendorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "No SaaS operator company configured",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/invoices/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns one non-draft invoice with lines for the authenticated user's company. Draft invoices and rows outside the tenant company are not exposed (404).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "invoices"
+                ],
+                "summary": "Get invoice by ID (tenant)",
                 "parameters": [
                     {
                         "type": "string",
@@ -1121,7 +1624,60 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Invoice PDF binary (Content-Type: application/pdf) once generation is implemented",
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.Invoice"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/invoices/{id}/download": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns application/pdf (A4 счёт на оплату with ST00012 QR). 422 if SaaS operator bank details cannot form a valid QR.",
+                "produces": [
+                    "application/json",
+                    "application/pdf"
+                ],
+                "tags": [
+                    "invoices"
+                ],
+                "summary": "Download invoice PDF",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Invoice ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Invoice PDF",
                         "schema": {
                             "type": "file"
                         }
@@ -1144,16 +1700,1538 @@ const docTemplate = `{
                             "type": "string"
                         }
                     },
+                    "422": {
+                        "description": "QR / vendor prerequisites missing",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
                             "type": "string"
                         }
-                    },
-                    "501": {
-                        "description": "PDF export not implemented",
+                    }
+                }
+            }
+        },
+        "/invoices/{id}/yookassa-payment-link": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates or returns an existing YooKassa confirmation URL for an open invoice when online payment is enabled. Returns confirmationUrl and paymentId.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "invoices"
+                ],
+                "summary": "Request YooKassa payment link for an invoice",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Invoice ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.InvoicePDFNotImplementedResponse"
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/platform/catalog-items": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Paginated platform catalog nomenclature for invoice line presets. Each item may include an embedded subscription plan. Default page size 50; maximum 200 (enforced server-side).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "platform"
+                ],
+                "summary": "List catalog items (platform)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 50,
+                        "description": "Page size (max 200)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "Zero-based row offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.platformListResponse-models_CatalogItem"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates a catalog row. Field name is required. Empty printName defaults to name; empty unit defaults to шт; empty currency defaults to RUB. Optional subscriptionPlanId must reference an existing plan or the request fails with 400.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "platform"
+                ],
+                "summary": "Create catalog item (platform)",
+                "parameters": [
+                    {
+                        "description": "New catalog item",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.CatalogItemCreateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/models.CatalogItem"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request (invalid JSON, missing name, or unknown subscriptionPlanId)",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/platform/catalog-items/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns one catalog item by ID, including linked subscription plan when subscriptionPlanId is set.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "platform"
+                ],
+                "summary": "Get catalog item by ID (platform)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Catalog item ID (UUID)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.CatalogItem"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Deletes a catalog item by ID after an existence check. If no row matches, responds with 404 (no silent success).",
+                "tags": [
+                    "platform"
+                ],
+                "summary": "Delete catalog item (platform)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Catalog item ID (UUID)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Partial update: only fields present in the JSON body are changed. Omit keys to leave values unchanged. Whitespace-only subscriptionPlanId clears the link; a non-empty value must reference an existing plan.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "platform"
+                ],
+                "summary": "Patch catalog item (platform)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Catalog item ID (UUID)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Fields to update",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.CatalogItemPatchRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.CatalogItem"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request (invalid JSON or unknown subscriptionPlanId)",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/platform/companies": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "platform"
+                ],
+                "summary": "List companies (platform)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filter by name",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (max 100)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.platformListResponse-models_Company"
+                        }
+                    }
+                }
+            }
+        },
+        "/platform/companies/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "platform"
+                ],
+                "summary": "Get company with billing (platform)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Company ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.Company"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "platform"
+                ],
+                "summary": "Update company (platform)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Company ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Fields to update",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.PatchPlatformCompanyBody"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.Company"
+                        }
+                    }
+                }
+            }
+        },
+        "/platform/dadata/address/clean": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authenticated proxy to DaData Cleaner; request body is forwarded unchanged (see DaData Cleaner API). Requires cleaner API key on the server.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dadata"
+                ],
+                "summary": "DaData Cleaner: standardize address strings",
+                "parameters": [
+                    {
+                        "description": "DaData cleaner request JSON",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "array",
+                            "items": {}
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Raw DaData JSON (HTTP status may mirror upstream)",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.DaDataUpstreamResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "413": {
+                        "description": "request body too large",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "502": {
+                        "description": "Upstream error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "503": {
+                        "description": "DaData Cleaner is not configured",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/platform/dadata/address/suggest": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authenticated proxy to DaData address suggestions; request body is forwarded unchanged (see DaData Suggestions API).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dadata"
+                ],
+                "summary": "DaData: address suggestions (passthrough body)",
+                "parameters": [
+                    {
+                        "description": "DaData address suggest JSON",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.DaDataPassthroughRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Raw DaData JSON (HTTP status may mirror upstream)",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.DaDataUpstreamResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "413": {
+                        "description": "request body too large",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "502": {
+                        "description": "Upstream error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "503": {
+                        "description": "DaData is not configured",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/platform/dadata/bank/suggest": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authenticated proxy to DaData bank suggestions; request body is forwarded unchanged (see DaData Suggestions API).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dadata"
+                ],
+                "summary": "DaData: bank suggestions by BIC/name (passthrough body)",
+                "parameters": [
+                    {
+                        "description": "DaData bank suggest JSON",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.DaDataPassthroughRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Raw DaData JSON (HTTP status may mirror upstream)",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.DaDataUpstreamResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "413": {
+                        "description": "request body too large",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "502": {
+                        "description": "Upstream error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "503": {
+                        "description": "DaData is not configured",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/platform/dadata/party/find-by-inn": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authenticated proxy to DaData findById/party. Requires JSON field inn; optional kpp and type are forwarded to DaData when set.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dadata"
+                ],
+                "summary": "DaData: organization by INN (findById/party)",
+                "parameters": [
+                    {
+                        "description": "INN and optional KPP/type",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.DaDataFindPartyByInnRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Raw DaData JSON (HTTP status may mirror upstream)",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.DaDataUpstreamResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request or inn is required",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "413": {
+                        "description": "request body too large",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "502": {
+                        "description": "Upstream error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "503": {
+                        "description": "DaData is not configured",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/platform/dadata/party/suggest": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authenticated proxy to DaData party suggestions; request body is forwarded unchanged (see DaData Suggestions API).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dadata"
+                ],
+                "summary": "DaData: party suggestions (passthrough body)",
+                "parameters": [
+                    {
+                        "description": "DaData party suggest JSON",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.DaDataPassthroughRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Raw DaData JSON (HTTP status may mirror upstream)",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.DaDataUpstreamResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "413": {
+                        "description": "request body too large",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "502": {
+                        "description": "Upstream error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "503": {
+                        "description": "DaData is not configured",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/platform/features": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "platform"
+                ],
+                "summary": "UI capability flags (DaData, etc.)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.FeaturesFlags"
+                        }
+                    }
+                }
+            }
+        },
+        "/platform/invoices": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "platform"
+                ],
+                "summary": "List invoices (platform)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filter by company",
+                        "name": "companyId",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (max 100)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.platformListResponse-models_Invoice"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates a multi-line draft invoice for a company. companyId and dueDate (RFC3339) are required; at least one line.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "platform"
+                ],
+                "summary": "Create draft invoice (platform)",
+                "parameters": [
+                    {
+                        "description": "Draft invoice payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.InvoiceDraftCreateBody"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/models.Invoice"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Company not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/platform/invoices/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the invoice with lines and related preloads.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "platform"
+                ],
+                "summary": "Get invoice by ID (platform)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Invoice ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.Invoice"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "platform"
+                ],
+                "summary": "Update invoice status (platform)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Invoice ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Fields to update",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.PatchPlatformInvoiceBody"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.Invoice"
+                        }
+                    }
+                }
+            }
+        },
+        "/platform/invoices/{id}/draft": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Replaces header and lines for a draft invoice. companyId in body is ignored; taken from the existing invoice.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "platform"
+                ],
+                "summary": "Update draft invoice (platform)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Invoice ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Draft invoice payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.InvoiceDraftUpsertBody"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.Invoice"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "409": {
+                        "description": "Not a draft",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/platform/invoices/{id}/issue": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Assigns document number, sets status to open, and stores buyer snapshot from the company.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "platform"
+                ],
+                "summary": "Issue invoice (platform)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Invoice ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.Invoice"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "409": {
+                        "description": "Not a draft or cannot issue",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/platform/saas-operator-company": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "platform"
+                ],
+                "summary": "Get the marked SaaS operator company (legal profile source for the deployment)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.Company"
+                        }
+                    },
+                    "404": {
+                        "description": "No operator company marked",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/platform/subscription-plans": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "platform"
+                ],
+                "summary": "List all subscription plans including inactive (platform)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.SubscriptionPlan"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "platform"
+                ],
+                "summary": "Create subscription plan (platform)",
+                "parameters": [
+                    {
+                        "description": "New plan",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.PlatformCreateSubscriptionPlanBody"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/models.SubscriptionPlan"
+                        }
+                    }
+                }
+            }
+        },
+        "/platform/subscription-plans/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "platform"
+                ],
+                "summary": "Replace subscription plan (platform)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Plan ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Full plan replacement",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.PlatformUpdateSubscriptionPlanBody"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.SubscriptionPlan"
+                        }
+                    }
+                }
+            }
+        },
+        "/platform/subscriptions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "platform"
+                ],
+                "summary": "List all subscriptions (platform)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page size (max 100)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.platformListResponse-models_Subscription"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "platform"
+                ],
+                "summary": "Create subscription for a company without one (platform)",
+                "parameters": [
+                    {
+                        "description": "New subscription",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.PlatformCreateSubscriptionBody"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/models.Subscription"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Company not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "409": {
+                        "description": "Company already has a subscription",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/platform/subscriptions/{id}": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "platform"
+                ],
+                "summary": "Update subscription fields (platform; may diverge from Stripe)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Subscription ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Fields to update",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.PatchPlatformSubscriptionBody"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.Subscription"
                         }
                     }
                 }
@@ -4073,6 +6151,87 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/webhooks/yookassa": {
+            "post": {
+                "description": "Receives YooKassa HTTP notifications. Verifies HMAC-SHA256 using X-YooMoney-Signature, then processes payment.succeeded when metadata contains invoice_id (platform invoice paid flow).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "webhooks"
+                ],
+                "summary": "YooKassa payment webhook",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Must be application/json",
+                        "name": "Content-Type",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Webhook HMAC-SHA256 digest (hex, optional sha256= prefix)",
+                        "name": "X-YooMoney-Signature",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "YooKassa notification JSON (event + object)",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.YooKassaWebhookNotification"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Empty response body"
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing signature",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "413": {
+                        "description": "Request body too large",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "503": {
+                        "description": "Service unavailable (webhook signing secret not configured)",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -4148,6 +6307,45 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.DaDataFindPartyByInnRequest": {
+            "type": "object",
+            "required": [
+                "inn"
+            ],
+            "properties": {
+                "inn": {
+                    "type": "string",
+                    "example": "7707083893"
+                },
+                "kpp": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.DaDataPassthroughRequest": {
+            "type": "object",
+            "additionalProperties": true
+        },
+        "handlers.DaDataUpstreamResponse": {
+            "type": "object",
+            "additionalProperties": true
+        },
+        "handlers.FeaturesFlags": {
+            "type": "object",
+            "properties": {
+                "dadata": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "dadataCleaner": {
+                    "type": "boolean",
+                    "example": false
+                }
+            }
+        },
         "handlers.ForgotPasswordRequest": {
             "type": "object",
             "properties": {
@@ -4156,11 +6354,113 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.InvoicePDFNotImplementedResponse": {
+        "handlers.InvoiceDraftCreateBody": {
+            "type": "object",
+            "required": [
+                "companyId",
+                "dueDate",
+                "lines"
+            ],
+            "properties": {
+                "allowStripePaymentLink": {
+                    "description": "Stripe Checkout for platform invoices is not wired end-to-end yet; the flag is stored for future use and API symmetry with YooKassa.",
+                    "type": "boolean"
+                },
+                "allowYookassaPaymentLink": {
+                    "type": "boolean"
+                },
+                "companyId": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "dueDate": {
+                    "description": "RFC3339",
+                    "type": "string"
+                },
+                "lines": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "$ref": "#/definitions/handlers.InvoiceDraftLineInput"
+                    }
+                },
+                "provisionSubscriptionsOnPayment": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "handlers.InvoiceDraftLineInput": {
             "type": "object",
             "properties": {
-                "error": {
+                "catalogItemId": {
                     "type": "string"
+                },
+                "descriptionPrint": {
+                    "type": "string"
+                },
+                "discountAmountMinor": {
+                    "type": "integer"
+                },
+                "discountPercent": {
+                    "type": "number"
+                },
+                "quantity": {
+                    "type": "number"
+                },
+                "subscriptionPeriodStart": {
+                    "type": "string"
+                },
+                "subscriptionPlanId": {
+                    "type": "string"
+                },
+                "unit": {
+                    "description": "UOM; if empty and catalog linked, defaults from catalog",
+                    "type": "string"
+                },
+                "unitPriceInclVatMinor": {
+                    "description": "If nil with a catalog line, defaults to catalog default price; if non-nil (including *0), that value is used as-is.",
+                    "type": "integer"
+                },
+                "vatExempt": {
+                    "type": "boolean"
+                },
+                "vatRatePercent": {
+                    "type": "number"
+                }
+            }
+        },
+        "handlers.InvoiceDraftUpsertBody": {
+            "type": "object",
+            "required": [
+                "dueDate",
+                "lines"
+            ],
+            "properties": {
+                "allowStripePaymentLink": {
+                    "description": "Stripe Checkout for platform invoices is not wired end-to-end yet; the flag is stored for future use and API symmetry with YooKassa.",
+                    "type": "boolean"
+                },
+                "allowYookassaPaymentLink": {
+                    "type": "boolean"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "dueDate": {
+                    "description": "RFC3339",
+                    "type": "string"
+                },
+                "lines": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "$ref": "#/definitions/handlers.InvoiceDraftLineInput"
+                    }
+                },
+                "provisionSubscriptionsOnPayment": {
+                    "type": "boolean"
                 }
             }
         },
@@ -4183,6 +6483,87 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.PatchPlatformCompanyBody": {
+            "type": "object",
+            "properties": {
+                "billingAddress": {
+                    "type": "object"
+                },
+                "billingEmail": {
+                    "type": "string"
+                },
+                "clearBillingAddress": {
+                    "type": "boolean"
+                },
+                "clearCounterparty": {
+                    "type": "boolean"
+                },
+                "counterparty": {
+                    "type": "object"
+                },
+                "isSaasOperator": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "paymentAccounts": {
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    }
+                }
+            }
+        },
+        "handlers.PatchPlatformInvoiceBody": {
+            "type": "object",
+            "properties": {
+                "clearSubscriptionId": {
+                    "type": "boolean"
+                },
+                "paidAt": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "subscriptionId": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.PatchPlatformSubscriptionBody": {
+            "type": "object",
+            "properties": {
+                "cancelAtPeriodEnd": {
+                    "type": "boolean"
+                },
+                "clearPending": {
+                    "type": "boolean"
+                },
+                "currentPeriodEnd": {
+                    "type": "string"
+                },
+                "currentPeriodStart": {
+                    "type": "string"
+                },
+                "pendingEffectiveAt": {
+                    "type": "string"
+                },
+                "pendingPlanId": {
+                    "type": "string"
+                },
+                "planId": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "trialEnd": {
+                    "type": "string"
+                }
+            }
+        },
         "handlers.PeriodResponse": {
             "type": "object",
             "properties": {
@@ -4199,6 +6580,91 @@ const docTemplate = `{
             "properties": {
                 "counterId": {
                     "type": "string"
+                }
+            }
+        },
+        "handlers.PlatformCreateSubscriptionBody": {
+            "type": "object",
+            "required": [
+                "companyId",
+                "planId"
+            ],
+            "properties": {
+                "companyId": {
+                    "type": "string"
+                },
+                "currentPeriodEnd": {
+                    "type": "string"
+                },
+                "currentPeriodStart": {
+                    "type": "string"
+                },
+                "planId": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "trialEnd": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.PlatformCreateSubscriptionPlanBody": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "features": {
+                    "type": "object"
+                },
+                "interval": {
+                    "type": "string"
+                },
+                "isActive": {
+                    "type": "boolean"
+                },
+                "limits": {
+                    "type": "object"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "price": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handlers.PlatformUpdateSubscriptionPlanBody": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "features": {
+                    "type": "object"
+                },
+                "interval": {
+                    "type": "string"
+                },
+                "isActive": {
+                    "type": "boolean"
+                },
+                "limits": {
+                    "type": "object"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "price": {
+                    "type": "integer"
                 }
             }
         },
@@ -4232,6 +6698,29 @@ const docTemplate = `{
                 },
                 "token": {
                     "type": "string"
+                }
+            }
+        },
+        "handlers.SaasVendorResponse": {
+            "type": "object",
+            "properties": {
+                "billingAddress": {
+                    "type": "object"
+                },
+                "billingEmail": {
+                    "type": "string"
+                },
+                "counterparty": {
+                    "type": "object"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "paymentAccounts": {
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    }
                 }
             }
         },
@@ -4306,6 +6795,109 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.YooKassaWebhookNotification": {
+            "type": "object",
+            "properties": {
+                "event": {
+                    "type": "string",
+                    "example": "payment.succeeded"
+                },
+                "object": {
+                    "type": "object"
+                }
+            }
+        },
+        "handlers.companyMeResponse": {
+            "type": "object",
+            "properties": {
+                "company": {
+                    "$ref": "#/definitions/models.Company"
+                },
+                "features": {
+                    "$ref": "#/definitions/handlers.FeaturesFlags"
+                }
+            }
+        },
+        "handlers.platformListResponse-models_CatalogItem": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.CatalogItem"
+                    }
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handlers.platformListResponse-models_Company": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Company"
+                    }
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handlers.platformListResponse-models_Invoice": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Invoice"
+                    }
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handlers.platformListResponse-models_Subscription": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Subscription"
+                    }
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "handlers.setupFirstAdminRequest": {
             "type": "object",
             "properties": {
@@ -4349,6 +6941,237 @@ const docTemplate = `{
                 },
                 "userPhone": {
                     "type": "string"
+                }
+            }
+        },
+        "models.CatalogItem": {
+            "type": "object",
+            "properties": {
+                "article": {
+                    "type": "string"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "defaultPriceMinor": {
+                    "description": "gross (incl. VAT) per unit",
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "isActive": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "plan": {
+                    "$ref": "#/definitions/models.SubscriptionPlan"
+                },
+                "printName": {
+                    "type": "string"
+                },
+                "subscriptionPlanId": {
+                    "type": "string"
+                },
+                "unit": {
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "type": "string"
+                },
+                "vatExempt": {
+                    "type": "boolean"
+                },
+                "vatRatePercent": {
+                    "description": "used when VatExempt is false",
+                    "type": "number"
+                }
+            }
+        },
+        "models.CatalogItemCreateRequest": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "article": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "defaultPriceMinor": {
+                    "type": "integer"
+                },
+                "isActive": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Подписка Pro"
+                },
+                "printName": {
+                    "type": "string"
+                },
+                "subscriptionPlanId": {
+                    "type": "string"
+                },
+                "unit": {
+                    "type": "string"
+                },
+                "vatExempt": {
+                    "type": "boolean"
+                },
+                "vatRatePercent": {
+                    "type": "number"
+                }
+            }
+        },
+        "models.CatalogItemPatchRequest": {
+            "type": "object",
+            "properties": {
+                "article": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "defaultPriceMinor": {
+                    "type": "integer"
+                },
+                "isActive": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "printName": {
+                    "type": "string"
+                },
+                "subscriptionPlanId": {
+                    "type": "string"
+                },
+                "unit": {
+                    "type": "string"
+                },
+                "vatExempt": {
+                    "type": "boolean"
+                },
+                "vatRatePercent": {
+                    "type": "number"
+                }
+            }
+        },
+        "models.Company": {
+            "type": "object",
+            "properties": {
+                "billingAddress": {
+                    "description": "billing address details",
+                    "type": "object"
+                },
+                "billingEmail": {
+                    "description": "billing contact email",
+                    "type": "string"
+                },
+                "counterparty": {
+                    "description": "legal profile (RU): partyType, inn, addresses, etc.",
+                    "type": "object"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "invoices": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Invoice"
+                    }
+                },
+                "isSaasOperator": {
+                    "description": "single operator tenant per deployment; quotas bypassed",
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "onboardingState": {
+                    "description": "onboarding progress",
+                    "type": "object"
+                },
+                "ownerUserId": {
+                    "description": "owner of the organization",
+                    "type": "string"
+                },
+                "paymentAccounts": {
+                    "description": "RU bank accounts (JSON array)",
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    }
+                },
+                "settings": {
+                    "description": "company settings",
+                    "type": "object"
+                },
+                "subscription": {
+                    "$ref": "#/definitions/models.Subscription"
+                },
+                "subscriptionId": {
+                    "description": "FK to Subscription",
+                    "type": "string"
+                },
+                "units": {
+                    "description": "Relations",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Unit"
+                    }
+                },
+                "updatedAt": {
+                    "type": "string"
+                },
+                "usageRecords": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.UsageRecord"
+                    }
+                }
+            }
+        },
+        "models.CompanyPatch": {
+            "type": "object",
+            "properties": {
+                "billingAddress": {
+                    "type": "object"
+                },
+                "billingEmail": {
+                    "type": "string"
+                },
+                "clearBillingAddress": {
+                    "type": "boolean"
+                },
+                "clearCounterparty": {
+                    "type": "boolean"
+                },
+                "counterparty": {
+                    "type": "object"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "paymentAccounts": {
+                    "description": "items: @quokkaq/shared-types PaymentAccountSchema",
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    }
                 }
             }
         },
@@ -4460,9 +7283,18 @@ const docTemplate = `{
         "models.Invoice": {
             "type": "object",
             "properties": {
+                "allowStripePaymentLink": {
+                    "type": "boolean"
+                },
+                "allowYookassaPaymentLink": {
+                    "type": "boolean"
+                },
                 "amount": {
-                    "description": "amount in minor units",
+                    "description": "total in minor units (gross); equals sum of line gross when lines exist",
                     "type": "integer"
+                },
+                "buyerSnapshot": {
+                    "type": "object"
                 },
                 "companyId": {
                     "type": "string"
@@ -4474,12 +7306,25 @@ const docTemplate = `{
                     "description": "\"RUB\", \"USD\"",
                     "type": "string"
                 },
+                "documentNumber": {
+                    "description": "QQ-YYYY-NNNNN when issued",
+                    "type": "string"
+                },
                 "dueDate": {
                     "description": "payment due date",
                     "type": "string"
                 },
                 "id": {
                     "type": "string"
+                },
+                "issuedAt": {
+                    "type": "string"
+                },
+                "lines": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.InvoiceLine"
+                    }
                 },
                 "paidAt": {
                     "description": "when payment was received",
@@ -4493,8 +7338,20 @@ const docTemplate = `{
                     "description": "external invoice ID",
                     "type": "string"
                 },
+                "provisionSubscriptionsOnPayment": {
+                    "type": "boolean"
+                },
+                "provisioningDoneAt": {
+                    "type": "string"
+                },
                 "status": {
                     "description": "\"draft\", \"open\", \"paid\", \"void\", \"uncollectible\"",
+                    "type": "string"
+                },
+                "stripeCheckoutUrl": {
+                    "type": "string"
+                },
+                "stripeSessionId": {
                     "type": "string"
                 },
                 "subscription": {
@@ -4503,8 +7360,89 @@ const docTemplate = `{
                 "subscriptionId": {
                     "type": "string"
                 },
+                "subtotalExclVatMinor": {
+                    "type": "integer"
+                },
                 "updatedAt": {
                     "type": "string"
+                },
+                "vatTotalMinor": {
+                    "type": "integer"
+                },
+                "yookassaConfirmationUrl": {
+                    "type": "string"
+                },
+                "yookassaPaymentId": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.InvoiceLine": {
+            "type": "object",
+            "properties": {
+                "catalogItemId": {
+                    "type": "string"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "descriptionPrint": {
+                    "type": "string"
+                },
+                "discountAmountMinor": {
+                    "type": "integer"
+                },
+                "discountPercent": {
+                    "type": "number"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "invoiceId": {
+                    "type": "string"
+                },
+                "lineGrossMinor": {
+                    "type": "integer"
+                },
+                "lineNetMinor": {
+                    "type": "integer"
+                },
+                "plan": {
+                    "$ref": "#/definitions/models.SubscriptionPlan"
+                },
+                "position": {
+                    "type": "integer"
+                },
+                "quantity": {
+                    "type": "number"
+                },
+                "subscriptionPeriodEnd": {
+                    "type": "string"
+                },
+                "subscriptionPeriodStart": {
+                    "type": "string"
+                },
+                "subscriptionPlanId": {
+                    "type": "string"
+                },
+                "unit": {
+                    "description": "Print UOM (DB column unit). Renamed from \"Unit\" to avoid GORM confusion with models.Unit in this package.",
+                    "type": "string"
+                },
+                "unitPriceInclVatMinor": {
+                    "type": "integer"
+                },
+                "updatedAt": {
+                    "type": "string"
+                },
+                "vatAmountMinor": {
+                    "type": "integer"
+                },
+                "vatExempt": {
+                    "type": "boolean"
+                },
+                "vatRatePercent": {
+                    "type": "number"
                 }
             }
         },
@@ -4873,6 +7811,17 @@ const docTemplate = `{
                     "description": "additional data",
                     "type": "object"
                 },
+                "pendingEffectiveAt": {
+                    "description": "UTC; when reached, PlanID moves to pending plan",
+                    "type": "string"
+                },
+                "pendingPlan": {
+                    "$ref": "#/definitions/models.SubscriptionPlan"
+                },
+                "pendingPlanId": {
+                    "description": "scheduled plan change (platform)",
+                    "type": "string"
+                },
                 "plan": {
                     "description": "Relations",
                     "allOf": [
@@ -5110,6 +8059,36 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/models.ServiceSlot"
                     }
+                }
+            }
+        },
+        "models.UsageRecord": {
+            "type": "object",
+            "properties": {
+                "billingMonth": {
+                    "description": "month for aggregation (first day of month)",
+                    "type": "string"
+                },
+                "companyId": {
+                    "type": "string"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "metricType": {
+                    "description": "e.g. tickets_per_month (monthly ticket quota), matches plan limit keys",
+                    "type": "string"
+                },
+                "timestamp": {
+                    "description": "when the usage occurred",
+                    "type": "string"
+                },
+                "value": {
+                    "description": "metric value",
+                    "type": "integer"
                 }
             }
         },

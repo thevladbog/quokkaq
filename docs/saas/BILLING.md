@@ -363,11 +363,9 @@ POST /api/subscriptions/checkout
 // Получить историю счетов текущей компании
 GET /api/invoices/me
 
-// Скачать конкретный счёт по ID (тот же префикс `/api`, что и у остальных маршрутов)
-// Path-параметр: invoiceId — UUID счёта из списка `GET /api/invoices/me`.
-// Query (опционально): format=pdf — зарезервировано на будущее; пока эндпоинт может отвечать 501 JSON, пока не реализована выдача PDF.
-// Успешный ответ (когда PDF включён): 200, Content-Type: application/pdf,
-//   Content-Disposition: attachment; filename="invoice_<invoiceId>.pdf", тело — бинарный PDF.
+// Скачать PDF счёта на оплату по ID (префикс `/api` как у остальных маршрутов; Next проксирует на Go).
+// 200: application/pdf, Content-Disposition с именем вида Счет_на_оплату_…_От_YYYY-MM-DD_<hash>.pdf (и ASCII fallback).
+// 422 JSON: не собран обязательный ST00012 QR (нет SaaS-оператора, не RUB, нет счёта с isDefault, невалидные реквизиты).
 GET /api/invoices/{invoiceId}/download
 
 // Получить использование квот по companyId (при доступе к компании)

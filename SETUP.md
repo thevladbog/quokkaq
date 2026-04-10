@@ -57,6 +57,16 @@ cd quokkaq
 pnpm install
 ```
 
+The `prepare` script installs **Git hooks** (Husky). The pre-commit hook runs **`pnpm run precommit`**, which runs **lint-staged** on staged files only, then the full frontend Prettier check:
+
+- **`apps/frontend`**: `eslint --fix` and Prettier on staged files, then `pnpm nx run frontend:format:check` (entire `apps/frontend` tree)
+- **`apps/backend`**: `gofmt -s -w`
+- **`packages/shared-types`**, **`kiosk-lib`**, **`ui-kit`**: Prettier (uses `apps/frontend/.prettierrc.json`)
+
+To skip hooks once: `HUSKY=0 git commit ...`. To run the same checks manually: `pnpm precommit`.
+
+Full backend checks (`golangci-lint`, `go vet`, Swagger diff) remain in CI.
+
 ### 2. Build Packages
 
 Packages must be built before apps can use them:

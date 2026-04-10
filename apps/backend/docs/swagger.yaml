@@ -46,15 +46,116 @@ definitions:
       unitId:
         type: string
     type: object
+  handlers.DaDataFindPartyByInnRequest:
+    properties:
+      inn:
+        example: "7707083893"
+        type: string
+      kpp:
+        type: string
+      type:
+        type: string
+    required:
+    - inn
+    type: object
+  handlers.DaDataPassthroughRequest:
+    additionalProperties: true
+    type: object
+  handlers.DaDataUpstreamResponse:
+    additionalProperties: true
+    type: object
+  handlers.FeaturesFlags:
+    properties:
+      dadata:
+        example: true
+        type: boolean
+      dadataCleaner:
+        example: false
+        type: boolean
+    type: object
   handlers.ForgotPasswordRequest:
     properties:
       email:
         type: string
     type: object
-  handlers.InvoicePDFNotImplementedResponse:
+  handlers.InvoiceDraftCreateBody:
     properties:
-      error:
+      allowStripePaymentLink:
+        description: Stripe Checkout for platform invoices is not wired end-to-end
+          yet; the flag is stored for future use and API symmetry with YooKassa.
+        type: boolean
+      allowYookassaPaymentLink:
+        type: boolean
+      companyId:
         type: string
+      currency:
+        type: string
+      dueDate:
+        description: RFC3339
+        type: string
+      lines:
+        items:
+          $ref: '#/definitions/handlers.InvoiceDraftLineInput'
+        minItems: 1
+        type: array
+      provisionSubscriptionsOnPayment:
+        type: boolean
+    required:
+    - companyId
+    - dueDate
+    - lines
+    type: object
+  handlers.InvoiceDraftLineInput:
+    properties:
+      catalogItemId:
+        type: string
+      descriptionPrint:
+        type: string
+      discountAmountMinor:
+        type: integer
+      discountPercent:
+        type: number
+      quantity:
+        type: number
+      subscriptionPeriodStart:
+        type: string
+      subscriptionPlanId:
+        type: string
+      unit:
+        description: UOM; if empty and catalog linked, defaults from catalog
+        type: string
+      unitPriceInclVatMinor:
+        description: If nil with a catalog line, defaults to catalog default price;
+          if non-nil (including *0), that value is used as-is.
+        type: integer
+      vatExempt:
+        type: boolean
+      vatRatePercent:
+        type: number
+    type: object
+  handlers.InvoiceDraftUpsertBody:
+    properties:
+      allowStripePaymentLink:
+        description: Stripe Checkout for platform invoices is not wired end-to-end
+          yet; the flag is stored for future use and API symmetry with YooKassa.
+        type: boolean
+      allowYookassaPaymentLink:
+        type: boolean
+      currency:
+        type: string
+      dueDate:
+        description: RFC3339
+        type: string
+      lines:
+        items:
+          $ref: '#/definitions/handlers.InvoiceDraftLineInput'
+        minItems: 1
+        type: array
+      provisionSubscriptionsOnPayment:
+        type: boolean
+    required:
+    - dueDate
+    - lines
     type: object
   handlers.LoginRequest:
     properties:
@@ -68,6 +169,59 @@ definitions:
       token:
         type: string
     type: object
+  handlers.PatchPlatformCompanyBody:
+    properties:
+      billingAddress:
+        type: object
+      billingEmail:
+        type: string
+      clearBillingAddress:
+        type: boolean
+      clearCounterparty:
+        type: boolean
+      counterparty:
+        type: object
+      isSaasOperator:
+        type: boolean
+      name:
+        type: string
+      paymentAccounts:
+        items:
+          type: object
+        type: array
+    type: object
+  handlers.PatchPlatformInvoiceBody:
+    properties:
+      clearSubscriptionId:
+        type: boolean
+      paidAt:
+        type: string
+      status:
+        type: string
+      subscriptionId:
+        type: string
+    type: object
+  handlers.PatchPlatformSubscriptionBody:
+    properties:
+      cancelAtPeriodEnd:
+        type: boolean
+      clearPending:
+        type: boolean
+      currentPeriodEnd:
+        type: string
+      currentPeriodStart:
+        type: string
+      pendingEffectiveAt:
+        type: string
+      pendingPlanId:
+        type: string
+      planId:
+        type: string
+      status:
+        type: string
+      trialEnd:
+        type: string
+    type: object
   handlers.PeriodResponse:
     properties:
       end:
@@ -79,6 +233,62 @@ definitions:
     properties:
       counterId:
         type: string
+    type: object
+  handlers.PlatformCreateSubscriptionBody:
+    properties:
+      companyId:
+        type: string
+      currentPeriodEnd:
+        type: string
+      currentPeriodStart:
+        type: string
+      planId:
+        type: string
+      status:
+        type: string
+      trialEnd:
+        type: string
+    required:
+    - companyId
+    - planId
+    type: object
+  handlers.PlatformCreateSubscriptionPlanBody:
+    properties:
+      code:
+        type: string
+      currency:
+        type: string
+      features:
+        type: object
+      interval:
+        type: string
+      isActive:
+        type: boolean
+      limits:
+        type: object
+      name:
+        type: string
+      price:
+        type: integer
+    type: object
+  handlers.PlatformUpdateSubscriptionPlanBody:
+    properties:
+      code:
+        type: string
+      currency:
+        type: string
+      features:
+        type: object
+      interval:
+        type: string
+      isActive:
+        type: boolean
+      limits:
+        type: object
+      name:
+        type: string
+      price:
+        type: integer
     type: object
   handlers.RegisterUserRequest:
     properties:
@@ -100,6 +310,21 @@ definitions:
         type: string
       token:
         type: string
+    type: object
+  handlers.SaasVendorResponse:
+    properties:
+      billingAddress:
+        type: object
+      billingEmail:
+        type: string
+      counterparty:
+        type: object
+      name:
+        type: string
+      paymentAccounts:
+        items:
+          type: object
+        type: array
     type: object
   handlers.SignupRequest:
     properties:
@@ -148,6 +373,73 @@ definitions:
           $ref: '#/definitions/handlers.UsageMetricInfoResponse'
         type: object
     type: object
+  handlers.YooKassaWebhookNotification:
+    properties:
+      event:
+        example: payment.succeeded
+        type: string
+      object:
+        type: object
+    type: object
+  handlers.companyMeResponse:
+    properties:
+      company:
+        $ref: '#/definitions/models.Company'
+      features:
+        $ref: '#/definitions/handlers.FeaturesFlags'
+    type: object
+  handlers.platformListResponse-models_CatalogItem:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/models.CatalogItem'
+        type: array
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  handlers.platformListResponse-models_Company:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/models.Company'
+        type: array
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  handlers.platformListResponse-models_Invoice:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/models.Invoice'
+        type: array
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  handlers.platformListResponse-models_Subscription:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/models.Subscription'
+        type: array
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
   handlers.setupFirstAdminRequest:
     properties:
       email:
@@ -177,6 +469,163 @@ definitions:
         type: string
       userPhone:
         type: string
+    type: object
+  models.CatalogItem:
+    properties:
+      article:
+        type: string
+      createdAt:
+        type: string
+      currency:
+        type: string
+      defaultPriceMinor:
+        description: gross (incl. VAT) per unit
+        type: integer
+      id:
+        type: string
+      isActive:
+        type: boolean
+      name:
+        type: string
+      plan:
+        $ref: '#/definitions/models.SubscriptionPlan'
+      printName:
+        type: string
+      subscriptionPlanId:
+        type: string
+      unit:
+        type: string
+      updatedAt:
+        type: string
+      vatExempt:
+        type: boolean
+      vatRatePercent:
+        description: used when VatExempt is false
+        type: number
+    type: object
+  models.CatalogItemCreateRequest:
+    properties:
+      article:
+        type: string
+      currency:
+        type: string
+      defaultPriceMinor:
+        type: integer
+      isActive:
+        type: boolean
+      name:
+        example: Подписка Pro
+        type: string
+      printName:
+        type: string
+      subscriptionPlanId:
+        type: string
+      unit:
+        type: string
+      vatExempt:
+        type: boolean
+      vatRatePercent:
+        type: number
+    required:
+    - name
+    type: object
+  models.CatalogItemPatchRequest:
+    properties:
+      article:
+        type: string
+      currency:
+        type: string
+      defaultPriceMinor:
+        type: integer
+      isActive:
+        type: boolean
+      name:
+        type: string
+      printName:
+        type: string
+      subscriptionPlanId:
+        type: string
+      unit:
+        type: string
+      vatExempt:
+        type: boolean
+      vatRatePercent:
+        type: number
+    type: object
+  models.Company:
+    properties:
+      billingAddress:
+        description: billing address details
+        type: object
+      billingEmail:
+        description: billing contact email
+        type: string
+      counterparty:
+        description: 'legal profile (RU): partyType, inn, addresses, etc.'
+        type: object
+      createdAt:
+        type: string
+      id:
+        type: string
+      invoices:
+        items:
+          $ref: '#/definitions/models.Invoice'
+        type: array
+      isSaasOperator:
+        description: single operator tenant per deployment; quotas bypassed
+        type: boolean
+      name:
+        type: string
+      onboardingState:
+        description: onboarding progress
+        type: object
+      ownerUserId:
+        description: owner of the organization
+        type: string
+      paymentAccounts:
+        description: RU bank accounts (JSON array)
+        items:
+          type: object
+        type: array
+      settings:
+        description: company settings
+        type: object
+      subscription:
+        $ref: '#/definitions/models.Subscription'
+      subscriptionId:
+        description: FK to Subscription
+        type: string
+      units:
+        description: Relations
+        items:
+          $ref: '#/definitions/models.Unit'
+        type: array
+      updatedAt:
+        type: string
+      usageRecords:
+        items:
+          $ref: '#/definitions/models.UsageRecord'
+        type: array
+    type: object
+  models.CompanyPatch:
+    properties:
+      billingAddress:
+        type: object
+      billingEmail:
+        type: string
+      clearBillingAddress:
+        type: boolean
+      clearCounterparty:
+        type: boolean
+      counterparty:
+        type: object
+      name:
+        type: string
+      paymentAccounts:
+        description: 'items: @quokkaq/shared-types PaymentAccountSchema'
+        items:
+          type: object
+        type: array
     type: object
   models.Counter:
     properties:
@@ -251,9 +700,16 @@ definitions:
     type: object
   models.Invoice:
     properties:
+      allowStripePaymentLink:
+        type: boolean
+      allowYookassaPaymentLink:
+        type: boolean
       amount:
-        description: amount in minor units
+        description: total in minor units (gross); equals sum of line gross when lines
+          exist
         type: integer
+      buyerSnapshot:
+        type: object
       companyId:
         type: string
       createdAt:
@@ -261,11 +717,20 @@ definitions:
       currency:
         description: '"RUB", "USD"'
         type: string
+      documentNumber:
+        description: QQ-YYYY-NNNNN when issued
+        type: string
       dueDate:
         description: payment due date
         type: string
       id:
         type: string
+      issuedAt:
+        type: string
+      lines:
+        items:
+          $ref: '#/definitions/models.InvoiceLine'
+        type: array
       paidAt:
         description: when payment was received
         type: string
@@ -275,15 +740,78 @@ definitions:
       paymentProviderInvoiceId:
         description: external invoice ID
         type: string
+      provisionSubscriptionsOnPayment:
+        type: boolean
+      provisioningDoneAt:
+        type: string
       status:
         description: '"draft", "open", "paid", "void", "uncollectible"'
+        type: string
+      stripeCheckoutUrl:
+        type: string
+      stripeSessionId:
         type: string
       subscription:
         $ref: '#/definitions/models.Subscription'
       subscriptionId:
         type: string
+      subtotalExclVatMinor:
+        type: integer
       updatedAt:
         type: string
+      vatTotalMinor:
+        type: integer
+      yookassaConfirmationUrl:
+        type: string
+      yookassaPaymentId:
+        type: string
+    type: object
+  models.InvoiceLine:
+    properties:
+      catalogItemId:
+        type: string
+      createdAt:
+        type: string
+      descriptionPrint:
+        type: string
+      discountAmountMinor:
+        type: integer
+      discountPercent:
+        type: number
+      id:
+        type: string
+      invoiceId:
+        type: string
+      lineGrossMinor:
+        type: integer
+      lineNetMinor:
+        type: integer
+      plan:
+        $ref: '#/definitions/models.SubscriptionPlan'
+      position:
+        type: integer
+      quantity:
+        type: number
+      subscriptionPeriodEnd:
+        type: string
+      subscriptionPeriodStart:
+        type: string
+      subscriptionPlanId:
+        type: string
+      unit:
+        description: Print UOM (DB column unit). Renamed from "Unit" to avoid GORM
+          confusion with models.Unit in this package.
+        type: string
+      unitPriceInclVatMinor:
+        type: integer
+      updatedAt:
+        type: string
+      vatAmountMinor:
+        type: integer
+      vatExempt:
+        type: boolean
+      vatRatePercent:
+        type: number
     type: object
   models.MessageTemplate:
     properties:
@@ -529,6 +1057,14 @@ definitions:
       metadata:
         description: additional data
         type: object
+      pendingEffectiveAt:
+        description: UTC; when reached, PlanID moves to pending plan
+        type: string
+      pendingPlan:
+        $ref: '#/definitions/models.SubscriptionPlan'
+      pendingPlanId:
+        description: scheduled plan change (platform)
+        type: string
       plan:
         allOf:
         - $ref: '#/definitions/models.SubscriptionPlan'
@@ -688,6 +1224,28 @@ definitions:
         items:
           $ref: '#/definitions/models.ServiceSlot'
         type: array
+    type: object
+  models.UsageRecord:
+    properties:
+      billingMonth:
+        description: month for aggregation (first day of month)
+        type: string
+      companyId:
+        type: string
+      createdAt:
+        type: string
+      id:
+        type: string
+      metricType:
+        description: e.g. tickets_per_month (monthly ticket quota), matches plan limit
+          keys
+        type: string
+      timestamp:
+        description: when the usage occurred
+        type: string
+      value:
+        description: metric value
+        type: integer
     type: object
   models.User:
     properties:
@@ -1061,6 +1619,303 @@ paths:
       summary: Get Usage Metrics
       tags:
       - usage
+  /companies/dadata/address/clean:
+    post:
+      consumes:
+      - application/json
+      description: Authenticated proxy to DaData Cleaner; request body is forwarded
+        unchanged (see DaData Cleaner API). Requires cleaner API key on the server.
+      parameters:
+      - description: DaData cleaner request JSON
+        in: body
+        name: body
+        required: true
+        schema:
+          items: {}
+          type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Raw DaData JSON (HTTP status may mirror upstream)
+          schema:
+            $ref: '#/definitions/handlers.DaDataUpstreamResponse'
+        "400":
+          description: Bad request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "413":
+          description: request body too large
+          schema:
+            type: string
+        "502":
+          description: Upstream error
+          schema:
+            type: string
+        "503":
+          description: DaData Cleaner is not configured
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: 'DaData Cleaner: standardize address strings'
+      tags:
+      - dadata
+  /companies/dadata/address/suggest:
+    post:
+      consumes:
+      - application/json
+      description: Authenticated proxy to DaData address suggestions; request body
+        is forwarded unchanged (see DaData Suggestions API).
+      parameters:
+      - description: DaData address suggest JSON
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.DaDataPassthroughRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Raw DaData JSON (HTTP status may mirror upstream)
+          schema:
+            $ref: '#/definitions/handlers.DaDataUpstreamResponse'
+        "400":
+          description: Bad request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "413":
+          description: request body too large
+          schema:
+            type: string
+        "502":
+          description: Upstream error
+          schema:
+            type: string
+        "503":
+          description: DaData is not configured
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: 'DaData: address suggestions (passthrough body)'
+      tags:
+      - dadata
+  /companies/dadata/bank/suggest:
+    post:
+      consumes:
+      - application/json
+      description: Authenticated proxy to DaData bank suggestions; request body is
+        forwarded unchanged (see DaData Suggestions API).
+      parameters:
+      - description: DaData bank suggest JSON
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.DaDataPassthroughRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Raw DaData JSON (HTTP status may mirror upstream)
+          schema:
+            $ref: '#/definitions/handlers.DaDataUpstreamResponse'
+        "400":
+          description: Bad request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "413":
+          description: request body too large
+          schema:
+            type: string
+        "502":
+          description: Upstream error
+          schema:
+            type: string
+        "503":
+          description: DaData is not configured
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: 'DaData: bank suggestions by BIC/name (passthrough body)'
+      tags:
+      - dadata
+  /companies/dadata/party/find-by-inn:
+    post:
+      consumes:
+      - application/json
+      description: Authenticated proxy to DaData findById/party. Requires JSON field
+        inn; optional kpp and type are forwarded to DaData when set.
+      parameters:
+      - description: INN and optional KPP/type
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.DaDataFindPartyByInnRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Raw DaData JSON (HTTP status may mirror upstream)
+          schema:
+            $ref: '#/definitions/handlers.DaDataUpstreamResponse'
+        "400":
+          description: Bad request or inn is required
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "413":
+          description: request body too large
+          schema:
+            type: string
+        "500":
+          description: Internal error
+          schema:
+            type: string
+        "502":
+          description: Upstream error
+          schema:
+            type: string
+        "503":
+          description: DaData is not configured
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: 'DaData: organization by INN (findById/party)'
+      tags:
+      - dadata
+  /companies/dadata/party/suggest:
+    post:
+      consumes:
+      - application/json
+      description: Authenticated proxy to DaData party suggestions; request body is
+        forwarded unchanged (see DaData Suggestions API).
+      parameters:
+      - description: DaData party suggest JSON
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.DaDataPassthroughRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Raw DaData JSON (HTTP status may mirror upstream)
+          schema:
+            $ref: '#/definitions/handlers.DaDataUpstreamResponse'
+        "400":
+          description: Bad request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "413":
+          description: request body too large
+          schema:
+            type: string
+        "502":
+          description: Upstream error
+          schema:
+            type: string
+        "503":
+          description: DaData is not configured
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: 'DaData: party suggestions (passthrough body)'
+      tags:
+      - dadata
+  /companies/me:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.companyMeResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "404":
+          description: No company found
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Get current user's company (tenant admin)
+      tags:
+      - companies
+    patch:
+      consumes:
+      - application/json
+      description: 'Partial update: JSON body matches models.CompanyPatch at the root
+        (not wrapped in a "company" property). Only send fields to change. Cannot
+        combine clearBillingAddress with billingAddress (same for counterparty).'
+      parameters:
+      - description: Patch payload
+        in: body
+        name: company
+        required: true
+        schema:
+          $ref: '#/definitions/models.CompanyPatch'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Company'
+        "400":
+          description: Bad request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "404":
+          description: No company found
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Update current user's company (tenant admin)
+      tags:
+      - companies
   /companies/me/complete-onboarding:
     post:
       consumes:
@@ -1447,12 +2302,47 @@ paths:
       summary: Get invitation by token
       tags:
       - invitations
+  /invoices/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Returns one non-draft invoice with lines for the authenticated
+        user's company. Draft invoices and rows outside the tenant company are not
+        exposed (404).
+      parameters:
+      - description: Invoice ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Invoice'
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "404":
+          description: Not found
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Get invoice by ID (tenant)
+      tags:
+      - invoices
   /invoices/{id}/download:
     get:
-      description: Currently returns HTTP 501 with JSON after authorization. When
-        PDF export is implemented, a successful response will be 200 with body as
-        application/pdf (binary PDF bytes). Until then, clients should treat 501 and
-        handlers.InvoicePDFNotImplementedResponse as the expected outcome.
+      description: Returns application/pdf (A4 счёт на оплату with ST00012 QR). 422
+        if SaaS operator bank details cannot form a valid QR.
       parameters:
       - description: Invoice ID
         in: path
@@ -1464,8 +2354,7 @@ paths:
       - application/pdf
       responses:
         "200":
-          description: 'Invoice PDF binary (Content-Type: application/pdf) once generation
-            is implemented'
+          description: Invoice PDF
           schema:
             type: file
         "401":
@@ -1480,17 +2369,73 @@ paths:
           description: Not Found
           schema:
             type: string
+        "422":
+          description: QR / vendor prerequisites missing
+          schema:
+            additionalProperties:
+              type: string
+            type: object
         "500":
           description: Internal Server Error
           schema:
             type: string
-        "501":
-          description: PDF export not implemented
-          schema:
-            $ref: '#/definitions/handlers.InvoicePDFNotImplementedResponse'
       security:
       - BearerAuth: []
-      summary: Download Invoice (PDF when implemented)
+      summary: Download invoice PDF
+      tags:
+      - invoices
+  /invoices/{id}/yookassa-payment-link:
+    post:
+      consumes:
+      - application/json
+      description: Creates or returns an existing YooKassa confirmation URL for an
+        open invoice when online payment is enabled. Returns confirmationUrl and paymentId.
+      parameters:
+      - description: Invoice ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "404":
+          description: Not found
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+        "502":
+          description: Bad Gateway
+          schema:
+            type: string
+        "503":
+          description: Service Unavailable
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Request YooKassa payment link for an invoice
       tags:
       - invoices
   /invoices/me:
@@ -1522,6 +2467,962 @@ paths:
       summary: Get Current User's Invoices
       tags:
       - invoices
+  /invoices/me/vendor:
+    get:
+      consumes:
+      - application/json
+      description: Returns the SaaS operator company (legal and payment accounts)
+        for invoice display. Responds with 404 when no operator company is marked.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.SaasVendorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "404":
+          description: No SaaS operator company configured
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Get SaaS vendor company for invoices
+      tags:
+      - invoices
+  /platform/catalog-items:
+    get:
+      description: Paginated platform catalog nomenclature for invoice line presets.
+        Each item may include an embedded subscription plan. Default page size 50;
+        maximum 200 (enforced server-side).
+      parameters:
+      - default: 50
+        description: Page size (max 200)
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Zero-based row offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.platformListResponse-models_CatalogItem'
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: List catalog items (platform)
+      tags:
+      - platform
+    post:
+      consumes:
+      - application/json
+      description: Creates a catalog row. Field name is required. Empty printName
+        defaults to name; empty unit defaults to шт; empty currency defaults to RUB.
+        Optional subscriptionPlanId must reference an existing plan or the request
+        fails with 400.
+      parameters:
+      - description: New catalog item
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.CatalogItemCreateRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.CatalogItem'
+        "400":
+          description: Bad request (invalid JSON, missing name, or unknown subscriptionPlanId)
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Create catalog item (platform)
+      tags:
+      - platform
+  /platform/catalog-items/{id}:
+    delete:
+      description: Deletes a catalog item by ID after an existence check. If no row
+        matches, responds with 404 (no silent success).
+      parameters:
+      - description: Catalog item ID (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "404":
+          description: Not found
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Delete catalog item (platform)
+      tags:
+      - platform
+    get:
+      description: Returns one catalog item by ID, including linked subscription plan
+        when subscriptionPlanId is set.
+      parameters:
+      - description: Catalog item ID (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.CatalogItem'
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "404":
+          description: Not found
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Get catalog item by ID (platform)
+      tags:
+      - platform
+    patch:
+      consumes:
+      - application/json
+      description: 'Partial update: only fields present in the JSON body are changed.
+        Omit keys to leave values unchanged. Whitespace-only subscriptionPlanId clears
+        the link; a non-empty value must reference an existing plan.'
+      parameters:
+      - description: Catalog item ID (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.CatalogItemPatchRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.CatalogItem'
+        "400":
+          description: Bad request (invalid JSON or unknown subscriptionPlanId)
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "404":
+          description: Not found
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Patch catalog item (platform)
+      tags:
+      - platform
+  /platform/companies:
+    get:
+      parameters:
+      - description: Filter by name
+        in: query
+        name: search
+        type: string
+      - description: Page size (max 100)
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.platformListResponse-models_Company'
+      security:
+      - BearerAuth: []
+      summary: List companies (platform)
+      tags:
+      - platform
+  /platform/companies/{id}:
+    get:
+      parameters:
+      - description: Company ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Company'
+      security:
+      - BearerAuth: []
+      summary: Get company with billing (platform)
+      tags:
+      - platform
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Company ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.PatchPlatformCompanyBody'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Company'
+      security:
+      - BearerAuth: []
+      summary: Update company (platform)
+      tags:
+      - platform
+  /platform/dadata/address/clean:
+    post:
+      consumes:
+      - application/json
+      description: Authenticated proxy to DaData Cleaner; request body is forwarded
+        unchanged (see DaData Cleaner API). Requires cleaner API key on the server.
+      parameters:
+      - description: DaData cleaner request JSON
+        in: body
+        name: body
+        required: true
+        schema:
+          items: {}
+          type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Raw DaData JSON (HTTP status may mirror upstream)
+          schema:
+            $ref: '#/definitions/handlers.DaDataUpstreamResponse'
+        "400":
+          description: Bad request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "413":
+          description: request body too large
+          schema:
+            type: string
+        "502":
+          description: Upstream error
+          schema:
+            type: string
+        "503":
+          description: DaData Cleaner is not configured
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: 'DaData Cleaner: standardize address strings'
+      tags:
+      - dadata
+  /platform/dadata/address/suggest:
+    post:
+      consumes:
+      - application/json
+      description: Authenticated proxy to DaData address suggestions; request body
+        is forwarded unchanged (see DaData Suggestions API).
+      parameters:
+      - description: DaData address suggest JSON
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.DaDataPassthroughRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Raw DaData JSON (HTTP status may mirror upstream)
+          schema:
+            $ref: '#/definitions/handlers.DaDataUpstreamResponse'
+        "400":
+          description: Bad request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "413":
+          description: request body too large
+          schema:
+            type: string
+        "502":
+          description: Upstream error
+          schema:
+            type: string
+        "503":
+          description: DaData is not configured
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: 'DaData: address suggestions (passthrough body)'
+      tags:
+      - dadata
+  /platform/dadata/bank/suggest:
+    post:
+      consumes:
+      - application/json
+      description: Authenticated proxy to DaData bank suggestions; request body is
+        forwarded unchanged (see DaData Suggestions API).
+      parameters:
+      - description: DaData bank suggest JSON
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.DaDataPassthroughRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Raw DaData JSON (HTTP status may mirror upstream)
+          schema:
+            $ref: '#/definitions/handlers.DaDataUpstreamResponse'
+        "400":
+          description: Bad request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "413":
+          description: request body too large
+          schema:
+            type: string
+        "502":
+          description: Upstream error
+          schema:
+            type: string
+        "503":
+          description: DaData is not configured
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: 'DaData: bank suggestions by BIC/name (passthrough body)'
+      tags:
+      - dadata
+  /platform/dadata/party/find-by-inn:
+    post:
+      consumes:
+      - application/json
+      description: Authenticated proxy to DaData findById/party. Requires JSON field
+        inn; optional kpp and type are forwarded to DaData when set.
+      parameters:
+      - description: INN and optional KPP/type
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.DaDataFindPartyByInnRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Raw DaData JSON (HTTP status may mirror upstream)
+          schema:
+            $ref: '#/definitions/handlers.DaDataUpstreamResponse'
+        "400":
+          description: Bad request or inn is required
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "413":
+          description: request body too large
+          schema:
+            type: string
+        "500":
+          description: Internal error
+          schema:
+            type: string
+        "502":
+          description: Upstream error
+          schema:
+            type: string
+        "503":
+          description: DaData is not configured
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: 'DaData: organization by INN (findById/party)'
+      tags:
+      - dadata
+  /platform/dadata/party/suggest:
+    post:
+      consumes:
+      - application/json
+      description: Authenticated proxy to DaData party suggestions; request body is
+        forwarded unchanged (see DaData Suggestions API).
+      parameters:
+      - description: DaData party suggest JSON
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.DaDataPassthroughRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Raw DaData JSON (HTTP status may mirror upstream)
+          schema:
+            $ref: '#/definitions/handlers.DaDataUpstreamResponse'
+        "400":
+          description: Bad request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "413":
+          description: request body too large
+          schema:
+            type: string
+        "502":
+          description: Upstream error
+          schema:
+            type: string
+        "503":
+          description: DaData is not configured
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: 'DaData: party suggestions (passthrough body)'
+      tags:
+      - dadata
+  /platform/features:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.FeaturesFlags'
+      security:
+      - BearerAuth: []
+      summary: UI capability flags (DaData, etc.)
+      tags:
+      - platform
+  /platform/invoices:
+    get:
+      parameters:
+      - description: Filter by company
+        in: query
+        name: companyId
+        type: string
+      - description: Page size (max 100)
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.platformListResponse-models_Invoice'
+      security:
+      - BearerAuth: []
+      summary: List invoices (platform)
+      tags:
+      - platform
+    post:
+      consumes:
+      - application/json
+      description: Creates a multi-line draft invoice for a company. companyId and
+        dueDate (RFC3339) are required; at least one line.
+      parameters:
+      - description: Draft invoice payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.InvoiceDraftCreateBody'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Invoice'
+        "400":
+          description: Bad request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "404":
+          description: Company not found
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Create draft invoice (platform)
+      tags:
+      - platform
+  /platform/invoices/{id}:
+    get:
+      description: Returns the invoice with lines and related preloads.
+      parameters:
+      - description: Invoice ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Invoice'
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "404":
+          description: Not found
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Get invoice by ID (platform)
+      tags:
+      - platform
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Invoice ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.PatchPlatformInvoiceBody'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Invoice'
+      security:
+      - BearerAuth: []
+      summary: Update invoice status (platform)
+      tags:
+      - platform
+  /platform/invoices/{id}/draft:
+    patch:
+      consumes:
+      - application/json
+      description: Replaces header and lines for a draft invoice. companyId in body
+        is ignored; taken from the existing invoice.
+      parameters:
+      - description: Invoice ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Draft invoice payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.InvoiceDraftUpsertBody'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Invoice'
+        "400":
+          description: Bad request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "404":
+          description: Not found
+          schema:
+            type: string
+        "409":
+          description: Not a draft
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Update draft invoice (platform)
+      tags:
+      - platform
+  /platform/invoices/{id}/issue:
+    post:
+      description: Assigns document number, sets status to open, and stores buyer
+        snapshot from the company.
+      parameters:
+      - description: Invoice ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Invoice'
+        "400":
+          description: Bad request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "404":
+          description: Not found
+          schema:
+            type: string
+        "409":
+          description: Not a draft or cannot issue
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Issue invoice (platform)
+      tags:
+      - platform
+  /platform/saas-operator-company:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Company'
+        "404":
+          description: No operator company marked
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Get the marked SaaS operator company (legal profile source for the
+        deployment)
+      tags:
+      - platform
+  /platform/subscription-plans:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.SubscriptionPlan'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: List all subscription plans including inactive (platform)
+      tags:
+      - platform
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: New plan
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.PlatformCreateSubscriptionPlanBody'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.SubscriptionPlan'
+      security:
+      - BearerAuth: []
+      summary: Create subscription plan (platform)
+      tags:
+      - platform
+  /platform/subscription-plans/{id}:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Plan ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Full plan replacement
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.PlatformUpdateSubscriptionPlanBody'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.SubscriptionPlan'
+      security:
+      - BearerAuth: []
+      summary: Replace subscription plan (platform)
+      tags:
+      - platform
+  /platform/subscriptions:
+    get:
+      parameters:
+      - description: Page size (max 100)
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.platformListResponse-models_Subscription'
+      security:
+      - BearerAuth: []
+      summary: List all subscriptions (platform)
+      tags:
+      - platform
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: New subscription
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.PlatformCreateSubscriptionBody'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Subscription'
+        "400":
+          description: Bad request
+          schema:
+            type: string
+        "404":
+          description: Company not found
+          schema:
+            type: string
+        "409":
+          description: Company already has a subscription
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Create subscription for a company without one (platform)
+      tags:
+      - platform
+  /platform/subscriptions/{id}:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Subscription ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.PatchPlatformSubscriptionBody'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Subscription'
+      security:
+      - BearerAuth: []
+      summary: Update subscription fields (platform; may diverge from Stripe)
+      tags:
+      - platform
   /services:
     post:
       consumes:
@@ -3445,6 +5346,62 @@ paths:
       summary: Remove unit from user
       tags:
       - users
+  /webhooks/yookassa:
+    post:
+      consumes:
+      - application/json
+      description: Receives YooKassa HTTP notifications. Verifies HMAC-SHA256 using
+        X-YooMoney-Signature, then processes payment.succeeded when metadata contains
+        invoice_id (platform invoice paid flow).
+      parameters:
+      - description: Must be application/json
+        in: header
+        name: Content-Type
+        required: true
+        type: string
+      - description: Webhook HMAC-SHA256 digest (hex, optional sha256= prefix)
+        in: header
+        name: X-YooMoney-Signature
+        required: true
+        type: string
+      - description: YooKassa notification JSON (event + object)
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.YooKassaWebhookNotification'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Empty response body
+        "400":
+          description: Bad request
+          schema:
+            type: string
+        "401":
+          description: Invalid or missing signature
+          schema:
+            type: string
+        "405":
+          description: Method not allowed
+          schema:
+            type: string
+        "413":
+          description: Request body too large
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+        "503":
+          description: Service unavailable (webhook signing secret not configured)
+          schema:
+            type: string
+      summary: YooKassa payment webhook
+      tags:
+      - webhooks
 securityDefinitions:
   BearerAuth:
     in: header
