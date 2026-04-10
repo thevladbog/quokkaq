@@ -32,6 +32,7 @@ type YooKassaWebhookNotification struct {
 // @Param        body                   body      YooKassaWebhookNotification   true  "YooKassa notification JSON (event + object)"
 // @Success      200  "Empty response body"
 // @Failure      400  {string}  string  "Bad request"
+// @Failure      413  {string}  string  "Request body too large"
 // @Failure      401  {string}  string  "Invalid or missing signature"
 // @Failure      405  {string}  string  "Method not allowed"
 // @Failure      500  {string}  string  "Internal server error"
@@ -51,8 +52,14 @@ func ServeYooKassaWebhook(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Service unavailable", http.StatusServiceUnavailable)
 		return
 	}
-	body, err := io.ReadAll(r.Body)
+	const maxWebhookBody = 64 * 1024
+	limited := http.MaxBytesReader(w, r.Body, maxWebhookBody)
+	body, err := io.ReadAll(limited)
 	if err != nil {
+		if strings.Contains(err.Error(), "request body too large") {
+			http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
+			return
+		}
 		http.Error(w, "Bad request", http.StatusBadRequest)
 		return
 	}

@@ -31,6 +31,15 @@ describe('buildRuBankQrSt00012Payload', () => {
     expect(
       buildRuBankQrSt00012Payload({ ...base, sumKopecks: -100 })
     ).toBeNull();
+    expect(
+      buildRuBankQrSt00012Payload({
+        ...base,
+        sumKopecks: Number.MAX_SAFE_INTEGER + 1
+      })
+    ).toBeNull();
+    expect(
+      buildRuBankQrSt00012Payload({ ...base, sumKopecks: Infinity })
+    ).toBeNull();
   });
 
   it('returns null for invalid account', () => {

@@ -20,8 +20,8 @@ export default {
     if (files.length === 0) return [];
     const args = frontendArgs(files);
     return [
-      `cd apps/frontend && eslint --fix --max-warnings=0 ${args}`,
-      `cd apps/frontend && prettier --write ${args}`
+      `pnpm --dir apps/frontend exec -- eslint --fix --max-warnings=0 ${args}`,
+      `pnpm --dir apps/frontend exec -- prettier --write ${args}`
     ];
   },
   'apps/backend/**/*.go': (files) => {
@@ -31,6 +31,6 @@ export default {
   'packages/{shared-types,kiosk-lib,ui-kit}/**/*.{ts,tsx}': (files) => {
     if (files.length === 0) return [];
     const cfg = JSON.stringify(prettierConfig);
-    return `prettier --write --config ${cfg} ${absArgs(files)}`;
+    return `pnpm --dir apps/frontend exec -- prettier --write --config ${cfg} ${absArgs(files)}`;
   }
 };

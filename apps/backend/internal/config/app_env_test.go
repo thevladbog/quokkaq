@@ -6,14 +6,13 @@ import (
 )
 
 func TestAppEnvAllowsYooKassaDevReturnURLFallback(t *testing.T) {
-	t.Parallel()
-	orig := os.Getenv("APP_ENV")
+	orig, hadOrig := os.LookupEnv("APP_ENV")
 	t.Cleanup(func() {
-		if orig == "" {
+		if !hadOrig {
 			_ = os.Unsetenv("APP_ENV")
-		} else {
-			_ = os.Setenv("APP_ENV", orig)
+			return
 		}
+		_ = os.Setenv("APP_ENV", orig)
 	})
 
 	cases := []struct {

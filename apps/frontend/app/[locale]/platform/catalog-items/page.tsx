@@ -66,12 +66,22 @@ export default function PlatformCatalogItemsPage() {
   const [editing, setEditing] = useState<CatalogItem | null>(null);
   const [form, setForm] = useState(() => emptyForm());
 
-  const { data, isLoading } = useQuery({
+  const {
+    data,
+    isLoading,
+    isError: catalogIsError,
+    error: catalogError
+  } = useQuery({
     queryKey: ['platform-catalog-items'],
     queryFn: () => platformApi.listCatalogItems({ limit: 500 })
   });
 
-  const { data: plans = [] } = useQuery({
+  const {
+    data: plans = [],
+    isError: plansIsError,
+    error: plansError,
+    isLoading: plansLoading
+  } = useQuery({
     queryKey: ['platform-subscription-plans', 'catalog'],
     queryFn: () => platformApi.listSubscriptionPlans()
   });
@@ -79,12 +89,14 @@ export default function PlatformCatalogItemsPage() {
   const items = data?.items ?? [];
 
   const openCreate = () => {
+    saveMut.reset();
     setEditing(null);
     setForm(emptyForm());
     setDialogOpen(true);
   };
 
   const openEdit = (item: CatalogItem) => {
+    saveMut.reset();
     setEditing(item);
     setForm({
       name: item.name,
@@ -181,13 +193,31 @@ export default function PlatformCatalogItemsPage() {
         <Button onClick={openCreate}>{t('add')}</Button>
       </div>
 
+      {catalogIsError && (
+        <p className='text-destructive mb-4 text-sm' role='alert'>
+          {t('loadCatalogError')}{' '}
+          <span className='font-mono text-xs'>
+            {(catalogError as Error)?.message ?? ''}
+          </span>
+        </p>
+      )}
+
+      {plansIsError && (
+        <p className='text-destructive mb-4 text-sm' role='alert'>
+          {t('loadPlansErrorCatalog')}{' '}
+          <span className='font-mono text-xs'>
+            {(plansError as Error)?.message ?? ''}
+          </span>
+        </p>
+      )}
+
       {isLoading && (
         <div className='flex justify-center py-12'>
           <Spinner className='h-8 w-8' />
         </div>
       )}
 
-      {data && (
+      {data && !catalogIsError && (
         <Table>
           <TableHeader>
             <TableRow>
@@ -389,6 +419,7 @@ export default function PlatformCatalogItemsPage() {
               <Label>{t('fieldPlan')}</Label>
               <Select
                 value={form.subscriptionPlanId || '__none__'}
+                disabled={plansIsError || plansLoading}
                 onValueChange={(v) =>
                   setForm((f) => ({
                     ...f,

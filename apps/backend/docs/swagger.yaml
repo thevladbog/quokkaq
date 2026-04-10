@@ -58,6 +58,8 @@ definitions:
         type: string
       type:
         type: string
+    required:
+    - inn
     type: object
   handlers.DaDataPassthroughRequest:
     additionalProperties: true
@@ -78,6 +80,33 @@ definitions:
     properties:
       email:
         type: string
+    type: object
+  handlers.InvoiceDraftCreateBody:
+    properties:
+      allowStripePaymentLink:
+        description: Stripe Checkout for platform invoices is not wired end-to-end
+          yet; the flag is stored for future use and API symmetry with YooKassa.
+        type: boolean
+      allowYookassaPaymentLink:
+        type: boolean
+      companyId:
+        type: string
+      currency:
+        type: string
+      dueDate:
+        description: RFC3339
+        type: string
+      lines:
+        items:
+          $ref: '#/definitions/handlers.InvoiceDraftLineInput'
+        minItems: 1
+        type: array
+      provisionSubscriptionsOnPayment:
+        type: boolean
+    required:
+    - companyId
+    - dueDate
+    - lines
     type: object
   handlers.InvoiceDraftLineInput:
     properties:
@@ -115,8 +144,6 @@ definitions:
         type: boolean
       allowYookassaPaymentLink:
         type: boolean
-      companyId:
-        type: string
       currency:
         type: string
       dueDate:
@@ -162,7 +189,9 @@ definitions:
       name:
         type: string
       paymentAccounts:
-        type: object
+        items:
+          type: object
+        type: array
     type: object
   handlers.PatchPlatformInvoiceBody:
     properties:
@@ -482,6 +511,8 @@ definitions:
         type: boolean
       vatRatePercent:
         type: number
+    required:
+    - name
     type: object
   models.CatalogItemPatchRequest:
     properties:
@@ -2429,7 +2460,7 @@ paths:
       consumes:
       - application/json
       description: Returns the SaaS operator company (legal and payment accounts)
-        for invoice display. Response body may be JSON null if not configured.
+        for invoice display. Responds with 404 when no operator company is marked.
       produces:
       - application/json
       responses:
@@ -2439,6 +2470,10 @@ paths:
             $ref: '#/definitions/models.Company'
         "401":
           description: Unauthorized
+          schema:
+            type: string
+        "404":
+          description: No SaaS operator company configured
           schema:
             type: string
         "500":
@@ -3008,7 +3043,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/handlers.InvoiceDraftUpsertBody'
+          $ref: '#/definitions/handlers.InvoiceDraftCreateBody'
       produces:
       - application/json
       responses:
@@ -5337,6 +5372,10 @@ paths:
             type: string
         "405":
           description: Method not allowed
+          schema:
+            type: string
+        "413":
+          description: Request body too large
           schema:
             type: string
         "500":

@@ -103,7 +103,8 @@ function rowsFromLines(
       ),
       vatExempt: l.vatExempt,
       vatRatePercent:
-        typeof l.vatRatePercent === 'number' && Number.isFinite(l.vatRatePercent)
+        typeof l.vatRatePercent === 'number' &&
+        Number.isFinite(l.vatRatePercent)
           ? String(l.vatRatePercent)
           : '20',
       discountPercent:
@@ -160,7 +161,9 @@ function buildDraftBody(
       unit: r.measureUnit.trim(),
       unitPriceInclVatMinor: unit,
       vatExempt: r.vatExempt,
-      vatRatePercent: r.vatExempt ? 0 : parseVatRatePercentInput(r.vatRatePercent)
+      vatRatePercent: r.vatExempt
+        ? 0
+        : parseVatRatePercentInput(r.vatRatePercent)
     };
 
     const cat = r.catalogItemId.trim();
@@ -286,7 +289,9 @@ function tryParseDraftRowForTotals(
   }
 
   const vatExempt = r.vatExempt;
-  const vatRatePercent = vatExempt ? 0 : parseVatRatePercentInput(r.vatRatePercent);
+  const vatRatePercent = vatExempt
+    ? 0
+    : parseVatRatePercentInput(r.vatRatePercent);
   if (!vatExempt && vatRatePercent < 0) return null;
 
   return {
@@ -355,32 +360,44 @@ export function PlatformInvoiceDraftForm({
         return;
       }
       syncedInvoiceIdRef.current = id;
-      setCompanyId(inv!.companyId?.trim() ?? '');
-      setDueLocal(inv!.dueDate ? toDateTimeLocalString(inv!.dueDate) : '');
-      setCurrency(inv!.currency?.trim() || 'RUB');
-      setAllowYookassa(inv!.allowYookassaPaymentLink ?? false);
-      setProvision(inv!.provisionSubscriptionsOnPayment ?? false);
-      setRows(
-        rowsFromLines(inv!.lines, inv!.currency?.trim() || 'RUB', appLocale)
-      );
+      const snapshot = inv!;
+      queueMicrotask(() => {
+        setCompanyId(snapshot.companyId?.trim() ?? '');
+        setDueLocal(
+          snapshot.dueDate ? toDateTimeLocalString(snapshot.dueDate) : ''
+        );
+        setCurrency(snapshot.currency?.trim() || 'RUB');
+        setAllowYookassa(snapshot.allowYookassaPaymentLink ?? false);
+        setProvision(snapshot.provisionSubscriptionsOnPayment ?? false);
+        setRows(
+          rowsFromLines(
+            snapshot.lines,
+            snapshot.currency?.trim() || 'RUB',
+            appLocale
+          )
+        );
+      });
       return;
     }
 
     if (syncedInvoiceIdRef.current !== undefined) {
       syncedInvoiceIdRef.current = undefined;
-      setCompanyId(defaultCompanyId.trim());
-      setDueLocal('');
-      setCurrency('RUB');
-      setAllowYookassa(false);
-      setProvision(false);
-      setRows(rowsFromLines(undefined, 'RUB', appLocale));
+      const d = defaultCompanyId.trim();
+      queueMicrotask(() => {
+        setCompanyId(d);
+        setDueLocal('');
+        setCurrency('RUB');
+        setAllowYookassa(false);
+        setProvision(false);
+        setRows(rowsFromLines(undefined, 'RUB', appLocale));
+      });
     }
   }, [initialInvoice, appLocale, defaultCompanyId]);
 
   useEffect(() => {
     if (initialInvoice?.id) return;
     const d = defaultCompanyId.trim();
-    if (d) setCompanyId(d);
+    if (d) queueMicrotask(() => setCompanyId(d));
   }, [defaultCompanyId, initialInvoice?.id]);
 
   const { data: companiesData } = useQuery({
@@ -597,6 +614,8 @@ export function PlatformInvoiceDraftForm({
   });
 
   const issueMut = useMutation({
+    // Snapshot current server draft, PATCH to latest form state, issue; on issue failure restore the
+    // snapshot via PATCH so the user does not lose work. Distinct errors if rollback fails.
     mutationFn: async () => {
       if (!initialInvoice?.id) throw new Error('noId');
       const id = initialInvoice.id;

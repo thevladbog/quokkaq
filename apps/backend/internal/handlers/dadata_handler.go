@@ -21,7 +21,7 @@ type DaDataUpstreamResponse map[string]interface{}
 
 // DaDataFindPartyByInnRequest is the JSON body for find-by-INN; the handler builds DaData findById/party payload from it.
 type DaDataFindPartyByInnRequest struct {
-	Inn  string  `json:"inn" example:"7707083893"`
+	Inn  string  `json:"inn" binding:"required" example:"7707083893"`
 	KPP  *string `json:"kpp,omitempty"`
 	Type *string `json:"type,omitempty"`
 }

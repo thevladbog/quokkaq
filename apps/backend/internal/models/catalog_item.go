@@ -22,7 +22,7 @@ type CatalogItem struct {
 
 // CatalogItemCreateRequest is the JSON body for POST /platform/catalog-items.
 type CatalogItemCreateRequest struct {
-	Name               string   `json:"name" example:"Подписка Pro"`
+	Name               string   `json:"name" binding:"required" example:"Подписка Pro"`
 	PrintName          string   `json:"printName"`
 	Unit               string   `json:"unit"`
 	Article            string   `json:"article"`

@@ -1555,7 +1555,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns the SaaS operator company (legal and payment accounts) for invoice display. Response body may be JSON null if not configured.",
+                "description": "Returns the SaaS operator company (legal and payment accounts) for invoice display. Responds with 404 when no operator company is marked.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1575,6 +1575,12 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "No SaaS operator company configured",
                         "schema": {
                             "type": "string"
                         }
@@ -2663,7 +2669,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.InvoiceDraftUpsertBody"
+                            "$ref": "#/definitions/handlers.InvoiceDraftCreateBody"
                         }
                     }
                 ],
@@ -6210,6 +6216,12 @@ const docTemplate = `{
                             "type": "string"
                         }
                     },
+                    "413": {
+                        "description": "Request body too large",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
@@ -6305,6 +6317,9 @@ const docTemplate = `{
         },
         "handlers.DaDataFindPartyByInnRequest": {
             "type": "object",
+            "required": [
+                "inn"
+            ],
             "properties": {
                 "inn": {
                     "type": "string",
@@ -6344,6 +6359,43 @@ const docTemplate = `{
             "properties": {
                 "email": {
                     "type": "string"
+                }
+            }
+        },
+        "handlers.InvoiceDraftCreateBody": {
+            "type": "object",
+            "required": [
+                "companyId",
+                "dueDate",
+                "lines"
+            ],
+            "properties": {
+                "allowStripePaymentLink": {
+                    "description": "Stripe Checkout for platform invoices is not wired end-to-end yet; the flag is stored for future use and API symmetry with YooKassa.",
+                    "type": "boolean"
+                },
+                "allowYookassaPaymentLink": {
+                    "type": "boolean"
+                },
+                "companyId": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "dueDate": {
+                    "description": "RFC3339",
+                    "type": "string"
+                },
+                "lines": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "$ref": "#/definitions/handlers.InvoiceDraftLineInput"
+                    }
+                },
+                "provisionSubscriptionsOnPayment": {
+                    "type": "boolean"
                 }
             }
         },
@@ -6400,9 +6452,6 @@ const docTemplate = `{
                 },
                 "allowYookassaPaymentLink": {
                     "type": "boolean"
-                },
-                "companyId": {
-                    "type": "string"
                 },
                 "currency": {
                     "type": "string"
@@ -6467,7 +6516,10 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "paymentAccounts": {
-                    "type": "object"
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    }
                 }
             }
         },
@@ -6924,6 +6976,9 @@ const docTemplate = `{
         },
         "models.CatalogItemCreateRequest": {
             "type": "object",
+            "required": [
+                "name"
+            ],
             "properties": {
                 "article": {
                     "type": "string"

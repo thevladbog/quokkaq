@@ -74,13 +74,14 @@ func (h *InvoiceHandler) GetMyInvoiceByID(w http.ResponseWriter, r *http.Request
 
 // GetSaaSVendor godoc
 // @Summary      Get SaaS vendor company for invoices
-// @Description  Returns the SaaS operator company (legal and payment accounts) for invoice display. Response body may be JSON null if not configured.
+// @Description  Returns the SaaS operator company (legal and payment accounts) for invoice display. Responds with 404 when no operator company is marked.
 // @Tags         invoices
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
 // @Success      200  {object}  models.Company
 // @Failure      401  {string}  string "Unauthorized"
+// @Failure      404  {string}  string "No SaaS operator company configured"
 // @Failure      500  {string}  string "Internal server error"
 // @Router       /invoices/me/vendor [get]
 func (h *InvoiceHandler) GetSaaSVendor(w http.ResponseWriter, r *http.Request) {
@@ -96,8 +97,7 @@ func (h *InvoiceHandler) GetSaaSVendor(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if c == nil {
-		// 200 + null: optional resource; avoids client 404 noise (browser + apiRequest error logs).
-		RespondJSON(w, nil)
+		http.Error(w, "No SaaS operator company is configured", http.StatusNotFound)
 		return
 	}
 	RespondJSON(w, c)

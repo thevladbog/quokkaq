@@ -691,13 +691,15 @@ export const UsageMetricsSchema = z.object({
     start: z.string(),
     end: z.string()
   }),
-  metrics: z.object({
-    units: UsageMetricSchema.optional(),
-    users: UsageMetricSchema.optional(),
-    tickets_per_month: UsageMetricSchema.optional(),
-    services: UsageMetricSchema.optional(),
-    counters: UsageMetricSchema.optional()
-  }).catchall(UsageMetricSchema) // Allow any other metric keys
+  metrics: z
+    .object({
+      units: UsageMetricSchema.optional(),
+      users: UsageMetricSchema.optional(),
+      tickets_per_month: UsageMetricSchema.optional(),
+      services: UsageMetricSchema.optional(),
+      counters: UsageMetricSchema.optional()
+    })
+    .catchall(UsageMetricSchema) // Allow any other metric keys
 });
 
 export type SubscriptionPlan = z.infer<typeof SubscriptionPlanSchema>;
@@ -734,7 +736,7 @@ export const InvoiceDraftLineInputSchema = z.object({
 
 /** Platform invoice draft create / PATCH draft body (matches backend JSON). */
 export const InvoiceDraftUpsertBodySchema = z.object({
-  companyId: z.string(),
+  companyId: z.string().optional(),
   dueDate: z.string(),
   currency: z.string(),
   allowYookassaPaymentLink: z.boolean(),
@@ -744,7 +746,9 @@ export const InvoiceDraftUpsertBodySchema = z.object({
 });
 
 export type InvoiceDraftLineInput = z.infer<typeof InvoiceDraftLineInputSchema>;
-export type InvoiceDraftUpsertBody = z.infer<typeof InvoiceDraftUpsertBodySchema>;
+export type InvoiceDraftUpsertBody = z.infer<
+  typeof InvoiceDraftUpsertBodySchema
+>;
 export type UsageMetric = z.infer<typeof UsageMetricSchema>;
 export type UsageMetrics = z.infer<typeof UsageMetricsSchema>;
 

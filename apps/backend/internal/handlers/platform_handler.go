@@ -358,7 +358,7 @@ type PatchPlatformCompanyBody struct {
 	ClearCounterparty   *bool            `json:"clearCounterparty"`
 	BillingAddress      *json.RawMessage `json:"billingAddress" swaggertype:"object"`
 	ClearBillingAddress *bool            `json:"clearBillingAddress"`
-	PaymentAccounts     *json.RawMessage `json:"paymentAccounts" swaggertype:"object"`
+	PaymentAccounts     *json.RawMessage `json:"paymentAccounts" swaggertype:"array,object"`
 	IsSaasOperator      *bool            `json:"isSaasOperator"`
 }
 

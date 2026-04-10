@@ -4,7 +4,7 @@
   "license": "UNLICENSED",
   "scripts": {
     "prepare": "husky",
-    "precommit": "lint-staged"
+    "precommit": "lint-staged && pnpm nx run frontend:format:check"
   },
   "private": true,
   "devDependencies": {

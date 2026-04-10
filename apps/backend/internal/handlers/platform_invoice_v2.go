@@ -43,9 +43,8 @@ type InvoiceDraftLineInput struct {
 	SubscriptionPeriodStart *time.Time `json:"subscriptionPeriodStart"`
 }
 
-// InvoiceDraftUpsertBody is the JSON body for POST /platform/invoices and PATCH .../draft.
+// InvoiceDraftUpsertBody is the JSON body for PATCH /platform/invoices/{id}/draft (companyId in JSON is ignored).
 type InvoiceDraftUpsertBody struct {
-	CompanyID                string `json:"companyId"`
 	DueDate                  string `json:"dueDate" binding:"required"` // RFC3339
 	Currency                 string `json:"currency"`
 	AllowYookassaPaymentLink bool   `json:"allowYookassaPaymentLink"`
@@ -53,6 +52,12 @@ type InvoiceDraftUpsertBody struct {
 	AllowStripePaymentLink          bool                    `json:"allowStripePaymentLink"`
 	ProvisionSubscriptionsOnPayment bool                    `json:"provisionSubscriptionsOnPayment"`
 	Lines                           []InvoiceDraftLineInput `json:"lines" binding:"required,min=1"`
+}
+
+// InvoiceDraftCreateBody is the JSON body for POST /platform/invoices.
+type InvoiceDraftCreateBody struct {
+	CompanyID string `json:"companyId" binding:"required"`
+	InvoiceDraftUpsertBody
 }
 
 func licensePeriodEnd(start time.Time, qty float64, interval string) time.Time {
@@ -215,7 +220,6 @@ func (h *PlatformHandler) upsertDraftInvoiceInTx(tx *gorm.DB, invoiceID string, 
 	if inv.CompanyID == nil {
 		return errors.New("invoice has no company")
 	}
-	body.CompanyID = *inv.CompanyID
 	if strings.TrimSpace(body.Currency) == "" {
 		body.Currency = inv.Currency
 	}
@@ -247,7 +251,7 @@ func (h *PlatformHandler) upsertDraftInvoiceInTx(tx *gorm.DB, invoiceID string, 
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
-// @Param        body  body      InvoiceDraftUpsertBody  true  "Draft invoice payload"
+// @Param        body  body      InvoiceDraftCreateBody  true  "Draft invoice payload"
 // @Success      201   {object}  models.Invoice
 // @Failure      400   {string}  string "Bad request"
 // @Failure      401   {string}  string "Unauthorized"
@@ -261,7 +265,7 @@ func (h *PlatformHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	var body InvoiceDraftUpsertBody
+	var body InvoiceDraftCreateBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return

@@ -52,8 +52,7 @@ function loosePaymentAccountFromUnknown(
         typeof o.correspondentAccount === 'string'
           ? o.correspondentAccount
           : '',
-      accountNumber:
-        typeof o.accountNumber === 'string' ? o.accountNumber : '',
+      accountNumber: typeof o.accountNumber === 'string' ? o.accountNumber : '',
       isDefault: o.isDefault === true
     };
   }
@@ -73,7 +72,9 @@ export function parsePaymentAccountsFromApi(raw: unknown): PaymentAccount[] {
           : `pa-${idx}-${Date.now()}`)
     }));
   }
-  const loose = raw.map((item, idx) => loosePaymentAccountFromUnknown(item, idx));
+  const loose = raw.map((item, idx) =>
+    loosePaymentAccountFromUnknown(item, idx)
+  );
   if (loose.length > 0 && !loose.some((a) => a.isDefault)) {
     loose[0] = { ...loose[0], isDefault: true };
   }

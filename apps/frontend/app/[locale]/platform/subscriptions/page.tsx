@@ -55,6 +55,7 @@ const STATUS_SELECT_DEFAULT = '__default__';
 type CreateSubscriptionMutationResult =
   | { outcome: 'subscription-only' }
   | { outcome: 'subscription-and-invoice' }
+  | { outcome: 'subscription-only-invoice-failed' }
   | {
       outcome: 'subscription-draft-invoice';
       invoiceId: string;
@@ -188,27 +189,39 @@ export default function PlatformSubscriptionsPage() {
         await platformApi.createSubscription(body);
 
         const plan = plans.find((p) => p.id === planId);
-        const inv = await platformApi.createInvoice({
-          companyId,
-          dueDate: due,
-          currency: (plan?.currency ?? 'RUB').trim() || 'RUB',
-          allowYookassaPaymentLink: false,
-          allowStripePaymentLink: false,
-          provisionSubscriptionsOnPayment: false,
-          lines: [
-            {
-              descriptionPrint: plan?.name?.trim() || 'Subscription',
-              quantity: 1,
-              unitPriceInclVatMinor: amount,
-              vatExempt: true,
-              vatRatePercent: 0
-            }
-          ]
-        });
+        let inv;
+        try {
+          inv = await platformApi.createInvoice({
+            companyId,
+            dueDate: due,
+            currency: (plan?.currency ?? 'RUB').trim() || 'RUB',
+            allowYookassaPaymentLink: false,
+            allowStripePaymentLink: false,
+            provisionSubscriptionsOnPayment: false,
+            lines: [
+              {
+                descriptionPrint: plan?.name?.trim() || 'Subscription',
+                quantity: 1,
+                unitPriceInclVatMinor: amount,
+                vatExempt: true,
+                vatRatePercent: 0
+              }
+            ]
+          });
+        } catch (invoiceErr) {
+          logger.error(
+            'createInvoice after createSubscription (with invoice flow)',
+            invoiceErr
+          );
+          return { outcome: 'subscription-only-invoice-failed' };
+        }
         try {
           await platformApi.issueInvoice(inv.id);
         } catch (issueErr) {
-          logger.error('issueInvoice after createSubscription+createInvoice', issueErr);
+          logger.error(
+            'issueInvoice after createSubscription+createInvoice',
+            issueErr
+          );
           return {
             outcome: 'subscription-draft-invoice',
             invoiceId: inv.id
@@ -234,6 +247,10 @@ export default function PlatformSubscriptionsPage() {
           }),
           { duration: 12_000 }
         );
+      } else if (result.outcome === 'subscription-only-invoice-failed') {
+        toast.warning(t('toastSubCreatedInvoiceCreateFailed'), {
+          duration: 12_000
+        });
       } else {
         toast.success(
           t('toastCreated', { defaultValue: 'Subscription created.' })

@@ -155,10 +155,16 @@ function headersInitWithoutAuthorization(
 const API_BASE_URL = '/api';
 
 // Create a base fetch function with proper error handling and authentication
+type ApiRequestExtra<T> = {
+  /** When the server returns 404, return this value instead of throwing (no JSON parse). */
+  notFoundValue?: T;
+};
+
 async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {},
-  schema?: z.ZodType<T>
+  schema?: z.ZodType<T>,
+  extra?: ApiRequestExtra<T>
 ): Promise<T> {
   let token = null;
   let refreshToken = null;
@@ -227,6 +233,13 @@ async function apiRequest<T>(
             };
 
             const retryResponse = await fetch(url, retryConfig);
+            if (
+              retryResponse.status === 404 &&
+              extra &&
+              Object.prototype.hasOwnProperty.call(extra, 'notFoundValue')
+            ) {
+              return extra.notFoundValue as T;
+            }
             if (!retryResponse.ok) {
               throw new Error(
                 `API Error: ${retryResponse.status} - ${await retryResponse.text()}`
@@ -283,6 +296,14 @@ async function apiRequest<T>(
       }
 
       throw new Error(`Unauthorized: ${await response.text()}`);
+    }
+
+    if (
+      response.status === 404 &&
+      extra &&
+      Object.prototype.hasOwnProperty.call(extra, 'notFoundValue')
+    ) {
+      return extra.notFoundValue as T;
     }
 
     if (!response.ok) {
@@ -1172,13 +1193,11 @@ export const invoicesApi = {
     };
   },
 
-  /** SaaS operator company for invoice header / bank QR (tenant). `null` if not configured. */
+  /** SaaS operator company for invoice header / bank QR (tenant). `null` if not configured (404). */
   getSaaSVendor: () =>
-    apiRequest<Company | null>(
-      `/invoices/me/vendor`,
-      {},
-      CompanySchema.nullable()
-    )
+    apiRequest<Company | null>(`/invoices/me/vendor`, {}, CompanySchema, {
+      notFoundValue: null
+    })
 };
 
 // Company API functions

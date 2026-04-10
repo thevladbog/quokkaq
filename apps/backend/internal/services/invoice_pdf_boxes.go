@@ -144,10 +144,32 @@ func pdfDrawLabelValueRows(
 		labelW = maxLabel
 	}
 	valGap := 6.0
-	valX := innerL + labelW + valGap
-	valW := innerW - labelW - valGap
-	if valW < 40 {
-		valW = 40
+	const minValCol = 40.0
+	innerRight := innerL + innerW
+	var valX, valW float64
+	for {
+		valX = innerL + labelW + valGap
+		remaining := innerRight - valX
+		if remaining < 0 {
+			remaining = 0
+		}
+		if labelW <= 0 {
+			valW = min(minValCol, remaining)
+			break
+		}
+		if remaining >= minValCol {
+			valW = min(minValCol, remaining)
+			break
+		}
+		short := minValCol - remaining
+		if short > labelW {
+			short = labelW
+		}
+		if short <= 0 {
+			valW = remaining
+			break
+		}
+		labelW -= short
 	}
 	for _, p := range pairs {
 		rowTop := y
