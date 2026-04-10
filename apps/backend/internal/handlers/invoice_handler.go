@@ -13,6 +13,20 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// InvoicePDFPrerequisiteError is the JSON body when invoice PDF cannot be generated (HTTP 422).
+type InvoicePDFPrerequisiteError struct {
+	Code    string `json:"code" binding:"required" example:"invoice_pdf_prerequisites"`
+	Message string `json:"message" binding:"required"`
+}
+
+func respondInvoicePDFPrerequisiteError(w http.ResponseWriter, r *http.Request) {
+	loc := middleware.GetLocale(r.Context())
+	RespondJSONWithStatus(w, http.StatusUnprocessableEntity, InvoicePDFPrerequisiteError{
+		Code:    "invoice_pdf_prerequisites",
+		Message: services.InvoicePDFPrerequisitesUserMessage(loc),
+	})
+}
+
 type InvoiceHandler struct {
 	invoiceRepo  repository.InvoiceRepository
 	companyRepo  repository.CompanyRepository
@@ -92,7 +106,7 @@ func (h *InvoiceHandler) GetMyInvoices(w http.ResponseWriter, r *http.Request) {
 // @Failure      401  {string}  string "Unauthorized"
 // @Failure      403  {string}  string "Forbidden"
 // @Failure      404  {string}  string "Not Found"
-// @Failure      422  {object}  map[string]string "code=invoice_pdf_prerequisites, localized message"
+// @Failure      422  {object}  InvoicePDFPrerequisiteError "invoice_pdf_prerequisites + localized message"
 // @Failure      500  {string}  string "Internal Server Error"
 // @Router       /invoices/{id}/download [get]
 func (h *InvoiceHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request) {
@@ -159,21 +173,13 @@ func (h *InvoiceHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if vendor == nil {
-		loc := middleware.GetLocale(r.Context())
-		RespondJSONWithStatus(w, http.StatusUnprocessableEntity, map[string]string{
-			"code":    "invoice_pdf_prerequisites",
-			"message": services.InvoicePDFPrerequisitesUserMessage(loc),
-		})
+		respondInvoicePDFPrerequisiteError(w, r)
 		return
 	}
 
 	pdfBytes, err := services.BuildInvoicePDF(invoice, vendor)
 	if errors.Is(err, services.ErrInvoicePDFQRPrerequisites) {
-		loc := middleware.GetLocale(r.Context())
-		RespondJSONWithStatus(w, http.StatusUnprocessableEntity, map[string]string{
-			"code":    "invoice_pdf_prerequisites",
-			"message": services.InvoicePDFPrerequisitesUserMessage(loc),
-		})
+		respondInvoicePDFPrerequisiteError(w, r)
 		return
 	}
 	if err != nil {

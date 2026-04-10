@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -20,27 +21,68 @@ func LocaleMiddleware(next http.Handler) http.Handler {
 }
 
 // LocaleFromAcceptLanguage returns "ru" or "en" (default), matching the frontend contract.
+// It parses all comma-separated language ranges, honors q values (default q=1), and picks
+// the supported locale ("en" or "ru") with the highest q; on equal q, the earlier range wins.
 func LocaleFromAcceptLanguage(accept string) string {
 	accept = strings.TrimSpace(accept)
 	if accept == "" {
 		return "en"
 	}
-	parts := strings.Split(accept, ",")
-	tag := strings.TrimSpace(parts[0])
-	if tag == "" {
+	bestQ := -1.0
+	bestLocale := "en"
+	for _, part := range strings.Split(accept, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		semis := strings.Split(part, ";")
+		langRange := strings.TrimSpace(semis[0])
+		if langRange == "" || langRange == "*" {
+			continue
+		}
+		q := parseAcceptLanguageQ(semis[1:])
+		primary := normalizeAcceptLanguagePrimary(langRange)
+		if primary != "en" && primary != "ru" {
+			continue
+		}
+		if q > bestQ {
+			bestQ = q
+			bestLocale = primary
+		}
+	}
+	if bestQ < 0 {
 		return "en"
 	}
-	if semi := strings.Index(tag, ";"); semi >= 0 {
-		tag = strings.TrimSpace(tag[:semi])
-	}
-	tag = strings.ToLower(tag)
+	return bestLocale
+}
+
+func normalizeAcceptLanguagePrimary(langRange string) string {
+	tag := strings.ToLower(strings.TrimSpace(langRange))
 	if dash := strings.Index(tag, "-"); dash >= 0 {
 		tag = tag[:dash]
 	}
-	if tag == "ru" {
-		return "ru"
+	return tag
+}
+
+func parseAcceptLanguageQ(params []string) float64 {
+	for _, p := range params {
+		p = strings.TrimSpace(p)
+		eq := strings.Index(p, "=")
+		if eq < 0 {
+			continue
+		}
+		name := strings.TrimSpace(strings.ToLower(p[:eq]))
+		if name != "q" {
+			continue
+		}
+		vStr := strings.TrimSpace(p[eq+1:])
+		v, err := strconv.ParseFloat(vStr, 64)
+		if err != nil || v < 0 || v > 1 {
+			return 1.0
+		}
+		return v
 	}
-	return "en"
+	return 1.0
 }
 
 // GetLocale returns context locale or "en".

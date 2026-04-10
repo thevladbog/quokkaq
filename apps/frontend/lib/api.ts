@@ -470,6 +470,9 @@ async function apiRequestBlob(
           }
         }
       } catch (refreshError) {
+        if (refreshError instanceof ApiHttpError) {
+          throw refreshError;
+        }
         logger.error('Token refresh failed:', refreshError);
       }
 

@@ -12,6 +12,7 @@ import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import type { SubscriptionPlan } from '@quokkaq/shared-types';
 import { subscriptionsApi } from '@/lib/api';
+import { formatApiToastErrorMessage } from '@/lib/format-api-toast-error';
 
 export function OrganizationBillingContent() {
   const router = useRouter();
@@ -36,8 +37,12 @@ export function OrganizationBillingContent() {
     onSuccess: (data) => {
       window.location.href = data.checkoutUrl;
     },
-    onError: (err: Error) => {
-      toast.error(t('toastCheckoutFailed', { message: err.message }));
+    onError: (err: unknown) => {
+      toast.error(
+        t('toastCheckoutFailed', {
+          message: formatApiToastErrorMessage(err, tCommon('error'))
+        })
+      );
     }
   });
 
@@ -48,8 +53,12 @@ export function OrganizationBillingContent() {
       queryClient.invalidateQueries({ queryKey: ['subscription-me'] });
       toast.success(t('toastSubscriptionCanceled'));
     },
-    onError: (err: Error) => {
-      toast.error(t('toastCancelFailed', { message: err.message }));
+    onError: (err: unknown) => {
+      toast.error(
+        t('toastCancelFailed', {
+          message: formatApiToastErrorMessage(err, tCommon('error'))
+        })
+      );
     }
   });
 

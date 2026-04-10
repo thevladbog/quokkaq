@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useId, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,6 +25,7 @@ export function LogoUpload({
 }: LogoUploadProps) {
   const t = useTranslations('components.upload');
   const displayLabel = label ?? t('defaultLogoLabel');
+  const fileInputId = useId();
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -80,7 +81,7 @@ export function LogoUpload({
 
   return (
     <div className='space-y-2'>
-      <Label>{displayLabel}</Label>
+      <Label htmlFor={fileInputId}>{displayLabel}</Label>
       <div className='flex items-center gap-4'>
         {currentLogoUrl ? (
           <div className='bg-muted/50 relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-md border'>
@@ -113,7 +114,7 @@ export function LogoUpload({
             accept='image/*'
             className='hidden'
             onChange={handleFileChange}
-            id='logo-upload'
+            id={fileInputId}
           />
           <Button
             variant='outline'

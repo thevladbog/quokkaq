@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useId, useRef, useState } from 'react';
 import { Button } from './button';
 import { Input } from './input';
 import { Label } from './label';
@@ -50,6 +50,7 @@ export function LogoUpload({
 }: LogoUploadProps) {
   const m = { ...defaultLogoUploadMessages, ...messagesProp };
   const displayLabel = label ?? m.defaultLabel;
+  const fileInputId = useId();
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -105,7 +106,7 @@ export function LogoUpload({
 
   return (
     <div className='space-y-2'>
-      <Label>{displayLabel}</Label>
+      <Label htmlFor={fileInputId}>{displayLabel}</Label>
       <div className='flex items-center gap-4'>
         {currentLogoUrl ? (
           <div className='bg-muted/50 relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-md border'>
@@ -138,7 +139,7 @@ export function LogoUpload({
             accept='image/*'
             className='hidden'
             onChange={handleFileChange}
-            id='logo-upload'
+            id={fileInputId}
           />
           <Button
             variant='outline'

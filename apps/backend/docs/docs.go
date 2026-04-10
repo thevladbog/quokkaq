@@ -1701,12 +1701,9 @@ const docTemplate = `{
                         }
                     },
                     "422": {
-                        "description": "code=invoice_pdf_prerequisites, localized message",
+                        "description": "invoice_pdf_prerequisites + localized message",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/handlers.InvoicePDFPrerequisiteError"
                         }
                     },
                     "500": {
@@ -6461,6 +6458,22 @@ const docTemplate = `{
                 },
                 "provisionSubscriptionsOnPayment": {
                     "type": "boolean"
+                }
+            }
+        },
+        "handlers.InvoicePDFPrerequisiteError": {
+            "type": "object",
+            "required": [
+                "code",
+                "message"
+            ],
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "example": "invoice_pdf_prerequisites"
+                },
+                "message": {
+                    "type": "string"
                 }
             }
         },
