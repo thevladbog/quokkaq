@@ -79,7 +79,8 @@ func buyerLabelValuePairs(inv *models.Invoice) []pdfLabelValue {
 			return p
 		}
 	}
-	if inv.CompanyID != nil {
+	// Company is a value field; without Preload("Company") it is zero-valued — do not read Counterparty/Name unless the association was loaded.
+	if inv.CompanyID != nil && strings.TrimSpace(*inv.CompanyID) != "" && strings.TrimSpace(inv.Company.ID) != "" {
 		cp := parseCounterparty(inv.Company.Counterparty)
 		p := legalEntityLabelValuePairs(cp, strings.TrimSpace(inv.Company.Name))
 		if len(p) > 0 {

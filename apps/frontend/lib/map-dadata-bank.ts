@@ -1,24 +1,42 @@
 import type { PaymentAccount } from '@quokkaq/shared-types';
+import { z } from 'zod';
 
-type BankData = {
-  bic?: string;
-  correspondent_account?: string;
-  swift?: string;
-  name?: {
-    payment?: string;
-    full?: string | null;
-    short?: string | null;
-  };
-};
+/** Nested `data.name` from DaData `suggest/bank` (fields used by {@link bankDataName}). */
+const dadataBankNameSchema = z
+  .object({
+    payment: z.string().optional(),
+    full: z.string().nullable().optional(),
+    short: z.string().nullable().optional()
+  })
+  .passthrough()
+  .optional();
 
-type BankSuggestion = {
-  value?: string;
-  unrestricted_value?: string;
-  data?: BankData;
-};
+/** `data` object from DaData `suggest/bank` (BIC, k/c, SWIFT, bank name parts). */
+const dadataBankDataSchema = z
+  .object({
+    bic: z.string().optional(),
+    correspondent_account: z.string().optional(),
+    swift: z.string().optional(),
+    name: dadataBankNameSchema
+  })
+  .passthrough();
 
-function bankDataName(data: BankData | undefined): string {
-  const n = data?.name;
+/** Top-level suggestion item from DaData `suggest/bank`. */
+const dadataBankSuggestionSchema = z
+  .object({
+    value: z.string().optional(),
+    unrestricted_value: z.string().optional(),
+    data: z.union([dadataBankDataSchema, z.null()]).optional()
+  })
+  .passthrough();
+
+export type DadataBankSuggestion = z.infer<typeof dadataBankSuggestionSchema>;
+
+function bankDataName(
+  data: z.infer<typeof dadataBankDataSchema> | undefined
+): string {
+  if (!data) return '';
+  const n = data.name;
   const payment = typeof n?.payment === 'string' ? n.payment.trim() : '';
   if (payment) return payment;
   const short = typeof n?.short === 'string' ? n.short.trim() : '';
@@ -27,12 +45,18 @@ function bankDataName(data: BankData | undefined): string {
   return full;
 }
 
+function parseBankSuggestion(suggestion: unknown) {
+  return dadataBankSuggestionSchema.safeParse(suggestion);
+}
+
 /** Human-readable line for a bank suggestion row. */
 export function formatBankSuggestionLabel(suggestion: unknown): string {
   if (!suggestion || typeof suggestion !== 'object') return '';
-  const s = suggestion as BankSuggestion;
+  const parsed = parseBankSuggestion(suggestion);
+  if (!parsed.success) return '';
+  const s = parsed.data;
   if (typeof s.value === 'string' && s.value.trim()) return s.value.trim();
-  const d = s.data;
+  const d = s.data === null ? undefined : s.data;
   const name = bankDataName(d);
   const bic = typeof d?.bic === 'string' ? d.bic.trim() : '';
   if (name && bic) return `${name} — ${bic}`;
@@ -48,8 +72,10 @@ export function draftPaymentAccountFromBankSuggestion(
   suggestion: unknown
 ): Partial<PaymentAccount> {
   if (!suggestion || typeof suggestion !== 'object') return {};
-  const s = suggestion as BankSuggestion;
-  const d = s.data;
+  const parsed = parseBankSuggestion(suggestion);
+  if (!parsed.success) return {};
+  const s = parsed.data;
+  const d = s.data === null ? undefined : s.data;
   const bankName = bankDataName(d);
   const bic = typeof d?.bic === 'string' ? d.bic.trim() : '';
   const correspondentAccount =

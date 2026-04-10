@@ -23,7 +23,7 @@ export default function PlatformNewInvoicePage() {
         </Button>
       </div>
       <h1 className='mb-6 text-3xl font-bold'>
-        {t('newTitle', { defaultValue: 'New invoice (draft)' })}
+        {t.has('newTitle') ? t('newTitle') : 'New invoice (draft)'}
       </h1>
       <PlatformInvoiceDraftForm defaultCompanyId={defaultCompanyId} />
     </div>

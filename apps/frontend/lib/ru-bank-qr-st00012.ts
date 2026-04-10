@@ -78,8 +78,14 @@ export function buildRuBankQrSt00012Payload(
   }
   if (!ru20.test(corr)) return null;
   if (!(ruInn10.test(inn) || ruInn12.test(inn))) return null;
-  const sum = Math.round(input.sumKopecks);
-  if (!Number.isFinite(sum) || sum <= 0) return null;
+  if (
+    !Number.isInteger(input.sumKopecks) ||
+    !Number.isSafeInteger(input.sumKopecks) ||
+    input.sumKopecks <= 0
+  ) {
+    return null;
+  }
+  const sum = input.sumKopecks;
 
   const parts = [
     'ST00012',

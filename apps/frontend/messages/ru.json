@@ -1019,6 +1019,7 @@
       "toastDraftSaved": "Черновик сохранён.",
       "toastIssued": "Счёт выставлен.",
       "errors": {
+        "generic": "Произошла ошибка. Проверьте форму и попробуйте снова.",
         "dueInvalid": "Укажите корректный срок оплаты.",
         "quantityInvalid": "В каждой строке нужно положительное количество.",
         "unitPriceInvalid": "Укажите корректную цену за единицу в валюте счёта (например 100,50).",
@@ -1029,14 +1030,16 @@
         "planRequired": "Для лицензионной строки выберите тариф.",
         "periodStartInvalid": "Укажите корректное начало периода подписки.",
         "tooManyLicenseLines": "Только одна строка может ссылаться на тариф подписки.",
-        "noId": "Не указан идентификатор счёта."
+        "noId": "Не указан идентификатор счёта.",
+        "issueInvoiceFailedDraftRestored": "Не удалось провести счёт ({detail}). Черновик возвращён к предыдущему сохранённому состоянию.",
+        "issueInvoiceFailedRollbackFailed": "Не удалось провести счёт ({detail}). Откат черновика тоже не удался ({rollback}). Обновите страницу и проверьте счёт на сервере."
       }
     },
     "invoiceDetail": {
       "title": "Счёт",
       "notFound": "Счёт не найден.",
       "downloadPdf": "Скачать счёт (PDF)",
-      "downloadPdfError": "Не удалось скачать PDF счёта. {message}",
+      "downloadPdfError": "Не удалось скачать PDF счёта.",
       "openCompany": "Организация",
       "billTo": "Получатель",
       "inn": "ИНН",
@@ -1104,6 +1107,7 @@
       "cancel": "Отмена",
       "save": "Сохранить",
       "validationPrice": "Укажите корректную неотрицательную сумму.",
+      "validationVatRate": "Укажите ставку НДС от 0 до 100 %.",
       "backInvoices": "К списку счетов"
     },
     "subscriptions": {
@@ -1142,7 +1146,8 @@
       "invoiceDueDate": "Срок оплаты счёта",
       "invoiceWithSubValidation": "Укажите положительную сумму и срок оплаты для счёта.",
       "toastCreated": "Подписка создана.",
-      "toastCreatedWithInvoice": "Подписка и счёт созданы."
+      "toastCreatedWithInvoice": "Подписка и счёт созданы.",
+      "toastSubCreatedInvoiceIssueFailed": "Подписка создана. Черновик счёта {invoiceId} не удалось провести ({detail}). Проведите счёт в разделе «Счёта» платформы."
     }
   },
   "pageTitles": {
@@ -1441,7 +1446,7 @@
       "metaDescription": "Детали счёта и оплата",
       "notFound": "Счёт не найден.",
       "downloadPdf": "Скачать счёт (PDF)",
-      "downloadPdfError": "Не удалось скачать PDF счёта. {message}",
+      "downloadPdfError": "Не удалось скачать PDF счёта.",
       "untitled": "Счёт",
       "documentTitle": "Счёт",
       "statusLabel": "Статус",

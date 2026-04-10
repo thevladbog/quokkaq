@@ -4,18 +4,36 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 
+	"quokkaq-go-backend/internal/config"
 	"quokkaq-go-backend/internal/middleware"
-	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
-	"quokkaq-go-backend/pkg/database"
+	"quokkaq-go-backend/internal/services/billing"
 
 	"github.com/go-chi/chi/v5"
 	"gorm.io/gorm"
 )
 
-// GetMyInvoiceByID returns one invoice with lines for the user's company.
+// Hardcoded return URL used only when APP_ENV is local-dev-like and neither
+// YOOKASSA_PAYMENT_RETURN_URL nor PUBLIC_APP_URL is set (see RequestYooKassaPaymentLink).
+const yooKassaDevPaymentReturnURL = "https://localhost/payment-return"
+
+// GetMyInvoiceByID godoc
+// @Summary      Get invoice by ID (tenant)
+// @Description  Returns one non-draft invoice with lines for the authenticated user's company. Draft invoices and invoices belonging to other companies are not exposed (404/403).
+// @Tags         invoices
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      string  true  "Invoice ID"
+// @Success      200  {object}  models.Invoice
+// @Failure      401  {string}  string "Unauthorized"
+// @Failure      403  {string}  string "Forbidden"
+// @Failure      404  {string}  string "Not found"
+// @Failure      500  {string}  string "Internal server error"
+// @Router       /invoices/{id} [get]
 func (h *InvoiceHandler) GetMyInvoiceByID(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserIDFromContext(r.Context())
 	if !ok {
@@ -54,7 +72,17 @@ func (h *InvoiceHandler) GetMyInvoiceByID(w http.ResponseWriter, r *http.Request
 	RespondJSON(w, inv)
 }
 
-// GetSaaSVendor returns the SaaS operator company (legal + payment accounts) for invoice display.
+// GetSaaSVendor godoc
+// @Summary      Get SaaS vendor company for invoices
+// @Description  Returns the SaaS operator company (legal and payment accounts) for invoice display. Response body may be JSON null if not configured.
+// @Tags         invoices
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {object}  models.Company
+// @Failure      401  {string}  string "Unauthorized"
+// @Failure      500  {string}  string "Internal server error"
+// @Router       /invoices/me/vendor [get]
 func (h *InvoiceHandler) GetSaaSVendor(w http.ResponseWriter, r *http.Request) {
 	_, ok := middleware.GetUserIDFromContext(r.Context())
 	if !ok {
@@ -75,7 +103,23 @@ func (h *InvoiceHandler) GetSaaSVendor(w http.ResponseWriter, r *http.Request) {
 	RespondJSON(w, c)
 }
 
-// RequestYooKassaPaymentLink creates or returns an existing YooKassa confirmation URL (tenant).
+// RequestYooKassaPaymentLink godoc
+// @Summary      Request YooKassa payment link for an invoice
+// @Description  Creates or returns an existing YooKassa confirmation URL for an open invoice when online payment is enabled. Returns confirmationUrl and paymentId.
+// @Tags         invoices
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      string  true  "Invoice ID"
+// @Success      200  {object}  map[string]string
+// @Failure      400  {string}  string "Bad Request"
+// @Failure      401  {string}  string "Unauthorized"
+// @Failure      403  {string}  string "Forbidden"
+// @Failure      404  {string}  string "Not found"
+// @Failure      500  {string}  string "Internal server error"
+// @Failure      502  {string}  string "Bad Gateway"
+// @Failure      503  {string}  string "Service Unavailable"
+// @Router       /invoices/{id}/yookassa-payment-link [post]
 func (h *InvoiceHandler) RequestYooKassaPaymentLink(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserIDFromContext(r.Context())
 	if !ok {
@@ -129,20 +173,26 @@ func (h *InvoiceHandler) RequestYooKassaPaymentLink(w http.ResponseWriter, r *ht
 		ret = strings.TrimSpace(h.publicAppURL)
 	}
 	if ret == "" {
-		ret = "https://localhost/payment-return"
+		if config.AppEnvAllowsYooKassaDevReturnURLFallback() {
+			ret = yooKassaDevPaymentReturnURL
+			log.Printf("RequestYooKassaPaymentLink: using development-only default return URL %q (set YOOKASSA_PAYMENT_RETURN_URL or PUBLIC_APP_URL)", ret)
+		} else {
+			log.Printf("RequestYooKassaPaymentLink: payment return URL missing (APP_ENV=%q); set YOOKASSA_PAYMENT_RETURN_URL or PUBLIC_APP_URL", strings.TrimSpace(os.Getenv("APP_ENV")))
+			http.Error(w, "Payment return URL is not configured", http.StatusServiceUnavailable)
+			return
+		}
 	}
 	payID, url, err := h.yooKassa.CreatePayment(r.Context(), inv, ret)
 	if err != nil {
 		log.Printf("RequestYooKassaPaymentLink CreatePayment: %v", err)
+		if errors.Is(err, billing.ErrYooKassaReturnURLRequired) {
+			http.Error(w, "Payment return URL is not configured", http.StatusServiceUnavailable)
+			return
+		}
 		http.Error(w, "Could not create payment", http.StatusBadGateway)
 		return
 	}
-	if err := database.DB.Model(&models.Invoice{}).Where("id = ?", inv.ID).Updates(map[string]interface{}{
-		"yookassa_payment_id":         payID,
-		"yookassa_confirmation_url":   url,
-		"payment_provider":           "yookassa",
-		"payment_provider_invoice_id": payID,
-	}).Error; err != nil {
+	if err := h.invoiceRepo.UpdateYookassaPayment(inv.ID, payID, url); err != nil {
 		log.Printf("RequestYooKassaPaymentLink Updates: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return

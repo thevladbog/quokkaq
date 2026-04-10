@@ -32,7 +32,8 @@ import type {
   Company,
   CompanyMeResponse,
   CatalogItem,
-  InvoiceDraftUpsertBody
+  InvoiceDraftUpsertBody,
+  PaymentAccount
 } from '@quokkaq/shared-types';
 
 import {
@@ -1201,7 +1202,8 @@ export const companiesApiExt = {
     clearBillingAddress?: boolean;
     counterparty?: unknown;
     clearCounterparty?: boolean;
-    paymentAccounts?: unknown;
+    /** Shape matches PaymentAccountsSchema in @quokkaq/shared-types; validate client-side when needed. */
+    paymentAccounts?: PaymentAccount[];
   }) =>
     apiRequest<Company>(
       `/companies/me`,
@@ -1360,7 +1362,8 @@ export const platformApi = {
       clearBillingAddress?: boolean;
       counterparty?: unknown;
       clearCounterparty?: boolean;
-      paymentAccounts?: unknown;
+      /** Shape matches PaymentAccountsSchema in @quokkaq/shared-types; validate client-side when needed. */
+      paymentAccounts?: PaymentAccount[];
       isSaasOperator?: boolean;
     }
   ) =>

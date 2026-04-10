@@ -15,6 +15,7 @@ import {
 import { Spinner } from '@/components/ui/spinner';
 import { platformApi } from '@/lib/api';
 import { downloadInvoicePdf } from '@/lib/invoice-pdf-download';
+import { logger } from '@/lib/logger';
 import {
   formatAppDateTime,
   intlLocaleFromAppLocale
@@ -86,14 +87,8 @@ function PlatformInvoiceReadOnly({
       setPdfBusy(true);
       await downloadInvoicePdf(inv);
     } catch (error) {
-      const raw = error instanceof Error ? error.message : String(error);
-      toast.error(
-        t('downloadPdfError', {
-          message: raw,
-          defaultValue: 'Could not download invoice PDF. {message}'
-        }),
-        { duration: 8000 }
-      );
+      logger.error('downloadInvoicePdf failed', error);
+      toast.error(t('downloadPdfError'), { duration: 8000 });
     } finally {
       setPdfBusy(false);
     }

@@ -51,10 +51,15 @@ export function fallbackInvoicePdfFilename(inv: {
   const doc = docRaw.replace(/[/\\:*?"<>|]/g, '_');
   const dateSrc = inv.issuedAt || inv.createdAt;
   const d = dateSrc ? new Date(dateSrc) : new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  const dateStr = `${y}-${m}-${day}`;
+  let dateStr: string;
+  if (Number.isNaN(d.getTime())) {
+    dateStr = 'unknown-date';
+  } else {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    dateStr = `${y}-${m}-${day}`;
+  }
   const hash8 = randomHex8();
   return `Счет_на_оплату_${doc}_От_${dateStr}_${hash8}.pdf`;
 }

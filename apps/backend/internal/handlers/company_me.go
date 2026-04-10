@@ -81,21 +81,13 @@ func (h *CompanyHandler) GetMyCompany(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-type patchMyCompanyBody struct {
-	Name                *string          `json:"name"`
-	BillingEmail        *string          `json:"billingEmail"`
-	Counterparty        *json.RawMessage `json:"counterparty"`
-	ClearCounterparty   *bool            `json:"clearCounterparty"`
-	BillingAddress      *json.RawMessage `json:"billingAddress"`
-	ClearBillingAddress *bool            `json:"clearBillingAddress"`
-	PaymentAccounts     *json.RawMessage `json:"paymentAccounts"`
-}
-
 // PatchMyCompany godoc
 // @Summary      Update current user's company (tenant admin)
+// @Description  Partial update: JSON body matches models.CompanyPatch at the root (not wrapped in a "company" property). Only send fields to change. Cannot combine clearBillingAddress with billingAddress (same for counterparty).
 // @Tags         companies
 // @Accept       json
 // @Produce      json
+// @Param        company  body      models.CompanyPatch  true  "Patch payload"
 // @Security     BearerAuth
 // @Success      200  {object}  models.Company
 // @Failure      400  {string}  string "Bad request"
@@ -134,7 +126,7 @@ func (h *CompanyHandler) PatchMyCompany(w http.ResponseWriter, r *http.Request) 
 
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
-	var body patchMyCompanyBody
+	var body models.CompanyPatch
 	if err := dec.Decode(&body); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return

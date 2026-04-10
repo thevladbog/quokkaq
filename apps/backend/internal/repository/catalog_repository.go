@@ -57,6 +57,9 @@ func (r *catalogRepository) ListAll(limit, offset int) ([]models.CatalogItem, in
 	if limit > 200 {
 		limit = 200
 	}
+	if offset < 0 {
+		offset = 0
+	}
 	var total int64
 	if err := database.DB.Model(&models.CatalogItem{}).Count(&total).Error; err != nil {
 		return nil, 0, err

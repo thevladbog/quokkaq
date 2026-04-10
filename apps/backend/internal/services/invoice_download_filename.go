@@ -69,14 +69,40 @@ func InvoicePDFDownloadSuffix() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
+// invoicePDFDownloadSuffixIsValid is true when s is exactly eight ASCII hex digits (same contract as [InvoicePDFDownloadSuffix]).
+func invoicePDFDownloadSuffixIsValid(s string) bool {
+	if len(s) != 8 {
+		return false
+	}
+	for i := 0; i < 8; i++ {
+		c := s[i]
+		switch {
+		case c >= '0' && c <= '9', c >= 'a' && c <= 'f', c >= 'A' && c <= 'F':
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// invoicePDFEmbedDownloadSuffix validates the raw suffix, then applies [asciiFilePart] for safe embedding.
+// If the raw suffix is invalid, returns "00000000". If it is valid but [asciiFilePart] changes length (edge case), returns a lowercase copy of the raw suffix (still ASCII-safe).
+func invoicePDFEmbedDownloadSuffix(downloadSuffix string) string {
+	if !invoicePDFDownloadSuffixIsValid(downloadSuffix) {
+		return "00000000"
+	}
+	h := asciiFilePart(downloadSuffix)
+	if len(h) != 8 {
+		return strings.ToLower(downloadSuffix)
+	}
+	return h
+}
+
 // InvoicePDFUTF8Filename is Счет_на_оплату_{Номер}_От_{дата}_{суффикс}.pdf
 func InvoicePDFUTF8Filename(inv *models.Invoice, downloadSuffix string) string {
 	doc := sanitizeFilePart(invoiceDocLabelForFile(inv))
 	date := sanitizeFilePart(invoiceDateKeyForFile(inv))
-	h := asciiFilePart(downloadSuffix)
-	if h == "" || len(h) != 8 {
-		h = "00000000"
-	}
+	h := invoicePDFEmbedDownloadSuffix(downloadSuffix)
 	return "Счет_на_оплату_" + doc + "_От_" + date + "_" + h + ".pdf"
 }
 
@@ -84,9 +110,6 @@ func InvoicePDFUTF8Filename(inv *models.Invoice, downloadSuffix string) string {
 func InvoicePDFASCIIFilename(inv *models.Invoice, downloadSuffix string) string {
 	doc := asciiFilePart(sanitizeFilePart(invoiceDocLabelForFile(inv)))
 	date := asciiFilePart(sanitizeFilePart(invoiceDateKeyForFile(inv)))
-	h := asciiFilePart(downloadSuffix)
-	if h == "" || len(h) != 8 {
-		h = "00000000"
-	}
+	h := invoicePDFEmbedDownloadSuffix(downloadSuffix)
 	return "Schet_na_oplatu_" + doc + "_Ot_" + date + "_" + h + ".pdf"
 }

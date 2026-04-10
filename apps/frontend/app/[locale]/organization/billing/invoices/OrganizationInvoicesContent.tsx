@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { invoicesApi } from '@/lib/api';
 import { downloadInvoicePdf } from '@/lib/invoice-pdf-download';
+import { logger } from '@/lib/logger';
 import { toast } from 'sonner';
 
 export function OrganizationInvoicesContent() {
@@ -26,13 +27,8 @@ export function OrganizationInvoicesContent() {
     try {
       await downloadInvoicePdf(invoice);
     } catch (error) {
-      const raw = error instanceof Error ? error.message : String(error);
-      toast.error(
-        tDetail('downloadPdfError', {
-          message: raw,
-          defaultValue: 'Could not download invoice PDF. {message}'
-        })
-      );
+      logger.error('downloadInvoicePdf failed', error);
+      toast.error(tDetail('downloadPdfError'));
     }
   };
 

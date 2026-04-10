@@ -36,6 +36,7 @@ type InvoiceRepository interface {
 	FindByCompanyIDNonDraft(companyID string) ([]models.Invoice, error)
 	ListPaginated(companyID *string, limit, offset int) ([]models.Invoice, int64, error)
 	Update(invoice *models.Invoice) error
+	UpdateYookassaPayment(id, paymentID, confirmationURL string) error
 	Delete(id string) error
 	CreateWithLinesInTx(tx *gorm.DB, invoice *models.Invoice, lines []models.InvoiceLine) error
 	UpdateHeaderAndLinesInTx(tx *gorm.DB, invoice *models.Invoice, lines []models.InvoiceLine) error
@@ -122,6 +123,16 @@ func (r *invoiceRepository) Update(invoice *models.Invoice) error {
 	return database.DB.Save(invoice).Error
 }
 
+// UpdateYookassaPayment persists YooKassa payment id, confirmation URL, and provider fields after CreatePayment.
+func (r *invoiceRepository) UpdateYookassaPayment(id, paymentID, confirmationURL string) error {
+	return database.DB.Model(&models.Invoice{}).Where("id = ?", id).Updates(map[string]interface{}{
+		"yookassa_payment_id":         paymentID,
+		"yookassa_confirmation_url":   confirmationURL,
+		"payment_provider":            "yookassa",
+		"payment_provider_invoice_id": paymentID,
+	}).Error
+}
+
 func (r *invoiceRepository) Delete(id string) error {
 	return database.DB.Delete(&models.Invoice{}, "id = ?", id).Error
 }
@@ -133,11 +144,11 @@ func (r *invoiceRepository) CreateWithLinesInTx(tx *gorm.DB, invoice *models.Inv
 	for i := range lines {
 		lines[i].InvoiceID = invoice.ID
 		lines[i].Position = i + 1
-		if err := tx.Create(&lines[i]).Error; err != nil {
-			return err
-		}
 	}
-	return nil
+	if len(lines) == 0 {
+		return nil
+	}
+	return tx.Create(&lines).Error
 }
 
 func (r *invoiceRepository) UpdateHeaderAndLinesInTx(tx *gorm.DB, invoice *models.Invoice, lines []models.InvoiceLine) error {

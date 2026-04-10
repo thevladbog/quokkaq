@@ -116,9 +116,20 @@ export default function PlatformCatalogItemsPage() {
       if (!Number.isFinite(price) || price < 0) {
         throw new Error(t('validationPrice'));
       }
-      const vatRate = form.vatExempt
-        ? 0
-        : Number.parseFloat(form.vatRatePercent.trim()) || 0;
+      let vatRate: number;
+      if (form.vatExempt) {
+        vatRate = 0;
+      } else {
+        const parsed = Number.parseFloat(form.vatRatePercent.trim());
+        if (
+          !Number.isFinite(parsed) ||
+          parsed < 0 ||
+          parsed > 100
+        ) {
+          throw new Error(t('validationVatRate'));
+        }
+        vatRate = parsed;
+      }
       const planPart = form.subscriptionPlanId.trim();
       const base = {
         name: form.name.trim(),

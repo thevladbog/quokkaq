@@ -330,7 +330,10 @@ const addressPartSchema = z
 const ruBic9 = /^\d{9}$/;
 const ruAccount20 = /^\d{20}$/;
 
-/** Single RU bank account (JSON item in companies.payment_accounts). */
+/**
+ * Single RU bank account (JSON item in `companies.payment_accounts`).
+ * Kept in sync with Go: `internal/handlers.normalizePaymentAccountsJSON` (BIC / account digit rules, max 30 rows).
+ */
 export const PaymentAccountSchema = z
   .object({
     id: z.string().optional(),
@@ -705,31 +708,43 @@ export type Invoice = z.infer<typeof InvoiceSchema>;
 export type InvoiceLine = z.infer<typeof InvoiceLineSchema>;
 export type CatalogItem = z.infer<typeof CatalogItemSchema>;
 
-/** Platform invoice draft create / PATCH draft body (matches backend JSON). */
-export type InvoiceDraftLineInput = {
-  catalogItemId?: string | null;
-  descriptionPrint: string;
-  quantity: number;
-  /** Unit of measure for print (e.g. шт, мес.) */
-  unit?: string;
-  unitPriceInclVatMinor: number;
-  discountPercent?: number | null;
-  discountAmountMinor?: number | null;
-  vatExempt?: boolean | null;
-  vatRatePercent?: number | null;
-  subscriptionPlanId?: string | null;
-  subscriptionPeriodStart?: string | null;
-};
+/** Platform invoice draft line (matches backend JSON). */
+export const InvoiceDraftLineInputSchema = z.object({
+  catalogItemId: z.string().nullable().optional(),
+  descriptionPrint: z.string(),
+  quantity: z.number(),
+  unit: z
+    .string()
+    .optional()
+    .describe('Unit of measure for print (e.g. шт, мес.)'),
+  unitPriceInclVatMinor: z
+    .number()
+    .nullable()
+    .optional()
+    .describe(
+      'Omit with catalogItemId to use catalog default; include 0 for a free line.'
+    ),
+  discountPercent: z.number().nullable().optional(),
+  discountAmountMinor: z.number().nullable().optional(),
+  vatExempt: z.boolean().nullable().optional(),
+  vatRatePercent: z.number().nullable().optional(),
+  subscriptionPlanId: z.string().nullable().optional(),
+  subscriptionPeriodStart: z.string().nullable().optional()
+});
 
-export type InvoiceDraftUpsertBody = {
-  companyId: string;
-  dueDate: string;
-  currency: string;
-  allowYookassaPaymentLink: boolean;
-  allowStripePaymentLink: boolean;
-  provisionSubscriptionsOnPayment: boolean;
-  lines: InvoiceDraftLineInput[];
-};
+/** Platform invoice draft create / PATCH draft body (matches backend JSON). */
+export const InvoiceDraftUpsertBodySchema = z.object({
+  companyId: z.string(),
+  dueDate: z.string(),
+  currency: z.string(),
+  allowYookassaPaymentLink: z.boolean(),
+  allowStripePaymentLink: z.boolean(),
+  provisionSubscriptionsOnPayment: z.boolean(),
+  lines: z.array(InvoiceDraftLineInputSchema)
+});
+
+export type InvoiceDraftLineInput = z.infer<typeof InvoiceDraftLineInputSchema>;
+export type InvoiceDraftUpsertBody = z.infer<typeof InvoiceDraftUpsertBodySchema>;
 export type UsageMetric = z.infer<typeof UsageMetricSchema>;
 export type UsageMetrics = z.infer<typeof UsageMetricsSchema>;
 

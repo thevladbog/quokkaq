@@ -7,6 +7,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.41.5
 	github.com/aws/aws-sdk-go-v2/config v1.32.14
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.98.0
+	github.com/boombuler/barcode v1.0.1
 	github.com/glebarez/sqlite v1.11.0
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/go-chi/cors v1.2.2
@@ -27,7 +28,6 @@ require (
 )
 
 require (
-	github.com/boombuler/barcode v1.0.1 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/glebarez/go-sqlite v1.21.2 // indirect
 	github.com/mattn/go-isatty v0.0.17 // indirect

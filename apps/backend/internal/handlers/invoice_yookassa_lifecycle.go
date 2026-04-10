@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -20,7 +21,12 @@ func provisionInvoiceSubscriptionFromLines(tx *gorm.DB, inv *models.Invoice, now
 		ln := inv.Lines[i]
 		if ln.SubscriptionPlanID != nil && strings.TrimSpace(*ln.SubscriptionPlanID) != "" {
 			if lic != nil {
-				return nil
+				p1 := strings.TrimSpace(*lic.SubscriptionPlanID)
+				p2 := strings.TrimSpace(*ln.SubscriptionPlanID)
+				return fmt.Errorf(
+					"multiple subscription-plan lines on invoice %s: line id=%q position=%d plan=%q vs line id=%q position=%d plan=%q",
+					inv.ID, lic.ID, lic.Position, p1, ln.ID, ln.Position, p2,
+				)
 			}
 			lcopy := ln
 			lic = &lcopy

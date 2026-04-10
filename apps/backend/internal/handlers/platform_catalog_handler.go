@@ -14,33 +14,18 @@ import (
 	"gorm.io/gorm"
 )
 
-type catalogItemCreateBody struct {
-	Name               string   `json:"name"`
-	PrintName          string   `json:"printName"`
-	Unit               string   `json:"unit"`
-	Article            string   `json:"article"`
-	DefaultPriceMinor  int64    `json:"defaultPriceMinor"`
-	Currency           string   `json:"currency"`
-	VatExempt          bool     `json:"vatExempt"`
-	VatRatePercent     *float64 `json:"vatRatePercent"`
-	SubscriptionPlanID *string  `json:"subscriptionPlanId"`
-	IsActive           *bool    `json:"isActive"`
-}
-
-type catalogItemPatchBody struct {
-	Name               *string  `json:"name"`
-	PrintName          *string  `json:"printName"`
-	Unit               *string  `json:"unit"`
-	Article            *string  `json:"article"`
-	DefaultPriceMinor  *int64   `json:"defaultPriceMinor"`
-	Currency           *string  `json:"currency"`
-	VatExempt          *bool    `json:"vatExempt"`
-	VatRatePercent     *float64 `json:"vatRatePercent"`
-	SubscriptionPlanID *string  `json:"subscriptionPlanId"`
-	IsActive           *bool    `json:"isActive"`
-}
-
 // ListCatalogItems godoc
+// @Summary      List catalog items (platform)
+// @Description  Paginated platform catalog nomenclature for invoice line presets. Each item may include an embedded subscription plan. Default page size 50; maximum 200 (enforced server-side).
+// @Tags         platform
+// @Produce      json
+// @Security     BearerAuth
+// @Param        limit   query int false "Page size (max 200)" default(50)
+// @Param        offset  query int false "Zero-based row offset" default(0)
+// @Success      200     {object}  platformListResponse[models.CatalogItem]
+// @Failure      401     {string}  string "Unauthorized"
+// @Failure      403     {string}  string "Forbidden"
+// @Failure      500     {string}  string "Internal server error"
 // @Router       /platform/catalog-items [get]
 func (h *PlatformHandler) ListCatalogItems(w http.ResponseWriter, r *http.Request) {
 	limit, offset := platformParseCatalogLimitOffset(r)
@@ -69,6 +54,17 @@ func toCatalogItemPtrSlice(in []models.CatalogItem) []*models.CatalogItem {
 }
 
 // GetCatalogItem godoc
+// @Summary      Get catalog item by ID (platform)
+// @Description  Returns one catalog item by ID, including linked subscription plan when subscriptionPlanId is set.
+// @Tags         platform
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      string  true  "Catalog item ID (UUID)"
+// @Success      200  {object}  models.CatalogItem
+// @Failure      401  {string}  string "Unauthorized"
+// @Failure      403  {string}  string "Forbidden"
+// @Failure      404  {string}  string "Not found"
+// @Failure      500  {string}  string "Internal server error"
 // @Router       /platform/catalog-items/{id} [get]
 func (h *PlatformHandler) GetCatalogItem(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimSpace(chi.URLParam(r, "id"))
@@ -86,6 +82,18 @@ func (h *PlatformHandler) GetCatalogItem(w http.ResponseWriter, r *http.Request)
 }
 
 // CreateCatalogItem godoc
+// @Summary      Create catalog item (platform)
+// @Description  Creates a catalog row. Field name is required. Empty printName defaults to name; empty unit defaults to шт; empty currency defaults to RUB. Optional subscriptionPlanId must reference an existing plan or the request fails with 400.
+// @Tags         platform
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        body  body      models.CatalogItemCreateRequest  true  "New catalog item"
+// @Success      201   {object}  models.CatalogItem
+// @Failure      400   {string}  string "Bad request (invalid JSON, missing name, or unknown subscriptionPlanId)"
+// @Failure      401   {string}  string "Unauthorized"
+// @Failure      403   {string}  string "Forbidden"
+// @Failure      500   {string}  string "Internal server error"
 // @Router       /platform/catalog-items [post]
 func (h *PlatformHandler) CreateCatalogItem(w http.ResponseWriter, r *http.Request) {
 	_, ok := middleware.GetUserIDFromContext(r.Context())
@@ -93,7 +101,7 @@ func (h *PlatformHandler) CreateCatalogItem(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	var body catalogItemCreateBody
+	var body models.CatalogItemCreateRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
@@ -160,11 +168,30 @@ func (h *PlatformHandler) CreateCatalogItem(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-	out, _ := h.catalogRepo.FindByID(item.ID)
+	out, err := h.catalogRepo.FindByID(item.ID)
+	if err != nil {
+		log.Printf("CreateCatalogItem FindByID after create: %v", err)
+		RespondJSONWithStatus(w, http.StatusCreated, item)
+		return
+	}
 	RespondJSONWithStatus(w, http.StatusCreated, out)
 }
 
 // PatchCatalogItem godoc
+// @Summary      Patch catalog item (platform)
+// @Description  Partial update: only fields present in the JSON body are changed. Omit keys to leave values unchanged. Whitespace-only subscriptionPlanId clears the link; a non-empty value must reference an existing plan.
+// @Tags         platform
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id    path      string                         true  "Catalog item ID (UUID)"
+// @Param        body  body      models.CatalogItemPatchRequest true  "Fields to update"
+// @Success      200   {object}  models.CatalogItem
+// @Failure      400   {string}  string "Bad request (invalid JSON or unknown subscriptionPlanId)"
+// @Failure      401   {string}  string "Unauthorized"
+// @Failure      403   {string}  string "Forbidden"
+// @Failure      404   {string}  string "Not found"
+// @Failure      500   {string}  string "Internal server error"
 // @Router       /platform/catalog-items/{id} [patch]
 func (h *PlatformHandler) PatchCatalogItem(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimSpace(chi.URLParam(r, "id"))
@@ -178,7 +205,7 @@ func (h *PlatformHandler) PatchCatalogItem(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-	var body catalogItemPatchBody
+	var body models.CatalogItemPatchRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
@@ -232,14 +259,39 @@ func (h *PlatformHandler) PatchCatalogItem(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-	out, _ := h.catalogRepo.FindByID(id)
+	out, err := h.catalogRepo.FindByID(id)
+	if err != nil {
+		log.Printf("PatchCatalogItem FindByID after update: %v", err)
+		RespondJSON(w, item)
+		return
+	}
 	RespondJSON(w, out)
 }
 
 // DeleteCatalogItem godoc
+// @Summary      Delete catalog item (platform)
+// @Description  Deletes a catalog item by ID after an existence check. If no row matches, responds with 404 (no silent success).
+// @Tags         platform
+// @Security     BearerAuth
+// @Param        id   path  string  true  "Catalog item ID (UUID)"
+// @Success      204  "No Content"
+// @Failure      401  {string}  string "Unauthorized"
+// @Failure      403  {string}  string "Forbidden"
+// @Failure      404  {string}  string "Not found"
+// @Failure      500  {string}  string "Internal server error"
 // @Router       /platform/catalog-items/{id} [delete]
 func (h *PlatformHandler) DeleteCatalogItem(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimSpace(chi.URLParam(r, "id"))
+	_, err := h.catalogRepo.FindByID(id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "Not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("DeleteCatalogItem FindByID: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
 	if err := h.catalogRepo.Delete(id); err != nil {
 		log.Printf("DeleteCatalogItem: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)

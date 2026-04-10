@@ -1,4 +1,4 @@
-package services
+package billing
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -21,6 +22,9 @@ import (
 	yoowebhook "github.com/rvinnie/yookassa-sdk-go/yookassa/webhook"
 	"gorm.io/gorm"
 )
+
+// ErrYooKassaReturnURLRequired is returned when CreatePayment is called with an empty return URL (YooKassa redirect confirmation requires it).
+var ErrYooKassaReturnURLRequired = errors.New("yookassa: returnURL is required for payment confirmation redirect")
 
 // YooKassaInvoiceClient creates one-off payments for manual/platform invoices (metadata invoice_id).
 type YooKassaInvoiceClient struct {
@@ -65,8 +69,9 @@ func (c *YooKassaInvoiceClient) CreatePayment(ctx context.Context, inv *models.I
 	} else {
 		desc = fmt.Sprintf("Оплата счёта %s", inv.ID)
 	}
+	returnURL = strings.TrimSpace(returnURL)
 	if returnURL == "" {
-		returnURL = "https://example.com/payment-return"
+		return "", "", ErrYooKassaReturnURLRequired
 	}
 
 	payment := &yoopayment.Payment{

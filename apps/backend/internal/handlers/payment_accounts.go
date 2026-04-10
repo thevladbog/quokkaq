@@ -13,8 +13,8 @@ import (
 const paymentAccountsMaxItems = 30
 
 var (
-	bicRE   = regexp.MustCompile(`^\d{9}$`)
-	ru20RE  = regexp.MustCompile(`^\d{20}$`)
+	bicRE  = regexp.MustCompile(`^\d{9}$`)
+	ru20RE = regexp.MustCompile(`^\d{20}$`)
 )
 
 type paymentAccountWire struct {
@@ -28,6 +28,7 @@ type paymentAccountWire struct {
 }
 
 // normalizePaymentAccountsJSON validates a JSON array of payment accounts and returns canonical JSON bytes.
+// Contract matches @quokkaq/shared-types PaymentAccountSchema / PaymentAccountsSchema (frontend); disallow unknown JSON keys per item.
 // Empty input or JSON null yields nil (clear column). Ensures at most one isDefault; if any accounts exist and none default, marks the first as default.
 func normalizePaymentAccountsJSON(raw json.RawMessage) (json.RawMessage, error) {
 	if len(raw) == 0 || string(bytes.TrimSpace(raw)) == "null" {

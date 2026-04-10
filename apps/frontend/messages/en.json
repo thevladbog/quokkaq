@@ -1018,6 +1018,7 @@
       "toastDraftSaved": "Draft saved.",
       "toastIssued": "Invoice issued.",
       "errors": {
+        "generic": "Something went wrong. Check the form and try again.",
         "dueInvalid": "Enter a valid due date.",
         "quantityInvalid": "Each line needs a positive quantity.",
         "unitPriceInvalid": "Enter a valid unit price (currency amount, not kopecks/cents as a plain integer).",
@@ -1028,14 +1029,16 @@
         "planRequired": "Select a plan for subscription lines.",
         "periodStartInvalid": "Enter a valid subscription period start.",
         "tooManyLicenseLines": "Only one line may reference a subscription plan.",
-        "noId": "Missing invoice id."
+        "noId": "Missing invoice id.",
+        "issueInvoiceFailedDraftRestored": "Could not issue the invoice ({detail}). The draft was reverted to its previous saved state.",
+        "issueInvoiceFailedRollbackFailed": "Could not issue the invoice ({detail}). Reverting the draft also failed ({rollback}). Refresh the page and verify the invoice on the server."
       }
     },
     "invoiceDetail": {
       "title": "Invoice",
       "notFound": "Invoice not found.",
       "downloadPdf": "Download invoice PDF",
-      "downloadPdfError": "Could not download invoice PDF. {message}",
+      "downloadPdfError": "Could not download invoice PDF.",
       "openCompany": "Company",
       "billTo": "Bill to",
       "inn": "INN",
@@ -1103,6 +1106,7 @@
       "cancel": "Cancel",
       "save": "Save",
       "validationPrice": "Enter a valid non-negative amount.",
+      "validationVatRate": "Enter a valid VAT rate between 0 and 100.",
       "backInvoices": "Back to invoices"
     },
     "subscriptions": {
@@ -1141,7 +1145,8 @@
       "invoiceDueDate": "Invoice due date",
       "invoiceWithSubValidation": "Enter a positive amount and due date for the invoice.",
       "toastCreated": "Subscription created.",
-      "toastCreatedWithInvoice": "Subscription and invoice created."
+      "toastCreatedWithInvoice": "Subscription and invoice created.",
+      "toastSubCreatedInvoiceIssueFailed": "Subscription created. Draft invoice {invoiceId} could not be issued ({detail}). Issue it from Platform → Invoices."
     }
   },
   "pageTitles": {
@@ -1440,7 +1445,7 @@
       "metaDescription": "Invoice details and payment",
       "notFound": "Invoice not found.",
       "downloadPdf": "Download invoice PDF",
-      "downloadPdfError": "Could not download invoice PDF. {message}",
+      "downloadPdfError": "Could not download invoice PDF.",
       "untitled": "Invoice",
       "documentTitle": "Invoice",
       "statusLabel": "Status",

@@ -8,10 +8,14 @@ import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { invoicesApi } from '@/lib/api';
 import { downloadInvoicePdf } from '@/lib/invoice-pdf-download';
+import { logger } from '@/lib/logger';
 import { pickDefaultPaymentAccount } from '@/lib/default-payment-account';
 import { formatAppDate, intlLocaleFromAppLocale } from '@/lib/format-datetime';
 import { cn } from '@/lib/utils';
-import { ruBankPaymentPurposeFromInvoice } from '@/lib/invoice-payment-purpose-ru';
+import {
+  MissingInvoiceDocumentNumberError,
+  ruBankPaymentPurposeFromInvoice
+} from '@/lib/invoice-payment-purpose-ru';
 import { buildRuBankQrSt00012Payload } from '@/lib/ru-bank-qr-st00012';
 import dynamic from 'next/dynamic';
 import { useParams, useRouter } from 'next/navigation';
@@ -93,13 +97,8 @@ export function OrganizationInvoiceDetailContent() {
       setPdfBusy(true);
       await downloadInvoicePdf(inv);
     } catch (error) {
-      const raw = error instanceof Error ? error.message : String(error);
-      toast.error(
-        tDetail('downloadPdfError', {
-          message: raw,
-          defaultValue: 'Could not download invoice PDF. {message}'
-        })
-      );
+      logger.error('downloadInvoicePdf failed', error);
+      toast.error(tDetail('downloadPdfError'));
     } finally {
       setPdfBusy(false);
     }
@@ -141,7 +140,12 @@ export function OrganizationInvoiceDetailContent() {
 
   const paymentPurposeRu = useMemo(() => {
     if (!inv) return '';
-    return ruBankPaymentPurposeFromInvoice(inv);
+    try {
+      return ruBankPaymentPurposeFromInvoice(inv);
+    } catch (e) {
+      if (e instanceof MissingInvoiceDocumentNumberError) return '';
+      throw e;
+    }
   }, [inv]);
 
   const qrPayload = useMemo(() => {

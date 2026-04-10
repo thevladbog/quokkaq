@@ -15,6 +15,19 @@ export function minorUnitDivisor(currency: string, intlLocale: string): number {
   }
 }
 
+/**
+ * Accepts only a non-negative decimal literal: integer, digits.digits, digits., or .digits.
+ * Rejects scientific notation, signs, and trailing junk (e.g. "123abc").
+ */
+function strictParseNonNegativeMajor(s: string): number | null {
+  if (s === '' || s === '.' || s === '-') return null;
+  if (/e/i.test(s)) return null;
+  if (!/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(s)) return null;
+  const n = Number.parseFloat(s);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return n;
+}
+
 export function formatPriceMinorUnits(
   amountMinor: number,
   currency: string,
@@ -51,14 +64,17 @@ export function normalizeAmountInputToDecimalString(
   } else if (hasComma && !hasDot) {
     const parts = s.split(',');
     if (parts.length !== 2) return null;
-    s = `${parts[0]}.${parts[1]}`;
+    const after = parts[1];
+    const nAfter = after.length;
+    // "1,234" → thousands; "12,34" / "5,5" → decimal (dot-decimal locales typing US-style groups).
+    if (nAfter === 0 || nAfter > 3) return null;
+    if (nAfter === 3) {
+      s = `${parts[0]}${after}`;
+    } else {
+      s = `${parts[0]}.${after}`;
+    }
   }
-  if (s === '' || s === '.' || s === '-') return null;
-  if (/e/i.test(s)) return null;
-  const dotParts = s.split('.');
-  if (dotParts.length > 2) return null;
-  const n = Number.parseFloat(s);
-  if (!Number.isFinite(n) || n < 0) return null;
+  if (strictParseNonNegativeMajor(s) === null) return null;
   return s;
 }
 
@@ -70,8 +86,8 @@ export function parseAmountStringToMinorUnits(
 ): number {
   const dec = normalizeAmountInputToDecimalString(raw);
   if (dec === null) return Number.NaN;
-  const n = Number.parseFloat(dec);
-  if (!Number.isFinite(n) || n < 0) return Number.NaN;
+  const n = strictParseNonNegativeMajor(dec);
+  if (n === null) return Number.NaN;
   const div = minorUnitDivisor(currency, intlLocale);
   return Math.round(n * div);
 }

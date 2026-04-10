@@ -328,8 +328,10 @@ export function PaymentAccountsForm({
                   isDefault: i !== index && !!a.isDefault
                 }));
                 if (!next.some((a) => a.isDefault)) {
-                  const j = next.findIndex((_, i) => i !== index);
-                  if (j >= 0) next[j] = { ...next[j], isDefault: true };
+                  const j = index === 0 ? 1 : 0;
+                  if (j < next.length) {
+                    next[j] = { ...next[j], isDefault: true };
+                  }
                 }
                 onChange(next);
               }}

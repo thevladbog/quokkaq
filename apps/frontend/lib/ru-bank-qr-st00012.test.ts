@@ -10,6 +10,31 @@ function decodeQrUtf8Binary(s: string): string {
 }
 
 describe('buildRuBankQrSt00012Payload', () => {
+  it('returns null when sumKopecks is not a positive safe integer', () => {
+    const base = {
+      name: 'ООО Тест',
+      personalAcc: '40702810100000000001',
+      bankName: 'Тестбанк',
+      bic: '044525225',
+      correspondentAccount: '30101810100000000593',
+      purpose: 'Оплата',
+      payeeInn: '7707083893',
+      kpp: '770701001'
+    };
+    expect(
+      buildRuBankQrSt00012Payload({ ...base, sumKopecks: 100.5 })
+    ).toBeNull();
+    expect(
+      buildRuBankQrSt00012Payload({ ...base, sumKopecks: NaN })
+    ).toBeNull();
+    expect(
+      buildRuBankQrSt00012Payload({ ...base, sumKopecks: 0 })
+    ).toBeNull();
+    expect(
+      buildRuBankQrSt00012Payload({ ...base, sumKopecks: -100 })
+    ).toBeNull();
+  });
+
   it('returns null for invalid account', () => {
     expect(
       buildRuBankQrSt00012Payload({

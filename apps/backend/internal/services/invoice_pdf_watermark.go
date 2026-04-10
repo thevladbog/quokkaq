@@ -6,6 +6,7 @@ import (
 	"image/color"
 	"image/png"
 	"math"
+	"sync"
 
 	"quokkaq-go-backend/internal/assets"
 
@@ -21,6 +22,24 @@ const (
 	// pixels with α=0 stay paper-white).
 	watermarkAlphaBoost = 58.0
 )
+
+var (
+	quokkaOnce     sync.Once
+	quokkaFadedPNG []byte
+	quokkaHolder   gopdf.ImageHolder
+	quokkaInitErr  error
+)
+
+func initQuokkaWatermarkCache() {
+	if len(assets.QuokkaWatermarkPNG) == 0 {
+		return
+	}
+	quokkaFadedPNG, quokkaInitErr = watermarkOpacityOnWhite(assets.QuokkaWatermarkPNG)
+	if quokkaInitErr != nil {
+		return
+	}
+	quokkaHolder, quokkaInitErr = gopdf.ImageHolderByBytes(quokkaFadedPNG)
+}
 
 func watermarkOpacityOnWhite(src []byte) ([]byte, error) {
 	img, _, err := image.Decode(bytes.NewReader(src))
@@ -66,17 +85,16 @@ func drawQuokkaWatermark(pdf *gopdf.GoPdf) error {
 	if len(assets.QuokkaWatermarkPNG) == 0 {
 		return nil
 	}
-	faded, err := watermarkOpacityOnWhite(assets.QuokkaWatermarkPNG)
-	if err != nil {
-		return err
+	quokkaOnce.Do(initQuokkaWatermarkCache)
+	if quokkaInitErr != nil {
+		return quokkaInitErr
 	}
-	h, err := gopdf.ImageHolderByBytes(faded)
-	if err != nil {
-		return err
+	if quokkaHolder == nil {
+		return nil
 	}
 	wmW := pdfPageW * 0.37
 	wmH := wmW
 	x := pdfPageW - wmW - pdfMargin*0.35
 	y := pdfPageH - pdfMargin*0.35 - wmH
-	return pdf.ImageByHolder(h, x, y, &gopdf.Rect{W: wmW, H: wmH})
+	return pdf.ImageByHolder(quokkaHolder, x, y, &gopdf.Rect{W: wmW, H: wmH})
 }

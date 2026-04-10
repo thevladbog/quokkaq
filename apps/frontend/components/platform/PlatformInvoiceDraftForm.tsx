@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   Invoice,
+  InvoiceDraftLineInput,
   InvoiceDraftUpsertBody,
   InvoiceLine
 } from '@quokkaq/shared-types';
@@ -23,7 +24,7 @@ import { Combobox } from '@/components/ui/combobox';
 import { Spinner } from '@/components/ui/spinner';
 import { useRouter } from '@/src/i18n/navigation';
 import { useLocale, useTranslations } from 'next-intl';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
   intlLocaleFromAppLocale,
@@ -213,6 +214,46 @@ function buildDraftBody(
   };
 }
 
+/** Rebuild PATCH draft body from a server invoice (for rollback after a failed issue). */
+function invoiceToDraftUpsertBody(inv: Invoice): InvoiceDraftUpsertBody {
+  const companyId = inv.companyId?.trim() ?? '';
+  const lines: InvoiceDraftLineInput[] = [...(inv.lines ?? [])]
+    .sort((a, b) => a.position - b.position)
+    .map((l) => {
+      const line: InvoiceDraftLineInput = {
+        descriptionPrint: l.descriptionPrint,
+        quantity: l.quantity,
+        unit: l.unit ?? '',
+        unitPriceInclVatMinor: l.unitPriceInclVatMinor,
+        vatExempt: l.vatExempt,
+        vatRatePercent: l.vatRatePercent
+      };
+      const cat = (l.catalogItemId ?? '').trim();
+      if (cat) line.catalogItemId = cat;
+      if (l.discountPercent != null) line.discountPercent = l.discountPercent;
+      if (l.discountAmountMinor != null)
+        line.discountAmountMinor = l.discountAmountMinor;
+      const plan = (l.subscriptionPlanId ?? '').trim();
+      if (plan) {
+        line.subscriptionPlanId = plan;
+        if (l.subscriptionPeriodStart) {
+          line.subscriptionPeriodStart = l.subscriptionPeriodStart;
+        }
+      }
+      return line;
+    });
+
+  return {
+    companyId,
+    dueDate: inv.dueDate,
+    currency: (inv.currency ?? 'RUB').trim() || 'RUB',
+    allowYookassaPaymentLink: inv.allowYookassaPaymentLink ?? false,
+    allowStripePaymentLink: inv.allowStripePaymentLink ?? false,
+    provisionSubscriptionsOnPayment: inv.provisionSubscriptionsOnPayment ?? false,
+    lines
+  };
+}
+
 /** Draft preview: same numeric rules as save, but omits description / license checks. */
 function tryParseDraftRowForTotals(
   r: DraftLineRow,
@@ -300,6 +341,50 @@ export function PlatformInvoiceDraftForm({
       appLocale
     )
   );
+
+  /** Avoid re-seeding when `initialInvoice` is a new object reference but the same draft (preserves in-progress edits). */
+  const syncedInvoiceIdRef = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    const inv = initialInvoice;
+    const id = inv?.id?.trim() ?? '';
+
+    if (id) {
+      if (syncedInvoiceIdRef.current === id) {
+        return;
+      }
+      syncedInvoiceIdRef.current = id;
+      setCompanyId(inv!.companyId?.trim() ?? '');
+      setDueLocal(inv!.dueDate ? toDateTimeLocalString(inv!.dueDate) : '');
+      setCurrency(inv!.currency?.trim() || 'RUB');
+      setAllowYookassa(inv!.allowYookassaPaymentLink ?? false);
+      setProvision(inv!.provisionSubscriptionsOnPayment ?? false);
+      setRows(
+        rowsFromLines(
+          inv!.lines,
+          inv!.currency?.trim() || 'RUB',
+          appLocale
+        )
+      );
+      return;
+    }
+
+    if (syncedInvoiceIdRef.current !== undefined) {
+      syncedInvoiceIdRef.current = undefined;
+      setCompanyId(defaultCompanyId.trim());
+      setDueLocal('');
+      setCurrency('RUB');
+      setAllowYookassa(false);
+      setProvision(false);
+      setRows(rowsFromLines(undefined, 'RUB', appLocale));
+    }
+  }, [initialInvoice, appLocale, defaultCompanyId]);
+
+  useEffect(() => {
+    if (initialInvoice?.id) return;
+    const d = defaultCompanyId.trim();
+    if (d) setCompanyId(d);
+  }, [defaultCompanyId, initialInvoice?.id]);
 
   const { data: companiesData } = useQuery({
     queryKey: ['platform-companies', 'invoice-draft'],
@@ -443,9 +528,23 @@ export function PlatformInvoiceDraftForm({
   const toastMutationError = useCallback(
     (err: unknown) => {
       const raw = err instanceof Error ? err.message : String(err ?? 'Error');
-      toast.error(t(`errors.${raw}`, { defaultValue: raw }), {
-        duration: 6000
-      });
+      const looksLikeErrorKey = /^[a-zA-Z][a-zA-Z0-9]*$/.test(raw);
+      const key = `errors.${raw}` as `errors.${string}`;
+      if (looksLikeErrorKey && t.has(key)) {
+        toast.error(t(key), { duration: 6000 });
+        return;
+      }
+      if (looksLikeErrorKey) {
+        toast.error(
+          t('errors.generic', {
+            defaultValue:
+              'Something went wrong. Check the form and try again.'
+          }),
+          { duration: 6000 }
+        );
+        return;
+      }
+      toast.error(raw, { duration: 6000 });
     },
     [t]
   );
@@ -500,6 +599,7 @@ export function PlatformInvoiceDraftForm({
   const issueMut = useMutation({
     mutationFn: async () => {
       if (!initialInvoice?.id) throw new Error('noId');
+      const id = initialInvoice.id;
       const body = buildDraftBody(
         companyId,
         dueLocal,
@@ -509,8 +609,34 @@ export function PlatformInvoiceDraftForm({
         rows,
         intlLocale
       );
-      await platformApi.patchInvoiceDraft(initialInvoice.id, body);
-      return platformApi.issueInvoice(initialInvoice.id);
+
+      const snapshot = await platformApi.getPlatformInvoice(id);
+      const originalBody = invoiceToDraftUpsertBody(snapshot);
+
+      await platformApi.patchInvoiceDraft(id, body);
+      try {
+        return await platformApi.issueInvoice(id);
+      } catch (issueErr) {
+        const detail =
+          issueErr instanceof Error ? issueErr.message : String(issueErr);
+        try {
+          await platformApi.patchInvoiceDraft(id, originalBody);
+        } catch (rollbackErr) {
+          const rollbackMsg =
+            rollbackErr instanceof Error
+              ? rollbackErr.message
+              : String(rollbackErr);
+          throw new Error(
+            t('errors.issueInvoiceFailedRollbackFailed', {
+              detail,
+              rollback: rollbackMsg
+            })
+          );
+        }
+        throw new Error(
+          t('errors.issueInvoiceFailedDraftRestored', { detail })
+        );
+      }
     },
     onSuccess: async () => {
       toast.success(t('toastIssued', { defaultValue: 'Invoice issued.' }));
@@ -519,7 +645,13 @@ export function PlatformInvoiceDraftForm({
         queryKey: ['platform-invoice', initialInvoice?.id]
       });
     },
-    onError: toastMutationError
+    onError: (err) => {
+      toastMutationError(err);
+      void qc.invalidateQueries({ queryKey: ['platform-invoices'] });
+      void qc.invalidateQueries({
+        queryKey: ['platform-invoice', initialInvoice?.id]
+      });
+    }
   });
 
   const pending =

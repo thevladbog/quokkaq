@@ -12,6 +12,7 @@ import (
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
+	"quokkaq-go-backend/internal/services/billing"
 	"quokkaq-go-backend/internal/ws"
 	"quokkaq-go-backend/pkg/database"
 	"strconv"
@@ -176,21 +177,31 @@ func main() {
 		}
 	}
 	subscriptionHandler := handlers.NewSubscriptionHandler(subscriptionRepo, userRepo, paymentProvider)
-	var yooInvoice *services.YooKassaInvoiceClient
-	if yShop := strings.TrimSpace(os.Getenv("YOOKASSA_SHOP_ID")); yShop != "" {
-		yooInvoice = services.NewYooKassaInvoiceClient(
-			yShop,
-			strings.TrimSpace(os.Getenv("YOOKASSA_SECRET_KEY")),
-			strings.TrimSpace(os.Getenv("YOOKASSA_WEBHOOK_SECRET")),
-		)
+	yShop := strings.TrimSpace(os.Getenv("YOOKASSA_SHOP_ID"))
+	ySecret := strings.TrimSpace(os.Getenv("YOOKASSA_SECRET_KEY"))
+	yWebhook := strings.TrimSpace(os.Getenv("YOOKASSA_WEBHOOK_SECRET"))
+	yReturn := strings.TrimSpace(os.Getenv("YOOKASSA_PAYMENT_RETURN_URL"))
+	pubApp := strings.TrimSpace(os.Getenv("PUBLIC_APP_URL"))
+
+	// Return URL: YOOKASSA_PAYMENT_RETURN_URL or PUBLIC_APP_URL (see InvoiceHandler.RequestYooKassaPaymentLink).
+	// Local dev only: if both are empty and APP_ENV allows, the handler uses a localhost placeholder (never in production/staging).
+	// Webhook HMAC may use YOOKASSA_WEBHOOK_SECRET or fall back to YOOKASSA_SECRET_KEY (.env.example / internal/services/billing).
+	yookassaInvoiceReady := yShop != "" && ySecret != "" && (yReturn != "" || pubApp != "" || config.AppEnvAllowsYooKassaDevReturnURLFallback())
+
+	var yooInvoice *billing.YooKassaInvoiceClient
+	if yookassaInvoiceReady {
+		yooInvoice = billing.NewYooKassaInvoiceClient(yShop, ySecret, yWebhook)
+	} else if yShop != "" || ySecret != "" || yWebhook != "" || yReturn != "" {
+		log.Printf("YooKassa invoice integration disabled: incomplete env (need non-empty YOOKASSA_SHOP_ID, YOOKASSA_SECRET_KEY, and YOOKASSA_PAYMENT_RETURN_URL or PUBLIC_APP_URL (unless APP_ENV is local dev for localhost fallback only); optional YOOKASSA_WEBHOOK_SECRET falls back to shop secret)")
 	}
+
 	invoiceHandler := handlers.NewInvoiceHandler(
 		invoiceRepo,
 		companyRepo,
 		userRepo,
 		yooInvoice,
-		strings.TrimSpace(os.Getenv("YOOKASSA_PAYMENT_RETURN_URL")),
-		strings.TrimSpace(os.Getenv("PUBLIC_APP_URL")),
+		yReturn,
+		pubApp,
 	)
 	companyHandler := handlers.NewCompanyHandler(companyRepo, userRepo)
 	platformHandler := handlers.NewPlatformHandler(companyRepo, subscriptionRepo, invoiceRepo, catalogRepo)

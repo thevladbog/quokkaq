@@ -26,6 +26,7 @@ import {
 import {
   CounterpartySchema,
   PaymentAccountsSchema,
+  type Company,
   type Counterparty,
   type PaymentAccount,
   type Subscription,
@@ -316,7 +317,7 @@ type PlatformCounterpartySectionProps = {
 
 type PlatformPaymentAccountsSectionProps = {
   companyId: string;
-  initialPaymentAccounts: unknown;
+  initialPaymentAccounts: Company['paymentAccounts'];
   canUseDadata: boolean;
   t: ReturnType<typeof useTranslations<'platform.companyDetail'>>;
 };

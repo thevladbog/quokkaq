@@ -19,12 +19,14 @@ import (
 	"gorm.io/gorm"
 )
 
-type invoiceDraftLineInput struct {
-	CatalogItemID           *string    `json:"catalogItemId"`
-	DescriptionPrint        string     `json:"descriptionPrint"`
-	Quantity                float64    `json:"quantity"`
-	Unit                    string     `json:"unit"` // UOM; if empty and catalog linked, defaults from catalog
-	UnitPriceInclVatMinor   int64      `json:"unitPriceInclVatMinor"`
+// InvoiceDraftLineInput is one line in a platform invoice draft create/patch request.
+type InvoiceDraftLineInput struct {
+	CatalogItemID    *string `json:"catalogItemId"`
+	DescriptionPrint string  `json:"descriptionPrint"`
+	Quantity         float64 `json:"quantity"`
+	Unit             string  `json:"unit"` // UOM; if empty and catalog linked, defaults from catalog
+	// If nil with a catalog line, defaults to catalog default price; if non-nil (including *0), that value is used as-is.
+	UnitPriceInclVatMinor   *int64     `json:"unitPriceInclVatMinor,omitempty"`
 	DiscountPercent         *float64   `json:"discountPercent"`
 	DiscountAmountMinor     *int64     `json:"discountAmountMinor"`
 	VatExempt               *bool      `json:"vatExempt"`
@@ -33,14 +35,16 @@ type invoiceDraftLineInput struct {
 	SubscriptionPeriodStart *time.Time `json:"subscriptionPeriodStart"`
 }
 
-type invoiceDraftUpsertBody struct {
-	CompanyID                       string                  `json:"companyId"`
-	DueDate                         string                  `json:"dueDate"` // RFC3339
-	Currency                        string                  `json:"currency"`
-	AllowYookassaPaymentLink        bool                    `json:"allowYookassaPaymentLink"`
+// InvoiceDraftUpsertBody is the JSON body for POST /platform/invoices and PATCH .../draft.
+type InvoiceDraftUpsertBody struct {
+	CompanyID                string `json:"companyId"`
+	DueDate                  string `json:"dueDate"` // RFC3339
+	Currency                 string `json:"currency"`
+	AllowYookassaPaymentLink bool   `json:"allowYookassaPaymentLink"`
+	// Stripe Checkout for platform invoices is not wired end-to-end yet; the flag is stored for future use and API symmetry with YooKassa.
 	AllowStripePaymentLink          bool                    `json:"allowStripePaymentLink"`
 	ProvisionSubscriptionsOnPayment bool                    `json:"provisionSubscriptionsOnPayment"`
-	Lines                           []invoiceDraftLineInput `json:"lines"`
+	Lines                           []InvoiceDraftLineInput `json:"lines"`
 }
 
 func licensePeriodEnd(start time.Time, qty float64, interval string) time.Time {
@@ -56,7 +60,7 @@ func licensePeriodEnd(start time.Time, qty float64, interval string) time.Time {
 	}
 }
 
-func (h *PlatformHandler) buildDraftLines(inputs []invoiceDraftLineInput) ([]models.InvoiceLine, int64, int64, int64, error) {
+func (h *PlatformHandler) buildDraftLines(inputs []InvoiceDraftLineInput) ([]models.InvoiceLine, int64, int64, int64, error) {
 	if len(inputs) == 0 {
 		return nil, 0, 0, 0, errors.New("at least one line is required")
 	}
@@ -74,7 +78,10 @@ func (h *PlatformHandler) buildDraftLines(inputs []invoiceDraftLineInput) ([]mod
 			vatRate = *in.VatRatePercent
 		}
 		desc := strings.TrimSpace(in.DescriptionPrint)
-		priceMinor := in.UnitPriceInclVatMinor
+		var priceMinor int64
+		if in.UnitPriceInclVatMinor != nil {
+			priceMinor = *in.UnitPriceInclVatMinor
+		}
 		qty := in.Quantity
 
 		var catID *string
@@ -97,7 +104,7 @@ func (h *PlatformHandler) buildDraftLines(inputs []invoiceDraftLineInput) ([]mod
 						desc = cat.Name
 					}
 				}
-				if priceMinor == 0 {
+				if in.UnitPriceInclVatMinor == nil {
 					priceMinor = cat.DefaultPriceMinor
 				}
 				if in.VatExempt == nil {
@@ -184,7 +191,7 @@ func (h *PlatformHandler) buildDraftLines(inputs []invoiceDraftLineInput) ([]mod
 	return lines, totalNet, totalVat, totalGross, nil
 }
 
-func (h *PlatformHandler) upsertDraftInvoice(inv *models.Invoice, body invoiceDraftUpsertBody) error {
+func (h *PlatformHandler) upsertDraftInvoice(inv *models.Invoice, body InvoiceDraftUpsertBody) error {
 	lines, net, vat, gross, err := h.buildDraftLines(body.Lines)
 	if err != nil {
 		return err
@@ -193,7 +200,7 @@ func (h *PlatformHandler) upsertDraftInvoice(inv *models.Invoice, body invoiceDr
 	inv.VatTotalMinor = vat
 	inv.Amount = gross
 	inv.AllowYookassaPaymentLink = body.AllowYookassaPaymentLink
-	inv.AllowStripePaymentLink = false
+	inv.AllowStripePaymentLink = body.AllowStripePaymentLink
 	inv.ProvisionSubscriptionsOnPayment = body.ProvisionSubscriptionsOnPayment
 	due, err := time.Parse(time.RFC3339, strings.TrimSpace(body.DueDate))
 	if err != nil {
@@ -208,14 +215,28 @@ func (h *PlatformHandler) upsertDraftInvoice(inv *models.Invoice, body invoiceDr
 	})
 }
 
-// CreateInvoice creates a draft multi-line invoice (platform).
+// CreateInvoice godoc
+// @Summary      Create draft invoice (platform)
+// @Description  Creates a multi-line draft invoice for a company. companyId and dueDate (RFC3339) are required; at least one line.
+// @Tags         platform
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        body  body      InvoiceDraftUpsertBody  true  "Draft invoice payload"
+// @Success      201   {object}  models.Invoice
+// @Failure      400   {string}  string "Bad request"
+// @Failure      401   {string}  string "Unauthorized"
+// @Failure      403   {string}  string "Forbidden"
+// @Failure      404   {string}  string "Company not found"
+// @Failure      500   {string}  string "Internal server error"
+// @Router       /platform/invoices [post]
 func (h *PlatformHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserIDFromContext(r.Context())
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	var body invoiceDraftUpsertBody
+	var body InvoiceDraftUpsertBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
@@ -259,7 +280,7 @@ func (h *PlatformHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 		VatTotalMinor:                   vat,
 		Amount:                          gross,
 		AllowYookassaPaymentLink:        body.AllowYookassaPaymentLink,
-		AllowStripePaymentLink:          false,
+		AllowStripePaymentLink:          body.AllowStripePaymentLink,
 		ProvisionSubscriptionsOnPayment: body.ProvisionSubscriptionsOnPayment,
 	}
 	if err := database.DB.Transaction(func(tx *gorm.DB) error {
@@ -279,7 +300,23 @@ func (h *PlatformHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 	RespondJSONWithStatus(w, http.StatusCreated, out)
 }
 
-// PatchInvoiceDraft updates a draft invoice (lines and header fields).
+// PatchInvoiceDraft godoc
+// @Summary      Update draft invoice (platform)
+// @Description  Replaces header and lines for a draft invoice. companyId in body is ignored; taken from the existing invoice.
+// @Tags         platform
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id    path      string                  true  "Invoice ID"
+// @Param        body  body      InvoiceDraftUpsertBody  true  "Draft invoice payload"
+// @Success      200   {object}  models.Invoice
+// @Failure      400   {string}  string "Bad request"
+// @Failure      401   {string}  string "Unauthorized"
+// @Failure      403   {string}  string "Forbidden"
+// @Failure      404   {string}  string "Not found"
+// @Failure      409   {string}  string "Not a draft"
+// @Failure      500   {string}  string "Internal server error"
+// @Router       /platform/invoices/{id}/draft [patch]
 func (h *PlatformHandler) PatchInvoiceDraft(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimSpace(chi.URLParam(r, "id"))
 	inv, err := h.invoiceRepo.FindByIDWithLines(id)
@@ -296,7 +333,7 @@ func (h *PlatformHandler) PatchInvoiceDraft(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "only draft invoices can be edited", http.StatusConflict)
 		return
 	}
-	var body invoiceDraftUpsertBody
+	var body InvoiceDraftUpsertBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
@@ -321,7 +358,21 @@ func (h *PlatformHandler) PatchInvoiceDraft(w http.ResponseWriter, r *http.Reque
 	RespondJSON(w, out)
 }
 
-// IssueInvoice assigns document number and sets status open.
+// IssueInvoice godoc
+// @Summary      Issue invoice (platform)
+// @Description  Assigns document number, sets status to open, and stores buyer snapshot from the company.
+// @Tags         platform
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      string  true  "Invoice ID"
+// @Success      200  {object}  models.Invoice
+// @Failure      400  {string}  string "Bad request"
+// @Failure      401  {string}  string "Unauthorized"
+// @Failure      403  {string}  string "Forbidden"
+// @Failure      404  {string}  string "Not found"
+// @Failure      409  {string}  string "Not a draft or cannot issue"
+// @Failure      500  {string}  string "Internal server error"
+// @Router       /platform/invoices/{id}/issue [post]
 func (h *PlatformHandler) IssueInvoice(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimSpace(chi.URLParam(r, "id"))
 	inv, err := h.invoiceRepo.FindByIDWithLines(id)
@@ -354,10 +405,8 @@ func (h *PlatformHandler) IssueInvoice(w http.ResponseWriter, r *http.Request) {
 	}
 	now := time.Now().UTC()
 	year := repository.InvoiceYearUTC(now)
-	var doc string
 	if err := database.DB.Transaction(func(tx *gorm.DB) error {
-		var err error
-		doc, err = h.invoiceRepo.AllocateDocumentNumber(tx, year)
+		doc, err := h.invoiceRepo.AllocateDocumentNumber(tx, year)
 		if err != nil {
 			return err
 		}
@@ -372,11 +421,11 @@ func (h *PlatformHandler) IssueInvoice(w http.ResponseWriter, r *http.Request) {
 		}
 		snap, _ := json.Marshal(snapObj)
 		updates := map[string]interface{}{
-			"document_number":             doc,
-			"status":                      "open",
-			"issued_at":                   now,
-			"allow_stripe_payment_link":   false,
-			"buyer_snapshot":              snap,
+			"document_number":           doc,
+			"status":                    "open",
+			"issued_at":                 now,
+			"allow_stripe_payment_link": false,
+			"buyer_snapshot":            snap,
 		}
 		return tx.Model(&models.Invoice{}).Where("id = ?", inv.ID).Updates(updates).Error
 	}); err != nil {
@@ -384,7 +433,6 @@ func (h *PlatformHandler) IssueInvoice(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-	_ = doc
 	out, err := h.invoiceRepo.FindByIDWithLines(id)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -393,7 +441,19 @@ func (h *PlatformHandler) IssueInvoice(w http.ResponseWriter, r *http.Request) {
 	RespondJSON(w, out)
 }
 
-// GetPlatformInvoice returns invoice with lines for platform admin.
+// GetPlatformInvoice godoc
+// @Summary      Get invoice by ID (platform)
+// @Description  Returns the invoice with lines and related preloads.
+// @Tags         platform
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      string  true  "Invoice ID"
+// @Success      200  {object}  models.Invoice
+// @Failure      401  {string}  string "Unauthorized"
+// @Failure      403  {string}  string "Forbidden"
+// @Failure      404  {string}  string "Not found"
+// @Failure      500  {string}  string "Internal server error"
+// @Router       /platform/invoices/{id} [get]
 func (h *PlatformHandler) GetPlatformInvoice(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimSpace(chi.URLParam(r, "id"))
 	inv, err := h.invoiceRepo.FindByIDWithLines(id)

@@ -42,7 +42,7 @@ export function computeLineTotals(
   if (in_.discountAmountMinor != null) {
     const d = in_.discountAmountMinor;
     if (d < 0) return null;
-    discounted = lineGross - d;
+    discounted = Math.round(lineGross - d);
   }
   if (discounted < 0) discounted = 0;
 

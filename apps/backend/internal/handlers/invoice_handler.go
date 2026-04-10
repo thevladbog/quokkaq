@@ -8,24 +8,25 @@ import (
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
+	"quokkaq-go-backend/internal/services/billing"
 
 	"github.com/go-chi/chi/v5"
 )
 
 type InvoiceHandler struct {
-	invoiceRepo   repository.InvoiceRepository
-	companyRepo   repository.CompanyRepository
-	userRepo      repository.UserRepository
-	yooKassa      *services.YooKassaInvoiceClient
-	yooReturnURL  string
-	publicAppURL  string
+	invoiceRepo  repository.InvoiceRepository
+	companyRepo  repository.CompanyRepository
+	userRepo     repository.UserRepository
+	yooKassa     *billing.YooKassaInvoiceClient
+	yooReturnURL string
+	publicAppURL string
 }
 
 func NewInvoiceHandler(
 	invoiceRepo repository.InvoiceRepository,
 	companyRepo repository.CompanyRepository,
 	userRepo repository.UserRepository,
-	yooKassa *services.YooKassaInvoiceClient,
+	yooKassa *billing.YooKassaInvoiceClient,
 	yooReturnURL string,
 	publicAppURL string,
 ) *InvoiceHandler {

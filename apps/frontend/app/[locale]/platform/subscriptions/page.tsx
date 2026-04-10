@@ -51,6 +51,15 @@ const SUB_STATUSES = [
 
 const STATUS_SELECT_DEFAULT = '__default__';
 
+type CreateSubscriptionMutationResult =
+  | { outcome: 'subscription-only' }
+  | { outcome: 'subscription-and-invoice' }
+  | {
+      outcome: 'subscription-draft-invoice';
+      invoiceId: string;
+      issueError: string;
+    };
+
 function subscriptionStatusLabel(
   tBilling: ReturnType<typeof useTranslations<'organization.billing'>>,
   code: string
@@ -119,7 +128,7 @@ export default function PlatformSubscriptionsPage() {
   });
 
   const createMut = useMutation({
-    mutationFn: async (): Promise<{ withInvoice: boolean }> => {
+    mutationFn: async (): Promise<CreateSubscriptionMutationResult> => {
       if (!companyId || !planId) {
         throw new Error(t('validationCompanyPlan'));
       }
@@ -192,19 +201,37 @@ export default function PlatformSubscriptionsPage() {
             }
           ]
         });
-        await platformApi.issueInvoice(inv.id);
-        return { withInvoice: true };
+        try {
+          await platformApi.issueInvoice(inv.id);
+        } catch (issueErr) {
+          const issueError =
+            issueErr instanceof Error ? issueErr.message : String(issueErr);
+          return {
+            outcome: 'subscription-draft-invoice',
+            invoiceId: inv.id,
+            issueError
+          };
+        }
+        return { outcome: 'subscription-and-invoice' };
       }
 
       await platformApi.createSubscription(body);
-      return { withInvoice: false };
+      return { outcome: 'subscription-only' };
     },
     onSuccess: (result) => {
-      if (result.withInvoice) {
+      if (result.outcome === 'subscription-and-invoice') {
         toast.success(
           t('toastCreatedWithInvoice', {
             defaultValue: 'Subscription and invoice created.'
           })
+        );
+      } else if (result.outcome === 'subscription-draft-invoice') {
+        toast.warning(
+          t('toastSubCreatedInvoiceIssueFailed', {
+            invoiceId: result.invoiceId,
+            detail: result.issueError
+          }),
+          { duration: 12_000 }
         );
       } else {
         toast.success(
