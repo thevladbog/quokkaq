@@ -1147,7 +1147,8 @@
       "invoiceWithSubValidation": "Укажите положительную сумму и срок оплаты для счёта.",
       "toastCreated": "Подписка создана.",
       "toastCreatedWithInvoice": "Подписка и счёт созданы.",
-      "toastSubCreatedInvoiceIssueFailed": "Подписка создана. Черновик счёта {invoiceId} не удалось провести ({detail}). Проведите счёт в разделе «Счёта» платформы."
+      "toastCreateFailed": "Не удалось создать подписку. Проверьте данные и попробуйте снова.",
+      "toastSubCreatedInvoiceIssueFailed": "Подписка создана. Черновик счёта не удалось провести автоматически. Откройте «Счета» платформы и проведите счёт {invoiceId}."
     }
   },
   "pageTitles": {
@@ -1471,6 +1472,7 @@
       "vendorLoadError": "Не удалось загрузить платёжные реквизиты.",
       "yookassaSection": "Онлайн-оплата (ЮKassa)",
       "getPaymentLink": "Получить ссылку на оплату",
+      "payLinkErrorGeneric": "Не удалось открыть онлайн-оплату. Попробуйте снова или обратитесь в поддержку.",
       "paymentLinkReady": "Страница оплаты",
       "description": "Наименование",
       "qty": "Кол-во",

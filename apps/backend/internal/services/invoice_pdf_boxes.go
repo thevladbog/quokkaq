@@ -72,6 +72,9 @@ func legalEntityLabelValuePairs(cp counterpartyJSON, fallbackName string) []pdfL
 }
 
 func buyerLabelValuePairs(inv *models.Invoice) []pdfLabelValue {
+	if inv == nil {
+		return nil
+	}
 	if len(inv.BuyerSnapshot) > 0 {
 		cp := parseCounterparty(inv.BuyerSnapshot)
 		p := legalEntityLabelValuePairs(cp, "")

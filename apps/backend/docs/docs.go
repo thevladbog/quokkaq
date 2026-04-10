@@ -2200,6 +2200,15 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "description": "Fields to update",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.PatchPlatformCompanyBody"
+                        }
                     }
                 ],
                 "responses": {
@@ -2581,10 +2590,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "boolean"
-                            }
+                            "$ref": "#/definitions/handlers.FeaturesFlags"
                         }
                     }
                 }
@@ -2781,6 +2787,15 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "description": "Fields to update",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.PatchPlatformInvoiceBody"
+                        }
                     }
                 ],
                 "responses": {
@@ -3017,6 +3032,17 @@ const docTemplate = `{
                     "platform"
                 ],
                 "summary": "Create subscription plan (platform)",
+                "parameters": [
+                    {
+                        "description": "New plan",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.PlatformCreateSubscriptionPlanBody"
+                        }
+                    }
+                ],
                 "responses": {
                     "201": {
                         "description": "Created",
@@ -3051,6 +3077,15 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "description": "Full plan replacement",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.PlatformUpdateSubscriptionPlanBody"
+                        }
                     }
                 ],
                 "responses": {
@@ -3116,6 +3151,17 @@ const docTemplate = `{
                     "platform"
                 ],
                 "summary": "Create subscription for a company without one (platform)",
+                "parameters": [
+                    {
+                        "description": "New subscription",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.PlatformCreateSubscriptionBody"
+                        }
+                    }
+                ],
                 "responses": {
                     "201": {
                         "description": "Created",
@@ -3168,6 +3214,15 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "description": "Fields to update",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.PatchPlatformSubscriptionBody"
+                        }
                     }
                 ],
                 "responses": {
@@ -6135,10 +6190,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Empty body on success",
-                        "schema": {
-                            "type": "string"
-                        }
+                        "description": "Empty response body"
                     },
                     "400": {
                         "description": "Bad request",
@@ -6274,6 +6326,19 @@ const docTemplate = `{
             "type": "object",
             "additionalProperties": true
         },
+        "handlers.FeaturesFlags": {
+            "type": "object",
+            "properties": {
+                "dadata": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "dadataCleaner": {
+                    "type": "boolean",
+                    "example": false
+                }
+            }
+        },
         "handlers.ForgotPasswordRequest": {
             "type": "object",
             "properties": {
@@ -6324,6 +6389,10 @@ const docTemplate = `{
         },
         "handlers.InvoiceDraftUpsertBody": {
             "type": "object",
+            "required": [
+                "dueDate",
+                "lines"
+            ],
             "properties": {
                 "allowStripePaymentLink": {
                     "description": "Stripe Checkout for platform invoices is not wired end-to-end yet; the flag is stored for future use and API symmetry with YooKassa.",
@@ -6344,6 +6413,7 @@ const docTemplate = `{
                 },
                 "lines": {
                     "type": "array",
+                    "minItems": 1,
                     "items": {
                         "$ref": "#/definitions/handlers.InvoiceDraftLineInput"
                     }
@@ -6372,6 +6442,84 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.PatchPlatformCompanyBody": {
+            "type": "object",
+            "properties": {
+                "billingAddress": {
+                    "type": "object"
+                },
+                "billingEmail": {
+                    "type": "string"
+                },
+                "clearBillingAddress": {
+                    "type": "boolean"
+                },
+                "clearCounterparty": {
+                    "type": "boolean"
+                },
+                "counterparty": {
+                    "type": "object"
+                },
+                "isSaasOperator": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "paymentAccounts": {
+                    "type": "object"
+                }
+            }
+        },
+        "handlers.PatchPlatformInvoiceBody": {
+            "type": "object",
+            "properties": {
+                "clearSubscriptionId": {
+                    "type": "boolean"
+                },
+                "paidAt": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "subscriptionId": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.PatchPlatformSubscriptionBody": {
+            "type": "object",
+            "properties": {
+                "cancelAtPeriodEnd": {
+                    "type": "boolean"
+                },
+                "clearPending": {
+                    "type": "boolean"
+                },
+                "currentPeriodEnd": {
+                    "type": "string"
+                },
+                "currentPeriodStart": {
+                    "type": "string"
+                },
+                "pendingEffectiveAt": {
+                    "type": "string"
+                },
+                "pendingPlanId": {
+                    "type": "string"
+                },
+                "planId": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "trialEnd": {
+                    "type": "string"
+                }
+            }
+        },
         "handlers.PeriodResponse": {
             "type": "object",
             "properties": {
@@ -6388,6 +6536,87 @@ const docTemplate = `{
             "properties": {
                 "counterId": {
                     "type": "string"
+                }
+            }
+        },
+        "handlers.PlatformCreateSubscriptionBody": {
+            "type": "object",
+            "properties": {
+                "companyId": {
+                    "type": "string"
+                },
+                "currentPeriodEnd": {
+                    "type": "string"
+                },
+                "currentPeriodStart": {
+                    "type": "string"
+                },
+                "planId": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "trialEnd": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.PlatformCreateSubscriptionPlanBody": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "features": {
+                    "type": "object"
+                },
+                "interval": {
+                    "type": "string"
+                },
+                "isActive": {
+                    "type": "boolean"
+                },
+                "limits": {
+                    "type": "object"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "price": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handlers.PlatformUpdateSubscriptionPlanBody": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "features": {
+                    "type": "object"
+                },
+                "interval": {
+                    "type": "string"
+                },
+                "isActive": {
+                    "type": "boolean"
+                },
+                "limits": {
+                    "type": "object"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "price": {
+                    "type": "integer"
                 }
             }
         },
@@ -6514,18 +6743,7 @@ const docTemplate = `{
                     "$ref": "#/definitions/models.Company"
                 },
                 "features": {
-                    "$ref": "#/definitions/handlers.featuresFlags"
-                }
-            }
-        },
-        "handlers.featuresFlags": {
-            "type": "object",
-            "properties": {
-                "dadata": {
-                    "type": "boolean"
-                },
-                "dadataCleaner": {
-                    "type": "boolean"
+                    "$ref": "#/definitions/handlers.FeaturesFlags"
                 }
             }
         },

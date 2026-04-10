@@ -158,6 +158,12 @@ func (h *InvoiceHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
+	if vendor == nil {
+		RespondJSONWithStatus(w, http.StatusUnprocessableEntity, map[string]string{
+			"error": services.ErrInvoicePDFQRPrerequisites.Error(),
+		})
+		return
+	}
 
 	pdfBytes, err := services.BuildInvoicePDF(invoice, vendor)
 	if errors.Is(err, services.ErrInvoicePDFQRPrerequisites) {

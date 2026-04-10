@@ -27,9 +27,7 @@ describe('buildRuBankQrSt00012Payload', () => {
     expect(
       buildRuBankQrSt00012Payload({ ...base, sumKopecks: NaN })
     ).toBeNull();
-    expect(
-      buildRuBankQrSt00012Payload({ ...base, sumKopecks: 0 })
-    ).toBeNull();
+    expect(buildRuBankQrSt00012Payload({ ...base, sumKopecks: 0 })).toBeNull();
     expect(
       buildRuBankQrSt00012Payload({ ...base, sumKopecks: -100 })
     ).toBeNull();

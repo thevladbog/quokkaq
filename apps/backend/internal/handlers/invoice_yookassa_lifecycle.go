@@ -64,11 +64,11 @@ func applyYooKassaInvoicePaid(tx *gorm.DB, invoiceID, paymentID string, paidAt t
 	if err := tx.Preload("Lines").First(&inv, "id = ?", invoiceID).Error; err != nil {
 		return err
 	}
-	if inv.Status == "paid" {
-		return nil
-	}
 	if strings.TrimSpace(inv.YookassaPaymentID) != "" && inv.YookassaPaymentID != paymentID {
 		return errors.New("payment id does not match invoice")
+	}
+	if inv.Status == "paid" {
+		return nil
 	}
 
 	updates := map[string]interface{}{

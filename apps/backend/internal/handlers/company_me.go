@@ -16,12 +16,13 @@ import (
 // companyMeResponse is returned by GET /companies/me.
 type companyMeResponse struct {
 	Company  *models.Company `json:"company"`
-	Features featuresFlags   `json:"features"`
+	Features FeaturesFlags   `json:"features"`
 }
 
-type featuresFlags struct {
-	DaData        bool `json:"dadata"`
-	DaDataCleaner bool `json:"dadataCleaner"`
+// FeaturesFlags describes DaData-related UI toggles for the deployment.
+type FeaturesFlags struct {
+	DaData        bool `json:"dadata" example:"true"`
+	DaDataCleaner bool `json:"dadataCleaner" example:"false"`
 }
 
 func dadataConfigured() bool {
@@ -74,7 +75,7 @@ func (h *CompanyHandler) GetMyCompany(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	RespondJSON(w, companyMeResponse{
 		Company: company,
-		Features: featuresFlags{
+		Features: FeaturesFlags{
 			DaData:        dadataConfigured(),
 			DaDataCleaner: dadataCleanerConfigured(),
 		},

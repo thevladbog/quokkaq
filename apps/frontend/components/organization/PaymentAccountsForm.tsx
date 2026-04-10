@@ -33,18 +33,51 @@ export function emptyPaymentAccount(): PaymentAccount {
   };
 }
 
+function loosePaymentAccountFromUnknown(
+  item: unknown,
+  idx: number
+): PaymentAccount {
+  const base = emptyPaymentAccount();
+  if (item && typeof item === 'object' && !Array.isArray(item)) {
+    const o = item as Record<string, unknown>;
+    const id =
+      typeof o.id === 'string' && o.id.trim()
+        ? o.id.trim()
+        : base.id + `-row-${idx}`;
+    return {
+      id,
+      bankName: typeof o.bankName === 'string' ? o.bankName : '',
+      bic: typeof o.bic === 'string' ? o.bic : '',
+      correspondentAccount:
+        typeof o.correspondentAccount === 'string'
+          ? o.correspondentAccount
+          : '',
+      accountNumber:
+        typeof o.accountNumber === 'string' ? o.accountNumber : '',
+      isDefault: o.isDefault === true
+    };
+  }
+  return { ...base, id: `${base.id}-fallback-${idx}` };
+}
+
 export function parsePaymentAccountsFromApi(raw: unknown): PaymentAccount[] {
   if (!Array.isArray(raw)) return [];
   const parsed = PaymentAccountsSchema.safeParse(raw);
-  if (!parsed.success) return [];
-  return parsed.data.map((row, idx) => ({
-    ...row,
-    id:
-      row.id?.trim() ||
-      (typeof crypto !== 'undefined' && 'randomUUID' in crypto
-        ? crypto.randomUUID()
-        : `pa-${idx}-${Date.now()}`)
-  }));
+  if (parsed.success) {
+    return parsed.data.map((row, idx) => ({
+      ...row,
+      id:
+        row.id?.trim() ||
+        (typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : `pa-${idx}-${Date.now()}`)
+    }));
+  }
+  const loose = raw.map((item, idx) => loosePaymentAccountFromUnknown(item, idx));
+  if (loose.length > 0 && !loose.some((a) => a.isDefault)) {
+    loose[0] = { ...loose[0], isDefault: true };
+  }
+  return loose;
 }
 
 type BankHit = {
@@ -321,6 +354,9 @@ export function PaymentAccountsForm({
               onCheckedChange={(checked) => {
                 if (checked === true) {
                   setDefault(row.id);
+                  return;
+                }
+                if (accounts.length <= 1) {
                   return;
                 }
                 const next = accounts.map((a, i) => ({

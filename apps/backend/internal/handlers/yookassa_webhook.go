@@ -30,7 +30,7 @@ type YooKassaWebhookNotification struct {
 // @Param        Content-Type           header    string                        true  "Must be application/json"
 // @Param        X-YooMoney-Signature   header    string                        true  "Webhook HMAC-SHA256 digest (hex, optional sha256= prefix)"
 // @Param        body                   body      YooKassaWebhookNotification   true  "YooKassa notification JSON (event + object)"
-// @Success      200  {string}  string  "Empty body on success"
+// @Success      200  "Empty response body"
 // @Failure      400  {string}  string  "Bad request"
 // @Failure      401  {string}  string  "Invalid or missing signature"
 // @Failure      405  {string}  string  "Method not allowed"

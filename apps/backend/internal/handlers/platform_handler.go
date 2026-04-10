@@ -50,7 +50,7 @@ func resolvePlatformSubscriptionStatusForCreate(in *string) (string, error) {
 
 // applyPlatformPatchSubscriptionCore merges status, billing window, cancel-at-period-end, and trialEnd from body into sub
 // and enforces the same invariants as CreateSubscription for those fields.
-func applyPlatformPatchSubscriptionCore(sub *models.Subscription, body patchSubscriptionBody, now time.Time) error {
+func applyPlatformPatchSubscriptionCore(sub *models.Subscription, body PatchPlatformSubscriptionBody, now time.Time) error {
 	if (body.CurrentPeriodStart == nil) != (body.CurrentPeriodEnd == nil) {
 		return errors.New("currentPeriodStart and currentPeriodEnd must both be set or both omitted")
 	}
@@ -293,13 +293,13 @@ func toCompanyPtrSlice(in []models.Company) []*models.Company {
 // @Tags         platform
 // @Produce      json
 // @Security     BearerAuth
-// @Success      200  {object}  map[string]bool
+// @Success      200  {object}  FeaturesFlags
 // @Router       /platform/features [get]
 func (h *PlatformHandler) GetFeatures(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	RespondJSON(w, map[string]bool{
-		"dadata":        dadataConfigured(),
-		"dadataCleaner": dadataCleanerConfigured(),
+	RespondJSON(w, FeaturesFlags{
+		DaData:        dadataConfigured(),
+		DaDataCleaner: dadataCleanerConfigured(),
 	})
 }
 
@@ -350,14 +350,15 @@ func (h *PlatformHandler) GetCompany(w http.ResponseWriter, r *http.Request) {
 	RespondJSON(w, company)
 }
 
-type patchPlatformCompanyBody struct {
+// PatchPlatformCompanyBody is the JSON body for PATCH /platform/companies/{id}.
+type PatchPlatformCompanyBody struct {
 	Name                *string          `json:"name"`
 	BillingEmail        *string          `json:"billingEmail"`
-	Counterparty        *json.RawMessage `json:"counterparty"`
+	Counterparty        *json.RawMessage `json:"counterparty" swaggertype:"object"`
 	ClearCounterparty   *bool            `json:"clearCounterparty"`
-	BillingAddress      *json.RawMessage `json:"billingAddress"`
+	BillingAddress      *json.RawMessage `json:"billingAddress" swaggertype:"object"`
 	ClearBillingAddress *bool            `json:"clearBillingAddress"`
-	PaymentAccounts     *json.RawMessage `json:"paymentAccounts"`
+	PaymentAccounts     *json.RawMessage `json:"paymentAccounts" swaggertype:"object"`
 	IsSaasOperator      *bool            `json:"isSaasOperator"`
 }
 
@@ -367,7 +368,8 @@ type patchPlatformCompanyBody struct {
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
-// @Param        id path string true "Company ID"
+// @Param        id   path  string                    true  "Company ID"
+// @Param        body body  PatchPlatformCompanyBody  true  "Fields to update"
 // @Success      200  {object}  models.Company
 // @Router       /platform/companies/{id} [patch]
 func (h *PlatformHandler) PatchCompany(w http.ResponseWriter, r *http.Request) {
@@ -393,7 +395,7 @@ func (h *PlatformHandler) PatchCompany(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var body patchPlatformCompanyBody
+	var body PatchPlatformCompanyBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
@@ -518,7 +520,8 @@ func toSubscriptionPtrSlice(in []models.Subscription) []*models.Subscription {
 	return out
 }
 
-type createSubscriptionBody struct {
+// PlatformCreateSubscriptionBody is the JSON body for POST /platform/subscriptions.
+type PlatformCreateSubscriptionBody struct {
 	CompanyID          string     `json:"companyId"`
 	PlanID             string     `json:"planId"`
 	Status             *string    `json:"status"`
@@ -533,6 +536,7 @@ type createSubscriptionBody struct {
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
+// @Param        body body  PlatformCreateSubscriptionBody  true  "New subscription"
 // @Success      201  {object}  models.Subscription
 // @Failure      400  {string}  string "Bad request"
 // @Failure      404  {string}  string "Company not found"
@@ -545,7 +549,7 @@ func (h *PlatformHandler) CreateSubscription(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	var body createSubscriptionBody
+	var body PlatformCreateSubscriptionBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
@@ -659,7 +663,8 @@ func (h *PlatformHandler) CreateSubscription(w http.ResponseWriter, r *http.Requ
 	RespondJSONWithStatus(w, http.StatusCreated, created)
 }
 
-type patchSubscriptionBody struct {
+// PatchPlatformSubscriptionBody is the JSON body for PATCH /platform/subscriptions/{id}.
+type PatchPlatformSubscriptionBody struct {
 	Status             *string    `json:"status"`
 	CurrentPeriodStart *time.Time `json:"currentPeriodStart"`
 	CurrentPeriodEnd   *time.Time `json:"currentPeriodEnd"`
@@ -676,7 +681,7 @@ func subscriptionStripeLinked(sub *models.Subscription) bool {
 }
 
 // patchSubscriptionRequestsTierChange is true when the body attempts to change plan, schedule a plan, or clear a scheduled plan.
-func patchSubscriptionRequestsTierChange(body patchSubscriptionBody) bool {
+func patchSubscriptionRequestsTierChange(body PatchPlatformSubscriptionBody) bool {
 	if body.PlanID != nil {
 		return true
 	}
@@ -692,7 +697,8 @@ func patchSubscriptionRequestsTierChange(body patchSubscriptionBody) bool {
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
-// @Param        id path string true "Subscription ID"
+// @Param        id   path  string                         true  "Subscription ID"
+// @Param        body body  PatchPlatformSubscriptionBody  true  "Fields to update"
 // @Success      200  {object}  models.Subscription
 // @Router       /platform/subscriptions/{id} [patch]
 func (h *PlatformHandler) PatchSubscription(w http.ResponseWriter, r *http.Request) {
@@ -713,7 +719,7 @@ func (h *PlatformHandler) PatchSubscription(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	var body patchSubscriptionBody
+	var body PatchPlatformSubscriptionBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
@@ -825,14 +831,15 @@ func (h *PlatformHandler) ListSubscriptionPlans(w http.ResponseWriter, r *http.R
 	RespondJSON(w, plans)
 }
 
-type createPlanBody struct {
+// PlatformCreateSubscriptionPlanBody is the JSON body for POST /platform/subscription-plans.
+type PlatformCreateSubscriptionPlanBody struct {
 	Name     string          `json:"name"`
 	Code     string          `json:"code"`
 	Price    int64           `json:"price"`
 	Currency string          `json:"currency"`
 	Interval string          `json:"interval"`
-	Features json.RawMessage `json:"features"`
-	Limits   json.RawMessage `json:"limits"`
+	Features json.RawMessage `json:"features" swaggertype:"object"`
+	Limits   json.RawMessage `json:"limits" swaggertype:"object"`
 	IsActive bool            `json:"isActive"`
 }
 
@@ -842,10 +849,11 @@ type createPlanBody struct {
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
+// @Param        body body  PlatformCreateSubscriptionPlanBody  true  "New plan"
 // @Success      201  {object}  models.SubscriptionPlan
 // @Router       /platform/subscription-plans [post]
 func (h *PlatformHandler) CreateSubscriptionPlan(w http.ResponseWriter, r *http.Request) {
-	var body createPlanBody
+	var body PlatformCreateSubscriptionPlanBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
@@ -885,14 +893,15 @@ func (h *PlatformHandler) CreateSubscriptionPlan(w http.ResponseWriter, r *http.
 	RespondJSONWithStatus(w, http.StatusCreated, plan)
 }
 
-type updatePlanBody struct {
+// PlatformUpdateSubscriptionPlanBody is the JSON body for PUT /platform/subscription-plans/{id}.
+type PlatformUpdateSubscriptionPlanBody struct {
 	Name     string          `json:"name"`
 	Code     string          `json:"code"`
 	Price    int64           `json:"price"`
 	Currency string          `json:"currency"`
 	Interval string          `json:"interval"`
-	Features json.RawMessage `json:"features"`
-	Limits   json.RawMessage `json:"limits"`
+	Features json.RawMessage `json:"features" swaggertype:"object"`
+	Limits   json.RawMessage `json:"limits" swaggertype:"object"`
 	IsActive bool            `json:"isActive"`
 }
 
@@ -902,7 +911,8 @@ type updatePlanBody struct {
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
-// @Param        id path string true "Plan ID"
+// @Param        id   path  string                              true  "Plan ID"
+// @Param        body body  PlatformUpdateSubscriptionPlanBody  true  "Full plan replacement"
 // @Success      200  {object}  models.SubscriptionPlan
 // @Router       /platform/subscription-plans/{id} [put]
 func (h *PlatformHandler) UpdateSubscriptionPlan(w http.ResponseWriter, r *http.Request) {
@@ -917,7 +927,7 @@ func (h *PlatformHandler) UpdateSubscriptionPlan(w http.ResponseWriter, r *http.
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-	var body updatePlanBody
+	var body PlatformUpdateSubscriptionPlanBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
@@ -996,7 +1006,8 @@ func toInvoicePtrSlice(in []models.Invoice) []*models.Invoice {
 	return out
 }
 
-type patchInvoiceBody struct {
+// PatchPlatformInvoiceBody is the JSON body for PATCH /platform/invoices/{id}.
+type PatchPlatformInvoiceBody struct {
 	Status              *string    `json:"status"`
 	PaidAt              *time.Time `json:"paidAt"`
 	SubscriptionID      *string    `json:"subscriptionId"`
@@ -1009,7 +1020,8 @@ type patchInvoiceBody struct {
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
-// @Param        id path string true "Invoice ID"
+// @Param        id   path  string                   true  "Invoice ID"
+// @Param        body body  PatchPlatformInvoiceBody true  "Fields to update"
 // @Success      200  {object}  models.Invoice
 // @Router       /platform/invoices/{id} [patch]
 func (h *PlatformHandler) PatchInvoice(w http.ResponseWriter, r *http.Request) {
@@ -1029,7 +1041,7 @@ func (h *PlatformHandler) PatchInvoice(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-	var body patchInvoiceBody
+	var body PatchPlatformInvoiceBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return

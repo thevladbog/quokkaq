@@ -65,6 +65,15 @@ definitions:
   handlers.DaDataUpstreamResponse:
     additionalProperties: true
     type: object
+  handlers.FeaturesFlags:
+    properties:
+      dadata:
+        example: true
+        type: boolean
+      dadataCleaner:
+        example: false
+        type: boolean
+    type: object
   handlers.ForgotPasswordRequest:
     properties:
       email:
@@ -116,9 +125,13 @@ definitions:
       lines:
         items:
           $ref: '#/definitions/handlers.InvoiceDraftLineInput'
+        minItems: 1
         type: array
       provisionSubscriptionsOnPayment:
         type: boolean
+    required:
+    - dueDate
+    - lines
     type: object
   handlers.LoginRequest:
     properties:
@@ -132,6 +145,57 @@ definitions:
       token:
         type: string
     type: object
+  handlers.PatchPlatformCompanyBody:
+    properties:
+      billingAddress:
+        type: object
+      billingEmail:
+        type: string
+      clearBillingAddress:
+        type: boolean
+      clearCounterparty:
+        type: boolean
+      counterparty:
+        type: object
+      isSaasOperator:
+        type: boolean
+      name:
+        type: string
+      paymentAccounts:
+        type: object
+    type: object
+  handlers.PatchPlatformInvoiceBody:
+    properties:
+      clearSubscriptionId:
+        type: boolean
+      paidAt:
+        type: string
+      status:
+        type: string
+      subscriptionId:
+        type: string
+    type: object
+  handlers.PatchPlatformSubscriptionBody:
+    properties:
+      cancelAtPeriodEnd:
+        type: boolean
+      clearPending:
+        type: boolean
+      currentPeriodEnd:
+        type: string
+      currentPeriodStart:
+        type: string
+      pendingEffectiveAt:
+        type: string
+      pendingPlanId:
+        type: string
+      planId:
+        type: string
+      status:
+        type: string
+      trialEnd:
+        type: string
+    type: object
   handlers.PeriodResponse:
     properties:
       end:
@@ -143,6 +207,59 @@ definitions:
     properties:
       counterId:
         type: string
+    type: object
+  handlers.PlatformCreateSubscriptionBody:
+    properties:
+      companyId:
+        type: string
+      currentPeriodEnd:
+        type: string
+      currentPeriodStart:
+        type: string
+      planId:
+        type: string
+      status:
+        type: string
+      trialEnd:
+        type: string
+    type: object
+  handlers.PlatformCreateSubscriptionPlanBody:
+    properties:
+      code:
+        type: string
+      currency:
+        type: string
+      features:
+        type: object
+      interval:
+        type: string
+      isActive:
+        type: boolean
+      limits:
+        type: object
+      name:
+        type: string
+      price:
+        type: integer
+    type: object
+  handlers.PlatformUpdateSubscriptionPlanBody:
+    properties:
+      code:
+        type: string
+      currency:
+        type: string
+      features:
+        type: object
+      interval:
+        type: string
+      isActive:
+        type: boolean
+      limits:
+        type: object
+      name:
+        type: string
+      price:
+        type: integer
     type: object
   handlers.RegisterUserRequest:
     properties:
@@ -225,14 +342,7 @@ definitions:
       company:
         $ref: '#/definitions/models.Company'
       features:
-        $ref: '#/definitions/handlers.featuresFlags'
-    type: object
-  handlers.featuresFlags:
-    properties:
-      dadata:
-        type: boolean
-      dadataCleaner:
-        type: boolean
+        $ref: '#/definitions/handlers.FeaturesFlags'
     type: object
   handlers.platformListResponse-models_CatalogItem:
     properties:
@@ -2599,6 +2709,12 @@ paths:
         name: id
         required: true
         type: string
+      - description: Fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.PatchPlatformCompanyBody'
       produces:
       - application/json
       responses:
@@ -2848,9 +2964,7 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties:
-              type: boolean
-            type: object
+            $ref: '#/definitions/handlers.FeaturesFlags'
       security:
       - BearerAuth: []
       summary: UI capability flags (DaData, etc.)
@@ -2973,6 +3087,12 @@ paths:
         name: id
         required: true
         type: string
+      - description: Fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.PatchPlatformInvoiceBody'
       produces:
       - application/json
       responses:
@@ -3123,6 +3243,13 @@ paths:
     post:
       consumes:
       - application/json
+      parameters:
+      - description: New plan
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.PlatformCreateSubscriptionPlanBody'
       produces:
       - application/json
       responses:
@@ -3145,6 +3272,12 @@ paths:
         name: id
         required: true
         type: string
+      - description: Full plan replacement
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.PlatformUpdateSubscriptionPlanBody'
       produces:
       - application/json
       responses:
@@ -3183,6 +3316,13 @@ paths:
     post:
       consumes:
       - application/json
+      parameters:
+      - description: New subscription
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.PlatformCreateSubscriptionBody'
       produces:
       - application/json
       responses:
@@ -3217,6 +3357,12 @@ paths:
         name: id
         required: true
         type: string
+      - description: Fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.PatchPlatformSubscriptionBody'
       produces:
       - application/json
       responses:
@@ -5180,9 +5326,7 @@ paths:
       - application/json
       responses:
         "200":
-          description: Empty body on success
-          schema:
-            type: string
+          description: Empty response body
         "400":
           description: Bad request
           schema:

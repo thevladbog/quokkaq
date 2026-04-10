@@ -67,6 +67,10 @@ func toCatalogItemPtrSlice(in []models.CatalogItem) []*models.CatalogItem {
 // @Failure      500  {string}  string "Internal server error"
 // @Router       /platform/catalog-items/{id} [get]
 func (h *PlatformHandler) GetCatalogItem(w http.ResponseWriter, r *http.Request) {
+	if _, ok := middleware.GetUserIDFromContext(r.Context()); !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
 	id := strings.TrimSpace(chi.URLParam(r, "id"))
 	item, err := h.catalogRepo.FindByID(id)
 	if err != nil {
@@ -194,6 +198,10 @@ func (h *PlatformHandler) CreateCatalogItem(w http.ResponseWriter, r *http.Reque
 // @Failure      500   {string}  string "Internal server error"
 // @Router       /platform/catalog-items/{id} [patch]
 func (h *PlatformHandler) PatchCatalogItem(w http.ResponseWriter, r *http.Request) {
+	if _, ok := middleware.GetUserIDFromContext(r.Context()); !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
 	id := strings.TrimSpace(chi.URLParam(r, "id"))
 	item, err := h.catalogRepo.FindByID(id)
 	if err != nil {
@@ -281,6 +289,10 @@ func (h *PlatformHandler) PatchCatalogItem(w http.ResponseWriter, r *http.Reques
 // @Failure      500  {string}  string "Internal server error"
 // @Router       /platform/catalog-items/{id} [delete]
 func (h *PlatformHandler) DeleteCatalogItem(w http.ResponseWriter, r *http.Request) {
+	if _, ok := middleware.GetUserIDFromContext(r.Context()); !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
 	id := strings.TrimSpace(chi.URLParam(r, "id"))
 	_, err := h.catalogRepo.FindByID(id)
 	if err != nil {

@@ -17,6 +17,14 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+)
+
+var (
+	errPlatformInvoiceNotDraft  = errors.New("platform invoice not in draft status")
+	errIssueInvoiceConflict     = errors.New("invoice issue conflict: status changed concurrently")
+	errInvoiceNoLinesForIssue   = errors.New("invoice has no lines")
+	errInvoiceNoCompanyForIssue = errors.New("invoice has no company")
 )
 
 // InvoiceDraftLineInput is one line in a platform invoice draft create/patch request.
@@ -38,13 +46,13 @@ type InvoiceDraftLineInput struct {
 // InvoiceDraftUpsertBody is the JSON body for POST /platform/invoices and PATCH .../draft.
 type InvoiceDraftUpsertBody struct {
 	CompanyID                string `json:"companyId"`
-	DueDate                  string `json:"dueDate"` // RFC3339
+	DueDate                  string `json:"dueDate" binding:"required"` // RFC3339
 	Currency                 string `json:"currency"`
 	AllowYookassaPaymentLink bool   `json:"allowYookassaPaymentLink"`
 	// Stripe Checkout for platform invoices is not wired end-to-end yet; the flag is stored for future use and API symmetry with YooKassa.
 	AllowStripePaymentLink          bool                    `json:"allowStripePaymentLink"`
 	ProvisionSubscriptionsOnPayment bool                    `json:"provisionSubscriptionsOnPayment"`
-	Lines                           []InvoiceDraftLineInput `json:"lines"`
+	Lines                           []InvoiceDraftLineInput `json:"lines" binding:"required,min=1"`
 }
 
 func licensePeriodEnd(start time.Time, qty float64, interval string) time.Time {
@@ -191,7 +199,26 @@ func (h *PlatformHandler) buildDraftLines(inputs []InvoiceDraftLineInput) ([]mod
 	return lines, totalNet, totalVat, totalGross, nil
 }
 
-func (h *PlatformHandler) upsertDraftInvoice(inv *models.Invoice, body InvoiceDraftUpsertBody) error {
+// upsertDraftInvoiceInTx loads the invoice row with FOR UPDATE, requires status draft, then replaces header totals and lines.
+func (h *PlatformHandler) upsertDraftInvoiceInTx(tx *gorm.DB, invoiceID string, body InvoiceDraftUpsertBody) error {
+	var inv models.Invoice
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Preload("Lines", func(db *gorm.DB) *gorm.DB {
+			return db.Order("position ASC")
+		}).
+		First(&inv, "id = ?", invoiceID).Error; err != nil {
+		return err
+	}
+	if inv.Status != "draft" {
+		return errPlatformInvoiceNotDraft
+	}
+	if inv.CompanyID == nil {
+		return errors.New("invoice has no company")
+	}
+	body.CompanyID = *inv.CompanyID
+	if strings.TrimSpace(body.Currency) == "" {
+		body.Currency = inv.Currency
+	}
 	lines, net, vat, gross, err := h.buildDraftLines(body.Lines)
 	if err != nil {
 		return err
@@ -210,9 +237,7 @@ func (h *PlatformHandler) upsertDraftInvoice(inv *models.Invoice, body InvoiceDr
 	if strings.TrimSpace(body.Currency) != "" {
 		inv.Currency = strings.TrimSpace(body.Currency)
 	}
-	return database.DB.Transaction(func(tx *gorm.DB) error {
-		return h.invoiceRepo.UpdateHeaderAndLinesInTx(tx, inv, lines)
-	})
+	return h.invoiceRepo.UpdateHeaderAndLinesInTx(tx, &inv, lines)
 }
 
 // CreateInvoice godoc
@@ -319,34 +344,24 @@ func (h *PlatformHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 // @Router       /platform/invoices/{id}/draft [patch]
 func (h *PlatformHandler) PatchInvoiceDraft(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimSpace(chi.URLParam(r, "id"))
-	inv, err := h.invoiceRepo.FindByIDWithLines(id)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			http.Error(w, "Not found", http.StatusNotFound)
-			return
-		}
-		log.Printf("PatchInvoiceDraft FindByID: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	if inv.Status != "draft" {
-		http.Error(w, "only draft invoices can be edited", http.StatusConflict)
-		return
-	}
 	var body InvoiceDraftUpsertBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
-	if inv.CompanyID == nil {
-		http.Error(w, "invoice has no company", http.StatusBadRequest)
-		return
-	}
-	body.CompanyID = *inv.CompanyID
-	if body.Currency == "" {
-		body.Currency = inv.Currency
-	}
-	if err := h.upsertDraftInvoice(inv, body); err != nil {
+	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		return h.upsertDraftInvoiceInTx(tx, id, body)
+	})
+	if err != nil {
+		if errors.Is(err, errPlatformInvoiceNotDraft) {
+			http.Error(w, "only draft invoices can be edited", http.StatusConflict)
+			return
+		}
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "Not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("PatchInvoiceDraft: %v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -375,37 +390,30 @@ func (h *PlatformHandler) PatchInvoiceDraft(w http.ResponseWriter, r *http.Reque
 // @Router       /platform/invoices/{id}/issue [post]
 func (h *PlatformHandler) IssueInvoice(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimSpace(chi.URLParam(r, "id"))
-	inv, err := h.invoiceRepo.FindByIDWithLines(id)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			http.Error(w, "Not found", http.StatusNotFound)
-			return
-		}
-		log.Printf("IssueInvoice FindByID: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	if inv.Status != "draft" {
-		http.Error(w, "only draft invoices can be issued", http.StatusConflict)
-		return
-	}
-	if len(inv.Lines) == 0 {
-		http.Error(w, "invoice has no lines", http.StatusBadRequest)
-		return
-	}
-	if inv.CompanyID == nil {
-		http.Error(w, "invoice has no company", http.StatusBadRequest)
-		return
-	}
-	company, err := h.companyRepo.FindByID(*inv.CompanyID)
-	if err != nil {
-		log.Printf("IssueInvoice company: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
 	now := time.Now().UTC()
 	year := repository.InvoiceYearUTC(now)
-	if err := database.DB.Transaction(func(tx *gorm.DB) error {
+	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		var inv models.Invoice
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Preload("Lines", func(db *gorm.DB) *gorm.DB {
+				return db.Order("position ASC")
+			}).
+			First(&inv, "id = ?", id).Error; err != nil {
+			return err
+		}
+		if inv.Status != "draft" {
+			return errPlatformInvoiceNotDraft
+		}
+		if len(inv.Lines) == 0 {
+			return errInvoiceNoLinesForIssue
+		}
+		if inv.CompanyID == nil {
+			return errInvoiceNoCompanyForIssue
+		}
+		var company models.Company
+		if err := tx.First(&company, "id = ?", *inv.CompanyID).Error; err != nil {
+			return err
+		}
 		doc, err := h.invoiceRepo.AllocateDocumentNumber(tx, year)
 		if err != nil {
 			return err
@@ -427,8 +435,32 @@ func (h *PlatformHandler) IssueInvoice(w http.ResponseWriter, r *http.Request) {
 			"allow_stripe_payment_link": false,
 			"buyer_snapshot":            snap,
 		}
-		return tx.Model(&models.Invoice{}).Where("id = ?", inv.ID).Updates(updates).Error
-	}); err != nil {
+		res := tx.Model(&models.Invoice{}).Where("id = ? AND status = ?", id, "draft").Updates(updates)
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return errIssueInvoiceConflict
+		}
+		return nil
+	})
+	if err != nil {
+		if errors.Is(err, errPlatformInvoiceNotDraft) {
+			http.Error(w, "only draft invoices can be issued", http.StatusConflict)
+			return
+		}
+		if errors.Is(err, errIssueInvoiceConflict) {
+			http.Error(w, "invoice was modified concurrently; reload and try again", http.StatusConflict)
+			return
+		}
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "Not found", http.StatusNotFound)
+			return
+		}
+		if errors.Is(err, errInvoiceNoLinesForIssue) || errors.Is(err, errInvoiceNoCompanyForIssue) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		log.Printf("IssueInvoice tx: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return

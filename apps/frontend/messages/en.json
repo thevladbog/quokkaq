@@ -1146,7 +1146,8 @@
       "invoiceWithSubValidation": "Enter a positive amount and due date for the invoice.",
       "toastCreated": "Subscription created.",
       "toastCreatedWithInvoice": "Subscription and invoice created.",
-      "toastSubCreatedInvoiceIssueFailed": "Subscription created. Draft invoice {invoiceId} could not be issued ({detail}). Issue it from Platform → Invoices."
+      "toastCreateFailed": "Could not create subscription. Check the form and try again.",
+      "toastSubCreatedInvoiceIssueFailed": "Subscription created. The draft invoice could not be issued automatically. Open Platform → Invoices and issue invoice {invoiceId}."
     }
   },
   "pageTitles": {
@@ -1470,6 +1471,7 @@
       "vendorLoadError": "Could not load payment details.",
       "yookassaSection": "Online payment (YooKassa)",
       "getPaymentLink": "Get payment link",
+      "payLinkErrorGeneric": "Could not start online payment. Try again or contact support.",
       "paymentLinkReady": "Payment page",
       "description": "Description",
       "qty": "Qty",

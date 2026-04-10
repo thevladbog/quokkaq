@@ -98,7 +98,11 @@ export default function PlatformCatalogItemsPage() {
       ),
       currency: item.currency,
       vatExempt: item.vatExempt,
-      vatRatePercent: String(item.vatRatePercent),
+      vatRatePercent:
+        typeof item.vatRatePercent === 'number' &&
+        Number.isFinite(item.vatRatePercent)
+          ? String(item.vatRatePercent)
+          : '20',
       subscriptionPlanId: item.subscriptionPlanId ?? '',
       isActive: item.isActive !== false
     });
@@ -121,11 +125,7 @@ export default function PlatformCatalogItemsPage() {
         vatRate = 0;
       } else {
         const parsed = Number.parseFloat(form.vatRatePercent.trim());
-        if (
-          !Number.isFinite(parsed) ||
-          parsed < 0 ||
-          parsed > 100
-        ) {
+        if (!Number.isFinite(parsed) || parsed < 0 || parsed > 100) {
           throw new Error(t('validationVatRate'));
         }
         vatRate = parsed;
@@ -145,7 +145,7 @@ export default function PlatformCatalogItemsPage() {
       if (editing) {
         return platformApi.patchCatalogItem(editing.id, {
           ...base,
-          subscriptionPlanId: planPart || ''
+          subscriptionPlanId: planPart ? planPart : null
         });
       }
       return platformApi.createCatalogItem({

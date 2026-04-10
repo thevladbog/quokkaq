@@ -66,7 +66,8 @@ export function normalizeAmountInputToDecimalString(
     if (parts.length !== 2) return null;
     const after = parts[1];
     const nAfter = after.length;
-    // "1,234" → thousands; "12,34" / "5,5" → decimal (dot-decimal locales typing US-style groups).
+    // Heuristic: exactly three digits after comma → thousands separator ("1,234" → 1234);
+    // one or two digits → decimal comma ("12,34", "5,5").
     if (nAfter === 0 || nAfter > 3) return null;
     if (nAfter === 3) {
       s = `${parts[0]}${after}`;
@@ -78,6 +79,14 @@ export function normalizeAmountInputToDecimalString(
   return s;
 }
 
+/** Parses VAT % from a form field; accepts comma as decimal separator. */
+export function parseVatRatePercentInput(raw: string): number {
+  const s = raw.replace(',', '.').trim();
+  if (s === '') return 0;
+  const n = Number.parseFloat(s);
+  return Number.isFinite(n) ? n : 0;
+}
+
 /** Converts a major-unit amount string to minor units (rounded). NaN if invalid. */
 export function parseAmountStringToMinorUnits(
   raw: string,
@@ -86,8 +95,8 @@ export function parseAmountStringToMinorUnits(
 ): number {
   const dec = normalizeAmountInputToDecimalString(raw);
   if (dec === null) return Number.NaN;
-  const n = strictParseNonNegativeMajor(dec);
-  if (n === null) return Number.NaN;
+  const n = Number.parseFloat(dec);
+  if (!Number.isFinite(n) || n < 0) return Number.NaN;
   const div = minorUnitDivisor(currency, intlLocale);
   return Math.round(n * div);
 }

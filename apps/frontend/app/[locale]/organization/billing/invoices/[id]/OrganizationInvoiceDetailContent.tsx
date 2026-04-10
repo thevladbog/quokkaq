@@ -113,7 +113,10 @@ export function OrganizationInvoiceDetailContent() {
         window.open(data.confirmationUrl, '_blank', 'noopener,noreferrer');
       }
     },
-    onError: (e: Error) => setLinkError(e.message)
+    onError: (e: Error) => {
+      logger.error('requestYooKassaPaymentLink failed', e);
+      setLinkError(tDetail('payLinkErrorGeneric'));
+    }
   });
 
   const defaultAccount = useMemo(

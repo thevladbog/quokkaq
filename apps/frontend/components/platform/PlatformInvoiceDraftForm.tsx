@@ -33,7 +33,8 @@ import {
 import {
   formatPriceMinorUnits,
   minorUnitsToAmountInputString,
-  parseAmountStringToMinorUnits
+  parseAmountStringToMinorUnits,
+  parseVatRatePercentInput
 } from '@/lib/format-price';
 import {
   computeLineTotals,
@@ -101,7 +102,10 @@ function rowsFromLines(
         appLocale
       ),
       vatExempt: l.vatExempt,
-      vatRatePercent: String(l.vatRatePercent),
+      vatRatePercent:
+        typeof l.vatRatePercent === 'number' && Number.isFinite(l.vatRatePercent)
+          ? String(l.vatRatePercent)
+          : '20',
       discountPercent:
         l.discountPercent != null ? String(l.discountPercent) : '',
       discountAmountInput:
@@ -156,9 +160,7 @@ function buildDraftBody(
       unit: r.measureUnit.trim(),
       unitPriceInclVatMinor: unit,
       vatExempt: r.vatExempt,
-      vatRatePercent: r.vatExempt
-        ? 0
-        : Number.parseFloat(r.vatRatePercent.trim()) || 0
+      vatRatePercent: r.vatExempt ? 0 : parseVatRatePercentInput(r.vatRatePercent)
     };
 
     const cat = r.catalogItemId.trim();
@@ -249,7 +251,8 @@ function invoiceToDraftUpsertBody(inv: Invoice): InvoiceDraftUpsertBody {
     currency: (inv.currency ?? 'RUB').trim() || 'RUB',
     allowYookassaPaymentLink: inv.allowYookassaPaymentLink ?? false,
     allowStripePaymentLink: inv.allowStripePaymentLink ?? false,
-    provisionSubscriptionsOnPayment: inv.provisionSubscriptionsOnPayment ?? false,
+    provisionSubscriptionsOnPayment:
+      inv.provisionSubscriptionsOnPayment ?? false,
     lines
   };
 }
@@ -283,9 +286,7 @@ function tryParseDraftRowForTotals(
   }
 
   const vatExempt = r.vatExempt;
-  const vatRatePercent = vatExempt
-    ? 0
-    : Number.parseFloat(r.vatRatePercent.replace(',', '.').trim()) || 0;
+  const vatRatePercent = vatExempt ? 0 : parseVatRatePercentInput(r.vatRatePercent);
   if (!vatExempt && vatRatePercent < 0) return null;
 
   return {
@@ -360,11 +361,7 @@ export function PlatformInvoiceDraftForm({
       setAllowYookassa(inv!.allowYookassaPaymentLink ?? false);
       setProvision(inv!.provisionSubscriptionsOnPayment ?? false);
       setRows(
-        rowsFromLines(
-          inv!.lines,
-          inv!.currency?.trim() || 'RUB',
-          appLocale
-        )
+        rowsFromLines(inv!.lines, inv!.currency?.trim() || 'RUB', appLocale)
       );
       return;
     }
@@ -448,7 +445,11 @@ export function PlatformInvoiceDraftForm({
               appLocale
             ),
             vatExempt: item.vatExempt,
-            vatRatePercent: String(item.vatRatePercent),
+            vatRatePercent:
+              typeof item.vatRatePercent === 'number' &&
+              Number.isFinite(item.vatRatePercent)
+                ? String(item.vatRatePercent)
+                : '20',
             isLicenseLine: !!(
               item.subscriptionPlanId && item.subscriptionPlanId.trim()
             ),
@@ -537,8 +538,7 @@ export function PlatformInvoiceDraftForm({
       if (looksLikeErrorKey) {
         toast.error(
           t('errors.generic', {
-            defaultValue:
-              'Something went wrong. Check the form and try again.'
+            defaultValue: 'Something went wrong. Check the form and try again.'
           }),
           { duration: 6000 }
         );

@@ -13,8 +13,7 @@ const eslintConfig = defineConfig([
     '.next/**',
     'out/**',
     'build/**',
-    'next-env.d.ts',
-    '.lintstagedrc.js'
+    'next-env.d.ts'
   ])
 ]);
 

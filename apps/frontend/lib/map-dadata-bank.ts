@@ -51,7 +51,6 @@ function parseBankSuggestion(suggestion: unknown) {
 
 /** Human-readable line for a bank suggestion row. */
 export function formatBankSuggestionLabel(suggestion: unknown): string {
-  if (!suggestion || typeof suggestion !== 'object') return '';
   const parsed = parseBankSuggestion(suggestion);
   if (!parsed.success) return '';
   const s = parsed.data;
@@ -71,7 +70,6 @@ export function formatBankSuggestionLabel(suggestion: unknown): string {
 export function draftPaymentAccountFromBankSuggestion(
   suggestion: unknown
 ): Partial<PaymentAccount> {
-  if (!suggestion || typeof suggestion !== 'object') return {};
   const parsed = parseBankSuggestion(suggestion);
   if (!parsed.success) return {};
   const s = parsed.data;

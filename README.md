@@ -762,7 +762,7 @@ Contributions are welcome! Please follow these guidelines:
    - Follow existing code conventions
    - Use TypeScript for all frontend/kiosk code
    - Follow Go best practices for backend
-   - Run formatters before committing
+   - After `pnpm install`, **pre-commit** runs ESLint/Prettier (frontend), `gofmt` (backend Go), and Prettier (selected packages) on staged files; see [SETUP.md](SETUP.md#quick-start) for details and how to skip hooks (`HUSKY=0`)
 
 2. **Testing**
    - Write tests for new features

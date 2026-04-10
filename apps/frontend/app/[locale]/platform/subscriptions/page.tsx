@@ -36,6 +36,7 @@ import { Link } from '@/src/i18n/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { logger } from '@/lib/logger';
 import {
   formatAppDateTime,
   intlLocaleFromAppLocale
@@ -57,7 +58,6 @@ type CreateSubscriptionMutationResult =
   | {
       outcome: 'subscription-draft-invoice';
       invoiceId: string;
-      issueError: string;
     };
 
 function subscriptionStatusLabel(
@@ -168,7 +168,11 @@ export default function PlatformSubscriptionsPage() {
       }
 
       if (createWithInvoice) {
-        const amount = Number.parseInt(invAmount.trim(), 10);
+        const amountRaw = invAmount.trim();
+        if (!/^\d+$/.test(amountRaw)) {
+          throw new Error(t('invoiceWithSubValidation'));
+        }
+        const amount = Number.parseInt(amountRaw, 10);
         const dueRaw = invDue.trim();
         const dueDate = new Date(dueRaw);
         if (
@@ -204,12 +208,10 @@ export default function PlatformSubscriptionsPage() {
         try {
           await platformApi.issueInvoice(inv.id);
         } catch (issueErr) {
-          const issueError =
-            issueErr instanceof Error ? issueErr.message : String(issueErr);
+          logger.error('issueInvoice after createSubscription+createInvoice', issueErr);
           return {
             outcome: 'subscription-draft-invoice',
-            invoiceId: inv.id,
-            issueError
+            invoiceId: inv.id
           };
         }
         return { outcome: 'subscription-and-invoice' };
@@ -228,8 +230,7 @@ export default function PlatformSubscriptionsPage() {
       } else if (result.outcome === 'subscription-draft-invoice') {
         toast.warning(
           t('toastSubCreatedInvoiceIssueFailed', {
-            invoiceId: result.invoiceId,
-            detail: result.issueError
+            invoiceId: result.invoiceId
           }),
           { duration: 12_000 }
         );
@@ -252,8 +253,8 @@ export default function PlatformSubscriptionsPage() {
       setInvDue('');
     },
     onError: (err) => {
-      const raw = err instanceof Error ? err.message : String(err);
-      toast.error(raw, { duration: 6000 });
+      logger.error('platform create subscription', err);
+      toast.error(t('toastCreateFailed'), { duration: 6000 });
     }
   });
 
