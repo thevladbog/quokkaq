@@ -28,6 +28,8 @@ type TicketRepository interface {
 	GetActiveTicketByCounter(counterID string) (*models.Ticket, error)
 	MarkAsEOD(unitID string) (int64, error)
 	MarkAsEODTx(tx *gorm.DB, unitID string) (int64, error)
+	// CountEODTicketSplitTx counts tickets already marked end-of-day (is_eod=true), split into waiting vs non-waiting status, for EOD messaging.
+	CountEODTicketSplitTx(tx *gorm.DB, unitID string) (waiting int64, nonWaiting int64, err error)
 	ResetSequencesTx(tx *gorm.DB, unitID, date string) error
 }
 
@@ -186,4 +188,18 @@ func (r *ticketRepository) MarkAsEODTx(tx *gorm.DB, unitID string) (int64, error
 		Where("unit_id = ? AND is_eod = ?", unitID, false).
 		Update("is_eod", true)
 	return result.RowsAffected, result.Error
+}
+
+func (r *ticketRepository) CountEODTicketSplitTx(tx *gorm.DB, unitID string) (waiting int64, nonWaiting int64, err error) {
+	if err = tx.Model(&models.Ticket{}).
+		Where("unit_id = ? AND is_eod = ? AND status = ?", unitID, true, "waiting").
+		Count(&waiting).Error; err != nil {
+		return 0, 0, err
+	}
+	if err = tx.Model(&models.Ticket{}).
+		Where("unit_id = ? AND is_eod = ? AND status <> ?", unitID, true, "waiting").
+		Count(&nonWaiting).Error; err != nil {
+		return 0, 0, err
+	}
+	return waiting, nonWaiting, nil
 }

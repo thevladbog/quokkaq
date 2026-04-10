@@ -100,8 +100,11 @@ export default function ShiftDashboardPage({
   const eodMutation = useMutation({
     mutationFn: () => shiftApi.executeEOD(unitId),
     onSuccess: (data) => {
+      const closed = Number(data.activeTicketsClosed ?? 0);
+      const noShow = Number(data.waitingTicketsNoShow ?? 0);
+      const released = Number(data.countersReleased ?? 0);
       toast.success(
-        `${t('eodSuccess')}: ${data.activeTicketsClosed} ${t('ticketsClosed')}, ${data.waitingTicketsNoShow} ${t('ticketsNoShow')}, ${data.countersReleased} ${t('countersReleased')}`
+        `${t('eodSuccess')}: ${closed} ${t('ticketsClosed')}, ${noShow} ${t('ticketsNoShow')}, ${released} ${t('countersReleased')}`
       );
       queryClient.invalidateQueries({ queryKey: ['shift-dashboard', unitId] });
       queryClient.invalidateQueries({ queryKey: ['shift-queue', unitId] });

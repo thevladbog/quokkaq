@@ -76,7 +76,20 @@ func (s *storageService) UploadFile(ctx context.Context, fileBytes []byte, fileN
 	}
 
 	ext := filepath.Ext(fileName)
-	key := fmt.Sprintf("%s/%s%s", folder, uuid.New().String(), ext)
+	id := uuid.New().String()
+	// Objects served anonymously (prod MinIO policy) must live under public/.
+	// Private uploads stay outside this prefix.
+	publicFolders := map[string]struct{}{
+		"logos":     {},
+		"materials": {},
+		"tts":       {},
+	}
+	var key string
+	if _, ok := publicFolders[folder]; ok {
+		key = fmt.Sprintf("public/%s/%s%s", folder, id, ext)
+	} else {
+		key = fmt.Sprintf("%s/%s%s", folder, id, ext)
+	}
 
 	_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:      aws.String(s.bucketName),

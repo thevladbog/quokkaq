@@ -61,6 +61,41 @@ services:
       timeout: 20s
       retries: 3
 
+  # Create bucket + anonymous read so logo/material URLs work in the browser (path-style GET).
+  minio-init:
+    image: minio/mc:latest
+    container_name: quokkaq-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks:
+      - quokkaq-network
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        MAX_ATTEMPTS=12
+        SLEEP_SEC=2
+        attempt=1
+        while [ "$$attempt" -le "$$MAX_ATTEMPTS" ]; do
+          echo "minio-init: attempt $$attempt/$$MAX_ATTEMPTS..."
+          if mc alias set local http://minio:9000 minioadmin minioadmin \
+            && mc mb local/quokkaq-materials --ignore-existing \
+            && mc anonymous set download local/quokkaq-materials/public; then
+            echo 'MinIO: bucket quokkaq-materials ready (anonymous GET under public/)'
+            exit 0
+          fi
+          echo "minio-init: failed, sleeping $$SLEEP_SEC seconds before retry"
+          sleep "$$SLEEP_SEC"
+          attempt=$$((attempt + 1))
+          SLEEP_SEC=$$((SLEEP_SEC * 2))
+          if [ "$$SLEEP_SEC" -gt 32 ]; then SLEEP_SEC=32; fi
+        done
+        echo "minio-init: giving up after $$MAX_ATTEMPTS attempts"
+        exit 1
+    restart: 'no'
+
   # QuokkaQ Backend API
   backend:
     build:
@@ -84,7 +119,9 @@ services:
       AWS_REGION: us-east-1
       AWS_S3_BUCKET: quokkaq-materials
       AWS_ENDPOINT: http://minio:9000
-      
+      # URLs in JSON must be reachable from the host browser (not http://minio:9000).
+      AWS_PUBLIC_ENDPOINT: ${AWS_PUBLIC_ENDPOINT:-http://localhost:9000}
+
       # SMTP Configuration (from .env)
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT}
@@ -102,6 +139,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
     networks:
       - quokkaq-network
     healthcheck:

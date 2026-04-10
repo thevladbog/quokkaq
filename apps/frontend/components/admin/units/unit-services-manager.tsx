@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -75,6 +75,7 @@ export function UnitServicesManager({ unitId }: UnitServicesManagerProps) {
 
   const [editingService, setEditingService] = useState<Service | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [formIsDirty, setFormIsDirty] = useState(false);
 
   const deleteServiceMutation = useDeleteService();
 
@@ -82,7 +83,17 @@ export function UnitServicesManager({ unitId }: UnitServicesManagerProps) {
   const tRoot = useTranslations();
   const locale = useLocale();
 
+  const confirmDiscardIfDirty = useCallback(() => {
+    if (!formIsDirty) {
+      return true;
+    }
+    return confirm(t('services.unsaved_discard_confirm'));
+  }, [formIsDirty, t]);
+
   const handleEdit = (service: Service) => {
+    if (!confirmDiscardIfDirty()) {
+      return;
+    }
     setEditingService(service);
     setIsCreating(false);
   };
@@ -105,8 +116,12 @@ export function UnitServicesManager({ unitId }: UnitServicesManagerProps) {
   };
 
   const handleCancel = () => {
+    if (!confirmDiscardIfDirty()) {
+      return;
+    }
     setEditingService(null);
     setIsCreating(false);
+    setFormIsDirty(false);
   };
 
   const selectedUnit = units.find((unit) => unit.id === selectedUnitId);
@@ -135,6 +150,9 @@ export function UnitServicesManager({ unitId }: UnitServicesManagerProps) {
             <div className='mb-4'>
               <Button
                 onClick={() => {
+                  if (!confirmDiscardIfDirty()) {
+                    return;
+                  }
                   setIsCreating(true);
                   setEditingService(null);
                 }}
@@ -246,14 +264,17 @@ export function UnitServicesManager({ unitId }: UnitServicesManagerProps) {
           <CardContent>
             {(editingService || isCreating) && (
               <ServiceForm
+                key={isCreating ? 'create' : editingService!.id}
                 editingService={editingService}
                 isCreating={isCreating}
                 selectedUnitId={selectedUnitId}
                 services={services}
+                onDirtyChange={setFormIsDirty}
                 onCancel={handleCancel}
                 onSaved={() => {
                   setEditingService(null);
                   setIsCreating(false);
+                  setFormIsDirty(false);
                   refetch();
                 }}
               />
@@ -274,10 +295,84 @@ export function UnitServicesManager({ unitId }: UnitServicesManagerProps) {
   );
 }
 
+function buildInitialFormValues(
+  editingService: Service | null,
+  isCreating: boolean
+): Partial<Service> {
+  if (editingService) {
+    return {
+      name: editingService.name,
+      nameRu: editingService.nameRu ?? '',
+      nameEn: editingService.nameEn ?? '',
+      description: editingService.description ?? '',
+      descriptionRu: editingService.descriptionRu ?? '',
+      descriptionEn: editingService.descriptionEn ?? '',
+      imageUrl: editingService.imageUrl ?? '',
+      backgroundColor: editingService.backgroundColor ?? '',
+      textColor: editingService.textColor ?? '',
+      prefix: editingService.prefix ?? '',
+      duration: editingService.duration ?? undefined,
+      maxWaitingTime: editingService.maxWaitingTime ?? undefined,
+      prebook: editingService.prebook ?? false,
+      isLeaf: editingService.isLeaf ?? false,
+      parentId: editingService.parentId ?? ''
+    };
+  }
+  if (isCreating) {
+    return {
+      name: '',
+      nameRu: '',
+      nameEn: '',
+      description: '',
+      descriptionRu: '',
+      descriptionEn: '',
+      imageUrl: '',
+      backgroundColor: '',
+      textColor: '',
+      prefix: '',
+      duration: undefined,
+      maxWaitingTime: undefined,
+      prebook: false,
+      isLeaf: false,
+      parentId: ''
+    };
+  }
+  return {};
+}
+
+function snapshotServiceFormValues(v: Partial<Service>): string {
+  return JSON.stringify({
+    name: v.name ?? '',
+    nameRu: v.nameRu ?? '',
+    nameEn: v.nameEn ?? '',
+    description: v.description ?? '',
+    descriptionRu: v.descriptionRu ?? '',
+    descriptionEn: v.descriptionEn ?? '',
+    imageUrl: v.imageUrl ?? '',
+    backgroundColor: v.backgroundColor ?? '',
+    textColor: v.textColor ?? '',
+    prefix: v.prefix ?? '',
+    duration: v.duration ?? null,
+    maxWaitingTime: v.maxWaitingTime ?? null,
+    prebook: !!v.prebook,
+    isLeaf: !!v.isLeaf,
+    parentId: v.parentId ?? ''
+  });
+}
+
+function areServiceFormValuesEqual(
+  a: Partial<Service>,
+  b: Partial<Service>
+): boolean {
+  return snapshotServiceFormValues(a) === snapshotServiceFormValues(b);
+}
+
 function ServiceForm({
   editingService,
+  isCreating,
   selectedUnitId,
   services,
+  onDirtyChange,
   onCancel,
   onSaved
 }: {
@@ -285,6 +380,7 @@ function ServiceForm({
   isCreating: boolean;
   selectedUnitId: string;
   services: Service[];
+  onDirtyChange?: (dirty: boolean) => void;
   onCancel: () => void;
   onSaved: () => void;
 }) {
@@ -293,45 +389,22 @@ function ServiceForm({
   const createServiceMutation = useCreateService();
   const updateServiceMutation = useUpdateService();
 
-  const [formValues, setFormValues] = useState<Partial<Service>>(() => {
-    if (editingService) {
-      return {
-        name: editingService.name,
-        nameRu: editingService.nameRu,
-        nameEn: editingService.nameEn,
-        description: editingService.description,
-        descriptionRu: editingService.descriptionRu,
-        descriptionEn: editingService.descriptionEn,
-        imageUrl: editingService.imageUrl,
-        backgroundColor: editingService.backgroundColor,
-        textColor: editingService.textColor,
-        prefix: editingService.prefix,
-        duration: editingService.duration,
-        maxWaitingTime: editingService.maxWaitingTime,
-        prebook: editingService.prebook,
-        isLeaf: editingService.isLeaf,
-        parentId: editingService.parentId
-      };
-    } else {
-      return {
-        name: '',
-        nameRu: '',
-        nameEn: '',
-        description: '',
-        descriptionRu: '',
-        descriptionEn: '',
-        imageUrl: '',
-        backgroundColor: '',
-        textColor: '',
-        prefix: '',
-        duration: undefined,
-        maxWaitingTime: undefined,
-        prebook: false,
-        isLeaf: false,
-        parentId: ''
-      };
-    }
-  });
+  const [baselineValues] = useState<Partial<Service>>(() =>
+    structuredClone(buildInitialFormValues(editingService, isCreating))
+  );
+
+  const [formValues, setFormValues] = useState<Partial<Service>>(() =>
+    structuredClone(buildInitialFormValues(editingService, isCreating))
+  );
+
+  const isDirty = useMemo(
+    () => !areServiceFormValuesEqual(formValues, baselineValues),
+    [formValues, baselineValues]
+  );
+
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
 
   const handleInputChange = (
     e: React.ChangeEvent<
@@ -380,6 +453,14 @@ function ServiceForm({
 
   return (
     <form onSubmit={handleSubmit} className='space-y-4'>
+      {isDirty ? (
+        <p
+          className='rounded-md border border-amber-200/80 bg-amber-50 px-2.5 py-2 text-sm text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100'
+          role='status'
+        >
+          {t('services.unsaved_changes')}
+        </p>
+      ) : null}
       <div className='space-y-2'>
         <Label htmlFor='name'>{t('services.name')} (EN) *</Label>
         <Input
@@ -681,7 +762,9 @@ function ServiceForm({
         <Button
           type='submit'
           disabled={
-            createServiceMutation.isPending || updateServiceMutation.isPending
+            createServiceMutation.isPending ||
+            updateServiceMutation.isPending ||
+            (!!editingService && !isDirty)
           }
         >
           {createServiceMutation.isPending || updateServiceMutation.isPending

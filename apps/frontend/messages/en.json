@@ -130,6 +130,8 @@
       "configuration_desc": "Configure services and their layout for the kiosk.",
       "open_editor": "Open Service Editor",
       "loading": "Loading services...",
+      "unsaved_changes": "You have unsaved changes",
+      "unsaved_discard_confirm": "You have unsaved changes. Discard them and continue?",
       "delete_confirm": "Are you sure you want to delete this service?"
     },
     "users": {
@@ -266,7 +268,11 @@
       "units": "Units",
       "no_unit_selected": "No Unit Selected",
       "select_unit_desc": "Please select a unit from the left panel to configure its grid layout.",
-      "remove_from_grid": "Remove from grid"
+      "remove_from_grid": "Remove from grid",
+      "remove_from_grid_error": "Could not remove the service from the grid. Changes were reverted.",
+      "drag_from_palette_hint": "Drag to a grid cell to place, or click to use the first free cell",
+      "drag_placed_hint": "Drag to another cell to move (top-left snaps to that cell)",
+      "resize_corner_hint": "Drag the corner to resize width and height in grid cells"
     },
     "ad_screen": {
       "title": "Ad Screen",
@@ -305,10 +311,18 @@
       "pin_code": "PIN Code",
       "pin_help": "6-digit PIN for accessing settings on the kiosk",
       "pin_code_placeholder": "1234",
-      "ticket_header": "Ticket Header",
-      "header_placeholder": "Text to appear at the top of tickets",
-      "ticket_footer": "Ticket Footer",
-      "footer_placeholder": "Text to appear at the bottom of tickets",
+      "welcome_section_desc": "Text shown on the kiosk home screen above the service grid (optional; defaults are used if empty).",
+      "welcome_title": "Welcome title (main screen)",
+      "welcome_title_placeholder": "How can we help you today?",
+      "welcome_title_help": "Large headline centered above the service buttons.",
+      "welcome_subtitle": "Welcome subtitle (main screen)",
+      "welcome_subtitle_placeholder": "Select a service below to join the queue.",
+      "welcome_subtitle_help": "Optional second line under the welcome title.",
+      "ticket_text_section_desc": "Shown only in the ticket confirmation dialog after the guest takes a number (not on the main screen).",
+      "ticket_header": "Ticket dialog — header text",
+      "header_placeholder": "Text at the top of the ticket confirmation dialog",
+      "ticket_footer": "Ticket dialog — footer text",
+      "footer_placeholder": "Text at the bottom of the ticket confirmation dialog",
       "printer_ip": "Printer IP Address",
       "printer_port": "Printer Port",
       "printer_type": "Printer Type",
@@ -335,7 +349,12 @@
       "header_color": "Header Color",
       "body_color": "Body Color",
       "grid_color": "Service Grid Color",
-      "enable_pre_registration": "Enable Pre-registration Redemption"
+      "enable_pre_registration": "Enable Pre-registration Redemption",
+      "show_unit_in_header": "Show unit name in kiosk header",
+      "show_unit_in_header_desc": "Shown on the left next to the logo. Disable for a logo-only bar.",
+      "kiosk_unit_label_text": "Header label (optional)",
+      "kiosk_unit_label_placeholder": "Default: {unitName}",
+      "kiosk_unit_label_help": "Leave empty to use the unit name from branch settings."
     },
     "slots": {
       "title": "Slot Configuration",
@@ -515,9 +534,15 @@
     "kioskTitle": "Kiosk",
     "selectUnit": "Please select a unit",
     "selectUnitButton": "Select Unit",
+    "select_unit_aria": "Open kiosk for {unit}",
     "noServicesAvailable": "No services available at this level",
+    "servicesUnavailableTitle": "Services unavailable",
+    "servicesUnavailableMessage": "We could not load this unit's services. Check the connection and try again.",
+    "retryServices": "Try again",
     "changeLocation": "Change Location",
     "backButton": "Back",
+    "welcome_default_title": "How can we help you today?",
+    "welcome_default_subtitle": "Select a service below to join the queue.",
     "services": "Services",
     "confirm": {
       "title": "Confirm Service",
@@ -564,9 +589,9 @@
       "theme": "Theme",
       "theme_desc": "Toggle light/dark mode",
       "show_header": "Show Header Text",
-      "show_header_desc": "Display custom header on tickets",
+      "show_header_desc": "Show ticket header text in the ticket confirmation dialog",
       "show_footer": "Show Footer Text",
-      "show_footer_desc": "Display custom footer on tickets",
+      "show_footer_desc": "Show ticket footer text in the ticket confirmation dialog",
       "printer_ip": "Printer IP Address",
       "printer_port": "Printer Port",
       "printer_type": "Printer Type",
@@ -591,7 +616,12 @@
       "save_success": "Settings saved",
       "save_error": "Failed to save settings",
       "saving": "Saving...",
-      "save_changes": "Save Changes"
+      "save_changes": "Save Changes",
+      "show_unit_in_header": "Show unit name in header",
+      "show_unit_in_header_desc": "On the left, next to the logo. Turn off to hide the title.",
+      "kiosk_unit_label_text": "Header label (optional)",
+      "kiosk_unit_label_placeholder": "Default: {unitName}",
+      "kiosk_unit_label_help": "Leave empty to use the unit name."
     },
     "lock_screen": {
       "kiosk_locked": "Kiosk Locked",
@@ -599,6 +629,7 @@
     },
     "pre_registration": {
       "button": "I have a code",
+      "backspace": "Delete last digit",
       "enter_code": "Enter Code",
       "invalid_code": "Invalid code. Please try again.",
       "cancel": "Cancel",

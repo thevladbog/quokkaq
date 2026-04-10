@@ -27,11 +27,14 @@ import {
   testPrintLines,
   type PrinterInfo
 } from '@/lib/kiosk-print';
+import { useKioskHeaderFields } from '@/hooks/use-kiosk-header-fields';
 
 interface KioskSettingsSheetProps {
   isOpen: boolean;
   onClose: () => void;
   unitId: string;
+  /** Unit display name for placeholder (header label default). */
+  unitName?: string;
   currentConfig?: UnitConfig | null;
   onLock: () => void;
   isLocked: boolean;
@@ -42,6 +45,7 @@ export function KioskSettingsSheet({
   isOpen,
   onClose,
   unitId,
+  unitName = '',
   currentConfig,
   onLock,
   isLocked,
@@ -63,6 +67,7 @@ export function KioskSettingsSheet({
         {isOpen && (
           <KioskSettingsForm
             unitId={unitId}
+            unitName={unitName}
             currentConfig={currentConfig}
             onClose={onClose}
             onLock={onLock}
@@ -77,6 +82,7 @@ export function KioskSettingsSheet({
 
 function KioskSettingsForm({
   unitId,
+  unitName,
   currentConfig,
   onClose,
   onLock,
@@ -84,6 +90,7 @@ function KioskSettingsForm({
   onUnlock
 }: {
   unitId: string;
+  unitName: string;
   currentConfig?: UnitConfig | null;
   onClose: () => void;
   onLock: () => void;
@@ -133,14 +140,22 @@ function KioskSettingsForm({
   const [printers, setPrinters] = useState<PrinterInfo[]>([]);
   const [loadingPrinters, setLoadingPrinters] = useState(false);
   const [logoUrl, setLogoUrl] = useState(currentConfig?.kiosk?.logoUrl || '');
+  const {
+    showUnitInHeader,
+    setShowUnitInHeader,
+    kioskUnitLabelText,
+    setKioskUnitLabelText,
+    headerKioskSaveFields
+  } = useKioskHeaderFields(currentConfig?.kiosk ?? undefined);
 
   const handleSave = () => {
     const newConfig = {
       ...currentConfig,
       kiosk: {
-        ...currentConfig?.kiosk,
+        ...(currentConfig?.kiosk || {}),
         showHeader,
         showFooter,
+        ...headerKioskSaveFields(),
         printerConnection,
         systemPrinterName:
           printerConnection === 'system'
@@ -260,6 +275,42 @@ function KioskSettingsForm({
             onLogoUploaded={setLogoUrl}
             onLogoRemoved={() => setLogoUrl('')}
           />
+        </div>
+
+        <div className='space-y-4 border-b pb-4'>
+          <div className='flex items-center justify-between gap-4'>
+            <div className='space-y-0.5'>
+              <Label htmlFor='sheet-show-unit'>
+                {t('show_unit_in_header')}
+              </Label>
+              <p className='text-muted-foreground text-sm'>
+                {t('show_unit_in_header_desc')}
+              </p>
+            </div>
+            <Switch
+              id='sheet-show-unit'
+              checked={showUnitInHeader}
+              onCheckedChange={setShowUnitInHeader}
+            />
+          </div>
+          {showUnitInHeader ? (
+            <div className='space-y-2'>
+              <Label htmlFor='sheet-unit-label'>
+                {t('kiosk_unit_label_text')}
+              </Label>
+              <Input
+                id='sheet-unit-label'
+                value={kioskUnitLabelText}
+                onChange={(e) => setKioskUnitLabelText(e.target.value)}
+                placeholder={t('kiosk_unit_label_placeholder', {
+                  unitName: unitName || '—'
+                })}
+              />
+              <p className='text-muted-foreground text-xs'>
+                {t('kiosk_unit_label_help')}
+              </p>
+            </div>
+          ) : null}
         </div>
 
         <div className='flex items-center justify-between'>

@@ -17,39 +17,42 @@ import {
 import { useUpdateUnit } from '@/lib/hooks';
 import { toast } from 'sonner';
 import { LogoUpload } from '@/components/ui/logo-upload';
-
-interface KioskConfig {
-  pin?: string;
-  headerText?: string;
-  footerText?: string;
-  printerConnection?: 'network' | 'system';
-  systemPrinterName?: string;
-  printerIp?: string;
-  printerPort?: string;
-  printerType?: string;
-  isPrintEnabled?: boolean;
-  logoUrl?: string;
-  feedbackUrl?: string;
-  isPreRegistrationEnabled?: boolean;
-  isCustomColorsEnabled?: boolean;
-  headerColor?: string;
-  bodyColor?: string;
-  serviceGridColor?: string;
-}
+import type { KioskConfig } from '@quokkaq/shared-types';
+import { useKioskHeaderFields } from '@/hooks/use-kiosk-header-fields';
 
 interface KioskSettingsProps {
   unitId: string;
+  /** Default header label when kiosk unit label is empty. */
+  unitName: string;
   currentConfig: Record<string, unknown>;
 }
 
-export function KioskSettings({ unitId, currentConfig }: KioskSettingsProps) {
+export function KioskSettings({
+  unitId,
+  unitName,
+  currentConfig
+}: KioskSettingsProps) {
   const t = useTranslations('admin.kiosk_settings');
   const updateUnitMutation = useUpdateUnit();
 
   const typedConfig = currentConfig as { kiosk?: KioskConfig };
   const kioskConfig = typedConfig.kiosk || {};
 
+  const {
+    showUnitInHeader,
+    setShowUnitInHeader,
+    kioskUnitLabelText,
+    setKioskUnitLabelText,
+    headerKioskSaveFields
+  } = useKioskHeaderFields(kioskConfig);
+
   const [pin, setPin] = useState(kioskConfig.pin || '');
+  const [welcomeTitle, setWelcomeTitle] = useState(
+    kioskConfig.welcomeTitle || ''
+  );
+  const [welcomeSubtitle, setWelcomeSubtitle] = useState(
+    kioskConfig.welcomeSubtitle || ''
+  );
   const [headerText, setHeaderText] = useState(kioskConfig.headerText || '');
   const [footerText, setFooterText] = useState(kioskConfig.footerText || '');
   const inferConn = (): 'network' | 'system' => {
@@ -109,6 +112,8 @@ export function KioskSettings({ unitId, currentConfig }: KioskSettingsProps) {
       kiosk: {
         ...(typedConfig.kiosk || {}),
         pin,
+        welcomeTitle: welcomeTitle.trim() || undefined,
+        welcomeSubtitle: welcomeSubtitle.trim() || undefined,
         headerText,
         footerText,
         printerConnection,
@@ -121,6 +126,7 @@ export function KioskSettings({ unitId, currentConfig }: KioskSettingsProps) {
         printerType,
         isPrintEnabled,
         logoUrl,
+        ...headerKioskSaveFields(),
         feedbackUrl,
         isPreRegistrationEnabled,
         isCustomColorsEnabled,
@@ -158,6 +164,42 @@ export function KioskSettings({ unitId, currentConfig }: KioskSettingsProps) {
               onLogoUploaded={setLogoUrl}
               onLogoRemoved={() => setLogoUrl('')}
             />
+          </div>
+
+          <div className='space-y-4 border-b pb-4'>
+            <div className='flex items-center justify-between gap-4'>
+              <div className='space-y-0.5'>
+                <Label htmlFor='admin-show-unit'>
+                  {t('show_unit_in_header')}
+                </Label>
+                <p className='text-muted-foreground text-sm'>
+                  {t('show_unit_in_header_desc')}
+                </p>
+              </div>
+              <Switch
+                id='admin-show-unit'
+                checked={showUnitInHeader}
+                onCheckedChange={setShowUnitInHeader}
+              />
+            </div>
+            {showUnitInHeader ? (
+              <div className='space-y-2'>
+                <Label htmlFor='admin-unit-label'>
+                  {t('kiosk_unit_label_text')}
+                </Label>
+                <Input
+                  id='admin-unit-label'
+                  value={kioskUnitLabelText}
+                  onChange={(e) => setKioskUnitLabelText(e.target.value)}
+                  placeholder={t('kiosk_unit_label_placeholder', {
+                    unitName: unitName.trim() || '—'
+                  })}
+                />
+                <p className='text-muted-foreground text-xs'>
+                  {t('kiosk_unit_label_help')}
+                </p>
+              </div>
+            ) : null}
           </div>
 
           {/* Color Settings Section */}
@@ -263,24 +305,60 @@ export function KioskSettings({ unitId, currentConfig }: KioskSettingsProps) {
             <p className='text-muted-foreground text-xs'>{t('pin_help')}</p>
           </div>
 
-          <div className='space-y-2'>
-            <Label htmlFor='ticket-header'>{t('ticket_header')}</Label>
-            <Textarea
-              id='ticket-header'
-              value={headerText}
-              onChange={(e) => setHeaderText(e.target.value)}
-              placeholder={t('header_placeholder')}
-            />
+          <div className='space-y-4 border-t pt-4'>
+            <p className='text-muted-foreground text-sm'>
+              {t('welcome_section_desc')}
+            </p>
+            <div className='space-y-2'>
+              <Label htmlFor='welcome-title'>{t('welcome_title')}</Label>
+              <Input
+                id='welcome-title'
+                value={welcomeTitle}
+                onChange={(e) => setWelcomeTitle(e.target.value)}
+                placeholder={t('welcome_title_placeholder')}
+              />
+              <p className='text-muted-foreground text-xs'>
+                {t('welcome_title_help')}
+              </p>
+            </div>
+            <div className='space-y-2'>
+              <Label htmlFor='welcome-subtitle'>{t('welcome_subtitle')}</Label>
+              <Textarea
+                id='welcome-subtitle'
+                value={welcomeSubtitle}
+                onChange={(e) => setWelcomeSubtitle(e.target.value)}
+                placeholder={t('welcome_subtitle_placeholder')}
+                rows={2}
+              />
+              <p className='text-muted-foreground text-xs'>
+                {t('welcome_subtitle_help')}
+              </p>
+            </div>
           </div>
 
-          <div className='space-y-2'>
-            <Label htmlFor='ticket-footer'>{t('ticket_footer')}</Label>
-            <Textarea
-              id='ticket-footer'
-              value={footerText}
-              onChange={(e) => setFooterText(e.target.value)}
-              placeholder={t('footer_placeholder')}
-            />
+          <div className='space-y-4 border-t pt-4'>
+            <p className='text-muted-foreground text-sm'>
+              {t('ticket_text_section_desc')}
+            </p>
+            <div className='space-y-2'>
+              <Label htmlFor='ticket-header'>{t('ticket_header')}</Label>
+              <Textarea
+                id='ticket-header'
+                value={headerText}
+                onChange={(e) => setHeaderText(e.target.value)}
+                placeholder={t('header_placeholder')}
+              />
+            </div>
+
+            <div className='space-y-2'>
+              <Label htmlFor='ticket-footer'>{t('ticket_footer')}</Label>
+              <Textarea
+                id='ticket-footer'
+                value={footerText}
+                onChange={(e) => setFooterText(e.target.value)}
+                placeholder={t('footer_placeholder')}
+              />
+            </div>
           </div>
 
           <div className='space-y-2'>

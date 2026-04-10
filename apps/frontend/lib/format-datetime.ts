@@ -74,7 +74,7 @@ export function formatAppDateTime(
 }
 
 export function formatAppTime(
-  value: string | Date,
+  value: string | Date | null | undefined,
   intlLocale: string
 ): string {
   const d = parseDate(value);
