@@ -625,10 +625,10 @@ export const unitsApi = {
       z.array(TicketModelSchema)
     ),
 
-  getServicesTree: (unitId: string) =>
+  getServicesTree: (unitId: string, init?: RequestInit) =>
     apiRequest<Service[]>(
       `/units/${unitId}/services-tree`,
-      {},
+      init ?? {},
       z.array(ServiceModelSchema)
     ),
 

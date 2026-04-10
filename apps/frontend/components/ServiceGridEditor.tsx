@@ -1,9 +1,15 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  startTransition
+} from 'react';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
-import { Service, Unit, servicesApi, unitsApi } from '@/lib/api';
+import { Service, Unit, unitsApi } from '@/lib/api';
 import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -221,6 +227,14 @@ const GridServiceOverlay: React.FC<{
   resizeLabel
 }) => {
   const overlayOuterRef = useRef<HTMLDivElement>(null);
+  const resizeGestureCleanupRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    return () => {
+      resizeGestureCleanupRef.current?.();
+      resizeGestureCleanupRef.current = null;
+    };
+  }, []);
 
   const [resizePreview, setResizePreview] = useState<{
     colSpan: number;
@@ -295,6 +309,9 @@ const GridServiceOverlay: React.FC<{
     e.preventDefault();
     e.stopPropagation();
 
+    resizeGestureCleanupRef.current?.();
+    resizeGestureCleanupRef.current = null;
+
     const sid = service.id;
     const baseCol = service.gridCol!;
     const baseRow = service.gridRow!;
@@ -302,6 +319,7 @@ const GridServiceOverlay: React.FC<{
     const startRs = service.gridRowSpan || 1;
     const startX = e.clientX;
     const startY = e.clientY;
+    const pointerId = e.pointerId;
 
     const outer = overlayOuterRef.current;
     const rect0 = outer?.getBoundingClientRect();
@@ -316,7 +334,7 @@ const GridServiceOverlay: React.FC<{
 
     const target = e.currentTarget;
     if (target instanceof HTMLElement && 'setPointerCapture' in target) {
-      target.setPointerCapture(e.pointerId);
+      target.setPointerCapture(pointerId);
     }
 
     setResizePreview({ colSpan: startCs, rowSpan: startRs });
@@ -336,23 +354,45 @@ const GridServiceOverlay: React.FC<{
       setResizePreview({ colSpan: newCs, rowSpan: newRs });
     };
 
-    const onUp = (ev: PointerEvent) => {
-      window.removeEventListener('pointermove', onMove);
-      const { newCs, newRs } = spansFromClient(ev.clientX, ev.clientY);
-      setResizePreview(null);
-      if (
-        target instanceof HTMLElement &&
-        target.hasPointerCapture(ev.pointerId)
-      ) {
-        target.releasePointerCapture(ev.pointerId);
-      }
-      if (newCs !== startCs || newRs !== startRs) {
-        onGridSpanCommit(sid, newCs, newRs);
+    const releaseCapture = () => {
+      if (target instanceof HTMLElement) {
+        try {
+          if (target.hasPointerCapture(pointerId)) {
+            target.releasePointerCapture(pointerId);
+          }
+        } catch {
+          /* ignore */
+        }
       }
     };
 
+    let gestureEnded = false;
+    const endResize = (ev: PointerEvent | null, commit: boolean) => {
+      if (gestureEnded) return;
+      gestureEnded = true;
+      resizeGestureCleanupRef.current = null;
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onEnd);
+      window.removeEventListener('pointercancel', onEnd);
+      setResizePreview(null);
+      releaseCapture();
+      if (commit && ev) {
+        const { newCs, newRs } = spansFromClient(ev.clientX, ev.clientY);
+        if (newCs !== startCs || newRs !== startRs) {
+          onGridSpanCommit(sid, newCs, newRs);
+        }
+      }
+    };
+
+    const onEnd = (ev: PointerEvent) => {
+      endResize(ev, ev.type === 'pointerup');
+    };
+
+    resizeGestureCleanupRef.current = () => endResize(null, false);
+
     window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp, { once: true });
+    window.addEventListener('pointerup', onEnd, { once: true });
+    window.addEventListener('pointercancel', onEnd, { once: true });
   };
 
   return (
@@ -1281,6 +1321,8 @@ const ServiceGridEditor: React.FC<ServiceGridEditorProps> = ({ unitId }) => {
 
   const activeUnitId = unitId ?? selectedUnitId;
 
+  const servicesTreeFetchSeqRef = useRef(0);
+
   useEffect(() => {
     if (!unitId) {
       const fetchUnits = async () => {
@@ -1296,50 +1338,82 @@ const ServiceGridEditor: React.FC<ServiceGridEditorProps> = ({ unitId }) => {
   }, [unitId]);
 
   useEffect(() => {
+    let effectAlive = true;
     const id = unitId || selectedUnitId;
-    if (id) {
-      unitsApi
-        .getServicesTree(id)
-        .then((servicesTree) => {
-          const flattenedServices: ServiceWithPosition[] = [];
-          const flattenTree = (services: Service[], level = 0) => {
-            services.forEach((service) => {
-              flattenedServices.push({
-                ...service,
-                gridRow:
-                  service.gridRow !== undefined && service.gridRow !== null
-                    ? Number(service.gridRow)
-                    : null,
-                gridCol:
-                  service.gridCol !== undefined && service.gridCol !== null
-                    ? Number(service.gridCol)
-                    : null,
-                gridRowSpan:
-                  service.gridRowSpan !== undefined &&
-                  service.gridRowSpan !== null
-                    ? Number(service.gridRowSpan)
-                    : 1,
-                gridColSpan:
-                  service.gridColSpan !== undefined &&
-                  service.gridColSpan !== null
-                    ? Number(service.gridColSpan)
-                    : 1,
-                children: service.children || [],
-                t: t
-              });
-              if (service.children && service.children.length > 0) {
-                flattenTree(service.children, level + 1);
-              }
-            });
-          };
-          flattenTree(servicesTree);
-          setServices(flattenedServices);
-        })
-        .catch((error) => {
-          console.error('Error loading services:', error);
-        })
-        .finally(() => setIsLoading(false));
+    if (!id) {
+      startTransition(() => setIsLoading(false));
+      return () => {
+        effectAlive = false;
+      };
     }
+
+    const ac = new AbortController();
+    const seq = ++servicesTreeFetchSeqRef.current;
+    startTransition(() => setIsLoading(true));
+
+    unitsApi
+      .getServicesTree(id, { signal: ac.signal })
+      .then((servicesTree) => {
+        if (!effectAlive || seq !== servicesTreeFetchSeqRef.current) {
+          return;
+        }
+        const flattenedServices: ServiceWithPosition[] = [];
+        const flattenTree = (services: Service[], level = 0) => {
+          services.forEach((service) => {
+            flattenedServices.push({
+              ...service,
+              gridRow:
+                service.gridRow !== undefined && service.gridRow !== null
+                  ? Number(service.gridRow)
+                  : null,
+              gridCol:
+                service.gridCol !== undefined && service.gridCol !== null
+                  ? Number(service.gridCol)
+                  : null,
+              gridRowSpan:
+                service.gridRowSpan !== undefined &&
+                service.gridRowSpan !== null
+                  ? Number(service.gridRowSpan)
+                  : 1,
+              gridColSpan:
+                service.gridColSpan !== undefined &&
+                service.gridColSpan !== null
+                  ? Number(service.gridColSpan)
+                  : 1,
+              children: service.children || [],
+              t: t
+            });
+            if (service.children && service.children.length > 0) {
+              flattenTree(service.children, level + 1);
+            }
+          });
+        };
+        flattenTree(servicesTree);
+        setServices(flattenedServices);
+      })
+      .catch((error: unknown) => {
+        if (!effectAlive || seq !== servicesTreeFetchSeqRef.current) {
+          return;
+        }
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          return;
+        }
+        if (error instanceof Error && error.name === 'AbortError') {
+          return;
+        }
+        console.error('Error loading services:', error);
+      })
+      .finally(() => {
+        if (!effectAlive || seq !== servicesTreeFetchSeqRef.current) {
+          return;
+        }
+        startTransition(() => setIsLoading(false));
+      });
+
+    return () => {
+      effectAlive = false;
+      ac.abort();
+    };
   }, [unitId, selectedUnitId, t]);
 
   const handleUnitSelect = (id: string) => {
@@ -1434,7 +1508,8 @@ const ServiceGridEditor: React.FC<ServiceGridEditorProps> = ({ unitId }) => {
 
     void (async () => {
       try {
-        await servicesApi.update(updatedService.id, {
+        await updateServiceMutation.mutateAsync({
+          id: updatedService.id,
           gridRow: null,
           gridCol: null,
           gridRowSpan: 1,

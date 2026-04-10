@@ -35,7 +35,11 @@ import {
   ticketReceiptLines
 } from '@/lib/kiosk-print';
 import { intlLocaleFromAppLocale } from '@/lib/format-datetime';
-import { SERVICE_GRID_CELL_COUNT, SERVICE_GRID_COLS } from '@/lib/service-grid';
+import {
+  SERVICE_GRID_CELL_COUNT,
+  SERVICE_GRID_COLS,
+  SERVICE_GRID_ROWS
+} from '@/lib/service-grid';
 
 export default function UnitKioskPage() {
   const params = useParams() as { unitId?: string };
@@ -294,44 +298,28 @@ export default function UnitKioskPage() {
     }
   };
 
-  if (servicesLoading) {
-    return (
-      <div
-        className='text-kiosk-ink flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-4'
-        style={{ backgroundColor: bodyColor }}
-      >
-        <KioskTopBar
-          intlLocale={intlLocale}
-          currentTime={currentTime}
-          onClockClick={handleClockClick}
-          headerColor={headerColor}
-          leading={topBarLeading}
-          beforeClock={topBarBeforeClock}
-        />
+  return (
+    <div
+      className='text-kiosk-ink flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-4'
+      style={{ backgroundColor: bodyColor }}
+    >
+      <KioskTopBar
+        intlLocale={intlLocale}
+        currentTime={currentTime}
+        onClockClick={handleClockClick}
+        headerColor={headerColor}
+        leading={topBarLeading}
+        beforeClock={topBarBeforeClock}
+      />
+
+      {servicesLoading ? (
         <div className='flex min-h-0 flex-1 items-center justify-center overflow-hidden'>
           <div className='text-center'>
             <div className='border-kiosk-ink/30 mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-2 border-b-transparent'></div>
             <p className='text-kiosk-ink-muted'>{t('loading')}</p>
           </div>
         </div>
-      </div>
-    );
-  }
-
-  if (servicesQueryError) {
-    return (
-      <div
-        className='text-kiosk-ink flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-4'
-        style={{ backgroundColor: bodyColor }}
-      >
-        <KioskTopBar
-          intlLocale={intlLocale}
-          currentTime={currentTime}
-          onClockClick={handleClockClick}
-          headerColor={headerColor}
-          leading={topBarLeading}
-          beforeClock={topBarBeforeClock}
-        />
+      ) : servicesQueryError ? (
         <div className='flex min-h-0 flex-1 items-center justify-center overflow-hidden'>
           <div className='max-w-md px-4 text-center'>
             <h2 className='mb-2 text-2xl font-bold tracking-tight sm:text-3xl'>
@@ -353,25 +341,7 @@ export default function UnitKioskPage() {
             </Button>
           </div>
         </div>
-      </div>
-    );
-  }
-
-  // If no services are available at the current level
-  if (visibleServices.length === 0) {
-    return (
-      <div
-        className='text-kiosk-ink flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-4'
-        style={{ backgroundColor: bodyColor }}
-      >
-        <KioskTopBar
-          intlLocale={intlLocale}
-          currentTime={currentTime}
-          onClockClick={handleClockClick}
-          headerColor={headerColor}
-          leading={topBarLeading}
-          beforeClock={topBarBeforeClock}
-        />
+      ) : visibleServices.length === 0 ? (
         <div className='flex min-h-0 flex-1 items-center justify-center overflow-hidden'>
           <div className='max-w-md px-4 text-center'>
             <h2 className='mb-2 text-2xl font-bold tracking-tight sm:text-3xl'>
@@ -396,151 +366,141 @@ export default function UnitKioskPage() {
             </Button>
           </div>
         </div>
-      </div>
-    );
-  }
+      ) : (
+        <>
+          <KioskWelcomeHero title={heroTitle} subtitle={heroSubtitle} />
 
-  return (
-    <div
-      className='text-kiosk-ink flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-4'
-      style={{ backgroundColor: bodyColor }}
-    >
-      <KioskTopBar
-        intlLocale={intlLocale}
-        currentTime={currentTime}
-        onClockClick={handleClockClick}
-        headerColor={headerColor}
-        leading={topBarLeading}
-        beforeClock={topBarBeforeClock}
-      />
+          {/* Navigation breadcrumbs and buttons */}
+          <div className='border-kiosk-border/50 mb-2 flex shrink-0 items-center justify-between rounded-xl border bg-white/40 px-3 py-2 sm:mb-3 sm:px-4'>
+            <div className='text-kiosk-ink-muted flex min-w-0 items-center overflow-x-auto text-sm font-medium'>
+              <span className='mr-2 shrink-0 opacity-70'>#</span>
+              {selectedServicePath.length === 0 ? (
+                <span>{t('services', { defaultValue: 'Services' })}</span>
+              ) : (
+                selectedServicePath.map((service, index) => (
+                  <div key={index} className='flex items-center'>
+                    {index > 0 && (
+                      <Separator
+                        orientation='vertical'
+                        className='bg-kiosk-border mx-2 h-4'
+                      />
+                    )}
+                    <span className='text-kiosk-ink whitespace-nowrap'>
+                      {getLocalizedName(
+                        service.name,
+                        service.nameRu,
+                        service.nameEn,
+                        locale
+                      )}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
 
-      <KioskWelcomeHero title={heroTitle} subtitle={heroSubtitle} />
+            <div className='ml-3 flex shrink-0 items-center gap-2'>
+              {selectedServicePath.length > 1 && (
+                <Button
+                  variant='outline'
+                  size='sm'
+                  className='border-kiosk-border/60 rounded-full'
+                  onClick={() => setSelectedServicePath([])}
+                >
+                  <Home className='mr-2 h-4 w-4' />
+                  {t('home', { defaultValue: 'Home' })}
+                </Button>
+              )}
+              {selectedServicePath.length > 0 && (
+                <Button
+                  variant='outline'
+                  size='sm'
+                  className='border-kiosk-border/60 rounded-full'
+                  onClick={handleGoBack}
+                >
+                  <ArrowLeft className='mr-2 h-4 w-4' />
+                  {t('back', { defaultValue: 'Back' })}
+                </Button>
+              )}
+            </div>
+          </div>
 
-      {/* Navigation breadcrumbs and buttons */}
-      <div className='border-kiosk-border/50 mb-2 flex shrink-0 items-center justify-between rounded-xl border bg-white/40 px-3 py-2 sm:mb-3 sm:px-4'>
-        <div className='text-kiosk-ink-muted flex min-w-0 items-center overflow-x-auto text-sm font-medium'>
-          <span className='mr-2 shrink-0 opacity-70'>#</span>
-          {selectedServicePath.length === 0 ? (
-            <span>{t('services', { defaultValue: 'Services' })}</span>
-          ) : (
-            selectedServicePath.map((service, index) => (
-              <div key={index} className='flex items-center'>
-                {index > 0 && (
-                  <Separator
-                    orientation='vertical'
-                    className='bg-kiosk-border mx-2 h-4'
+          {/* Services grid — fills remaining viewport height; no page scroll */}
+          <div
+            className='grid min-h-0 w-full min-w-0 flex-1 gap-1.5 overflow-hidden rounded-2xl p-2 sm:gap-2 sm:p-3 md:gap-3 md:p-4'
+            style={{
+              backgroundColor: serviceGridColor,
+              gridTemplateColumns: `repeat(${SERVICE_GRID_COLS}, minmax(0, 1fr))`,
+              gridTemplateRows: `repeat(${SERVICE_GRID_ROWS}, minmax(0, 1fr))`
+            }}
+          >
+            {/* Render services with their exact grid positions */}
+            {visibleServices.map((service) => {
+              if (service.gridRow !== null && service.gridCol !== null) {
+                const startRow = (service.gridRow ?? 0) + 1;
+                const startCol = (service.gridCol ?? 0) + 1;
+                const rowSpan = service.gridRowSpan || 1;
+                const colSpan = service.gridColSpan || 1;
+
+                return (
+                  <div
+                    key={service.id}
+                    className='h-full min-h-0 w-full min-w-0'
+                    style={{
+                      gridRow: `${startRow} / span ${rowSpan}`,
+                      gridColumn: `${startCol} / span ${colSpan}`
+                    }}
+                  >
+                    <KioskServiceTile
+                      service={service}
+                      locale={locale}
+                      onSelect={handleServiceSelection}
+                    />
+                  </div>
+                );
+              }
+
+              return null;
+            })}
+
+            {/* Add empty cells to fill up the grid structure where no services are positioned */}
+            {Array.from({ length: SERVICE_GRID_CELL_COUNT }).map((_, index) => {
+              const row = Math.floor(index / SERVICE_GRID_COLS);
+              const col = index % SERVICE_GRID_COLS;
+
+              // Check if this cell is already occupied by a service
+              const isOccupied = visibleServices.some((service) => {
+                if (service.gridRow === null || service.gridCol === null) {
+                  return false;
+                }
+
+                // Check if this cell falls within the service's grid position
+                return (
+                  row >= (service.gridRow || 0) &&
+                  row < (service.gridRow || 0) + (service.gridRowSpan || 1) &&
+                  col >= (service.gridCol || 0) &&
+                  col < (service.gridCol || 0) + (service.gridColSpan || 1)
+                );
+              });
+
+              // Only render empty cell if not occupied
+              if (!isOccupied) {
+                return (
+                  <div
+                    key={`empty-${row}-${col}`}
+                    className='border-0 opacity-0'
+                    style={{
+                      gridRow: `${row + 1}`,
+                      gridColumn: `${col + 1}`
+                    }}
                   />
-                )}
-                <span className='text-kiosk-ink whitespace-nowrap'>
-                  {getLocalizedName(
-                    service.name,
-                    service.nameRu,
-                    service.nameEn,
-                    locale
-                  )}
-                </span>
-              </div>
-            ))
-          )}
-        </div>
+                );
+              }
 
-        <div className='ml-3 flex shrink-0 items-center gap-2'>
-          {selectedServicePath.length > 1 && (
-            <Button
-              variant='outline'
-              size='sm'
-              className='border-kiosk-border/60 rounded-full'
-              onClick={() => setSelectedServicePath([])}
-            >
-              <Home className='mr-2 h-4 w-4' />
-              {t('home', { defaultValue: 'Home' })}
-            </Button>
-          )}
-          {selectedServicePath.length > 0 && (
-            <Button
-              variant='outline'
-              size='sm'
-              className='border-kiosk-border/60 rounded-full'
-              onClick={handleGoBack}
-            >
-              <ArrowLeft className='mr-2 h-4 w-4' />
-              {t('back', { defaultValue: 'Back' })}
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* Services grid — fills remaining viewport height; no page scroll */}
-      <div
-        className='grid min-h-0 w-full min-w-0 flex-1 grid-cols-8 grid-rows-8 gap-1.5 overflow-hidden rounded-2xl p-2 sm:gap-2 sm:p-3 md:gap-3 md:p-4'
-        style={{ backgroundColor: serviceGridColor }}
-      >
-        {/* Render services with their exact grid positions */}
-        {visibleServices.map((service) => {
-          if (service.gridRow !== null && service.gridCol !== null) {
-            const startRow = (service.gridRow ?? 0) + 1;
-            const startCol = (service.gridCol ?? 0) + 1;
-            const rowSpan = service.gridRowSpan || 1;
-            const colSpan = service.gridColSpan || 1;
-
-            return (
-              <div
-                key={service.id}
-                className='h-full min-h-0 w-full min-w-0'
-                style={{
-                  gridRow: `${startRow} / span ${rowSpan}`,
-                  gridColumn: `${startCol} / span ${colSpan}`
-                }}
-              >
-                <KioskServiceTile
-                  service={service}
-                  locale={locale}
-                  onSelect={handleServiceSelection}
-                />
-              </div>
-            );
-          }
-
-          return null;
-        })}
-
-        {/* Add empty cells to fill up the grid structure where no services are positioned */}
-        {Array.from({ length: SERVICE_GRID_CELL_COUNT }).map((_, index) => {
-          const row = Math.floor(index / SERVICE_GRID_COLS);
-          const col = index % SERVICE_GRID_COLS;
-
-          // Check if this cell is already occupied by a service
-          const isOccupied = visibleServices.some((service) => {
-            if (service.gridRow === null || service.gridCol === null) {
-              return false;
-            }
-
-            // Check if this cell falls within the service's grid position
-            return (
-              row >= (service.gridRow || 0) &&
-              row < (service.gridRow || 0) + (service.gridRowSpan || 1) &&
-              col >= (service.gridCol || 0) &&
-              col < (service.gridCol || 0) + (service.gridColSpan || 1)
-            );
-          });
-
-          // Only render empty cell if not occupied
-          if (!isOccupied) {
-            return (
-              <div
-                key={`empty-${row}-${col}`}
-                className='border-0 opacity-0'
-                style={{
-                  gridRow: `${row + 1}`,
-                  gridColumn: `${col + 1}`
-                }}
-              />
-            );
-          }
-
-          return null;
-        })}
-      </div>
+              return null;
+            })}
+          </div>
+        </>
+      )}
 
       {/* Ticket modal */}
       <Dialog

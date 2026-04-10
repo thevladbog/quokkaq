@@ -439,6 +439,23 @@ export const useUpdateService = () => {
       id,
       ...serviceData
     }: { id: string } & Partial<Omit<Service, 'id'>>) => {
+      const has = (k: keyof typeof serviceData) =>
+        Object.prototype.hasOwnProperty.call(serviceData, k);
+      const clearingGrid =
+        has('gridRow') &&
+        has('gridCol') &&
+        serviceData.gridRow === null &&
+        serviceData.gridCol === null;
+
+      if (clearingGrid) {
+        return servicesApi.update(id, {
+          gridRow: null,
+          gridCol: null,
+          gridRowSpan: serviceData.gridRowSpan ?? 1,
+          gridColSpan: serviceData.gridColSpan ?? 1
+        });
+      }
+
       const filteredData = filterEmptyValues(serviceData);
       return servicesApi.update(id, filteredData);
     },
