@@ -457,8 +457,8 @@ func toSubscriptionPtrSlice(in []models.Subscription) []*models.Subscription {
 
 // PlatformCreateSubscriptionBody is the JSON body for POST /platform/subscriptions.
 type PlatformCreateSubscriptionBody struct {
-	CompanyID          string     `json:"companyId"`
-	PlanID             string     `json:"planId"`
+	CompanyID          string     `json:"companyId" binding:"required"`
+	PlanID             string     `json:"planId" binding:"required"`
 	Status             *string    `json:"status"`
 	CurrentPeriodStart *time.Time `json:"currentPeriodStart"`
 	CurrentPeriodEnd   *time.Time `json:"currentPeriodEnd"`

@@ -1602,7 +1602,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns one non-draft invoice with lines for the authenticated user's company. Draft invoices and invoices belonging to other companies are not exposed (404/403).",
+                "description": "Returns one non-draft invoice with lines for the authenticated user's company. Draft invoices and rows outside the tenant company are not exposed (404).",
                 "consumes": [
                     "application/json"
                 ],
@@ -1631,12 +1631,6 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
                         "schema": {
                             "type": "string"
                         }
@@ -6591,6 +6585,10 @@ const docTemplate = `{
         },
         "handlers.PlatformCreateSubscriptionBody": {
             "type": "object",
+            "required": [
+                "companyId",
+                "planId"
+            ],
             "properties": {
                 "companyId": {
                     "type": "string"

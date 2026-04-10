@@ -32,6 +32,8 @@ type InvoiceRepository interface {
 	Create(invoice *models.Invoice) error
 	FindByID(id string) (*models.Invoice, error)
 	FindByIDWithLines(id string) (*models.Invoice, error)
+	// FindByIDWithLinesForCompany scopes the row to a tenant company (404 when missing or wrong company).
+	FindByIDWithLinesForCompany(id, companyID string) (*models.Invoice, error)
 	FindByCompanyID(companyID string) ([]models.Invoice, error)
 	FindByCompanyIDNonDraft(companyID string) ([]models.Invoice, error)
 	ListPaginated(companyID *string, limit, offset int) ([]models.Invoice, int64, error)
@@ -72,6 +74,23 @@ func (r *invoiceRepository) FindByIDWithLines(id string) (*models.Invoice, error
 		Preload("Company").
 		Preload("Subscription.Plan").
 		First(&invoice, "id = ?", id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &invoice, nil
+}
+
+func (r *invoiceRepository) FindByIDWithLinesForCompany(id, companyID string) (*models.Invoice, error) {
+	var invoice models.Invoice
+	err := database.DB.
+		Preload("Lines", func(db *gorm.DB) *gorm.DB {
+			return db.Order("position ASC")
+		}).
+		Preload("Lines.SubscriptionPlan").
+		Preload("Company").
+		Preload("Subscription.Plan").
+		Where("id = ? AND company_id = ?", id, companyID).
+		First(&invoice).Error
 	if err != nil {
 		return nil, err
 	}

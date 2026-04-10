@@ -34,6 +34,7 @@ import type {
   CompanyMeResponse,
   CatalogItem,
   InvoiceDraftUpsertBody,
+  InvoiceDraftCreateBody,
   PaymentAccount
 } from '@quokkaq/shared-types';
 
@@ -1584,7 +1585,7 @@ export const platformApi = {
       platformListResponseSchema(InvoiceSchema)
     ),
 
-  createInvoice: (body: InvoiceDraftUpsertBody) =>
+  createInvoice: (body: InvoiceDraftCreateBody) =>
     apiRequest<Invoice>(
       `/platform/invoices`,
       {

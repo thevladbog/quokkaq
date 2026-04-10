@@ -1034,7 +1034,11 @@
         "noId": "Не указан идентификатор счёта.",
         "issueInvoiceFailedDraftRestored": "Не удалось провести счёт ({detail}). Черновик возвращён к предыдущему сохранённому состоянию.",
         "issueInvoiceFailedRollbackFailed": "Не удалось провести счёт ({detail}). Откат черновика тоже не удался ({rollback}). Обновите страницу и проверьте счёт на сервере."
-      }
+      },
+      "referenceCompaniesError": "Не удалось загрузить организации для черновика.",
+      "referenceCompanyError": "Не удалось загрузить данные компании счёта.",
+      "referenceCatalogError": "Не удалось загрузить номенклатуру.",
+      "referencePlansError": "Не удалось загрузить тарифные планы."
     },
     "invoiceDetail": {
       "title": "Счёт",

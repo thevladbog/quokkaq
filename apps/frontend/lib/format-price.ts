@@ -86,8 +86,8 @@ export function normalizeAmountInputToDecimalString(
 export function validateVatRatePercentInput(raw: string): number | null {
   const s = raw.replace(',', '.').trim();
   if (s === '') return null;
-  const n = Number.parseFloat(s);
-  if (!Number.isFinite(n) || n < 0 || n > 100) return null;
+  const n = strictParseNonNegativeMajor(s);
+  if (n === null || n > 100) return null;
   return n;
 }
 

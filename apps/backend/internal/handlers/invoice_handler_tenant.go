@@ -46,7 +46,7 @@ const yooKassaDevPaymentReturnURL = "https://localhost/payment-return"
 
 // GetMyInvoiceByID godoc
 // @Summary      Get invoice by ID (tenant)
-// @Description  Returns one non-draft invoice with lines for the authenticated user's company. Draft invoices and invoices belonging to other companies are not exposed (404/403).
+// @Description  Returns one non-draft invoice with lines for the authenticated user's company. Draft invoices and rows outside the tenant company are not exposed (404).
 // @Tags         invoices
 // @Accept       json
 // @Produce      json
@@ -54,7 +54,6 @@ const yooKassaDevPaymentReturnURL = "https://localhost/payment-return"
 // @Param        id   path      string  true  "Invoice ID"
 // @Success      200  {object}  models.Invoice
 // @Failure      401  {string}  string "Unauthorized"
-// @Failure      403  {string}  string "Forbidden"
 // @Failure      404  {string}  string "Not found"
 // @Failure      500  {string}  string "Internal server error"
 // @Router       /invoices/{id} [get]
@@ -75,7 +74,7 @@ func (h *InvoiceHandler) GetMyInvoiceByID(w http.ResponseWriter, r *http.Request
 		return
 	}
 	id := strings.TrimSpace(chi.URLParam(r, "id"))
-	inv, err := h.invoiceRepo.FindByIDWithLines(id)
+	inv, err := h.invoiceRepo.FindByIDWithLinesForCompany(id, companyID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			http.Error(w, "Not found", http.StatusNotFound)
@@ -83,10 +82,6 @@ func (h *InvoiceHandler) GetMyInvoiceByID(w http.ResponseWriter, r *http.Request
 		}
 		log.Printf("GetMyInvoiceByID: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	if inv.CompanyID == nil || *inv.CompanyID != companyID {
-		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 	if inv.Status == "draft" {
@@ -160,17 +155,13 @@ func (h *InvoiceHandler) RequestYooKassaPaymentLink(w http.ResponseWriter, r *ht
 		return
 	}
 	id := strings.TrimSpace(chi.URLParam(r, "id"))
-	inv, err := h.invoiceRepo.FindByIDWithLines(id)
+	inv, err := h.invoiceRepo.FindByIDWithLinesForCompany(id, companyID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			http.Error(w, "Not found", http.StatusNotFound)
 			return
 		}
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	if inv.CompanyID == nil || *inv.CompanyID != companyID {
-		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 	if !inv.AllowYookassaPaymentLink {
@@ -218,7 +209,18 @@ func (h *InvoiceHandler) RequestYooKassaPaymentLink(w http.ResponseWriter, r *ht
 	}
 	if err := h.invoiceRepo.UpdateYookassaPayment(inv.ID, payID, url); err != nil {
 		log.Printf("RequestYooKassaPaymentLink Updates: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		fresh, ferr := h.invoiceRepo.FindByIDWithLinesForCompany(id, companyID)
+		if ferr == nil && strings.TrimSpace(fresh.YookassaConfirmationURL) != "" {
+			RespondJSON(w, map[string]string{
+				"confirmationUrl": fresh.YookassaConfirmationURL,
+				"paymentId":       fresh.YookassaPaymentID,
+			})
+			return
+		}
+		RespondJSON(w, map[string]string{
+			"confirmationUrl": url,
+			"paymentId":       payID,
+		})
 		return
 	}
 	RespondJSON(w, map[string]string{

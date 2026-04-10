@@ -406,7 +406,11 @@ export function PlatformInvoiceDraftForm({
     if (d) queueMicrotask(() => setCompanyId(d));
   }, [defaultCompanyId, initialInvoice?.id]);
 
-  const { data: companiesData } = useQuery({
+  const {
+    data: companiesData,
+    isError: companiesQueryError,
+    error: companiesErrorObj
+  } = useQuery({
     queryKey: ['platform-companies', 'invoice-draft'],
     queryFn: () => platformApi.listCompanies({ limit: 200 }),
     enabled: !isEdit
@@ -420,13 +424,22 @@ export function PlatformInvoiceDraftForm({
     }));
   }, [companiesData?.items]);
 
-  const { data: companyForEdit, isPending: companyForEditLoading } = useQuery({
+  const {
+    data: companyForEdit,
+    isPending: companyForEditLoading,
+    isError: companyForEditQueryError,
+    error: companyForEditErrorObj
+  } = useQuery({
     queryKey: ['platform-company', 'invoice-draft', companyId],
     queryFn: () => platformApi.getCompany(companyId),
     enabled: isEdit && !!companyId.trim()
   });
 
-  const { data: catalogData } = useQuery({
+  const {
+    data: catalogData,
+    isError: catalogQueryError,
+    error: catalogErrorObj
+  } = useQuery({
     queryKey: ['platform-catalog-items', 'invoice-draft'],
     queryFn: () => platformApi.listCatalogItems({ limit: 500 })
   });
@@ -436,10 +449,20 @@ export function PlatformInvoiceDraftForm({
     [catalogData?.items]
   );
 
-  const { data: plans = [] } = useQuery({
+  const {
+    data: plans = [],
+    isError: plansQueryError,
+    error: plansErrorObj
+  } = useQuery({
     queryKey: ['platform-subscription-plans', 'invoice-draft'],
     queryFn: () => platformApi.listSubscriptionPlans()
   });
+
+  const referenceDataBlocked =
+    (!isEdit && companiesQueryError) ||
+    (isEdit && !!companyId.trim() && companyForEditQueryError) ||
+    catalogQueryError ||
+    plansQueryError;
 
   const catalogById = useMemo(() => {
     const m = new Map<string, (typeof catalogItems)[number]>();
@@ -718,6 +741,7 @@ export function PlatformInvoiceDraftForm({
               options={companyOptions}
               value={companyId}
               onChange={setCompanyId}
+              disabled={companiesQueryError}
               placeholder={t('companyPlaceholder', {
                 defaultValue: 'Select organization…'
               })}
@@ -727,6 +751,38 @@ export function PlatformInvoiceDraftForm({
             />
           )}
         </div>
+        {!isEdit && companiesQueryError ? (
+          <p className='text-destructive text-sm' role='alert'>
+            {t('referenceCompaniesError')}{' '}
+            <span className='font-mono text-xs'>
+              {(companiesErrorObj as Error)?.message ?? ''}
+            </span>
+          </p>
+        ) : null}
+        {isEdit && !!companyId.trim() && companyForEditQueryError ? (
+          <p className='text-destructive text-sm' role='alert'>
+            {t('referenceCompanyError')}{' '}
+            <span className='font-mono text-xs'>
+              {(companyForEditErrorObj as Error)?.message ?? ''}
+            </span>
+          </p>
+        ) : null}
+        {catalogQueryError ? (
+          <p className='text-destructive text-sm' role='alert'>
+            {t('referenceCatalogError')}{' '}
+            <span className='font-mono text-xs'>
+              {(catalogErrorObj as Error)?.message ?? ''}
+            </span>
+          </p>
+        ) : null}
+        {plansQueryError ? (
+          <p className='text-destructive text-sm' role='alert'>
+            {t('referencePlansError')}{' '}
+            <span className='font-mono text-xs'>
+              {(plansErrorObj as Error)?.message ?? ''}
+            </span>
+          </p>
+        ) : null}
         <div className='grid grid-cols-1 gap-4 md:grid-cols-2 md:items-start md:gap-x-6 lg:gap-x-8'>
           <div className='grid min-w-0 gap-2'>
             <Label>{t('dueDate', { defaultValue: 'Due date' })}</Label>
@@ -838,6 +894,7 @@ export function PlatformInvoiceDraftForm({
                     </Label>
                     <Select
                       value={row.catalogItemId || '__none__'}
+                      disabled={catalogQueryError}
                       onValueChange={(v) => {
                         if (v === '__none__') {
                           setRows((prev) =>
@@ -1077,7 +1134,7 @@ export function PlatformInvoiceDraftForm({
                         <Label>{t('plan', { defaultValue: 'Plan' })}</Label>
                         <Select
                           value={row.subscriptionPlanId || ''}
-                          disabled={!provision}
+                          disabled={!provision || plansQueryError}
                           onValueChange={(v) =>
                             setRows((prev) =>
                               prev.map((r) =>
@@ -1242,7 +1299,7 @@ export function PlatformInvoiceDraftForm({
       <div className='flex flex-wrap gap-2'>
         {!isEdit ? (
           <Button
-            disabled={pending || !companyId.trim()}
+            disabled={pending || !companyId.trim() || referenceDataBlocked}
             onClick={() => createMut.mutate()}
           >
             {createMut.isPending && <Spinner className='mr-2 h-4 w-4' />}
@@ -1251,14 +1308,17 @@ export function PlatformInvoiceDraftForm({
         ) : (
           <>
             <Button
-              disabled={pending}
+              disabled={pending || referenceDataBlocked}
               variant='secondary'
               onClick={() => saveMut.mutate()}
             >
               {saveMut.isPending && <Spinner className='mr-2 h-4 w-4' />}
               {t('saveDraft', { defaultValue: 'Save draft' })}
             </Button>
-            <Button disabled={pending} onClick={() => issueMut.mutate()}>
+            <Button
+              disabled={pending || referenceDataBlocked}
+              onClick={() => issueMut.mutate()}
+            >
               {issueMut.isPending && <Spinner className='mr-2 h-4 w-4' />}
               {t('issue', { defaultValue: 'Issue invoice' })}
             </Button>

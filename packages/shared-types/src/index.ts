@@ -767,9 +767,19 @@ export const InvoiceDraftUpsertBodySchema = z.object({
   lines: z.array(InvoiceDraftLineInputSchema)
 });
 
+/** POST create draft: `companyId` is required (PATCH draft omits it). */
+export const InvoiceDraftCreateBodySchema = InvoiceDraftUpsertBodySchema.extend(
+  {
+    companyId: z.string().min(1)
+  }
+);
+
 export type InvoiceDraftLineInput = z.infer<typeof InvoiceDraftLineInputSchema>;
 export type InvoiceDraftUpsertBody = z.infer<
   typeof InvoiceDraftUpsertBodySchema
+>;
+export type InvoiceDraftCreateBody = z.infer<
+  typeof InvoiceDraftCreateBodySchema
 >;
 export type UsageMetric = z.infer<typeof UsageMetricSchema>;
 export type UsageMetrics = z.infer<typeof UsageMetricsSchema>;

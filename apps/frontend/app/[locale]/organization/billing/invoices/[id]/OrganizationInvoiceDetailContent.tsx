@@ -18,7 +18,8 @@ import {
 } from '@/lib/invoice-payment-purpose-ru';
 import { buildRuBankQrSt00012Payload } from '@/lib/ru-bank-qr-st00012';
 import dynamic from 'next/dynamic';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
+import { useRouter } from '@/src/i18n/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import { ArrowLeft, Download } from 'lucide-react';
@@ -153,6 +154,7 @@ export function OrganizationInvoiceDetailContent() {
 
   const qrPayload = useMemo(() => {
     if (!inv || !vendor || !defaultAccount) return null;
+    if (!paymentPurposeRu.trim()) return null;
     const cur = inv.currency?.trim().toUpperCase() || 'RUB';
     if (cur !== 'RUB') return null;
     const inn = vendor.counterparty?.inn?.replace(/\D/g, '') ?? '';

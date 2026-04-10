@@ -457,7 +457,8 @@
       "noShow": "Marked ticket {number} as no-show",
       "transferred": "Transferred ticket {number}",
       "failed": "Failed to {action} ticket",
-      "serviceStarted": "Started service for ticket {number}"
+      "serviceStarted": "Started service for ticket {number}",
+      "ticketCreated": "Ticket created successfully"
     },
     "selectUnit": "Please select a unit",
     "selectUnitButton": "Select Unit",
@@ -661,6 +662,7 @@
       "prefix": "Ticket Prefix",
       "number_sequence": "Number Sequence",
       "max_duration": "Max Service Duration (minutes)",
+      "max_waiting_time": "Max waiting time",
       "parent_service": "Parent Service",
       "no_parent": "No parent (root service)",
       "allow_prebooking": "Allow Prebooking",
@@ -1033,7 +1035,11 @@
         "noId": "Missing invoice id.",
         "issueInvoiceFailedDraftRestored": "Could not issue the invoice ({detail}). The draft was reverted to its previous saved state.",
         "issueInvoiceFailedRollbackFailed": "Could not issue the invoice ({detail}). Reverting the draft also failed ({rollback}). Refresh the page and verify the invoice on the server."
-      }
+      },
+      "referenceCompaniesError": "Could not load organizations for this draft.",
+      "referenceCompanyError": "Could not load the invoice company.",
+      "referenceCatalogError": "Could not load catalog items.",
+      "referencePlansError": "Could not load subscription plans."
     },
     "invoiceDetail": {
       "title": "Invoice",

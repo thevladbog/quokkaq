@@ -1,4 +1,4 @@
-package services
+package billing
 
 import (
 	"errors"
@@ -8,20 +8,21 @@ import (
 	"quokkaq-go-backend/internal/models"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // companyShouldPointSubscriptionID decides whether companies.subscription_id should reference a newly created subscription.
 func companyShouldPointSubscriptionID(company *models.Company, sub *models.Subscription, now time.Time) bool {
 	now = now.UTC()
+	if sub.Status == "canceled" {
+		return false
+	}
 	sid := ""
 	if company.SubscriptionID != nil {
 		sid = strings.TrimSpace(*company.SubscriptionID)
 	}
 	if sid == "" {
 		return true
-	}
-	if sub.Status == "canceled" {
-		return false
 	}
 	if now.Before(sub.CurrentPeriodStart) || !now.Before(sub.CurrentPeriodEnd) {
 		return false
@@ -52,7 +53,7 @@ func CreateSubscriptionForCompanyTx(tx *gorm.DB, now time.Time, companyID, planI
 	}
 
 	var company models.Company
-	if err := tx.Where("id = ?", companyID).First(&company).Error; err != nil {
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", companyID).First(&company).Error; err != nil {
 		return nil, err
 	}
 
