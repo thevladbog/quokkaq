@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Company, Invoice } from '@quokkaq/shared-types';
+import type { Invoice, SaasVendor } from '@quokkaq/shared-types';
 import { InvoiceDocumentLinesAndTotals } from '@/components/billing/InvoiceDocumentLinesAndTotals';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -27,7 +27,7 @@ import { toast } from 'sonner';
 const QRCode = dynamic(() => import('react-qr-code'), { ssr: false });
 
 function legalAddressLine(
-  cp: Company['counterparty'] | null | undefined
+  cp: SaasVendor['counterparty'] | null | undefined
 ): string | null {
   const legal = cp?.addresses?.legal;
   if (!legal) return null;
@@ -53,7 +53,7 @@ function invoiceStatusChipClass(status: Invoice['status']): string {
   }
 }
 
-async function fetchSaaSVendor(): Promise<Company | null> {
+async function fetchSaaSVendor(): Promise<SaasVendor | null> {
   return invoicesApi.getSaaSVendor();
 }
 

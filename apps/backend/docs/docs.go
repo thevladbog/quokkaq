@@ -429,7 +429,8 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.DaDataCleanRequest"
+                            "type": "array",
+                            "items": {}
                         }
                     }
                 ],
@@ -1570,7 +1571,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.Company"
+                            "$ref": "#/definitions/handlers.SaasVendorResponse"
                         }
                     },
                     "401": {
@@ -2252,7 +2253,8 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.DaDataCleanRequest"
+                            "type": "array",
+                            "items": {}
                         }
                     }
                 ],
@@ -6311,10 +6313,6 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.DaDataCleanRequest": {
-            "type": "object",
-            "additionalProperties": true
-        },
         "handlers.DaDataFindPartyByInnRequest": {
             "type": "object",
             "required": [
@@ -6702,6 +6700,29 @@ const docTemplate = `{
                 },
                 "token": {
                     "type": "string"
+                }
+            }
+        },
+        "handlers.SaasVendorResponse": {
+            "type": "object",
+            "properties": {
+                "billingAddress": {
+                    "type": "object"
+                },
+                "billingEmail": {
+                    "type": "string"
+                },
+                "counterparty": {
+                    "type": "object"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "paymentAccounts": {
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    }
                 }
             }
         },

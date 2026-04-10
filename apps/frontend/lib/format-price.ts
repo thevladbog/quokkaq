@@ -79,12 +79,22 @@ export function normalizeAmountInputToDecimalString(
   return s;
 }
 
+/**
+ * Validates VAT % in [0, 100] (inclusive).
+ * Returns null for blank, non-numeric, or out-of-range input.
+ */
+export function validateVatRatePercentInput(raw: string): number | null {
+  const s = raw.replace(',', '.').trim();
+  if (s === '') return null;
+  const n = Number.parseFloat(s);
+  if (!Number.isFinite(n) || n < 0 || n > 100) return null;
+  return n;
+}
+
 /** Parses VAT % from a form field; accepts comma as decimal separator. */
 export function parseVatRatePercentInput(raw: string): number {
-  const s = raw.replace(',', '.').trim();
-  if (s === '') return 0;
-  const n = Number.parseFloat(s);
-  return Number.isFinite(n) ? n : 0;
+  const v = validateVatRatePercentInput(raw);
+  return v ?? 0;
 }
 
 /** Converts a major-unit amount string to minor units (rounded). NaN if invalid. */

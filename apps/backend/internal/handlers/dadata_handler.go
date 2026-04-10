@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -13,8 +14,8 @@ import (
 // DaDataPassthroughRequest is JSON forwarded verbatim to DaData Suggestions (shape per DaData docs: query, count, filters, etc.).
 type DaDataPassthroughRequest map[string]interface{}
 
-// DaDataCleanRequest is JSON forwarded to DaData Cleaner (typically an array of address strings/objects per DaData docs).
-type DaDataCleanRequest map[string]interface{}
+// DaDataCleanRequest is JSON forwarded to DaData Cleaner (array payload per DaData Cleaner API).
+type DaDataCleanRequest []interface{}
 
 // DaDataUpstreamResponse is the JSON body returned from DaData; structure depends on endpoint.
 type DaDataUpstreamResponse map[string]interface{}
@@ -39,7 +40,8 @@ func readDaDataRequestBody(w http.ResponseWriter, r *http.Request) ([]byte, erro
 
 // maxBytesReaderExceeded matches net/http MaxBytesReader's error when the body is larger than the limit.
 func maxBytesReaderExceeded(err error) bool {
-	return err != nil && strings.Contains(err.Error(), "request body too large")
+	var maxErr *http.MaxBytesError
+	return err != nil && errors.As(err, &maxErr)
 }
 
 // DaDataHandler proxies DaData Suggestions/Cleaner (no keys to the browser).

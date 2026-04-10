@@ -1026,6 +1026,7 @@
         "discountBoth": "Use either discount % or discount amount, not both.",
         "discountPercentInvalid": "Discount % must be between 0 and 100.",
         "discountAmountInvalid": "Enter a valid discount amount in currency units.",
+        "vatRateInvalid": "Enter a valid VAT rate between 0 and 100 for lines that are not VAT-exempt.",
         "planRequired": "Select a plan for subscription lines.",
         "periodStartInvalid": "Enter a valid subscription period start.",
         "tooManyLicenseLines": "Only one line may reference a subscription plan.",
@@ -1109,6 +1110,8 @@
       "validationVatRate": "Enter a valid VAT rate between 0 and 100.",
       "loadCatalogError": "Could not load catalog items.",
       "loadPlansErrorCatalog": "Could not load subscription plans.",
+      "deleteFailed": "Could not delete catalog item",
+      "deleteFailedGeneric": "Request failed",
       "backInvoices": "Back to invoices"
     },
     "subscriptions": {

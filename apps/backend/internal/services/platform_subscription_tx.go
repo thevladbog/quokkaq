@@ -1,0 +1,78 @@
+package services
+
+import (
+	"errors"
+	"strings"
+	"time"
+
+	"quokkaq-go-backend/internal/models"
+
+	"gorm.io/gorm"
+)
+
+// companyShouldPointSubscriptionID decides whether companies.subscription_id should reference a newly created subscription.
+func companyShouldPointSubscriptionID(company *models.Company, sub *models.Subscription, now time.Time) bool {
+	now = now.UTC()
+	sid := ""
+	if company.SubscriptionID != nil {
+		sid = strings.TrimSpace(*company.SubscriptionID)
+	}
+	if sid == "" {
+		return true
+	}
+	if sub.Status == "canceled" {
+		return false
+	}
+	if now.Before(sub.CurrentPeriodStart) || !now.Before(sub.CurrentPeriodEnd) {
+		return false
+	}
+	return true
+}
+
+// CreateSubscriptionForCompanyTx creates a subscription for company and optionally updates company.subscription_id (same tx).
+// Allows multiple subscriptions per company (e.g. future periods); the company pointer is only updated when appropriate.
+func CreateSubscriptionForCompanyTx(tx *gorm.DB, now time.Time, companyID, planID string, status string, start, end time.Time, trialEnd *time.Time) (*models.Subscription, error) {
+	start = start.UTC()
+	end = end.UTC()
+	var trialEndUTC *time.Time
+	if trialEnd != nil {
+		t := trialEnd.UTC()
+		trialEndUTC = &t
+	}
+
+	if !end.After(start) {
+		return nil, errors.New("subscription currentPeriodEnd must be after currentPeriodStart")
+	}
+	effectiveEnd := end
+	if trialEndUTC != nil && trialEndUTC.Before(end) {
+		effectiveEnd = *trialEndUTC
+	}
+	if !effectiveEnd.After(start) {
+		return nil, errors.New("subscription period is invalid: when trialEnd is before currentPeriodEnd, trialEnd must still be after currentPeriodStart")
+	}
+
+	var company models.Company
+	if err := tx.Where("id = ?", companyID).First(&company).Error; err != nil {
+		return nil, err
+	}
+
+	sub := &models.Subscription{
+		CompanyID:            companyID,
+		PlanID:               planID,
+		Status:               status,
+		CurrentPeriodStart:   start,
+		CurrentPeriodEnd:     end,
+		CancelAtPeriodEnd:    false,
+		TrialEnd:             trialEndUTC,
+		StripeSubscriptionID: nil,
+	}
+	if err := tx.Create(sub).Error; err != nil {
+		return nil, err
+	}
+	if companyShouldPointSubscriptionID(&company, sub, now) {
+		if err := tx.Model(&models.Company{}).Where("id = ?", companyID).Update("subscription_id", sub.ID).Error; err != nil {
+			return nil, err
+		}
+	}
+	return sub, nil
+}

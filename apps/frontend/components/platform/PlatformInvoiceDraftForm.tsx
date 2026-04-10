@@ -34,7 +34,7 @@ import {
   formatPriceMinorUnits,
   minorUnitsToAmountInputString,
   parseAmountStringToMinorUnits,
-  parseVatRatePercentInput
+  validateVatRatePercentInput
 } from '@/lib/format-price';
 import {
   computeLineTotals,
@@ -155,15 +155,21 @@ function buildDraftBody(
       throw new Error('descriptionRequired');
     }
 
+    let vatRatePercent = 0;
+    if (!r.vatExempt) {
+      const v = validateVatRatePercentInput(r.vatRatePercent);
+      if (v === null) {
+        throw new Error('vatRateInvalid');
+      }
+      vatRatePercent = v;
+    }
     const line: InvoiceDraftUpsertBody['lines'][number] = {
       descriptionPrint: desc,
       quantity: qty,
       unit: r.measureUnit.trim(),
       unitPriceInclVatMinor: unit,
       vatExempt: r.vatExempt,
-      vatRatePercent: r.vatExempt
-        ? 0
-        : parseVatRatePercentInput(r.vatRatePercent)
+      vatRatePercent
     };
 
     const cat = r.catalogItemId.trim();
@@ -291,8 +297,8 @@ function tryParseDraftRowForTotals(
   const vatExempt = r.vatExempt;
   const vatRatePercent = vatExempt
     ? 0
-    : parseVatRatePercentInput(r.vatRatePercent);
-  if (!vatExempt && vatRatePercent < 0) return null;
+    : validateVatRatePercentInput(r.vatRatePercent);
+  if (!vatExempt && vatRatePercent === null) return null;
 
   return {
     unitPriceInclVatMinor: unit,
@@ -300,7 +306,7 @@ function tryParseDraftRowForTotals(
     discountPercent,
     discountAmountMinor,
     vatExempt,
-    vatRatePercent
+    vatRatePercent: vatRatePercent ?? 0
   };
 }
 
@@ -443,6 +449,7 @@ export function PlatformInvoiceDraftForm({
 
   const applyCatalogToRow = useCallback(
     (key: string, catalogId: string) => {
+      const draftCur = currency.trim() || 'RUB';
       const item = catalogById.get(catalogId);
       setRows((prev) =>
         prev.map((r) => {
@@ -451,16 +458,19 @@ export function PlatformInvoiceDraftForm({
             return { ...r, catalogItemId: catalogId };
           }
           const itemCur = item.currency?.trim() || 'RUB';
+          const sameCurrency = itemCur === draftCur;
           return {
             ...r,
             catalogItemId: catalogId,
             descriptionPrint: item.printName || item.name,
             measureUnit: (item.unit ?? '').trim(),
-            unitPriceInput: minorUnitsToAmountInputString(
-              item.defaultPriceMinor,
-              itemCur,
-              appLocale
-            ),
+            unitPriceInput: sameCurrency
+              ? minorUnitsToAmountInputString(
+                  item.defaultPriceMinor,
+                  itemCur,
+                  appLocale
+                )
+              : '',
             vatExempt: item.vatExempt,
             vatRatePercent:
               typeof item.vatRatePercent === 'number' &&
@@ -475,7 +485,7 @@ export function PlatformInvoiceDraftForm({
         })
       );
     },
-    [catalogById, appLocale]
+    [catalogById, appLocale, currency]
   );
 
   const cur = currency.trim() || 'RUB';

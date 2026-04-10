@@ -16,10 +16,14 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const platformDefaultLimit = 50
 const platformMaxLimit = 100
+
+const platformCatalogDefaultLimit = 50
+const platformCatalogMaxLimit = 200
 
 // platformInvoiceStatuses is the allowed set for models.Invoice.Status on platform create/patch.
 var platformInvoiceStatuses = map[string]struct{}{
@@ -116,75 +120,6 @@ func applyPlatformPatchSubscriptionCore(sub *models.Subscription, body PatchPlat
 	return nil
 }
 
-// companyShouldPointSubscriptionID decides whether companies.subscription_id should reference a newly created subscription.
-// If the company has no primary subscription yet, always point. Otherwise only repoint when the new row is the current
-// billing window (now in [start, end)) and status is not canceled, so future-dated subscriptions do not steal the pointer.
-func companyShouldPointSubscriptionID(company *models.Company, sub *models.Subscription, now time.Time) bool {
-	now = now.UTC()
-	sid := ""
-	if company.SubscriptionID != nil {
-		sid = strings.TrimSpace(*company.SubscriptionID)
-	}
-	if sid == "" {
-		return true
-	}
-	if sub.Status == "canceled" {
-		return false
-	}
-	if now.Before(sub.CurrentPeriodStart) || !now.Before(sub.CurrentPeriodEnd) {
-		return false
-	}
-	return true
-}
-
-// platformCreateSubscriptionForCompanyTx creates a subscription for company and optionally updates company.subscription_id (same tx).
-// Allows multiple subscriptions per company (e.g. future periods); the company pointer is only updated when appropriate.
-func platformCreateSubscriptionForCompanyTx(tx *gorm.DB, now time.Time, companyID, planID string, status string, start, end time.Time, trialEnd *time.Time) (*models.Subscription, error) {
-	start = start.UTC()
-	end = end.UTC()
-	var trialEndUTC *time.Time
-	if trialEnd != nil {
-		t := trialEnd.UTC()
-		trialEndUTC = &t
-	}
-
-	if !end.After(start) {
-		return nil, errors.New("subscription currentPeriodEnd must be after currentPeriodStart")
-	}
-	effectiveEnd := end
-	if trialEndUTC != nil && trialEndUTC.Before(end) {
-		effectiveEnd = *trialEndUTC
-	}
-	if !effectiveEnd.After(start) {
-		return nil, errors.New("subscription period is invalid: when trialEnd is before currentPeriodEnd, trialEnd must still be after currentPeriodStart")
-	}
-
-	var company models.Company
-	if err := tx.Where("id = ?", companyID).First(&company).Error; err != nil {
-		return nil, err
-	}
-
-	sub := &models.Subscription{
-		CompanyID:            companyID,
-		PlanID:               planID,
-		Status:               status,
-		CurrentPeriodStart:   start,
-		CurrentPeriodEnd:     end,
-		CancelAtPeriodEnd:    false,
-		TrialEnd:             trialEndUTC,
-		StripeSubscriptionID: nil,
-	}
-	if err := tx.Create(sub).Error; err != nil {
-		return nil, err
-	}
-	if companyShouldPointSubscriptionID(&company, sub, now) {
-		if err := tx.Model(&models.Company{}).Where("id = ?", companyID).Update("subscription_id", sub.ID).Error; err != nil {
-			return nil, err
-		}
-	}
-	return sub, nil
-}
-
 // PlatformHandler exposes SaaS operator (platform_admin) APIs.
 type PlatformHandler struct {
 	companyRepo      repository.CompanyRepository
@@ -227,14 +162,14 @@ func platformParseLimitOffset(r *http.Request) (limit, offset int) {
 
 // platformParseCatalogLimitOffset matches repository/catalog max page size (200).
 func platformParseCatalogLimitOffset(r *http.Request) (limit, offset int) {
-	limit = 50
+	limit = platformCatalogDefaultLimit
 	if v := strings.TrimSpace(r.URL.Query().Get("limit")); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 {
 			limit = n
 		}
 	}
-	if limit > 200 {
-		limit = 200
+	if limit > platformCatalogMaxLimit {
+		limit = platformCatalogMaxLimit
 	}
 	if v := strings.TrimSpace(r.URL.Query().Get("offset")); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
@@ -1112,10 +1047,17 @@ func (h *PlatformHandler) PatchInvoice(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := database.DB.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Save(inv).Error; err != nil {
+		var dbInv models.Invoice
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&dbInv, "id = ?", id).Error; err != nil {
 			return err
 		}
-		if strings.TrimSpace(inv.Status) == "paid" {
+		dbInv.Status = inv.Status
+		dbInv.PaidAt = inv.PaidAt
+		dbInv.SubscriptionID = inv.SubscriptionID
+		if err := tx.Save(&dbInv).Error; err != nil {
+			return err
+		}
+		if strings.TrimSpace(dbInv.Status) == "paid" {
 			return maybeProvisionAfterManualPaid(tx, id, time.Now().UTC())
 		}
 		return nil

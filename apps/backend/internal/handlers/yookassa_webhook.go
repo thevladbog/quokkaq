@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -56,7 +57,8 @@ func ServeYooKassaWebhook(w http.ResponseWriter, r *http.Request) {
 	limited := http.MaxBytesReader(w, r.Body, maxWebhookBody)
 	body, err := io.ReadAll(limited)
 	if err != nil {
-		if strings.Contains(err.Error(), "request body too large") {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
 			http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
 			return
 		}
@@ -71,8 +73,15 @@ func ServeYooKassaWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := r.Context()
 	if err := billing.HandleYooKassaNotification(ctx, body, func(tx *gorm.DB, invoiceID, paymentID string, paidAt time.Time) error {
-		return applyYooKassaInvoicePaid(tx, invoiceID, paymentID, paidAt, time.Now().UTC())
+		return billing.ApplyYooKassaInvoicePaid(tx, invoiceID, paymentID, paidAt, time.Now().UTC())
 	}); err != nil {
+		var syn *json.SyntaxError
+		var typeErr *json.UnmarshalTypeError
+		if errors.As(err, &syn) || errors.As(err, &typeErr) {
+			log.Printf("YooKassa webhook bad JSON: %v", err)
+			http.Error(w, "Bad request", http.StatusBadRequest)
+			return
+		}
 		log.Printf("YooKassa webhook: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return

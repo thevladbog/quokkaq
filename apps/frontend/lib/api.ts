@@ -30,6 +30,7 @@ import type {
   SubscriptionPlan,
   Invoice,
   Company,
+  SaasVendor,
   CompanyMeResponse,
   CatalogItem,
   InvoiceDraftUpsertBody,
@@ -50,6 +51,7 @@ import {
   SubscriptionPlanSchema,
   InvoiceSchema,
   CompanySchema,
+  SaasVendorSchema,
   CompanyMeResponseSchema,
   CatalogItemSchema
 } from '@quokkaq/shared-types';
@@ -1195,7 +1197,7 @@ export const invoicesApi = {
 
   /** SaaS operator company for invoice header / bank QR (tenant). `null` if not configured (404). */
   getSaaSVendor: () =>
-    apiRequest<Company | null>(`/invoices/me/vendor`, {}, CompanySchema, {
+    apiRequest<SaasVendor | null>(`/invoices/me/vendor`, {}, SaasVendorSchema, {
       notFoundValue: null
     })
 };

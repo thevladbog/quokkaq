@@ -371,7 +371,18 @@ export const PaymentAccountSchema = z
     }
   });
 
-export const PaymentAccountsSchema = z.array(PaymentAccountSchema).max(30);
+export const PaymentAccountsSchema = z
+  .array(PaymentAccountSchema)
+  .max(30)
+  .superRefine((accounts, ctx) => {
+    const defaults = accounts.filter((a) => a.isDefault === true);
+    if (defaults.length > 1) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'At most one payment account may be marked as default'
+      });
+    }
+  });
 
 export type PaymentAccount = z.infer<typeof PaymentAccountSchema>;
 
@@ -576,6 +587,17 @@ export const SubscriptionSchema = z.object({
   plan: SubscriptionPlanSchema.optional(),
   pendingPlan: SubscriptionPlanSchema.optional()
 });
+
+/** Tenant-visible SaaS operator fields for invoice payment (GET /invoices/me/vendor). */
+export const SaasVendorSchema = z.object({
+  name: z.string(),
+  billingEmail: z.union([z.string().email(), z.literal('')]).optional(),
+  billingAddress: z.record(z.string(), z.any()).optional(),
+  paymentAccounts: PaymentAccountsSchema.optional(),
+  counterparty: CounterpartySchema.optional()
+});
+
+export type SaasVendor = z.infer<typeof SaasVendorSchema>;
 
 export const CompanySchema = z.object({
   id: z.string(),

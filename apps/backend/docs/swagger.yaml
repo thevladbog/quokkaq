@@ -46,9 +46,6 @@ definitions:
       unitId:
         type: string
     type: object
-  handlers.DaDataCleanRequest:
-    additionalProperties: true
-    type: object
   handlers.DaDataFindPartyByInnRequest:
     properties:
       inn:
@@ -310,6 +307,21 @@ definitions:
         type: string
       token:
         type: string
+    type: object
+  handlers.SaasVendorResponse:
+    properties:
+      billingAddress:
+        type: object
+      billingEmail:
+        type: string
+      counterparty:
+        type: object
+      name:
+        type: string
+      paymentAccounts:
+        items:
+          type: object
+        type: array
     type: object
   handlers.SignupRequest:
     properties:
@@ -1616,7 +1628,8 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/handlers.DaDataCleanRequest'
+          items: {}
+          type: array
       produces:
       - application/json
       responses:
@@ -2467,7 +2480,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.Company'
+            $ref: '#/definitions/handlers.SaasVendorResponse'
         "401":
           description: Unauthorized
           schema:
@@ -2774,7 +2787,8 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/handlers.DaDataCleanRequest'
+          items: {}
+          type: array
       produces:
       - application/json
       responses:

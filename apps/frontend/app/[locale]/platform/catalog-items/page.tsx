@@ -34,6 +34,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { Link } from '@/src/i18n/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import {
   formatPriceMinorUnits,
   minorUnitsToAmountInputString,
@@ -175,6 +176,11 @@ export default function PlatformCatalogItemsPage() {
     mutationFn: (id: string) => platformApi.deleteCatalogItem(id),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['platform-catalog-items'] });
+    },
+    onError: (err: Error) => {
+      toast.error(
+        `${t('deleteFailed')}: ${err.message || t('deleteFailedGeneric')}`
+      );
     }
   });
 
@@ -271,6 +277,7 @@ export default function PlatformCatalogItemsPage() {
                       variant='ghost'
                       size='sm'
                       className='text-destructive'
+                      disabled={deleteMut.isPending}
                       onClick={() => {
                         if (
                           typeof window !== 'undefined' &&
@@ -280,7 +287,12 @@ export default function PlatformCatalogItemsPage() {
                         }
                       }}
                     >
-                      {t('delete')}
+                      {deleteMut.isPending &&
+                      deleteMut.variables === item.id ? (
+                        <Spinner className='h-4 w-4' />
+                      ) : (
+                        t('delete')
+                      )}
                     </Button>
                   </div>
                 </TableCell>

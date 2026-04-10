@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
@@ -9,12 +10,35 @@ import (
 
 	"quokkaq-go-backend/internal/config"
 	"quokkaq-go-backend/internal/middleware"
+	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services/billing"
 
 	"github.com/go-chi/chi/v5"
 	"gorm.io/gorm"
 )
+
+// SaasVendorResponse is the tenant-visible subset of the SaaS operator company (invoice payee / legal).
+type SaasVendorResponse struct {
+	Name            string          `json:"name"`
+	BillingEmail    string          `json:"billingEmail,omitempty"`
+	BillingAddress  json.RawMessage `json:"billingAddress,omitempty" swaggertype:"object"`
+	PaymentAccounts json.RawMessage `json:"paymentAccounts,omitempty" swaggertype:"array,object"`
+	Counterparty    json.RawMessage `json:"counterparty,omitempty" swaggertype:"object"`
+}
+
+func companyToSaasVendorResponse(c *models.Company) SaasVendorResponse {
+	if c == nil {
+		return SaasVendorResponse{}
+	}
+	return SaasVendorResponse{
+		Name:            c.Name,
+		BillingEmail:    c.BillingEmail,
+		BillingAddress:  c.BillingAddress,
+		PaymentAccounts: c.PaymentAccounts,
+		Counterparty:    c.Counterparty,
+	}
+}
 
 // Hardcoded return URL used only when APP_ENV is local-dev-like and neither
 // YOOKASSA_PAYMENT_RETURN_URL nor PUBLIC_APP_URL is set (see RequestYooKassaPaymentLink).
@@ -79,7 +103,7 @@ func (h *InvoiceHandler) GetMyInvoiceByID(w http.ResponseWriter, r *http.Request
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
-// @Success      200  {object}  models.Company
+// @Success      200  {object}  handlers.SaasVendorResponse
 // @Failure      401  {string}  string "Unauthorized"
 // @Failure      404  {string}  string "No SaaS operator company configured"
 // @Failure      500  {string}  string "Internal server error"
@@ -100,7 +124,7 @@ func (h *InvoiceHandler) GetSaaSVendor(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "No SaaS operator company is configured", http.StatusNotFound)
 		return
 	}
-	RespondJSON(w, c)
+	RespondJSON(w, companyToSaasVendorResponse(c))
 }
 
 // RequestYooKassaPaymentLink godoc
