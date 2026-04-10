@@ -19,6 +19,7 @@ import { Switch } from '@/components/ui/switch';
 import { Link } from '@/src/i18n/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
+import { toast } from 'sonner';
 import {
   intlLocaleFromAppLocale,
   toDateTimeLocalString
@@ -169,6 +170,10 @@ function PlatformSubscriptionEditor({
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['platform-company', companyId] });
+      toast.success(t('toastSubscriptionSaved'));
+    },
+    onError: (err: Error) => {
+      toast.error(t('toastSubscriptionError', { message: err.message }));
     }
   });
 
@@ -177,6 +182,10 @@ function PlatformSubscriptionEditor({
       platformApi.patchSubscription(sub.id, { clearPending: true }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['platform-company', companyId] });
+      toast.success(t('toastPendingCleared'));
+    },
+    onError: (err: Error) => {
+      toast.error(t('toastPendingClearError', { message: err.message }));
     }
   });
 
@@ -346,6 +355,10 @@ function PlatformCompanyPaymentAccountsSection({
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['platform-company', companyId] });
+      toast.success(t('toastPaymentAccountsSaved'));
+    },
+    onError: (err: Error) => {
+      toast.error(t('toastPaymentAccountsError', { message: err.message }));
     }
   });
 
@@ -406,6 +419,10 @@ function PlatformCompanyCounterpartySection({
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['platform-company', companyId] });
+      toast.success(t('toastCounterpartySaved'));
+    },
+    onError: (err: Error) => {
+      toast.error(t('toastCounterpartyError', { message: err.message }));
     }
   });
 
@@ -469,6 +486,10 @@ export default function PlatformCompanyDetailPage() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['platform-company', id] });
       void qc.invalidateQueries({ queryKey: ['platform-companies'] });
+      toast.success(t('toastSaasOperatorUpdated'));
+    },
+    onError: (err: Error) => {
+      toast.error(t('toastSaasOperatorError', { message: err.message }));
     }
   });
 

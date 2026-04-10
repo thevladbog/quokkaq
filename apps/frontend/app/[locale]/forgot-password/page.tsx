@@ -47,7 +47,7 @@ export default function ForgotPasswordPage() {
       }
     } catch (error) {
       console.error('Forgot password error:', error);
-      toast.error('An error occurred');
+      toast.error(t('requestError'));
     } finally {
       setIsSubmitting(false);
     }

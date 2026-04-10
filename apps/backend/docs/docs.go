@@ -1701,7 +1701,7 @@ const docTemplate = `{
                         }
                     },
                     "422": {
-                        "description": "QR / vendor prerequisites missing",
+                        "description": "code=invoice_pdf_prerequisites, localized message",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {

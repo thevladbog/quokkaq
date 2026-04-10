@@ -8,7 +8,10 @@ import { ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { invoicesApi } from '@/lib/api';
-import { downloadInvoicePdf } from '@/lib/invoice-pdf-download';
+import {
+  downloadInvoicePdf,
+  invoicePdfDownloadErrorToastMessage
+} from '@/lib/invoice-pdf-download';
 import { logger } from '@/lib/logger';
 import { toast } from 'sonner';
 
@@ -28,7 +31,9 @@ export function OrganizationInvoicesContent() {
       await downloadInvoicePdf(invoice);
     } catch (error) {
       logger.error('downloadInvoicePdf failed', error);
-      toast.error(tDetail('downloadPdfError'));
+      toast.error(
+        invoicePdfDownloadErrorToastMessage(error, tDetail('downloadPdfError'))
+      );
     }
   };
 

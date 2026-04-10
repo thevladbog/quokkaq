@@ -14,7 +14,10 @@ import {
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { platformApi } from '@/lib/api';
-import { downloadInvoicePdf } from '@/lib/invoice-pdf-download';
+import {
+  downloadInvoicePdf,
+  invoicePdfDownloadErrorToastMessage
+} from '@/lib/invoice-pdf-download';
 import { logger } from '@/lib/logger';
 import {
   formatAppDateTime,
@@ -88,7 +91,10 @@ function PlatformInvoiceReadOnly({
       await downloadInvoicePdf(inv);
     } catch (error) {
       logger.error('downloadInvoicePdf failed', error);
-      toast.error(t('downloadPdfError'), { duration: 8000 });
+      toast.error(
+        invoicePdfDownloadErrorToastMessage(error, t('downloadPdfError')),
+        { duration: 8000 }
+      );
     } finally {
       setPdfBusy(false);
     }

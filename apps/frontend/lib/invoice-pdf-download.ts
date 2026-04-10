@@ -1,5 +1,5 @@
 import type { Invoice } from '@quokkaq/shared-types';
-import { invoicesApi } from '@/lib/api';
+import { ApiHttpError, invoicesApi } from '@/lib/api';
 import {
   fallbackInvoicePdfFilename,
   parseFilenameFromContentDisposition,
@@ -13,4 +13,12 @@ export async function downloadInvoicePdf(inv: Invoice): Promise<void> {
   const fromHeader = parseFilenameFromContentDisposition(contentDisposition);
   const name = fromHeader ?? fallbackInvoicePdfFilename(inv);
   triggerBlobDownload(blob, name);
+}
+
+/** Prefer API JSON `message` (e.g. localized 422) over a generic i18n fallback. */
+export function invoicePdfDownloadErrorToastMessage(
+  error: unknown,
+  fallback: string
+): string {
+  return error instanceof ApiHttpError ? error.message : fallback;
 }

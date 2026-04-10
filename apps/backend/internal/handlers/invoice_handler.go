@@ -92,7 +92,7 @@ func (h *InvoiceHandler) GetMyInvoices(w http.ResponseWriter, r *http.Request) {
 // @Failure      401  {string}  string "Unauthorized"
 // @Failure      403  {string}  string "Forbidden"
 // @Failure      404  {string}  string "Not Found"
-// @Failure      422  {object}  map[string]string "QR / vendor prerequisites missing"
+// @Failure      422  {object}  map[string]string "code=invoice_pdf_prerequisites, localized message"
 // @Failure      500  {string}  string "Internal Server Error"
 // @Router       /invoices/{id}/download [get]
 func (h *InvoiceHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request) {
@@ -159,16 +159,20 @@ func (h *InvoiceHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if vendor == nil {
+		loc := middleware.GetLocale(r.Context())
 		RespondJSONWithStatus(w, http.StatusUnprocessableEntity, map[string]string{
-			"error": services.ErrInvoicePDFQRPrerequisites.Error(),
+			"code":    "invoice_pdf_prerequisites",
+			"message": services.InvoicePDFPrerequisitesUserMessage(loc),
 		})
 		return
 	}
 
 	pdfBytes, err := services.BuildInvoicePDF(invoice, vendor)
 	if errors.Is(err, services.ErrInvoicePDFQRPrerequisites) {
+		loc := middleware.GetLocale(r.Context())
 		RespondJSONWithStatus(w, http.StatusUnprocessableEntity, map[string]string{
-			"error": err.Error(),
+			"code":    "invoice_pdf_prerequisites",
+			"message": services.InvoicePDFPrerequisitesUserMessage(loc),
 		})
 		return
 	}

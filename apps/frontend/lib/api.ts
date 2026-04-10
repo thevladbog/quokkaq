@@ -100,6 +100,47 @@ function summarizeZodErrorForLog(err: unknown): Record<string, unknown> {
   return { message: String(err) };
 }
 
+/** Non-OK HTTP response; when the body is JSON with a `message` field, it becomes {@link ApiHttpError.message}. */
+export class ApiHttpError extends Error {
+  readonly status: number;
+  readonly code?: string;
+  readonly rawBody?: string;
+
+  constructor(
+    message: string,
+    status: number,
+    code?: string,
+    rawBody?: string
+  ) {
+    super(message);
+    this.name = 'ApiHttpError';
+    this.status = status;
+    this.code = code;
+    this.rawBody = rawBody;
+  }
+}
+
+function throwApiHttpErrorFromBody(status: number, errorData: string): never {
+  try {
+    const j = JSON.parse(errorData) as Record<string, unknown>;
+    const msg = typeof j.message === 'string' ? j.message.trim() : '';
+    const code = typeof j.code === 'string' ? j.code : undefined;
+    if (msg) {
+      throw new ApiHttpError(msg, status, code, errorData);
+    }
+  } catch (e) {
+    if (e instanceof ApiHttpError) {
+      throw e;
+    }
+  }
+  throw new ApiHttpError(
+    `API Error: ${status} - ${errorData}`,
+    status,
+    undefined,
+    errorData
+  );
+}
+
 /**
  * Defaults first, then caller headers on top — so explicit `Authorization` (refresh/me)
  * wins over the access token from localStorage, while `Content-Type` from callers no longer
@@ -421,9 +462,8 @@ async function apiRequestBlob(
 
             const retryResponse = await fetch(url, retryConfig);
             if (!retryResponse.ok) {
-              throw new Error(
-                `API Error: ${retryResponse.status} - ${await retryResponse.text()}`
-              );
+              const retryErrText = await retryResponse.text();
+              throwApiHttpErrorFromBody(retryResponse.status, retryErrText);
             }
             const retryBlob = await readBodyAsBlob(retryResponse);
             return { blob: retryBlob, headers: retryResponse.headers };
@@ -449,7 +489,7 @@ async function apiRequestBlob(
 
     if (!response.ok) {
       const errorData = await response.text();
-      throw new Error(`API Error: ${response.status} - ${errorData}`);
+      throwApiHttpErrorFromBody(response.status, errorData);
     }
 
     const blob = await readBodyAsBlob(response);

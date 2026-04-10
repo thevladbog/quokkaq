@@ -76,7 +76,9 @@
       "save_changes": "Save Changes",
       "saving": "Saving...",
       "update_success": "Unit updated successfully",
-      "update_error": "Failed to update unit"
+      "update_error": "Failed to update unit",
+      "create_success": "Unit created successfully",
+      "create_error": "Failed to create unit: {message}"
     },
     "counters": {
       "title": "Counters",
@@ -508,6 +510,7 @@
     "you": "You",
     "occupiedByYou": "Occupied by You (Continue)",
     "occupiedUnknown": "Occupied",
+    "occupyCounterError": "Could not occupy counter: {message}",
     "pre_registration": {
       "badge": "PRE",
       "title": "Pre-registration",
@@ -621,7 +624,9 @@
       "show_unit_in_header_desc": "On the left, next to the logo. Turn off to hide the title.",
       "kiosk_unit_label_text": "Header label (optional)",
       "kiosk_unit_label_placeholder": "Default: {unitName}",
-      "kiosk_unit_label_help": "Leave empty to use the unit name."
+      "kiosk_unit_label_help": "Leave empty to use the unit name.",
+      "printerListError": "Could not load printers: {message}",
+      "printerTestError": "Print test failed: {message}"
     },
     "lock_screen": {
       "kiosk_locked": "Kiosk Locked",
@@ -669,6 +674,24 @@
     "actions": "Actions",
     "pickDate": "Select date",
     "time": "Time"
+  },
+  "components": {
+    "upload": {
+      "invalidType": "Please upload an image file",
+      "fileTooLarge": "File size must be less than 5MB",
+      "imageSuccess": "Image uploaded successfully",
+      "imageFailed": "Failed to upload image",
+      "logoSuccess": "Logo uploaded successfully",
+      "logoFailed": "Failed to upload logo",
+      "uploading": "Uploading...",
+      "uploadImage": "Upload Image",
+      "changeImage": "Change Image",
+      "uploadLogo": "Upload Logo",
+      "changeLogo": "Change Logo",
+      "hint": "Supported formats: JPG, PNG, SVG, WebP. Max 5MB.",
+      "defaultImageLabel": "Image",
+      "defaultLogoLabel": "Logo"
+    }
   },
   "general": {
     "delete": "Delete",
@@ -728,7 +751,8 @@
     "submit": "Send Reset Link",
     "submitting": "Sending...",
     "success": "If an account with that email exists, we sent you a reset link.",
-    "backToLogin": "Back to Login"
+    "backToLogin": "Back to Login",
+    "requestError": "Something went wrong. Please try again."
   },
   "resetPassword": {
     "title": "Reset Password",
@@ -872,6 +896,7 @@
     "status": "Status",
     "ticket_id": "Ticket ID",
     "your_ticket_called": "Ticket {number} called to {counter}",
+    "counterUnknown": "counter",
     "printer_type_label": "Label",
     "feedback_url": "Feedback URL",
     "feedback_url_help": "URL for the feedback form. Use {{ticketId}} to insert the ticket ID.",
@@ -973,7 +998,17 @@
       "saasOperatorTitle": "SaaS operator tenant",
       "saasOperatorDesc": "One organization per deployment: unlimited resource quotas and the canonical legal profile for invoices and platform use. Enabling this clears the operator flag on every other company.",
       "invoiceWizardHint": "Create a multi-line draft, set VAT and payment options, then issue a numbered invoice (QQ-YYYY-NNNNN).",
-      "openInvoiceWizard": "New invoice"
+      "openInvoiceWizard": "New invoice",
+      "toastSubscriptionSaved": "Subscription updated",
+      "toastSubscriptionError": "Could not update subscription: {message}",
+      "toastPendingCleared": "Scheduled plan change cleared",
+      "toastPendingClearError": "Could not clear scheduled change: {message}",
+      "toastCounterpartySaved": "Counterparty saved",
+      "toastCounterpartyError": "Could not save counterparty: {message}",
+      "toastPaymentAccountsSaved": "Payment accounts saved",
+      "toastPaymentAccountsError": "Could not save payment accounts: {message}",
+      "toastSaasOperatorUpdated": "SaaS operator setting updated",
+      "toastSaasOperatorError": "Could not update SaaS operator setting: {message}"
     },
     "plans": {
       "title": "Subscription plans",
@@ -988,7 +1023,12 @@
       "interval": "Interval",
       "active": "Active",
       "edit": "Edit",
-      "submit": "Save"
+      "submit": "Save",
+      "toastCreated": "Plan created",
+      "toastUpdated": "Plan updated",
+      "toastError": "Could not save plan: {message}",
+      "intervalMonth": "month",
+      "intervalYear": "year"
     },
     "invoices": {
       "title": "Invoices",
@@ -1149,7 +1189,8 @@
       "loadPlansErrorCatalog": "Could not load subscription plans.",
       "deleteFailed": "Could not delete catalog item",
       "deleteFailedGeneric": "Request failed",
-      "backInvoices": "Back to invoices"
+      "backInvoices": "Back to invoices",
+      "toastItemSaved": "Catalog item saved"
     },
     "subscriptions": {
       "title": "Subscriptions",
@@ -1379,6 +1420,8 @@
     "edit": "Edit",
     "save": "Save",
     "cancel": "Cancel",
+    "toastProfileSaved": "Organization profile saved",
+    "toastProfileSaveError": "Could not save profile: {message}",
     "quickLinks": {
       "billing": "Billing",
       "billingDesc": "Manage subscription and payments",
@@ -1457,7 +1500,10 @@
           "sla_guarantee": "SLA guarantee",
           "custom_integrations": "Custom integrations"
         }
-      }
+      },
+      "toastCheckoutFailed": "Could not start checkout: {message}",
+      "toastSubscriptionCanceled": "Subscription canceled",
+      "toastCancelFailed": "Could not cancel subscription: {message}"
     },
     "invoices": {
       "title": "Invoice History",
