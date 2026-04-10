@@ -30,10 +30,7 @@ func companyShouldPointSubscriptionID(tx *gorm.DB, company *models.Company, sub 
 	}
 	var existing models.Subscription
 	if err := tx.Where("id = ?", sid).First(&existing).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return true
-		}
-		return false
+		return errors.Is(err, gorm.ErrRecordNotFound)
 	}
 	if existing.CurrentPeriodEnd.Before(now) {
 		return true

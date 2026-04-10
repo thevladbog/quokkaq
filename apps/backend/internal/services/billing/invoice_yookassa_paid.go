@@ -85,6 +85,10 @@ func ApplyYooKassaInvoicePaid(tx *gorm.DB, invoiceID, paymentID string, paidAt t
 	if invoiceID == "" {
 		return errors.New("missing invoice id")
 	}
+	paymentID = strings.TrimSpace(paymentID)
+	if paymentID == "" {
+		return errors.New("missing payment id")
+	}
 	var inv models.Invoice
 	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 		Preload("Lines", func(db *gorm.DB) *gorm.DB {
@@ -96,7 +100,7 @@ func ApplyYooKassaInvoicePaid(tx *gorm.DB, invoiceID, paymentID string, paidAt t
 		}
 		return err
 	}
-	if strings.TrimSpace(inv.YookassaPaymentID) != "" && inv.YookassaPaymentID != paymentID {
+	if strings.TrimSpace(inv.YookassaPaymentID) != "" && strings.TrimSpace(inv.YookassaPaymentID) != paymentID {
 		return errors.New("payment id does not match invoice")
 	}
 	if inv.Status == "paid" {

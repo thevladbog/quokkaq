@@ -204,11 +204,11 @@ func (r *invoiceRepository) UpdateHeaderAndLinesInTx(tx *gorm.DB, invoice *model
 		lines[i].InvoiceID = invoice.ID
 		lines[i].Position = i + 1
 		lines[i].ID = ""
-		if err := tx.Create(&lines[i]).Error; err != nil {
-			return err
-		}
 	}
-	return nil
+	if len(lines) == 0 {
+		return nil
+	}
+	return tx.Create(&lines).Error
 }
 
 // AllocateDocumentNumber returns next QQ-YYYY-NNNNN for the given calendar year (UTC).

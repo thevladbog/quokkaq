@@ -64,6 +64,8 @@ export default function PlatformCatalogItemsPage() {
   );
   const qc = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [editing, setEditing] = useState<CatalogItem | null>(null);
   const [form, setForm] = useState(() => emptyForm());
 
@@ -279,12 +281,8 @@ export default function PlatformCatalogItemsPage() {
                       className='text-destructive'
                       disabled={deleteMut.isPending}
                       onClick={() => {
-                        if (
-                          typeof window !== 'undefined' &&
-                          window.confirm(t('confirmDelete'))
-                        ) {
-                          deleteMut.mutate(item.id);
-                        }
+                        setSelectedItemId(item.id);
+                        setDeleteDialogOpen(true);
                       }}
                     >
                       {deleteMut.isPending &&
@@ -476,6 +474,47 @@ export default function PlatformCatalogItemsPage() {
             >
               {saveMut.isPending && <Spinner className='mr-2 h-4 w-4' />}
               {t('save')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={deleteDialogOpen}
+        onOpenChange={(open) => {
+          setDeleteDialogOpen(open);
+          if (!open) setSelectedItemId(null);
+        }}
+      >
+        <DialogContent className='sm:max-w-md'>
+          <DialogHeader>
+            <DialogTitle>{t('delete')}</DialogTitle>
+            <DialogDescription>{t('confirmDelete')}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className='gap-2 sm:gap-0'>
+            <Button
+              type='button'
+              variant='secondary'
+              onClick={() => {
+                setDeleteDialogOpen(false);
+                setSelectedItemId(null);
+              }}
+            >
+              {t('cancel')}
+            </Button>
+            <Button
+              type='button'
+              variant='destructive'
+              disabled={!selectedItemId || deleteMut.isPending}
+              onClick={() => {
+                if (!selectedItemId) return;
+                deleteMut.mutate(selectedItemId);
+                setDeleteDialogOpen(false);
+                setSelectedItemId(null);
+              }}
+            >
+              {deleteMut.isPending && <Spinner className='mr-2 h-4 w-4' />}
+              {t('delete')}
             </Button>
           </DialogFooter>
         </DialogContent>
