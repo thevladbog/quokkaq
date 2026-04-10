@@ -41,6 +41,9 @@ func LocaleFromAcceptLanguage(accept string) string {
 			continue
 		}
 		q := parseAcceptLanguageQ(semis[1:])
+		if q <= 0 {
+			continue
+		}
 		primary := normalizeAcceptLanguagePrimary(langRange)
 		if primary != "en" && primary != "ru" {
 			continue
@@ -64,6 +67,8 @@ func normalizeAcceptLanguagePrimary(langRange string) string {
 	return tag
 }
 
+// parseAcceptLanguageQ returns the q value for the range, default 1.0 when absent.
+// Malformed, non-numeric, or out-of-range (not in [0,1]) q values return 0 so the range is ignored.
 func parseAcceptLanguageQ(params []string) float64 {
 	for _, p := range params {
 		p = strings.TrimSpace(p)
@@ -76,9 +81,12 @@ func parseAcceptLanguageQ(params []string) float64 {
 			continue
 		}
 		vStr := strings.TrimSpace(p[eq+1:])
+		if vStr == "" {
+			return 0
+		}
 		v, err := strconv.ParseFloat(vStr, 64)
 		if err != nil || v < 0 || v > 1 {
-			return 1.0
+			return 0
 		}
 		return v
 	}

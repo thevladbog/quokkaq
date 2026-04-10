@@ -100,7 +100,10 @@ function summarizeZodErrorForLog(err: unknown): Record<string, unknown> {
   return { message: String(err) };
 }
 
-/** Non-OK HTTP response; when the body is JSON with a `message` field, it becomes {@link ApiHttpError.message}. */
+/**
+ * Non-OK HTTP response. `message` is a short user-facing summary (never the raw response body).
+ * Full body is in `rawBody` when provided (for logging / debugging only).
+ */
 export class ApiHttpError extends Error {
   readonly status: number;
   readonly code?: string;
@@ -121,24 +124,36 @@ export class ApiHttpError extends Error {
 }
 
 function throwApiHttpErrorFromBody(status: number, errorData: string): never {
+  let parsedCode: string | undefined;
   try {
     const j = JSON.parse(errorData) as Record<string, unknown>;
+    parsedCode = typeof j.code === 'string' ? j.code : undefined;
     const msg = typeof j.message === 'string' ? j.message.trim() : '';
-    const code = typeof j.code === 'string' ? j.code : undefined;
     if (msg) {
-      throw new ApiHttpError(msg, status, code, errorData);
+      throw new ApiHttpError(msg, status, parsedCode, errorData);
     }
   } catch (e) {
     if (e instanceof ApiHttpError) {
       throw e;
     }
   }
-  throw new ApiHttpError(
-    `API Error: ${status} - ${errorData}`,
-    status,
-    undefined,
-    errorData
-  );
+  const summary = parsedCode
+    ? `API Error: ${status} (${parsedCode})`
+    : `API Error: ${status}`;
+  throw new ApiHttpError(summary, status, parsedCode, errorData);
+}
+
+function clearClientAuthSession(): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('refresh_token');
+  try {
+    window.dispatchEvent(new CustomEvent('auth:logout'));
+  } catch (e) {
+    logger.error('Failed to dispatch auth:logout event', e);
+  }
 }
 
 /**
@@ -471,21 +486,15 @@ async function apiRequestBlob(
         }
       } catch (refreshError) {
         if (refreshError instanceof ApiHttpError) {
+          if (refreshError.status === 401) {
+            clearClientAuthSession();
+          }
           throw refreshError;
         }
         logger.error('Token refresh failed:', refreshError);
       }
 
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-
-      try {
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('auth:logout'));
-        }
-      } catch (e) {
-        logger.error('Failed to dispatch auth:logout event', e);
-      }
+      clearClientAuthSession();
 
       throw new Error(`Unauthorized: ${await response.text()}`);
     }

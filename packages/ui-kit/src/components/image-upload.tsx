@@ -8,30 +8,13 @@ import { Upload, X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import Image from 'next/image';
 import { logger } from '../lib/logger';
+import {
+  type ImageUploadMessages,
+  defaultImageUploadMessages
+} from './upload-messages';
 
-export type ImageUploadMessages = {
-  invalidType: string;
-  fileTooLarge: string;
-  success: string;
-  failed: string;
-  uploading: string;
-  upload: string;
-  change: string;
-  hint: string;
-  defaultLabel: string;
-};
-
-const defaultImageUploadMessages: ImageUploadMessages = {
-  invalidType: 'Please upload an image file',
-  fileTooLarge: 'File size must be less than 5MB',
-  success: 'Image uploaded successfully',
-  failed: 'Failed to upload image',
-  uploading: 'Uploading...',
-  upload: 'Upload Image',
-  change: 'Change Image',
-  hint: 'Supported formats: JPG, PNG, SVG, WebP. Max 5MB.',
-  defaultLabel: 'Image'
-};
+export type { ImageUploadMessages } from './upload-messages';
+export { defaultImageUploadMessages } from './upload-messages';
 
 interface ImageUploadProps {
   value?: string | null;

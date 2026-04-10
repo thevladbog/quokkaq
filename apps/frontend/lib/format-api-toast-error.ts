@@ -1,6 +1,13 @@
 import { ApiHttpError } from '@/lib/api';
 
 const API_ERROR_PREFIX = /^API Error: \d+ - /;
+const MAX_TOAST_LEN = 280;
+
+function truncateToastText(s: string): string {
+  const t = s.trim();
+  if (!t) return t;
+  return t.length > MAX_TOAST_LEN ? `${t.slice(0, MAX_TOAST_LEN)}…` : t;
+}
 
 /**
  * User-facing toast text: prefers ApiHttpError.message, JSON `message` inside legacy API Error strings,
@@ -12,8 +19,8 @@ export function formatApiToastErrorMessage(
 ): string {
   if (err instanceof ApiHttpError) {
     const m = err.message.trim();
-    if (m) return m;
-    return fallback;
+    if (!m) return fallback;
+    return truncateToastText(m);
   }
   if (err instanceof Error) {
     const raw = err.message.trim();
@@ -23,7 +30,7 @@ export function formatApiToastErrorMessage(
       try {
         const j = JSON.parse(jsonPart) as { message?: unknown };
         if (typeof j.message === 'string' && j.message.trim()) {
-          return j.message.trim();
+          return truncateToastText(j.message);
         }
       } catch {
         /* not JSON */

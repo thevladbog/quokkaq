@@ -18,6 +18,10 @@ func TestLocaleFromAcceptLanguage(t *testing.T) {
 		{"RU-ru", "ru"},
 		{"  ru-RU ; q=0.9 ", "ru"},
 		{"fr", "en"},
+		{"ru;q=0,en", "en"},
+		{"ru;q=2,en", "en"},
+		{"ru;q=bad,en", "en"},
+		{"en;q=,ru", "ru"},
 	}
 	for _, tt := range tests {
 		if got := LocaleFromAcceptLanguage(tt.in); got != tt.want {
