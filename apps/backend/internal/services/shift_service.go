@@ -118,9 +118,15 @@ func (s *shiftService) ExecuteEndOfDay(ctx context.Context, unitID string, userI
 
 	var ticketsMarked int64
 	var countersReleased int64
+	var waitingTicketsNoShow int64
+	var activeTicketsClosed int64
 
 	err := database.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var err error
+		waitingTicketsNoShow, activeTicketsClosed, err = s.ticketRepo.CountEODTicketSplitTx(tx, unitID)
+		if err != nil {
+			return err
+		}
 		ticketsMarked, err = s.ticketRepo.MarkAsEODTx(tx, unitID)
 		if err != nil {
 			return err
@@ -134,10 +140,12 @@ func (s *shiftService) ExecuteEndOfDay(ctx context.Context, unitID string, userI
 		}
 
 		auditPayload := map[string]interface{}{
-			"unitId":           unitID,
-			"ticketsMarked":    ticketsMarked,
-			"countersReleased": countersReleased,
-			"timestamp":        time.Now(),
+			"unitId":               unitID,
+			"ticketsMarked":        ticketsMarked,
+			"waitingTicketsNoShow": waitingTicketsNoShow,
+			"activeTicketsClosed":  activeTicketsClosed,
+			"countersReleased":     countersReleased,
+			"timestamp":            time.Now(),
 		}
 		payloadBytes, err := json.Marshal(auditPayload)
 		if err != nil {
@@ -159,9 +167,11 @@ func (s *shiftService) ExecuteEndOfDay(ctx context.Context, unitID string, userI
 	}
 
 	result := map[string]interface{}{
-		"success":          true,
-		"ticketsMarked":    ticketsMarked,
-		"countersReleased": countersReleased,
+		"success":              true,
+		"ticketsMarked":        ticketsMarked,
+		"activeTicketsClosed":  activeTicketsClosed,
+		"waitingTicketsNoShow": waitingTicketsNoShow,
+		"countersReleased":     countersReleased,
 	}
 
 	s.hub.BroadcastEvent("unit.eod", result, unitID)

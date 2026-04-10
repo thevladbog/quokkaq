@@ -20,7 +20,10 @@ export default function PermissionGuard({
 }: PermissionGuardProps) {
   const { user, isAuthenticated, isLoading } = useAuthContext();
 
-  const permissionsSig = JSON.stringify([...permissions].sort());
+  const sortedPermissions = useMemo(
+    () => [...permissions].sort(),
+    [permissions]
+  );
 
   const hasAccess = useMemo(() => {
     if (isLoading) return null as boolean | null;
@@ -35,13 +38,12 @@ export default function PermissionGuard({
     }
 
     const userPermissions = user.permissions?.[unitId] || [];
-    const required: string[] = JSON.parse(permissionsSig) as string[];
 
     if (requireAll) {
-      return required.every((p) => userPermissions.includes(p));
+      return sortedPermissions.every((p) => userPermissions.includes(p));
     }
-    return required.some((p) => userPermissions.includes(p));
-  }, [isLoading, isAuthenticated, user, unitId, requireAll, permissionsSig]);
+    return sortedPermissions.some((p) => userPermissions.includes(p));
+  }, [isLoading, isAuthenticated, user, unitId, requireAll, sortedPermissions]);
 
   if (hasAccess === null) {
     return null;

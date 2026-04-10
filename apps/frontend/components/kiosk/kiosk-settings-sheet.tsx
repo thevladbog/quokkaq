@@ -27,6 +27,7 @@ import {
   testPrintLines,
   type PrinterInfo
 } from '@/lib/kiosk-print';
+import { useKioskHeaderFields } from '@/hooks/use-kiosk-header-fields';
 
 interface KioskSettingsSheetProps {
   isOpen: boolean;
@@ -139,12 +140,13 @@ function KioskSettingsForm({
   const [printers, setPrinters] = useState<PrinterInfo[]>([]);
   const [loadingPrinters, setLoadingPrinters] = useState(false);
   const [logoUrl, setLogoUrl] = useState(currentConfig?.kiosk?.logoUrl || '');
-  const [showUnitInHeader, setShowUnitInHeader] = useState(
-    currentConfig?.kiosk?.showUnitInHeader !== false
-  );
-  const [kioskUnitLabelText, setKioskUnitLabelText] = useState(
-    currentConfig?.kiosk?.kioskUnitLabelText || ''
-  );
+  const {
+    showUnitInHeader,
+    setShowUnitInHeader,
+    kioskUnitLabelText,
+    setKioskUnitLabelText,
+    headerKioskSaveFields
+  } = useKioskHeaderFields(currentConfig?.kiosk ?? undefined);
 
   const handleSave = () => {
     const newConfig = {
@@ -153,8 +155,7 @@ function KioskSettingsForm({
         ...(currentConfig?.kiosk || {}),
         showHeader,
         showFooter,
-        showUnitInHeader,
-        kioskUnitLabelText: kioskUnitLabelText.trim() || undefined,
+        ...headerKioskSaveFields(),
         printerConnection,
         systemPrinterName:
           printerConnection === 'system'

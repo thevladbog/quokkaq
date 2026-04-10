@@ -532,6 +532,7 @@
     "kioskTitle": "Киоск",
     "selectUnit": "Пожалуйста, выберите подразделение",
     "selectUnitButton": "Выбрать подразделение",
+    "select_unit_aria": "Открыть киоск: {unit}",
     "noServicesAvailable": "Нет доступных услуг на этом уровне",
     "changeLocation": "Изменить местоположение",
     "backButton": "Назад",
@@ -623,6 +624,7 @@
     },
     "pre_registration": {
       "button": "У меня есть код",
+      "backspace": "Удалить последнюю цифру",
       "enter_code": "Введите код",
       "invalid_code": "Неверный код. Попробуйте еще раз.",
       "cancel": "Отмена",

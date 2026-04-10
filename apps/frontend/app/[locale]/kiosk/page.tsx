@@ -1,7 +1,5 @@
 'use client';
 
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useUnits } from '@/lib/hooks';
 import { useLocale, useTranslations } from 'next-intl';
 import { useEffect, useMemo, useState } from 'react';
@@ -10,9 +8,17 @@ import { useRouter } from '@/src/i18n/navigation';
 import KioskLanguageSwitcher from '@/components/KioskLanguageSwitcher';
 import ThemeToggle from '@/components/ThemeToggle';
 import { KioskTopBar } from '@/components/kiosk/kiosk-top-bar';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 const KIOSK_BODY = '#fef8f3';
 const KIOSK_HEADER = '#fff9f4';
+
+const unitTileClassName = cn(
+  'border-kiosk-border/30 flex min-h-[5.5rem] w-full flex-col rounded-3xl border bg-card text-left shadow-[0_16px_24px_-8px_rgba(29,27,25,0.08)] transition-[transform,box-shadow]',
+  'hover:shadow-[0_20px_28px_-10px_rgba(29,27,25,0.1)] focus-visible:ring-kiosk-ink/30 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none',
+  'active:scale-[0.99] sm:h-32'
+);
 
 export default function KioskPage() {
   const locale = useLocale();
@@ -143,25 +149,24 @@ export default function KioskPage() {
         ) : (
           <div className='mx-auto grid min-h-0 w-full max-w-7xl flex-1 auto-rows-min grid-cols-2 content-start gap-3 overflow-hidden sm:grid-cols-3 md:grid-cols-4 md:gap-4 lg:grid-cols-5 xl:grid-cols-6'>
             {units.map((unit) => (
-              <Card
+              <button
                 key={unit.id}
-                className='border-kiosk-border/30 flex min-h-[5.5rem] cursor-pointer flex-col rounded-3xl border shadow-[0_16px_24px_-8px_rgba(29,27,25,0.08)] transition-[transform,box-shadow] hover:shadow-[0_20px_28px_-10px_rgba(29,27,25,0.1)] active:scale-[0.99] sm:h-32'
+                type='button'
+                className={unitTileClassName}
                 onClick={() => handleUnitSelect(unit.id)}
+                aria-label={t('select_unit_aria', { unit: unit.name })}
               >
-                <CardHeader className='flex flex-1 items-center justify-center px-3 pt-4'>
-                  <CardTitle className='text-kiosk-ink text-center text-lg font-bold sm:text-xl'>
+                <div className='flex flex-1 flex-col px-3 pt-4'>
+                  <span className='text-kiosk-ink text-center text-lg font-bold sm:text-xl'>
                     {unit.name}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className='px-3 pb-4 text-center'>
-                  <Button
-                    variant='outline'
-                    className='border-kiosk-border/50 w-full rounded-full'
-                  >
+                  </span>
+                </div>
+                <div className='px-3 pb-4 text-center'>
+                  <span className='border-kiosk-border/50 text-kiosk-ink inline-flex w-full items-center justify-center rounded-full border bg-transparent px-4 py-2 text-sm font-medium'>
                     {t('selectUnitButton', { defaultValue: 'Select Unit' })}
-                  </Button>
-                </CardContent>
-              </Card>
+                  </span>
+                </div>
+              </button>
             ))}
           </div>
         )}

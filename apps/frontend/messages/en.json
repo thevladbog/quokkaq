@@ -533,6 +533,7 @@
     "kioskTitle": "Kiosk",
     "selectUnit": "Please select a unit",
     "selectUnitButton": "Select Unit",
+    "select_unit_aria": "Open kiosk for {unit}",
     "noServicesAvailable": "No services available at this level",
     "changeLocation": "Change Location",
     "backButton": "Back",
@@ -624,6 +625,7 @@
     },
     "pre_registration": {
       "button": "I have a code",
+      "backspace": "Delete last digit",
       "enter_code": "Enter Code",
       "invalid_code": "Invalid code. Please try again.",
       "cancel": "Cancel",

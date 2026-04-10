@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import type { KeyboardEvent, ReactNode } from 'react';
 import { formatAppDate, formatAppTime } from '@/lib/format-datetime';
 
 type KioskTopBarProps = {
@@ -22,6 +22,16 @@ export function KioskTopBar({
   leading,
   beforeClock
 }: KioskTopBarProps) {
+  const onTimeKeyDown =
+    onClockClick !== undefined
+      ? (e: KeyboardEvent<HTMLDivElement>) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onClockClick();
+          }
+        }
+      : undefined;
+
   const timeBlock = (
     <div
       className={
@@ -30,7 +40,9 @@ export function KioskTopBar({
           : 'text-right select-none'
       }
       onClick={onClockClick}
+      onKeyDown={onTimeKeyDown}
       role={onClockClick ? 'button' : undefined}
+      tabIndex={onClockClick ? 0 : undefined}
     >
       <div className='text-kiosk-ink text-xl font-bold tracking-tight sm:text-2xl md:text-3xl'>
         {formatAppTime(currentTime, intlLocale)}

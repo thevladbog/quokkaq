@@ -988,24 +988,45 @@ const SimpleGrid: React.FC<{
 }) => {
   const [activeTab, setActiveTab] = useState<string>('main-grid');
 
-  const findFirstAvailableCell = (): [number, number] | null => {
+  const findFirstAvailableSlot = (
+    rowSpan: number,
+    colSpan: number
+  ): [number, number] | null => {
+    if (rowSpan < 1 || colSpan < 1) {
+      return null;
+    }
     for (let row = 0; row < SERVICE_GRID_ROWS; row++) {
       for (let col = 0; col < SERVICE_GRID_COLS; col++) {
-        const isOccupied = services.some((service) => {
-          if (service.gridRow === null || service.gridCol === null)
-            return false;
-          const serviceRowSpan = service.gridRowSpan || 1;
-          const serviceColSpan = service.gridColSpan || 1;
-
-          return (
-            row >= service.gridRow &&
-            row < service.gridRow + serviceRowSpan &&
-            col >= service.gridCol &&
-            col < service.gridCol + serviceColSpan
-          );
-        });
-
-        if (!isOccupied) {
+        if (
+          row + rowSpan > SERVICE_GRID_ROWS ||
+          col + colSpan > SERVICE_GRID_COLS
+        ) {
+          continue;
+        }
+        let fits = true;
+        for (let dr = 0; dr < rowSpan && fits; dr++) {
+          for (let dc = 0; dc < colSpan && fits; dc++) {
+            const r = row + dr;
+            const c = col + dc;
+            const occupied = services.some((service) => {
+              if (service.gridRow === null || service.gridCol === null) {
+                return false;
+              }
+              const serviceRowSpan = service.gridRowSpan || 1;
+              const serviceColSpan = service.gridColSpan || 1;
+              return (
+                r >= service.gridRow &&
+                r < service.gridRow + serviceRowSpan &&
+                c >= service.gridCol &&
+                c < service.gridCol + serviceColSpan
+              );
+            });
+            if (occupied) {
+              fits = false;
+            }
+          }
+        }
+        if (fits) {
           return [row, col];
         }
       }
@@ -1014,7 +1035,9 @@ const SimpleGrid: React.FC<{
   };
 
   const handleAddService = (service: ServiceWithPosition) => {
-    const pos = findFirstAvailableCell();
+    const rs = service.gridRowSpan || 1;
+    const cs = service.gridColSpan || 1;
+    const pos = findFirstAvailableSlot(rs, cs);
     if (pos) {
       const [row, col] = pos;
       onAddService({ ...service, gridRow: row, gridCol: col });
@@ -1333,64 +1356,62 @@ const ServiceGridEditor: React.FC<ServiceGridEditorProps> = ({ unitId }) => {
     field: string,
     value: number | null
   ) => {
-    setServices((prevServices) => {
-      const updatedServices = prevServices.map((service) => {
-        if (service.id === id) {
-          switch (field) {
-            case 'gridRow':
-              return { ...service, gridRow: value };
-            case 'gridCol':
-              return { ...service, gridCol: value };
-            case 'gridRowSpan':
-              return value !== null
-                ? { ...service, gridRowSpan: value }
-                : service;
-            case 'gridColSpan':
-              return value !== null
-                ? { ...service, gridColSpan: value }
-                : service;
-            default:
-              return service;
-          }
-        }
-        return service;
-      });
-
-      const updatedService = updatedServices.find((s) => s.id === id);
-      if (updatedService && activeUnitId) {
-        const isRemovalOperation =
-          updatedService.gridRow === null || updatedService.gridCol === null;
-
-        if (!isRemovalOperation) {
-          updateServiceMutation.mutate({
-            id: updatedService.id,
-            gridRow: updatedService.gridRow,
-            gridCol: updatedService.gridCol,
-            gridRowSpan: updatedService.gridRowSpan || 1,
-            gridColSpan: updatedService.gridColSpan || 1
-          });
-        } else {
-          servicesApi
-            .update(updatedService.id, {
-              gridRow: null,
-              gridCol: null,
-              gridRowSpan: updatedService.gridRowSpan || 1,
-              gridColSpan: updatedService.gridColSpan || 1
-            })
-            .then(() => {
-              setServices((innerPrev) =>
-                innerPrev.map((service) =>
-                  service.id === updatedService.id
-                    ? { ...service, gridRowSpan: 1, gridColSpan: 1 }
-                    : service
-                )
-              );
-            });
+    const updatedServices = services.map((service) => {
+      if (service.id === id) {
+        switch (field) {
+          case 'gridRow':
+            return { ...service, gridRow: value };
+          case 'gridCol':
+            return { ...service, gridCol: value };
+          case 'gridRowSpan':
+            return value !== null
+              ? { ...service, gridRowSpan: value }
+              : service;
+          case 'gridColSpan':
+            return value !== null
+              ? { ...service, gridColSpan: value }
+              : service;
+          default:
+            return service;
         }
       }
-
-      return updatedServices;
+      return service;
     });
+
+    const updatedService = updatedServices.find((s) => s.id === id);
+    setServices(updatedServices);
+
+    if (updatedService && activeUnitId) {
+      const isRemovalOperation =
+        updatedService.gridRow === null || updatedService.gridCol === null;
+
+      if (!isRemovalOperation) {
+        updateServiceMutation.mutate({
+          id: updatedService.id,
+          gridRow: updatedService.gridRow,
+          gridCol: updatedService.gridCol,
+          gridRowSpan: updatedService.gridRowSpan || 1,
+          gridColSpan: updatedService.gridColSpan || 1
+        });
+      } else {
+        void servicesApi
+          .update(updatedService.id, {
+            gridRow: null,
+            gridCol: null,
+            gridRowSpan: updatedService.gridRowSpan || 1,
+            gridColSpan: updatedService.gridColSpan || 1
+          })
+          .then(() => {
+            setServices((innerPrev) =>
+              innerPrev.map((service) =>
+                service.id === updatedService.id
+                  ? { ...service, gridRowSpan: 1, gridColSpan: 1 }
+                  : service
+              )
+            );
+          });
+      }
+    }
   };
 
   const handleGridSpanCommit = (
@@ -1398,27 +1419,26 @@ const ServiceGridEditor: React.FC<ServiceGridEditorProps> = ({ unitId }) => {
     gridColSpan: number,
     gridRowSpan: number
   ) => {
-    setServices((prevServices) => {
-      const updatedServices = prevServices.map((service) =>
-        service.id === id ? { ...service, gridColSpan, gridRowSpan } : service
-      );
-      const updatedService = updatedServices.find((s) => s.id === id);
-      if (
-        updatedService &&
-        activeUnitId &&
-        updatedService.gridRow !== null &&
-        updatedService.gridCol !== null
-      ) {
-        updateServiceMutation.mutate({
-          id: updatedService.id,
-          gridRow: updatedService.gridRow,
-          gridCol: updatedService.gridCol,
-          gridRowSpan,
-          gridColSpan
-        });
-      }
-      return updatedServices;
-    });
+    const updatedServices = services.map((service) =>
+      service.id === id ? { ...service, gridColSpan, gridRowSpan } : service
+    );
+    const updatedService = updatedServices.find((s) => s.id === id);
+    setServices(updatedServices);
+
+    if (
+      updatedService &&
+      activeUnitId &&
+      updatedService.gridRow !== null &&
+      updatedService.gridCol !== null
+    ) {
+      updateServiceMutation.mutate({
+        id: updatedService.id,
+        gridRow: updatedService.gridRow,
+        gridCol: updatedService.gridCol,
+        gridRowSpan,
+        gridColSpan
+      });
+    }
   };
 
   const handlePositionChange = (id: string, row: number, col: number) => {

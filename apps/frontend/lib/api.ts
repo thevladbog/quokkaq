@@ -964,10 +964,10 @@ export const shiftApi = {
   executeEOD: (unitId: string) =>
     apiRequest<{
       success: boolean;
-      activeTicketsClosed: number;
-      waitingTicketsNoShow: number;
-      countersReleased: number;
-      sequencesReset: number;
+      ticketsMarked?: number;
+      activeTicketsClosed?: number;
+      waitingTicketsNoShow?: number;
+      countersReleased?: number;
     }>(`/units/${unitId}/shift/eod`, {
       method: 'POST'
     })

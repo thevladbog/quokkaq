@@ -73,6 +73,7 @@ services:
 
   # Bucket + anonymous download policy (public GET for stored files via Traefik S3 host).
   minio-init:
+    container_name: quokkaq-minio-init
     image: minio/mc:latest
     depends_on:
       minio:

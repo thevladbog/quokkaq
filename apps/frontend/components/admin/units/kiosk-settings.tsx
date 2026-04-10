@@ -17,29 +17,8 @@ import {
 import { useUpdateUnit } from '@/lib/hooks';
 import { toast } from 'sonner';
 import { LogoUpload } from '@/components/ui/logo-upload';
-
-interface KioskConfig {
-  pin?: string;
-  welcomeTitle?: string;
-  welcomeSubtitle?: string;
-  headerText?: string;
-  footerText?: string;
-  printerConnection?: 'network' | 'system';
-  systemPrinterName?: string;
-  printerIp?: string;
-  printerPort?: string;
-  printerType?: string;
-  isPrintEnabled?: boolean;
-  logoUrl?: string;
-  feedbackUrl?: string;
-  isPreRegistrationEnabled?: boolean;
-  isCustomColorsEnabled?: boolean;
-  headerColor?: string;
-  bodyColor?: string;
-  serviceGridColor?: string;
-  showUnitInHeader?: boolean;
-  kioskUnitLabelText?: string;
-}
+import type { KioskConfig } from '@quokkaq/shared-types';
+import { useKioskHeaderFields } from '@/hooks/use-kiosk-header-fields';
 
 interface KioskSettingsProps {
   unitId: string;
@@ -58,6 +37,14 @@ export function KioskSettings({
 
   const typedConfig = currentConfig as { kiosk?: KioskConfig };
   const kioskConfig = typedConfig.kiosk || {};
+
+  const {
+    showUnitInHeader,
+    setShowUnitInHeader,
+    kioskUnitLabelText,
+    setKioskUnitLabelText,
+    headerKioskSaveFields
+  } = useKioskHeaderFields(kioskConfig);
 
   const [pin, setPin] = useState(kioskConfig.pin || '');
   const [welcomeTitle, setWelcomeTitle] = useState(
@@ -95,12 +82,6 @@ export function KioskSettings({
     kioskConfig.isPrintEnabled ?? true
   );
   const [logoUrl, setLogoUrl] = useState(kioskConfig.logoUrl || '');
-  const [showUnitInHeader, setShowUnitInHeader] = useState(
-    kioskConfig.showUnitInHeader !== false
-  );
-  const [kioskUnitLabelText, setKioskUnitLabelText] = useState(
-    kioskConfig.kioskUnitLabelText || ''
-  );
   const [feedbackUrl, setFeedbackUrl] = useState(kioskConfig.feedbackUrl || '');
   const [isPreRegistrationEnabled, setIsPreRegistrationEnabled] = useState(
     kioskConfig.isPreRegistrationEnabled ?? false
@@ -145,8 +126,7 @@ export function KioskSettings({
         printerType,
         isPrintEnabled,
         logoUrl,
-        showUnitInHeader,
-        kioskUnitLabelText: kioskUnitLabelText.trim() || undefined,
+        ...headerKioskSaveFields(),
         feedbackUrl,
         isPreRegistrationEnabled,
         isCustomColorsEnabled,

@@ -136,11 +136,15 @@ export function PreRegRedemptionModal({
               0
             </Button>
             <Button
+              type='button'
               variant='outline'
               className='h-[3.25rem] sm:h-16'
               onClick={handleBackspace}
+              aria-label={t('backspace', {
+                defaultValue: 'Delete last digit'
+              })}
             >
-              <Delete className='size-7 sm:size-9' />
+              <Delete className='size-7 sm:size-9' aria-hidden />
             </Button>
           </div>
 
