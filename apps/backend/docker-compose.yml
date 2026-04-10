@@ -61,6 +61,26 @@ services:
       timeout: 20s
       retries: 3
 
+  # Create bucket + anonymous read so logo/material URLs work in the browser (path-style GET).
+  minio-init:
+    image: minio/mc:latest
+    container_name: quokkaq-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks:
+      - quokkaq-network
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        mc alias set local http://minio:9000 minioadmin minioadmin
+        mc mb local/quokkaq-materials --ignore-existing
+        mc anonymous set download local/quokkaq-materials
+        echo 'MinIO: bucket quokkaq-materials ready (public read for GET)'
+    restart: 'no'
+
   # QuokkaQ Backend API
   backend:
     build:
@@ -84,7 +104,9 @@ services:
       AWS_REGION: us-east-1
       AWS_S3_BUCKET: quokkaq-materials
       AWS_ENDPOINT: http://minio:9000
-      
+      # URLs in JSON must be reachable from the host browser (not http://minio:9000).
+      AWS_PUBLIC_ENDPOINT: ${AWS_PUBLIC_ENDPOINT:-http://localhost:9000}
+
       # SMTP Configuration (from .env)
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT}
@@ -102,6 +124,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
     networks:
       - quokkaq-network
     healthcheck:

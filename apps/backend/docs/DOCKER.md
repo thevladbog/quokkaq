@@ -21,10 +21,8 @@ This will start:
 
 ### 2. Initial Setup
 
-1. **Create MinIO bucket:**
-   - Open http://localhost:9001
-   - Login: `minioadmin` / `minioadmin`
-   - Create bucket: `quokkaq-materials`
+1. **MinIO bucket:** On `docker compose up`, the `minio-init` service creates `quokkaq-materials` (if missing) and sets **anonymous download** so URLs like `http://localhost:9000/quokkaq-materials/...` work in the browser. If you use an older Compose without `minio-init`, create the bucket in the console (http://localhost:9001, `minioadmin` / `minioadmin`) and run:  
+   `mc anonymous set download local/quokkaq-materials` (after `mc alias set ...`).
 
 2. **Verify services:**
    ```bash
@@ -115,6 +113,10 @@ docker-compose stop minio
 docker volume rm quokkaq-go-backend_minio_data
 docker-compose up -d minio
 ```
+
+### Images return 403 or do not open in the browser
+- Ensure `minio-init` ran once (`docker compose logs minio-init`). The bucket must allow anonymous **GET** for public file URLs.
+- When the API runs **inside Docker**, set `AWS_PUBLIC_ENDPOINT=http://localhost:9000` (default in `docker-compose.yml`) so returned URLs use a host the browser can reach, not `http://minio:9000`.
 
 ## Production Deployment with Traefik
 

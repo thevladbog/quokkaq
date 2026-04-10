@@ -266,6 +266,7 @@ export default function UnitPage({ params }: UnitPageProps) {
             <KioskSettings
               key={JSON.stringify(unit.config?.kiosk)}
               unitId={unitId}
+              unitName={unit.name}
               currentConfig={unit.config || {}}
             />
           </PermissionGuard>

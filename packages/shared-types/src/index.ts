@@ -228,6 +228,10 @@ export interface AdScreenConfig {
 
 export interface KioskConfig {
   pin?: string;
+  /** Main screen hero headline above the service grid (kiosk home). */
+  welcomeTitle?: string;
+  /** Main screen hero subline below welcomeTitle. */
+  welcomeSubtitle?: string;
   headerText?: string;
   footerText?: string;
   printerConnection?: 'network' | 'system';
@@ -245,6 +249,10 @@ export interface KioskConfig {
   isPrintEnabled?: boolean;
   feedbackUrl?: string;
   isPreRegistrationEnabled?: boolean;
+  /** Show unit title in kiosk header (next to logo). Default true when unset. */
+  showUnitInHeader?: boolean;
+  /** Custom kiosk header label; when empty, the unit name from the API is shown. */
+  kioskUnitLabelText?: string;
 }
 
 export interface UnitConfig {

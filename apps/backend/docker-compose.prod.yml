@@ -71,6 +71,29 @@ services:
       timeout: 20s
       retries: 3
 
+  # Bucket + anonymous download policy (public GET for stored files via Traefik S3 host).
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks:
+      - quokkaq-network
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET:-quokkaq-materials}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
+        mc mb "local/$$AWS_S3_BUCKET" --ignore-existing
+        mc anonymous set download "local/$$AWS_S3_BUCKET"
+        echo "MinIO: bucket $$AWS_S3_BUCKET ready (public read for GET)"
+    restart: 'no'
+
   # QuokkaQ Backend API
   backend:
     image: cr.yandex/${YC_REGISTRY_ID}/quokkaq-backend:${TAG}
@@ -114,6 +137,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
     networks:
       - quokkaq-network
       - traefik-public

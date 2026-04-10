@@ -155,6 +155,11 @@
   --shadow-lg: var(--shadow-lg);
   --shadow-xl: var(--shadow-xl);
   --shadow-2xl: var(--shadow-2xl);
+
+  /* Kiosk warm neutral palette (Figma-inspired); use text-kiosk-ink, etc. */
+  --color-kiosk-ink: oklch(0.3 0.035 55);
+  --color-kiosk-ink-muted: oklch(0.44 0.028 55);
+  --color-kiosk-border: oklch(0.9 0.012 75);
 }
 
 @layer base {

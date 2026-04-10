@@ -1,8 +1,7 @@
 'use client';
 
-import { useAuth } from '@/lib/hooks';
-import { useEffect, useState } from 'react';
-import { authApi } from '@/lib/api';
+import { useMemo } from 'react';
+import { useAuthContext } from '@/contexts/AuthContext';
 
 interface PermissionGuardProps {
   children: React.ReactNode;
@@ -19,52 +18,33 @@ export default function PermissionGuard({
   requireAll = false,
   fallback = null
 }: PermissionGuardProps) {
-  const { isAuthenticated, token } = useAuth();
-  const [hasAccess, setHasAccess] = useState<boolean | null>(null);
+  const { user, isAuthenticated, isLoading } = useAuthContext();
 
-  useEffect(() => {
-    const checkAccess = async () => {
-      if (!isAuthenticated || !token) {
-        setHasAccess(false);
-        return;
-      }
+  const permissionsSig = JSON.stringify([...permissions].sort());
 
-      try {
-        // In a real app, we would decode the token or fetch user info from context
-        // For now, we'll fetch the user info
-        const user = await authApi.me(token);
+  const hasAccess = useMemo(() => {
+    if (isLoading) return null as boolean | null;
+    if (!isAuthenticated || !user) return false;
 
-        if (user.roles?.includes('admin')) {
-          setHasAccess(true);
-          return;
-        }
+    if (user.roles?.includes('admin')) {
+      return true;
+    }
 
-        if (!unitId) {
-          // If no unit context, we can't check unit-specific permissions
-          // But maybe we want to check global roles?
-          // For now, assume false if permissions are required but no unit context
-          setHasAccess(false);
-          return;
-        }
+    if (!unitId) {
+      return false;
+    }
 
-        const userPermissions = user.permissions?.[unitId] || [];
+    const userPermissions = user.permissions?.[unitId] || [];
+    const required: string[] = JSON.parse(permissionsSig) as string[];
 
-        if (requireAll) {
-          setHasAccess(permissions.every((p) => userPermissions.includes(p)));
-        } else {
-          setHasAccess(permissions.some((p) => userPermissions.includes(p)));
-        }
-      } catch (error) {
-        console.error('Failed to check permissions:', error);
-        setHasAccess(false);
-      }
-    };
-
-    checkAccess();
-  }, [isAuthenticated, token, permissions, unitId, requireAll]);
+    if (requireAll) {
+      return required.every((p) => userPermissions.includes(p));
+    }
+    return required.some((p) => userPermissions.includes(p));
+  }, [isLoading, isAuthenticated, user, unitId, requireAll, permissionsSig]);
 
   if (hasAccess === null) {
-    return null; // Loading
+    return null;
   }
 
   if (!hasAccess) {

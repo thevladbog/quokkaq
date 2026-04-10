@@ -16,7 +16,6 @@ import { ArrowLeft, Home } from 'lucide-react';
 import dynamic from 'next/dynamic';
 const QRCode = dynamic(() => import('react-qr-code'), { ssr: false });
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { useParams } from 'next/navigation';
 import { useRouter } from '@/src/i18n/navigation';
@@ -28,15 +27,15 @@ import { PinCodeModal } from '@/components/kiosk/pin-code-modal';
 import { KioskSettingsSheet } from '@/components/kiosk/kiosk-settings-sheet';
 import { LockScreen } from '@/components/kiosk/lock-screen';
 import { PreRegRedemptionModal } from '@/components/kiosk/PreRegRedemptionModal';
+import { KioskTopBar } from '@/components/kiosk/kiosk-top-bar';
+import { KioskWelcomeHero } from '@/components/kiosk/kiosk-welcome-hero';
+import { KioskServiceTile } from '@/components/kiosk/kiosk-service-tile';
 import {
   printReceiptFromKioskConfig,
   ticketReceiptLines
 } from '@/lib/kiosk-print';
-import {
-  formatAppDate,
-  formatAppTime,
-  intlLocaleFromAppLocale
-} from '@/lib/format-datetime';
+import { intlLocaleFromAppLocale } from '@/lib/format-datetime';
+import { SERVICE_GRID_CELL_COUNT, SERVICE_GRID_COLS } from '@/lib/service-grid';
 
 export default function UnitKioskPage() {
   const params = useParams() as { unitId?: string };
@@ -95,14 +94,77 @@ export default function UnitKioskPage() {
   const isCustomColorsEnabled =
     unit?.config?.kiosk?.isCustomColorsEnabled || false;
   const headerColor = isCustomColorsEnabled
-    ? unit?.config?.kiosk?.headerColor || '#ffffff'
-    : '#ffffff';
+    ? unit?.config?.kiosk?.headerColor || '#fff9f4'
+    : '#fff9f4';
   const bodyColor = isCustomColorsEnabled
-    ? unit?.config?.kiosk?.bodyColor || '#f3f4f6'
-    : '#f3f4f6';
+    ? unit?.config?.kiosk?.bodyColor || '#fef8f3'
+    : '#fef8f3';
   const serviceGridColor = isCustomColorsEnabled
-    ? unit?.config?.kiosk?.serviceGridColor || '#ffffff'
-    : '#ffffff';
+    ? unit?.config?.kiosk?.serviceGridColor || '#f2ebe6'
+    : '#f2ebe6';
+
+  const kioskCfg = unit?.config?.kiosk;
+  const showTicketHeader = kioskCfg?.showHeader !== false;
+  const showTicketFooter = kioskCfg?.showFooter !== false;
+
+  const showUnitInHeader = kioskCfg?.showUnitInHeader !== false;
+  const unitLabelOverride = kioskCfg?.kioskUnitLabelText?.trim();
+  const resolvedHeaderUnitTitle =
+    unitLabelOverride || unit?.name?.trim() || t('kioskTitle');
+
+  const switcherClass =
+    'text-kiosk-ink h-11 min-w-[3.25rem] rounded-full border-0 bg-[#f2ede8] px-4 text-base font-semibold shadow-sm hover:bg-[#ebe4de] md:h-12 md:min-w-[3.5rem]';
+
+  const topBarLeading = (
+    <>
+      {kioskCfg?.logoUrl ? (
+        <div className='relative h-10 w-auto shrink-0 md:h-14'>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={kioskCfg.logoUrl}
+            alt=''
+            className='h-full w-auto object-contain'
+          />
+        </div>
+      ) : null}
+      {showUnitInHeader ? (
+        <p className='text-kiosk-ink min-w-0 truncate text-lg font-bold tracking-tight sm:text-xl md:text-2xl'>
+          {resolvedHeaderUnitTitle}
+        </p>
+      ) : null}
+    </>
+  );
+
+  const topBarBeforeClock = (
+    <>
+      {kioskCfg?.isPreRegistrationEnabled ? (
+        <Button
+          variant='secondary'
+          className='text-kiosk-ink h-11 shrink-0 rounded-full px-4 text-base font-semibold shadow-sm md:h-12'
+          onClick={() => setIsRedemptionModalOpen(true)}
+        >
+          {t('pre_registration.button', { defaultValue: 'I have a code' })}
+        </Button>
+      ) : null}
+      <KioskLanguageSwitcher className={switcherClass} />
+    </>
+  );
+
+  const isServiceRoot = selectedServicePath.length === 0;
+  const pathLeaf = selectedServicePath[selectedServicePath.length - 1];
+  const heroTitle = isServiceRoot
+    ? kioskCfg?.welcomeTitle?.trim() || t('welcome_default_title')
+    : pathLeaf
+      ? getLocalizedName(
+          pathLeaf.name,
+          pathLeaf.nameRu,
+          pathLeaf.nameEn,
+          locale
+        )
+      : t('selectService');
+  const heroSubtitle = isServiceRoot
+    ? kioskCfg?.welcomeSubtitle?.trim() || t('welcome_default_subtitle')
+    : undefined;
 
   const handleClockClick = () => {
     setClockClicks((prev) => {
@@ -235,34 +297,21 @@ export default function UnitKioskPage() {
   if (servicesLoading) {
     return (
       <div
-        className='bg-background flex min-h-screen flex-col p-4'
+        className='text-kiosk-ink flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-4'
         style={{ backgroundColor: bodyColor }}
       >
-        {/* Header with date/time and language/theme toggles */}
-        <div
-          className='mb-4 flex items-center justify-between rounded-lg p-4'
-          style={{ backgroundColor: headerColor }}
-        >
-          {/* Date and Time in two rows - time first, date second */}
+        <KioskTopBar
+          intlLocale={intlLocale}
+          currentTime={currentTime}
+          onClockClick={handleClockClick}
+          headerColor={headerColor}
+          leading={topBarLeading}
+          beforeClock={topBarBeforeClock}
+        />
+        <div className='flex min-h-0 flex-1 items-center justify-center overflow-hidden'>
           <div className='text-center'>
-            <div className='text-3xl font-bold'>
-              {formatAppTime(new Date(), intlLocale)}
-            </div>
-            <div className='mt-1 text-sm'>
-              {formatAppDate(new Date(), intlLocale, 'full')}
-            </div>
-          </div>
-
-          {/* Language and Theme toggles on the right */}
-          <div className='flex space-x-2'>
-            <KioskLanguageSwitcher />
-          </div>
-        </div>
-
-        <div className='flex flex-1 items-center justify-center'>
-          <div className='text-center'>
-            <div className='border-primary mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2'></div>
-            <p className='text-muted-foreground'>{t('loading')}</p>
+            <div className='border-kiosk-ink/30 mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-2 border-b-transparent'></div>
+            <p className='text-kiosk-ink-muted'>{t('loading')}</p>
           </div>
         </div>
       </div>
@@ -273,33 +322,20 @@ export default function UnitKioskPage() {
   if (currentServices().length === 0) {
     return (
       <div
-        className='bg-background flex min-h-screen flex-col p-4'
+        className='text-kiosk-ink flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-4'
         style={{ backgroundColor: bodyColor }}
       >
-        {/* Header with date/time and language/theme toggles */}
-        <div
-          className='mb-4 flex items-center justify-between rounded-lg p-4'
-          style={{ backgroundColor: headerColor }}
-        >
-          {/* Date and Time in two rows - time first, date second */}
-          <div className='text-center'>
-            <div className='text-3xl font-bold'>
-              {formatAppTime(new Date(), intlLocale)}
-            </div>
-            <div className='mt-1 text-sm'>
-              {formatAppDate(new Date(), intlLocale, 'full')}
-            </div>
-          </div>
-
-          {/* Language and Theme toggles on the right */}
-          <div className='flex space-x-2'>
-            <KioskLanguageSwitcher />
-          </div>
-        </div>
-
-        <div className='flex flex-1 items-center justify-center'>
-          <div className='text-center'>
-            <h2 className='mb-2 text-2xl font-bold'>
+        <KioskTopBar
+          intlLocale={intlLocale}
+          currentTime={currentTime}
+          onClockClick={handleClockClick}
+          headerColor={headerColor}
+          leading={topBarLeading}
+          beforeClock={topBarBeforeClock}
+        />
+        <div className='flex min-h-0 flex-1 items-center justify-center overflow-hidden'>
+          <div className='max-w-md px-4 text-center'>
+            <h2 className='mb-2 text-2xl font-bold tracking-tight sm:text-3xl'>
               {selectedServicePath.length > 0
                 ? getLocalizedName(
                     selectedServicePath[selectedServicePath.length - 1].name,
@@ -309,12 +345,12 @@ export default function UnitKioskPage() {
                   )
                 : t('selectService')}
             </h2>
-            <p className='text-muted-foreground mb-4'>
+            <p className='text-kiosk-ink-muted mb-6 text-base'>
               {t('noServicesAvailable', {
                 defaultValue: 'No services available at this level'
               })}
             </p>
-            <Button onClick={handleGoBack}>
+            <Button className='rounded-full px-8' onClick={handleGoBack}>
               {selectedServicePath.length > 0
                 ? t('back')
                 : t('changeLocation', { defaultValue: 'Change Location' })}
@@ -327,72 +363,36 @@ export default function UnitKioskPage() {
 
   return (
     <div
-      className='bg-background flex min-h-screen flex-col p-4'
+      className='text-kiosk-ink flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-4'
       style={{ backgroundColor: bodyColor }}
     >
-      {/* Header with date/time and language/theme toggles */}
-      <div
-        className='mb-4 flex items-center justify-between rounded-lg p-4 shadow-sm'
-        style={{ backgroundColor: headerColor }}
-      >
-        {/* Date and Time in two rows - time first, date second */}
-        <div
-          className='cursor-pointer text-center select-none'
-          onClick={handleClockClick}
-        >
-          <div className='text-3xl font-bold'>
-            {formatAppTime(currentTime, intlLocale)}
-          </div>
-          <div className='mt-1 text-sm'>
-            {formatAppDate(currentTime, intlLocale, 'full')}
-          </div>
-        </div>
+      <KioskTopBar
+        intlLocale={intlLocale}
+        currentTime={currentTime}
+        onClockClick={handleClockClick}
+        headerColor={headerColor}
+        leading={topBarLeading}
+        beforeClock={topBarBeforeClock}
+      />
 
-        {/* Language toggle and Logo on the right */}
-        <div className='flex items-center gap-4 md:gap-8'>
-          {unit?.config?.kiosk?.isPreRegistrationEnabled && (
-            <Button
-              variant='secondary'
-              className='h-12 text-xl md:h-16 md:w-50'
-              onClick={() => setIsRedemptionModalOpen(true)}
-            >
-              {t('pre_registration.button', { defaultValue: 'I have a code' })}
-            </Button>
-          )}
-
-          <KioskLanguageSwitcher className='h-12 w-12 text-xl md:h-16 md:w-16' />
-          {/* ThemeToggle removed as per request */}
-
-          {unit?.config?.kiosk?.logoUrl && (
-            <div className='relative h-12 w-auto md:h-16'>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={unit.config.kiosk.logoUrl}
-                alt='Logo'
-                className='h-full w-auto object-contain'
-              />
-            </div>
-          )}
-        </div>
-      </div>
+      <KioskWelcomeHero title={heroTitle} subtitle={heroSubtitle} />
 
       {/* Navigation breadcrumbs and buttons */}
-      <div className='mb-4 flex items-center justify-between'>
-        <div className='flex items-center overflow-x-auto'>
-          <span className='text-muted-foreground mr-2 whitespace-nowrap'>
-            #
-          </span>
+      <div className='border-kiosk-border/50 mb-2 flex shrink-0 items-center justify-between rounded-xl border bg-white/40 px-3 py-2 sm:mb-3 sm:px-4'>
+        <div className='text-kiosk-ink-muted flex min-w-0 items-center overflow-x-auto text-sm font-medium'>
+          <span className='mr-2 shrink-0 opacity-70'>#</span>
           {selectedServicePath.length === 0 ? (
-            <span className='text-muted-foreground'>
-              {t('services', { defaultValue: 'Services' })}
-            </span>
+            <span>{t('services', { defaultValue: 'Services' })}</span>
           ) : (
             selectedServicePath.map((service, index) => (
               <div key={index} className='flex items-center'>
                 {index > 0 && (
-                  <Separator orientation='vertical' className='mx-2 h-4' />
+                  <Separator
+                    orientation='vertical'
+                    className='bg-kiosk-border mx-2 h-4'
+                  />
                 )}
-                <span className='whitespace-nowrap'>
+                <span className='text-kiosk-ink whitespace-nowrap'>
                   {getLocalizedName(
                     service.name,
                     service.nameRu,
@@ -405,11 +405,12 @@ export default function UnitKioskPage() {
           )}
         </div>
 
-        <div className='ml-4 flex shrink-0 items-center gap-2'>
+        <div className='ml-3 flex shrink-0 items-center gap-2'>
           {selectedServicePath.length > 1 && (
             <Button
               variant='outline'
               size='sm'
+              className='border-kiosk-border/60 rounded-full'
               onClick={() => setSelectedServicePath([])}
             >
               <Home className='mr-2 h-4 w-4' />
@@ -417,7 +418,12 @@ export default function UnitKioskPage() {
             </Button>
           )}
           {selectedServicePath.length > 0 && (
-            <Button variant='outline' size='sm' onClick={handleGoBack}>
+            <Button
+              variant='outline'
+              size='sm'
+              className='border-kiosk-border/60 rounded-full'
+              onClick={handleGoBack}
+            >
               <ArrowLeft className='mr-2 h-4 w-4' />
               {t('back', { defaultValue: 'Back' })}
             </Button>
@@ -425,70 +431,33 @@ export default function UnitKioskPage() {
         </div>
       </div>
 
-      {/* Services grid */}
+      {/* Services grid — fills remaining viewport height; no page scroll */}
       <div
-        className='bg-muted grid h-full w-full flex-1 grid-cols-8 grid-rows-4 gap-4 overflow-auto rounded-lg p-4'
+        className='grid min-h-0 w-full min-w-0 flex-1 grid-cols-8 grid-rows-8 gap-1.5 overflow-hidden rounded-2xl p-2 sm:gap-2 sm:p-3 md:gap-3 md:p-4'
         style={{ backgroundColor: serviceGridColor }}
       >
         {/* Render services with their exact grid positions */}
         {currentServices().map((service) => {
           if (service.gridRow !== null && service.gridCol !== null) {
-            // Calculate grid positions accounting for CSS Grid 1-indexed positions
-            const startRow = (service.gridRow ?? 0) + 1; // Convert from 0-indexed to 1-indexed
-            const startCol = (service.gridCol ?? 0) + 1; // Convert from 0-indexed to 1-indexed
+            const startRow = (service.gridRow ?? 0) + 1;
+            const startCol = (service.gridCol ?? 0) + 1;
             const rowSpan = service.gridRowSpan || 1;
             const colSpan = service.gridColSpan || 1;
 
             return (
               <div
                 key={service.id}
-                className='h-full w-full'
+                className='h-full min-h-0 w-full min-w-0'
                 style={{
                   gridRow: `${startRow} / span ${rowSpan}`,
                   gridColumn: `${startCol} / span ${colSpan}`
                 }}
               >
-                <Card
-                  className='relative flex h-full w-full cursor-pointer flex-col overflow-hidden border-0 transition-all hover:shadow-lg'
-                  onClick={() => handleServiceSelection(service)}
-                  style={{
-                    backgroundColor: service.backgroundColor || undefined,
-                    color: service.textColor || undefined
-                  }}
-                >
-                  <CardHeader className='relative z-10 flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden p-3'>
-                    <CardTitle className='line-clamp-2 shrink-0 px-1 text-center text-2xl font-semibold wrap-break-word'>
-                      {getLocalizedName(
-                        service.name,
-                        service.nameRu || '',
-                        service.nameEn || '',
-                        locale
-                      )}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className='relative z-10 shrink-0 p-2 pt-0'>
-                    {service.description && (
-                      <p className='text-muted-foreground line-clamp-2 px-1 text-center text-base wrap-break-word'>
-                        {getLocalizedName(
-                          service.description,
-                          service.descriptionRu,
-                          service.descriptionEn,
-                          locale
-                        )}
-                      </p>
-                    )}
-                  </CardContent>
-                  {service.imageUrl && (
-                    <div className='absolute inset-0 z-0 p-4'>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={service.imageUrl}
-                        alt={service.name}
-                        className='object-contain opacity-20'
-                      />
-                    </div>
-                  )}
-                </Card>
+                <KioskServiceTile
+                  service={service}
+                  locale={locale}
+                  onSelect={handleServiceSelection}
+                />
               </div>
             );
           }
@@ -497,9 +466,9 @@ export default function UnitKioskPage() {
         })}
 
         {/* Add empty cells to fill up the grid structure where no services are positioned */}
-        {Array.from({ length: 32 }).map((_, index) => {
-          const row = Math.floor(index / 8);
-          const col = index % 8;
+        {Array.from({ length: SERVICE_GRID_CELL_COUNT }).map((_, index) => {
+          const row = Math.floor(index / SERVICE_GRID_COLS);
+          const col = index % SERVICE_GRID_COLS;
 
           // Check if this cell is already occupied by a service
           const isOccupied = currentServices().some((service) => {
@@ -558,12 +527,11 @@ export default function UnitKioskPage() {
               </div>
             )}
 
-            {/* Header text (if set) */}
-            {unit?.config?.kiosk?.headerText && (
+            {showTicketHeader && kioskCfg?.headerText ? (
               <div className='mb-2 text-center text-lg font-medium'>
-                {unit.config.kiosk.headerText}
+                {kioskCfg.headerText}
               </div>
-            )}
+            ) : null}
 
             <DialogHeader>
               <DialogTitle className='text-center text-xl'>
@@ -602,15 +570,14 @@ export default function UnitKioskPage() {
                 />
               </div>
 
-              {/* Show Footer if configured */}
-              {unit?.config?.kiosk?.footerText && (
+              {showTicketFooter && kioskCfg?.footerText ? (
                 <>
                   <Separator className='my-4 w-full' />
                   <div className='text-muted-foreground text-center text-sm'>
-                    {unit.config.kiosk.footerText}
+                    {kioskCfg.footerText}
                   </div>
                 </>
-              )}
+              ) : null}
             </div>
             <DialogFooter className='w-full sm:justify-center'>
               <DialogClose asChild>
@@ -637,6 +604,7 @@ export default function UnitKioskPage() {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         unitId={unitId!}
+        unitName={unit?.name ?? ''}
         currentConfig={unit?.config}
         onLock={() => {
           setIsSettingsOpen(false);
