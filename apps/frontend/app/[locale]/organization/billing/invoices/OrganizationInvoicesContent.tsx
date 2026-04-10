@@ -1,16 +1,20 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import type { Invoice } from '@quokkaq/shared-types';
 import { InvoiceList } from '@/components/billing/InvoiceList';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { invoicesApi } from '@/lib/api';
+import { downloadInvoicePdf } from '@/lib/invoice-pdf-download';
+import { toast } from 'sonner';
 
 export function OrganizationInvoicesContent() {
   const router = useRouter();
   const t = useTranslations('organization.invoices');
+  const tDetail = useTranslations('organization.invoiceDetail');
   const tCommon = useTranslations('common');
 
   const { data: invoices, isLoading } = useQuery({
@@ -18,17 +22,17 @@ export function OrganizationInvoicesContent() {
     queryFn: () => invoicesApi.getMyInvoices()
   });
 
-  const handleDownload = async (invoiceId: string) => {
+  const handleDownload = async (invoice: Invoice) => {
     try {
-      const blob = await invoicesApi.downloadInvoice(invoiceId);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `invoice-${invoiceId}.json`;
-      a.click();
-      window.URL.revokeObjectURL(url);
+      await downloadInvoicePdf(invoice);
     } catch (error) {
-      console.error('Failed to download invoice:', error);
+      const raw = error instanceof Error ? error.message : String(error);
+      toast.error(
+        tDetail('downloadPdfError', {
+          message: raw,
+          defaultValue: 'Could not download invoice PDF. {message}'
+        })
+      );
     }
   };
 
@@ -46,7 +50,11 @@ export function OrganizationInvoicesContent() {
         {t('backToBilling')}
       </Button>
 
-      <InvoiceList invoices={invoices || []} onDownload={handleDownload} />
+      <InvoiceList
+        invoices={invoices || []}
+        onDownload={handleDownload}
+        detailBasePath='/organization/billing/invoices'
+      />
     </div>
   );
 }

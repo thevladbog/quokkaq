@@ -1,6 +1,9 @@
 package repository
 
 import (
+	"fmt"
+	"time"
+
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/pkg/database"
 
@@ -28,10 +31,15 @@ func clampInvoiceListPagination(limit, offset int) (int, int) {
 type InvoiceRepository interface {
 	Create(invoice *models.Invoice) error
 	FindByID(id string) (*models.Invoice, error)
+	FindByIDWithLines(id string) (*models.Invoice, error)
 	FindByCompanyID(companyID string) ([]models.Invoice, error)
+	FindByCompanyIDNonDraft(companyID string) ([]models.Invoice, error)
 	ListPaginated(companyID *string, limit, offset int) ([]models.Invoice, int64, error)
 	Update(invoice *models.Invoice) error
 	Delete(id string) error
+	CreateWithLinesInTx(tx *gorm.DB, invoice *models.Invoice, lines []models.InvoiceLine) error
+	UpdateHeaderAndLinesInTx(tx *gorm.DB, invoice *models.Invoice, lines []models.InvoiceLine) error
+	AllocateDocumentNumber(tx *gorm.DB, year int) (string, error)
 }
 
 type invoiceRepository struct{}
@@ -53,9 +61,34 @@ func (r *invoiceRepository) FindByID(id string) (*models.Invoice, error) {
 	return &invoice, nil
 }
 
+func (r *invoiceRepository) FindByIDWithLines(id string) (*models.Invoice, error) {
+	var invoice models.Invoice
+	err := database.DB.
+		Preload("Lines", func(db *gorm.DB) *gorm.DB {
+			return db.Order("position ASC")
+		}).
+		Preload("Lines.SubscriptionPlan").
+		Preload("Company").
+		Preload("Subscription.Plan").
+		First(&invoice, "id = ?", id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &invoice, nil
+}
+
 func (r *invoiceRepository) FindByCompanyID(companyID string) ([]models.Invoice, error) {
 	var invoices []models.Invoice
 	err := database.DB.Where("company_id = ?", companyID).
+		Order("created_at DESC, id DESC").
+		Find(&invoices).Error
+	return invoices, err
+}
+
+// FindByCompanyIDNonDraft returns issued invoices only (excludes platform drafts).
+func (r *invoiceRepository) FindByCompanyIDNonDraft(companyID string) ([]models.Invoice, error) {
+	var invoices []models.Invoice
+	err := database.DB.Where("company_id = ? AND status <> ?", companyID, "draft").
 		Order("created_at DESC, id DESC").
 		Find(&invoices).Error
 	return invoices, err
@@ -91,4 +124,55 @@ func (r *invoiceRepository) Update(invoice *models.Invoice) error {
 
 func (r *invoiceRepository) Delete(id string) error {
 	return database.DB.Delete(&models.Invoice{}, "id = ?", id).Error
+}
+
+func (r *invoiceRepository) CreateWithLinesInTx(tx *gorm.DB, invoice *models.Invoice, lines []models.InvoiceLine) error {
+	if err := tx.Create(invoice).Error; err != nil {
+		return err
+	}
+	for i := range lines {
+		lines[i].InvoiceID = invoice.ID
+		lines[i].Position = i + 1
+		if err := tx.Create(&lines[i]).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *invoiceRepository) UpdateHeaderAndLinesInTx(tx *gorm.DB, invoice *models.Invoice, lines []models.InvoiceLine) error {
+	if err := tx.Save(invoice).Error; err != nil {
+		return err
+	}
+	if err := tx.Where("invoice_id = ?", invoice.ID).Delete(&models.InvoiceLine{}).Error; err != nil {
+		return err
+	}
+	for i := range lines {
+		lines[i].InvoiceID = invoice.ID
+		lines[i].Position = i + 1
+		lines[i].ID = ""
+		if err := tx.Create(&lines[i]).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// AllocateDocumentNumber returns next QQ-YYYY-NNNNN for the given calendar year (UTC).
+func (r *invoiceRepository) AllocateDocumentNumber(tx *gorm.DB, year int) (string, error) {
+	var seq int64
+	err := tx.Raw(`
+		INSERT INTO invoice_number_sequences (year, last_seq) VALUES (?, 1)
+		ON CONFLICT (year) DO UPDATE SET last_seq = invoice_number_sequences.last_seq + 1
+		RETURNING last_seq
+	`, year).Scan(&seq).Error
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("QQ-%d-%05d", year, seq), nil
+}
+
+// InvoiceYearUTC returns calendar year for document numbering.
+func InvoiceYearUTC(t time.Time) int {
+	return t.UTC().Year()
 }

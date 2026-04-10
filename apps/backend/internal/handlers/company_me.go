@@ -82,12 +82,13 @@ func (h *CompanyHandler) GetMyCompany(w http.ResponseWriter, r *http.Request) {
 }
 
 type patchMyCompanyBody struct {
-	Name               *string          `json:"name"`
-	BillingEmail       *string          `json:"billingEmail"`
-	Counterparty       *json.RawMessage `json:"counterparty"`
-	ClearCounterparty  *bool            `json:"clearCounterparty"`
-	BillingAddress     *json.RawMessage `json:"billingAddress"`
-	ClearBillingAddress *bool           `json:"clearBillingAddress"`
+	Name                *string          `json:"name"`
+	BillingEmail        *string          `json:"billingEmail"`
+	Counterparty        *json.RawMessage `json:"counterparty"`
+	ClearCounterparty   *bool            `json:"clearCounterparty"`
+	BillingAddress      *json.RawMessage `json:"billingAddress"`
+	ClearBillingAddress *bool            `json:"clearBillingAddress"`
+	PaymentAccounts     *json.RawMessage `json:"paymentAccounts"`
 }
 
 // PatchMyCompany godoc
@@ -191,6 +192,14 @@ func (h *CompanyHandler) PatchMyCompany(w http.ResponseWriter, r *http.Request) 
 			}
 			company.Counterparty = raw
 		}
+	}
+	if body.PaymentAccounts != nil {
+		out, err := normalizePaymentAccountsJSON(*body.PaymentAccounts)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		company.PaymentAccounts = out
 	}
 
 	if err := h.companyRepo.Update(company); err != nil {

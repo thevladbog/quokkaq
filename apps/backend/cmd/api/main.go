@@ -65,6 +65,9 @@ func main() {
 			// Models with foreign keys (in dependency order)
 			&models.Subscription{},
 			&models.Invoice{},
+			&models.CatalogItem{},
+			&models.InvoiceLine{},
+			&models.InvoiceNumberSequence{},
 			&models.UsageRecord{},
 			&models.Unit{},
 			&models.User{},
@@ -120,6 +123,7 @@ func main() {
 	desktopTerminalRepo := repository.NewDesktopTerminalRepository()
 	subscriptionRepo := repository.NewSubscriptionRepository()
 	invoiceRepo := repository.NewInvoiceRepository()
+	catalogRepo := repository.NewCatalogRepository()
 	companyRepo := repository.NewCompanyRepository()
 
 	jobWorker := jobs.NewJobWorker(ttsService, ticketRepo)
@@ -172,9 +176,24 @@ func main() {
 		}
 	}
 	subscriptionHandler := handlers.NewSubscriptionHandler(subscriptionRepo, userRepo, paymentProvider)
-	invoiceHandler := handlers.NewInvoiceHandler(invoiceRepo, userRepo)
+	var yooInvoice *services.YooKassaInvoiceClient
+	if yShop := strings.TrimSpace(os.Getenv("YOOKASSA_SHOP_ID")); yShop != "" {
+		yooInvoice = services.NewYooKassaInvoiceClient(
+			yShop,
+			strings.TrimSpace(os.Getenv("YOOKASSA_SECRET_KEY")),
+			strings.TrimSpace(os.Getenv("YOOKASSA_WEBHOOK_SECRET")),
+		)
+	}
+	invoiceHandler := handlers.NewInvoiceHandler(
+		invoiceRepo,
+		companyRepo,
+		userRepo,
+		yooInvoice,
+		strings.TrimSpace(os.Getenv("YOOKASSA_PAYMENT_RETURN_URL")),
+		strings.TrimSpace(os.Getenv("PUBLIC_APP_URL")),
+	)
 	companyHandler := handlers.NewCompanyHandler(companyRepo, userRepo)
-	platformHandler := handlers.NewPlatformHandler(companyRepo, subscriptionRepo, invoiceRepo)
+	platformHandler := handlers.NewPlatformHandler(companyRepo, subscriptionRepo, invoiceRepo, catalogRepo)
 	dadataHandler := handlers.NewDaDataHandler()
 
 	r := chi.NewRouter()
@@ -206,6 +225,8 @@ func main() {
 			fmt.Printf("Error writing response: %v\n", err)
 		}
 	})
+
+	r.Post("/webhooks/yookassa", handlers.ServeYooKassaWebhook)
 
 	r.Get("/ws", func(w http.ResponseWriter, r *http.Request) {
 		ws.ServeWs(hub, w, r)
@@ -402,6 +423,7 @@ func main() {
 			r.Post("/dadata/party/find-by-inn", dadataHandler.FindPartyByInn)
 			r.Post("/dadata/party/suggest", dadataHandler.SuggestParty)
 			r.Post("/dadata/address/suggest", dadataHandler.SuggestAddress)
+			r.Post("/dadata/bank/suggest", dadataHandler.SuggestBank)
 			r.Post("/dadata/address/clean", dadataHandler.CleanAddress)
 		})
 		r.Post("/me/complete-onboarding", companyHandler.CompleteOnboarding)
@@ -426,6 +448,10 @@ func main() {
 	r.Route("/invoices", func(r chi.Router) {
 		r.Use(authmiddleware.JWTAuth)
 		r.Get("/me", invoiceHandler.GetMyInvoices)
+		// Must live under /me/... so chi does not treat the last segment as /{id} (e.g. "saas-vendor").
+		r.Get("/me/vendor", invoiceHandler.GetSaaSVendor)
+		r.Post("/{id}/yookassa-payment-link", invoiceHandler.RequestYooKassaPaymentLink)
+		r.Get("/{id}", invoiceHandler.GetMyInvoiceByID)
 		r.Get("/{id}/download", invoiceHandler.DownloadInvoice)
 	})
 
@@ -440,6 +466,7 @@ func main() {
 		r.Post("/dadata/party/find-by-inn", dadataHandler.FindPartyByInn)
 		r.Post("/dadata/party/suggest", dadataHandler.SuggestParty)
 		r.Post("/dadata/address/suggest", dadataHandler.SuggestAddress)
+		r.Post("/dadata/bank/suggest", dadataHandler.SuggestBank)
 		r.Post("/dadata/address/clean", dadataHandler.CleanAddress)
 		r.Get("/subscriptions", platformHandler.ListSubscriptions)
 		r.Post("/subscriptions", platformHandler.CreateSubscription)
@@ -447,8 +474,16 @@ func main() {
 		r.Get("/subscription-plans", platformHandler.ListSubscriptionPlans)
 		r.Post("/subscription-plans", platformHandler.CreateSubscriptionPlan)
 		r.Put("/subscription-plans/{id}", platformHandler.UpdateSubscriptionPlan)
+		r.Get("/catalog-items", platformHandler.ListCatalogItems)
+		r.Post("/catalog-items", platformHandler.CreateCatalogItem)
+		r.Get("/catalog-items/{id}", platformHandler.GetCatalogItem)
+		r.Patch("/catalog-items/{id}", platformHandler.PatchCatalogItem)
+		r.Delete("/catalog-items/{id}", platformHandler.DeleteCatalogItem)
 		r.Get("/invoices", platformHandler.ListInvoices)
 		r.Post("/invoices", platformHandler.CreateInvoice)
+		r.Get("/invoices/{id}", platformHandler.GetPlatformInvoice)
+		r.Patch("/invoices/{id}/draft", platformHandler.PatchInvoiceDraft)
+		r.Post("/invoices/{id}/issue", platformHandler.IssueInvoice)
 		r.Patch("/invoices/{id}", platformHandler.PatchInvoice)
 	})
 

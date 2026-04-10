@@ -103,6 +103,7 @@ func newPendingPlanTestDB(t *testing.T) *gorm.DB {
 			is_saas_operator INTEGER NOT NULL DEFAULT 0,
 			billing_email TEXT,
 			billing_address TEXT,
+			payment_accounts TEXT,
 			counterparty TEXT,
 			settings TEXT,
 			onboarding_state TEXT,

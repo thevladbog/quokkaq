@@ -35,6 +35,7 @@ import { Combobox } from '@/components/ui/combobox';
 import { Link } from '@/src/i18n/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import {
   formatAppDateTime,
   intlLocaleFromAppLocale
@@ -49,24 +50,6 @@ const SUB_STATUSES = [
 ] as const;
 
 const STATUS_SELECT_DEFAULT = '__default__';
-
-/** Next calendar month, clamping the day to the last day of the target month (avoids Jan 31 → Mar 3). */
-function addOneCalendarMonthClamped(from: Date): Date {
-  const y = from.getFullYear();
-  const m = from.getMonth();
-  const day = from.getDate();
-  const lastDayOfTargetMonth = new Date(y, m + 2, 0).getDate();
-  const clampedDay = Math.min(day, lastDayOfTargetMonth);
-  return new Date(
-    y,
-    m + 1,
-    clampedDay,
-    from.getHours(),
-    from.getMinutes(),
-    from.getSeconds(),
-    from.getMilliseconds()
-  );
-}
 
 function subscriptionStatusLabel(
   tBilling: ReturnType<typeof useTranslations<'organization.billing'>>,
@@ -136,7 +119,7 @@ export default function PlatformSubscriptionsPage() {
   });
 
   const createMut = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (): Promise<{ withInvoice: boolean }> => {
       if (!companyId || !planId) {
         throw new Error(t('validationCompanyPlan'));
       }
@@ -176,12 +159,11 @@ export default function PlatformSubscriptionsPage() {
       }
 
       if (createWithInvoice) {
-        const amount = Number.parseFloat(invAmount.trim());
+        const amount = Number.parseInt(invAmount.trim(), 10);
         const dueRaw = invDue.trim();
         const dueDate = new Date(dueRaw);
         if (
           !Number.isFinite(amount) ||
-          !Number.isInteger(amount) ||
           amount <= 0 ||
           dueRaw === '' ||
           Number.isNaN(dueDate.getTime())
@@ -190,39 +172,45 @@ export default function PlatformSubscriptionsPage() {
         }
         const due = dueDate.toISOString();
 
-        let currentPeriodStart: string;
-        let currentPeriodEnd: string;
-        if (body.currentPeriodStart && body.currentPeriodEnd) {
-          currentPeriodStart = body.currentPeriodStart;
-          currentPeriodEnd = body.currentPeriodEnd;
-        } else {
-          const now = new Date();
-          const endDefault = addOneCalendarMonthClamped(now);
-          currentPeriodStart = now.toISOString();
-          currentPeriodEnd = endDefault.toISOString();
-        }
+        await platformApi.createSubscription(body);
 
-        return platformApi.createInvoice({
+        const plan = plans.find((p) => p.id === planId);
+        const inv = await platformApi.createInvoice({
           companyId,
-          amount,
           dueDate: due,
-          status: 'open',
-          paymentProvider: 'manual',
-          createSubscriptionWithInvoice: true,
-          subscription: {
-            planId,
-            currentPeriodStart,
-            currentPeriodEnd,
-            ...(subStatusSelect !== STATUS_SELECT_DEFAULT
-              ? { status: subStatusSelect }
-              : {})
-          }
+          currency: (plan?.currency ?? 'RUB').trim() || 'RUB',
+          allowYookassaPaymentLink: false,
+          allowStripePaymentLink: false,
+          provisionSubscriptionsOnPayment: false,
+          lines: [
+            {
+              descriptionPrint: plan?.name?.trim() || 'Subscription',
+              quantity: 1,
+              unitPriceInclVatMinor: amount,
+              vatExempt: true,
+              vatRatePercent: 0
+            }
+          ]
         });
+        await platformApi.issueInvoice(inv.id);
+        return { withInvoice: true };
       }
 
-      return platformApi.createSubscription(body);
+      await platformApi.createSubscription(body);
+      return { withInvoice: false };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
+      if (result.withInvoice) {
+        toast.success(
+          t('toastCreatedWithInvoice', {
+            defaultValue: 'Subscription and invoice created.'
+          })
+        );
+      } else {
+        toast.success(
+          t('toastCreated', { defaultValue: 'Subscription created.' })
+        );
+      }
       qc.invalidateQueries({ queryKey: ['platform-subscriptions'] });
       qc.invalidateQueries({ queryKey: ['platform-company'] });
       qc.invalidateQueries({ queryKey: ['platform-invoices'] });
@@ -235,6 +223,10 @@ export default function PlatformSubscriptionsPage() {
       setCreateWithInvoice(false);
       setInvAmount('');
       setInvDue('');
+    },
+    onError: (err) => {
+      const raw = err instanceof Error ? err.message : String(err);
+      toast.error(raw, { duration: 6000 });
     }
   });
 

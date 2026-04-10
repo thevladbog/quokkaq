@@ -13,6 +13,7 @@ type Company struct {
 	IsSaaSOperator  bool            `gorm:"column:is_saas_operator;not null;default:false" json:"isSaasOperator"` // single operator tenant per deployment; quotas bypassed
 	BillingEmail    string          `json:"billingEmail,omitempty"`                                 // billing contact email
 	BillingAddress  json.RawMessage `gorm:"type:jsonb" json:"billingAddress,omitempty" swaggertype:"object"` // billing address details
+	PaymentAccounts json.RawMessage `gorm:"type:jsonb" json:"paymentAccounts,omitempty" swaggertype:"array,object"` // RU bank accounts (JSON array)
 	Counterparty    json.RawMessage `gorm:"type:jsonb" json:"counterparty,omitempty" swaggertype:"object"`   // legal profile (RU): partyType, inn, addresses, etc.
 	Settings        json.RawMessage `gorm:"type:jsonb" json:"settings,omitempty" swaggertype:"object"`       // company settings
 	OnboardingState json.RawMessage `gorm:"type:jsonb" json:"onboardingState,omitempty" swaggertype:"object"` // onboarding progress

@@ -9,13 +9,29 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useMemo } from 'react';
 import { formatPriceMinorUnits } from '@/lib/format-price';
 import { formatAppDate, intlLocaleFromAppLocale } from '@/lib/format-datetime';
+import { Link } from '@/src/i18n/navigation';
+
+function invoiceAllowsPdfDownload(status: string): boolean {
+  return (
+    status === 'open' ||
+    status === 'paid' ||
+    status === 'uncollectible' ||
+    status === 'void'
+  );
+}
 
 interface InvoiceListProps {
   invoices: Invoice[];
-  onDownload?: (invoiceId: string) => void;
+  onDownload?: (invoice: Invoice) => void;
+  /** Locale-prefixed path without trailing slash, e.g. `/organization/billing/invoices` */
+  detailBasePath?: string;
 }
 
-export function InvoiceList({ invoices, onDownload }: InvoiceListProps) {
+export function InvoiceList({
+  invoices,
+  onDownload,
+  detailBasePath
+}: InvoiceListProps) {
   const t = useTranslations('organization.invoices');
   const locale = useLocale();
   const intlLocale = useMemo(() => intlLocaleFromAppLocale(locale), [locale]);
@@ -96,9 +112,22 @@ export function InvoiceList({ invoices, onDownload }: InvoiceListProps) {
                   className='border-b last:border-0 hover:bg-gray-50'
                 >
                   <td className='px-4 py-3'>
-                    <span className='font-mono text-sm'>
-                      #{invoice.id.slice(0, 8)}
-                    </span>
+                    {detailBasePath ? (
+                      <Link
+                        href={`${detailBasePath}/${invoice.id}`}
+                        className='text-primary font-mono text-sm underline'
+                      >
+                        {invoice.documentNumber?.trim()
+                          ? invoice.documentNumber
+                          : `#${invoice.id.slice(0, 8)}…`}
+                      </Link>
+                    ) : (
+                      <span className='font-mono text-sm'>
+                        {invoice.documentNumber?.trim()
+                          ? invoice.documentNumber
+                          : `#${invoice.id.slice(0, 8)}…`}
+                      </span>
+                    )}
                   </td>
                   <td className='px-4 py-3 text-sm'>
                     {formatAppDate(
@@ -122,11 +151,11 @@ export function InvoiceList({ invoices, onDownload }: InvoiceListProps) {
                     {getStatusBadge(invoice.status)}
                   </td>
                   <td className='px-4 py-3 text-right'>
-                    {invoice.status === 'paid' && onDownload && (
+                    {invoiceAllowsPdfDownload(invoice.status) && onDownload && (
                       <Button
                         variant='ghost'
                         size='sm'
-                        onClick={() => onDownload(invoice.id)}
+                        onClick={() => onDownload(invoice)}
                       >
                         <Download className='mr-1 h-4 w-4' />
                         {t('download')}

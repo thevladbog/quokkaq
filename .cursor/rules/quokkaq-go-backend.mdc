@@ -1,0 +1,35 @@
+---
+description: Go backend conventions — Chi, GORM, layering, Swagger (QuokkaQ)
+globs: apps/backend/**/*.go
+alwaysApply: false
+---
+
+# Go backend (`apps/backend`)
+
+For **lint, tests, and local restart**, follow the always-on workflow rule (`quokkaq-agent-workflow.mdc`). This rule covers **architecture and style** only.
+
+## Stack
+
+- Module: `quokkaq-go-backend` · Go 1.26+
+- HTTP: Chi v5 · Auth: JWT · DB: PostgreSQL + GORM · Jobs: Asynq · Real-time: Gorilla WebSocket · Storage: AWS SDK v2 (S3/MinIO)
+
+## Layering
+
+Use the existing flow: **handlers → services → repository → models**. Extend nearby patterns for errors, HTTP status codes, and JSON responses instead of introducing parallel trees.
+
+- Entry and route registration: [`apps/backend/cmd/api/main.go`](apps/backend/cmd/api/main.go)
+- Deeper context: [`apps/backend/AGENTS.md`](apps/backend/AGENTS.md)
+
+## New HTTP API surface
+
+1. Wire routes in `main.go`.
+2. Add Swagger annotations on handlers; regenerate docs when contracts change: `swag init -g cmd/api/main.go -o ./docs` (CI checks OpenAPI artifacts — see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
+
+## Configuration
+
+- New env vars: document in [`apps/backend/.env.example`](apps/backend/.env.example).
+- Default API port in dev: **3001**.
+
+## Lint
+
+- [`apps/backend/.golangci.yml`](apps/backend/.golangci.yml) — standard golangci-lint preset; fix all reported issues before finishing a task.

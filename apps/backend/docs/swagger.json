@@ -398,6 +398,197 @@
                 }
             }
         },
+        "/companies/dadata/address/clean": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dadata"
+                ],
+                "summary": "DaData Cleaner: standardize address strings",
+                "responses": {}
+            }
+        },
+        "/companies/dadata/address/suggest": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dadata"
+                ],
+                "summary": "DaData: address suggestions (passthrough body)",
+                "responses": {}
+            }
+        },
+        "/companies/dadata/bank/suggest": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dadata"
+                ],
+                "summary": "DaData: bank suggestions by BIC/name (passthrough body)",
+                "responses": {}
+            }
+        },
+        "/companies/dadata/party/find-by-inn": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dadata"
+                ],
+                "summary": "DaData: organization by INN (findById/party)",
+                "responses": {}
+            }
+        },
+        "/companies/dadata/party/suggest": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dadata"
+                ],
+                "summary": "DaData: party suggestions (passthrough body)",
+                "responses": {}
+            }
+        },
+        "/companies/me": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "companies"
+                ],
+                "summary": "Get current user's company (tenant admin)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.companyMeResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "No company found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "companies"
+                ],
+                "summary": "Update current user's company (tenant admin)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.Company"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "No company found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/companies/me/complete-onboarding": {
             "post": {
                 "security": [
@@ -1095,7 +1286,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Currently returns HTTP 501 with JSON after authorization. When PDF export is implemented, a successful response will be 200 with body as application/pdf (binary PDF bytes). Until then, clients should treat 501 and handlers.InvoicePDFNotImplementedResponse as the expected outcome.",
+                "description": "Returns application/pdf (A4 счёт на оплату with ST00012 QR). 422 if SaaS operator bank details cannot form a valid QR.",
                 "produces": [
                     "application/json",
                     "application/pdf"
@@ -1103,7 +1294,7 @@
                 "tags": [
                     "invoices"
                 ],
-                "summary": "Download Invoice (PDF when implemented)",
+                "summary": "Download invoice PDF",
                 "parameters": [
                     {
                         "type": "string",
@@ -1115,7 +1306,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Invoice PDF binary (Content-Type: application/pdf) once generation is implemented",
+                        "description": "Invoice PDF",
                         "schema": {
                             "type": "file"
                         }
@@ -1138,16 +1329,491 @@
                             "type": "string"
                         }
                     },
+                    "422": {
+                        "description": "QR / vendor prerequisites missing",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
                             "type": "string"
                         }
+                    }
+                }
+            }
+        },
+        "/platform/catalog-items": {
+            "get": {
+                "responses": {}
+            },
+            "post": {
+                "responses": {}
+            }
+        },
+        "/platform/catalog-items/{id}": {
+            "get": {
+                "responses": {}
+            },
+            "delete": {
+                "responses": {}
+            },
+            "patch": {
+                "responses": {}
+            }
+        },
+        "/platform/companies": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "platform"
+                ],
+                "summary": "List companies (platform)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filter by name",
+                        "name": "search",
+                        "in": "query"
                     },
-                    "501": {
-                        "description": "PDF export not implemented",
+                    {
+                        "type": "integer",
+                        "description": "Page size (max 100)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.InvoicePDFNotImplementedResponse"
+                            "$ref": "#/definitions/handlers.platformListResponse-models_Company"
+                        }
+                    }
+                }
+            }
+        },
+        "/platform/companies/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "platform"
+                ],
+                "summary": "Get company with billing (platform)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Company ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.Company"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "platform"
+                ],
+                "summary": "Update company (platform)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Company ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.Company"
+                        }
+                    }
+                }
+            }
+        },
+        "/platform/features": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "platform"
+                ],
+                "summary": "UI capability flags (DaData, etc.)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "boolean"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/platform/invoices": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "platform"
+                ],
+                "summary": "List invoices (platform)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filter by company",
+                        "name": "companyId",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (max 100)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.platformListResponse-models_Invoice"
+                        }
+                    }
+                }
+            }
+        },
+        "/platform/invoices/{id}": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "platform"
+                ],
+                "summary": "Update invoice status (platform)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Invoice ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.Invoice"
+                        }
+                    }
+                }
+            }
+        },
+        "/platform/saas-operator-company": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "platform"
+                ],
+                "summary": "Get the marked SaaS operator company (legal profile source for the deployment)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.Company"
+                        }
+                    },
+                    "404": {
+                        "description": "No operator company marked",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/platform/subscription-plans": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "platform"
+                ],
+                "summary": "List all subscription plans including inactive (platform)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.SubscriptionPlan"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "platform"
+                ],
+                "summary": "Create subscription plan (platform)",
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/models.SubscriptionPlan"
+                        }
+                    }
+                }
+            }
+        },
+        "/platform/subscription-plans/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "platform"
+                ],
+                "summary": "Replace subscription plan (platform)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Plan ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.SubscriptionPlan"
+                        }
+                    }
+                }
+            }
+        },
+        "/platform/subscriptions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "platform"
+                ],
+                "summary": "List all subscriptions (platform)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page size (max 100)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.platformListResponse-models_Subscription"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "platform"
+                ],
+                "summary": "Create subscription for a company without one (platform)",
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/models.Subscription"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Company not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "409": {
+                        "description": "Company already has a subscription",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/platform/subscriptions/{id}": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "platform"
+                ],
+                "summary": "Update subscription fields (platform; may diverge from Stripe)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Subscription ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.Subscription"
                         }
                     }
                 }
@@ -4150,14 +4816,6 @@
                 }
             }
         },
-        "handlers.InvoicePDFNotImplementedResponse": {
-            "type": "object",
-            "properties": {
-                "error": {
-                    "type": "string"
-                }
-            }
-        },
         "handlers.LoginRequest": {
             "type": "object",
             "properties": {
@@ -4300,6 +4958,88 @@
                 }
             }
         },
+        "handlers.companyMeResponse": {
+            "type": "object",
+            "properties": {
+                "company": {
+                    "$ref": "#/definitions/models.Company"
+                },
+                "features": {
+                    "$ref": "#/definitions/handlers.featuresFlags"
+                }
+            }
+        },
+        "handlers.featuresFlags": {
+            "type": "object",
+            "properties": {
+                "dadata": {
+                    "type": "boolean"
+                },
+                "dadataCleaner": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "handlers.platformListResponse-models_Company": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Company"
+                    }
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handlers.platformListResponse-models_Invoice": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Invoice"
+                    }
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handlers.platformListResponse-models_Subscription": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Subscription"
+                    }
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "handlers.setupFirstAdminRequest": {
             "type": "object",
             "properties": {
@@ -4343,6 +5083,84 @@
                 },
                 "userPhone": {
                     "type": "string"
+                }
+            }
+        },
+        "models.Company": {
+            "type": "object",
+            "properties": {
+                "billingAddress": {
+                    "description": "billing address details",
+                    "type": "object"
+                },
+                "billingEmail": {
+                    "description": "billing contact email",
+                    "type": "string"
+                },
+                "counterparty": {
+                    "description": "legal profile (RU): partyType, inn, addresses, etc.",
+                    "type": "object"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "invoices": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Invoice"
+                    }
+                },
+                "isSaasOperator": {
+                    "description": "single operator tenant per deployment; quotas bypassed",
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "onboardingState": {
+                    "description": "onboarding progress",
+                    "type": "object"
+                },
+                "ownerUserId": {
+                    "description": "owner of the organization",
+                    "type": "string"
+                },
+                "paymentAccounts": {
+                    "description": "RU bank accounts (JSON array)",
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    }
+                },
+                "settings": {
+                    "description": "company settings",
+                    "type": "object"
+                },
+                "subscription": {
+                    "$ref": "#/definitions/models.Subscription"
+                },
+                "subscriptionId": {
+                    "description": "FK to Subscription",
+                    "type": "string"
+                },
+                "units": {
+                    "description": "Relations",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Unit"
+                    }
+                },
+                "updatedAt": {
+                    "type": "string"
+                },
+                "usageRecords": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.UsageRecord"
+                    }
                 }
             }
         },
@@ -4454,9 +5272,18 @@
         "models.Invoice": {
             "type": "object",
             "properties": {
+                "allowStripePaymentLink": {
+                    "type": "boolean"
+                },
+                "allowYookassaPaymentLink": {
+                    "type": "boolean"
+                },
                 "amount": {
-                    "description": "amount in minor units",
+                    "description": "total in minor units (gross); equals sum of line gross when lines exist",
                     "type": "integer"
+                },
+                "buyerSnapshot": {
+                    "type": "object"
                 },
                 "companyId": {
                     "type": "string"
@@ -4468,12 +5295,25 @@
                     "description": "\"RUB\", \"USD\"",
                     "type": "string"
                 },
+                "documentNumber": {
+                    "description": "QQ-YYYY-NNNNN when issued",
+                    "type": "string"
+                },
                 "dueDate": {
                     "description": "payment due date",
                     "type": "string"
                 },
                 "id": {
                     "type": "string"
+                },
+                "issuedAt": {
+                    "type": "string"
+                },
+                "lines": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.InvoiceLine"
+                    }
                 },
                 "paidAt": {
                     "description": "when payment was received",
@@ -4487,8 +5327,20 @@
                     "description": "external invoice ID",
                     "type": "string"
                 },
+                "provisionSubscriptionsOnPayment": {
+                    "type": "boolean"
+                },
+                "provisioningDoneAt": {
+                    "type": "string"
+                },
                 "status": {
                     "description": "\"draft\", \"open\", \"paid\", \"void\", \"uncollectible\"",
+                    "type": "string"
+                },
+                "stripeCheckoutUrl": {
+                    "type": "string"
+                },
+                "stripeSessionId": {
                     "type": "string"
                 },
                 "subscription": {
@@ -4497,8 +5349,89 @@
                 "subscriptionId": {
                     "type": "string"
                 },
+                "subtotalExclVatMinor": {
+                    "type": "integer"
+                },
                 "updatedAt": {
                     "type": "string"
+                },
+                "vatTotalMinor": {
+                    "type": "integer"
+                },
+                "yookassaConfirmationUrl": {
+                    "type": "string"
+                },
+                "yookassaPaymentId": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.InvoiceLine": {
+            "type": "object",
+            "properties": {
+                "catalogItemId": {
+                    "type": "string"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "descriptionPrint": {
+                    "type": "string"
+                },
+                "discountAmountMinor": {
+                    "type": "integer"
+                },
+                "discountPercent": {
+                    "type": "number"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "invoiceId": {
+                    "type": "string"
+                },
+                "lineGrossMinor": {
+                    "type": "integer"
+                },
+                "lineNetMinor": {
+                    "type": "integer"
+                },
+                "plan": {
+                    "$ref": "#/definitions/models.SubscriptionPlan"
+                },
+                "position": {
+                    "type": "integer"
+                },
+                "quantity": {
+                    "type": "number"
+                },
+                "subscriptionPeriodEnd": {
+                    "type": "string"
+                },
+                "subscriptionPeriodStart": {
+                    "type": "string"
+                },
+                "subscriptionPlanId": {
+                    "type": "string"
+                },
+                "unit": {
+                    "description": "Print UOM (DB column unit). Renamed from \"Unit\" to avoid GORM confusion with models.Unit in this package.",
+                    "type": "string"
+                },
+                "unitPriceInclVatMinor": {
+                    "type": "integer"
+                },
+                "updatedAt": {
+                    "type": "string"
+                },
+                "vatAmountMinor": {
+                    "type": "integer"
+                },
+                "vatExempt": {
+                    "type": "boolean"
+                },
+                "vatRatePercent": {
+                    "type": "number"
                 }
             }
         },
@@ -4867,6 +5800,17 @@
                     "description": "additional data",
                     "type": "object"
                 },
+                "pendingEffectiveAt": {
+                    "description": "UTC; when reached, PlanID moves to pending plan",
+                    "type": "string"
+                },
+                "pendingPlan": {
+                    "$ref": "#/definitions/models.SubscriptionPlan"
+                },
+                "pendingPlanId": {
+                    "description": "scheduled plan change (platform)",
+                    "type": "string"
+                },
                 "plan": {
                     "description": "Relations",
                     "allOf": [
@@ -5104,6 +6048,36 @@
                     "items": {
                         "$ref": "#/definitions/models.ServiceSlot"
                     }
+                }
+            }
+        },
+        "models.UsageRecord": {
+            "type": "object",
+            "properties": {
+                "billingMonth": {
+                    "description": "month for aggregation (first day of month)",
+                    "type": "string"
+                },
+                "companyId": {
+                    "type": "string"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "metricType": {
+                    "description": "e.g. tickets_per_month (monthly ticket quota), matches plan limit keys",
+                    "type": "string"
+                },
+                "timestamp": {
+                    "description": "when the usage occurred",
+                    "type": "string"
+                },
+                "value": {
+                    "description": "metric value",
+                    "type": "integer"
                 }
             }
         },

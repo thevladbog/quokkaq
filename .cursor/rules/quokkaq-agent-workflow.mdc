@@ -1,0 +1,47 @@
+---
+description: Post-edit verification, linters, Prettier, and restarting local dev servers (QuokkaQ monorepo)
+alwaysApply: true
+---
+
+# Agent workflow (mandatory)
+
+## Before finishing a task that changes code
+
+1. **Run linters** and fix all reported issues. Do not leave the workspace in a failing lint state.
+2. **Restart local dev servers** when your edits affect runtime and the user (or session) is using locally running instances—so running processes pick up changes without asking the user to restart manually.
+
+## Lint & format commands (repository root: `pnpm nx …`)
+
+| Scope | Command |
+|--------|---------|
+| **All projects** | `pnpm nx run-many -t lint --all` |
+| **Affected only** | `pnpm nx affected -t lint` (needs git base; optional when appropriate) |
+| **Backend (Go)** | `pnpm nx run backend:lint` — golangci-lint |
+| **Frontend** | `pnpm nx run frontend:lint` — ESLint |
+| **Frontend formatting** | `pnpm nx run frontend:format:check` — must pass after editing TS/TSX/JSON in `apps/frontend`; fix with `pnpm nx run frontend:format:fix` |
+| **Kiosk (Rust)** | `pnpm nx run kiosk-desktop:lint` — `cargo clippy` |
+
+`shared-types` and `ui-kit` Nx `lint` targets are placeholders (echo only); real checks are `tsc` via `build` when you change those packages.
+
+## Tests (when behavior changes)
+
+- Backend: `pnpm nx run backend:test`
+- Frontend: `pnpm nx run frontend:test`
+
+## Restart API + Next.js (default local ports)
+
+After backend and/or frontend code changes when dev servers are in use (`localhost:3001`, `localhost:3000`):
+
+```bash
+lsof -tiTCP:3000 -sTCP:LISTEN | xargs kill -9 2>/dev/null
+lsof -tiTCP:3001 -sTCP:LISTEN | xargs kill -9 2>/dev/null
+sleep 1
+```
+
+Then start again in the background from repo root: `pnpm nx run backend:serve`, then `pnpm nx run frontend:dev` (short delay between starts is fine).
+
+## Principles
+
+- Run commands yourself; do not only suggest that the user run lint or restart servers.
+- Prefer `nx run-many -t lint --all` before handing off a multi-area change.
+- If you only touched one app, you may scope lint to that project to save time, but run the full matrix before merge-ready work.

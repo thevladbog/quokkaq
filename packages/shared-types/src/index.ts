@@ -327,6 +327,51 @@ const addressPartSchema = z
   })
   .optional();
 
+const ruBic9 = /^\d{9}$/;
+const ruAccount20 = /^\d{20}$/;
+
+/** Single RU bank account (JSON item in companies.payment_accounts). */
+export const PaymentAccountSchema = z
+  .object({
+    id: z.string().optional(),
+    bankName: z.string().optional(),
+    bic: z.string().optional(),
+    correspondentAccount: z.string().optional(),
+    accountNumber: z.string().optional(),
+    swift: z.string().optional(),
+    isDefault: z.boolean().optional()
+  })
+  .superRefine((row, ctx) => {
+    const bic = (row.bic ?? '').trim();
+    if (bic && !ruBic9.test(bic)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['bic'],
+        message: 'BIC must be 9 digits'
+      });
+    }
+    const ks = (row.correspondentAccount ?? '').trim();
+    if (ks && !ruAccount20.test(ks)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['correspondentAccount'],
+        message: 'Correspondent account must be 20 digits'
+      });
+    }
+    const rs = (row.accountNumber ?? '').trim();
+    if (rs && !ruAccount20.test(rs)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['accountNumber'],
+        message: 'Account number must be 20 digits'
+      });
+    }
+  });
+
+export const PaymentAccountsSchema = z.array(PaymentAccountSchema).max(30);
+
+export type PaymentAccount = z.infer<typeof PaymentAccountSchema>;
+
 /** RU counterparty profile (JSON stored in companies.counterparty). */
 export const CounterpartySchema = z
   .object({
@@ -537,6 +582,7 @@ export const CompanySchema = z.object({
   isSaasOperator: z.boolean().optional(),
   billingEmail: z.union([z.string().email(), z.literal('')]).optional(),
   billingAddress: z.record(z.string(), z.any()).optional(),
+  paymentAccounts: PaymentAccountsSchema.optional(),
   counterparty: CounterpartySchema.optional(),
   settings: z.record(z.string(), z.any()).optional(),
   onboardingState: z.record(z.string(), z.any()).optional(),
@@ -556,6 +602,50 @@ export const CompanyMeResponseSchema = z.object({
   features: CompanyMeFeaturesSchema
 });
 
+export const InvoiceLineSchema = z.object({
+  id: z.string(),
+  invoiceId: z.string(),
+  position: z.number(),
+  catalogItemId: z.string().nullable().optional(),
+  descriptionPrint: z.string(),
+  quantity: z.number(),
+  unit: z
+    .union([z.string(), z.null()])
+    .optional()
+    .transform((v) => (v == null ? '' : v)),
+  unitPriceInclVatMinor: z.number(),
+  discountPercent: z.number().nullable().optional(),
+  discountAmountMinor: z.number().nullable().optional(),
+  vatExempt: z.boolean(),
+  vatRatePercent: z.number(),
+  lineNetMinor: z.number(),
+  vatAmountMinor: z.number(),
+  lineGrossMinor: z.number(),
+  subscriptionPlanId: z.string().nullable().optional(),
+  subscriptionPeriodStart: z.string().nullable().optional(),
+  subscriptionPeriodEnd: z.string().nullable().optional(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+  plan: SubscriptionPlanSchema.optional()
+});
+
+export const CatalogItemSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  printName: z.string(),
+  unit: z.string(),
+  article: z.string(),
+  defaultPriceMinor: z.number(),
+  currency: z.string(),
+  vatExempt: z.boolean(),
+  vatRatePercent: z.number(),
+  subscriptionPlanId: z.string().nullable().optional(),
+  isActive: z.boolean(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+  plan: SubscriptionPlanSchema.optional()
+});
+
 export const InvoiceSchema = z.object({
   id: z.string(),
   companyId: z.string().nullable().optional(),
@@ -569,7 +659,23 @@ export const InvoiceSchema = z.object({
   dueDate: z.string(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
-  subscription: SubscriptionSchema.optional()
+  subscription: SubscriptionSchema.optional(),
+  documentNumber: z.string().nullable().optional(),
+  subtotalExclVatMinor: z.number().optional(),
+  vatTotalMinor: z.number().optional(),
+  allowYookassaPaymentLink: z.boolean().optional(),
+  allowStripePaymentLink: z.boolean().optional(),
+  provisionSubscriptionsOnPayment: z.boolean().optional(),
+  yookassaPaymentId: z.string().optional(),
+  yookassaConfirmationUrl: z.string().optional(),
+  stripeCheckoutUrl: z.string().optional(),
+  stripeSessionId: z.string().optional(),
+  provisioningDoneAt: z.string().nullable().optional(),
+  issuedAt: z.string().nullable().optional(),
+  buyerSnapshot: z
+    .union([z.record(z.string(), z.unknown()), z.null()])
+    .optional(),
+  lines: z.array(InvoiceLineSchema).optional()
 });
 
 export const UsageMetricSchema = z.object({
@@ -596,6 +702,34 @@ export type Subscription = z.infer<typeof SubscriptionSchema>;
 export type Company = z.infer<typeof CompanySchema>;
 export type CompanyMeResponse = z.infer<typeof CompanyMeResponseSchema>;
 export type Invoice = z.infer<typeof InvoiceSchema>;
+export type InvoiceLine = z.infer<typeof InvoiceLineSchema>;
+export type CatalogItem = z.infer<typeof CatalogItemSchema>;
+
+/** Platform invoice draft create / PATCH draft body (matches backend JSON). */
+export type InvoiceDraftLineInput = {
+  catalogItemId?: string | null;
+  descriptionPrint: string;
+  quantity: number;
+  /** Unit of measure for print (e.g. шт, мес.) */
+  unit?: string;
+  unitPriceInclVatMinor: number;
+  discountPercent?: number | null;
+  discountAmountMinor?: number | null;
+  vatExempt?: boolean | null;
+  vatRatePercent?: number | null;
+  subscriptionPlanId?: string | null;
+  subscriptionPeriodStart?: string | null;
+};
+
+export type InvoiceDraftUpsertBody = {
+  companyId: string;
+  dueDate: string;
+  currency: string;
+  allowYookassaPaymentLink: boolean;
+  allowStripePaymentLink: boolean;
+  provisionSubscriptionsOnPayment: boolean;
+  lines: InvoiceDraftLineInput[];
+};
 export type UsageMetric = z.infer<typeof UsageMetricSchema>;
 export type UsageMetrics = z.infer<typeof UsageMetricsSchema>;
 

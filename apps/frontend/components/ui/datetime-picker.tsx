@@ -32,6 +32,11 @@ export interface DateTimePickerProps {
   onChange?: (value: string) => void;
   disabled?: boolean;
   className?: string;
+  /**
+   * `stacked`: date on first row, time full width below (better next to other columns).
+   * `default`: date + time side by side from `sm` up.
+   */
+  variant?: 'default' | 'stacked';
 }
 
 /**
@@ -41,11 +46,13 @@ export function DateTimePicker({
   value = '',
   onChange,
   disabled,
-  className
+  className,
+  variant = 'default'
 }: DateTimePickerProps) {
   const t = useTranslations('common');
   const timeInputId = React.useId();
   const { date, time } = React.useMemo(() => splitDateTime(value), [value]);
+  const stacked = variant === 'stacked';
 
   const handleDate = (d: string) => {
     onChange?.(joinDateTime(d, time));
@@ -57,9 +64,14 @@ export function DateTimePicker({
 
   return (
     <div
-      className={cn('flex flex-col gap-2 sm:flex-row sm:items-end', className)}
+      className={cn(
+        stacked
+          ? 'flex flex-col gap-2'
+          : 'flex flex-col gap-2 sm:flex-row sm:items-end',
+        className
+      )}
     >
-      <div className='min-w-0 flex-1'>
+      <div className={cn('min-w-0', !stacked && 'flex-1')}>
         <DatePicker
           value={date}
           onChange={handleDate}
@@ -67,7 +79,12 @@ export function DateTimePicker({
           placeholder={t('pickDate', { defaultValue: 'Select date' })}
         />
       </div>
-      <div className='flex w-full flex-col gap-1.5 sm:w-[9rem]'>
+      <div
+        className={cn(
+          'flex w-full flex-col gap-1.5',
+          stacked ? 'w-full' : 'sm:w-[9rem]'
+        )}
+      >
         <Label htmlFor={timeInputId} className='text-muted-foreground text-xs'>
           {t('time', { defaultValue: 'Time' })}
         </Label>
@@ -75,6 +92,7 @@ export function DateTimePicker({
           id={timeInputId}
           type='time'
           step={60}
+          className={stacked ? 'h-10 w-full' : undefined}
           value={date ? time : ''}
           disabled={disabled || !date}
           onChange={handleTime}

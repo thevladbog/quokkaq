@@ -155,6 +155,39 @@ func (h *DaDataHandler) SuggestAddress(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(raw)
 }
 
+// SuggestBank godoc
+// @Summary      DaData: bank suggestions by BIC/name (passthrough body)
+// @Tags         dadata
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Router       /companies/dadata/bank/suggest [post]
+func (h *DaDataHandler) SuggestBank(w http.ResponseWriter, r *http.Request) {
+	dc, err := dadata.NewClientFromEnv()
+	if err != nil {
+		http.Error(w, "DaData is not configured", http.StatusServiceUnavailable)
+		return
+	}
+	b, err := readDaDataRequestBody(w, r)
+	if err != nil {
+		if maxBytesReaderExceeded(err) {
+			http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
+			return
+		}
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+	raw, status, err := dc.SuggestBank(b)
+	if err != nil {
+		log.Printf("DaData SuggestBank: %v", err)
+		http.Error(w, "Upstream error", http.StatusBadGateway)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCodeOr200(status))
+	_, _ = w.Write(raw)
+}
+
 // CleanAddress godoc
 // @Summary      DaData Cleaner: standardize address strings
 // @Tags         dadata
