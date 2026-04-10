@@ -74,11 +74,26 @@ services:
       - /bin/sh
       - -c
       - |
-        set -e
-        mc alias set local http://minio:9000 minioadmin minioadmin
-        mc mb local/quokkaq-materials --ignore-existing
-        mc anonymous set download local/quokkaq-materials/public
-        echo 'MinIO: bucket quokkaq-materials ready (anonymous GET under public/)'
+        set -eu
+        MAX_ATTEMPTS=12
+        SLEEP_SEC=2
+        attempt=1
+        while [ "$$attempt" -le "$$MAX_ATTEMPTS" ]; do
+          echo "minio-init: attempt $$attempt/$$MAX_ATTEMPTS..."
+          if mc alias set local http://minio:9000 minioadmin minioadmin \
+            && mc mb local/quokkaq-materials --ignore-existing \
+            && mc anonymous set download local/quokkaq-materials/public; then
+            echo 'MinIO: bucket quokkaq-materials ready (anonymous GET under public/)'
+            exit 0
+          fi
+          echo "minio-init: failed, sleeping $$SLEEP_SEC seconds before retry"
+          sleep "$$SLEEP_SEC"
+          attempt=$$((attempt + 1))
+          SLEEP_SEC=$$((SLEEP_SEC * 2))
+          if [ "$$SLEEP_SEC" -gt 32 ]; then SLEEP_SEC=32; fi
+        done
+        echo "minio-init: giving up after $$MAX_ATTEMPTS attempts"
+        exit 1
     restart: 'no'
 
   # QuokkaQ Backend API

@@ -43,8 +43,12 @@ export default function UnitKioskPage() {
   const [selectedServicePath, setSelectedServicePath] = useState<Service[]>([]);
   const [, setMessage] = useState('');
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
-  const { data: unitServicesTree, isLoading: servicesLoading } =
-    useUnitServicesTree(unitId!);
+  const {
+    data: unitServicesTree,
+    isLoading: servicesLoading,
+    isError: servicesQueryError,
+    refetch: refetchServicesTree
+  } = useUnitServicesTree(unitId!);
   const createTicketMutation = useCreateTicketInUnit();
   const [createdTicket, setCreatedTicket] = useState<Ticket | null>(null);
   const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
@@ -199,24 +203,19 @@ export default function UnitKioskPage() {
     };
   }, [autoCloseTimerId]);
 
-  // Get current services based on selected path
-  // unitServicesTree contains flat list of services, so we need to filter by parentId
-  const currentServices = () => {
+  // Visible services for the current breadcrumb level (recomputed only when tree or path changes)
+  const visibleServices = useMemo(() => {
     if (!unitServicesTree) {
-      return []; // Return empty array if services haven't loaded yet
+      return [];
     }
-
     if (selectedServicePath.length === 0) {
-      // Top level services - services without parent (parentId is null or undefined)
       return unitServicesTree.filter((service) => !service.parentId);
-    } else {
-      // Services under the currently selected service
-      const lastService = selectedServicePath[selectedServicePath.length - 1];
-      return unitServicesTree.filter(
-        (service) => service.parentId === lastService.id
-      );
     }
-  };
+    const lastService = selectedServicePath[selectedServicePath.length - 1];
+    return unitServicesTree.filter(
+      (service) => service.parentId === lastService.id
+    );
+  }, [unitServicesTree, selectedServicePath]);
 
   const handleServiceSelection = async (service: Service) => {
     if (service.isLeaf) {
@@ -319,8 +318,47 @@ export default function UnitKioskPage() {
     );
   }
 
+  if (servicesQueryError) {
+    return (
+      <div
+        className='text-kiosk-ink flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-4'
+        style={{ backgroundColor: bodyColor }}
+      >
+        <KioskTopBar
+          intlLocale={intlLocale}
+          currentTime={currentTime}
+          onClockClick={handleClockClick}
+          headerColor={headerColor}
+          leading={topBarLeading}
+          beforeClock={topBarBeforeClock}
+        />
+        <div className='flex min-h-0 flex-1 items-center justify-center overflow-hidden'>
+          <div className='max-w-md px-4 text-center'>
+            <h2 className='mb-2 text-2xl font-bold tracking-tight sm:text-3xl'>
+              {t('servicesUnavailableTitle', {
+                defaultValue: 'Services unavailable'
+              })}
+            </h2>
+            <p className='text-kiosk-ink-muted mb-6 text-base'>
+              {t('servicesUnavailableMessage', {
+                defaultValue:
+                  "We could not load this unit's services. Check the connection and try again."
+              })}
+            </p>
+            <Button
+              className='rounded-full px-8'
+              onClick={() => void refetchServicesTree()}
+            >
+              {t('retryServices', { defaultValue: 'Try again' })}
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // If no services are available at the current level
-  if (currentServices().length === 0) {
+  if (visibleServices.length === 0) {
     return (
       <div
         className='text-kiosk-ink flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-4'
@@ -438,7 +476,7 @@ export default function UnitKioskPage() {
         style={{ backgroundColor: serviceGridColor }}
       >
         {/* Render services with their exact grid positions */}
-        {currentServices().map((service) => {
+        {visibleServices.map((service) => {
           if (service.gridRow !== null && service.gridCol !== null) {
             const startRow = (service.gridRow ?? 0) + 1;
             const startCol = (service.gridCol ?? 0) + 1;
@@ -472,7 +510,7 @@ export default function UnitKioskPage() {
           const col = index % SERVICE_GRID_COLS;
 
           // Check if this cell is already occupied by a service
-          const isOccupied = currentServices().some((service) => {
+          const isOccupied = visibleServices.some((service) => {
             if (service.gridRow === null || service.gridCol === null) {
               return false;
             }

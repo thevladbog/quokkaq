@@ -99,7 +99,7 @@ services:
             echo "MinIO: bucket $$AWS_S3_BUCKET ready (anonymous GET under public/)"
             exit 0
           fi
-          echo "minio-init: attempt $$attempt/$$MAX_ATTEMPTS failed, retrying in $$SLEEP_SECs..."
+          echo "minio-init: attempt $$attempt/$$MAX_ATTEMPTS failed, retrying in $$SLEEP_SEC seconds..."
           attempt=$$((attempt + 1))
           sleep "$$SLEEP_SEC"
         done

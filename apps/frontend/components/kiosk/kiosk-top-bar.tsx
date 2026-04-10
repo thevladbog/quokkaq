@@ -49,7 +49,7 @@ export function KioskTopBar({
         {formatAppTime(currentTime, intlLocale)}
       </div>
       <div className='text-kiosk-ink-muted mt-0.5 text-xs sm:text-sm'>
-        {formatAppDate(currentTime, intlLocale, 'full')}
+        {formatAppDate(currentTime, intlLocale, 'full', '')}
       </div>
     </div>
   );

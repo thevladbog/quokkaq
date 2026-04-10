@@ -28,7 +28,7 @@ type TicketRepository interface {
 	GetActiveTicketByCounter(counterID string) (*models.Ticket, error)
 	MarkAsEOD(unitID string) (int64, error)
 	MarkAsEODTx(tx *gorm.DB, unitID string) (int64, error)
-	// CountEODTicketSplitTx counts open-day tickets (is_eod=false) by queue vs non-queue status for EOD messaging.
+	// CountEODTicketSplitTx counts tickets already marked end-of-day (is_eod=true), split into waiting vs non-waiting status, for EOD messaging.
 	CountEODTicketSplitTx(tx *gorm.DB, unitID string) (waiting int64, nonWaiting int64, err error)
 	ResetSequencesTx(tx *gorm.DB, unitID, date string) error
 }

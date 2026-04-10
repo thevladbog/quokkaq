@@ -288,8 +288,7 @@ const GridServiceOverlay: React.FC<{
 
   const handleRemoveService = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onChange(service.id, 'gridRow', null);
-    onChange(service.id, 'gridCol', null);
+    onChange(service.id, 'gridPositionClear', null);
   };
 
   const handleResizePointerDown = (e: React.PointerEvent) => {
@@ -1024,13 +1023,18 @@ const SimpleGrid: React.FC<{
               if (!serviceOnActiveGrid(service)) {
                 return false;
               }
+              const gr = service.gridRow;
+              const gc = service.gridCol;
+              if (gr === null || gc === null) {
+                return false;
+              }
               const serviceRowSpan = service.gridRowSpan || 1;
               const serviceColSpan = service.gridColSpan || 1;
               return (
-                r >= service.gridRow &&
-                r < service.gridRow + serviceRowSpan &&
-                c >= service.gridCol &&
-                c < service.gridCol + serviceColSpan
+                r >= gr &&
+                r < gr + serviceRowSpan &&
+                c >= gc &&
+                c < gc + serviceColSpan
               );
             });
             if (occupied) {
@@ -1371,6 +1375,14 @@ const ServiceGridEditor: React.FC<ServiceGridEditorProps> = ({ unitId }) => {
     const updatedServices = services.map((service) => {
       if (service.id === id) {
         switch (field) {
+          case 'gridPositionClear':
+            return {
+              ...service,
+              gridRow: null,
+              gridCol: null,
+              gridRowSpan: 1,
+              gridColSpan: 1
+            };
           case 'gridRow':
             return { ...service, gridRow: value };
           case 'gridCol':
@@ -1430,7 +1442,13 @@ const ServiceGridEditor: React.FC<ServiceGridEditorProps> = ({ unitId }) => {
         });
       } catch (err) {
         console.error('remove service from grid:', err);
-        setServices(previousServices);
+        setServices((prev) =>
+          prev.map((s) => {
+            if (s.id !== id) return s;
+            const orig = previousServices.find((p) => p.id === id);
+            return orig ? { ...s, ...orig } : s;
+          })
+        );
         toast.error(
           t('grid_configuration.remove_from_grid_error', {
             defaultValue:
