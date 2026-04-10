@@ -496,7 +496,8 @@ async function apiRequestBlob(
 
       clearClientAuthSession();
 
-      throw new Error(`Unauthorized: ${await response.text()}`);
+      const unauthorizedBody = await response.text();
+      throwApiHttpErrorFromBody(401, unauthorizedBody);
     }
 
     if (!response.ok) {

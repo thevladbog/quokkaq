@@ -1,17 +1,24 @@
 /** Shared i18n shape for image-style file uploads (logo / generic image). */
-const sharedUploadStrings = {
-  invalidType: 'Please upload an image file',
-  fileTooLarge: 'File size must be less than 5MB',
-  uploading: 'Uploading...',
-  hint: 'Supported formats: JPG, PNG, SVG, WebP. Max 5MB.'
-} as const;
-
-export type UploadMessages = typeof sharedUploadStrings & {
+export type UploadMessages = {
+  invalidType: string;
+  fileTooLarge: string;
+  uploading: string;
+  hint: string;
   success: string;
   failed: string;
   upload: string;
   change: string;
   defaultLabel: string;
+};
+
+const sharedUploadStrings: Pick<
+  UploadMessages,
+  'invalidType' | 'fileTooLarge' | 'uploading' | 'hint'
+> = {
+  invalidType: 'Please upload an image file',
+  fileTooLarge: 'File size must be less than 5MB',
+  uploading: 'Uploading...',
+  hint: 'Supported formats: JPG, PNG, SVG, WebP. Max 5MB.'
 };
 
 export const defaultLogoUploadMessages: UploadMessages = {
