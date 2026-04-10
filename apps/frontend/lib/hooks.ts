@@ -449,10 +449,9 @@ export const useUpdateService = () => {
 
       if (clearingGrid) {
         return servicesApi.update(id, {
+          ...serviceData,
           gridRow: null,
-          gridCol: null,
-          gridRowSpan: serviceData.gridRowSpan ?? 1,
-          gridColSpan: serviceData.gridColSpan ?? 1
+          gridCol: null
         });
       }
 
