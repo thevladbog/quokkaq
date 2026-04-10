@@ -5,7 +5,8 @@ import { formatAppDate, formatAppTime } from '@/lib/format-datetime';
 
 type KioskTopBarProps = {
   intlLocale: string;
-  currentTime: Date;
+  /** Null before client mount avoids SSR/CSR clock mismatch. */
+  currentTime: Date | null;
   onClockClick?: () => void;
   headerColor: string;
   /** Left cluster: e.g. logo + optional unit title. */

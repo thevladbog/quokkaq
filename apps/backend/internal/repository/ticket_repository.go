@@ -192,12 +192,12 @@ func (r *ticketRepository) MarkAsEODTx(tx *gorm.DB, unitID string) (int64, error
 
 func (r *ticketRepository) CountEODTicketSplitTx(tx *gorm.DB, unitID string) (waiting int64, nonWaiting int64, err error) {
 	if err = tx.Model(&models.Ticket{}).
-		Where("unit_id = ? AND is_eod = ? AND status = ?", unitID, false, "waiting").
+		Where("unit_id = ? AND is_eod = ? AND status = ?", unitID, true, "waiting").
 		Count(&waiting).Error; err != nil {
 		return 0, 0, err
 	}
 	if err = tx.Model(&models.Ticket{}).
-		Where("unit_id = ? AND is_eod = ? AND status <> ?", unitID, false, "waiting").
+		Where("unit_id = ? AND is_eod = ? AND status <> ?", unitID, true, "waiting").
 		Count(&nonWaiting).Error; err != nil {
 		return 0, 0, err
 	}

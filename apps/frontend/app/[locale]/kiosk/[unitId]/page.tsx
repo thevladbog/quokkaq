@@ -42,7 +42,7 @@ export default function UnitKioskPage() {
   const unitId = params.unitId;
   const [selectedServicePath, setSelectedServicePath] = useState<Service[]>([]);
   const [, setMessage] = useState('');
-  const [currentTime, setCurrentTime] = useState<Date>(new Date());
+  const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const { data: unitServicesTree, isLoading: servicesLoading } =
     useUnitServicesTree(unitId!);
   const createTicketMutation = useCreateTicketInUnit();
@@ -179,14 +179,15 @@ export default function UnitKioskPage() {
     setTimeout(() => setClockClicks(0), 2000);
   };
 
-  // Update time every second
+  // Update time every second (defer first tick to client to avoid SSR/client clock mismatch)
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-
-    // Clear interval on component unmount
-    return () => clearInterval(timer);
+    const tick = () => setCurrentTime(new Date());
+    const startId = window.setTimeout(tick, 0);
+    const timer = window.setInterval(tick, 1000);
+    return () => {
+      window.clearTimeout(startId);
+      window.clearInterval(timer);
+    };
   }, []);
 
   // Cleanup any pending auto-close timer when unmounting

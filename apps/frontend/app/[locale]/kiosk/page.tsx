@@ -23,7 +23,7 @@ const unitTileClassName = cn(
 export default function KioskPage() {
   const locale = useLocale();
   const intlLocale = useMemo(() => intlLocaleFromAppLocale(locale), [locale]);
-  const [currentTime, setCurrentTime] = useState(() => new Date());
+  const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const {
     data: units = [],
     isLoading: unitsLoading,
@@ -33,8 +33,13 @@ export default function KioskPage() {
   const t = useTranslations('kiosk');
 
   useEffect(() => {
-    const id = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(id);
+    const tick = () => setCurrentTime(new Date());
+    const startId = window.setTimeout(tick, 0);
+    const id = window.setInterval(tick, 1000);
+    return () => {
+      window.clearTimeout(startId);
+      window.clearInterval(id);
+    };
   }, []);
 
   const topBarLeading = (
@@ -147,7 +152,7 @@ export default function KioskPage() {
             </div>
           </div>
         ) : (
-          <div className='mx-auto grid min-h-0 w-full max-w-7xl flex-1 auto-rows-min grid-cols-2 content-start gap-3 overflow-hidden sm:grid-cols-3 md:grid-cols-4 md:gap-4 lg:grid-cols-5 xl:grid-cols-6'>
+          <div className='mx-auto grid min-h-0 w-full max-w-7xl flex-1 auto-rows-min grid-cols-2 content-start gap-3 overflow-y-auto sm:grid-cols-3 md:grid-cols-4 md:gap-4 lg:grid-cols-5 xl:grid-cols-6'>
             {units.map((unit) => (
               <button
                 key={unit.id}

@@ -18,6 +18,7 @@ import {
 import { FolderIcon } from '@/src/components/ui/icons/akar-icons-folder';
 import { XSmallIcon } from '@/src/components/ui/icons/akar-icons-x-small';
 import { useUpdateService } from '@/lib/hooks';
+import { toast } from 'sonner';
 import {
   SERVICE_GRID_COLS,
   SERVICE_GRID_ROWS,
@@ -63,16 +64,7 @@ const StartCellInput: React.FC<{
   const value = isFocused ? draft : canonical;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value;
-    setDraft(newValue);
-
-    const index = parseInt(newValue);
-    if (!isNaN(index)) {
-      if (index >= 0 && index <= max) {
-        const { row, col } = indexToPosition(index);
-        onPositionChange(service.id, row, col);
-      }
-    }
+    setDraft(e.target.value);
   };
 
   const handleBlur = () => {
@@ -990,11 +982,31 @@ const SimpleGrid: React.FC<{
 
   const findFirstAvailableSlot = (
     rowSpan: number,
-    colSpan: number
+    colSpan: number,
+    gridScopeTab: string
   ): [number, number] | null => {
     if (rowSpan < 1 || colSpan < 1) {
       return null;
     }
+
+    const parentFolderServices = services.filter(
+      (service) => service.isLeaf === false
+    );
+
+    const serviceOnActiveGrid = (s: ServiceWithPosition): boolean => {
+      if (s.gridRow === null || s.gridCol === null) {
+        return false;
+      }
+      if (gridScopeTab === 'main-grid') {
+        return !(
+          s.parentId &&
+          parentFolderServices.some((parent) => parent.id === s.parentId)
+        );
+      }
+      const parentId = gridScopeTab.replace('grid-', '');
+      return s.parentId === parentId;
+    };
+
     for (let row = 0; row < SERVICE_GRID_ROWS; row++) {
       for (let col = 0; col < SERVICE_GRID_COLS; col++) {
         if (
@@ -1009,7 +1021,7 @@ const SimpleGrid: React.FC<{
             const r = row + dr;
             const c = col + dc;
             const occupied = services.some((service) => {
-              if (service.gridRow === null || service.gridCol === null) {
+              if (!serviceOnActiveGrid(service)) {
                 return false;
               }
               const serviceRowSpan = service.gridRowSpan || 1;
@@ -1037,7 +1049,7 @@ const SimpleGrid: React.FC<{
   const handleAddService = (service: ServiceWithPosition) => {
     const rs = service.gridRowSpan || 1;
     const cs = service.gridColSpan || 1;
-    const pos = findFirstAvailableSlot(rs, cs);
+    const pos = findFirstAvailableSlot(rs, cs, activeTab);
     if (pos) {
       const [row, col] = pos;
       onAddService({ ...service, gridRow: row, gridCol: col });
@@ -1379,39 +1391,54 @@ const ServiceGridEditor: React.FC<ServiceGridEditorProps> = ({ unitId }) => {
     });
 
     const updatedService = updatedServices.find((s) => s.id === id);
-    setServices(updatedServices);
 
-    if (updatedService && activeUnitId) {
-      const isRemovalOperation =
-        updatedService.gridRow === null || updatedService.gridCol === null;
-
-      if (!isRemovalOperation) {
-        updateServiceMutation.mutate({
-          id: updatedService.id,
-          gridRow: updatedService.gridRow,
-          gridCol: updatedService.gridCol,
-          gridRowSpan: updatedService.gridRowSpan || 1,
-          gridColSpan: updatedService.gridColSpan || 1
-        });
-      } else {
-        void servicesApi
-          .update(updatedService.id, {
-            gridRow: null,
-            gridCol: null,
-            gridRowSpan: updatedService.gridRowSpan || 1,
-            gridColSpan: updatedService.gridColSpan || 1
-          })
-          .then(() => {
-            setServices((innerPrev) =>
-              innerPrev.map((service) =>
-                service.id === updatedService.id
-                  ? { ...service, gridRowSpan: 1, gridColSpan: 1 }
-                  : service
-              )
-            );
-          });
-      }
+    if (!updatedService || !activeUnitId) {
+      setServices(updatedServices);
+      return;
     }
+
+    const isRemovalOperation =
+      updatedService.gridRow === null || updatedService.gridCol === null;
+
+    if (!isRemovalOperation) {
+      setServices(updatedServices);
+      updateServiceMutation.mutate({
+        id: updatedService.id,
+        gridRow: updatedService.gridRow,
+        gridCol: updatedService.gridCol,
+        gridRowSpan: updatedService.gridRowSpan || 1,
+        gridColSpan: updatedService.gridColSpan || 1
+      });
+      return;
+    }
+
+    const previousServices = services;
+    const optimistic = updatedServices.map((s) =>
+      s.id === id
+        ? { ...s, gridRow: null, gridCol: null, gridRowSpan: 1, gridColSpan: 1 }
+        : s
+    );
+    setServices(optimistic);
+
+    void (async () => {
+      try {
+        await servicesApi.update(updatedService.id, {
+          gridRow: null,
+          gridCol: null,
+          gridRowSpan: 1,
+          gridColSpan: 1
+        });
+      } catch (err) {
+        console.error('remove service from grid:', err);
+        setServices(previousServices);
+        toast.error(
+          t('grid_configuration.remove_from_grid_error', {
+            defaultValue:
+              'Could not remove the service from the grid. Changes were reverted.'
+          })
+        );
+      }
+    })();
   };
 
   const handleGridSpanCommit = (

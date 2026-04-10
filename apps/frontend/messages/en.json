@@ -269,6 +269,7 @@
       "no_unit_selected": "No Unit Selected",
       "select_unit_desc": "Please select a unit from the left panel to configure its grid layout.",
       "remove_from_grid": "Remove from grid",
+      "remove_from_grid_error": "Could not remove the service from the grid. Changes were reverted.",
       "drag_from_palette_hint": "Drag to a grid cell to place, or click to use the first free cell",
       "drag_placed_hint": "Drag to another cell to move (top-left snaps to that cell)",
       "resize_corner_hint": "Drag the corner to resize width and height in grid cells"

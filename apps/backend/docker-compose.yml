@@ -77,8 +77,8 @@ services:
         set -e
         mc alias set local http://minio:9000 minioadmin minioadmin
         mc mb local/quokkaq-materials --ignore-existing
-        mc anonymous set download local/quokkaq-materials
-        echo 'MinIO: bucket quokkaq-materials ready (public read for GET)'
+        mc anonymous set download local/quokkaq-materials/public
+        echo 'MinIO: bucket quokkaq-materials ready (anonymous GET under public/)'
     restart: 'no'
 
   # QuokkaQ Backend API
