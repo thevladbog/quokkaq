@@ -6,6 +6,8 @@ import (
 	"log"
 	"os"
 	dbmodels "quokkaq-go-backend/internal/models"
+	"strconv"
+	"strings"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -51,6 +53,23 @@ func Connect() {
 	}
 
 	fmt.Println("Database connected successfully")
+}
+
+// requirePostgresAtLeastVersionNum fails if server_version_num < minNum (e.g. 160000 = PostgreSQL 16.0).
+func requirePostgresAtLeastVersionNum(db *gorm.DB, minNum int, what string) error {
+	var verStr string
+	if err := db.Raw(`SELECT current_setting('server_version_num')`).Scan(&verStr).Error; err != nil {
+		return fmt.Errorf("read PostgreSQL server_version_num: %w", err)
+	}
+	v, err := strconv.Atoi(strings.TrimSpace(verStr))
+	if err != nil {
+		return fmt.Errorf("parse server_version_num %q: %w", verStr, err)
+	}
+	if v < minNum {
+		maj, min := minNum/10000, (minNum/100)%100
+		return fmt.Errorf("%s requires PostgreSQL %d.%d+ (current server_version_num=%d)", what, maj, min, v)
+	}
+	return nil
 }
 
 // Ping checks connectivity to PostgreSQL using the GORM pool (*sql.DB).
@@ -293,6 +312,9 @@ func RunVersionedMigrations(models ...interface{}) error {
 				END LOOP;
 			END $$;
 		`).Error; err != nil {
+			return err
+		}
+		if err := requirePostgresAtLeastVersionNum(db, 160000, "unique index units_company_parent_code_uq (NULLS NOT DISTINCT)"); err != nil {
 			return err
 		}
 		if err := db.Exec(`

@@ -168,7 +168,12 @@ func (h *UnitHandler) GetUnitChildUnits(w http.ResponseWriter, r *http.Request) 
 func (h *UnitHandler) DeleteUnit(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if err := h.service.DeleteUnit(id); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		switch {
+		case errors.Is(err, services.ErrUnitHasChildren):
+			http.Error(w, err.Error(), http.StatusConflict)
+		default:
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -389,16 +394,7 @@ func (h *UnitHandler) UpdateUnit(w http.ResponseWriter, r *http.Request) {
 			existingUnit.Timezone = s
 		}
 	}
-	if v, ok := raw["companyId"]; ok {
-		var s string
-		if err := json.Unmarshal(v, &s); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		if s != "" {
-			existingUnit.CompanyID = s
-		}
-	}
+	// companyId in PATCH is ignored: units cannot be moved across companies via this endpoint.
 	if v, ok := raw["config"]; ok {
 		if string(v) != "null" {
 			var cfg json.RawMessage

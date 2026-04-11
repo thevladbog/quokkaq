@@ -41,8 +41,11 @@ export default function SettingsSidebar() {
   const tProfile = useTranslations('profile');
 
   const isActive = (path: string) => pathname === path;
-  const isActiveSub = (path: string) =>
-    pathname.startsWith(path) && pathname !== path;
+  /** True only for real subpaths (e.g. /settings/units/foo), not sibling routes like /settings/units-archive. */
+  const isActiveSub = (path: string) => {
+    if (path === '/') return false;
+    return pathname !== path && pathname.startsWith(`${path}/`);
+  };
 
   const items = [
     {
@@ -53,61 +56,59 @@ export default function SettingsSidebar() {
     },
     {
       icon: Building,
-      label: tAdmin('navigation.units', { defaultValue: 'Units' }),
+      label: tAdmin('navigation.units'),
       href: '/settings/units',
       active: isActive('/settings/units') || isActiveSub('/settings/units')
     },
     {
       icon: UserRound,
-      label: tAdmin('navigation.users', { defaultValue: 'Users' }),
+      label: tAdmin('navigation.users'),
       href: '/settings/users',
       active: isActive('/settings/users')
     },
     {
       icon: Grid3X3,
-      label: tAdmin('navigation.grid_configuration', {
-        defaultValue: 'Grid Configuration'
-      }),
+      label: tAdmin('navigation.grid_configuration'),
       href: '/settings/grid-configuration',
       active: isActive('/settings/grid-configuration')
     },
     {
       icon: Mail,
-      label: tAdmin('navigation.invitations', { defaultValue: 'Invitations' }),
+      label: tAdmin('navigation.invitations'),
       href: '/settings/invitations',
       active: isActive('/settings/invitations')
     },
     {
       icon: MessageSquare,
-      label: tAdmin('navigation.templates', { defaultValue: 'Templates' }),
+      label: tAdmin('navigation.templates'),
       href: '/settings/templates',
       active: isActive('/settings/templates')
     },
     {
       icon: Monitor,
-      label: tAdmin('navigation.desktop_terminals', {
-        defaultValue: 'Desktop terminals'
-      }),
+      label: tAdmin('navigation.desktop_terminals'),
       href: '/settings/desktop-terminals',
       active: isActive('/settings/desktop-terminals')
     },
     {
       icon: DollarSign,
-      label: tPricing('title', { defaultValue: 'Pricing' }),
+      label: tPricing('title'),
       href: '/settings/pricing',
       active: isActive('/settings/pricing')
     },
     {
       icon: Building2,
-      label: tOrg('title', { defaultValue: 'Organization' }),
+      label: tOrg('title'),
       href: '/settings/organization',
       active:
-        isActive('/settings/organization') &&
-        !pathname.startsWith('/settings/organization/billing')
+        pathname === '/settings/organization' ||
+        (pathname.startsWith('/settings/organization/') &&
+          !pathname.startsWith('/settings/organization/billing/') &&
+          pathname !== '/settings/organization/billing')
     },
     {
       icon: CreditCard,
-      label: tOrg('billing.title', { defaultValue: 'Billing' }),
+      label: tOrg('billing.title'),
       href: '/settings/organization/billing',
       active:
         isActive('/settings/organization/billing') ||
@@ -115,7 +116,7 @@ export default function SettingsSidebar() {
     },
     {
       icon: Home,
-      label: tNav('home', { defaultValue: 'Home' }),
+      label: tNav('home'),
       href: '/',
       active: isActive('/')
     }

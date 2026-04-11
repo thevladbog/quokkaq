@@ -19,7 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import type { Ticket, Service } from '@/lib/api';
 import { useMemo } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { Loader2, Info, LogOut } from 'lucide-react';
 import {
   formatWaitDurationSeconds,
@@ -57,6 +57,7 @@ export function SupervisorListView({
   onForceRelease: (counter: ShiftCounterRow) => void;
   releasePending: boolean;
 }) {
+  const locale = useLocale();
   const t = useTranslations('supervisor.dashboardUi');
   const sorted = useMemo(() => {
     const list = queue ?? [];
@@ -104,7 +105,13 @@ export function SupervisorListView({
                         {ticket.queueNumber}
                       </TableCell>
                       <TableCell className='text-muted-foreground max-w-[200px] truncate text-sm'>
-                        {ticket.service?.nameRu || ticket.service?.name || '—'}
+                        {locale === 'ru'
+                          ? ticket.service?.nameRu ||
+                            ticket.service?.name ||
+                            '—'
+                          : ticket.service?.name ||
+                            ticket.service?.nameRu ||
+                            '—'}
                       </TableCell>
                       <TableCell>
                         <TableWaitCell ticket={ticket} />

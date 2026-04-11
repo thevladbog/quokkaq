@@ -41,7 +41,8 @@ import { UnitCountersSection } from '@/components/admin/units/counters-list';
 import {
   childUnitsQueryKey,
   childSubdivisionsQueryKey
-} from '@/components/admin/units/service-zone-workplaces-panel';
+} from '@/components/admin/units/unit-child-query-keys';
+import { z } from 'zod';
 
 type CreateKind = 'subdivision' | 'service_zone';
 
@@ -108,16 +109,40 @@ export function SubdivisionStationsAndZonesPanel({
   };
 
   const handleCreate = async () => {
-    const trimmedName = name.trim();
-    const trimmedCode = code.trim();
-    if (!trimmedName || !trimmedCode) {
-      toast.error(t('unit_name_code_required'));
+    const requiredMsg = t('unit_name_code_required');
+    const parsed = z
+      .object({
+        name: z.string().transform((s) => s.trim()),
+        code: z.string().transform((s) => s.trim())
+      })
+      .superRefine((val, ctx) => {
+        if (!val.name) {
+          ctx.addIssue({
+            code: 'custom',
+            message: requiredMsg,
+            path: ['name']
+          });
+        }
+        if (!val.code) {
+          ctx.addIssue({
+            code: 'custom',
+            message: requiredMsg,
+            path: ['code']
+          });
+        }
+      })
+      .safeParse({ name, code });
+    if (!parsed.success) {
+      toast.error(
+        parsed.error.issues[0]?.message ?? t('unit_name_code_required')
+      );
       return;
     }
+    const { name: validName, code: validCode } = parsed.data;
     try {
       await createUnitMutation.mutateAsync({
-        name: trimmedName,
-        code: trimmedCode,
+        name: validName,
+        code: validCode,
         companyId,
         timezone: parentTimezone,
         kind: createKind,

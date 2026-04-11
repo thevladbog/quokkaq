@@ -48,8 +48,7 @@ export default function ShiftDashboardPage({
     queryFn: () => unitsApi.getById(unitId)
   });
 
-  const unitListsChildWorkplaces =
-    unit?.kind === 'service_zone' || unit?.kind === 'subdivision';
+  const unitListsChildWorkplaces = unit?.kind === 'service_zone';
 
   const { data: childWorkplaces, isLoading: childWorkplacesLoading } = useQuery(
     {

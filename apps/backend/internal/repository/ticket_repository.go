@@ -24,7 +24,9 @@ type TicketHistoryListRow struct {
 }
 
 type TicketRepository interface {
+	Transaction(fn func(tx *gorm.DB) error) error
 	Create(ticket *models.Ticket) error
+	CreateTx(tx *gorm.DB, ticket *models.Ticket) error
 	CreateTicketHistory(history *models.TicketHistory) error
 	CreateTicketHistoryTx(tx *gorm.DB, history *models.TicketHistory) error
 	// AppendEODFlaggedHistoryForUnitTx inserts ticket.eod_flagged rows for all tickets in the unit that are not yet EOD. Call before MarkAsEODTx.
@@ -64,8 +66,16 @@ func NewTicketRepository() TicketRepository {
 	return &ticketRepository{db: database.DB}
 }
 
+func (r *ticketRepository) Transaction(fn func(tx *gorm.DB) error) error {
+	return r.db.Transaction(fn)
+}
+
 func (r *ticketRepository) Create(ticket *models.Ticket) error {
 	return r.db.Create(ticket).Error
+}
+
+func (r *ticketRepository) CreateTx(tx *gorm.DB, ticket *models.Ticket) error {
+	return tx.Create(ticket).Error
 }
 
 func (r *ticketRepository) CreateTicketHistory(history *models.TicketHistory) error {
@@ -79,6 +89,7 @@ func (r *ticketRepository) CreateTicketHistoryTx(tx *gorm.DB, history *models.Ti
 func (r *ticketRepository) AppendEODFlaggedHistoryForUnitTx(tx *gorm.DB, unitID string, actorUserID *string) error {
 	var ids []string
 	if err := tx.Model(&models.Ticket{}).
+		Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("unit_id = ? AND is_eod = ?", unitID, false).
 		Pluck("id", &ids).Error; err != nil {
 		return err

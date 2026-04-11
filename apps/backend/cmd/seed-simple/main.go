@@ -142,7 +142,7 @@ func ensureCompany() (models.Company, error) {
 
 func ensureUnit(companyID string) (models.Unit, error) {
 	var u models.Unit
-	err := database.DB.Where(models.Unit{Code: seedUnitCode}).First(&u).Error
+	err := database.DB.Where("company_id = ? AND code = ?", companyID, seedUnitCode).First(&u).Error
 	if err == nil {
 		if u.Kind == "workplace" || u.Kind == "" {
 			if err := database.DB.Model(&u).Update("kind", models.UnitKindSubdivision).Error; err != nil {

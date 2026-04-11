@@ -37,13 +37,10 @@ import { useCreateUnit } from '@/lib/hooks';
 import { useRouter } from '@/src/i18n/navigation';
 import PermissionGuard from '@/components/auth/permission-guard';
 import { formatApiToastErrorMessage } from '@/lib/format-api-toast-error';
-
-export const childUnitsQueryKey = (parentId: string) =>
-  ['unit-child-units', parentId] as const;
-
-/** Matches GET /units/:id/child-workplaces (child subdivisions). */
-export const childSubdivisionsQueryKey = (parentId: string) =>
-  ['unit-child-workplaces', parentId] as const;
+import {
+  childSubdivisionsQueryKey,
+  childUnitsQueryKey
+} from '@/components/admin/units/unit-child-query-keys';
 
 type CreateKind = 'subdivision' | 'service_zone';
 

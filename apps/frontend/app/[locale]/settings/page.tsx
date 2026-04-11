@@ -84,7 +84,10 @@ export default function AdminPage() {
                         : unit.kind === 'service_zone'
                           ? t('units.kind_service_zone')
                           : t('units.kind_unknown', {
-                              kind: unit.kind?.trim() || '—'
+                              kind:
+                                String(
+                                  (unit as { kind?: string | null }).kind ?? ''
+                                ).trim() || '—'
                             })}
                     </TableCell>
                     <TableCell>

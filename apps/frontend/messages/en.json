@@ -112,7 +112,7 @@
       "child_unit_actions": "Actions",
       "open_child_unit": "Open unit",
       "create_service_zone_dialog_title": "New service zone",
-      "create_service_zone_dialog_desc": "Creates a child service zone under this zone. Open it to add stations or further nesting.",
+      "create_service_zone_dialog_desc": "Creates a child service zone under this subdivision. Open it to add stations or further nesting.",
       "create_service_zone_submit": "Create service zone",
       "child_service_zone_created": "Service zone created",
       "create_subdivision_dialog_title": "New nested subdivision",

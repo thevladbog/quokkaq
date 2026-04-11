@@ -17,6 +17,8 @@ var (
 	ErrCrossCompanyParent = errors.New("parent unit belongs to another company")
 	ErrInvalidParentKind  = errors.New("parent must be a subdivision or a service zone")
 	ErrCycleDetected      = errors.New("cannot set parent: would create a cycle")
+	// ErrUnitHasChildren is returned when deleting a unit that still has children (map to HTTP 409).
+	ErrUnitHasChildren = errors.New("cannot delete unit that has child units")
 )
 
 type UnitService interface {
@@ -184,7 +186,7 @@ func (s *unitService) DeleteUnit(id string) error {
 		return err
 	}
 	if n > 0 {
-		return errors.New("cannot delete unit that has child units")
+		return ErrUnitHasChildren
 	}
 	return s.repo.Delete(id)
 }

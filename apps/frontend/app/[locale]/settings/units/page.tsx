@@ -159,7 +159,13 @@ export default function UnitsIndexPage() {
                 {' · '}
                 {unit.kind === 'subdivision'
                   ? t('units.kind_subdivision')
-                  : t('units.kind_service_zone')}
+                  : unit.kind === 'service_zone'
+                    ? t('units.kind_service_zone')
+                    : unit.kind === 'workplace'
+                      ? t('units.kind_unknown', { kind: 'workplace' })
+                      : t('units.kind_unknown', {
+                          kind: String(unit.kind ?? '').trim() || '—'
+                        })}
               </CardDescription>
             </CardHeader>
             <CardContent>

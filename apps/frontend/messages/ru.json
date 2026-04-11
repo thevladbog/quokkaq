@@ -112,7 +112,7 @@
       "child_unit_actions": "Действия",
       "open_child_unit": "Открыть юнит",
       "create_service_zone_dialog_title": "Новая сервисная зона",
-      "create_service_zone_dialog_desc": "Создаётся дочерняя сервисная зона. Откройте её, чтобы добавить стойки или дальнейшее вложение.",
+      "create_service_zone_dialog_desc": "Создаётся дочерняя сервисная зона внутри этого подразделения. Откройте её, чтобы добавить стойки или дальнейшее вложение.",
       "create_service_zone_submit": "Создать сервисную зону",
       "child_service_zone_created": "Сервисная зона создана",
       "create_subdivision_dialog_title": "Новое вложенное подразделение",

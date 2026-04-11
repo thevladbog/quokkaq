@@ -19,10 +19,10 @@
   },
   "private": true,
   "devDependencies": {
-    "@nx/js": "22.6.1",
-    "@nx/workspace": "22.6.1",
+    "@nx/js": "22.6.5",
+    "@nx/workspace": "22.6.5",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
-    "nx": "22.6.1"
+    "nx": "22.6.5"
   }
 }

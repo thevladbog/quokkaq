@@ -4,7 +4,14 @@ import { useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { countersApi, unitsApi, type Counter, type Unit } from '@/lib/api';
+import {
+  ApiHttpError,
+  countersApi,
+  unitsApi,
+  type Counter,
+  type Unit
+} from '@/lib/api';
+import { logger } from '@/lib/logger';
 import { useRouter } from '@/src/i18n/navigation';
 
 export type WorkstationRow = {
@@ -13,6 +20,17 @@ export type WorkstationRow = {
   zoneFilterKey: string;
   zoneLabel: string;
 };
+
+async function fetchUnitOrNull(id: string): Promise<Unit | null> {
+  try {
+    return await unitsApi.getById(id);
+  } catch (e) {
+    if (e instanceof ApiHttpError && e.status === 404) {
+      return null;
+    }
+    throw e;
+  }
+}
 
 async function loadUnitsWithAncestors(
   seedIds: string[]
@@ -25,9 +43,7 @@ async function loadUnitsWithAncestors(
     const batch = pending.filter((id) => !map.has(id));
     pending = [];
     if (batch.length === 0) break;
-    const results = await Promise.all(
-      batch.map((id) => unitsApi.getById(id).catch(() => null))
-    );
+    const results = await Promise.all(batch.map((id) => fetchUnitOrNull(id)));
     for (const u of results) {
       if (!u) continue;
       map.set(u.id, u);
@@ -49,9 +65,6 @@ function resolveZone(
     steps += 1;
     if (current.kind === 'service_zone') {
       return { zoneFilterKey: `sz:${current.id}`, zoneLabel: current.name };
-    }
-    if (current.kind === 'subdivision') {
-      return { zoneFilterKey: `sd:${current.id}`, zoneLabel: current.name };
     }
     if (!current.parentId) break;
     current = unitsById.get(current.parentId);
@@ -133,7 +146,7 @@ export function useWorkstationBootstrap({
     }
     if (loadErrorToastShown.current) return;
     loadErrorToastShown.current = true;
-    console.error(query.error);
+    logger.error('Failed to load workstation directory', query.error);
     toast.error(t('loadError'));
   }, [query.isError, query.error, t]);
 
