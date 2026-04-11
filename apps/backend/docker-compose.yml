@@ -122,12 +122,12 @@ services:
       # URLs in JSON must be reachable from the host browser (not http://minio:9000).
       AWS_PUBLIC_ENDPOINT: ${AWS_PUBLIC_ENDPOINT:-http://localhost:9000}
 
-      # SMTP Configuration (from .env)
-      SMTP_HOST: ${SMTP_HOST}
-      SMTP_PORT: ${SMTP_PORT}
-      SMTP_USER: ${SMTP_USER}
-      SMTP_PASS: ${SMTP_PASS}
-      SMTP_FROM: ${SMTP_FROM}
+      # SMTP (optional; empty defaults avoid Compose "variable is not set" warnings in CI)
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
       SMTP_SECURE: ${SMTP_SECURE:-false}
       
       # Redis Configuration (jobs worker/client use REDIS_HOST/REDIS_PORT, not REDIS_URL)
@@ -146,11 +146,12 @@ services:
     networks:
       - quokkaq-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/"]
-      interval: 30s
+      # 127.0.0.1 avoids rare localhost/IPv6 quirks; long start_period for first-run migrations on slow CI
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3001/"]
+      interval: 15s
       timeout: 10s
-      retries: 3
-      start_period: 40s
+      retries: 8
+      start_period: 120s
 
   # Frontend E2E (Testplane): same Linux+Chromium stack locally and in CI. Not started by plain `docker compose up`.
   e2e:
