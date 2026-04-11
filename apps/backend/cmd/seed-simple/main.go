@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"quokkaq-go-backend/internal/config"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/pkg/database"
@@ -14,6 +15,17 @@ func main() {
 	fmt.Println("Starting database seeding...")
 	config.Load()
 	database.Connect()
+
+	const adminEmail = "admin@quokkaq.com"
+	var existing int64
+	if err := database.DB.Model(&models.User{}).Where("email = ?", adminEmail).Count(&existing).Error; err != nil {
+		fmt.Printf("Seed check failed: %v\n", err)
+		os.Exit(1)
+	}
+	if existing > 0 {
+		fmt.Println("Seed already applied (admin user exists), skipping.")
+		return
+	}
 
 	// Create seed data
 	fmt.Println("Seeding data...")
@@ -50,10 +62,10 @@ func main() {
 	// Create admin user
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("admin123"), bcrypt.DefaultCost)
 	hashedPasswordStr := string(hashedPassword)
-	adminEmail := "admin@quokkaq.com"
+	adminEmailStr := adminEmail
 	adminUser := models.User{
 		Name:     "Admin User",
-		Email:    &adminEmail,
+		Email:    &adminEmailStr,
 		Password: &hashedPasswordStr,
 	}
 	database.DB.Create(&adminUser)

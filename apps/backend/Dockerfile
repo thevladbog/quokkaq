@@ -24,6 +24,13 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
     -o quokkaq-backend \
     ./cmd/api
 
+# E2E / dev one-shot DB seed (idempotent; see docker-compose e2e-seed)
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -ldflags='-w -s -extldflags "-static"' \
+    -a \
+    -o seed-simple \
+    ./cmd/seed-simple
+
 # Final stage
 FROM alpine:latest
 
@@ -39,6 +46,7 @@ WORKDIR /app
 
 # Copy artifacts from builder
 COPY --from=builder /build/quokkaq-backend .
+COPY --from=builder /build/seed-simple .
 
 # Copy bundled docs (swagger, etc.)
 COPY --from=builder /build/docs ./docs

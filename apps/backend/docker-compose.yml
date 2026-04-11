@@ -153,6 +153,24 @@ services:
       retries: 8
       start_period: 120s
 
+  # One-shot seed so E2E sees an initialized system (SystemStatusGuard otherwise redirects /login → /setup).
+  e2e-seed:
+    profiles:
+      - e2e
+    build:
+      context: ../..
+      dockerfile: apps/backend/Dockerfile
+    container_name: quokkaq-e2e-seed
+    restart: "no"
+    entrypoint: ["/app/seed-simple"]
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/quokkaq
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - quokkaq-network
+
   # Frontend E2E (Testplane): same Linux+Chromium stack locally and in CI. Not started by plain `docker compose up`.
   e2e:
     profiles:
@@ -166,6 +184,8 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+      e2e-seed:
+        condition: service_completed_successfully
     working_dir: /workspace
     volumes:
       - ../..:/workspace
