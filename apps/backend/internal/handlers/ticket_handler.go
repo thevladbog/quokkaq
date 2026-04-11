@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
-	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/services"
 
 	"github.com/go-chi/chi/v5"
@@ -115,10 +114,7 @@ func (h *TicketHandler) CallNext(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var actor *string
-	if uid, ok := middleware.GetUserIDFromContext(r.Context()); ok && uid != "" {
-		actor = &uid
-	}
+	actor := getActorFromRequest(r)
 	ticket, err := h.service.CallNext(unitID, req.CounterID, req.ServiceID, actor)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound) // Or 404 if no tickets
@@ -152,10 +148,7 @@ func (h *TicketHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var actor *string
-	if uid, ok := middleware.GetUserIDFromContext(r.Context()); ok && uid != "" {
-		actor = &uid
-	}
+	actor := getActorFromRequest(r)
 	ticket, err := h.service.UpdateStatus(id, req.Status, actor)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -177,10 +170,7 @@ func (h *TicketHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 // @Router       /tickets/{id}/recall [post]
 func (h *TicketHandler) Recall(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	var actor *string
-	if uid, ok := middleware.GetUserIDFromContext(r.Context()); ok && uid != "" {
-		actor = &uid
-	}
+	actor := getActorFromRequest(r)
 	ticket, err := h.service.Recall(id, actor)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
@@ -212,10 +202,7 @@ func (h *TicketHandler) Pick(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var actor *string
-	if uid, ok := middleware.GetUserIDFromContext(r.Context()); ok && uid != "" {
-		actor = &uid
-	}
+	actor := getActorFromRequest(r)
 	ticket, err := h.service.Pick(id, req.CounterID, actor)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
@@ -248,10 +235,7 @@ func (h *TicketHandler) Transfer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var actor *string
-	if uid, ok := middleware.GetUserIDFromContext(r.Context()); ok && uid != "" {
-		actor = &uid
-	}
+	actor := getActorFromRequest(r)
 	ticket, err := h.service.Transfer(id, req.ToCounterID, req.ToUserID, actor)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -272,10 +256,7 @@ func (h *TicketHandler) Transfer(w http.ResponseWriter, r *http.Request) {
 // @Router       /tickets/{id}/return [post]
 func (h *TicketHandler) ReturnToQueue(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	var actor *string
-	if uid, ok := middleware.GetUserIDFromContext(r.Context()); ok && uid != "" {
-		actor = &uid
-	}
+	actor := getActorFromRequest(r)
 	ticket, err := h.service.ReturnToQueue(id, actor)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

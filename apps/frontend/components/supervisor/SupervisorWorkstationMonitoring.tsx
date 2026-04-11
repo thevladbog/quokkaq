@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Card,
   CardContent,
@@ -407,10 +407,55 @@ export function SupervisorWorkstationMonitoring({
     showZonePicker && !workplacesLoading && workplaceZones != null;
   const zones = workplaceZones ?? [];
   const zonesEmpty = zonesListReady && zones.length === 0;
+  const zoneIdsKey = JSON.stringify(zones.map((z) => z.id));
+  const firstZoneId = zones[0]?.id;
+
+  const effectiveWorkplaceId = useMemo(() => {
+    if (!zonesListReady || zones.length === 0 || firstZoneId == null) {
+      return selectedWorkplaceId && selectedWorkplaceId !== ''
+        ? selectedWorkplaceId
+        : undefined;
+    }
+    const ids: string[] = JSON.parse(zoneIdsKey) as string[];
+    const inList =
+      selectedWorkplaceId != null &&
+      selectedWorkplaceId !== '' &&
+      ids.includes(selectedWorkplaceId);
+    return inList ? selectedWorkplaceId! : firstZoneId;
+  }, [
+    zonesListReady,
+    zoneIdsKey,
+    firstZoneId,
+    zones.length,
+    selectedWorkplaceId
+  ]);
+
+  useEffect(() => {
+    if (
+      !zonesListReady ||
+      zones.length === 0 ||
+      !onWorkplaceChange ||
+      !firstZoneId
+    )
+      return;
+    const ids: string[] = JSON.parse(zoneIdsKey) as string[];
+    const inList =
+      selectedWorkplaceId != null &&
+      selectedWorkplaceId !== '' &&
+      ids.includes(selectedWorkplaceId);
+    if (inList) return;
+    onWorkplaceChange(firstZoneId);
+  }, [
+    zonesListReady,
+    zoneIdsKey,
+    firstZoneId,
+    zones.length,
+    selectedWorkplaceId,
+    onWorkplaceChange
+  ]);
+
   const zoneSelectionPending =
-    zonesListReady &&
-    zones.length > 0 &&
-    (selectedWorkplaceId == null || selectedWorkplaceId === '');
+    zonesListReady && zones.length > 0 && effectiveWorkplaceId == null;
 
   return (
     <Card data-testid='e2e-supervisor-workstation-monitoring'>
@@ -447,7 +492,7 @@ export function SupervisorWorkstationMonitoring({
               <p className='text-muted-foreground text-sm'>{t('zonesEmpty')}</p>
             ) : zones.length > 0 ? (
               <Tabs
-                value={selectedWorkplaceId ?? zones[0]?.id ?? '__none__'}
+                value={effectiveWorkplaceId ?? '__none__'}
                 onValueChange={(id) => onWorkplaceChange?.(id)}
               >
                 <TabsList

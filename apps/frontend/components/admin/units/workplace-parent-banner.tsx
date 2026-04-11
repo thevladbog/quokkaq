@@ -1,20 +1,15 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
 import { useRouter } from '@/src/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { unitsApi } from '@/lib/api';
+import { useUnit } from '@/lib/hooks';
 
 export function WorkplaceParentBanner({ parentId }: { parentId: string }) {
   const t = useTranslations('admin.units');
   const router = useRouter();
-  const { data: parent } = useQuery({
-    queryKey: ['unit', parentId],
-    queryFn: () => unitsApi.getById(parentId),
-    enabled: Boolean(parentId)
-  });
+  const { data: parent } = useUnit(parentId);
 
   const parentKind = parent?.kind;
   const parentName = parent?.name ?? '…';

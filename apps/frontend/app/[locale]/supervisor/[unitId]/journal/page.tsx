@@ -28,8 +28,9 @@ export default function SupervisorJournalPage({
 }) {
   const { unitId: dashboardUnitId } = use(params);
   const searchParams = useSearchParams();
-  const scopeUnitId = searchParams.get('scopeUnitId');
-  const apiUnitId = scopeUnitId ?? dashboardUnitId;
+  const scopeUnitIdRaw = searchParams.get('scopeUnitId')?.trim() ?? '';
+  const apiUnitId =
+    scopeUnitIdRaw.length > 0 ? scopeUnitIdRaw : dashboardUnitId;
 
   const t = useTranslations('supervisor.dashboardUi');
   const locale = useLocale();

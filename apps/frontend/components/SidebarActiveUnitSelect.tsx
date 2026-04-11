@@ -1,10 +1,9 @@
 'use client';
 
 import { useMemo } from 'react';
-import { usePathname } from 'next/navigation';
 import { useQueries } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
-import { useRouter } from '@/src/i18n/navigation';
+import { usePathname, useRouter } from '@/src/i18n/navigation';
 import { useActiveUnit } from '@/contexts/ActiveUnitContext';
 import { unitsApi } from '@/lib/api';
 import {
@@ -16,10 +15,6 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-
-function pathWithoutLocale(pathname: string) {
-  return pathname.replace(/^\/[a-z]{2}\//, '/').replace(/^\/[a-z]{2}$/, '/');
-}
 
 export function SidebarActiveUnitSelect({ className }: { className?: string }) {
   const tNav = useTranslations('nav');
@@ -51,7 +46,7 @@ export function SidebarActiveUnitSelect({ className }: { className?: string }) {
 
   const handleChange = (id: string) => {
     setActiveUnitId(id);
-    const pl = pathWithoutLocale(pathname);
+    const pl = pathname;
     if (pl.startsWith('/supervisor/')) {
       const seg = pl.split('/').filter(Boolean);
       if (seg.length >= 2 && seg[0] === 'supervisor') {
@@ -70,7 +65,10 @@ export function SidebarActiveUnitSelect({ className }: { className?: string }) {
     }
   };
 
-  const value = activeUnitId ?? assignableUnitIds[0];
+  const value =
+    activeUnitId && assignableUnitIds.includes(activeUnitId)
+      ? activeUnitId
+      : assignableUnitIds[0];
 
   return (
     <div className={cn('space-y-1.5 px-2 pb-2', className)}>

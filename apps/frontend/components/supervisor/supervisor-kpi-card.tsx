@@ -60,23 +60,21 @@ export function SupervisorKpiCard({
           />
         </div>
       ) : (
-        <>
-          <div className='relative z-[1] mt-auto flex flex-col gap-1 pt-4'>
-            {children}
-            {footer ? (
-              <div
-                className={cn(
-                  'text-xs leading-snug',
-                  isAccent
-                    ? 'text-primary-foreground/70'
-                    : 'text-muted-foreground'
-                )}
-              >
-                {footer}
-              </div>
-            ) : null}
-          </div>
-        </>
+        <div className='relative z-[1] mt-auto flex flex-col gap-1 pt-4'>
+          {children}
+          {footer ? (
+            <div
+              className={cn(
+                'text-xs leading-snug',
+                isAccent
+                  ? 'text-primary-foreground/70'
+                  : 'text-muted-foreground'
+              )}
+            >
+              {footer}
+            </div>
+          ) : null}
+        </div>
       )}
     </div>
   );

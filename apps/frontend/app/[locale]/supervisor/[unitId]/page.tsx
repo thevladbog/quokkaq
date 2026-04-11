@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useEffect, useMemo, useState } from 'react';
+import { use, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -18,7 +18,7 @@ import { toast } from 'sonner';
 import { PreRegistrationDetailsModal } from '@/components/staff/PreRegistrationDetailsModal';
 import { SupervisorShiftDashboard } from '@/components/supervisor/SupervisorShiftDashboard';
 import type { ShiftCounterRow } from '@/components/supervisor/SupervisorWorkstationMonitoring';
-import { useActiveUnit } from '@/contexts/ActiveUnitContext';
+import { useSyncActiveUnit } from '@/contexts/ActiveUnitContext';
 
 export default function ShiftDashboardPage({
   params
@@ -28,13 +28,7 @@ export default function ShiftDashboardPage({
   const { unitId } = use(params);
   const t = useTranslations('supervisor');
   const queryClient = useQueryClient();
-  const { setActiveUnitId, assignableUnitIds } = useActiveUnit();
-
-  useEffect(() => {
-    if (assignableUnitIds.includes(unitId)) {
-      setActiveUnitId(unitId);
-    }
-  }, [unitId, assignableUnitIds, setActiveUnitId]);
+  useSyncActiveUnit(unitId);
   const [showEODDialog, setShowEODDialog] = useState(false);
   const [forceReleaseDialogOpen, setForceReleaseDialogOpen] = useState(false);
   const [selectedCounter, setSelectedCounter] = useState<{

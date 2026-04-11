@@ -7,6 +7,16 @@ import (
 	"quokkaq-go-backend/internal/repository"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
+)
+
+// Validation errors from CreateUnit / UpdateUnit (use errors.Is in HTTP handlers).
+var (
+	ErrInvalidUnitKind    = errors.New("invalid unit kind: use subdivision or service_zone")
+	ErrParentNotFound     = errors.New("parent unit not found")
+	ErrCrossCompanyParent = errors.New("parent unit belongs to another company")
+	ErrInvalidParentKind  = errors.New("parent must be a subdivision or a service zone")
+	ErrCycleDetected      = errors.New("cannot set parent: would create a cycle")
 )
 
 type UnitService interface {
@@ -43,32 +53,32 @@ func validateUnitKind(kind string) error {
 	case models.UnitKindServiceZone, models.UnitKindSubdivision:
 		return nil
 	default:
-		return errors.New("invalid unit kind: use subdivision or service_zone")
+		return ErrInvalidUnitKind
 	}
 }
 
 // wouldCreateCycle is true if newParent is the unit itself or an ancestor of unitID would include unitID when walking up from newParent.
-func (s *unitService) wouldCreateCycle(unitID string, newParentID *string) bool {
+func (s *unitService) wouldCreateCycle(unitID string, newParentID *string) (bool, error) {
 	if newParentID == nil || *newParentID == "" || unitID == "" {
-		return false
+		return false, nil
 	}
 	visited := make(map[string]struct{})
 	cur := newParentID
 	for cur != nil && *cur != "" {
 		if *cur == unitID {
-			return true
+			return true, nil
 		}
 		if _, seen := visited[*cur]; seen {
-			return true
+			return true, nil
 		}
 		visited[*cur] = struct{}{}
 		p, err := s.repo.FindByIDLight(*cur)
 		if err != nil {
-			break
+			return false, err
 		}
 		cur = p.ParentID
 	}
-	return false
+	return false, nil
 }
 
 func (s *unitService) validateHierarchy(unitID, companyID string, parentID *string) error {
@@ -77,16 +87,25 @@ func (s *unitService) validateHierarchy(unitID, companyID string, parentID *stri
 	}
 	parent, err := s.repo.FindByIDLight(*parentID)
 	if err != nil {
-		return errors.New("parent unit not found")
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrParentNotFound
+		}
+		return err
 	}
 	if parent.CompanyID != companyID {
-		return errors.New("parent unit belongs to another company")
+		return ErrCrossCompanyParent
 	}
 	if !models.UnitKindAllowsChildUnits(parent.Kind) {
-		return errors.New("parent must be a subdivision or a service zone")
+		return ErrInvalidParentKind
 	}
-	if unitID != "" && s.wouldCreateCycle(unitID, parentID) {
-		return errors.New("cannot set parent: would create a cycle")
+	if unitID != "" {
+		cycle, err := s.wouldCreateCycle(unitID, parentID)
+		if err != nil {
+			return err
+		}
+		if cycle {
+			return ErrCycleDetected
+		}
 	}
 	return nil
 }
@@ -141,9 +160,17 @@ func (s *unitService) GetChildUnits(parentID string) ([]models.Unit, error) {
 }
 
 func (s *unitService) UpdateUnit(unit *models.Unit) error {
-	unit.Kind = normalizeUnitKind(unit.Kind)
-	if err := validateUnitKind(unit.Kind); err != nil {
+	stored, err := s.repo.FindByIDLight(unit.ID)
+	if err != nil {
 		return err
+	}
+	// Only normalize/validate when the client is changing kind; legacy DB values
+	// (e.g. historical leaf kinds) stay valid on PATCH that does not touch kind.
+	if unit.Kind != stored.Kind {
+		unit.Kind = normalizeUnitKind(unit.Kind)
+		if err := validateUnitKind(unit.Kind); err != nil {
+			return err
+		}
 	}
 	if err := s.validateHierarchy(unit.ID, unit.CompanyID, unit.ParentID); err != nil {
 		return err

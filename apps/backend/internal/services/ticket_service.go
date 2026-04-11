@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"quokkaq-go-backend/internal/models"
@@ -30,10 +31,18 @@ type ticketService struct {
 	serviceRepo repository.ServiceRepository
 	hub         *ws.Hub
 	jobClient   JobEnqueuer
+	log         *slog.Logger
 }
 
 func NewTicketService(repo repository.TicketRepository, counterRepo repository.CounterRepository, serviceRepo repository.ServiceRepository, hub *ws.Hub, jobClient JobEnqueuer) TicketService {
-	return &ticketService{repo: repo, counterRepo: counterRepo, serviceRepo: serviceRepo, hub: hub, jobClient: jobClient}
+	return &ticketService{
+		repo:        repo,
+		counterRepo: counterRepo,
+		serviceRepo: serviceRepo,
+		hub:         hub,
+		jobClient:   jobClient,
+		log:         slog.Default(),
+	}
 }
 
 func (s *ticketService) writeTicketHistory(ticketID string, actorUserID *string, action string, payload map[string]interface{}) error {
@@ -295,12 +304,14 @@ func (s *ticketService) Transfer(ticketID string, toCounterID, toUserID *string,
 	}
 
 	payload := map[string]interface{}{
-		"unit_id":        ticket.UnitID,
-		"service_id":     ticket.ServiceID,
-		"from_status":    fromStatus,
-		"to_status":      "waiting",
-		"to_counter_id":  targetCounterID,
-		"target_user_id": toUserID,
+		"unit_id":       ticket.UnitID,
+		"service_id":    ticket.ServiceID,
+		"from_status":   fromStatus,
+		"to_status":     "waiting",
+		"to_counter_id": targetCounterID,
+	}
+	if toUserID != nil {
+		payload["target_user_id"] = *toUserID
 	}
 	if fromCounterID != nil {
 		payload["from_counter_id"] = *fromCounterID
@@ -366,6 +377,12 @@ func (s *ticketService) enqueueTTS(ticket *models.Ticket, counterID string) {
 		CounterName: counterName,
 	})
 	if err != nil {
-		fmt.Printf("Failed to enqueue TTS job: %v\n", err)
+		s.log.Error("failed to enqueue TTS job",
+			slog.String("ticket_id", ticket.ID),
+			slog.String("queue_number", ticket.QueueNumber),
+			slog.String("unit_id", ticket.UnitID),
+			slog.String("counter_name", counterName),
+			slog.Any("error", err),
+		)
 	}
 }

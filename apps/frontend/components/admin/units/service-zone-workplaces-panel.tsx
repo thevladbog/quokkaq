@@ -70,7 +70,12 @@ export function ServiceZoneWorkplacesPanel({
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
 
-  const { data: children, isLoading } = useQuery({
+  const {
+    data: children,
+    isLoading,
+    isError,
+    error
+  } = useQuery({
     queryKey: childUnitsQueryKey(parentUnitId),
     queryFn: () => unitsApi.getChildUnits(parentUnitId)
   });
@@ -141,7 +146,10 @@ export function ServiceZoneWorkplacesPanel({
             </CardDescription>
           </div>
           <div className='flex shrink-0 flex-wrap gap-2'>
-            <PermissionGuard permissions={['UNIT_CREATE']}>
+            <PermissionGuard
+              permissions={['UNIT_CREATE']}
+              unitId={parentUnitId}
+            >
               <Button
                 size='sm'
                 variant='secondary'
@@ -165,6 +173,12 @@ export function ServiceZoneWorkplacesPanel({
           {isLoading ? (
             <p className='text-muted-foreground text-sm'>
               {t('loading', { defaultValue: 'Loading...' })}
+            </p>
+          ) : isError ? (
+            <p className='text-destructive text-sm' role='alert'>
+              {t('children_load_error', {
+                message: formatApiToastErrorMessage(error, tCommon('error'))
+              })}
             </p>
           ) : !children?.length ? (
             <p className='text-muted-foreground text-sm'>

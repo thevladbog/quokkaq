@@ -34,6 +34,7 @@ type TicketRepository interface {
 	FindByUnitID(unitID string) ([]models.Ticket, error)
 	FindWaiting(unitID string, serviceID *string) (*models.Ticket, error)
 	Update(ticket *models.Ticket) error
+	UpdateTx(tx *gorm.DB, ticket *models.Ticket) error
 	Delete(id string) error
 
 	// Sequence related
@@ -82,22 +83,23 @@ func (r *ticketRepository) AppendEODFlaggedHistoryForUnitTx(tx *gorm.DB, unitID 
 		Pluck("id", &ids).Error; err != nil {
 		return err
 	}
+	if len(ids) == 0 {
+		return nil
+	}
 	payload, err := json.Marshal(map[string]string{"unit_id": unitID})
 	if err != nil {
 		return err
 	}
+	histories := make([]models.TicketHistory, 0, len(ids))
 	for _, id := range ids {
-		h := &models.TicketHistory{
+		histories = append(histories, models.TicketHistory{
 			TicketID: id,
 			Action:   ticketaudit.ActionTicketEODFlagged,
 			UserID:   actorUserID,
 			Payload:  payload,
-		}
-		if err := tx.Create(h).Error; err != nil {
-			return err
-		}
+		})
 	}
-	return nil
+	return tx.Create(&histories).Error
 }
 
 func (r *ticketRepository) FindAll() ([]models.Ticket, error) {
@@ -140,7 +142,11 @@ func (r *ticketRepository) FindWaiting(unitID string, serviceID *string) (*model
 }
 
 func (r *ticketRepository) Update(ticket *models.Ticket) error {
-	return r.db.Save(ticket).Error
+	return r.UpdateTx(r.db, ticket)
+}
+
+func (r *ticketRepository) UpdateTx(tx *gorm.DB, ticket *models.Ticket) error {
+	return tx.Save(ticket).Error
 }
 
 func (r *ticketRepository) Delete(id string) error {

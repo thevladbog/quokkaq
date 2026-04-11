@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/card';
 
 export default function SupervisorSelectionPage() {
-  const { user, isLoading: authLoading } = useAuthContext();
+  const { isLoading: authLoading } = useAuthContext();
   const { activeUnitId, assignableUnitIds } = useActiveUnit();
   const router = useRouter();
   const t = useTranslations('supervisor');
@@ -38,7 +38,7 @@ export default function SupervisorSelectionPage() {
     );
   }
 
-  if (!user?.units?.length) {
+  if (!assignableUnitIds?.length) {
     return (
       <div className='container mx-auto max-w-4xl p-4'>
         <h1 className='mb-8 text-center text-3xl font-bold'>{t('title')}</h1>

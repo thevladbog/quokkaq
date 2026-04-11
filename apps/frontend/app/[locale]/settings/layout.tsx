@@ -11,7 +11,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const t = await getTranslations({ locale, namespace: 'pageTitles' });
 
   return {
-    title: t('admin.dashboard')
+    title: t('settings.title')
   };
 }
 

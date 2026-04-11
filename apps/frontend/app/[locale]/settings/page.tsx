@@ -81,7 +81,11 @@ export default function AdminPage() {
                     <TableCell>
                       {unit.kind === 'subdivision'
                         ? t('units.kind_subdivision')
-                        : t('units.kind_service_zone')}
+                        : unit.kind === 'service_zone'
+                          ? t('units.kind_service_zone')
+                          : t('units.kind_unknown', {
+                              kind: unit.kind?.trim() || '—'
+                            })}
                     </TableCell>
                     <TableCell>
                       <Button variant='outline' size='sm'>

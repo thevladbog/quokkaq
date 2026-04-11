@@ -5,7 +5,7 @@ import type { Invoice } from '@quokkaq/shared-types';
 import { InvoiceList } from '@/components/billing/InvoiceList';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/src/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import { invoicesApi } from '@/lib/api';
 import {
@@ -45,7 +45,7 @@ export function OrganizationInvoicesContent() {
     <div className='space-y-6'>
       <Button
         variant='ghost'
-        onClick={() => router.push('/settings/organization/billing')}
+        onClick={() => router.push('settings/organization/billing')}
       >
         <ArrowLeft className='mr-2 h-4 w-4' />
         {t('backToBilling')}
@@ -54,7 +54,7 @@ export function OrganizationInvoicesContent() {
       <InvoiceList
         invoices={invoices || []}
         onDownload={handleDownload}
-        detailBasePath='/settings/organization/billing/invoices'
+        detailBasePath='settings/organization/billing/invoices'
       />
     </div>
   );

@@ -263,7 +263,36 @@ func RunVersionedMigrations(models ...interface{}) error {
 		`).Error; err != nil {
 			return err
 		}
-		if err := db.Exec(`DROP INDEX IF EXISTS uni_units_code`).Error; err != nil {
+		// Drop legacy unique indexes on units(code) only (name varies by GORM/tooling);
+		// constraints were removed above — this catches standalone unique indexes.
+		if err := db.Exec(`
+			DO $$
+			DECLARE r RECORD;
+			BEGIN
+				FOR r IN
+					SELECT n.nspname AS idx_schema, ic.relname AS idx_name
+					FROM pg_index x
+					JOIN pg_class ic ON ic.oid = x.indexrelid
+					JOIN pg_namespace n ON n.oid = ic.relnamespace
+					WHERE x.indrelid = 'units'::regclass
+					  AND x.indisunique = true
+					  AND NOT x.indisprimary
+					  AND (
+						  SELECT count(*)::int
+						  FROM unnest(x.indkey::smallint[]) AS k(attnum)
+						  WHERE k.attnum > 0
+					  ) = 1
+					  AND EXISTS (
+						  SELECT 1
+						  FROM unnest(x.indkey::smallint[]) AS k(attnum)
+						  JOIN pg_attribute a ON a.attrelid = x.indrelid AND a.attnum = k.attnum
+						  WHERE k.attnum > 0 AND a.attname = 'code'
+					  )
+				LOOP
+					EXECUTE format('DROP INDEX IF EXISTS %I.%I', r.idx_schema, r.idx_name);
+				END LOOP;
+			END $$;
+		`).Error; err != nil {
 			return err
 		}
 		if err := db.Exec(`

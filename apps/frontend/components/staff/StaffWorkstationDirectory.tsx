@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   Table,
@@ -20,74 +20,19 @@ import {
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import {
-  countersApi,
-  shiftApi,
-  unitsApi,
-  type Counter,
-  type Unit
-} from '@/lib/api';
+import { countersApi, shiftApi } from '@/lib/api';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/src/i18n/navigation';
 import { Loader2, Search, User as UserIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import {
+  useWorkstationBootstrap,
+  type WorkstationRow
+} from '@/hooks/use-workstation-bootstrap';
 
-export type WorkstationRow = {
-  counter: Counter;
-  workplaceUnit: Unit;
-  zoneFilterKey: string;
-  zoneLabel: string;
-};
-
-async function loadUnitsWithAncestors(
-  seedIds: string[]
-): Promise<Map<string, Unit>> {
-  const map = new Map<string, Unit>();
-  let pending = [...new Set(seedIds.filter(Boolean))];
-  let guard = 0;
-  while (pending.length > 0 && guard < 20) {
-    guard += 1;
-    const batch = pending.filter((id) => !map.has(id));
-    pending = [];
-    if (batch.length === 0) break;
-    const results = await Promise.all(
-      batch.map((id) => unitsApi.getById(id).catch(() => null))
-    );
-    for (const u of results) {
-      if (!u) continue;
-      map.set(u.id, u);
-      if (u.parentId && !map.has(u.parentId)) {
-        pending.push(u.parentId);
-      }
-    }
-  }
-  return map;
-}
-
-function resolveZone(
-  workplaceUnit: Unit,
-  unitsById: Map<string, Unit>
-): { zoneFilterKey: string; zoneLabel: string } {
-  let current: Unit | undefined = workplaceUnit;
-  let steps = 0;
-  while (current && steps < 20) {
-    steps += 1;
-    if (current.kind === 'service_zone') {
-      return { zoneFilterKey: `sz:${current.id}`, zoneLabel: current.name };
-    }
-    if (current.kind === 'subdivision') {
-      return { zoneFilterKey: `sd:${current.id}`, zoneLabel: current.name };
-    }
-    if (!current.parentId) break;
-    current = unitsById.get(current.parentId);
-  }
-  return {
-    zoneFilterKey: `u:${workplaceUnit.id}`,
-    zoneLabel: workplaceUnit.name
-  };
-}
+export type { WorkstationRow };
 
 type Props = {
   restrictUnitId: string | null;
@@ -98,9 +43,6 @@ export default function StaffWorkstationDirectory({ restrictUnitId }: Props) {
   const router = useRouter();
   const t = useTranslations('staff.directory');
   const tStaff = useTranslations('staff');
-
-  const [bootstrapLoading, setBootstrapLoading] = useState(true);
-  const [rows, setRows] = useState<WorkstationRow[]>([]);
 
   const [zoneFilter, setZoneFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<
@@ -114,64 +56,14 @@ export default function StaffWorkstationDirectory({ restrictUnitId }: Props) {
     if (restrictUnitId && ids.includes(restrictUnitId)) return [restrictUnitId];
     if (restrictUnitId) return [];
     return ids;
-  }, [user?.units, restrictUnitId]);
+  }, [user, restrictUnitId]);
 
-  const runBootstrap = useCallback(async () => {
-    if (!user?.id || seedUnitIds.length === 0) {
-      setRows([]);
-      setBootstrapLoading(false);
-      return;
-    }
-
-    setBootstrapLoading(true);
-    let navigatedAway = false;
-    try {
-      const unitsById = await loadUnitsWithAncestors(seedUnitIds);
-
-      const counterLists = await Promise.all(
-        seedUnitIds.map((unitId) => countersApi.getByUnitId(unitId))
-      );
-
-      const flat = counterLists.flat();
-      const mine = flat.find((c) => c.assignedTo === user.id);
-      if (mine) {
-        router.replace(`/staff/${mine.unitId}/${mine.id}`);
-        navigatedAway = true;
-        return;
-      }
-
-      const built: WorkstationRow[] = [];
-      for (const counter of flat) {
-        const workplaceUnit = unitsById.get(counter.unitId);
-        if (!workplaceUnit) continue;
-        const { zoneFilterKey, zoneLabel } = resolveZone(
-          workplaceUnit,
-          unitsById
-        );
-        built.push({ counter, workplaceUnit, zoneFilterKey, zoneLabel });
-      }
-
-      setRows(built);
-    } catch (e) {
-      console.error(e);
-      setRows([]);
-      toast.error(t('loadError'));
-    } finally {
-      if (!navigatedAway) {
-        setBootstrapLoading(false);
-      }
-    }
-  }, [user?.id, seedUnitIds, router, t]);
-
-  useEffect(() => {
-    if (authLoading) return;
-    if (!user) {
-      setBootstrapLoading(false);
-      setRows([]);
-      return;
-    }
-    void runBootstrap();
-  }, [authLoading, user, runBootstrap]);
+  const { rows, isLoading: bootstrapLoading } = useWorkstationBootstrap({
+    authLoading,
+    userId: user?.id,
+    seedUnitIds,
+    hasUser: !!user
+  });
 
   const zoneOptions = useMemo(() => {
     const map = new Map<string, { label: string; count: number }>();
@@ -225,7 +117,7 @@ export default function StaffWorkstationDirectory({ restrictUnitId }: Props) {
   }, [filteredRows]);
 
   const { data: shiftDash, isLoading: shiftLoading } = useQuery({
-    queryKey: ['staff-selection-shift-dashboard', uniqueWorkplaceIds[0]],
+    queryKey: ['staff-selection-shift-dashboard', uniqueWorkplaceIds],
     queryFn: () => shiftApi.getDashboard(uniqueWorkplaceIds[0]!),
     enabled: uniqueWorkplaceIds.length === 1 && !!uniqueWorkplaceIds[0]
   });
@@ -443,9 +335,11 @@ export default function StaffWorkstationDirectory({ restrictUnitId }: Props) {
                     const c = r.counter;
                     const isOccupied = !!c.assignedTo;
                     const isMe = c.assignedTo === user.id;
+                    const occupiedByAnother = isOccupied && !isMe;
+                    const hasCounterElsewhereNotMe =
+                      !!hasMyCounterElsewhere && !isMe;
                     const disabledOther =
-                      (isOccupied && !isMe) ||
-                      (!!hasMyCounterElsewhere && !isMe);
+                      occupiedByAnother || hasCounterElsewhereNotMe;
 
                     return (
                       <TableRow key={c.id}>
@@ -499,14 +393,12 @@ export default function StaffWorkstationDirectory({ restrictUnitId }: Props) {
                               disabled={
                                 disabledOther || occupyMutation.isPending
                               }
-                              onClick={() => {
-                                if (!isOccupied && !hasMyCounterElsewhere) {
-                                  occupyMutation.mutate({
-                                    counterId: c.id,
-                                    unitId: c.unitId
-                                  });
-                                }
-                              }}
+                              onClick={() =>
+                                occupyMutation.mutate({
+                                  counterId: c.id,
+                                  unitId: c.unitId
+                                })
+                              }
                             >
                               {isOccupied
                                 ? t('actionInUse')

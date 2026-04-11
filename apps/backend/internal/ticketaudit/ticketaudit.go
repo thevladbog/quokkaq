@@ -3,6 +3,8 @@ package ticketaudit
 
 import (
 	"encoding/json"
+	"errors"
+	"strings"
 
 	"quokkaq-go-backend/internal/models"
 )
@@ -19,6 +21,13 @@ const (
 
 // NewHistory builds a TicketHistory row. Payload keys should be snake_case JSON for consumers.
 func NewHistory(ticketID, action string, actorUserID *string, payload map[string]interface{}) (*models.TicketHistory, error) {
+	if strings.TrimSpace(ticketID) == "" {
+		return nil, errors.New("ticketaudit: ticketID is required")
+	}
+	if strings.TrimSpace(action) == "" {
+		return nil, errors.New("ticketaudit: action is required")
+	}
+
 	var raw []byte
 	var err error
 	if len(payload) == 0 {

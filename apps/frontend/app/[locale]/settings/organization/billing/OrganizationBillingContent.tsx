@@ -7,7 +7,7 @@ import { PlanSelector } from '@/components/billing/PlanSelector';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CreditCard, Receipt, ArrowRight } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/src/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import type { SubscriptionPlan } from '@quokkaq/shared-types';

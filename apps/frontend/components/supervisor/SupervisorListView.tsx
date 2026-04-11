@@ -18,6 +18,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import type { Ticket, Service } from '@/lib/api';
+import { useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import { Loader2, Info, LogOut } from 'lucide-react';
 import {
@@ -57,12 +58,14 @@ export function SupervisorListView({
   releasePending: boolean;
 }) {
   const t = useTranslations('supervisor.dashboardUi');
-  const list = queue ?? [];
-  const sorted = [...list].sort((a, b) => {
-    const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-    const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-    return ta - tb;
-  });
+  const sorted = useMemo(() => {
+    const list = queue ?? [];
+    return [...list].sort((a, b) => {
+      const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return ta - tb;
+    });
+  }, [queue]);
   const counterRows = counters ?? [];
 
   return (

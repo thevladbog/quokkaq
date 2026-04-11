@@ -20,11 +20,7 @@ function StaffSelectionInner() {
       );
       if (allowed) return uid;
     }
-    if (
-      activeUnitId &&
-      assignableUnitIds.length > 0 &&
-      assignableUnitIds.includes(activeUnitId)
-    ) {
+    if (activeUnitId && assignableUnitIds.includes(activeUnitId)) {
       return activeUnitId;
     }
     return null;

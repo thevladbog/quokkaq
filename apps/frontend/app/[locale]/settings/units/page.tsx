@@ -33,7 +33,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
-import { useRouter } from '@/src/i18n/navigation';
+import { Link } from '@/src/i18n/navigation';
 import { formatApiToastErrorMessage } from '@/lib/format-api-toast-error';
 import { toast } from 'sonner';
 import type { UnitKind } from '@quokkaq/shared-types';
@@ -45,7 +45,6 @@ export default function UnitsIndexPage() {
   const createUnitMutation = useCreateUnit();
   const t = useTranslations('admin');
   const tCommon = useTranslations('common');
-  const router = useRouter();
   const { user } = useAuthContext();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [newUnitName, setNewUnitName] = useState('');
@@ -85,8 +84,6 @@ export default function UnitsIndexPage() {
     [units, companyId]
   );
 
-  const defaultTimezone = units[0]?.timezone ?? 'UTC';
-
   const resetCreateForm = () => {
     setNewUnitName('');
     setNewUnitCode('');
@@ -100,11 +97,20 @@ export default function UnitsIndexPage() {
       return;
     }
     try {
+      const hasParent = newParentId !== PARENT_NONE && newParentId !== '';
+      const parentUnit = hasParent
+        ? units.find((u) => u.id === newParentId)
+        : undefined;
+      const timezone =
+        hasParent && parentUnit
+          ? parentUnit.timezone
+          : (units[0]?.timezone ?? 'UTC');
+
       await createUnitMutation.mutateAsync({
         name: newUnitName,
         code: newUnitCode,
         companyId,
-        timezone: defaultTimezone,
+        timezone,
         kind: newUnitKind,
         parentId:
           newParentId === PARENT_NONE || newParentId === '' ? null : newParentId
@@ -135,7 +141,7 @@ export default function UnitsIndexPage() {
         <PermissionGuard permissions={['UNIT_CREATE']}>
           <Button
             onClick={() => setCreateDialogOpen(true)}
-            disabled={!companyId && (isLoading || isFetchingCompanyMe)}
+            disabled={!companyId || isLoading || isFetchingCompanyMe}
           >
             <Plus className='mr-2 h-4 w-4' />
             {t('units.add')}
@@ -145,11 +151,7 @@ export default function UnitsIndexPage() {
 
       <div className='grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3'>
         {units.map((unit) => (
-          <Card
-            key={unit.id}
-            className='hover:bg-accent cursor-pointer transition-colors'
-            onClick={() => router.push(`/settings/units/${unit.id}`)}
-          >
+          <Card key={unit.id}>
             <CardHeader>
               <CardTitle>{unit.name}</CardTitle>
               <CardDescription>
@@ -161,8 +163,15 @@ export default function UnitsIndexPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button variant='outline' className='w-full'>
-                {t('general.view', { defaultValue: 'View Details' })}
+              <Button asChild variant='outline' className='w-full'>
+                <Link
+                  href={`/settings/units/${unit.id}`}
+                  aria-label={t('units.view_unit_settings_aria', {
+                    name: unit.name
+                  })}
+                >
+                  {t('general.view', { defaultValue: 'View Details' })}
+                </Link>
               </Button>
             </CardContent>
           </Card>

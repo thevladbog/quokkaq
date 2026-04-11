@@ -163,7 +163,7 @@ export default function SettingsSidebar() {
               {items.map((item) => {
                 const Icon = item.icon;
                 return (
-                  <SidebarMenuItem key={item.href + item.label}>
+                  <SidebarMenuItem key={item.href}>
                     <SidebarMenuButton asChild isActive={item.active}>
                       <Link href={item.href}>
                         <Icon />

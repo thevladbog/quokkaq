@@ -15,7 +15,7 @@
   },
   "scripts": {
     "prepare": "husky",
-    "precommit": "lint-staged && pnpm --dir apps/frontend exec prettier --check ."
+    "precommit": "lint-staged && pnpm --dir apps/frontend run format:check"
   },
   "private": true,
   "devDependencies": {

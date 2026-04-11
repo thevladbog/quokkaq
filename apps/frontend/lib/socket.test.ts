@@ -95,4 +95,35 @@ describe('SocketClient.disconnect', () => {
 
     expect(close).toHaveBeenCalledTimes(1);
   });
+
+  it('disconnect() returns early without throwing when socket was never connected', () => {
+    const client = new SocketClient();
+    expect(() => client.disconnect()).not.toThrow();
+  });
+
+  it.each([
+    { state: 'CLOSING', readyState: WebSocket.CLOSING },
+    { state: 'CLOSED', readyState: WebSocket.CLOSED }
+  ])(
+    'disconnect() does not call socket.close() when readyState is $state',
+    ({ readyState }) => {
+      const close = vi.fn();
+
+      installMockWebSocket(() => ({
+        readyState,
+        close,
+        onopen: null,
+        onmessage: null,
+        onerror: null,
+        onclose: null,
+        addEventListener: vi.fn()
+      }));
+
+      const client = new SocketClient();
+      client.connect('unit-edge');
+      client.disconnect();
+
+      expect(close).not.toHaveBeenCalled();
+    }
+  );
 });

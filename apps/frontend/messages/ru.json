@@ -68,6 +68,7 @@
       "name_placeholder": "Название подразделения",
       "code_placeholder": "UNIT-001",
       "no_units": "Подразделения не найдены.",
+      "view_unit_settings_aria": "Открыть настройки: {name}",
       "general_settings": "Общие настройки",
       "general_settings_description": "Управление общими настройками подразделения.",
       "unit_name": "Название подразделения",
@@ -86,6 +87,7 @@
       "kind": "Тип",
       "kind_subdivision": "Подразделение",
       "kind_service_zone": "Сервисная зона",
+      "kind_unknown": "Неизвестный тип ({kind})",
       "parent_service_zone": "Родительская зона",
       "parent_subdivision_or_zone": "Родитель (подразделение или сервисная зона)",
       "parent_none": "Нет (корень)",
@@ -105,6 +107,7 @@
       "add_child_subdivision": "Добавить вложенное подразделение",
       "add_child_service_zone": "Добавить сервисную зону",
       "no_children_under_zone": "Вложенных юнитов пока нет. Добавьте подразделение или сервисную зону — либо настройте стойки на этом юните выше.",
+      "children_load_error": "Не удалось загрузить дочерние юниты: {message}",
       "unit_name_code_required": "Укажите название и код.",
       "child_unit_actions": "Действия",
       "open_child_unit": "Открыть юнит",
@@ -139,6 +142,9 @@
       "assigned_to": "Назначено",
       "actions": "Действия",
       "no_counters": "Стойки не найдены. Создайте первую, чтобы начать.",
+      "list_load_error": "Не удалось загрузить стойки: {message}",
+      "edit_aria": "Редактировать «{name}»",
+      "delete_aria": "Удалить «{name}»",
       "edit": "Редактировать стойку",
       "delete_confirm_title": "Вы уверены?",
       "delete_confirm_desc": "Это действие нельзя отменить. Стойка «{name}» будет удалена безвозвратно.",
@@ -895,7 +901,8 @@
     "cancel": "Отмена",
     "confirm": "Подтвердить",
     "pre_registration": {
-      "badge": "Запись"
+      "badge": "Запись",
+      "show_details_aria": "Показать детали предварительной записи"
     },
     "dashboardUi": {
       "eyebrow": "Операции смены",
@@ -990,7 +997,6 @@
       },
       "snapshotTitle": "Сводка смены",
       "snapshotDescription": "Итоги дня (полные метрики после доработки отчётов)",
-      "snapshotCompletion": "Доля завершений",
       "snapshotPeakWait": "Пик ожидания (прибл.)",
       "snapshotFootfall": "Поток посетителей",
       "snapshotReportCta": "Сформировать отчёт за день",
@@ -998,7 +1004,7 @@
       "listQueueTitle": "Очередь",
       "listQueueDescription": "Все ожидающие талоны, сначала с наибольшим ожиданием",
       "listCountersTitle": "Рабочие места",
-      "listCountersDescription": "Стоски и принудительное освобождение",
+      "listCountersDescription": "Стойки и принудительное освобождение",
       "timelineTitle": "Лента очереди",
       "timelineDescription": "Талоны по времени выдачи (сначала новые)"
     }
@@ -1441,6 +1447,9 @@
       "preRegistrations": "Предварительная запись - Админ - QuokkaQ",
       "users": "Пользователи и роли - Админ - QuokkaQ",
       "desktopTerminals": "Десктоп-терминалы - Админ - QuokkaQ"
+    },
+    "settings": {
+      "title": "Настройки - QuokkaQ"
     },
     "staff": {
       "selection": "Панель сотрудника - QuokkaQ",
@@ -1955,5 +1964,8 @@
       "later": "Позже",
       "upgrade": "Обновить тариф"
     }
+  },
+  "SupervisorTicketListItem": {
+    "maxWaiting": "Макс.: {time}"
   }
 }

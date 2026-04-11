@@ -68,7 +68,12 @@ export function SubdivisionStationsAndZonesPanel({
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
 
-  const { data: children, isLoading } = useQuery({
+  const {
+    data: children,
+    isLoading,
+    isError,
+    error
+  } = useQuery({
     queryKey: childUnitsQueryKey(subdivisionId),
     queryFn: () => unitsApi.getChildUnits(subdivisionId)
   });
@@ -177,110 +182,124 @@ export function SubdivisionStationsAndZonesPanel({
             <p className='text-muted-foreground text-sm'>
               {t('loading', { defaultValue: 'Loading...' })}
             </p>
+          ) : isError ? (
+            <p className='text-destructive text-sm' role='alert'>
+              {t('children_load_error', {
+                message: formatApiToastErrorMessage(error, tCommon('error'))
+              })}
+            </p>
           ) : (
-            serviceZones.map((zone) => (
-              <section
-                key={zone.id}
-                className='bg-muted/25 space-y-4 rounded-lg border p-4'
-              >
-                <div className='flex flex-wrap items-start justify-between gap-3'>
-                  <div className='flex min-w-0 items-center gap-2'>
-                    <FolderOpen
-                      className='text-muted-foreground h-5 w-5 shrink-0'
-                      aria-hidden
-                    />
-                    <span className='truncate font-semibold'>{zone.name}</span>
-                    <Badge variant='secondary' className='shrink-0 text-xs'>
-                      {t('kind_service_zone')}
-                    </Badge>
-                  </div>
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    className='shrink-0'
-                    asChild
-                  >
-                    <Link href={`/settings/units/${zone.id}`}>
-                      <ExternalLink className='mr-2 h-4 w-4' />
-                      {t('open_service_zone_page')}
-                    </Link>
-                  </Button>
-                </div>
-                <UnitCountersSection
-                  unitId={zone.id}
-                  variant='embedded'
-                  hideEmbeddedHeading
-                />
-              </section>
-            ))
-          )}
-
-          <section className='space-y-4'>
-            <div className='flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between'>
-              <div>
-                <h3 className='text-base font-semibold'>
-                  {t('nested_subdivisions_section_title')}
-                </h3>
-                <p className='text-muted-foreground mt-1 max-w-2xl text-sm'>
-                  {t('nested_subdivisions_section_description')}
-                </p>
-              </div>
-              <PermissionGuard permissions={['UNIT_CREATE']}>
-                <Button
-                  size='sm'
-                  variant='outline'
-                  onClick={() => openDialog('subdivision')}
-                  className='shrink-0'
+            <>
+              {serviceZones.map((zone) => (
+                <section
+                  key={zone.id}
+                  className='bg-muted/25 space-y-4 rounded-lg border p-4'
                 >
-                  <Plus className='mr-2 h-4 w-4' />
-                  {t('add_child_subdivision')}
-                </Button>
-              </PermissionGuard>
-            </div>
-            {!isLoading && nestedSubdivisions.length === 0 ? (
-              <p className='text-muted-foreground text-sm'>
-                {t('no_nested_subdivisions')}
-              </p>
-            ) : !isLoading ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t('unit_name')}</TableHead>
-                    <TableHead>{t('code')}</TableHead>
-                    <TableHead>{t('kind_column')}</TableHead>
-                    <TableHead className='w-[200px]'>
-                      {t('child_unit_actions')}
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {nestedSubdivisions.map((u) => (
-                    <TableRow key={u.id}>
-                      <TableCell className='font-medium'>{u.name}</TableCell>
-                      <TableCell className='text-muted-foreground'>
-                        {u.code}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant='secondary' className='text-xs'>
-                          {kindLabel(u)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant='outline'
-                          size='sm'
-                          onClick={() => router.push(`/settings/units/${u.id}`)}
-                        >
-                          <ExternalLink className='mr-2 h-4 w-4' />
-                          {t('open_child_unit')}
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            ) : null}
-          </section>
+                  <div className='flex flex-wrap items-start justify-between gap-3'>
+                    <div className='flex min-w-0 items-center gap-2'>
+                      <FolderOpen
+                        className='text-muted-foreground h-5 w-5 shrink-0'
+                        aria-hidden
+                      />
+                      <span className='truncate font-semibold'>
+                        {zone.name}
+                      </span>
+                      <Badge variant='secondary' className='shrink-0 text-xs'>
+                        {t('kind_service_zone')}
+                      </Badge>
+                    </div>
+                    <Button
+                      variant='outline'
+                      size='sm'
+                      className='shrink-0'
+                      asChild
+                    >
+                      <Link href={`/settings/units/${zone.id}`}>
+                        <ExternalLink className='mr-2 h-4 w-4' />
+                        {t('open_service_zone_page')}
+                      </Link>
+                    </Button>
+                  </div>
+                  <UnitCountersSection
+                    unitId={zone.id}
+                    variant='embedded'
+                    hideEmbeddedHeading
+                  />
+                </section>
+              ))}
+
+              <section className='space-y-4'>
+                <div className='flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between'>
+                  <div>
+                    <h3 className='text-base font-semibold'>
+                      {t('nested_subdivisions_section_title')}
+                    </h3>
+                    <p className='text-muted-foreground mt-1 max-w-2xl text-sm'>
+                      {t('nested_subdivisions_section_description')}
+                    </p>
+                  </div>
+                  <PermissionGuard permissions={['UNIT_CREATE']}>
+                    <Button
+                      size='sm'
+                      variant='outline'
+                      onClick={() => openDialog('subdivision')}
+                      className='shrink-0'
+                    >
+                      <Plus className='mr-2 h-4 w-4' />
+                      {t('add_child_subdivision')}
+                    </Button>
+                  </PermissionGuard>
+                </div>
+                {nestedSubdivisions.length === 0 ? (
+                  <p className='text-muted-foreground text-sm'>
+                    {t('no_nested_subdivisions')}
+                  </p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>{t('unit_name')}</TableHead>
+                        <TableHead>{t('code')}</TableHead>
+                        <TableHead>{t('kind_column')}</TableHead>
+                        <TableHead className='w-[200px]'>
+                          {t('child_unit_actions')}
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {nestedSubdivisions.map((u) => (
+                        <TableRow key={u.id}>
+                          <TableCell className='font-medium'>
+                            {u.name}
+                          </TableCell>
+                          <TableCell className='text-muted-foreground'>
+                            {u.code}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant='secondary' className='text-xs'>
+                              {kindLabel(u)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant='outline'
+                              size='sm'
+                              onClick={() =>
+                                router.push(`/settings/units/${u.id}`)
+                              }
+                            >
+                              <ExternalLink className='mr-2 h-4 w-4' />
+                              {t('open_child_unit')}
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </section>
+            </>
+          )}
         </CardContent>
       </Card>
 

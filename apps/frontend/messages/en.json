@@ -68,6 +68,7 @@
       "name_placeholder": "Unit Name",
       "code_placeholder": "UNIT-001",
       "no_units": "No units found.",
+      "view_unit_settings_aria": "Open settings for {name}",
       "general_settings": "General Settings",
       "general_settings_description": "Manage general settings for this unit.",
       "unit_name": "Unit Name",
@@ -86,6 +87,7 @@
       "kind": "Type",
       "kind_subdivision": "Subdivision",
       "kind_service_zone": "Service zone",
+      "kind_unknown": "Unknown ({kind})",
       "parent_service_zone": "Parent zone",
       "parent_subdivision_or_zone": "Parent (subdivision or service zone)",
       "parent_none": "None (root)",
@@ -105,6 +107,7 @@
       "add_child_subdivision": "Add nested subdivision",
       "add_child_service_zone": "Add service zone",
       "no_children_under_zone": "No nested units yet. Add a subdivision or service zone — or manage stations on this unit above.",
+      "children_load_error": "Could not load child units: {message}",
       "unit_name_code_required": "Name and code are required.",
       "child_unit_actions": "Actions",
       "open_child_unit": "Open unit",
@@ -139,6 +142,9 @@
       "assigned_to": "Assigned To",
       "actions": "Actions",
       "no_counters": "No counters found. Create one to get started.",
+      "list_load_error": "Could not load stations: {message}",
+      "edit_aria": "Edit {name}",
+      "delete_aria": "Delete {name}",
       "edit": "Edit Counter",
       "delete_confirm_title": "Are you sure?",
       "delete_confirm_desc": "This action cannot be undone. This will permanently delete the counter \"{name}\".",
@@ -895,7 +901,8 @@
     "cancel": "Cancel",
     "confirm": "Confirm",
     "pre_registration": {
-      "badge": "PRE"
+      "badge": "PRE",
+      "show_details_aria": "Show pre-registration details"
     },
     "dashboardUi": {
       "eyebrow": "Shift operations",
@@ -990,7 +997,6 @@
       },
       "snapshotTitle": "Shift overview",
       "snapshotDescription": "Today's summary (full metrics when reporting is available)",
-      "snapshotCompletion": "Completion rate",
       "snapshotPeakWait": "Peak wait (approx.)",
       "snapshotFootfall": "Footfall",
       "snapshotReportCta": "Generate daily report",
@@ -1441,6 +1447,9 @@
       "preRegistrations": "Pre-registrations - Admin - QuokkaQ",
       "users": "Users & Roles - Admin - QuokkaQ",
       "desktopTerminals": "Desktop terminals - Admin - QuokkaQ"
+    },
+    "settings": {
+      "title": "Settings - QuokkaQ"
     },
     "staff": {
       "selection": "Staff Panel - QuokkaQ",
@@ -1955,5 +1964,8 @@
       "later": "Later",
       "upgrade": "Upgrade Plan"
     }
+  },
+  "SupervisorTicketListItem": {
+    "maxWaiting": "Max: {time}"
   }
 }

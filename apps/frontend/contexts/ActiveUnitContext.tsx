@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode
@@ -83,4 +84,15 @@ export function useActiveUnit(): ActiveUnitContextValue {
     throw new Error('useActiveUnit must be used within ActiveUnitProvider');
   }
   return ctx;
+}
+
+/** When the route unit is assignable, align the sidebar / persisted active unit with it. */
+export function useSyncActiveUnit(unitId: string): void {
+  const { setActiveUnitId, assignableUnitIds } = useActiveUnit();
+
+  useEffect(() => {
+    if (assignableUnitIds.includes(unitId)) {
+      setActiveUnitId(unitId);
+    }
+  }, [unitId, assignableUnitIds, setActiveUnitId]);
 }

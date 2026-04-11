@@ -23,7 +23,7 @@ function invoiceAllowsPdfDownload(status: string): boolean {
 interface InvoiceListProps {
   invoices: Invoice[];
   onDownload?: (invoice: Invoice) => void;
-  /** Locale-prefixed path without trailing slash, e.g. `/settings/organization/billing/invoices` */
+  /** Path without locale prefix and without leading slash, e.g. `settings/organization/billing/invoices` */
   detailBasePath?: string;
 }
 

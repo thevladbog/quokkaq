@@ -191,10 +191,7 @@ func (h *CounterHandler) Release(w http.ResponseWriter, r *http.Request) {
 // @Router       /counters/{id}/force-release [post]
 func (h *CounterHandler) ForceRelease(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	var actor *string
-	if uid, ok := middleware.GetUserIDFromContext(r.Context()); ok && uid != "" {
-		actor = &uid
-	}
+	actor := getActorFromRequest(r)
 	counter, ticket, err := h.service.ForceRelease(id, actor)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -224,10 +221,7 @@ func (h *CounterHandler) CallNext(w http.ResponseWriter, r *http.Request) {
 	// Parse optional body for specific service filtering (if needed later)
 	// For now, just call next.
 
-	var actor *string
-	if uid, ok := middleware.GetUserIDFromContext(r.Context()); ok && uid != "" {
-		actor = &uid
-	}
+	actor := getActorFromRequest(r)
 	ticket, err := h.service.CallNext(id, nil, actor)
 	if err != nil {
 		// If error is "record not found" type, return 404 or 200 with message?

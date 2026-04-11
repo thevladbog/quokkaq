@@ -145,7 +145,9 @@ func ensureUnit(companyID string) (models.Unit, error) {
 	err := database.DB.Where(models.Unit{Code: seedUnitCode}).First(&u).Error
 	if err == nil {
 		if u.Kind == "workplace" || u.Kind == "" {
-			_ = database.DB.Model(&u).Update("kind", models.UnitKindSubdivision).Error
+			if err := database.DB.Model(&u).Update("kind", models.UnitKindSubdivision).Error; err != nil {
+				return u, err
+			}
 			u.Kind = models.UnitKindSubdivision
 		}
 		return u, nil

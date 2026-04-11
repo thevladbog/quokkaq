@@ -37,7 +37,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { useTicketTimer } from '@/lib/ticket-timer';
 import { PreRegistrationDetailsModal } from '@/components/staff/PreRegistrationDetailsModal';
-import { useActiveUnit } from '@/contexts/ActiveUnitContext';
+import { useSyncActiveUnit } from '@/contexts/ActiveUnitContext';
 
 interface StaffWorkspacePageProps {
   params: Promise<{
@@ -53,13 +53,7 @@ export default function StaffWorkspacePage({
   const { unitId, counterId, locale } = use(params);
   const t = useTranslations('staff');
   const router = useRouter();
-  const { setActiveUnitId, assignableUnitIds } = useActiveUnit();
-
-  useEffect(() => {
-    if (assignableUnitIds.includes(unitId)) {
-      setActiveUnitId(unitId);
-    }
-  }, [unitId, assignableUnitIds, setActiveUnitId]);
+  useSyncActiveUnit(unitId);
   const [inProgressTicketId, setInProgressTicketId] = useState<string | null>(
     null
   );

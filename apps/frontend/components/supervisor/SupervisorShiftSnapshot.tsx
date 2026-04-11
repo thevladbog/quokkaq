@@ -1,5 +1,6 @@
 'use client';
 
+import { useId } from 'react';
 import {
   Card,
   CardContent,
@@ -30,6 +31,7 @@ export function SupervisorShiftSnapshot({
   statsLoading: boolean;
 }) {
   const t = useTranslations('supervisor.dashboardUi');
+  const reportCtaId = useId();
 
   return (
     <Card className='bg-primary text-primary-foreground border-primary'>
@@ -44,10 +46,10 @@ export function SupervisorShiftSnapshot({
       <CardContent className='space-y-3 text-sm'>
         <div className='border-primary-foreground/20 flex justify-between border-b py-2'>
           <span className='text-primary-foreground/90'>
-            {t('snapshotCompletion')}
+            {t('kpiTotalWaiting')}
           </span>
           <span className='font-semibold tabular-nums'>
-            {statsLoading ? '…' : '—'}
+            {statsLoading ? '…' : (stats?.queueLength ?? 0)}
           </span>
         </div>
         <div className='border-primary-foreground/20 flex justify-between border-b py-2'>
@@ -75,12 +77,24 @@ export function SupervisorShiftSnapshot({
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <span className='w-full'>
+              <span
+                tabIndex={0}
+                aria-labelledby={reportCtaId}
+                className='focus-visible:ring-ring/50 inline-flex w-full rounded-md outline-none focus-visible:ring-[3px]'
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                  }
+                }}
+              >
                 <Button
+                  id={reportCtaId}
                   variant='secondary'
-                  className='w-full'
-                  disabled
                   type='button'
+                  className='pointer-events-none w-full opacity-50'
+                  aria-disabled
+                  tabIndex={-1}
+                  onClick={(e) => e.preventDefault()}
                 >
                   {t('snapshotReportCta')}
                 </Button>

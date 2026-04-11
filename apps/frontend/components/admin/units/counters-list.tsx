@@ -30,6 +30,7 @@ import {
   DialogFooter
 } from '@/components/ui/dialog';
 import { countersApi, Counter } from '@/lib/api';
+import { formatApiToastErrorMessage } from '@/lib/format-api-toast-error';
 import { CounterDialog } from './counter-dialog';
 import { cn } from '@/lib/utils';
 
@@ -53,13 +54,19 @@ export function UnitCountersSection({
   className
 }: UnitCountersSectionProps) {
   const t = useTranslations('admin.counters');
+  const tCommon = useTranslations('common');
   const tGeneral = useTranslations('general');
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCounter, setEditingCounter] = useState<Counter | null>(null);
   const [deletingCounter, setDeletingCounter] = useState<Counter | null>(null);
 
-  const { data: counters, isLoading } = useQuery({
+  const {
+    data: counters,
+    isLoading,
+    isError,
+    error
+  } = useQuery({
     queryKey: ['counters', unitId],
     queryFn: () => countersApi.getByUnitId(unitId)
   });
@@ -103,17 +110,38 @@ export function UnitCountersSection({
     </Button>
   );
 
+  const countersTableHeader = (
+    <TableHeader>
+      <TableRow>
+        <TableHead>{t('name')}</TableHead>
+        <TableHead>{t('assigned_to')}</TableHead>
+        <TableHead className='w-[100px]'>{t('actions')}</TableHead>
+      </TableRow>
+    </TableHeader>
+  );
+
   const tablePart = isLoading ? (
     <div>{tGeneral('loading', { defaultValue: 'Loading...' })}</div>
+  ) : isError ? (
+    <Table>
+      {countersTableHeader}
+      <TableBody>
+        <TableRow>
+          <TableCell
+            colSpan={3}
+            className='text-destructive text-center text-sm'
+            role='alert'
+          >
+            {t('list_load_error', {
+              message: formatApiToastErrorMessage(error, tCommon('error'))
+            })}
+          </TableCell>
+        </TableRow>
+      </TableBody>
+    </Table>
   ) : (
     <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>{t('name')}</TableHead>
-          <TableHead>{t('assigned_to')}</TableHead>
-          <TableHead className='w-[100px]'>{t('actions')}</TableHead>
-        </TableRow>
-      </TableHeader>
+      {countersTableHeader}
       <TableBody>
         {counters?.length === 0 ? (
           <TableRow>
@@ -134,17 +162,19 @@ export function UnitCountersSection({
                   <Button
                     variant='ghost'
                     size='icon'
+                    aria-label={t('edit_aria', { name: counter.name })}
                     onClick={() => handleEdit(counter)}
                   >
-                    <Pencil className='h-4 w-4' />
+                    <Pencil className='h-4 w-4' aria-hidden />
                   </Button>
                   <Button
                     variant='ghost'
                     size='icon'
                     className='text-destructive hover:text-destructive'
+                    aria-label={t('delete_aria', { name: counter.name })}
                     onClick={() => handleDelete(counter)}
                   >
-                    <Trash2 className='h-4 w-4' />
+                    <Trash2 className='h-4 w-4' aria-hidden />
                   </Button>
                 </div>
               </TableCell>

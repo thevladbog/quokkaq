@@ -2,11 +2,15 @@ package services
 
 import (
 	"errors"
+	"log"
 	"time"
 
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/ticketaudit"
+	"quokkaq-go-backend/pkg/database"
+
+	"gorm.io/gorm"
 )
 
 type CounterService interface {
@@ -146,9 +150,6 @@ func (s *counterService) ForceRelease(counterID string, actorUserID *string) (*m
 		now := time.Now()
 		activeTicket.Status = "completed"
 		activeTicket.CompletedAt = &now
-		if err := s.ticketRepo.Update(activeTicket); err != nil {
-			return nil, nil, err
-		}
 		payload := map[string]interface{}{
 			"unit_id":     activeTicket.UnitID,
 			"service_id":  activeTicket.ServiceID,
@@ -157,8 +158,23 @@ func (s *counterService) ForceRelease(counterID string, actorUserID *string) (*m
 			"to_status":   "completed",
 			"reason":      "force_release",
 		}
-		if err := s.writeTicketHistory(activeTicket.ID, actorUserID, ticketaudit.ActionTicketStatusChanged, payload); err != nil {
-			return nil, nil, err
+		txErr := database.DB.Transaction(func(tx *gorm.DB) error {
+			if err := s.ticketRepo.UpdateTx(tx, activeTicket); err != nil {
+				return err
+			}
+			h, err := ticketaudit.NewHistory(
+				activeTicket.ID,
+				ticketaudit.ActionTicketStatusChanged,
+				actorUserID,
+				payload,
+			)
+			if err != nil {
+				return err
+			}
+			return s.ticketRepo.CreateTicketHistoryTx(tx, h)
+		})
+		if txErr != nil {
+			return nil, nil, txErr
 		}
 	}
 
@@ -202,7 +218,12 @@ func (s *counterService) CallNext(counterID string, serviceID *string, actorUser
 		"source":      "counter_call_next",
 	}
 	if err := s.writeTicketHistory(ticket.ID, actorUserID, ticketaudit.ActionTicketCalled, payload); err != nil {
-		return nil, err
+		log.Printf(
+			"counter_service.CallNext: ticket history write failed (ticket_id=%s action=%s): %v",
+			ticket.ID,
+			ticketaudit.ActionTicketCalled,
+			err,
+		)
 	}
 
 	return ticket, nil

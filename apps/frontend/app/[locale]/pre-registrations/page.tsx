@@ -15,33 +15,34 @@ import { useRouter } from '@/src/i18n/navigation';
 import { Loader2 } from 'lucide-react';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useActiveUnit } from '@/contexts/ActiveUnitContext';
-import { unitsApi } from '@/lib/api';
+import { unitsApi, type Unit } from '@/lib/api';
 
 export default function PreRegistrationsIndexPage() {
-  const { user, isLoading: authLoading } = useAuthContext();
+  const { isLoading: authLoading } = useAuthContext();
   const { assignableUnitIds } = useActiveUnit();
   const t = useTranslations('admin');
   const router = useRouter();
 
   const queries = useQueries({
     queries: assignableUnitIds.map((id) => ({
-      queryKey: ['unit', id] as const,
+      queryKey: ['units', id] as const,
       queryFn: () => unitsApi.getById(id),
       enabled: assignableUnitIds.length > 0 && !authLoading
     }))
   });
 
-  const units = useMemo(
-    () =>
-      queries
-        .map((q, i) =>
-          q.data ? { ...q.data, assignmentId: assignableUnitIds[i] } : null
-        )
-        .filter(Boolean) as Array<
-        NonNullable<(typeof queries)[0]['data']> & { assignmentId: string }
-      >,
-    [queries, assignableUnitIds]
-  );
+  const unitQueriesFingerprint = queries.map((q) => q.dataUpdatedAt).join('|');
+
+  const units = useMemo(() => {
+    return queries
+      .map((q, i) =>
+        q.data ? { ...q.data, assignmentId: assignableUnitIds[i] } : null
+      )
+      .filter(Boolean) as Array<Unit & { assignmentId: string }>;
+    // queries is a new array each render from useQueries; dataUpdatedAt fingerprint
+    // changes when any unit payload updates so we do not list `queries` here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- see above
+  }, [assignableUnitIds, unitQueriesFingerprint]);
 
   const unitsLoading =
     authLoading ||
@@ -62,7 +63,7 @@ export default function PreRegistrationsIndexPage() {
     );
   }
 
-  if (!user?.units?.length) {
+  if (!assignableUnitIds?.length) {
     return (
       <div className='container mx-auto p-4'>
         <h1 className='mb-6 text-3xl font-bold'>

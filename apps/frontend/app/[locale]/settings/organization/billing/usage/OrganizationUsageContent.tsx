@@ -5,7 +5,7 @@ import { UsageMetrics } from '@/components/billing/UsageMetrics';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Download, TrendingUp } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/src/i18n/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useMemo } from 'react';
 import { formatAppDate, intlLocaleFromAppLocale } from '@/lib/format-datetime';

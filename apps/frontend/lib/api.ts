@@ -1003,20 +1003,23 @@ export const countersApi = {
     )
 };
 
-export type ShiftActivityItem = {
-  id: string;
-  ticketId: string;
-  queueNumber: string;
-  action: string;
-  userId?: string | null;
-  payload?: Record<string, unknown> | null;
-  createdAt: string;
-};
+export const ShiftActivityItemSchema = z.object({
+  id: z.string(),
+  ticketId: z.string(),
+  queueNumber: z.string(),
+  action: z.string(),
+  userId: z.string().nullish(),
+  payload: z.record(z.string(), z.unknown()).nullish(),
+  createdAt: z.string()
+});
 
-export type ShiftActivityResponse = {
-  items: ShiftActivityItem[];
-  nextCursor?: string;
-};
+export const ShiftActivityResponseSchema = z.object({
+  items: z.array(ShiftActivityItemSchema),
+  nextCursor: z.string().nullish()
+});
+
+export type ShiftActivityItem = z.infer<typeof ShiftActivityItemSchema>;
+export type ShiftActivityResponse = z.infer<typeof ShiftActivityResponseSchema>;
 
 // Shift API functions
 export const shiftApi = {
@@ -1058,7 +1061,11 @@ export const shiftApi = {
       qs.length > 0
         ? `/units/${unitId}/shift/activity?${qs}`
         : `/units/${unitId}/shift/activity`;
-    return apiRequest<ShiftActivityResponse>(path, {});
+    return apiRequest<ShiftActivityResponse>(
+      path,
+      {},
+      ShiftActivityResponseSchema
+    );
   },
 
   forceReleaseCounter: (counterId: string) =>

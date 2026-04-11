@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useEffect, useState } from 'react';
+import { use, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Plus } from 'lucide-react';
@@ -16,7 +16,7 @@ import { unitsApi, PreRegistration } from '@/lib/api';
 import { PreRegistrationTable } from '@/components/pre-registration/PreRegistrationTable';
 import { PreRegistrationForm } from '@/components/pre-registration/PreRegistrationForm';
 import { useRouter } from '@/src/i18n/navigation';
-import { useActiveUnit } from '@/contexts/ActiveUnitContext';
+import { useSyncActiveUnit } from '@/contexts/ActiveUnitContext';
 
 interface UnitPreRegistrationsPageProps {
   params: Promise<{
@@ -32,13 +32,7 @@ export default function UnitPreRegistrationsPage({
   const router = useRouter();
   const t = useTranslations('admin.pre_registrations');
   const tCommon = useTranslations('common');
-  const { setActiveUnitId, assignableUnitIds } = useActiveUnit();
-
-  useEffect(() => {
-    if (assignableUnitIds.includes(unitId)) {
-      setActiveUnitId(unitId);
-    }
-  }, [unitId, assignableUnitIds, setActiveUnitId]);
+  useSyncActiveUnit(unitId);
 
   const { data: unit } = useQuery({
     queryKey: ['unit', unitId],
