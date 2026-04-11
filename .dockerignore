@@ -16,6 +16,7 @@ tmp/
 # Testing
 coverage/
 .nyc_output/
+apps/frontend/testplane-report/
 
 # Environment files
 .env*.local

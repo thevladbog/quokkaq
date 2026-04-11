@@ -12,6 +12,10 @@
 
 # testing
 /coverage
+# Testplane: HTML report and caches (generated). Visual baselines: e2e/screens/ — commit, do not add here.
+/testplane-report
+/testplane
+/.testplane
 
 # next.js
 /.next/

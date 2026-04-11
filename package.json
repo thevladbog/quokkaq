@@ -4,7 +4,9 @@
   "license": "UNLICENSED",
   "scripts": {
     "prepare": "husky",
-    "precommit": "lint-staged && pnpm nx run frontend:format:check"
+    "precommit": "lint-staged && pnpm --dir apps/frontend exec prettier --check .",
+    "e2e:docker": "docker compose --profile e2e -f apps/backend/docker-compose.yml run --rm e2e",
+    "e2e:docker:update-refs": "E2E_UPDATE_REFS=1 docker compose --profile e2e -f apps/backend/docker-compose.yml run --rm e2e"
   },
   "private": true,
   "devDependencies": {

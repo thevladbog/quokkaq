@@ -59,7 +59,7 @@ pnpm install
 
 The `prepare` script installs **Git hooks** (Husky). The pre-commit hook runs **`pnpm run precommit`**, which runs **lint-staged** on staged files only, then the full frontend Prettier check:
 
-- **`apps/frontend`**: `eslint --fix` and Prettier on staged files, then `pnpm nx run frontend:format:check` (entire `apps/frontend` tree)
+- **`apps/frontend`**: `eslint --fix` and Prettier on staged files, then `pnpm --dir apps/frontend exec prettier --check .` (entire `apps/frontend` tree; avoids invoking the Nx CLI, which can fail with some Node/pnpm installs)
 - **`apps/backend`**: `gofmt -s -w`
 - **`packages/shared-types`**, **`kiosk-lib`**, **`ui-kit`**: Prettier (uses `apps/frontend/.prettierrc.json`)
 
@@ -350,9 +350,45 @@ cd apps/backend
 go test ./...
 ```
 
-### E2E Tests
+### E2E Tests (Testplane)
 
-(To be added)
+Полный стек: API и инфраструктура через Docker Compose в [`apps/backend`](apps/backend), фронт — production-сервер Next на порту **3000**, браузерные сценарии в [`apps/frontend/e2e/`](apps/frontend/e2e/). Файлы спеков именуются с префиксом **`NN-`** (например `05-…`, `10-…`, `30-…`), чтобы Testplane запускал сценарии в предсказуемом порядке; в [`.testplane.conf.js`](apps/frontend/.testplane.conf.js) для Chrome задано **`testsPerSession: 1`**, чтобы между тестами не протекала сессия браузера.
+
+**Рекомендуемый способ (Linux + Chromium в Docker)** — одинаковая среда с CI и эталонами визуальных тестов (`assertView`):
+
+1. Поднять стек: из `apps/backend` выполнить `docker compose up -d --build` (postgres, redis, minio, `backend`). Для контейнера API в [`docker-compose.yml`](apps/backend/docker-compose.yml) задан `JWT_SECRET` по умолчанию; при необходимости переопределите через переменную окружения.
+2. Засидировать демо-данные (один раз на чистую БД): из `apps/backend` с `DATABASE_URL=postgresql://postgres:postgres@localhost:5432/quokkaq` выполнить `go run ./cmd/seed-simple`. Учётная запись для логина: **admin@quokkaq.com** / **admin123**.
+3. Запустить E2E в сервисе **`e2e`** (профиль `e2e`, образ с Node 22 и закреплённым Chromium; внутри контейнера `NEXT_PUBLIC_*` указывают на `http://backend:3001` / `ws://backend:3001`):
+
+```bash
+# из корня репозитория
+pnpm run e2e:docker
+# или
+pnpm nx run frontend:e2e:docker
+```
+
+Обновить **визуальные эталоны** (после осознанного изменения UI; только в этом окружении):
+
+```bash
+pnpm run e2e:docker:update-refs
+# или
+pnpm nx run frontend:e2e:docker:update-refs
+```
+
+В контейнере E2E заданы **`HUSKY=0`** и **`CI=true`**, чтобы `pnpm install` не трогал git-hooks. Файл [`apps/frontend/e2e/run-e2e.sh`](apps/frontend/e2e/run-e2e.sh) должен быть исполняемым: при первом добавлении в репозиторий удобно `git add --chmod=+x apps/frontend/e2e/run-e2e.sh`.
+
+Скриншоты эталонов лежат в [`apps/frontend/e2e/screens/`](apps/frontend/e2e/screens/) (каталог задаётся `screenshotsDir` в [`.testplane.conf.js`](apps/frontend/.testplane.conf.js)). **Не** обновляйте их прогоном Testplane на голом macOS, если в репозитории эталоны сняты в Docker/Linux — будет расхождение пикселей.
+
+**Локально без Docker** (только если осознанно, например отладка): переменные как для разработки — `NEXT_PUBLIC_API_URL=http://localhost:3001`, `NEXT_PUBLIC_WS_URL=ws://localhost:3001` (см. [`apps/frontend/env.local`](apps/frontend/env.local)). На macOS в [`.testplane.conf.js`](apps/frontend/.testplane.conf.js) по умолчанию подставляется путь к Google Chrome; иначе задайте **`CHROME_BIN`**.
+
+```bash
+pnpm nx run frontend:build
+pnpm nx run frontend:e2e
+```
+
+В headless-режиме: `pnpm nx run frontend:e2e:ci` (или `CI=true`).
+
+**Отчёт:** после прогона может появиться каталог `apps/frontend/testplane-report` (в репозиторий не коммитится). При падении job **Frontend E2E** в GitHub Actions отчёт прикладывается как артефакт `testplane-report`.
 
 ## Deployment
 

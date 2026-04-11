@@ -1,6 +1,6 @@
 # Backend Dockerfile for Nx monorepo
 # Build stage
-FROM golang:1.23-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 # Install build dependencies
 RUN apk add --no-cache git ca-certificates tzdata
@@ -40,9 +40,8 @@ WORKDIR /app
 # Copy artifacts from builder
 COPY --from=builder /build/quokkaq-backend .
 
-# Copy static assets if they exist
-COPY --from=builder /build/docs ./docs 2>/dev/null || true
-COPY --from=builder /build/*.svg . 2>/dev/null || true
+# Copy bundled docs (swagger, etc.)
+COPY --from=builder /build/docs ./docs
 
 # Change ownership to non-root user
 RUN chown -R appuser:appuser /app

@@ -46,7 +46,10 @@ export default function LoginPage() {
 
   return (
     <div className='bg-background relative flex min-h-screen items-center justify-center overflow-hidden p-4'>
-      <Card className='relative z-10 w-full max-w-md'>
+      <Card
+        className='relative z-10 w-full max-w-md'
+        data-testid='e2e-login-card'
+      >
         <div className='mb-6 flex justify-center'>
           <div className='relative h-48 w-48'>
             <Image
