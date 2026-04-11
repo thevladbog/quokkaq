@@ -31,12 +31,16 @@ export default function SystemStatusGuard({
         const isSetupPage = pathname.includes('/setup');
 
         if (!isInitialized && !isSetupPage) {
-          router.push('/setup');
-        } else if (isInitialized && isSetupPage) {
-          router.push('/login');
-        } else {
+          void router.push('/setup');
           setLoading(false);
+          return;
         }
+        if (isInitialized && isSetupPage) {
+          void router.push('/login');
+          setLoading(false);
+          return;
+        }
+        setLoading(false);
       } catch (error) {
         console.error('Failed to check system status:', error);
         setLoading(false);
