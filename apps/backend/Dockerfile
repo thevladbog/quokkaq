@@ -17,12 +17,12 @@ RUN go mod download
 # Copy source code
 COPY apps/backend/ ./
 
-# Build the application
+# Build the application (package ./cmd/api so health.go and other files in the package are included)
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
     -ldflags='-w -s -extldflags "-static"' \
     -a \
     -o quokkaq-backend \
-    cmd/api/main.go
+    ./cmd/api
 
 # Final stage
 FROM alpine:latest
