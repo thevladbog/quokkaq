@@ -54,6 +54,44 @@
         "command": "prettier --write .",
         "cwd": "apps/frontend"
       }
+    },
+    "e2e": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build"],
+      "options": {
+        "command": "pnpm run e2e",
+        "cwd": "apps/frontend"
+      }
+    },
+    "e2e:ci": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build"],
+      "options": {
+        "command": "pnpm run e2e:ci",
+        "cwd": "apps/frontend"
+      }
+    },
+    "e2e:update-refs": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build"],
+      "options": {
+        "command": "pnpm run e2e:update-refs",
+        "cwd": "apps/frontend"
+      }
+    },
+    "e2e:docker": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm run e2e:docker",
+        "cwd": "apps/frontend"
+      }
+    },
+    "e2e:docker:update-refs": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm run e2e:docker:update-refs",
+        "cwd": "apps/frontend"
+      }
     }
   }
 }

@@ -2,6 +2,8 @@
 node_modules
 .pnp
 .pnp.js
+# pnpm content-addressable store when store-dir is inside the repo (can be 10k+ binary blobs)
+.pnpm-store/
 
 # Nx
 .nx/cache
@@ -9,6 +11,9 @@ node_modules
 
 # Testing
 coverage
+# Frontend Testplane HTML report: ignored in apps/frontend/.gitignore (testplane-report).
+# Chrome for Testing (e.g. @puppeteer/browsers install to repo root)
+/chrome/
 *.lcov
 .nyc_output
 

@@ -1,0 +1,27 @@
+---
+description: Frontend E2E (Testplane), визуальные тесты assertView и эталонные скриншоты (QuokkaQ)
+globs: apps/frontend/**
+alwaysApply: false
+---
+
+# E2E и скриншоты (`apps/frontend`)
+
+## Когда добавлять тесты
+
+- **Меняется поведение или контракт UI** (формы, навигация после действия, локали) — дополни или добавь сценарий в [`e2e/*.testplane.ts`](apps/frontend/e2e/). Имена файлов с префиксом порядка: `05-`, `10-`, `20-`, `30-` и т.д.
+- **Юнит-логика без браузера** — по возможности покрывай существующими **Vitest**-тестами там, где в проекте уже принят этот слой.
+
+## Визуальные регрессии (скриншоты)
+
+- Для **стабильных блоков интерфейса** (карточка, панель без тяжёлой динамики) используй **`assertView`** в Testplane: снимай **узкую область** (элемент с `data-testid`), не весь viewport без необходимости.
+- **Эталоны** лежат в [`e2e/screens/`](apps/frontend/e2e/screens/) (`screenshotsDir` в [`.testplane.conf.js`](apps/frontend/.testplane.conf.js)); файлы **коммитятся** в git.
+- Обновлять эталоны только в **Linux-образе E2E** (тот же Chromium, что в CI): из корня `pnpm run e2e:docker:update-refs` или `pnpm nx run frontend:e2e:docker:update-refs` при поднятом `docker compose` в `apps/backend`. Не переснимай рефы на «голом» macOS-Chrome, если в репозитории эталоны для Docker/Linux.
+
+## Конфиг и среда
+
+- Конфиг Testplane: [`.testplane.conf.js`](apps/frontend/.testplane.conf.js) (`testsPerSession: 1`, headless в CI).
+- Docker-сервис **`e2e`** (профиль `e2e`) в [`apps/backend/docker-compose.yml`](apps/backend/docker-compose.yml); подробности в [SETUP.md](SETUP.md) (раздел E2E).
+
+## Типы и линт
+
+- Глобалы тестов: [`e2e/testplane-env.d.ts`](apps/frontend/e2e/testplane-env.d.ts). Спеки в `e2e/` исключены из Next `tsconfig`, но **lintятся** ESLint по [`eslint.config.mjs`](apps/frontend/eslint.config.mjs).

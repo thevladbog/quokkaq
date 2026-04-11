@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -52,6 +53,18 @@ func Connect() {
 	fmt.Println("Database connected successfully")
 }
 
+// Ping checks connectivity to PostgreSQL using the GORM pool (*sql.DB).
+func Ping(ctx context.Context) error {
+	if DB == nil {
+		return fmt.Errorf("database not initialized")
+	}
+	sqlDB, err := DB.DB()
+	if err != nil {
+		return err
+	}
+	return sqlDB.PingContext(ctx)
+}
+
 // AutoMigrate runs auto-migrations for the given models
 // This is kept for backward compatibility but should be replaced with versioned migrations
 func AutoMigrate(models ...interface{}) {
@@ -65,10 +78,10 @@ func AutoMigrate(models ...interface{}) {
 // RunVersionedMigrations initializes migration tracking and runs all migrations
 func RunVersionedMigrations(models ...interface{}) error {
 	fmt.Println("Initializing migration system...")
-	
+
 	// Create migration manager
 	manager := NewMigrationManager(DB)
-	
+
 	// Initialize migration tracking table
 	if err := manager.Initialize(); err != nil {
 		return fmt.Errorf("failed to initialize migration tracking: %w", err)
@@ -78,7 +91,7 @@ func RunVersionedMigrations(models ...interface{}) error {
 	err := manager.RunMigration("v1.0.0_core_tables", func(db *gorm.DB) error {
 		return db.AutoMigrate(models...)
 	})
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to run core tables migration: %w", err)
 	}

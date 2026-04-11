@@ -27,7 +27,8 @@
 ## Локальная разработка
 
 - `npm install` / `npm run dev` — порт **3000**.
-- Pull request: GitHub Actions — [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (ESLint, Prettier, Vitest, `next build`).
+- Pull request: GitHub Actions — [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) (ESLint, Prettier, Vitest, `next build`; при затронутом frontend/backend — E2E Testplane).
+- Браузерные E2E: Testplane, спеки в [`e2e/`](e2e/), конфиг [`.testplane.conf.js`](.testplane.conf.js); эталоны `assertView` в `e2e/screens/`. Основной прогон и обновление референсов — **Docker** (`pnpm run e2e:docker`, см. [SETUP.md](../../SETUP.md#e2e-tests-testplane)).
 - Полный стек БД/Redis/MinIO/API: `docker compose` в `quokkaq-go-backend`.
 
 ## Деплой

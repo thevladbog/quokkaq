@@ -2,6 +2,7 @@
  .next
  .husky
  coverage
+ testplane-report
  .prettierignore
  .stylelintignore
  .eslintignore

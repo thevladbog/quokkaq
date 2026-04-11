@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # PostgreSQL Database
   postgres:
@@ -99,8 +97,9 @@ services:
   # QuokkaQ Backend API
   backend:
     build:
-      context: .
-      dockerfile: Dockerfile
+      # Monorepo root (Dockerfile expects COPY apps/backend/...)
+      context: ../..
+      dockerfile: apps/backend/Dockerfile
     container_name: quokkaq-backend
     restart: unless-stopped
     ports:
@@ -109,6 +108,7 @@ services:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/quokkaq
       PORT: 3001
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
+      JWT_SECRET: ${JWT_SECRET:-e2e-dev-jwt-secret-change-in-production}
       # Fail closed: tenant "admin" must not use /platform APIs unless you opt in.
       # Safe default for docker-compose; for local convenience set PLATFORM_ALLOW_TENANT_ADMIN=true in your shell or .env (never in production).
       PLATFORM_ALLOW_TENANT_ADMIN: ${PLATFORM_ALLOW_TENANT_ADMIN:-false}
@@ -122,16 +122,18 @@ services:
       # URLs in JSON must be reachable from the host browser (not http://minio:9000).
       AWS_PUBLIC_ENDPOINT: ${AWS_PUBLIC_ENDPOINT:-http://localhost:9000}
 
-      # SMTP Configuration (from .env)
-      SMTP_HOST: ${SMTP_HOST}
-      SMTP_PORT: ${SMTP_PORT}
-      SMTP_USER: ${SMTP_USER}
-      SMTP_PASS: ${SMTP_PASS}
-      SMTP_FROM: ${SMTP_FROM}
+      # SMTP (optional; empty defaults avoid Compose "variable is not set" warnings in CI)
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
       SMTP_SECURE: ${SMTP_SECURE:-false}
       
-      # Redis Configuration
+      # Redis Configuration (jobs worker/client use REDIS_HOST/REDIS_PORT, not REDIS_URL)
       REDIS_URL: redis://redis:6379/0
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
     depends_on:
       postgres:
         condition: service_healthy
@@ -144,11 +146,60 @@ services:
     networks:
       - quokkaq-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/"]
-      interval: 30s
+      # Use GET (-O /dev/null), not wget --spider: spider sends HEAD and chi only registers GET on / → 405 → unhealthy.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "--tries=1", "http://127.0.0.1:3001/health/ready"]
+      interval: 15s
       timeout: 10s
-      retries: 3
-      start_period: 40s
+      retries: 8
+      start_period: 120s
+
+  # One-shot seed so E2E sees an initialized system (SystemStatusGuard otherwise redirects /login → /setup).
+  e2e-seed:
+    profiles:
+      - e2e
+    build:
+      context: ../..
+      dockerfile: apps/backend/Dockerfile
+    container_name: quokkaq-e2e-seed
+    restart: "no"
+    entrypoint: ["/app/seed-simple"]
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/quokkaq
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - quokkaq-network
+
+  # Frontend E2E (Testplane): same Linux+Chromium stack locally and in CI. Not started by plain `docker compose up`.
+  e2e:
+    profiles:
+      - e2e
+    build:
+      context: ../..
+      dockerfile: apps/frontend/e2e/Dockerfile
+    container_name: quokkaq-e2e
+    networks:
+      - quokkaq-network
+    depends_on:
+      backend:
+        condition: service_healthy
+      e2e-seed:
+        condition: service_completed_successfully
+    working_dir: /workspace
+    volumes:
+      - ../..:/workspace
+    environment:
+      HUSKY: "0"
+      CI: "true"
+      CHROME_BIN: /usr/bin/chromium
+      # Server-side proxy (route.ts); avoids build-time inlining issues for /api → Go API in Docker.
+      API_UPSTREAM_URL: http://backend:3001
+      NEXT_PUBLIC_API_URL: http://backend:3001
+      NEXT_PUBLIC_WS_URL: ws://backend:3001
+      E2E_BASE_URL: http://127.0.0.1:3000
+      E2E_UPDATE_REFS: ${E2E_UPDATE_REFS:-0}
+    entrypoint: ["/workspace/apps/frontend/e2e/run-e2e.sh"]
 
 networks:
   quokkaq-network:

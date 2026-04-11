@@ -54,7 +54,7 @@ export default function AdminPage() {
             <CardDescription>{t('units.description')}</CardDescription>
           </CardHeader>
           <CardContent>
-            <Table>
+            <Table data-testid='e2e-admin-units-table'>
               <TableHeader>
                 <TableRow>
                   <TableHead>{t('units.code')}</TableHead>

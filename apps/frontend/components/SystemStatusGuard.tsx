@@ -14,10 +14,12 @@ export default function SystemStatusGuard({
 
   useEffect(() => {
     const checkStatus = async () => {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 15000);
       try {
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/system/status`
-        );
+        // Same-origin /api/* is proxied by app/api/[[...path]]/route.ts. Avoids browser
+        // cross-origin fetches to backend:3001 in Docker E2E (Chromium local-network / CORS issues).
+        const res = await fetch('/api/system/status', { signal: ctrl.signal });
         if (!res.ok) {
           // If status check fails, assume initialized to avoid locking out,
           // or handle error appropriately. For now, just proceed.
@@ -29,15 +31,21 @@ export default function SystemStatusGuard({
         const isSetupPage = pathname.includes('/setup');
 
         if (!isInitialized && !isSetupPage) {
-          router.push('/setup');
-        } else if (isInitialized && isSetupPage) {
-          router.push('/login');
-        } else {
+          void router.push('/setup');
           setLoading(false);
+          return;
         }
+        if (isInitialized && isSetupPage) {
+          void router.push('/login');
+          setLoading(false);
+          return;
+        }
+        setLoading(false);
       } catch (error) {
         console.error('Failed to check system status:', error);
         setLoading(false);
+      } finally {
+        clearTimeout(t);
       }
     };
 

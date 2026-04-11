@@ -5,9 +5,12 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
 
+/** Server-side only (not inlined at build). Prefer in Docker so proxy always reaches the API container. */
 function upstreamBase(): string {
   const raw =
-    process.env.NEXT_PUBLIC_API_URL?.trim() || 'http://localhost:3001';
+    process.env.API_UPSTREAM_URL?.trim() ||
+    process.env.NEXT_PUBLIC_API_URL?.trim() ||
+    'http://127.0.0.1:3001';
   return raw.replace(/\/+$/, '');
 }
 
@@ -40,7 +43,13 @@ async function proxy(req: NextRequest, ctx: RouteCtx): Promise<Response> {
     init.duplex = 'half';
   }
 
-  return fetch(target, init);
+  const ac = new AbortController();
+  const kill = setTimeout(() => ac.abort(), 25_000);
+  try {
+    return await fetch(target, { ...init, signal: ac.signal });
+  } finally {
+    clearTimeout(kill);
+  }
 }
 
 function toNextResponse(res: Response): NextResponse {

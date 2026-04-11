@@ -1273,6 +1273,81 @@
                 }
             }
         },
+        "/health/live": {
+            "get": {
+                "description": "Returns 200 if the HTTP server accepts requests. Does not check databases or Redis.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Liveness probe",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "head": {
+                "description": "Same as GET /health/live without a response body.",
+                "tags": [
+                    "health"
+                ],
+                "summary": "Liveness probe (HEAD)",
+                "responses": {}
+            }
+        },
+        "/health/ready": {
+            "get": {
+                "description": "Returns 200 if PostgreSQL is reachable via the connection pool; otherwise 503.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Readiness probe",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "head": {
+                "description": "Same checks as GET /health/ready without a response body.",
+                "tags": [
+                    "health"
+                ],
+                "summary": "Readiness probe (HEAD)",
+                "responses": {
+                    "503": {
+                        "description": "Database unreachable"
+                    }
+                }
+            }
+        },
         "/invitations": {
             "get": {
                 "description": "Retrieves all invitations",
