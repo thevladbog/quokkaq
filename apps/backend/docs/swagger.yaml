@@ -2182,18 +2182,9 @@ paths:
       tags:
       - health
     head:
-      description: Returns 200 if the HTTP server accepts requests. Does not check
-        databases or Redis.
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Liveness probe
+      description: Same as GET /health/live without a response body.
+      responses: {}
+      summary: Liveness probe (HEAD)
       tags:
       - health
   /health/ready:
@@ -2219,24 +2210,11 @@ paths:
       tags:
       - health
     head:
-      description: Returns 200 if PostgreSQL is reachable via the connection pool;
-        otherwise 503.
-      produces:
-      - application/json
+      description: Same checks as GET /health/ready without a response body.
       responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
         "503":
-          description: Service Unavailable
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Readiness probe
+          description: Database unreachable
+      summary: Readiness probe (HEAD)
       tags:
       - health
   /invitations:

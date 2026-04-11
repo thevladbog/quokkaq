@@ -1296,25 +1296,12 @@
                 }
             },
             "head": {
-                "description": "Returns 200 if the HTTP server accepts requests. Does not check databases or Redis.",
-                "produces": [
-                    "application/json"
-                ],
+                "description": "Same as GET /health/live without a response body.",
                 "tags": [
                     "health"
                 ],
-                "summary": "Liveness probe",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
+                "summary": "Liveness probe (HEAD)",
+                "responses": {}
             }
         },
         "/health/ready": {
@@ -1349,32 +1336,14 @@
                 }
             },
             "head": {
-                "description": "Returns 200 if PostgreSQL is reachable via the connection pool; otherwise 503.",
-                "produces": [
-                    "application/json"
-                ],
+                "description": "Same checks as GET /health/ready without a response body.",
                 "tags": [
                     "health"
                 ],
-                "summary": "Readiness probe",
+                "summary": "Readiness probe (HEAD)",
                 "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
                     "503": {
-                        "description": "Service Unavailable",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
+                        "description": "Database unreachable"
                     }
                 }
             }
