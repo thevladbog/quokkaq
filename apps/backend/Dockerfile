@@ -52,9 +52,9 @@ USER appuser
 # Expose port
 EXPOSE 3001
 
-# Health check (GET / — wget --spider uses HEAD and chi returns 405 for /)
+# Liveness only (readiness with DB is overridden in docker-compose where needed)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget -q -O /dev/null --tries=1 http://127.0.0.1:3001/ || exit 1
+    CMD wget -q -O /dev/null --tries=1 http://127.0.0.1:3001/health/live || exit 1
 
 # Run the application
 CMD ["./quokkaq-backend"]

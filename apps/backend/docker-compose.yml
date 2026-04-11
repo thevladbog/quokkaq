@@ -147,7 +147,7 @@ services:
       - quokkaq-network
     healthcheck:
       # Use GET (-O /dev/null), not wget --spider: spider sends HEAD and chi only registers GET on / → 405 → unhealthy.
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "--tries=1", "http://127.0.0.1:3001/"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "--tries=1", "http://127.0.0.1:3001/health/ready"]
       interval: 15s
       timeout: 10s
       retries: 8

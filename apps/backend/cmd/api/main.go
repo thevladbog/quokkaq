@@ -232,6 +232,11 @@ func main() {
 		MaxAge:           300,
 	}))
 
+	r.Get("/health/live", healthLive)
+	r.Head("/health/live", healthLive)
+	r.Get("/health/ready", healthReady)
+	r.Head("/health/ready", healthReady)
+
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		if _, err := w.Write([]byte("Hello from QuokkaQ Go Backend!")); err != nil {
 			fmt.Printf("Error writing response: %v\n", err)

@@ -2165,6 +2165,80 @@ paths:
       summary: Release counter
       tags:
       - counters
+  /health/live:
+    get:
+      description: Returns 200 if the HTTP server accepts requests. Does not check
+        databases or Redis.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Liveness probe
+      tags:
+      - health
+    head:
+      description: Returns 200 if the HTTP server accepts requests. Does not check
+        databases or Redis.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Liveness probe
+      tags:
+      - health
+  /health/ready:
+    get:
+      description: Returns 200 if PostgreSQL is reachable via the connection pool;
+        otherwise 503.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Readiness probe
+      tags:
+      - health
+    head:
+      description: Returns 200 if PostgreSQL is reachable via the connection pool;
+        otherwise 503.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Readiness probe
+      tags:
+      - health
   /invitations:
     get:
       description: Retrieves all invitations
