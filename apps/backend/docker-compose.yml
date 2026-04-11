@@ -146,8 +146,8 @@ services:
     networks:
       - quokkaq-network
     healthcheck:
-      # 127.0.0.1 avoids rare localhost/IPv6 quirks; long start_period for first-run migrations on slow CI
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3001/"]
+      # Use GET (-O /dev/null), not wget --spider: spider sends HEAD and chi only registers GET on / → 405 → unhealthy.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "--tries=1", "http://127.0.0.1:3001/"]
       interval: 15s
       timeout: 10s
       retries: 8
