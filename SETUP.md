@@ -352,43 +352,43 @@ go test ./...
 
 ### E2E Tests (Testplane)
 
-Полный стек: API и инфраструктура через Docker Compose в [`apps/backend`](apps/backend), фронт — production-сервер Next на порту **3000**, браузерные сценарии в [`apps/frontend/e2e/`](apps/frontend/e2e/). Файлы спеков именуются с префиксом **`NN-`** (например `05-…`, `10-…`, `30-…`), чтобы Testplane запускал сценарии в предсказуемом порядке; в [`.testplane.conf.js`](apps/frontend/.testplane.conf.js) для Chrome задано **`testsPerSession: 1`**, чтобы между тестами не протекала сессия браузера.
+Full stack: API and dependencies via Docker Compose in [`apps/backend`](apps/backend), the frontend is the production Next.js server on port **3000**, and browser specs live in [`apps/frontend/e2e/`](apps/frontend/e2e/). Spec files use an **`NN-` prefix** (for example `05-…`, `10-…`, `30-…`) so Testplane runs them in a predictable order. In [`.testplane.conf.js`](apps/frontend/.testplane.conf.js), Chrome uses **`testsPerSession: 1`** so browser state does not leak between tests.
 
-**Рекомендуемый способ (Linux + Chromium в Docker)** — одинаковая среда с CI и эталонами визуальных тестов (`assertView`):
+**Recommended path (Linux + Chromium in Docker)** — same environment as CI and for visual baselines (`assertView`):
 
-1. Поднять стек: из `apps/backend` выполнить `docker compose up -d --build` (postgres, redis, minio, `backend`). Для контейнера API в [`docker-compose.yml`](apps/backend/docker-compose.yml) задан `JWT_SECRET` по умолчанию; при необходимости переопределите через переменную окружения.
-2. Засидировать демо-данные (один раз на чистую БД): из `apps/backend` с `DATABASE_URL=postgresql://postgres:postgres@localhost:5432/quokkaq` выполнить `go run ./cmd/seed-simple`. Учётная запись для логина: **admin@quokkaq.com** / **admin123**.
-3. Запустить E2E в сервисе **`e2e`** (профиль `e2e`, образ с Node 22 и закреплённым Chromium; внутри контейнера `NEXT_PUBLIC_*` указывают на `http://backend:3001` / `ws://backend:3001`):
+1. Start the stack: from `apps/backend` run `docker compose up -d --build` (postgres, redis, minio, `backend`). The API container in [`docker-compose.yml`](apps/backend/docker-compose.yml) has a default `JWT_SECRET`; override with an environment variable if needed.
+2. Seed demo data (once per clean database): from `apps/backend` with `DATABASE_URL=postgresql://postgres:postgres@localhost:5432/quokkaq` run `go run ./cmd/seed-simple`. Login for the flow: **admin@quokkaq.com** / **admin123**.
+3. Run E2E in the **`e2e`** service (profile `e2e`, image with Node 22 and a pinned Chromium; inside the container `NEXT_PUBLIC_API_URL` / `NEXT_PUBLIC_WS_URL` point at `http://backend:3001` and `ws://backend:3001`):
 
 ```bash
-# из корня репозитория
+# from the monorepo root
 pnpm run e2e:docker
-# или
+# or
 pnpm nx run frontend:e2e:docker
 ```
 
-Обновить **визуальные эталоны** (после осознанного изменения UI; только в этом окружении):
+To refresh **visual baselines** after an intentional UI change (only in this environment):
 
 ```bash
 pnpm run e2e:docker:update-refs
-# или
+# or
 pnpm nx run frontend:e2e:docker:update-refs
 ```
 
-В контейнере E2E заданы **`HUSKY=0`** и **`CI=true`**, чтобы `pnpm install` не трогал git-hooks. Файл [`apps/frontend/e2e/run-e2e.sh`](apps/frontend/e2e/run-e2e.sh) должен быть исполняемым: при первом добавлении в репозиторий удобно `git add --chmod=+x apps/frontend/e2e/run-e2e.sh`.
+The E2E container sets **`HUSKY=0`** and **`CI=true`** so `pnpm install` does not run git hooks. [`apps/frontend/e2e/run-e2e.sh`](apps/frontend/e2e/run-e2e.sh) must be executable: on first add, `git add --chmod=+x apps/frontend/e2e/run-e2e.sh` is convenient.
 
-Скриншоты эталонов лежат в [`apps/frontend/e2e/screens/`](apps/frontend/e2e/screens/) (каталог задаётся `screenshotsDir` в [`.testplane.conf.js`](apps/frontend/.testplane.conf.js)). **Не** обновляйте их прогоном Testplane на голом macOS, если в репозитории эталоны сняты в Docker/Linux — будет расхождение пикселей.
+Baseline screenshots live under [`apps/frontend/e2e/screens/`](apps/frontend/e2e/screens/) (`screenshotsDir` in [`.testplane.conf.js`](apps/frontend/.testplane.conf.js)). **Do not** refresh them by running Testplane on bare macOS Chrome if the repo baselines were captured in Docker/Linux — pixel drift will fail the comparison.
 
-**Локально без Docker** (только если осознанно, например отладка): переменные как для разработки — `NEXT_PUBLIC_API_URL=http://localhost:3001`, `NEXT_PUBLIC_WS_URL=ws://localhost:3001` (см. [`apps/frontend/env.local`](apps/frontend/env.local)). На macOS в [`.testplane.conf.js`](apps/frontend/.testplane.conf.js) по умолчанию подставляется путь к Google Chrome; иначе задайте **`CHROME_BIN`**.
+**Local without Docker** (only when you mean to, e.g. debugging): use the same variables as normal dev — `NEXT_PUBLIC_API_URL=http://localhost:3001`, `NEXT_PUBLIC_WS_URL=ws://localhost:3001` (see [`apps/frontend/env.local`](apps/frontend/env.local)). On macOS, [`.testplane.conf.js`](apps/frontend/.testplane.conf.js) defaults to a typical Google Chrome path; set **`CHROME_BIN`** if needed.
 
 ```bash
 pnpm nx run frontend:build
 pnpm nx run frontend:e2e
 ```
 
-В headless-режиме: `pnpm nx run frontend:e2e:ci` (или `CI=true`).
+Headless: `pnpm nx run frontend:e2e:ci` (or `CI=true`).
 
-**Отчёт:** после прогона может появиться каталог `apps/frontend/testplane-report` (в репозиторий не коммитится). При падении job **Frontend E2E** в GitHub Actions отчёт прикладывается как артефакт `testplane-report`.
+**Report:** a run may create `apps/frontend/testplane-report` (not committed). If the **Frontend E2E** GitHub Actions job fails, that folder is uploaded as the `testplane-report` artifact.
 
 ## Deployment
 

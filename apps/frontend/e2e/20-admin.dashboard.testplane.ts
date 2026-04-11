@@ -11,8 +11,9 @@ describe('Admin dashboard (E2E)', () => {
       wait: 20000
     });
 
-    const body = await browser.$('body');
-    await expect(body).toHaveTextContaining('MAIN');
-    await expect(body).toHaveTextContaining('Main Office');
+    const unitsTable = await browser.$('[data-testid="e2e-admin-units-table"]');
+    await expect(unitsTable).toBeDisplayed({ wait: 20000 });
+    await expect(unitsTable).toHaveTextContaining('MAIN');
+    await expect(unitsTable).toHaveTextContaining('Main Office');
   });
 });

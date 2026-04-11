@@ -1,6 +1,21 @@
 'use strict';
 
-const isCI = Boolean(process.env.CI);
+/** True only for explicit CI truthy values (GitHub Actions sets `CI=true`). */
+function isTruthyCi(value) {
+  if (value == null || value === '') {
+    return false;
+  }
+  const v = String(value).trim().toLowerCase();
+  if (v === 'false' || v === '0' || v === 'no' || v === 'off') {
+    return false;
+  }
+  if (v === 'true' || v === '1' || v === 'yes' || v === 'on') {
+    return true;
+  }
+  return false;
+}
+
+const isCI = isTruthyCi(process.env.CI);
 
 const chromeArgs = isCI
   ? [

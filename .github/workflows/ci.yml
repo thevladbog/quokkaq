@@ -154,7 +154,7 @@ jobs:
       NX_BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}
       NX_HEAD: ${{ github.sha }}
       CI: 'true'
-      JWT_SECRET: e2e-ci-jwt-secret
+      # JWT signing key: use docker-compose default (JWT_SECRET in apps/backend/docker-compose.yml), not a repo-specific secret.
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/quokkaq
       NEXT_PUBLIC_API_URL: http://localhost:3001
       NEXT_PUBLIC_WS_URL: ws://localhost:3001

@@ -1,14 +1,22 @@
+import type { Browser } from '@testplane/webdriverio';
+
+export type LoginLocale = 'en' | 'ru';
+
 /**
  * Full login against seeded `seed-simple` admin (admin@quokkaq.com / admin123).
  */
-export async function loginAsSeededAdmin(browser: {
-  url: (path: string) => Promise<void>;
-  $: (selector: string) => Promise<{
-    setValue: (v: string) => Promise<void>;
-    click: () => Promise<void>;
-  }>;
-}): Promise<void> {
-  await browser.url('/en/login');
+export async function loginAsSeededAdmin(
+  browser: Browser,
+  options?: { locale?: LoginLocale }
+): Promise<void> {
+  const locale = options?.locale ?? 'en';
+  await browser.url(`/${locale}/login`);
+
+  if (locale === 'ru') {
+    const body = await browser.$('body');
+    await expect(body).toHaveTextContaining('Вход');
+  }
+
   const email = await browser.$('#email');
   const password = await browser.$('#password');
   await email.setValue('admin@quokkaq.com');
