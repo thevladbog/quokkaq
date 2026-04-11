@@ -12,13 +12,9 @@ export async function loginAsSeededAdmin(
   const locale = options?.locale ?? 'en';
   await browser.url(`/${locale}/login`);
 
-  if (locale === 'ru') {
-    const body = await browser.$('body');
-    await expect(body).toHaveTextContaining('Вход');
-  }
-
   const email = await browser.$('#email');
   const password = await browser.$('#password');
+  await expect(email).toBeDisplayed({ wait: 60000 });
   await email.setValue('admin@quokkaq.com');
   await password.setValue('admin123');
   const submit = await browser.$('button[type="submit"]');

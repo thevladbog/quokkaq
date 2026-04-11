@@ -12,9 +12,9 @@
     "lint:fix": "eslint --fix",
     "format:fix": "prettier --write .",
     "format:check": "prettier --check .",
-    "e2e": "start-server-and-test 'cross-env HOSTNAME=0.0.0.0 node .next/standalone/apps/frontend/server.js' http://127.0.0.1:3000 'pnpm exec testplane'",
+    "e2e": "start-server-and-test 'pnpm exec next start --hostname 0.0.0.0 --port 3000' http://127.0.0.1:3000 'pnpm exec testplane'",
     "e2e:ci": "cross-env CI=true pnpm run e2e",
-    "e2e:update-refs": "start-server-and-test 'cross-env HOSTNAME=0.0.0.0 node .next/standalone/apps/frontend/server.js' http://127.0.0.1:3000 'pnpm exec testplane --update-refs'",
+    "e2e:update-refs": "start-server-and-test 'pnpm exec next start --hostname 0.0.0.0 --port 3000' http://127.0.0.1:3000 'pnpm exec testplane --update-refs'",
     "e2e:ci:update-refs": "cross-env CI=true pnpm run e2e:update-refs",
     "e2e:docker": "docker compose --profile e2e -f ../backend/docker-compose.yml run --rm e2e",
     "e2e:docker:update-refs": "cross-env E2E_UPDATE_REFS=1 docker compose --profile e2e -f ../backend/docker-compose.yml run --rm e2e"
