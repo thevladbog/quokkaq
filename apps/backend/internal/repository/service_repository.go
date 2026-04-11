@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"errors"
+
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/pkg/database"
 
@@ -39,6 +41,9 @@ func (r *serviceRepository) FindByID(id string) (*models.Service, error) {
 }
 
 func (r *serviceRepository) FindByIDTx(tx *gorm.DB, id string) (*models.Service, error) {
+	if tx == nil {
+		return nil, errors.New("nil tx provided to FindByIDTx")
+	}
 	var service models.Service
 	err := tx.First(&service, "id = ?", id).Error
 	if err != nil {

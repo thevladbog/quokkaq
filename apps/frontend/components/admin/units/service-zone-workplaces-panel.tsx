@@ -168,9 +168,7 @@ export function ServiceZoneWorkplacesPanel({
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <p className='text-muted-foreground text-sm'>
-              {t('loading', { defaultValue: 'Loading...' })}
-            </p>
+            <p className='text-muted-foreground text-sm'>{t('loading')}</p>
           ) : isError ? (
             <p className='text-destructive text-sm' role='alert'>
               {t('children_load_error', {
@@ -273,7 +271,7 @@ export function ServiceZoneWorkplacesPanel({
               disabled={createUnitMutation.isPending}
             >
               {createUnitMutation.isPending
-                ? t('saving', { defaultValue: 'Saving...' })
+                ? t('saving')
                 : createKind === 'subdivision'
                   ? t('create_subdivision_submit')
                   : t('create_service_zone_submit')}

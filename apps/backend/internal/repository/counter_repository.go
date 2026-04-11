@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"errors"
+
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/pkg/database"
 
@@ -54,6 +56,9 @@ func (r *counterRepository) FindByUserID(userID string) (*models.Counter, error)
 }
 
 func (r *counterRepository) FindByUserIDTx(tx *gorm.DB, userID string) (*models.Counter, error) {
+	if tx == nil {
+		return nil, errors.New("nil tx provided to FindByUserIDTx")
+	}
 	var counter models.Counter
 	err := tx.First(&counter, "assigned_to = ?", userID).Error
 	if err != nil {

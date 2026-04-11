@@ -54,6 +54,8 @@ type TicketRepository interface {
 	MarkAsEODTicketIDsTx(tx *gorm.DB, ticketIDs []string) (int64, error)
 	// CountEODTicketSplitTx counts tickets already marked end-of-day (is_eod=true), split into waiting vs non-waiting status, for EOD messaging.
 	CountEODTicketSplitTx(tx *gorm.DB, unitID string) (waiting int64, nonWaiting int64, err error)
+	// CountEODTicketSplitByIDsTx counts by status among the given ticket IDs (e.g. the batch marked EOD in this transaction).
+	CountEODTicketSplitByIDsTx(tx *gorm.DB, ticketIDs []string) (waiting int64, nonWaiting int64, err error)
 	ResetSequencesTx(tx *gorm.DB, unitID, date string) error
 
 	// ListTicketHistoryByUnitID returns recent history for tickets belonging to the unit (keyset pagination).
@@ -290,6 +292,23 @@ func (r *ticketRepository) CountEODTicketSplitTx(tx *gorm.DB, unitID string) (wa
 	}
 	if err = tx.Model(&models.Ticket{}).
 		Where("unit_id = ? AND is_eod = ? AND status <> ?", unitID, true, "waiting").
+		Count(&nonWaiting).Error; err != nil {
+		return 0, 0, err
+	}
+	return waiting, nonWaiting, nil
+}
+
+func (r *ticketRepository) CountEODTicketSplitByIDsTx(tx *gorm.DB, ticketIDs []string) (waiting int64, nonWaiting int64, err error) {
+	if len(ticketIDs) == 0 {
+		return 0, 0, nil
+	}
+	if err = tx.Model(&models.Ticket{}).
+		Where("id IN ? AND status = ?", ticketIDs, "waiting").
+		Count(&waiting).Error; err != nil {
+		return 0, 0, err
+	}
+	if err = tx.Model(&models.Ticket{}).
+		Where("id IN ? AND status <> ?", ticketIDs, "waiting").
 		Count(&nonWaiting).Error; err != nil {
 		return 0, 0, err
 	}

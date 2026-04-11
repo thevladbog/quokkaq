@@ -531,7 +531,7 @@
     "selectUnitNoUnits": "No units assigned to your account.",
     "directory": {
       "pageTitle": "Workstation directory",
-      "pageSubtitle": "Pick a counter to open the staff queue for that station.",
+      "pageSubtitle": "Pick a workstation to open the staff queue for that station.",
       "zonesTitle": "Service zones",
       "allZones": "All zones",
       "statusTitle": "Status",

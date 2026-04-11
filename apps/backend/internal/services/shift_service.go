@@ -231,15 +231,15 @@ func (s *shiftService) ExecuteEndOfDay(ctx context.Context, unitID string, userI
 
 	err := database.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var err error
-		waitingTicketsNoShow, activeTicketsClosed, err = s.ticketRepo.CountEODTicketSplitTx(tx, unitID)
-		if err != nil {
-			return err
-		}
 		eodIDs, err := s.ticketRepo.AppendEODFlaggedHistoryForUnitTx(tx, unitID, userID)
 		if err != nil {
 			return fmt.Errorf("end of day: ticket history: %w", err)
 		}
 		ticketsMarked, err = s.ticketRepo.MarkAsEODTicketIDsTx(tx, eodIDs)
+		if err != nil {
+			return err
+		}
+		waitingTicketsNoShow, activeTicketsClosed, err = s.ticketRepo.CountEODTicketSplitByIDsTx(tx, eodIDs)
 		if err != nil {
 			return err
 		}

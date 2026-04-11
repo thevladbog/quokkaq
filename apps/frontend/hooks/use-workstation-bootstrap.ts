@@ -14,6 +14,9 @@ import {
 import { logger } from '@/lib/logger';
 import { useRouter } from '@/src/i18n/navigation';
 
+/** Max parent hops when resolving unit hierarchy (ancestors + zone walk). */
+const MAX_ANCESTOR_DEPTH = 20;
+
 export type WorkstationRow = {
   counter: Counter;
   workplaceUnit: Unit;
@@ -61,7 +64,7 @@ function resolveZone(
 ): { zoneFilterKey: string; zoneLabel: string } {
   let current: Unit | undefined = workplaceUnit;
   let steps = 0;
-  while (current && steps < 20) {
+  while (current && steps < MAX_ANCESTOR_DEPTH) {
     steps += 1;
     if (current.kind === 'service_zone') {
       return { zoneFilterKey: `sz:${current.id}`, zoneLabel: current.name };
