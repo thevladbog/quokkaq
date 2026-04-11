@@ -37,7 +37,7 @@ type ShiftActivityItem struct {
 	QueueNumber string          `json:"queueNumber"`
 	Action      string          `json:"action"`
 	UserID      *string         `json:"userId,omitempty"`
-	Payload     json.RawMessage `json:"payload,omitempty"`
+	Payload     json.RawMessage `json:"payload,omitempty" swaggertype:"object"`
 	CreatedAt   time.Time       `json:"createdAt"`
 }
 

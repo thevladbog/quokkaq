@@ -4413,6 +4413,24 @@ const docTemplate = `{
                             "type": "string"
                         }
                     },
+                    "404": {
+                        "description": "Parent unit not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict (cross-company parent or cycle)",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "413": {
+                        "description": "Request body too large",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -4563,6 +4581,104 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "No waiting tickets",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/units/{unitId}/child-units": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns all direct child units (subdivision or service_zone kinds). Returns an empty array if the parent unit kind cannot have children.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "units"
+                ],
+                "summary": "List direct child units",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Parent unit ID (subdivision or service zone)",
+                        "name": "unitId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.Unit"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unit not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/units/{unitId}/child-workplaces": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns direct child units with kind subdivision (legacy path name \"child-workplaces\"). Returns an empty array if the parent unit kind cannot have children.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "units"
+                ],
+                "summary": "List child subdivision units",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Parent unit ID (subdivision or service zone)",
+                        "name": "unitId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.Unit"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unit not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "type": "string"
                         }
@@ -5147,16 +5263,79 @@ const docTemplate = `{
                 }
             }
         },
-        "/units/{unitId}/shift/counters": {
+        "/units/{unitId}/shift/activity": {
             "get": {
-                "description": "Retrieves counters for shift view",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Paginated ticket history rows for tickets belonging to the unit (supervisor dashboard / journal). Limit is capped at 100.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "shift"
                 ],
-                "summary": "Get shift counters",
+                "summary": "Shift ticket activity feed",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Unit ID",
+                        "name": "unitId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (default 20, max 100)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Opaque keyset pagination cursor",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/services.ShiftActivityResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/units/{unitId}/shift/counters": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns stations (counters) for the unit with occupancy flag and optional active ticket for the supervisor shift view.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "shift"
+                ],
+                "summary": "List counters for shift dashboard",
                 "parameters": [
                     {
                         "type": "string",
@@ -5172,7 +5351,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/models.Counter"
+                                "$ref": "#/definitions/services.ShiftCounterDTO"
                             }
                         }
                     },
@@ -8301,6 +8480,72 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "services.ShiftActivityItem": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "payload": {
+                    "type": "object"
+                },
+                "queueNumber": {
+                    "type": "string"
+                },
+                "ticketId": {
+                    "type": "string"
+                },
+                "userId": {
+                    "type": "string"
+                }
+            }
+        },
+        "services.ShiftActivityResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/services.ShiftActivityItem"
+                    }
+                },
+                "nextCursor": {
+                    "type": "string"
+                }
+            }
+        },
+        "services.ShiftCounterDTO": {
+            "type": "object",
+            "properties": {
+                "activeTicket": {
+                    "$ref": "#/definitions/models.Ticket"
+                },
+                "assignedTo": {
+                    "type": "string"
+                },
+                "assignedUser": {
+                    "$ref": "#/definitions/models.User"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "isOccupied": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "unitId": {
                     "type": "string"
                 }
             }

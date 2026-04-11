@@ -58,12 +58,13 @@ func (h *ShiftHandler) GetQueueTickets(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetShiftCounters godoc
-// @Summary      Get shift counters
-// @Description  Retrieves counters for shift view
+// @Summary      List counters for shift dashboard
+// @Description  Returns stations (counters) for the unit with occupancy flag and optional active ticket for the supervisor shift view.
 // @Tags         shift
 // @Produce      json
+// @Security     BearerAuth
 // @Param        unitId path      string  true  "Unit ID"
-// @Success      200    {array}   models.Counter
+// @Success      200    {array}   services.ShiftCounterDTO
 // @Failure      500    {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/shift/counters [get]
 func (h *ShiftHandler) GetShiftCounters(w http.ResponseWriter, r *http.Request) {
@@ -78,12 +79,13 @@ func (h *ShiftHandler) GetShiftCounters(w http.ResponseWriter, r *http.Request) 
 
 // GetShiftActivity godoc
 // @Summary      Shift ticket activity feed
-// @Description  Paginated ticket_histories for tickets in the unit (supervisor dashboard)
+// @Description  Paginated ticket history rows for tickets belonging to the unit (supervisor dashboard / journal). Limit is capped at 100.
 // @Tags         shift
 // @Produce      json
+// @Security     BearerAuth
 // @Param        unitId path      string  true  "Unit ID"
 // @Param        limit  query     int     false "Page size (default 20, max 100)"
-// @Param        cursor query     string  false "Opaque pagination cursor"
+// @Param        cursor query     string  false "Opaque keyset pagination cursor"
 // @Success      200    {object}  services.ShiftActivityResponse
 // @Failure      400    {string}  string "Bad Request"
 // @Failure      500    {string}  string "Internal Server Error"
