@@ -251,6 +251,7 @@ export function ServiceZoneWorkplacesPanel({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder={t('name_placeholder')}
+                autoFocus
               />
             </div>
             <div className='space-y-2'>

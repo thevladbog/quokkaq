@@ -11,6 +11,7 @@ type ServiceRepository interface {
 	Create(service *models.Service) error
 	FindAllByUnit(unitID string) ([]models.Service, error)
 	FindByID(id string) (*models.Service, error)
+	FindByIDTx(tx *gorm.DB, id string) (*models.Service, error)
 	Update(service *models.Service) error
 	Delete(id string) error
 }
@@ -34,8 +35,12 @@ func (r *serviceRepository) FindAllByUnit(unitID string) ([]models.Service, erro
 }
 
 func (r *serviceRepository) FindByID(id string) (*models.Service, error) {
+	return r.FindByIDTx(r.db, id)
+}
+
+func (r *serviceRepository) FindByIDTx(tx *gorm.DB, id string) (*models.Service, error) {
 	var service models.Service
-	err := r.db.First(&service, "id = ?", id).Error
+	err := tx.First(&service, "id = ?", id).Error
 	if err != nil {
 		return nil, err
 	}

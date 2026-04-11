@@ -130,7 +130,17 @@ export function useWorkstationBootstrap({
     queryKey: ['staff-workstation-bootstrap', userId, seedUnitIds] as const,
     queryFn: () => fetchWorkstationBootstrap(userId!, seedUnitIds),
     enabled,
-    retry: false
+    retry(failureCount, error) {
+      if (failureCount >= 2) return false;
+      if (
+        error instanceof ApiHttpError &&
+        error.status >= 400 &&
+        error.status < 500
+      ) {
+        return false;
+      }
+      return true;
+    }
   });
 
   useEffect(() => {

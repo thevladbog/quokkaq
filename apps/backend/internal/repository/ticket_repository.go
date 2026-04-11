@@ -29,18 +29,21 @@ type TicketRepository interface {
 	CreateTx(tx *gorm.DB, ticket *models.Ticket) error
 	CreateTicketHistory(history *models.TicketHistory) error
 	CreateTicketHistoryTx(tx *gorm.DB, history *models.TicketHistory) error
-	// AppendEODFlaggedHistoryForUnitTx inserts ticket.eod_flagged rows for all tickets in the unit that are not yet EOD. Call before MarkAsEODTx.
-	AppendEODFlaggedHistoryForUnitTx(tx *gorm.DB, unitID string, actorUserID *string) error
+	// AppendEODFlaggedHistoryForUnitTx inserts ticket.eod_flagged rows for tickets locked by the snapshot (same IDs must be passed to MarkAsEODTicketIDsTx).
+	AppendEODFlaggedHistoryForUnitTx(tx *gorm.DB, unitID string, actorUserID *string) ([]string, error)
 	FindAll() ([]models.Ticket, error)
 	FindByID(id string) (*models.Ticket, error)
+	FindByIDForUpdateTx(tx *gorm.DB, id string) (*models.Ticket, error)
 	FindByUnitID(unitID string) ([]models.Ticket, error)
 	FindWaiting(unitID string, serviceID *string) (*models.Ticket, error)
+	FindWaitingForUpdateTx(tx *gorm.DB, unitID string, serviceID *string) (*models.Ticket, error)
 	Update(ticket *models.Ticket) error
 	UpdateTx(tx *gorm.DB, ticket *models.Ticket) error
 	Delete(id string) error
 
 	// Sequence related
 	GetNextSequence(unitID, serviceID, date string) (int, error)
+	GetNextSequenceTx(tx *gorm.DB, unitID, serviceID, date string) (int, error)
 	ResetSequences(unitID, date string) error
 
 	// Shift related
@@ -48,8 +51,7 @@ type TicketRepository interface {
 	GetWaitingTickets(unitID string) ([]models.Ticket, error)
 	UpdateStatusByUnit(unitID string, oldStatuses []string, newStatus string) (int64, error)
 	GetActiveTicketByCounter(counterID string) (*models.Ticket, error)
-	MarkAsEOD(unitID string) (int64, error)
-	MarkAsEODTx(tx *gorm.DB, unitID string) (int64, error)
+	MarkAsEODTicketIDsTx(tx *gorm.DB, ticketIDs []string) (int64, error)
 	// CountEODTicketSplitTx counts tickets already marked end-of-day (is_eod=true), split into waiting vs non-waiting status, for EOD messaging.
 	CountEODTicketSplitTx(tx *gorm.DB, unitID string) (waiting int64, nonWaiting int64, err error)
 	ResetSequencesTx(tx *gorm.DB, unitID, date string) error
@@ -86,20 +88,20 @@ func (r *ticketRepository) CreateTicketHistoryTx(tx *gorm.DB, history *models.Ti
 	return tx.Create(history).Error
 }
 
-func (r *ticketRepository) AppendEODFlaggedHistoryForUnitTx(tx *gorm.DB, unitID string, actorUserID *string) error {
+func (r *ticketRepository) AppendEODFlaggedHistoryForUnitTx(tx *gorm.DB, unitID string, actorUserID *string) ([]string, error) {
 	var ids []string
 	if err := tx.Model(&models.Ticket{}).
 		Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("unit_id = ? AND is_eod = ?", unitID, false).
 		Pluck("id", &ids).Error; err != nil {
-		return err
+		return nil, err
 	}
 	if len(ids) == 0 {
-		return nil
+		return nil, nil
 	}
 	payload, err := json.Marshal(map[string]string{"unit_id": unitID})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	histories := make([]models.TicketHistory, 0, len(ids))
 	for _, id := range ids {
@@ -110,7 +112,10 @@ func (r *ticketRepository) AppendEODFlaggedHistoryForUnitTx(tx *gorm.DB, unitID 
 			Payload:  payload,
 		})
 	}
-	return tx.Create(&histories).Error
+	if err := tx.Create(&histories).Error; err != nil {
+		return nil, err
+	}
+	return ids, nil
 }
 
 func (r *ticketRepository) FindAll() ([]models.Ticket, error) {
@@ -122,6 +127,15 @@ func (r *ticketRepository) FindAll() ([]models.Ticket, error) {
 func (r *ticketRepository) FindByID(id string) (*models.Ticket, error) {
 	var ticket models.Ticket
 	err := r.db.Preload("Unit").Preload("Service").Preload("Counter").Preload("PreRegistration").First(&ticket, "id = ?", id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &ticket, nil
+}
+
+func (r *ticketRepository) FindByIDForUpdateTx(tx *gorm.DB, id string) (*models.Ticket, error) {
+	var ticket models.Ticket
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&ticket, "id = ?", id).Error
 	if err != nil {
 		return nil, err
 	}
@@ -142,9 +156,21 @@ func (r *ticketRepository) FindWaiting(unitID string, serviceID *string) (*model
 	if serviceID != nil {
 		query = query.Where("service_id = ?", *serviceID)
 	}
-
 	var ticket models.Ticket
-	// Order by Priority DESC, CreatedAt ASC
+	err := query.Order("priority desc, created_at asc").First(&ticket).Error
+	if err != nil {
+		return nil, err
+	}
+	return &ticket, nil
+}
+
+func (r *ticketRepository) FindWaitingForUpdateTx(tx *gorm.DB, unitID string, serviceID *string) (*models.Ticket, error) {
+	query := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("unit_id = ? AND status = ? AND is_eod = ?", unitID, "waiting", false)
+	if serviceID != nil {
+		query = query.Where("service_id = ?", *serviceID)
+	}
+	var ticket models.Ticket
 	err := query.Order("priority desc, created_at asc").First(&ticket).Error
 	if err != nil {
 		return nil, err
@@ -165,28 +191,24 @@ func (r *ticketRepository) Delete(id string) error {
 }
 
 func (r *ticketRepository) GetNextSequence(unitID, serviceID, date string) (int, error) {
+	return r.GetNextSequenceTx(r.db, unitID, serviceID, date)
+}
+
+func (r *ticketRepository) GetNextSequenceTx(tx *gorm.DB, unitID, serviceID, date string) (int, error) {
 	var seq models.TicketNumberSequence
-	// Use locking to prevent race conditions
-	err := r.db.Clauses(clause.Locking{Strength: "UPDATE"}).
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("unit_id = ? AND service_id = ? AND date = ?", unitID, serviceID, date).
 		First(&seq).Error
 
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
-			// Create new sequence
-			// We might still have a race here if two threads reach here at same time
-			// Ideally we should have a unique index on (unit_id, service_id, date)
-			// and handle duplicate key error, but for now let's try to create.
 			seq = models.TicketNumberSequence{
 				UnitID:     unitID,
 				ServiceID:  serviceID,
 				Date:       date,
 				LastNumber: 1,
 			}
-			if err := r.db.Create(&seq).Error; err != nil {
-				// If create fails (likely due to unique constraint if we had one, or race),
-				// we should retry or return error.
-				// For now, let's return error.
+			if err := tx.Create(&seq).Error; err != nil {
 				return 0, err
 			}
 			return 1, nil
@@ -194,9 +216,8 @@ func (r *ticketRepository) GetNextSequence(unitID, serviceID, date string) (int,
 		return 0, err
 	}
 
-	// Increment
 	seq.LastNumber++
-	if err := r.db.Save(&seq).Error; err != nil {
+	if err := tx.Save(&seq).Error; err != nil {
 		return 0, err
 	}
 	return seq.LastNumber, nil
@@ -251,13 +272,12 @@ func (r *ticketRepository) GetActiveTicketByCounter(counterID string) (*models.T
 	return &tickets[0], nil
 }
 
-func (r *ticketRepository) MarkAsEOD(unitID string) (int64, error) {
-	return r.MarkAsEODTx(r.db, unitID)
-}
-
-func (r *ticketRepository) MarkAsEODTx(tx *gorm.DB, unitID string) (int64, error) {
+func (r *ticketRepository) MarkAsEODTicketIDsTx(tx *gorm.DB, ticketIDs []string) (int64, error) {
+	if len(ticketIDs) == 0 {
+		return 0, nil
+	}
 	result := tx.Model(&models.Ticket{}).
-		Where("unit_id = ? AND is_eod = ?", unitID, false).
+		Where("id IN ?", ticketIDs).
 		Update("is_eod", true)
 	return result.RowsAffected, result.Error
 }

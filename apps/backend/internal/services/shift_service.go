@@ -235,10 +235,11 @@ func (s *shiftService) ExecuteEndOfDay(ctx context.Context, unitID string, userI
 		if err != nil {
 			return err
 		}
-		if err := s.ticketRepo.AppendEODFlaggedHistoryForUnitTx(tx, unitID, userID); err != nil {
+		eodIDs, err := s.ticketRepo.AppendEODFlaggedHistoryForUnitTx(tx, unitID, userID)
+		if err != nil {
 			return fmt.Errorf("end of day: ticket history: %w", err)
 		}
-		ticketsMarked, err = s.ticketRepo.MarkAsEODTx(tx, unitID)
+		ticketsMarked, err = s.ticketRepo.MarkAsEODTicketIDsTx(tx, eodIDs)
 		if err != nil {
 			return err
 		}

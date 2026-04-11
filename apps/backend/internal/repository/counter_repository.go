@@ -12,6 +12,7 @@ type CounterRepository interface {
 	FindAllByUnit(unitID string) ([]models.Counter, error)
 	FindByID(id string) (*models.Counter, error)
 	FindByUserID(userID string) (*models.Counter, error)
+	FindByUserIDTx(tx *gorm.DB, userID string) (*models.Counter, error)
 	Update(counter *models.Counter) error
 	Delete(id string) error
 
@@ -49,8 +50,12 @@ func (r *counterRepository) FindByID(id string) (*models.Counter, error) {
 }
 
 func (r *counterRepository) FindByUserID(userID string) (*models.Counter, error) {
+	return r.FindByUserIDTx(r.db, userID)
+}
+
+func (r *counterRepository) FindByUserIDTx(tx *gorm.DB, userID string) (*models.Counter, error) {
 	var counter models.Counter
-	err := r.db.First(&counter, "assigned_to = ?", userID).Error
+	err := tx.First(&counter, "assigned_to = ?", userID).Error
 	if err != nil {
 		return nil, err
 	}
