@@ -8060,6 +8060,12 @@ const docTemplate = `{
         "models.Unit": {
             "type": "object",
             "properties": {
+                "children": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Unit"
+                    }
+                },
                 "code": {
                     "type": "string"
                 },
@@ -8081,7 +8087,13 @@ const docTemplate = `{
                 "id": {
                     "type": "string"
                 },
+                "kind": {
+                    "type": "string"
+                },
                 "name": {
+                    "type": "string"
+                },
+                "parentId": {
                     "type": "string"
                 },
                 "preRegistrations": {
@@ -8098,6 +8110,9 @@ const docTemplate = `{
                 },
                 "slotConfig": {
                     "$ref": "#/definitions/models.SlotConfig"
+                },
+                "sortOrder": {
+                    "type": "integer"
                 },
                 "tickets": {
                     "type": "array",

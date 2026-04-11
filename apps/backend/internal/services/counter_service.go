@@ -2,9 +2,11 @@ package services
 
 import (
 	"errors"
+	"time"
+
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
-	"time"
+	"quokkaq-go-backend/internal/ticketaudit"
 )
 
 type CounterService interface {
@@ -15,8 +17,8 @@ type CounterService interface {
 	DeleteCounter(id string) error
 	Occupy(counterID, userID string) (*models.Counter, error)
 	Release(counterID string) (*models.Counter, error)
-	ForceRelease(counterID string) (*models.Counter, *models.Ticket, error)
-	CallNext(counterID string, serviceID *string) (*models.Ticket, error)
+	ForceRelease(counterID string, actorUserID *string) (*models.Counter, *models.Ticket, error)
+	CallNext(counterID string, serviceID *string, actorUserID *string) (*models.Ticket, error)
 }
 
 type counterService struct {
@@ -27,6 +29,14 @@ type counterService struct {
 
 func NewCounterService(repo repository.CounterRepository, ticketRepo repository.TicketRepository, userRepo repository.UserRepository) CounterService {
 	return &counterService{repo: repo, ticketRepo: ticketRepo, userRepo: userRepo}
+}
+
+func (s *counterService) writeTicketHistory(ticketID string, actorUserID *string, action string, payload map[string]interface{}) error {
+	h, err := ticketaudit.NewHistory(ticketID, action, actorUserID, payload)
+	if err != nil {
+		return err
+	}
+	return s.ticketRepo.CreateTicketHistory(h)
 }
 
 func (s *counterService) CreateCounter(counter *models.Counter) error {
@@ -122,7 +132,7 @@ func (s *counterService) Release(counterID string) (*models.Counter, error) {
 	return counter, nil
 }
 
-func (s *counterService) ForceRelease(counterID string) (*models.Counter, *models.Ticket, error) {
+func (s *counterService) ForceRelease(counterID string, actorUserID *string) (*models.Counter, *models.Ticket, error) {
 	counter, err := s.repo.FindByID(counterID)
 	if err != nil {
 		return nil, nil, err
@@ -132,10 +142,22 @@ func (s *counterService) ForceRelease(counterID string) (*models.Counter, *model
 	activeTicket, err := s.ticketRepo.GetActiveTicketByCounter(counterID)
 	if err == nil && activeTicket != nil {
 		// Mark the active ticket as completed when force releasing
+		fromStatus := activeTicket.Status
 		now := time.Now()
 		activeTicket.Status = "completed"
 		activeTicket.CompletedAt = &now
 		if err := s.ticketRepo.Update(activeTicket); err != nil {
+			return nil, nil, err
+		}
+		payload := map[string]interface{}{
+			"unit_id":     activeTicket.UnitID,
+			"service_id":  activeTicket.ServiceID,
+			"counter_id":  counterID,
+			"from_status": fromStatus,
+			"to_status":   "completed",
+			"reason":      "force_release",
+		}
+		if err := s.writeTicketHistory(activeTicket.ID, actorUserID, ticketaudit.ActionTicketStatusChanged, payload); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -148,7 +170,7 @@ func (s *counterService) ForceRelease(counterID string) (*models.Counter, *model
 	return counter, activeTicket, nil
 }
 
-func (s *counterService) CallNext(counterID string, serviceID *string) (*models.Ticket, error) {
+func (s *counterService) CallNext(counterID string, serviceID *string, actorUserID *string) (*models.Ticket, error) {
 	counter, err := s.repo.FindByID(counterID)
 	if err != nil {
 		return nil, err
@@ -161,12 +183,25 @@ func (s *counterService) CallNext(counterID string, serviceID *string) (*models.
 	}
 
 	// Update ticket status
+	fromStatus := ticket.Status
 	now := time.Now()
 	ticket.Status = "called"
 	ticket.CounterID = &counterID
 	ticket.CalledAt = &now
 
 	if err := s.ticketRepo.Update(ticket); err != nil {
+		return nil, err
+	}
+
+	payload := map[string]interface{}{
+		"unit_id":     ticket.UnitID,
+		"service_id":  ticket.ServiceID,
+		"counter_id":  counterID,
+		"from_status": fromStatus,
+		"to_status":   "called",
+		"source":      "counter_call_next",
+	}
+	if err := s.writeTicketHistory(ticket.ID, actorUserID, ticketaudit.ActionTicketCalled, payload); err != nil {
 		return nil, err
 	}
 

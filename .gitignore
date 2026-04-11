@@ -11,7 +11,6 @@ node_modules
 
 # Testing
 coverage
-# Frontend Testplane HTML report: ignored in apps/frontend/.gitignore (testplane-report).
 # Chrome for Testing (e.g. @puppeteer/browsers install to repo root)
 /chrome/
 *.lcov

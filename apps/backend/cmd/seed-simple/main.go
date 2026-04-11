@@ -107,6 +107,14 @@ func runSeed() error {
 	}
 	fmt.Println("Counters: Counter 1, Counter 2")
 
+	// Idempotent reset: stale assignments (manual QA / prior E2E) would skip the workstation
+	// directory and redirect operators straight to /staff/:unitId/:counterId.
+	if err := database.DB.Model(&models.Counter{}).
+		Where("unit_id = ?", unit.ID).
+		Update("assigned_to", nil).Error; err != nil {
+		return fmt.Errorf("clear counter assignments: %w", err)
+	}
+
 	if err := ensureSampleTickets(unit.ID, serviceA.ID, serviceB.ID); err != nil {
 		return err
 	}
@@ -136,6 +144,10 @@ func ensureUnit(companyID string) (models.Unit, error) {
 	var u models.Unit
 	err := database.DB.Where(models.Unit{Code: seedUnitCode}).First(&u).Error
 	if err == nil {
+		if u.Kind == "workplace" || u.Kind == "" {
+			_ = database.DB.Model(&u).Update("kind", models.UnitKindSubdivision).Error
+			u.Kind = models.UnitKindSubdivision
+		}
 		return u, nil
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -145,6 +157,7 @@ func ensureUnit(companyID string) (models.Unit, error) {
 		CompanyID: companyID,
 		Name:      "Main Office",
 		Code:      seedUnitCode,
+		Kind:      models.UnitKindSubdivision,
 		Timezone:  "Europe/Moscow",
 	}
 	if err := database.DB.Create(&u).Error; err != nil {

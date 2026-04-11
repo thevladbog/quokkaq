@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
+import { Suspense } from 'react';
+import { Spinner } from '@/components/ui/spinner';
 
 type Props = {
   children: React.ReactNode;
@@ -15,6 +17,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
+function StaffSuspenseFallback() {
+  return (
+    <div className='flex min-h-[50vh] items-center justify-center'>
+      <Spinner className='text-primary h-10 w-10' />
+    </div>
+  );
+}
+
 export default function StaffLayout({ children }: Props) {
-  return <>{children}</>;
+  return <Suspense fallback={<StaffSuspenseFallback />}>{children}</Suspense>;
 }

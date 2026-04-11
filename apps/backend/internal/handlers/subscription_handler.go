@@ -7,13 +7,13 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"time"
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
 	"quokkaq-go-backend/internal/services/subscriptions"
 	"quokkaq-go-backend/pkg/database"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"gorm.io/gorm"
@@ -270,8 +270,8 @@ func (h *SubscriptionHandler) CreateCheckout(w http.ResponseWriter, r *http.Requ
 			http.Error(w, "APP_BASE_URL must be set to a public HTTPS (or HTTP) origin for billing checkout; localhost and loopback are not allowed. Configure APP_BASE_URL (e.g. https://app.example.com) or use BILLING_MOCK_CHECKOUT for non-production testing.", http.StatusBadRequest)
 			return
 		}
-		successURL := base + "/organization/billing?checkout=success"
-		cancelURL := base + "/organization/billing?checkout=cancel"
+		successURL := base + "/settings/organization/billing?checkout=success"
+		cancelURL := base + "/settings/organization/billing?checkout=cancel"
 		checkoutURL, sessionID, cerr := h.paymentProvider.CreateCheckoutSession(r.Context(), subscription, plan, successURL, cancelURL)
 		if cerr != nil {
 			http.Error(w, "Failed to create checkout session", http.StatusInternalServerError)
@@ -288,7 +288,7 @@ func (h *SubscriptionHandler) CreateCheckout(w http.ResponseWriter, r *http.Requ
 	}
 
 	mockBase := mockCheckoutBaseURL()
-	mockSuccess := mockBase + "/organization/billing?checkout=success"
+	mockSuccess := mockBase + "/settings/organization/billing?checkout=success"
 	w.Header().Set("Content-Type", "application/json")
 	RespondJSON(w, CreateCheckoutResponse{
 		CheckoutURL: mockSuccess,

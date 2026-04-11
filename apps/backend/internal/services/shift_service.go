@@ -2,24 +2,49 @@ package services
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"math"
+	"strings"
+	"time"
+
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/ws"
 	"quokkaq-go-backend/pkg/database"
-	"time"
 
 	"gorm.io/gorm"
 )
+
+// ErrInvalidShiftActivityCursor is returned when the cursor query parameter cannot be decoded.
+var ErrInvalidShiftActivityCursor = errors.New("invalid shift activity cursor")
 
 type ShiftService interface {
 	GetDashboardStats(unitID string) (map[string]interface{}, error)
 	GetQueueTickets(unitID string) ([]models.Ticket, error)
 	GetShiftCounters(unitID string) ([]ShiftCounterDTO, error)
+	GetShiftActivity(unitID string, limit int, cursor string) (*ShiftActivityResponse, error)
 	ExecuteEndOfDay(ctx context.Context, unitID string, userID *string) (map[string]interface{}, error)
+}
+
+// ShiftActivityItem is one row for supervisor activity feed (ticket_histories + ticket queue number).
+type ShiftActivityItem struct {
+	ID          string          `json:"id"`
+	TicketID    string          `json:"ticketId"`
+	QueueNumber string          `json:"queueNumber"`
+	Action      string          `json:"action"`
+	UserID      *string         `json:"userId,omitempty"`
+	Payload     json.RawMessage `json:"payload,omitempty"`
+	CreatedAt   time.Time       `json:"createdAt"`
+}
+
+// ShiftActivityResponse is paginated activity for a unit.
+type ShiftActivityResponse struct {
+	Items      []ShiftActivityItem `json:"items"`
+	NextCursor *string             `json:"nextCursor,omitempty"`
 }
 
 type ShiftCounterDTO struct {
@@ -113,6 +138,89 @@ func (s *shiftService) GetShiftCounters(unitID string) ([]ShiftCounterDTO, error
 	return dtos, nil
 }
 
+func encodeShiftActivityCursor(t time.Time, id string) string {
+	raw := t.UTC().Format(time.RFC3339Nano) + "|" + id
+	return base64.RawURLEncoding.EncodeToString([]byte(raw))
+}
+
+func decodeShiftActivityCursor(cursor string) (time.Time, string, error) {
+	var zero time.Time
+	if cursor == "" {
+		return zero, "", errors.New("empty cursor")
+	}
+	b, err := base64.RawURLEncoding.DecodeString(cursor)
+	if err != nil {
+		b, err = base64.URLEncoding.DecodeString(cursor)
+		if err != nil {
+			return zero, "", fmt.Errorf("cursor: %w", err)
+		}
+	}
+	parts := strings.SplitN(string(b), "|", 2)
+	if len(parts) != 2 {
+		return zero, "", errors.New("cursor: invalid format")
+	}
+	ts, err := time.Parse(time.RFC3339Nano, parts[0])
+	if err != nil {
+		return zero, "", fmt.Errorf("cursor: time: %w", err)
+	}
+	if parts[1] == "" {
+		return zero, "", errors.New("cursor: missing id")
+	}
+	return ts, parts[1], nil
+}
+
+func (s *shiftService) GetShiftActivity(unitID string, limit int, cursor string) (*ShiftActivityResponse, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	var beforeTime *time.Time
+	var beforeID *string
+	if cursor != "" {
+		ts, id, err := decodeShiftActivityCursor(cursor)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %v", ErrInvalidShiftActivityCursor, err)
+		}
+		beforeTime = &ts
+		beforeID = &id
+	}
+	rows, err := s.ticketRepo.ListTicketHistoryByUnitID(unitID, limit+1, beforeTime, beforeID)
+	if err != nil {
+		return nil, err
+	}
+	hasMore := len(rows) > limit
+	if hasMore {
+		rows = rows[:limit]
+	}
+	items := make([]ShiftActivityItem, 0, len(rows))
+	for _, row := range rows {
+		var raw json.RawMessage
+		if len(row.Payload) > 0 {
+			raw = json.RawMessage(row.Payload)
+		} else {
+			raw = json.RawMessage([]byte("{}"))
+		}
+		items = append(items, ShiftActivityItem{
+			ID:          row.ID,
+			TicketID:    row.TicketID,
+			QueueNumber: row.QueueNumber,
+			Action:      row.Action,
+			UserID:      row.UserID,
+			Payload:     raw,
+			CreatedAt:   row.CreatedAt,
+		})
+	}
+	resp := &ShiftActivityResponse{Items: items}
+	if hasMore && len(rows) > 0 {
+		last := rows[len(rows)-1]
+		nc := encodeShiftActivityCursor(last.CreatedAt, last.ID)
+		resp.NextCursor = &nc
+	}
+	return resp, nil
+}
+
 func (s *shiftService) ExecuteEndOfDay(ctx context.Context, unitID string, userID *string) (map[string]interface{}, error) {
 	today := time.Now().Format("2006-01-02")
 
@@ -126,6 +234,9 @@ func (s *shiftService) ExecuteEndOfDay(ctx context.Context, unitID string, userI
 		waitingTicketsNoShow, activeTicketsClosed, err = s.ticketRepo.CountEODTicketSplitTx(tx, unitID)
 		if err != nil {
 			return err
+		}
+		if err := s.ticketRepo.AppendEODFlaggedHistoryForUnitTx(tx, unitID, userID); err != nil {
+			return fmt.Errorf("end of day: ticket history: %w", err)
 		}
 		ticketsMarked, err = s.ticketRepo.MarkAsEODTx(tx, unitID)
 		if err != nil {

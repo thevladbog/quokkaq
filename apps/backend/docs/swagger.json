@@ -8054,6 +8054,12 @@
         "models.Unit": {
             "type": "object",
             "properties": {
+                "children": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Unit"
+                    }
+                },
                 "code": {
                     "type": "string"
                 },
@@ -8075,7 +8081,13 @@
                 "id": {
                     "type": "string"
                 },
+                "kind": {
+                    "type": "string"
+                },
                 "name": {
+                    "type": "string"
+                },
+                "parentId": {
                     "type": "string"
                 },
                 "preRegistrations": {
@@ -8092,6 +8104,9 @@
                 },
                 "slotConfig": {
                     "$ref": "#/definitions/models.SlotConfig"
+                },
+                "sortOrder": {
+                    "type": "integer"
                 },
                 "tickets": {
                     "type": "array",

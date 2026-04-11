@@ -664,6 +664,22 @@ export const unitsApi = {
   getById: (id: string) =>
     apiRequest<Unit>(`/units/${id}`, { cache: 'no-store' }, UnitModelSchema),
 
+  /** Workplace units under a service zone (empty if parent is not a service zone). Requires unit membership. */
+  getChildWorkplaces: (unitId: string) =>
+    apiRequest<Unit[]>(
+      `/units/${unitId}/child-workplaces`,
+      { cache: 'no-store' },
+      z.array(UnitModelSchema)
+    ),
+
+  /** Direct child units under a service zone (any kind). Empty if parent is not a service zone. */
+  getChildUnits: (unitId: string) =>
+    apiRequest<Unit[]>(
+      `/units/${unitId}/child-units`,
+      { cache: 'no-store' },
+      z.array(UnitModelSchema)
+    ),
+
   getServices: (unitId: string) =>
     apiRequest<Service[]>(
       `/units/${unitId}/services`,
@@ -685,7 +701,15 @@ export const unitsApi = {
       z.array(ServiceModelSchema)
     ),
 
-  create: (data: { name: string; code: string; companyId: string }) =>
+  create: (data: {
+    name: string;
+    code: string;
+    companyId: string;
+    timezone?: string;
+    parentId?: string | null;
+    kind?: 'subdivision' | 'service_zone';
+    sortOrder?: number;
+  }) =>
     apiRequest<Unit>('/units', {
       method: 'POST',
       body: JSON.stringify(data)
@@ -979,6 +1003,21 @@ export const countersApi = {
     )
 };
 
+export type ShiftActivityItem = {
+  id: string;
+  ticketId: string;
+  queueNumber: string;
+  action: string;
+  userId?: string | null;
+  payload?: Record<string, unknown> | null;
+  createdAt: string;
+};
+
+export type ShiftActivityResponse = {
+  items: ShiftActivityItem[];
+  nextCursor?: string;
+};
+
 // Shift API functions
 export const shiftApi = {
   getDashboard: (unitId: string) =>
@@ -1005,6 +1044,22 @@ export const shiftApi = {
         activeTicket: Ticket | null;
       }>
     >(`/units/${unitId}/shift/counters`, {}),
+
+  getActivity: (unitId: string, opts?: { limit?: number; cursor?: string }) => {
+    const params = new URLSearchParams();
+    if (opts?.limit != null && opts.limit > 0) {
+      params.set('limit', String(opts.limit));
+    }
+    if (opts?.cursor) {
+      params.set('cursor', opts.cursor);
+    }
+    const qs = params.toString();
+    const path =
+      qs.length > 0
+        ? `/units/${unitId}/shift/activity?${qs}`
+        : `/units/${unitId}/shift/activity`;
+    return apiRequest<ShiftActivityResponse>(path, {});
+  },
 
   forceReleaseCounter: (counterId: string) =>
     apiRequest<{

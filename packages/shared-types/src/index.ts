@@ -104,11 +104,16 @@ export const ServiceModelSchema: z.ZodType<ServiceModel> = z.object({
   gridColSpan: z.number().nullable().optional()
 });
 
+export const UnitKindSchema = z.enum(['subdivision', 'service_zone']);
+
 export const UnitModelSchema = z.object({
   id: z.string(),
   name: z.string(),
   code: z.string(),
   companyId: z.string(),
+  parentId: z.string().nullable().optional(),
+  kind: UnitKindSchema.optional().default('subdivision'),
+  sortOrder: z.number().int().optional().default(0),
   timezone: z.string(),
   config: z.custom<UnitConfig>().nullable().optional(),
   services: z.array(ServiceModelSchema).optional()
@@ -123,7 +128,14 @@ export const TicketModelSchema = z.object({
   priority: z.number().nullable().optional(),
   createdAt: z.string().nullable().optional(),
   calledAt: z.string().nullable().optional(),
+  confirmedAt: z.string().nullable().optional(),
   maxWaitingTime: z.number().nullable().optional(),
+  service: z
+    .object({
+      id: z.string().optional(),
+      duration: z.number().nullable().optional()
+    })
+    .optional(),
   counter: z
     .object({
       id: z.string(),
@@ -193,6 +205,7 @@ export const CreateDesktopTerminalResponseSchema = z.object({
 
 export type User = z.infer<typeof UserModelSchema>;
 export type Unit = z.infer<typeof UnitModelSchema>;
+export type UnitKind = z.infer<typeof UnitKindSchema>;
 export type Service = z.infer<typeof ServiceModelSchema>;
 export type Ticket = z.infer<typeof TicketModelSchema>;
 export type Booking = z.infer<typeof BookingModelSchema>;

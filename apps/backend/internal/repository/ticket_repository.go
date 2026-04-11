@@ -1,15 +1,34 @@
 package repository
 
 import (
+	"encoding/json"
+	"time"
+
 	"quokkaq-go-backend/internal/models"
+	"quokkaq-go-backend/internal/ticketaudit"
 	"quokkaq-go-backend/pkg/database"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
+// TicketHistoryListRow is ticket_histories joined with tickets for unit-scoped activity feeds.
+type TicketHistoryListRow struct {
+	ID          string
+	TicketID    string
+	QueueNumber string
+	Action      string
+	UserID      *string
+	Payload     []byte
+	CreatedAt   time.Time
+}
+
 type TicketRepository interface {
 	Create(ticket *models.Ticket) error
+	CreateTicketHistory(history *models.TicketHistory) error
+	CreateTicketHistoryTx(tx *gorm.DB, history *models.TicketHistory) error
+	// AppendEODFlaggedHistoryForUnitTx inserts ticket.eod_flagged rows for all tickets in the unit that are not yet EOD. Call before MarkAsEODTx.
+	AppendEODFlaggedHistoryForUnitTx(tx *gorm.DB, unitID string, actorUserID *string) error
 	FindAll() ([]models.Ticket, error)
 	FindByID(id string) (*models.Ticket, error)
 	FindByUnitID(unitID string) ([]models.Ticket, error)
@@ -31,6 +50,9 @@ type TicketRepository interface {
 	// CountEODTicketSplitTx counts tickets already marked end-of-day (is_eod=true), split into waiting vs non-waiting status, for EOD messaging.
 	CountEODTicketSplitTx(tx *gorm.DB, unitID string) (waiting int64, nonWaiting int64, err error)
 	ResetSequencesTx(tx *gorm.DB, unitID, date string) error
+
+	// ListTicketHistoryByUnitID returns recent history for tickets belonging to the unit (keyset pagination).
+	ListTicketHistoryByUnitID(unitID string, limit int, beforeTime *time.Time, beforeID *string) ([]TicketHistoryListRow, error)
 }
 
 type ticketRepository struct {
@@ -43,6 +65,39 @@ func NewTicketRepository() TicketRepository {
 
 func (r *ticketRepository) Create(ticket *models.Ticket) error {
 	return r.db.Create(ticket).Error
+}
+
+func (r *ticketRepository) CreateTicketHistory(history *models.TicketHistory) error {
+	return r.CreateTicketHistoryTx(r.db, history)
+}
+
+func (r *ticketRepository) CreateTicketHistoryTx(tx *gorm.DB, history *models.TicketHistory) error {
+	return tx.Create(history).Error
+}
+
+func (r *ticketRepository) AppendEODFlaggedHistoryForUnitTx(tx *gorm.DB, unitID string, actorUserID *string) error {
+	var ids []string
+	if err := tx.Model(&models.Ticket{}).
+		Where("unit_id = ? AND is_eod = ?", unitID, false).
+		Pluck("id", &ids).Error; err != nil {
+		return err
+	}
+	payload, err := json.Marshal(map[string]string{"unit_id": unitID})
+	if err != nil {
+		return err
+	}
+	for _, id := range ids {
+		h := &models.TicketHistory{
+			TicketID: id,
+			Action:   ticketaudit.ActionTicketEODFlagged,
+			UserID:   actorUserID,
+			Payload:  payload,
+		}
+		if err := tx.Create(h).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *ticketRepository) FindAll() ([]models.Ticket, error) {
@@ -202,4 +257,27 @@ func (r *ticketRepository) CountEODTicketSplitTx(tx *gorm.DB, unitID string) (wa
 		return 0, 0, err
 	}
 	return waiting, nonWaiting, nil
+}
+
+func (r *ticketRepository) ListTicketHistoryByUnitID(unitID string, limit int, beforeTime *time.Time, beforeID *string) ([]TicketHistoryListRow, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	q := r.db.Table("ticket_histories AS h").
+		Select("h.id, h.ticket_id, t.queue_number AS queue_number, h.action, h.user_id, h.payload, h.created_at").
+		Joins("INNER JOIN tickets AS t ON t.id = h.ticket_id").
+		Where("t.unit_id = ?", unitID).
+		Order("h.created_at DESC, h.id DESC").
+		Limit(limit)
+	if beforeTime != nil && beforeID != nil && *beforeID != "" {
+		q = q.Where("(h.created_at < ?) OR (h.created_at = ? AND h.id < ?)", *beforeTime, *beforeTime, *beforeID)
+	}
+	var rows []TicketHistoryListRow
+	if err := q.Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	return rows, nil
 }

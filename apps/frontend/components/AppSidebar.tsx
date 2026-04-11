@@ -9,29 +9,17 @@ import {
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem
+  SidebarMenuItem
 } from '@/components/ui/sidebar';
 import {
   Home,
-  Settings,
   Users,
-  Building,
-  UserRound,
-  Grid3X3,
   ClipboardList,
-  Mail,
-  MessageSquare,
   CalendarClock,
-  Monitor,
   LogOut,
   Globe,
-  Building2,
-  CreditCard,
-  DollarSign,
-  Layers
+  Layers,
+  Settings
 } from 'lucide-react';
 import Image from 'next/image';
 import { useAuthContext } from '@/contexts/AuthContext';
@@ -49,27 +37,12 @@ import ThemeToggle from '@/components/ThemeToggle';
 import { useTranslations } from 'next-intl';
 import { getInitials, getAvatarColor } from '@/lib/utils';
 import { userCanOpenPlatformOperatorUI } from '@/lib/platform-access';
-
-function filterSubItemsByRole<T extends { roles?: string[] }>(
-  items: T[],
-  isAuthenticated: boolean,
-  user: { roles?: string[] } | null | undefined
-): T[] {
-  return items.filter(
-    (item) =>
-      !item.roles ||
-      (isAuthenticated && user?.roles?.includes('admin')) ||
-      (isAuthenticated &&
-        user?.roles?.some((role: string) => item.roles?.includes(role)))
-  );
-}
+import { SidebarActiveUnitSelect } from '@/components/SidebarActiveUnitSelect';
 
 const AppSidebar = () => {
   const tAdmin = useTranslations('admin');
   const tNav = useTranslations('nav');
   const tProfile = useTranslations('profile');
-  const tOrg = useTranslations('organization');
-  const tPricing = useTranslations('pricing');
   const { user, isAuthenticated, logout } = useAuthContext();
   const pathname = usePathname();
 
@@ -77,77 +50,6 @@ const AppSidebar = () => {
   const isActiveSub = (path: string) =>
     pathname.startsWith(path) && pathname !== path;
 
-  // Define settings submenu items
-  const settingsSubItems = [
-    {
-      icon: Building,
-      label: tAdmin('navigation.units', { defaultValue: 'Units' }),
-      href: '/admin/units',
-      active: isActive('/admin/units') || isActiveSub('/admin/units'),
-      roles: ['admin']
-    },
-    {
-      icon: UserRound,
-      label: tAdmin('navigation.users', { defaultValue: 'Users' }),
-      href: '/admin/users',
-      active: isActive('/admin/users'),
-      roles: ['admin']
-    },
-    {
-      icon: Grid3X3,
-      label: tAdmin('navigation.grid_configuration', {
-        defaultValue: 'Grid Configuration'
-      }),
-      href: '/admin/grid-configuration',
-      active: isActive('/admin/grid-configuration'),
-      roles: ['admin']
-    },
-    {
-      icon: Mail,
-      label: tAdmin('navigation.invitations', { defaultValue: 'Invitations' }),
-      href: '/admin/invitations',
-      active: isActive('/admin/invitations'),
-      roles: ['admin']
-    },
-    {
-      icon: MessageSquare,
-      label: tAdmin('navigation.templates', { defaultValue: 'Templates' }),
-      href: '/admin/templates',
-      active: isActive('/admin/templates'),
-      roles: ['admin']
-    },
-    {
-      icon: Monitor,
-      label: tAdmin('navigation.desktop_terminals', {
-        defaultValue: 'Desktop terminals'
-      }),
-      href: '/admin/desktop-terminals',
-      active: isActive('/admin/desktop-terminals'),
-      roles: ['admin']
-    }
-  ];
-
-  // Define organization submenu items
-  const organizationSubItems = [
-    {
-      icon: Building2,
-      label: tOrg('title', { defaultValue: 'Organization' }),
-      href: '/organization',
-      active: isActive('/organization'),
-      roles: ['admin']
-    },
-    {
-      icon: CreditCard,
-      label: tOrg('billing.title', { defaultValue: 'Billing' }),
-      href: '/organization/billing',
-      active:
-        isActive('/organization/billing') ||
-        isActiveSub('/organization/billing'),
-      roles: ['admin']
-    }
-  ];
-
-  // Helper to check if user has specific permission in ANY unit
   const hasPermissionInAnyUnit = (permission: string) => {
     if (!user?.permissions) return false;
     return (Object.values(user.permissions) as string[][]).some(
@@ -155,46 +57,20 @@ const AppSidebar = () => {
     );
   };
 
-  // Filter navigation items based on user roles and permissions
   const navItems = [
     {
       icon: Home,
       label: tNav('home', { defaultValue: 'Home' }),
       href: '/',
       active: isActive('/'),
-      roles: ['admin', 'staff', 'supervisor', 'user'] // All users can access home
-    },
-    {
-      icon: Building2,
-      label: tOrg('title', { defaultValue: 'Organization' }),
-      href: '/organization',
-      active: pathname.startsWith('/organization'),
-      roles: ['admin'], // Only admins can access organization settings
-      hasSubmenu: true,
-      submenuKey: 'organization'
-    },
-    {
-      icon: DollarSign,
-      label: tPricing('title', { defaultValue: 'Pricing' }),
-      href: '/pricing',
-      active: isActive('/pricing'),
-      roles: ['admin', 'staff', 'supervisor', 'user'] // All users can view pricing
-    },
-    {
-      icon: Settings,
-      label: tAdmin('navigation.settings', { defaultValue: 'Settings' }),
-      href: '/admin/units',
-      active: pathname.startsWith('/admin'),
-      roles: ['admin'], // Only admins can access admin panel
-      hasSubmenu: true,
-      submenuKey: 'settings'
+      roles: ['admin', 'staff', 'supervisor', 'user', 'operator']
     },
     {
       icon: Users,
       label: tNav('staff', { defaultValue: 'Staff' }),
       href: '/staff',
-      active: isActive('/staff'),
-      roles: ['admin', 'staff'], // Admins and staff can access staff panel
+      active: pathname.startsWith('/staff'),
+      roles: ['admin', 'staff', 'operator'],
       requiredPermission: 'ACCESS_STAFF_PANEL'
     },
     {
@@ -202,7 +78,7 @@ const AppSidebar = () => {
       label: tNav('supervisor', { defaultValue: 'Supervisor' }),
       href: '/supervisor',
       active: isActive('/supervisor') || isActiveSub('/supervisor'),
-      roles: ['admin', 'supervisor'], // Admins and supervisors can access supervisor panel
+      roles: ['admin', 'supervisor'],
       requiredPermission: 'ACCESS_SUPERVISOR_PANEL'
     },
     {
@@ -210,41 +86,24 @@ const AppSidebar = () => {
       label: tAdmin('navigation.pre_registrations', {
         defaultValue: 'Pre-registrations'
       }),
-      href: '/admin/pre-registrations',
-      active:
-        isActive('/admin/pre-registrations') ||
-        isActiveSub('/admin/pre-registrations'),
+      href: '/pre-registrations',
+      active: pathname.startsWith('/pre-registrations'),
       roles: ['admin', 'staff', 'supervisor']
-      // requiredPermission: 'ACCESS_STAFF_PANEL', // Or maybe a specific one? Let's stick to roles for now or reuse staff/supervisor
     }
   ].filter((item) => {
     if (!isAuthenticated) return false;
-    if (user?.roles?.includes('admin')) return true; // Admin sees everything
+    if (user?.roles?.includes('admin')) return true;
 
-    // Check roles
     const hasRole =
       !item.roles ||
       user?.roles?.some((role: string) => item.roles?.includes(role));
 
-    // Check permissions if defined
     const hasPermission = item.requiredPermission
       ? hasPermissionInAnyUnit(item.requiredPermission)
       : false;
 
     return hasRole || hasPermission;
   });
-
-  const filteredSettingsSubItems = filterSubItemsByRole(
-    settingsSubItems,
-    isAuthenticated,
-    user
-  );
-
-  const filteredOrganizationSubItems = filterSubItemsByRole(
-    organizationSubItems,
-    isAuthenticated,
-    user
-  );
 
   return (
     <Sidebar>
@@ -284,14 +143,6 @@ const AppSidebar = () => {
             <SidebarMenu>
               {navItems.map((item) => {
                 const Icon = item.icon;
-                const hasSubmenu = item.hasSubmenu;
-                const submenuItems =
-                  item.submenuKey === 'settings'
-                    ? filteredSettingsSubItems
-                    : item.submenuKey === 'organization'
-                      ? filteredOrganizationSubItems
-                      : [];
-
                 return (
                   <SidebarMenuItem key={item.href}>
                     <SidebarMenuButton asChild isActive={item.active}>
@@ -300,26 +151,6 @@ const AppSidebar = () => {
                         <span>{item.label}</span>
                       </Link>
                     </SidebarMenuButton>
-                    {hasSubmenu && submenuItems.length > 0 && (
-                      <SidebarMenuSub>
-                        {submenuItems.map((subItem) => {
-                          const SubIcon = subItem.icon;
-                          return (
-                            <SidebarMenuSubItem key={subItem.href}>
-                              <SidebarMenuSubButton
-                                asChild
-                                isActive={subItem.active}
-                              >
-                                <Link href={subItem.href}>
-                                  <SubIcon />
-                                  <span>{subItem.label}</span>
-                                </Link>
-                              </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
-                          );
-                        })}
-                      </SidebarMenuSub>
-                    )}
                   </SidebarMenuItem>
                 );
               })}
@@ -331,6 +162,7 @@ const AppSidebar = () => {
         {isAuthenticated ? (
           <SidebarGroup>
             <SidebarGroupContent>
+              <SidebarActiveUnitSelect />
               <SidebarMenu>
                 <SidebarMenuItem>
                   <Popover>
@@ -367,7 +199,6 @@ const AppSidebar = () => {
                       side='top'
                       sideOffset={8}
                     >
-                      {/* Profile Card */}
                       <div className='flex items-center gap-3 pb-3'>
                         <Avatar size='lg'>
                           <AvatarFallback
@@ -393,7 +224,6 @@ const AppSidebar = () => {
 
                       <Separator />
 
-                      {/* Settings */}
                       <div className='space-y-3 py-3'>
                         <div className='flex items-center justify-between'>
                           <div className='flex items-center gap-2'>
@@ -410,6 +240,24 @@ const AppSidebar = () => {
                           <ThemeToggle />
                         </div>
                       </div>
+
+                      {user?.roles?.includes('admin') && (
+                        <>
+                          <Separator />
+                          <Button
+                            variant='outline'
+                            className='w-full justify-start'
+                            asChild
+                          >
+                            <Link href='/settings'>
+                              <Settings className='mr-2 h-4 w-4' />
+                              {tProfile('openSystemSettings', {
+                                defaultValue: 'System settings'
+                              })}
+                            </Link>
+                          </Button>
+                        </>
+                      )}
 
                       {userCanOpenPlatformOperatorUI(user) && (
                         <>
@@ -431,7 +279,6 @@ const AppSidebar = () => {
 
                       <Separator />
 
-                      {/* Logout */}
                       <Button
                         variant='ghost'
                         className='hover:text-destructive text-destructive mt-2 w-full justify-start'

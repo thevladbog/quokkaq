@@ -91,6 +91,64 @@ func (h *UnitHandler) GetUnitByID(w http.ResponseWriter, r *http.Request) {
 	RespondJSON(w, unit)
 }
 
+// GetUnitChildWorkplaces godoc
+// @Summary      List child subdivision units
+// @Description  Returns direct child units with kind subdivision (legacy path name "child-workplaces"). Empty if parent cannot have children.
+// @Tags         units
+// @Produce      json
+// @Param        unitId path string true "Parent unit ID (subdivision or service zone)"
+// @Success      200  {array}   models.Unit
+// @Failure      404  {string}  string "Unit not found"
+// @Router       /units/{unitId}/child-workplaces [get]
+func (h *UnitHandler) GetUnitChildWorkplaces(w http.ResponseWriter, r *http.Request) {
+	parentID := chi.URLParam(r, "unitId")
+	parent, err := h.service.GetUnitByID(parentID)
+	if err != nil {
+		http.Error(w, "Unit not found", http.StatusNotFound)
+		return
+	}
+	if !models.UnitKindAllowsChildUnits(parent.Kind) {
+		RespondJSON(w, []models.Unit{})
+		return
+	}
+	children, err := h.service.GetChildSubdivisions(parentID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	RespondJSON(w, children)
+}
+
+// GetUnitChildUnits godoc
+// @Summary      List direct child units
+// @Description  Returns all direct child units (subdivision or service_zone kinds).
+// @Tags         units
+// @Produce      json
+// @Param        unitId path string true "Parent unit ID (service zone)"
+// @Success      200  {array}   models.Unit
+// @Failure      404  {string}  string "Unit not found"
+// @Router       /units/{unitId}/child-units [get]
+func (h *UnitHandler) GetUnitChildUnits(w http.ResponseWriter, r *http.Request) {
+	parentID := chi.URLParam(r, "unitId")
+	parent, err := h.service.GetUnitByID(parentID)
+	if err != nil {
+		http.Error(w, "Unit not found", http.StatusNotFound)
+		return
+	}
+	if !models.UnitKindAllowsChildUnits(parent.Kind) {
+		RespondJSON(w, []models.Unit{})
+		return
+	}
+	children, err := h.service.GetChildUnits(parentID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	RespondJSON(w, children)
+}
+
 // DeleteUnit godoc
 // @Summary      Delete a unit
 // @Description  Deletes a unit by its ID
@@ -271,8 +329,20 @@ func (h *UnitHandler) UpdateUnit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(bodyBytes, &raw); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	var reqUnit models.Unit
-	if err := json.NewDecoder(r.Body).Decode(&reqUnit); err != nil {
+	if err := json.Unmarshal(bodyBytes, &reqUnit); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -292,6 +362,44 @@ func (h *UnitHandler) UpdateUnit(w http.ResponseWriter, r *http.Request) {
 	}
 	if reqUnit.Config != nil {
 		existingUnit.Config = reqUnit.Config
+	}
+
+	if v, ok := raw["parentId"]; ok {
+		switch string(v) {
+		case "null":
+			existingUnit.ParentID = nil
+		default:
+			var pid string
+			if err := json.Unmarshal(v, &pid); err != nil {
+				http.Error(w, "invalid parentId", http.StatusBadRequest)
+				return
+			}
+			if pid == "" {
+				existingUnit.ParentID = nil
+			} else {
+				existingUnit.ParentID = &pid
+			}
+		}
+	}
+
+	if v, ok := raw["kind"]; ok {
+		var k string
+		if err := json.Unmarshal(v, &k); err != nil {
+			http.Error(w, "invalid kind", http.StatusBadRequest)
+			return
+		}
+		if k != "" {
+			existingUnit.Kind = k
+		}
+	}
+
+	if v, ok := raw["sortOrder"]; ok {
+		var so int
+		if err := json.Unmarshal(v, &so); err != nil {
+			http.Error(w, "invalid sortOrder", http.StatusBadRequest)
+			return
+		}
+		existingUnit.SortOrder = so
 	}
 
 	if err := h.service.UpdateUnit(existingUnit); err != nil {

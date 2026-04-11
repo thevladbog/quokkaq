@@ -227,6 +227,92 @@ func RunVersionedMigrations(models ...interface{}) error {
 		return fmt.Errorf("failed to run invoice_lines unit column migration: %w", err)
 	}
 
+	// Service zones + workplaces: hierarchy on units, composite unique (company_id, parent_id, code).
+	err = manager.RunMigration("v1.0.9_units_service_zones", func(db *gorm.DB) error {
+		if err := db.Exec(`
+			ALTER TABLE units ADD COLUMN IF NOT EXISTS parent_id TEXT;
+			ALTER TABLE units ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'workplace';
+			ALTER TABLE units ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0;
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			UPDATE units SET kind = 'workplace' WHERE kind IS NULL OR btrim(kind) = '';
+		`).Error; err != nil {
+			return err
+		}
+		// Drop legacy single-column unique on code (name varies by GORM version).
+		if err := db.Exec(`
+			DO $$
+			DECLARE r RECORD;
+			BEGIN
+				FOR r IN
+					SELECT c.conname
+					FROM pg_constraint c
+					WHERE c.conrelid = 'units'::regclass
+					  AND c.contype = 'u'
+					  AND array_length(c.conkey, 1) = 1
+					  AND EXISTS (
+						SELECT 1 FROM pg_attribute a
+						WHERE a.attrelid = c.conrelid AND a.attnum = c.conkey[1] AND a.attname = 'code'
+					  )
+				LOOP
+					EXECUTE format('ALTER TABLE units DROP CONSTRAINT IF EXISTS %I', r.conname);
+				END LOOP;
+			END $$;
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`DROP INDEX IF EXISTS uni_units_code`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			CREATE UNIQUE INDEX IF NOT EXISTS units_company_parent_code_uq
+			ON units (company_id, parent_id, code) NULLS NOT DISTINCT
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			CREATE INDEX IF NOT EXISTS idx_units_company_parent ON units (company_id, parent_id)
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			DO $$
+			BEGIN
+				IF NOT EXISTS (
+					SELECT 1 FROM pg_constraint
+					WHERE conname = 'units_parent_id_fkey' AND conrelid = 'units'::regclass
+				) THEN
+					ALTER TABLE units
+					ADD CONSTRAINT units_parent_id_fkey
+					FOREIGN KEY (parent_id) REFERENCES units(id) ON UPDATE CASCADE ON DELETE RESTRICT;
+				END IF;
+			END $$;
+		`).Error; err != nil {
+			return err
+		}
+		return db.AutoMigrate(&dbmodels.Unit{})
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run units service zones migration: %w", err)
+	}
+
+	// Remove legacy workplace kind: map to subdivision and fix default.
+	err = manager.RunMigration("v1.1.0_units_remove_workplace_kind", func(db *gorm.DB) error {
+		if err := db.Exec(`
+			UPDATE units SET kind = 'subdivision' WHERE kind = 'workplace' OR kind IS NULL OR btrim(kind) = '';
+		`).Error; err != nil {
+			return err
+		}
+		return db.Exec(`
+			ALTER TABLE units ALTER COLUMN kind SET DEFAULT 'subdivision';
+		`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run units remove workplace migration: %w", err)
+	}
+
 	fmt.Println("All migrations completed successfully")
 	return nil
 }

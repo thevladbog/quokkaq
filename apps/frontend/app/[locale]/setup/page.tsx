@@ -83,7 +83,7 @@ export default function SetupPage() {
 
         if (response && response.accessToken) {
           login(response.accessToken);
-          router.push('/admin');
+          router.push('/settings');
         }
       } catch (loginError) {
         console.error('Auto-login failed:', loginError);

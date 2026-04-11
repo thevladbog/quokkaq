@@ -1177,6 +1177,10 @@ definitions:
     type: object
   models.Unit:
     properties:
+      children:
+        items:
+          $ref: '#/definitions/models.Unit'
+        type: array
       code:
         type: string
       companyId:
@@ -1191,7 +1195,11 @@ definitions:
         type: string
       id:
         type: string
+      kind:
+        type: string
       name:
+        type: string
+      parentId:
         type: string
       preRegistrations:
         items:
@@ -1203,6 +1211,8 @@ definitions:
         type: array
       slotConfig:
         $ref: '#/definitions/models.SlotConfig'
+      sortOrder:
+        type: integer
       tickets:
         items:
           $ref: '#/definitions/models.Ticket'
