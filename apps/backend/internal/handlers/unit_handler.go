@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,6 +14,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 )
+
+// maxUnitPatchBodyBytes caps PATCH /units/{id} JSON body size (DoS / memory bound).
+const maxUnitPatchBodyBytes = 1 << 20 // 1 MiB
 
 type UnitHandler struct {
 	service        services.UnitService
@@ -91,6 +95,68 @@ func (h *UnitHandler) GetUnitByID(w http.ResponseWriter, r *http.Request) {
 	RespondJSON(w, unit)
 }
 
+// GetUnitChildWorkplaces godoc
+// @Summary      List child subdivision units
+// @Description  Returns direct child units with kind subdivision (legacy path name "child-workplaces"). Returns an empty array if the parent unit kind cannot have children.
+// @Tags         units
+// @Produce      json
+// @Security     BearerAuth
+// @Param        unitId path string true "Parent unit ID (subdivision or service zone)"
+// @Success      200  {array}   models.Unit
+// @Failure      404  {string}  string "Unit not found"
+// @Failure      500  {string}  string "Internal Server Error"
+// @Router       /units/{unitId}/child-workplaces [get]
+func (h *UnitHandler) GetUnitChildWorkplaces(w http.ResponseWriter, r *http.Request) {
+	parentID := chi.URLParam(r, "unitId")
+	parent, err := h.service.GetUnitByID(parentID)
+	if err != nil {
+		http.Error(w, "Unit not found", http.StatusNotFound)
+		return
+	}
+	if !models.UnitKindAllowsChildUnits(parent.Kind) {
+		RespondJSON(w, []models.Unit{})
+		return
+	}
+	children, err := h.service.GetChildSubdivisions(parentID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	RespondJSON(w, children)
+}
+
+// GetUnitChildUnits godoc
+// @Summary      List direct child units
+// @Description  Returns all direct child units (subdivision or service_zone kinds). Returns an empty array if the parent unit kind cannot have children.
+// @Tags         units
+// @Produce      json
+// @Security     BearerAuth
+// @Param        unitId path string true "Parent unit ID (subdivision or service zone)"
+// @Success      200  {array}   models.Unit
+// @Failure      404  {string}  string "Unit not found"
+// @Failure      500  {string}  string "Internal Server Error"
+// @Router       /units/{unitId}/child-units [get]
+func (h *UnitHandler) GetUnitChildUnits(w http.ResponseWriter, r *http.Request) {
+	parentID := chi.URLParam(r, "unitId")
+	parent, err := h.service.GetUnitByID(parentID)
+	if err != nil {
+		http.Error(w, "Unit not found", http.StatusNotFound)
+		return
+	}
+	if !models.UnitKindAllowsChildUnits(parent.Kind) {
+		RespondJSON(w, []models.Unit{})
+		return
+	}
+	children, err := h.service.GetChildUnits(parentID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	RespondJSON(w, children)
+}
+
 // DeleteUnit godoc
 // @Summary      Delete a unit
 // @Description  Deletes a unit by its ID
@@ -102,7 +168,12 @@ func (h *UnitHandler) GetUnitByID(w http.ResponseWriter, r *http.Request) {
 func (h *UnitHandler) DeleteUnit(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if err := h.service.DeleteUnit(id); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		switch {
+		case errors.Is(err, services.ErrUnitHasChildren):
+			http.Error(w, err.Error(), http.StatusConflict)
+		default:
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -259,6 +330,9 @@ func (h *UnitHandler) UpdateAdSettings(w http.ResponseWriter, r *http.Request) {
 // @Param        unit  body      models.Unit  true  "Unit Data"
 // @Success      200   {object}  models.Unit
 // @Failure      400   {string}  string "Bad Request"
+// @Failure      404   {string}  string "Parent unit not found"
+// @Failure      409   {string}  string "Conflict (cross-company parent or cycle)"
+// @Failure      413   {string}  string "Request body too large"
 // @Failure      500   {string}  string "Internal Server Error"
 // @Router       /units/{id} [patch]
 func (h *UnitHandler) UpdateUnit(w http.ResponseWriter, r *http.Request) {
@@ -271,31 +345,118 @@ func (h *UnitHandler) UpdateUnit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var reqUnit models.Unit
-	if err := json.NewDecoder(r.Body).Decode(&reqUnit); err != nil {
+	limited := http.MaxBytesReader(w, r.Body, maxUnitPatchBodyBytes)
+	bodyBytes, err := io.ReadAll(limited)
+	if err != nil {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	// Merge changes
-	if reqUnit.Name != "" {
-		existingUnit.Name = reqUnit.Name
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(bodyBytes, &raw); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
-	if reqUnit.Code != "" {
-		existingUnit.Code = reqUnit.Code
+
+	// Merge changes (single JSON parse into raw; same semantics as former reqUnit merge)
+	if v, ok := raw["name"]; ok {
+		var s string
+		if err := json.Unmarshal(v, &s); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if s != "" {
+			existingUnit.Name = s
+		}
 	}
-	if reqUnit.Timezone != "" {
-		existingUnit.Timezone = reqUnit.Timezone
+	if v, ok := raw["code"]; ok {
+		var s string
+		if err := json.Unmarshal(v, &s); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if s != "" {
+			existingUnit.Code = s
+		}
 	}
-	if reqUnit.CompanyID != "" {
-		existingUnit.CompanyID = reqUnit.CompanyID
+	if v, ok := raw["timezone"]; ok {
+		var s string
+		if err := json.Unmarshal(v, &s); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if s != "" {
+			existingUnit.Timezone = s
+		}
 	}
-	if reqUnit.Config != nil {
-		existingUnit.Config = reqUnit.Config
+	// companyId in PATCH is ignored: units cannot be moved across companies via this endpoint.
+	if v, ok := raw["config"]; ok {
+		if string(v) != "null" {
+			var cfg json.RawMessage
+			if err := json.Unmarshal(v, &cfg); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			if cfg != nil {
+				existingUnit.Config = cfg
+			}
+		}
+	}
+
+	if v, ok := raw["parentId"]; ok {
+		switch string(v) {
+		case "null":
+			existingUnit.ParentID = nil
+		default:
+			var pid string
+			if err := json.Unmarshal(v, &pid); err != nil {
+				http.Error(w, "invalid parentId", http.StatusBadRequest)
+				return
+			}
+			if pid == "" {
+				existingUnit.ParentID = nil
+			} else {
+				existingUnit.ParentID = &pid
+			}
+		}
+	}
+
+	if v, ok := raw["kind"]; ok {
+		var k string
+		if err := json.Unmarshal(v, &k); err != nil {
+			http.Error(w, "invalid kind", http.StatusBadRequest)
+			return
+		}
+		if k != "" {
+			existingUnit.Kind = k
+		}
+	}
+
+	if v, ok := raw["sortOrder"]; ok {
+		var so int
+		if err := json.Unmarshal(v, &so); err != nil {
+			http.Error(w, "invalid sortOrder", http.StatusBadRequest)
+			return
+		}
+		existingUnit.SortOrder = so
 	}
 
 	if err := h.service.UpdateUnit(existingUnit); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		switch {
+		case errors.Is(err, services.ErrInvalidUnitKind), errors.Is(err, services.ErrInvalidParentKind):
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		case errors.Is(err, services.ErrParentNotFound):
+			http.Error(w, err.Error(), http.StatusNotFound)
+		case errors.Is(err, services.ErrCrossCompanyParent), errors.Is(err, services.ErrCycleDetected):
+			http.Error(w, err.Error(), http.StatusConflict)
+		default:
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 		return
 	}
 

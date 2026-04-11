@@ -41,7 +41,7 @@ func (h *TicketHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Use unitID from URL, ignore what's in body if any
-	ticket, err := h.service.CreateTicket(unitID, req.ServiceID)
+	ticket, err := h.service.CreateTicket(unitID, req.ServiceID, nil)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -114,7 +114,8 @@ func (h *TicketHandler) CallNext(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ticket, err := h.service.CallNext(unitID, req.CounterID, req.ServiceID)
+	actor := getActorFromRequest(r)
+	ticket, err := h.service.CallNext(unitID, req.CounterID, req.ServiceID, actor)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound) // Or 404 if no tickets
 		return
@@ -147,7 +148,8 @@ func (h *TicketHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ticket, err := h.service.UpdateStatus(id, req.Status)
+	actor := getActorFromRequest(r)
+	ticket, err := h.service.UpdateStatus(id, req.Status, actor)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -168,7 +170,8 @@ func (h *TicketHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 // @Router       /tickets/{id}/recall [post]
 func (h *TicketHandler) Recall(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	ticket, err := h.service.Recall(id)
+	actor := getActorFromRequest(r)
+	ticket, err := h.service.Recall(id, actor)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
@@ -199,7 +202,8 @@ func (h *TicketHandler) Pick(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ticket, err := h.service.Pick(id, req.CounterID)
+	actor := getActorFromRequest(r)
+	ticket, err := h.service.Pick(id, req.CounterID, actor)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
@@ -231,7 +235,8 @@ func (h *TicketHandler) Transfer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ticket, err := h.service.Transfer(id, req.ToCounterID, req.ToUserID)
+	actor := getActorFromRequest(r)
+	ticket, err := h.service.Transfer(id, req.ToCounterID, req.ToUserID, actor)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -251,7 +256,8 @@ func (h *TicketHandler) Transfer(w http.ResponseWriter, r *http.Request) {
 // @Router       /tickets/{id}/return [post]
 func (h *TicketHandler) ReturnToQueue(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	ticket, err := h.service.ReturnToQueue(id)
+	actor := getActorFromRequest(r)
+	ticket, err := h.service.ReturnToQueue(id, actor)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

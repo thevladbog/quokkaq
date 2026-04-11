@@ -27,7 +27,6 @@ alwaysApply: true
 
 - Backend: `pnpm nx run backend:test`
 - Frontend: `pnpm nx run frontend:test`
-- **E2E (браузер, Testplane)** — после изменений пользовательских сценариев или экранов, которые уже покрыты E2E: `pnpm nx run frontend:e2e:docker` (нужен стек `docker compose` в `apps/backend`). Визуальные эталоны (`assertView`): обновление только через `frontend:e2e:docker:update-refs`. Детали: правило `quokkaq-frontend-e2e-visual.mdc`, [SETUP.md](SETUP.md#e2e-tests-testplane).
 
 ## Restart API + Next.js (default local ports)
 

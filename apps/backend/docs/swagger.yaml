@@ -1177,6 +1177,10 @@ definitions:
     type: object
   models.Unit:
     properties:
+      children:
+        items:
+          $ref: '#/definitions/models.Unit'
+        type: array
       code:
         type: string
       companyId:
@@ -1191,7 +1195,11 @@ definitions:
         type: string
       id:
         type: string
+      kind:
+        type: string
       name:
+        type: string
+      parentId:
         type: string
       preRegistrations:
         items:
@@ -1203,6 +1211,8 @@ definitions:
         type: array
       slotConfig:
         $ref: '#/definitions/models.SlotConfig'
+      sortOrder:
+        type: integer
       tickets:
         items:
           $ref: '#/definitions/models.Ticket'
@@ -1329,6 +1339,49 @@ definitions:
       unitId:
         type: string
       updatedAt:
+        type: string
+    type: object
+  services.ShiftActivityItem:
+    properties:
+      action:
+        type: string
+      createdAt:
+        type: string
+      id:
+        type: string
+      payload:
+        type: object
+      queueNumber:
+        type: string
+      ticketId:
+        type: string
+      userId:
+        type: string
+    type: object
+  services.ShiftActivityResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/services.ShiftActivityItem'
+        type: array
+      nextCursor:
+        type: string
+    type: object
+  services.ShiftCounterDTO:
+    properties:
+      activeTicket:
+        $ref: '#/definitions/models.Ticket'
+      assignedTo:
+        type: string
+      assignedUser:
+        $ref: '#/definitions/models.User'
+      id:
+        type: string
+      isOccupied:
+        type: boolean
+      name:
+        type: string
+      unitId:
         type: string
     type: object
 host: localhost:3001
@@ -4206,6 +4259,18 @@ paths:
           description: Bad Request
           schema:
             type: string
+        "404":
+          description: Parent unit not found
+          schema:
+            type: string
+        "409":
+          description: Conflict (cross-company parent or cycle)
+          schema:
+            type: string
+        "413":
+          description: Request body too large
+          schema:
+            type: string
         "500":
           description: Internal Server Error
           schema:
@@ -4311,6 +4376,71 @@ paths:
       summary: Call next ticket
       tags:
       - tickets
+  /units/{unitId}/child-units:
+    get:
+      description: Returns all direct child units (subdivision or service_zone kinds).
+        Returns an empty array if the parent unit kind cannot have children.
+      parameters:
+      - description: Parent unit ID (subdivision or service zone)
+        in: path
+        name: unitId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Unit'
+            type: array
+        "404":
+          description: Unit not found
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: List direct child units
+      tags:
+      - units
+  /units/{unitId}/child-workplaces:
+    get:
+      description: Returns direct child units with kind subdivision (legacy path name
+        "child-workplaces"). Returns an empty array if the parent unit kind cannot
+        have children.
+      parameters:
+      - description: Parent unit ID (subdivision or service zone)
+        in: path
+        name: unitId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Unit'
+            type: array
+        "404":
+          description: Unit not found
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: List child subdivision units
+      tags:
+      - units
   /units/{unitId}/counters:
     get:
       description: Retrieves all counters for a specific unit
@@ -4697,9 +4827,48 @@ paths:
       summary: Get services by unit
       tags:
       - services
+  /units/{unitId}/shift/activity:
+    get:
+      description: Paginated ticket history rows for tickets belonging to the unit
+        (supervisor dashboard / journal). Limit is capped at 100.
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        type: string
+      - description: Page size (default 20, max 100)
+        in: query
+        name: limit
+        type: integer
+      - description: Opaque keyset pagination cursor
+        in: query
+        name: cursor
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/services.ShiftActivityResponse'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Shift ticket activity feed
+      tags:
+      - shift
   /units/{unitId}/shift/counters:
     get:
-      description: Retrieves counters for shift view
+      description: Returns stations (counters) for the unit with occupancy flag and
+        optional active ticket for the supervisor shift view.
       parameters:
       - description: Unit ID
         in: path
@@ -4713,13 +4882,15 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/models.Counter'
+              $ref: '#/definitions/services.ShiftCounterDTO'
             type: array
         "500":
           description: Internal Server Error
           schema:
             type: string
-      summary: Get shift counters
+      security:
+      - BearerAuth: []
+      summary: List counters for shift dashboard
       tags:
       - shift
   /units/{unitId}/shift/dashboard:

@@ -2,7 +2,6 @@
  .next
  .husky
  coverage
- testplane-report
  .prettierignore
  .stylelintignore
  .eslintignore
@@ -10,6 +9,7 @@
  storybook-static
  *.log
  playwright-report
+ .testplane
  .nyc_output
  test-results
  junit.xml

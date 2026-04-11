@@ -1,7 +1,10 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
+	"strconv"
+
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/services"
 
@@ -55,12 +58,13 @@ func (h *ShiftHandler) GetQueueTickets(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetShiftCounters godoc
-// @Summary      Get shift counters
-// @Description  Retrieves counters for shift view
+// @Summary      List counters for shift dashboard
+// @Description  Returns stations (counters) for the unit with occupancy flag and optional active ticket for the supervisor shift view.
 // @Tags         shift
 // @Produce      json
+// @Security     BearerAuth
 // @Param        unitId path      string  true  "Unit ID"
-// @Success      200    {array}   models.Counter
+// @Success      200    {array}   services.ShiftCounterDTO
 // @Failure      500    {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/shift/counters [get]
 func (h *ShiftHandler) GetShiftCounters(w http.ResponseWriter, r *http.Request) {
@@ -71,6 +75,40 @@ func (h *ShiftHandler) GetShiftCounters(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	RespondJSON(w, counters)
+}
+
+// GetShiftActivity godoc
+// @Summary      Shift ticket activity feed
+// @Description  Paginated ticket history rows for tickets belonging to the unit (supervisor dashboard / journal). Limit is capped at 100.
+// @Tags         shift
+// @Produce      json
+// @Security     BearerAuth
+// @Param        unitId path      string  true  "Unit ID"
+// @Param        limit  query     int     false "Page size (default 20, max 100)"
+// @Param        cursor query     string  false "Opaque keyset pagination cursor"
+// @Success      200    {object}  services.ShiftActivityResponse
+// @Failure      400    {string}  string "Bad Request"
+// @Failure      500    {string}  string "Internal Server Error"
+// @Router       /units/{unitId}/shift/activity [get]
+func (h *ShiftHandler) GetShiftActivity(w http.ResponseWriter, r *http.Request) {
+	unitID := chi.URLParam(r, "unitId")
+	limit := 20
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+	cursor := r.URL.Query().Get("cursor")
+	resp, err := h.service.GetShiftActivity(unitID, limit, cursor)
+	if err != nil {
+		if errors.Is(err, services.ErrInvalidShiftActivityCursor) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	RespondJSON(w, resp)
 }
 
 // ExecuteEndOfDay godoc

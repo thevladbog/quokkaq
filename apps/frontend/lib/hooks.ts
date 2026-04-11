@@ -70,8 +70,15 @@ export const useCreateUnit = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (unitData: { name: string; code: string; companyId: string }) =>
-      unitsApi.create(unitData),
+    mutationFn: (unitData: {
+      name: string;
+      code: string;
+      companyId: string;
+      timezone?: string;
+      parentId?: string | null;
+      kind?: 'subdivision' | 'service_zone';
+      sortOrder?: number;
+    }) => unitsApi.create(unitData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['units'] });
     }

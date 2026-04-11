@@ -350,46 +350,6 @@ cd apps/backend
 go test ./...
 ```
 
-### E2E Tests (Testplane)
-
-Full stack: API and dependencies via Docker Compose in [`apps/backend`](apps/backend), the frontend is the production Next.js server on port **3000**, and browser specs live in [`apps/frontend/e2e/`](apps/frontend/e2e/). Spec files use an **`NN-` prefix** (for example `05-…`, `10-…`, `30-…`) so Testplane runs them in a predictable order. In [`.testplane.conf.js`](apps/frontend/.testplane.conf.js), Chrome uses **`testsPerSession: 1`** so browser state does not leak between tests.
-
-**Recommended path (Linux + Chromium in Docker)** — same environment as CI and for visual baselines (`assertView`):
-
-1. Start the stack: from `apps/backend` run `docker compose up -d --build` (postgres, redis, minio, `backend`). The API container in [`docker-compose.yml`](apps/backend/docker-compose.yml) has a default `JWT_SECRET`; override with an environment variable if needed.
-2. Seed demo data (once per clean database): from `apps/backend` with `DATABASE_URL=postgresql://postgres:postgres@localhost:5432/quokkaq` run `go run ./cmd/seed-simple`. Login for the flow: **admin@quokkaq.com** / **admin123**.
-3. Run E2E in the **`e2e`** service (profile `e2e`, image with Node 22 and a pinned Chromium; inside the container `NEXT_PUBLIC_API_URL` / `NEXT_PUBLIC_WS_URL` point at `http://backend:3001` and `ws://backend:3001`):
-
-```bash
-# from the monorepo root
-pnpm run e2e:docker
-# or
-pnpm nx run frontend:e2e:docker
-```
-
-To refresh **visual baselines** after an intentional UI change (only in this environment):
-
-```bash
-pnpm run e2e:docker:update-refs
-# or
-pnpm nx run frontend:e2e:docker:update-refs
-```
-
-The E2E container sets **`HUSKY=0`** and **`CI=true`** so `pnpm install` does not run git hooks. [`apps/frontend/e2e/run-e2e.sh`](apps/frontend/e2e/run-e2e.sh) must be executable: on first add, `git add --chmod=+x apps/frontend/e2e/run-e2e.sh` is convenient.
-
-Baseline screenshots live under [`apps/frontend/e2e/screens/`](apps/frontend/e2e/screens/) (`screenshotsDir` in [`.testplane.conf.js`](apps/frontend/.testplane.conf.js)). **Do not** refresh them by running Testplane on bare macOS Chrome if the repo baselines were captured in Docker/Linux — pixel drift will fail the comparison.
-
-**Local without Docker** (only when you mean to, e.g. debugging): use the same variables as normal dev — `NEXT_PUBLIC_API_URL=http://localhost:3001`, `NEXT_PUBLIC_WS_URL=ws://localhost:3001` (see [`apps/frontend/env.local`](apps/frontend/env.local)). On macOS, [`.testplane.conf.js`](apps/frontend/.testplane.conf.js) defaults to a typical Google Chrome path; set **`CHROME_BIN`** if needed.
-
-```bash
-pnpm nx run frontend:build
-pnpm nx run frontend:e2e
-```
-
-Headless: `pnpm nx run frontend:e2e:ci` (or `CI=true`).
-
-**Report:** a run may create `apps/frontend/testplane-report` (not committed). If the **Frontend E2E** GitHub Actions job fails, that folder is uploaded as the `testplane-report` artifact.
-
 ## Deployment
 
 `main` is the trunk branch (merge via pull requests). Production releases run only after you merge into the **`release`** branch (for example a PR from `main` into `release`).

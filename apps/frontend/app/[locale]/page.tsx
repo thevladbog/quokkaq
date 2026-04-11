@@ -49,6 +49,22 @@ export default function Home() {
     }
   }, [isLoading, isAuthenticated, router, systemChecked]);
 
+  // Operators without admin/staff/supervisor: land on staff panel.
+  useEffect(() => {
+    if (!systemChecked || isLoading || !user) return;
+    const roles = user.roles ?? [];
+    if (!roles.includes('operator')) return;
+    if (
+      roles.includes('admin') ||
+      roles.includes('platform_admin') ||
+      roles.includes('staff') ||
+      roles.includes('supervisor')
+    ) {
+      return;
+    }
+    router.replace('/staff');
+  }, [systemChecked, isLoading, user, router]);
+
   if (isLoading) {
     return (
       <div className='flex h-screen w-full items-center justify-center'>
@@ -74,7 +90,7 @@ export default function Home() {
 
   const menuItems = [
     {
-      href: '/admin',
+      href: '/settings',
       title: t('admin'),
       description: t('admin_description', {
         defaultValue: 'Manage system settings and services'

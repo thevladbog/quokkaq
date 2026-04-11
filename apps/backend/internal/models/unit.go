@@ -8,6 +8,18 @@ import (
 	"gorm.io/gorm"
 )
 
+// Unit kinds: subdivision = branch / operational unit (queue, kiosk, counters attach here);
+// service_zone = optional grouping inside a subdivision (or nested).
+const (
+	UnitKindSubdivision = "subdivision"
+	UnitKindServiceZone = "service_zone"
+)
+
+// UnitKindAllowsChildUnits is true when this unit may have child units in the org tree.
+func UnitKindAllowsChildUnits(k string) bool {
+	return k == UnitKindServiceZone || k == UnitKindSubdivision
+}
+
 type Company struct {
 	ID              string          `gorm:"primaryKey" json:"id"`
 	Name            string          `gorm:"not null" json:"name"`
@@ -53,7 +65,10 @@ type CompanyPatch struct {
 type Unit struct {
 	ID        string          `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
 	CompanyID string          `gorm:"not null" json:"companyId"`
-	Code      string          `gorm:"unique;not null" json:"code"`
+	ParentID  *string         `gorm:"index" json:"parentId,omitempty"`
+	Code      string          `gorm:"not null" json:"code"`
+	Kind      string          `gorm:"not null;default:subdivision" json:"kind"`
+	SortOrder int             `gorm:"not null;default:0" json:"sortOrder"`
 	Name      string          `gorm:"not null" json:"name"`
 	Timezone  string          `gorm:"not null" json:"timezone"`
 	Config    json.RawMessage `gorm:"type:jsonb" json:"config,omitempty" swaggertype:"object"`
@@ -62,6 +77,8 @@ type Unit struct {
 
 	// Relations
 	Company          Company           `gorm:"constraint:OnUpdate:CASCADE,OnDelete:SET NULL;" json:"-" swaggerignore:"true"`
+	Parent           *Unit             `gorm:"foreignKey:ParentID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;" json:"parent,omitempty" swaggerignore:"true"`
+	Children         []Unit            `gorm:"foreignKey:ParentID" json:"children,omitempty"`
 	Services         []Service         `gorm:"foreignKey:UnitID" json:"services,omitempty"`
 	Counters         []Counter         `gorm:"foreignKey:UnitID" json:"counters,omitempty"`
 	Tickets          []Ticket          `gorm:"foreignKey:UnitID" json:"tickets,omitempty"`

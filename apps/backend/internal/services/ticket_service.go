@@ -3,24 +3,31 @@ package services
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
+	"quokkaq-go-backend/internal/ticketaudit"
 	"quokkaq-go-backend/internal/ws"
+
+	"gorm.io/gorm"
 )
 
+// errCounterNotFoundForUser is returned from Transfer when resolving a counter by user ID fails.
+var errCounterNotFoundForUser = errors.New("counter not found for user")
+
 type TicketService interface {
-	CreateTicket(unitID, serviceID string) (*models.Ticket, error)
-	CreateTicketWithPreRegistration(unitID, serviceID, preRegID string) (*models.Ticket, error)
+	CreateTicket(unitID, serviceID string, actorUserID *string) (*models.Ticket, error)
+	CreateTicketWithPreRegistration(unitID, serviceID, preRegID string, actorUserID *string) (*models.Ticket, error)
 	GetTicketByID(id string) (*models.Ticket, error)
 	GetTicketsByUnit(unitID string) ([]models.Ticket, error)
-	Recall(ticketID string) (*models.Ticket, error)
-	Pick(ticketID, counterID string) (*models.Ticket, error)
-	Transfer(ticketID string, toCounterID, toUserID *string) (*models.Ticket, error)
-	ReturnToQueue(ticketID string) (*models.Ticket, error)
-	CallNext(unitID, counterID string, serviceID *string) (*models.Ticket, error)
-	UpdateStatus(ticketID, status string) (*models.Ticket, error)
+	Recall(ticketID string, actorUserID *string) (*models.Ticket, error)
+	Pick(ticketID, counterID string, actorUserID *string) (*models.Ticket, error)
+	Transfer(ticketID string, toCounterID, toUserID *string, actorUserID *string) (*models.Ticket, error)
+	ReturnToQueue(ticketID string, actorUserID *string) (*models.Ticket, error)
+	CallNext(unitID, counterID string, serviceID *string, actorUserID *string) (*models.Ticket, error)
+	UpdateStatus(ticketID, status string, actorUserID *string) (*models.Ticket, error)
 }
 
 type ticketService struct {
@@ -29,50 +36,80 @@ type ticketService struct {
 	serviceRepo repository.ServiceRepository
 	hub         *ws.Hub
 	jobClient   JobEnqueuer
+	log         *slog.Logger
 }
 
 func NewTicketService(repo repository.TicketRepository, counterRepo repository.CounterRepository, serviceRepo repository.ServiceRepository, hub *ws.Hub, jobClient JobEnqueuer) TicketService {
-	return &ticketService{repo: repo, counterRepo: counterRepo, serviceRepo: serviceRepo, hub: hub, jobClient: jobClient}
+	return &ticketService{
+		repo:        repo,
+		counterRepo: counterRepo,
+		serviceRepo: serviceRepo,
+		hub:         hub,
+		jobClient:   jobClient,
+		log:         slog.Default(),
+	}
 }
 
-func (s *ticketService) CreateTicket(unitID, serviceID string) (*models.Ticket, error) {
-	return s.createTicketInternal(unitID, serviceID, nil)
+func (s *ticketService) writeTicketHistoryTx(tx *gorm.DB, ticketID string, actorUserID *string, action string, payload map[string]interface{}) error {
+	h, err := ticketaudit.NewHistory(ticketID, action, actorUserID, payload)
+	if err != nil {
+		return err
+	}
+	return s.repo.CreateTicketHistoryTx(tx, h)
 }
 
-func (s *ticketService) CreateTicketWithPreRegistration(unitID, serviceID, preRegID string) (*models.Ticket, error) {
-	return s.createTicketInternal(unitID, serviceID, &preRegID)
+func (s *ticketService) CreateTicket(unitID, serviceID string, actorUserID *string) (*models.Ticket, error) {
+	return s.createTicketInternal(unitID, serviceID, nil, actorUserID)
 }
 
-func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID *string) (*models.Ticket, error) {
-	// Generate Queue Number
+func (s *ticketService) CreateTicketWithPreRegistration(unitID, serviceID, preRegID string, actorUserID *string) (*models.Ticket, error) {
+	return s.createTicketInternal(unitID, serviceID, &preRegID, actorUserID)
+}
+
+func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID *string, actorUserID *string) (*models.Ticket, error) {
 	date := time.Now().Format("2006-01-02")
-	seq, err := s.repo.GetNextSequence(unitID, serviceID, date)
-	if err != nil {
-		return nil, err
-	}
+	var ticket *models.Ticket
+	if err := s.repo.Transaction(func(tx *gorm.DB) error {
+		seq, err := s.repo.GetNextSequenceTx(tx, unitID, serviceID, date)
+		if err != nil {
+			return err
+		}
+		service, err := s.serviceRepo.FindByIDTx(tx, serviceID)
+		if err != nil {
+			return err
+		}
 
-	// Fetch service to get prefix
-	service, err := s.serviceRepo.FindByID(serviceID)
-	if err != nil {
-		return nil, err
-	}
+		queueNumber := fmt.Sprintf("%03d", seq)
+		if service.Prefix != nil && *service.Prefix != "" {
+			queueNumber = fmt.Sprintf("%s-%03d", *service.Prefix, seq)
+		}
 
-	queueNumber := fmt.Sprintf("%03d", seq)
-	if service.Prefix != nil && *service.Prefix != "" {
-		queueNumber = fmt.Sprintf("%s-%03d", *service.Prefix, seq)
-	}
+		ticket = &models.Ticket{
+			UnitID:            unitID,
+			ServiceID:         serviceID,
+			QueueNumber:       queueNumber,
+			Status:            "waiting",
+			CreatedAt:         time.Now(),
+			MaxWaitingTime:    service.MaxWaitingTime,
+			PreRegistrationID: preRegID,
+		}
 
-	ticket := &models.Ticket{
-		UnitID:            unitID,
-		ServiceID:         serviceID,
-		QueueNumber:       queueNumber,
-		Status:            "waiting",
-		CreatedAt:         time.Now(),
-		MaxWaitingTime:    service.MaxWaitingTime,
-		PreRegistrationID: preRegID,
-	}
-
-	if err := s.repo.Create(ticket); err != nil {
+		payload := map[string]interface{}{
+			"unit_id":    unitID,
+			"service_id": serviceID,
+			"status":     "waiting",
+		}
+		if preRegID != nil {
+			payload["pre_registration_id"] = *preRegID
+			payload["source"] = "pre_registration_redeem"
+		} else {
+			payload["source"] = "public_issue"
+		}
+		if err := s.repo.CreateTx(tx, ticket); err != nil {
+			return err
+		}
+		return s.writeTicketHistoryTx(tx, ticket.ID, actorUserID, ticketaudit.ActionTicketCreated, payload)
+	}); err != nil {
 		return nil, err
 	}
 
@@ -88,48 +125,83 @@ func (s *ticketService) GetTicketsByUnit(unitID string) ([]models.Ticket, error)
 	return s.repo.FindByUnitID(unitID)
 }
 
-func (s *ticketService) CallNext(unitID, counterID string, serviceID *string) (*models.Ticket, error) {
-	ticket, err := s.repo.FindWaiting(unitID, serviceID)
+func (s *ticketService) CallNext(unitID, counterID string, serviceID *string, actorUserID *string) (*models.Ticket, error) {
+	var ticket *models.Ticket
+	err := s.repo.Transaction(func(tx *gorm.DB) error {
+		t, err := s.repo.FindWaitingForUpdateTx(tx, unitID, serviceID)
+		if err != nil {
+			return err
+		}
+		ticket = t
+		fromStatus := ticket.Status
+		now := time.Now()
+		ticket.Status = "called"
+		ticket.CounterID = &counterID
+		ticket.CalledAt = &now
+
+		payload := map[string]interface{}{
+			"unit_id":     ticket.UnitID,
+			"service_id":  ticket.ServiceID,
+			"counter_id":  counterID,
+			"from_status": fromStatus,
+			"to_status":   "called",
+			"source":      "unit_call_next",
+		}
+		if err := s.repo.UpdateTx(tx, ticket); err != nil {
+			return err
+		}
+		return s.writeTicketHistoryTx(tx, ticket.ID, actorUserID, ticketaudit.ActionTicketCalled, payload)
+	})
 	if err != nil {
-		return nil, errors.New("no waiting tickets")
-	}
-
-	now := time.Now()
-	ticket.Status = "called"
-	ticket.CounterID = &counterID
-	ticket.CalledAt = &now
-
-	if err := s.repo.Update(ticket); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("no waiting tickets")
+		}
 		return nil, err
 	}
 
 	s.hub.BroadcastEvent("ticket.called", ticket, ticket.UnitID)
 
-	// Enqueue TTS Job
 	s.enqueueTTS(ticket, counterID)
 
 	return ticket, nil
 }
 
-func (s *ticketService) UpdateStatus(ticketID, status string) (*models.Ticket, error) {
-	ticket, err := s.repo.FindByID(ticketID)
+func (s *ticketService) UpdateStatus(ticketID, status string, actorUserID *string) (*models.Ticket, error) {
+	var ticket *models.Ticket
+	err := s.repo.Transaction(func(tx *gorm.DB) error {
+		t, err := s.repo.FindByIDForUpdateTx(tx, ticketID)
+		if err != nil {
+			return err
+		}
+		ticket = t
+		fromStatus := ticket.Status
+		ticket.Status = status
+		now := time.Now()
+
+		switch status {
+		case "served":
+			ticket.CompletedAt = &now
+		case "no_show":
+			ticket.CompletedAt = &now
+		case "in_service":
+			ticket.ConfirmedAt = &now
+		}
+
+		payload := map[string]interface{}{
+			"unit_id":     ticket.UnitID,
+			"from_status": fromStatus,
+			"to_status":   status,
+			"reason":      "api_status_patch",
+		}
+		if ticket.CounterID != nil {
+			payload["counter_id"] = *ticket.CounterID
+		}
+		if err := s.repo.UpdateTx(tx, ticket); err != nil {
+			return err
+		}
+		return s.writeTicketHistoryTx(tx, ticket.ID, actorUserID, ticketaudit.ActionTicketStatusChanged, payload)
+	})
 	if err != nil {
-		return nil, err
-	}
-
-	ticket.Status = status
-	now := time.Now()
-
-	switch status {
-	case "served":
-		ticket.CompletedAt = &now
-	case "no_show":
-		ticket.CompletedAt = &now
-	case "in_service":
-		ticket.ConfirmedAt = &now
-	}
-
-	if err := s.repo.Update(ticket); err != nil {
 		return nil, err
 	}
 
@@ -137,17 +209,32 @@ func (s *ticketService) UpdateStatus(ticketID, status string) (*models.Ticket, e
 	return ticket, nil
 }
 
-func (s *ticketService) Recall(ticketID string) (*models.Ticket, error) {
-	ticket, err := s.repo.FindByID(ticketID)
+func (s *ticketService) Recall(ticketID string, actorUserID *string) (*models.Ticket, error) {
+	var ticket *models.Ticket
+	err := s.repo.Transaction(func(tx *gorm.DB) error {
+		t, err := s.repo.FindByIDForUpdateTx(tx, ticketID)
+		if err != nil {
+			return err
+		}
+		ticket = t
+		now := time.Now()
+		ticket.Status = "called"
+		ticket.LastCalledAt = &now
+
+		payload := map[string]interface{}{
+			"unit_id":    ticket.UnitID,
+			"service_id": ticket.ServiceID,
+			"status":     ticket.Status,
+		}
+		if ticket.CounterID != nil {
+			payload["counter_id"] = *ticket.CounterID
+		}
+		if err := s.repo.UpdateTx(tx, ticket); err != nil {
+			return err
+		}
+		return s.writeTicketHistoryTx(tx, ticket.ID, actorUserID, ticketaudit.ActionTicketRecalled, payload)
+	})
 	if err != nil {
-		return nil, err
-	}
-
-	now := time.Now()
-	ticket.Status = "called"
-	ticket.LastCalledAt = &now
-
-	if err := s.repo.Update(ticket); err != nil {
 		return nil, err
 	}
 
@@ -160,18 +247,34 @@ func (s *ticketService) Recall(ticketID string) (*models.Ticket, error) {
 	return ticket, nil
 }
 
-func (s *ticketService) Pick(ticketID, counterID string) (*models.Ticket, error) {
-	ticket, err := s.repo.FindByID(ticketID)
+func (s *ticketService) Pick(ticketID, counterID string, actorUserID *string) (*models.Ticket, error) {
+	var ticket *models.Ticket
+	err := s.repo.Transaction(func(tx *gorm.DB) error {
+		t, err := s.repo.FindByIDForUpdateTx(tx, ticketID)
+		if err != nil {
+			return err
+		}
+		ticket = t
+		fromStatus := ticket.Status
+		now := time.Now()
+		ticket.Status = "called"
+		ticket.CounterID = &counterID
+		ticket.CalledAt = &now
+
+		payload := map[string]interface{}{
+			"unit_id":     ticket.UnitID,
+			"service_id":  ticket.ServiceID,
+			"counter_id":  counterID,
+			"from_status": fromStatus,
+			"to_status":   "called",
+			"source":      "pick",
+		}
+		if err := s.repo.UpdateTx(tx, ticket); err != nil {
+			return err
+		}
+		return s.writeTicketHistoryTx(tx, ticket.ID, actorUserID, ticketaudit.ActionTicketCalled, payload)
+	})
 	if err != nil {
-		return nil, err
-	}
-
-	now := time.Now()
-	ticket.Status = "called"
-	ticket.CounterID = &counterID
-	ticket.CalledAt = &now
-
-	if err := s.repo.Update(ticket); err != nil {
 		return nil, err
 	}
 
@@ -181,33 +284,65 @@ func (s *ticketService) Pick(ticketID, counterID string) (*models.Ticket, error)
 	return ticket, nil
 }
 
-func (s *ticketService) Transfer(ticketID string, toCounterID, toUserID *string) (*models.Ticket, error) {
-	ticket, err := s.repo.FindByID(ticketID)
-	if err != nil {
-		return nil, err
-	}
-
-	var targetCounterID string
-
-	if toCounterID != nil {
-		targetCounterID = *toCounterID
-	} else if toUserID != nil {
-		// Find counter by user ID
-		counter, err := s.counterRepo.FindByUserID(*toUserID)
-		if err != nil {
-			return nil, errors.New("counter not found for user")
-		}
-		targetCounterID = counter.ID
-	} else {
+func (s *ticketService) Transfer(ticketID string, toCounterID, toUserID *string, actorUserID *string) (*models.Ticket, error) {
+	if toCounterID == nil && toUserID == nil {
 		return nil, errors.New("target counter or user required")
 	}
 
-	ticket.CounterID = &targetCounterID
-	ticket.Status = "waiting" // Back to waiting but assigned to a counter? Or just waiting in general?
-	// If we assign a counter, it might be "waiting for that counter".
-	// For now, let's set it to waiting.
+	var ticket *models.Ticket
+	err := s.repo.Transaction(func(tx *gorm.DB) error {
+		t, err := s.repo.FindByIDForUpdateTx(tx, ticketID)
+		if err != nil {
+			return err
+		}
+		ticket = t
 
-	if err := s.repo.Update(ticket); err != nil {
+		fromStatus := ticket.Status
+		var fromCounterID *string
+		if ticket.CounterID != nil {
+			c := *ticket.CounterID
+			fromCounterID = &c
+		}
+
+		var targetCounterID string
+		if toCounterID != nil {
+			targetCounterID = *toCounterID
+		} else {
+			counter, err := s.counterRepo.FindByUserIDTx(tx, *toUserID)
+			if err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return errCounterNotFoundForUser
+				}
+				return err
+			}
+			targetCounterID = counter.ID
+		}
+
+		ticket.CounterID = &targetCounterID
+		ticket.Status = "waiting"
+
+		payload := map[string]interface{}{
+			"unit_id":       ticket.UnitID,
+			"service_id":    ticket.ServiceID,
+			"from_status":   fromStatus,
+			"to_status":     "waiting",
+			"to_counter_id": targetCounterID,
+		}
+		if toUserID != nil {
+			payload["target_user_id"] = *toUserID
+		}
+		if fromCounterID != nil {
+			payload["from_counter_id"] = *fromCounterID
+		}
+		if err := s.repo.UpdateTx(tx, ticket); err != nil {
+			return err
+		}
+		return s.writeTicketHistoryTx(tx, ticket.ID, actorUserID, ticketaudit.ActionTicketTransferred, payload)
+	})
+	if err != nil {
+		if errors.Is(err, errCounterNotFoundForUser) {
+			return nil, errCounterNotFoundForUser
+		}
 		return nil, err
 	}
 
@@ -215,18 +350,42 @@ func (s *ticketService) Transfer(ticketID string, toCounterID, toUserID *string)
 	return ticket, nil
 }
 
-func (s *ticketService) ReturnToQueue(ticketID string) (*models.Ticket, error) {
-	ticket, err := s.repo.FindByID(ticketID)
+func (s *ticketService) ReturnToQueue(ticketID string, actorUserID *string) (*models.Ticket, error) {
+	var ticket *models.Ticket
+	err := s.repo.Transaction(func(tx *gorm.DB) error {
+		t, err := s.repo.FindByIDForUpdateTx(tx, ticketID)
+		if err != nil {
+			return err
+		}
+		ticket = t
+
+		fromStatus := ticket.Status
+		var fromCounterID *string
+		if ticket.CounterID != nil {
+			c := *ticket.CounterID
+			fromCounterID = &c
+		}
+
+		ticket.Status = "waiting"
+		ticket.CounterID = nil
+		ticket.CalledAt = nil
+		ticket.ConfirmedAt = nil
+
+		payload := map[string]interface{}{
+			"unit_id":     ticket.UnitID,
+			"service_id":  ticket.ServiceID,
+			"from_status": fromStatus,
+			"to_status":   "waiting",
+		}
+		if fromCounterID != nil {
+			payload["from_counter_id"] = *fromCounterID
+		}
+		if err := s.repo.UpdateTx(tx, ticket); err != nil {
+			return err
+		}
+		return s.writeTicketHistoryTx(tx, ticket.ID, actorUserID, ticketaudit.ActionTicketReturnedToQueue, payload)
+	})
 	if err != nil {
-		return nil, err
-	}
-
-	ticket.Status = "waiting"
-	ticket.CounterID = nil
-	ticket.CalledAt = nil
-	ticket.ConfirmedAt = nil
-
-	if err := s.repo.Update(ticket); err != nil {
 		return nil, err
 	}
 
@@ -248,6 +407,12 @@ func (s *ticketService) enqueueTTS(ticket *models.Ticket, counterID string) {
 		CounterName: counterName,
 	})
 	if err != nil {
-		fmt.Printf("Failed to enqueue TTS job: %v\n", err)
+		s.log.Error("failed to enqueue TTS job",
+			slog.String("ticket_id", ticket.ID),
+			slog.String("queue_number", ticket.QueueNumber),
+			slog.String("unit_id", ticket.UnitID),
+			slog.String("counter_name", counterName),
+			slog.Any("error", err),
+		)
 	}
 }

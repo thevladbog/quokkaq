@@ -4,6 +4,7 @@ import { ReactNode, useMemo } from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import AppSidebar from '@/components/AppSidebar';
 import PlatformSidebar from '@/components/PlatformSidebar';
+import SettingsSidebar from '@/components/SettingsSidebar';
 import { usePathname } from 'next/navigation';
 import ProtectedSidebarLayout from '@/components/ProtectedSidebarLayout';
 import { platformRouteAllowsTenantAdmin } from '@/lib/platform-access';
@@ -48,10 +49,15 @@ const ConditionalLayout = ({ children }: ConditionalLayoutProps) => {
     }
 
     if (
-      pathWithoutLocale === '/admin' ||
-      pathWithoutLocale === '/admin/grid-configuration'
+      pathWithoutLocale === '/settings' ||
+      pathWithoutLocale.startsWith('/settings/')
     ) {
-      return { useSidebar: true, protected: true, roles: ['admin'] };
+      return {
+        useSidebar: true,
+        protected: true,
+        roles: ['admin'],
+        SidebarComponent: SettingsSidebar
+      };
     }
 
     if (pathWithoutLocale === '/staff') {
@@ -63,17 +69,15 @@ const ConditionalLayout = ({ children }: ConditionalLayoutProps) => {
       };
     }
 
-    // Organization pages - admin only
     if (
-      pathWithoutLocale === '/organization' ||
-      pathWithoutLocale.startsWith('/organization/')
+      pathWithoutLocale === '/pre-registrations' ||
+      pathWithoutLocale.startsWith('/pre-registrations/')
     ) {
-      return { useSidebar: true, protected: true, roles: ['admin'] };
-    }
-
-    // Pricing page - public but with sidebar
-    if (pathWithoutLocale === '/pricing') {
-      return { useSidebar: true, protected: false };
+      return {
+        useSidebar: true,
+        protected: true,
+        roles: ['admin', 'staff', 'supervisor']
+      };
     }
 
     // Onboarding - admin only
@@ -81,12 +85,6 @@ const ConditionalLayout = ({ children }: ConditionalLayoutProps) => {
       pathWithoutLocale === '/onboarding' ||
       pathWithoutLocale.startsWith('/onboarding/')
     ) {
-      return { useSidebar: true, protected: true, roles: ['admin'] };
-    }
-
-    // Check if it's a subpage of admin that should use the same layout
-    if (pathWithoutLocale.startsWith('/admin')) {
-      // All admin subpages use sidebar layout
       return { useSidebar: true, protected: true, roles: ['admin'] };
     }
 

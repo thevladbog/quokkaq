@@ -27,7 +27,7 @@ func NewQuotaService() QuotaService {
 
 // UsageMetrics represents current usage across all metrics
 type UsageMetrics struct {
-	CurrentPeriod Period                    `json:"currentPeriod"`
+	CurrentPeriod Period                     `json:"currentPeriod"`
 	Metrics       map[string]UsageMetricInfo `json:"metrics"`
 }
 
@@ -72,9 +72,11 @@ func (s *quotaService) GetCurrentUsage(companyID string, metric string) (int, er
 
 	switch metric {
 	case "units":
-		// Count units for this company
+		// Count billable branch/operational units; pure service zones do not consume quota.
 		var count int64
-		if err := db.Model(&models.Unit{}).Where("company_id = ?", companyID).Count(&count).Error; err != nil {
+		if err := db.Model(&models.Unit{}).
+			Where("company_id = ? AND kind = ?", companyID, models.UnitKindSubdivision).
+			Count(&count).Error; err != nil {
 			return 0, err
 		}
 		return int(count), nil
@@ -220,11 +222,11 @@ func (s *quotaService) limitsMapForCompany(companyID string) (map[string]int, er
 // getDefaultLimit returns default limits for free/no-subscription users
 func (s *quotaService) getDefaultLimit(metric string) int {
 	defaults := map[string]int{
-		"units":              1,
-		"users":              3,
-		"tickets_per_month":  100,
-		"services":           5,
-		"counters":           2,
+		"units":             1,
+		"users":             3,
+		"tickets_per_month": 100,
+		"services":          5,
+		"counters":          2,
 	}
 
 	if limit, exists := defaults[metric]; exists {

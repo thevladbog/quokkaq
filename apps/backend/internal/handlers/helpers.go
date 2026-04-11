@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+
+	"quokkaq-go-backend/internal/middleware"
 )
 
 // encodeJSONResponse marshals data to JSON in a buffer without writing to the ResponseWriter.
@@ -45,4 +47,13 @@ func RespondJSONWithStatus(w http.ResponseWriter, status int, data interface{}) 
 		return false
 	}
 	return true
+}
+
+// getActorFromRequest returns a pointer to the authenticated user ID for audit fields, or nil if absent.
+func getActorFromRequest(r *http.Request) *string {
+	if uid, ok := middleware.GetUserIDFromContext(r.Context()); ok && uid != "" {
+		u := uid
+		return &u
+	}
+	return nil
 }

@@ -6,7 +6,6 @@ import {
   LayoutDashboard,
   Building,
   Users,
-  Settings,
   Grid3X3,
   Menu,
   Mail,
@@ -33,22 +32,22 @@ export default function AdminSidebar({ className }: AdminSidebarProps) {
     {
       icon: LayoutDashboard,
       label: t('navigation.dashboard', { defaultValue: 'Dashboard' }),
-      href: '/admin',
+      href: '/settings',
       active:
-        isActive('/admin') &&
+        isActive('/settings') &&
         !isActive('/units') &&
         !isActive('/grid-configuration')
     },
     {
       icon: Building,
       label: t('navigation.units', { defaultValue: 'Units' }),
-      href: '/admin/units',
+      href: '/settings/units',
       active: isActive('/units')
     },
     {
       icon: Users,
       label: t('navigation.users', { defaultValue: 'Users' }),
-      href: '/admin/users',
+      href: '/settings/users',
       active: isActive('/users')
     },
     {
@@ -56,19 +55,19 @@ export default function AdminSidebar({ className }: AdminSidebarProps) {
       label: t('navigation.grid_configuration', {
         defaultValue: 'Grid Configuration'
       }),
-      href: '/admin/grid-configuration',
+      href: '/settings/grid-configuration',
       active: isActive('/grid-configuration')
     },
     {
       icon: Mail,
       label: t('navigation.invitations', { defaultValue: 'Invitations' }),
-      href: '/admin/invitations',
+      href: '/settings/invitations',
       active: isActive('/invitations')
     },
     {
       icon: MessageSquare,
       label: t('navigation.templates', { defaultValue: 'Templates' }),
-      href: '/admin/templates',
+      href: '/settings/templates',
       active: isActive('/templates')
     },
     {
@@ -76,14 +75,8 @@ export default function AdminSidebar({ className }: AdminSidebarProps) {
       label: t('navigation.desktop_terminals', {
         defaultValue: 'Desktop terminals'
       }),
-      href: '/admin/desktop-terminals',
+      href: '/settings/desktop-terminals',
       active: isActive('/desktop-terminals')
-    },
-    {
-      icon: Settings,
-      label: t('navigation.settings', { defaultValue: 'Settings' }),
-      href: '/admin/settings',
-      active: isActive('/settings')
     }
   ];
 

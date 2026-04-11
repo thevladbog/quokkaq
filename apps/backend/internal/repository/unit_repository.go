@@ -18,6 +18,9 @@ type UnitRepository interface {
 	// UpdateConfig updates only the config JSONB column (no full Save — avoids wiping associations).
 	UpdateConfig(unitID string, config json.RawMessage) error
 	Delete(id string) error
+	CountChildren(parentID string) (int64, error)
+	FindChildSubdivisions(parentID string) ([]models.Unit, error)
+	FindChildUnits(parentID string) ([]models.Unit, error)
 	AddMaterial(material *models.UnitMaterial) error
 	GetMaterials(unitID string) ([]models.UnitMaterial, error)
 	DeleteMaterial(id string) error
@@ -71,6 +74,28 @@ func (r *unitRepository) UpdateConfig(unitID string, config json.RawMessage) err
 
 func (r *unitRepository) Delete(id string) error {
 	return r.db.Delete(&models.Unit{}, "id = ?", id).Error
+}
+
+func (r *unitRepository) CountChildren(parentID string) (int64, error) {
+	var count int64
+	err := r.db.Model(&models.Unit{}).Where("parent_id = ?", parentID).Count(&count).Error
+	return count, err
+}
+
+func (r *unitRepository) FindChildSubdivisions(parentID string) ([]models.Unit, error) {
+	var units []models.Unit
+	err := r.db.Where("parent_id = ? AND kind = ?", parentID, models.UnitKindSubdivision).
+		Order("sort_order ASC, name ASC").
+		Find(&units).Error
+	return units, err
+}
+
+func (r *unitRepository) FindChildUnits(parentID string) ([]models.Unit, error) {
+	var units []models.Unit
+	err := r.db.Where("parent_id = ?", parentID).
+		Order("sort_order ASC, name ASC").
+		Find(&units).Error
+	return units, err
 }
 
 func (r *unitRepository) AddMaterial(material *models.UnitMaterial) error {

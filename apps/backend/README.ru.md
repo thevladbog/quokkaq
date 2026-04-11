@@ -97,7 +97,7 @@
 Перед запуском QuokkaQ Backend убедитесь, что у вас установлены:
 
 - **Go** 1.26.0 или выше
-- **PostgreSQL** 14+
+- **PostgreSQL** 16+ (нужен для индекса `units_company_parent_code_uq` с `NULLS NOT DISTINCT`; в Docker Compose — `postgres:16-alpine`)
 - **Redis** 6+ - для фоновых задач
 - **MinIO** или AWS S3
 - **SMTP сервер** (например, Yandex, Gmail, SendGrid) - для email-уведомлений
@@ -145,7 +145,7 @@ docker run -d \
   minio/minio server /data --console-address ":9001"
 ```
 
-Откройте консоль MinIO по адресу http://localhost:9001 и создайте bucket `quokkaq-materials`.
+Откройте консоль MinIO по адресу <http://localhost:9001> и создайте bucket `quokkaq-materials`.
 
 ### 5. Настройка Redis (для фоновых задач)
 
@@ -201,7 +201,7 @@ SMTP_SECURE=false
 go run cmd/api/main.go
 ```
 
-Сервер запустится по адресу http://localhost:3001
+Сервер запустится по адресу <http://localhost:3001>
 
 ### Production сборка
 
@@ -232,13 +232,13 @@ air
 
 После запуска сервера, откройте интерактивную документацию API:
 
-**Scalar API Reference**: http://localhost:3001/swagger/
+**Scalar API Reference**: <http://localhost:3001/swagger/>
 
 ### Спецификация Swagger
 
 OpenAPI спецификация доступна по адресам:
 
-- **JSON формат**: http://localhost:3001/docs/swagger.json
+- **JSON формат**: <http://localhost:3001/docs/swagger.json>
 - **YAML формат**: `./docs/swagger.yaml`
 
 ### Генерация документации API
@@ -328,12 +328,12 @@ docker-compose down -v
 ```
 
 После запуска сервисы будут доступны по адресам:
-- **API**: http://localhost:3001
-- **API Документация**: http://localhost:3001/swagger/
-- **Консоль MinIO**: http://localhost:9001 (логин: minioadmin/minioadmin)
+- **API**: <http://localhost:3001>
+- **API Документация**: <http://localhost:3001/swagger/>
+- **Консоль MinIO**: <http://localhost:9001> (логин: minioadmin/minioadmin)
 
 **Первоначальная настройка:**
-1. Откройте консоль MinIO по адресу http://localhost:9001
+1. Откройте консоль MinIO по адресу <http://localhost:9001>
 2. Создайте bucket с именем `quokkaq-materials`
 3. API автоматически выполнит миграции при первом запуске
 

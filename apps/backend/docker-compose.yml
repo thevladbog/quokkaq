@@ -153,54 +153,6 @@ services:
       retries: 8
       start_period: 120s
 
-  # One-shot seed so E2E sees an initialized system (SystemStatusGuard otherwise redirects /login → /setup).
-  e2e-seed:
-    profiles:
-      - e2e
-    build:
-      context: ../..
-      dockerfile: apps/backend/Dockerfile
-    container_name: quokkaq-e2e-seed
-    restart: "no"
-    entrypoint: ["/app/seed-simple"]
-    environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/quokkaq
-    depends_on:
-      backend:
-        condition: service_healthy
-    networks:
-      - quokkaq-network
-
-  # Frontend E2E (Testplane): same Linux+Chromium stack locally and in CI. Not started by plain `docker compose up`.
-  e2e:
-    profiles:
-      - e2e
-    build:
-      context: ../..
-      dockerfile: apps/frontend/e2e/Dockerfile
-    container_name: quokkaq-e2e
-    networks:
-      - quokkaq-network
-    depends_on:
-      backend:
-        condition: service_healthy
-      e2e-seed:
-        condition: service_completed_successfully
-    working_dir: /workspace
-    volumes:
-      - ../..:/workspace
-    environment:
-      HUSKY: "0"
-      CI: "true"
-      CHROME_BIN: /usr/bin/chromium
-      # Server-side proxy (route.ts); avoids build-time inlining issues for /api → Go API in Docker.
-      API_UPSTREAM_URL: http://backend:3001
-      NEXT_PUBLIC_API_URL: http://backend:3001
-      NEXT_PUBLIC_WS_URL: ws://backend:3001
-      E2E_BASE_URL: http://127.0.0.1:3000
-      E2E_UPDATE_REFS: ${E2E_UPDATE_REFS:-0}
-    entrypoint: ["/workspace/apps/frontend/e2e/run-e2e.sh"]
-
 networks:
   quokkaq-network:
     driver: bridge

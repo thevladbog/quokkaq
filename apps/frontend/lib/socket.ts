@@ -15,7 +15,7 @@ export interface QueueSnapshot {
 
 type Listener = (data: unknown) => void;
 
-class SocketClient {
+export class SocketClient {
   private socket: WebSocket | null = null;
   private unitId: string | null = null;
   private listeners: Map<string, Set<Listener>> = new Map();
@@ -95,9 +95,9 @@ class SocketClient {
     };
 
     this.socket.onerror = (error) => {
-      // Connection failures also trigger onclose/retry; still log at error so production sees them.
+      // Do not call close() here: while CONNECTING it makes Chrome log
+      // "WebSocket is closed before the connection is established". onclose runs next and handles retry.
       logger.error('WebSocket connection issue (will retry):', error);
-      this.socket?.close();
     };
   }
 
@@ -107,9 +107,24 @@ class SocketClient {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
-    if (this.socket) {
-      this.socket.close();
+    const s = this.socket;
+    if (!s) return;
+
+    // React Strict Mode runs effect cleanup while the socket may still be CONNECTING.
+    // Calling close() in that state makes Chrome log "closed before the connection is established".
+    if (s.readyState === WebSocket.CONNECTING) {
       this.socket = null;
+      s.onopen = null;
+      s.onmessage = null;
+      s.onerror = null;
+      s.onclose = null;
+      s.addEventListener('open', () => s.close(), { once: true });
+      return;
+    }
+
+    this.socket = null;
+    if (s.readyState === WebSocket.OPEN) {
+      s.close();
     }
   }
 

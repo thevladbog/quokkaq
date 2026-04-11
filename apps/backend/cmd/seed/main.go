@@ -94,11 +94,12 @@ func main() {
 	database.DB.Create(&company)
 	fmt.Printf("Created company: %s (ID: %s)\n", company.Name, company.ID)
 
-	// Create unit
+	// Root subdivision (branch): queues, kiosk, counters attach to this unitId.
 	unit := models.Unit{
 		CompanyID: company.ID,
 		Name:      "Main Office",
 		Code:      "MAIN",
+		Kind:      models.UnitKindSubdivision,
 		Timezone:  "Europe/Moscow",
 	}
 	database.DB.Create(&unit)

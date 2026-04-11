@@ -2,18 +2,27 @@
   "name": "@quokkaq/source",
   "version": "0.0.0",
   "license": "UNLICENSED",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@parcel/watcher",
+      "@swc/core",
+      "esbuild",
+      "msw",
+      "nx",
+      "sharp",
+      "unrs-resolver"
+    ]
+  },
   "scripts": {
     "prepare": "husky",
-    "precommit": "lint-staged && pnpm --dir apps/frontend exec prettier --check .",
-    "e2e:docker": "docker compose --profile e2e -f apps/backend/docker-compose.yml run --rm e2e",
-    "e2e:docker:update-refs": "E2E_UPDATE_REFS=1 docker compose --profile e2e -f apps/backend/docker-compose.yml run --rm e2e"
+    "precommit": "lint-staged && pnpm --dir apps/frontend run format:check"
   },
   "private": true,
   "devDependencies": {
-    "@nx/js": "22.6.1",
-    "@nx/workspace": "22.6.1",
+    "@nx/js": "22.6.5",
+    "@nx/workspace": "22.6.5",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
-    "nx": "22.6.1"
+    "nx": "22.6.5"
   }
 }

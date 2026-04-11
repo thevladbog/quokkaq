@@ -114,7 +114,7 @@
 Before running QuokkaQ Backend, ensure you have:
 
 - **Go** 1.26.0 or higher ([Download](https://golang.org/dl/))
-- **PostgreSQL** 14+ ([Download](https://www.postgresql.org/download/))
+- **PostgreSQL** 16+ ([Download](https://www.postgresql.org/download/)) — required for `units_company_parent_code_uq` (`NULLS NOT DISTINCT`); local stack uses `postgres:16-alpine` in Docker Compose
 - **Redis** 6+ ([Download](https://redis.io/download)) - for background jobs
 - **MinIO** or AWS S3 ([MinIO Setup](https://min.io/docs/minio/linux/operations/installation.html))
 - **SMTP Server** (e.g., Yandex, Gmail, SendGrid) - for email notifications
@@ -162,7 +162,7 @@ docker run -d \
   minio/minio server /data --console-address ":9001"
 ```
 
-Access MinIO Console at http://localhost:9001 and create a bucket named `quokkaq-materials`.
+Access MinIO Console at <http://localhost:9001> and create a bucket named `quokkaq-materials`.
 
 ### 5. Set Up Redis (for Background Jobs)
 
@@ -206,7 +206,7 @@ SMTP_USER=your-email@example.com
 go run cmd/api/main.go
 ```
 
-The server will start on http://localhost:3001
+The server will start on <http://localhost:3001>
 
 ### Production Build
 
@@ -237,13 +237,13 @@ air
 
 Once the server is running, access the interactive API documentation:
 
-**Scalar API Reference**: http://localhost:3001/swagger/
+**Scalar API Reference**: <http://localhost:3001/swagger/>
 
 ### Swagger Specification
 
 The OpenAPI specification is available at:
 
-- **JSON Format**: http://localhost:3001/docs/swagger.json
+- **JSON Format**: <http://localhost:3001/docs/swagger.json>
 - **YAML Format**: `./docs/swagger.yaml`
 
 ### Generating API Docs
@@ -381,12 +381,12 @@ docker-compose down -v
 ```
 
 After starting, the services will be available at:
-- **API**: http://localhost:3001
-- **API Documentation**: http://localhost:3001/swagger/
-- **MinIO Console**: http://localhost:9001 (login: minioadmin/minioadmin)
+- **API**: <http://localhost:3001>
+- **API Documentation**: <http://localhost:3001/swagger/>
+- **MinIO Console**: <http://localhost:9001> (login: minioadmin/minioadmin)
 
 **First-time setup:**
-1. Access MinIO Console at http://localhost:9001
+1. Access MinIO Console at <http://localhost:9001>
 2. Create a bucket named `quokkaq-materials`
 3. The API will automatically run migrations on first start
 

@@ -6,6 +6,8 @@ import (
 	"log"
 	"os"
 	dbmodels "quokkaq-go-backend/internal/models"
+	"strconv"
+	"strings"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -51,6 +53,23 @@ func Connect() {
 	}
 
 	fmt.Println("Database connected successfully")
+}
+
+// requirePostgresAtLeastVersionNum fails if server_version_num < minNum (e.g. 160000 = PostgreSQL 16.0).
+func requirePostgresAtLeastVersionNum(db *gorm.DB, minNum int, what string) error {
+	var verStr string
+	if err := db.Raw(`SELECT current_setting('server_version_num')`).Scan(&verStr).Error; err != nil {
+		return fmt.Errorf("read PostgreSQL server_version_num: %w", err)
+	}
+	v, err := strconv.Atoi(strings.TrimSpace(verStr))
+	if err != nil {
+		return fmt.Errorf("parse server_version_num %q: %w", verStr, err)
+	}
+	if v < minNum {
+		maj, min := minNum/10000, (minNum/100)%100
+		return fmt.Errorf("%s requires PostgreSQL %d.%d+ (current server_version_num=%d)", what, maj, min, v)
+	}
+	return nil
 }
 
 // Ping checks connectivity to PostgreSQL using the GORM pool (*sql.DB).
@@ -225,6 +244,124 @@ func RunVersionedMigrations(models ...interface{}) error {
 	})
 	if err != nil {
 		return fmt.Errorf("failed to run invoice_lines unit column migration: %w", err)
+	}
+
+	// Service zones + workplaces: hierarchy on units, composite unique (company_id, parent_id, code).
+	err = manager.RunMigration("v1.0.9_units_service_zones", func(db *gorm.DB) error {
+		if err := db.Exec(`
+			ALTER TABLE units ADD COLUMN IF NOT EXISTS parent_id TEXT;
+			ALTER TABLE units ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'workplace';
+			ALTER TABLE units ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0;
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			UPDATE units SET kind = 'workplace' WHERE kind IS NULL OR btrim(kind) = '';
+		`).Error; err != nil {
+			return err
+		}
+		// Drop legacy single-column unique on code (name varies by GORM version).
+		if err := db.Exec(`
+			DO $$
+			DECLARE r RECORD;
+			BEGIN
+				FOR r IN
+					SELECT c.conname
+					FROM pg_constraint c
+					WHERE c.conrelid = 'units'::regclass
+					  AND c.contype = 'u'
+					  AND array_length(c.conkey, 1) = 1
+					  AND EXISTS (
+						SELECT 1 FROM pg_attribute a
+						WHERE a.attrelid = c.conrelid AND a.attnum = c.conkey[1] AND a.attname = 'code'
+					  )
+				LOOP
+					EXECUTE format('ALTER TABLE units DROP CONSTRAINT IF EXISTS %I', r.conname);
+				END LOOP;
+			END $$;
+		`).Error; err != nil {
+			return err
+		}
+		// Drop legacy unique indexes on units(code) only (name varies by GORM/tooling);
+		// constraints were removed above — this catches standalone unique indexes.
+		if err := db.Exec(`
+			DO $$
+			DECLARE r RECORD;
+			BEGIN
+				FOR r IN
+					SELECT n.nspname AS idx_schema, ic.relname AS idx_name
+					FROM pg_index x
+					JOIN pg_class ic ON ic.oid = x.indexrelid
+					JOIN pg_namespace n ON n.oid = ic.relnamespace
+					WHERE x.indrelid = 'units'::regclass
+					  AND x.indisunique = true
+					  AND NOT x.indisprimary
+					  AND (
+						  SELECT count(*)::int
+						  FROM unnest(x.indkey::smallint[]) AS k(attnum)
+						  WHERE k.attnum > 0
+					  ) = 1
+					  AND EXISTS (
+						  SELECT 1
+						  FROM unnest(x.indkey::smallint[]) AS k(attnum)
+						  JOIN pg_attribute a ON a.attrelid = x.indrelid AND a.attnum = k.attnum
+						  WHERE k.attnum > 0 AND a.attname = 'code'
+					  )
+				LOOP
+					EXECUTE format('DROP INDEX IF EXISTS %I.%I', r.idx_schema, r.idx_name);
+				END LOOP;
+			END $$;
+		`).Error; err != nil {
+			return err
+		}
+		if err := requirePostgresAtLeastVersionNum(db, 160000, "unique index units_company_parent_code_uq (NULLS NOT DISTINCT)"); err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			CREATE UNIQUE INDEX IF NOT EXISTS units_company_parent_code_uq
+			ON units (company_id, parent_id, code) NULLS NOT DISTINCT
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			CREATE INDEX IF NOT EXISTS idx_units_company_parent ON units (company_id, parent_id)
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			DO $$
+			BEGIN
+				IF NOT EXISTS (
+					SELECT 1 FROM pg_constraint
+					WHERE conname = 'units_parent_id_fkey' AND conrelid = 'units'::regclass
+				) THEN
+					ALTER TABLE units
+					ADD CONSTRAINT units_parent_id_fkey
+					FOREIGN KEY (parent_id) REFERENCES units(id) ON UPDATE CASCADE ON DELETE RESTRICT;
+				END IF;
+			END $$;
+		`).Error; err != nil {
+			return err
+		}
+		return db.AutoMigrate(&dbmodels.Unit{})
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run units service zones migration: %w", err)
+	}
+
+	// Remove legacy workplace kind: map to subdivision and fix default.
+	err = manager.RunMigration("v1.1.0_units_remove_workplace_kind", func(db *gorm.DB) error {
+		if err := db.Exec(`
+			UPDATE units SET kind = 'subdivision' WHERE kind = 'workplace' OR kind IS NULL OR btrim(kind) = '';
+		`).Error; err != nil {
+			return err
+		}
+		return db.Exec(`
+			ALTER TABLE units ALTER COLUMN kind SET DEFAULT 'subdivision';
+		`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run units remove workplace migration: %w", err)
 	}
 
 	fmt.Println("All migrations completed successfully")
