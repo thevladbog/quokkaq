@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"time"
+
+	"github.com/google/uuid"
 
 	"quokkaq-go-backend/internal/models"
 )
@@ -42,9 +45,11 @@ func NewHistory(ticketID, action string, actorUserID *string, payload map[string
 		}
 	}
 	return &models.TicketHistory{
-		TicketID: ticketID,
-		Action:   action,
-		UserID:   actorUserID,
-		Payload:  raw,
+		ID:        uuid.New().String(),
+		TicketID:  ticketID,
+		Action:    action,
+		UserID:    actorUserID,
+		Payload:   raw,
+		CreatedAt: time.Now().UTC(),
 	}, nil
 }

@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -151,8 +152,11 @@ type TicketRepository interface {
 	FindByID(id string) (*models.Ticket, error)
 	FindByIDForUpdateTx(tx *gorm.DB, id string) (*models.Ticket, error)
 	FindByUnitID(unitID string) ([]models.Ticket, error)
-	FindWaiting(unitID string, serviceIDs []string) (*models.Ticket, error)
-	FindWaitingForUpdateTx(tx *gorm.DB, unitID string, serviceIDs []string) (*models.Ticket, error)
+	// FindBySubdivisionAndServiceZoneID returns non-EOD tickets for a waiting pool (subdivision row + service_zone_id = zone).
+	FindBySubdivisionAndServiceZoneID(subdivisionID, serviceZoneID string) ([]models.Ticket, error)
+	// FindWaiting returns the next waiting ticket; counterPool nil = subdivision-wide pool (service_zone_id IS NULL).
+	FindWaiting(unitID string, serviceIDs []string, counterPool *string) (*models.Ticket, error)
+	FindWaitingForUpdateTx(tx *gorm.DB, unitID string, serviceIDs []string, counterPool *string) (*models.Ticket, error)
 	Update(ticket *models.Ticket) error
 	UpdateTx(tx *gorm.DB, ticket *models.Ticket) error
 	Delete(id string) error
@@ -181,6 +185,8 @@ type TicketRepository interface {
 	ListShiftActivityActorRows(unitID string, limit int) ([]ShiftActivityActorRow, error)
 	// ListVisitsByClientID returns tickets for a client in the unit (newest first, keyset pagination).
 	ListVisitsByClientID(unitID, clientID string, limit int, beforeTime *time.Time, beforeID *string) ([]models.Ticket, error)
+	// ListTerminalVisitActorNamesByTicketIDs returns display names of users who last moved each ticket to a terminal status (PostgreSQL).
+	ListTerminalVisitActorNamesByTicketIDs(ticketIDs []string) (map[string]string, error)
 }
 
 type ticketRepository struct {
@@ -274,8 +280,25 @@ func (r *ticketRepository) FindByUnitID(unitID string) ([]models.Ticket, error) 
 	return tickets, err
 }
 
-func (r *ticketRepository) FindWaiting(unitID string, serviceIDs []string) (*models.Ticket, error) {
+func (r *ticketRepository) FindBySubdivisionAndServiceZoneID(subdivisionID, serviceZoneID string) ([]models.Ticket, error) {
+	var tickets []models.Ticket
+	err := r.db.Preload("Unit").Preload("Service").Preload("Counter").Preload("PreRegistration").Preload("Client.Definitions").
+		Where("unit_id = ? AND service_zone_id = ? AND is_eod = ?", subdivisionID, serviceZoneID, false).
+		Order("created_at asc").
+		Find(&tickets).Error
+	return tickets, err
+}
+
+func applyWaitingPoolFilter(db *gorm.DB, counterPool *string) *gorm.DB {
+	if counterPool == nil {
+		return db.Where("service_zone_id IS NULL")
+	}
+	return db.Where("service_zone_id = ?", *counterPool)
+}
+
+func (r *ticketRepository) FindWaiting(unitID string, serviceIDs []string, counterPool *string) (*models.Ticket, error) {
 	query := r.db.Where("unit_id = ? AND status = ? AND is_eod = ?", unitID, "waiting", false)
+	query = applyWaitingPoolFilter(query, counterPool)
 	if len(serviceIDs) > 0 {
 		query = query.Where("service_id IN ?", serviceIDs)
 	}
@@ -287,9 +310,10 @@ func (r *ticketRepository) FindWaiting(unitID string, serviceIDs []string) (*mod
 	return &ticket, nil
 }
 
-func (r *ticketRepository) FindWaitingForUpdateTx(tx *gorm.DB, unitID string, serviceIDs []string) (*models.Ticket, error) {
+func (r *ticketRepository) FindWaitingForUpdateTx(tx *gorm.DB, unitID string, serviceIDs []string, counterPool *string) (*models.Ticket, error) {
 	query := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("unit_id = ? AND status = ? AND is_eod = ?", unitID, "waiting", false)
+	query = applyWaitingPoolFilter(query, counterPool)
 	if len(serviceIDs) > 0 {
 		query = query.Where("service_id IN ?", serviceIDs)
 	}
@@ -516,4 +540,33 @@ func (r *ticketRepository) ListVisitsByClientID(unitID, clientID string, limit i
 		return nil, err
 	}
 	return tickets, nil
+}
+
+func (r *ticketRepository) ListTerminalVisitActorNamesByTicketIDs(ticketIDs []string) (map[string]string, error) {
+	out := make(map[string]string)
+	if len(ticketIDs) == 0 {
+		return out, nil
+	}
+	var rows []struct {
+		TicketID  string         `gorm:"column:ticket_id"`
+		ActorName sql.NullString `gorm:"column:actor_name"`
+	}
+	err := r.db.Raw(`
+		SELECT DISTINCT ON (h.ticket_id) h.ticket_id, u.name AS actor_name
+		FROM ticket_histories h
+		LEFT JOIN users u ON u.id = h.user_id
+		WHERE h.ticket_id IN ?
+		AND h.action = ?
+		AND (h.payload::jsonb->>'to_status') IN ('served', 'no_show', 'cancelled', 'completed')
+		ORDER BY h.ticket_id, h.created_at DESC
+	`, ticketIDs, ticketaudit.ActionTicketStatusChanged).Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		if row.ActorName.Valid && strings.TrimSpace(row.ActorName.String) != "" {
+			out[row.TicketID] = strings.TrimSpace(row.ActorName.String)
+		}
+	}
+	return out, nil
 }

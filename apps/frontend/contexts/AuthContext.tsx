@@ -92,11 +92,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  // Fetch user data only after mounting on client and manage loading state
+  // Fetch user after mount / token change. Pathname is only needed for kiosk routes.
+  // Do not set isLoading on every pathname change — that remounts ProtectedRoute and flashes the sidebar.
   useEffect(() => {
     if (!isClient) return;
-
-    setIsLoading(true);
 
     if (!token) {
       setIsLoading(false);
@@ -109,20 +108,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
+    if (user !== null) {
+      return;
+    }
+
+    setIsLoading(true);
+
+    let cancelled = false;
     const fetchUser = async () => {
       try {
         const userData = await authApi.getMe();
-        setUser(userData);
+        if (!cancelled) setUser(userData);
       } catch (error) {
         console.error('Failed to fetch user:', error);
-        logout();
+        if (!cancelled) logout();
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
 
-    fetchUser();
-  }, [isClient, token, pathname, logout]);
+    void fetchUser();
+    return () => {
+      cancelled = true;
+    };
+  }, [isClient, token, pathname, logout, user]);
 
   // Listen for global 'auth:logout' events (dispatched by apiRequest on 401 / refresh failure)
   useEffect(() => {

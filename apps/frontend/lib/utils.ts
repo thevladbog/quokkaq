@@ -5,6 +5,13 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/** next-intl may use `ru`; browsers sometimes use `ru-RU`. */
+function primaryLocaleTag(currentLocale: string): string {
+  const s = currentLocale.trim().toLowerCase();
+  const dash = s.indexOf('-');
+  return dash === -1 ? s : s.slice(0, dash);
+}
+
 // Function to get localized value based on current locale
 export function getLocalizedValue(
   value: string | null | undefined,
@@ -12,9 +19,11 @@ export function getLocalizedValue(
   valueEn: string | null | undefined,
   currentLocale: string
 ): string {
-  if (currentLocale === 'ru' && valueRu) {
+  const loc = primaryLocaleTag(currentLocale);
+  if (loc === 'ru' && valueRu) {
     return valueRu;
-  } else if (currentLocale === 'en' && valueEn) {
+  }
+  if (loc === 'en' && valueEn) {
     return valueEn;
   }
   // If specific translation is not available, return the default value

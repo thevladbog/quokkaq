@@ -21,6 +21,8 @@ type Service struct {
 	MaxWaitingTime  *int    `json:"maxWaitingTime,omitempty"` // In seconds
 	Prebook         bool    `gorm:"default:false" json:"prebook"`
 	IsLeaf          bool    `gorm:"default:false" json:"isLeaf"`
+	// RestrictedServiceZoneID: when set, this leaf service is only offered in that service_zone's waiting pool (child of UnitID subdivision).
+	RestrictedServiceZoneID *string `json:"restrictedServiceZoneId,omitempty" gorm:"column:restricted_service_zone_id"`
 
 	// Grid configuration
 	GridRow     *int `json:"gridRow,omitempty"`
@@ -35,11 +37,13 @@ type Service struct {
 }
 
 type Counter struct {
-	ID         string  `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
-	UnitID     string  `gorm:"not null" json:"unitId"`
-	Name       string  `gorm:"not null" json:"name"`
-	AssignedTo *string `gorm:"column:assigned_to" json:"assignedTo,omitempty"`
-	OnBreak    bool    `gorm:"default:false" json:"onBreak"`
+	ID     string `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
+	UnitID string `gorm:"not null" json:"unitId"`
+	// ServiceZoneID: when set, this counter serves only the waiting pool for that service_zone (direct child of UnitID).
+	ServiceZoneID *string `json:"serviceZoneId,omitempty" gorm:"column:service_zone_id"`
+	Name          string  `gorm:"not null" json:"name"`
+	AssignedTo    *string `gorm:"column:assigned_to" json:"assignedTo,omitempty"`
+	OnBreak       bool    `gorm:"default:false" json:"onBreak"`
 	// BreakStartedAt is hydrated for JSON when OnBreak is true (open break interval); not stored on counters row.
 	BreakStartedAt *time.Time `json:"breakStartedAt,omitempty" gorm:"-" swaggerignore:"true"`
 	AssignedUser   *User      `gorm:"foreignKey:AssignedTo" json:"assignedUser,omitempty"`

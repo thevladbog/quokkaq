@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
@@ -33,9 +33,13 @@ import { countersApi, Counter } from '@/lib/api';
 import { formatApiToastErrorMessage } from '@/lib/format-api-toast-error';
 import { CounterDialog } from './counter-dialog';
 import { cn } from '@/lib/utils';
+import type { CounterServiceZoneFilter } from '@/components/admin/units/counter-zone-filter';
+
+export type { CounterServiceZoneFilter } from '@/components/admin/units/counter-zone-filter';
 
 export type UnitCountersSectionProps = {
-  unitId: string;
+  /** Subdivision id for GET/POST `/units/{id}/counters` and query invalidation. */
+  countersUnitId: string;
   variant?: 'card' | 'embedded';
   /** Embedded: section title (ignored if hideEmbeddedHeading) */
   embeddedHeading?: string;
@@ -43,15 +47,28 @@ export type UnitCountersSectionProps = {
   /** Embedded: only “Add” + table — for blocks that already have a parent title (e.g. zone folder) */
   hideEmbeddedHeading?: boolean;
   className?: string;
+  /** See `CounterServiceZoneFilter`. */
+  serviceZoneFilter?: CounterServiceZoneFilter;
 };
 
+function counterMatchesFilter(
+  counter: Counter,
+  filter: CounterServiceZoneFilter | undefined
+): boolean {
+  if (filter === undefined) return true;
+  const z = counter.serviceZoneId?.trim() || null;
+  if (filter === null) return z === null;
+  return z === filter;
+}
+
 export function UnitCountersSection({
-  unitId,
+  countersUnitId,
   variant = 'card',
   embeddedHeading,
   embeddedDescription,
   hideEmbeddedHeading = false,
-  className
+  className,
+  serviceZoneFilter
 }: UnitCountersSectionProps) {
   const t = useTranslations('admin.counters');
   const tCommon = useTranslations('common');
@@ -62,19 +79,24 @@ export function UnitCountersSection({
   const [deletingCounter, setDeletingCounter] = useState<Counter | null>(null);
 
   const {
-    data: counters,
+    data: countersRaw,
     isLoading,
     isError,
     error
   } = useQuery({
-    queryKey: ['counters', unitId],
-    queryFn: () => countersApi.getByUnitId(unitId)
+    queryKey: ['counters', countersUnitId],
+    queryFn: () => countersApi.getByUnitId(countersUnitId)
   });
+
+  const counters = useMemo(() => {
+    const list = countersRaw ?? [];
+    return list.filter((c) => counterMatchesFilter(c, serviceZoneFilter));
+  }, [countersRaw, serviceZoneFilter]);
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => countersApi.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['counters', unitId] });
+      queryClient.invalidateQueries({ queryKey: ['counters', countersUnitId] });
       toast.success(t('deleted_success'));
       setDeletingCounter(null);
     },
@@ -190,7 +212,8 @@ export function UnitCountersSection({
       <CounterDialog
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
-        unitId={unitId}
+        countersUnitId={countersUnitId}
+        serviceZoneFilter={serviceZoneFilter}
         counter={editingCounter}
       />
 
@@ -261,9 +284,25 @@ export function UnitCountersSection({
 }
 
 interface CountersListProps {
+  /** Subdivision id for counters API (use parent subdivision when editing a service zone unit). */
   unitId: string;
+  /** When set, list/create counters on `unitId` but only for this service zone (zone’s own unit id). */
+  restrictToServiceZoneId?: string;
 }
 
-export function CountersList({ unitId }: CountersListProps) {
-  return <UnitCountersSection unitId={unitId} variant='card' />;
+export function CountersList({
+  unitId,
+  restrictToServiceZoneId
+}: CountersListProps) {
+  return (
+    <UnitCountersSection
+      countersUnitId={unitId}
+      variant='card'
+      serviceZoneFilter={
+        restrictToServiceZoneId === undefined
+          ? undefined
+          : restrictToServiceZoneId
+      }
+    />
+  );
 }

@@ -1,4 +1,5 @@
 import type { ShiftActivityItem } from '@/lib/api';
+import { getLocalizedName } from '@/lib/utils';
 import type { LucideIcon } from 'lucide-react';
 import {
   AlertTriangle,
@@ -48,6 +49,26 @@ function payloadRecord(
 
 function str(v: unknown): string | undefined {
   return typeof v === 'string' ? v : undefined;
+}
+
+/** Build a display label for a service from audit payload (default name + optional ru/en). */
+function localizedServiceLabelFromPayload(
+  p: Record<string, unknown>,
+  fieldPrefix: 'to' | 'from',
+  locale: string
+): string {
+  const label =
+    str(p[`${fieldPrefix}_service_label`]) ??
+    str(p[`${fieldPrefix}ServiceLabel`]);
+  const nameRu =
+    str(p[`${fieldPrefix}_service_name_ru`]) ??
+    str(p[`${fieldPrefix}ServiceNameRu`]);
+  const nameEn =
+    str(p[`${fieldPrefix}_service_name_en`]) ??
+    str(p[`${fieldPrefix}ServiceNameEn`]);
+  const base = label?.trim() ?? '';
+  if (!base) return '—';
+  return getLocalizedName(base, nameRu, nameEn, locale);
 }
 
 function strArray(v: unknown): string[] {
@@ -103,7 +124,8 @@ export type SupervisorActivityPresentation = {
 
 export function getSupervisorActivityPresentation(
   item: ShiftActivityItem,
-  t: ActivityTranslate
+  t: ActivityTranslate,
+  locale: string
 ): SupervisorActivityPresentation {
   const q = item.queueNumber;
   const p = payloadRecord(item.payload);
@@ -177,12 +199,30 @@ export function getSupervisorActivityPresentation(
         })
       };
     }
-    case TicketHistoryAction.Transferred:
+    case TicketHistoryAction.Transferred: {
+      const kind = str(p.transfer_kind);
+      if (kind === 'zone') {
+        const zone =
+          str(p.to_zone_name) ||
+          (str(p.to_service_zone_id) ?? '').trim() ||
+          '—';
+        const service = localizedServiceLabelFromPayload(p, 'to', locale);
+        return {
+          icon: ArrowRightLeft,
+          iconClassName: 'text-indigo-600 dark:text-indigo-400',
+          line: t('activityEvent.transferredZone', {
+            queueNumber: q,
+            zone,
+            service
+          })
+        };
+      }
       return {
         icon: ArrowRightLeft,
         iconClassName: 'text-indigo-600 dark:text-indigo-400',
         line: t('activityEvent.transferred', { queueNumber: q })
       };
+    }
     case TicketHistoryAction.ReturnedToQueue:
       return {
         icon: Undo2,

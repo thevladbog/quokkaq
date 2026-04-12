@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
 import {
@@ -14,19 +14,37 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { countersApi, Counter } from '@/lib/api';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select';
+import { countersApi, Counter, unitsApi } from '@/lib/api';
+import type { CounterServiceZoneFilter } from '@/components/admin/units/counter-zone-filter';
 
 interface CounterDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  unitId: string;
+  /** Subdivision id for counters API and child-zone list. */
+  countersUnitId: string;
+  /** Where this dialog was opened from: drives default / fixed service zone for new counters. */
+  serviceZoneFilter?: CounterServiceZoneFilter;
   counter?: Counter | null;
+}
+
+function filterKey(f: CounterServiceZoneFilter): string {
+  if (f === undefined) return 'any';
+  if (f === null) return 'none';
+  return f;
 }
 
 export function CounterDialog({
   open,
   onOpenChange,
-  unitId,
+  countersUnitId,
+  serviceZoneFilter,
   counter
 }: CounterDialogProps) {
   const t = useTranslations('admin.counters');
@@ -39,7 +57,9 @@ export function CounterDialog({
         </DialogHeader>
         {open && (
           <CounterForm
-            unitId={unitId}
+            key={`${counter?.id ?? 'new'}-${filterKey(serviceZoneFilter)}`}
+            countersUnitId={countersUnitId}
+            serviceZoneFilter={serviceZoneFilter}
             counter={counter}
             onOpenChange={onOpenChange}
           />
@@ -50,11 +70,13 @@ export function CounterDialog({
 }
 
 function CounterForm({
-  unitId,
+  countersUnitId,
+  serviceZoneFilter,
   counter,
   onOpenChange
 }: {
-  unitId: string;
+  countersUnitId: string;
+  serviceZoneFilter?: CounterServiceZoneFilter;
   counter?: Counter | null;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -63,11 +85,36 @@ function CounterForm({
   const queryClient = useQueryClient();
   const isEditing = !!counter;
   const [name, setName] = useState(counter?.name || '');
+  const [serviceZoneId, setServiceZoneId] = useState<string | null>(
+    counter?.serviceZoneId ??
+      (serviceZoneFilter === null
+        ? null
+        : typeof serviceZoneFilter === 'string' && serviceZoneFilter
+          ? serviceZoneFilter
+          : null)
+  );
+
+  const lockZoneForNewCounter =
+    !isEditing &&
+    (serviceZoneFilter === null ||
+      (typeof serviceZoneFilter === 'string' && Boolean(serviceZoneFilter)));
+
+  const { data: childUnits = [] } = useQuery({
+    queryKey: ['units', countersUnitId, 'child-units'],
+    queryFn: () => unitsApi.getChildUnits(countersUnitId),
+    enabled: !!countersUnitId
+  });
+
+  const serviceZones = useMemo(
+    () => childUnits.filter((u) => u.kind === 'service_zone'),
+    [childUnits]
+  );
 
   const createMutation = useMutation({
-    mutationFn: (data: { name: string }) => countersApi.create(unitId, data),
+    mutationFn: (data: { name: string; serviceZoneId?: string | null }) =>
+      countersApi.create(countersUnitId, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['counters', unitId] });
+      queryClient.invalidateQueries({ queryKey: ['counters', countersUnitId] });
       toast.success(t('created_success'));
       onOpenChange(false);
     },
@@ -77,10 +124,12 @@ function CounterForm({
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: { name: string }) =>
+    mutationFn: (data: { name: string; serviceZoneId?: string | null }) =>
       countersApi.update(counter!.id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['counters', unitId] });
+      queryClient.invalidateQueries({
+        queryKey: ['counters', countersUnitId]
+      });
       toast.success(t('updated_success'));
       onOpenChange(false);
     },
@@ -96,10 +145,22 @@ function CounterForm({
       return;
     }
 
+    let zonePayload = serviceZoneId ?? null;
+    if (!isEditing) {
+      if (serviceZoneFilter === null) {
+        zonePayload = null;
+      } else if (
+        typeof serviceZoneFilter === 'string' &&
+        serviceZoneFilter.trim()
+      ) {
+        zonePayload = serviceZoneFilter.trim();
+      }
+    }
+
     if (isEditing) {
-      updateMutation.mutate({ name });
+      updateMutation.mutate({ name, serviceZoneId: zonePayload });
     } else {
-      createMutation.mutate({ name });
+      createMutation.mutate({ name, serviceZoneId: zonePayload });
     }
   };
 
@@ -113,6 +174,40 @@ function CounterForm({
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
+      </div>
+      <div className='space-y-2'>
+        <Label htmlFor='counter-service-zone'>{t('service_zone')}</Label>
+        {lockZoneForNewCounter ? (
+          <p
+            id='counter-service-zone'
+            className='text-muted-foreground border-input bg-muted/30 rounded-md border px-3 py-2 text-sm'
+          >
+            {serviceZoneFilter === null
+              ? t('service_zone_locked_none')
+              : t('service_zone_locked_zone', {
+                  name:
+                    serviceZones.find((z) => z.id === serviceZoneFilter)
+                      ?.name ?? ''
+                })}
+          </p>
+        ) : (
+          <Select
+            value={serviceZoneId ?? '__none__'}
+            onValueChange={(v) => setServiceZoneId(v === '__none__' ? null : v)}
+          >
+            <SelectTrigger id='counter-service-zone' className='w-full'>
+              <SelectValue placeholder={t('service_zone_none')} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value='__none__'>{t('service_zone_none')}</SelectItem>
+              {serviceZones.map((zone) => (
+                <SelectItem key={zone.id} value={zone.id}>
+                  {zone.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
       <DialogFooter>
         <Button

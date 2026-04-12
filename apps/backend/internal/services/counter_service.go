@@ -47,6 +47,7 @@ type counterService struct {
 	ticketRepo   repository.TicketRepository
 	serviceRepo  repository.ServiceRepository
 	userRepo     repository.UserRepository
+	unitRepo     repository.UnitRepository
 	intervalRepo repository.OperatorIntervalRepository
 	hub          *ws.Hub
 }
@@ -57,6 +58,7 @@ func NewCounterService(
 	serviceRepo repository.ServiceRepository,
 	userRepo repository.UserRepository,
 	intervalRepo repository.OperatorIntervalRepository,
+	unitRepo repository.UnitRepository,
 	hub *ws.Hub,
 ) CounterService {
 	return &counterService{
@@ -64,6 +66,7 @@ func NewCounterService(
 		ticketRepo:   ticketRepo,
 		serviceRepo:  serviceRepo,
 		userRepo:     userRepo,
+		unitRepo:     unitRepo,
 		intervalRepo: intervalRepo,
 		hub:          hub,
 	}
@@ -95,6 +98,9 @@ func (s *counterService) hydrateBreakStartedAt(c *models.Counter) {
 func (s *counterService) CreateCounter(counter *models.Counter) error {
 	if counter.UnitID == "" {
 		return errors.New("unit ID is required")
+	}
+	if err := ValidateOptionalChildServiceZone(s.unitRepo, counter.UnitID, counter.ServiceZoneID); err != nil {
+		return err
 	}
 	return s.repo.Create(counter)
 }
@@ -141,6 +147,14 @@ func (s *counterService) GetCounterByID(id string) (*models.Counter, error) {
 }
 
 func (s *counterService) UpdateCounter(counter *models.Counter) error {
+	existing, err := s.repo.FindByID(counter.ID)
+	if err != nil {
+		return err
+	}
+	counter.UnitID = existing.UnitID
+	if err := ValidateOptionalChildServiceZone(s.unitRepo, counter.UnitID, counter.ServiceZoneID); err != nil {
+		return err
+	}
 	return s.repo.Update(counter)
 }
 
@@ -380,7 +394,7 @@ func (s *counterService) CallNext(counterID string, serviceIDs []string, actorUs
 		}
 	}
 
-	ticket, err := s.ticketRepo.FindWaiting(counter.UnitID, serviceIDs)
+	ticket, err := s.ticketRepo.FindWaiting(counter.UnitID, serviceIDs, counter.ServiceZoneID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrNoWaitingTickets

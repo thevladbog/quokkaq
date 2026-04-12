@@ -13,6 +13,7 @@ import (
 
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
+	"quokkaq-go-backend/internal/ticketaudit"
 	"quokkaq-go-backend/internal/ws"
 	"quokkaq-go-backend/pkg/database"
 
@@ -26,8 +27,8 @@ type ShiftService interface {
 	GetDashboardStats(unitID string) (map[string]interface{}, error)
 	GetQueueTickets(unitID string) ([]models.Ticket, error)
 	GetShiftCounters(unitID string) ([]ShiftCounterDTO, error)
-	GetShiftActivity(unitID string, limit int, cursor string, filters *repository.TicketHistoryListFilters) (*ShiftActivityResponse, error)
-	ListShiftActivityActors(unitID string) ([]ShiftActivityActorOption, error)
+	GetShiftActivity(unitID, viewerUserID string, limit int, cursor string, filters *repository.TicketHistoryListFilters) (*ShiftActivityResponse, error)
+	ListShiftActivityActors(unitID, viewerUserID string) ([]ShiftActivityActorOption, error)
 	ExecuteEndOfDay(ctx context.Context, unitID string, userID *string) (map[string]interface{}, error)
 }
 
@@ -70,6 +71,7 @@ type ShiftCounterDTO struct {
 type shiftService struct {
 	ticketRepo   repository.TicketRepository
 	counterRepo  repository.CounterRepository
+	serviceRepo  repository.ServiceRepository
 	intervalRepo repository.OperatorIntervalRepository
 	auditLogRepo repository.AuditLogRepository
 	hub          *ws.Hub
@@ -79,6 +81,7 @@ type shiftService struct {
 func NewShiftService(
 	ticketRepo repository.TicketRepository,
 	counterRepo repository.CounterRepository,
+	serviceRepo repository.ServiceRepository,
 	auditLogRepo repository.AuditLogRepository,
 	intervalRepo repository.OperatorIntervalRepository,
 	hub *ws.Hub,
@@ -87,10 +90,95 @@ func NewShiftService(
 	return &shiftService{
 		ticketRepo:   ticketRepo,
 		counterRepo:  counterRepo,
+		serviceRepo:  serviceRepo,
 		intervalRepo: intervalRepo,
 		auditLogRepo: auditLogRepo,
 		hub:          hub,
 		userRepo:     userRepo,
+	}
+}
+
+func shiftActivityPayloadString(p map[string]interface{}, key string) string {
+	v, ok := p[key]
+	if !ok || v == nil {
+		return ""
+	}
+	if s, ok := v.(string); ok {
+		return strings.TrimSpace(s)
+	}
+	return strings.TrimSpace(fmt.Sprint(v))
+}
+
+// enrichShiftActivityZoneTransferServiceLabels merges current service display names into
+// zone-transfer rows so the client can localize labels even for older history rows.
+func (s *shiftService) enrichShiftActivityZoneTransferServiceLabels(items []ShiftActivityItem) {
+	if len(items) == 0 {
+		return
+	}
+	type ref struct {
+		idx int
+		sid string
+	}
+	var refs []ref
+	for i := range items {
+		if items[i].Action != ticketaudit.ActionTicketTransferred {
+			continue
+		}
+		var p map[string]interface{}
+		if err := json.Unmarshal(items[i].Payload, &p); err != nil || len(p) == 0 {
+			continue
+		}
+		if shiftActivityPayloadString(p, "transfer_kind") != "zone" {
+			continue
+		}
+		sid := shiftActivityPayloadString(p, "to_service_id")
+		if sid == "" {
+			continue
+		}
+		refs = append(refs, ref{idx: i, sid: sid})
+	}
+	if len(refs) == 0 {
+		return
+	}
+	ids := make([]string, 0, len(refs))
+	seen := make(map[string]struct{}, len(refs))
+	for _, r := range refs {
+		if _, ok := seen[r.sid]; ok {
+			continue
+		}
+		seen[r.sid] = struct{}{}
+		ids = append(ids, r.sid)
+	}
+	svcMap, err := s.serviceRepo.FindMapByIDs(ids)
+	if err != nil {
+		log.Printf("GetShiftActivity: FindMapByIDs for journal service labels: %v", err)
+		return
+	}
+	for _, r := range refs {
+		svc := svcMap[r.sid]
+		if svc == nil {
+			continue
+		}
+		var p map[string]interface{}
+		if err := json.Unmarshal(items[r.idx].Payload, &p); err != nil {
+			continue
+		}
+		p["to_service_label"] = svc.Name
+		if svc.NameRu != nil && strings.TrimSpace(*svc.NameRu) != "" {
+			p["to_service_name_ru"] = strings.TrimSpace(*svc.NameRu)
+		} else {
+			delete(p, "to_service_name_ru")
+		}
+		if svc.NameEn != nil && strings.TrimSpace(*svc.NameEn) != "" {
+			p["to_service_name_en"] = strings.TrimSpace(*svc.NameEn)
+		} else {
+			delete(p, "to_service_name_en")
+		}
+		raw, err := json.Marshal(p)
+		if err != nil {
+			continue
+		}
+		items[r.idx].Payload = raw
 	}
 }
 
@@ -208,12 +296,26 @@ func decodeShiftActivityCursor(cursor string) (time.Time, string, error) {
 	return ts, parts[1], nil
 }
 
-func (s *shiftService) GetShiftActivity(unitID string, limit int, cursor string, filters *repository.TicketHistoryListFilters) (*ShiftActivityResponse, error) {
+func (s *shiftService) GetShiftActivity(unitID, viewerUserID string, limit int, cursor string, filters *repository.TicketHistoryListFilters) (*ShiftActivityResponse, error) {
 	if limit <= 0 {
 		limit = 20
 	}
 	if limit > 100 {
 		limit = 100
+	}
+	seesAll, err := s.userRepo.ShiftJournalSeesAllActivity(viewerUserID, unitID)
+	if err != nil {
+		return nil, err
+	}
+	effectiveFilters := filters
+	if !seesAll {
+		var f repository.TicketHistoryListFilters
+		if filters != nil {
+			f = *filters
+		}
+		uid := strings.TrimSpace(viewerUserID)
+		f.ActorUserID = &uid
+		effectiveFilters = &f
 	}
 	var beforeTime *time.Time
 	var beforeID *string
@@ -225,7 +327,7 @@ func (s *shiftService) GetShiftActivity(unitID string, limit int, cursor string,
 		beforeTime = &ts
 		beforeID = &id
 	}
-	rows, err := s.ticketRepo.ListTicketHistoryByUnitID(unitID, limit+1, beforeTime, beforeID, filters)
+	rows, err := s.ticketRepo.ListTicketHistoryByUnitID(unitID, limit+1, beforeTime, beforeID, effectiveFilters)
 	if err != nil {
 		return nil, err
 	}
@@ -288,6 +390,7 @@ func (s *shiftService) GetShiftActivity(unitID string, limit int, cursor string,
 			CreatedAt:   row.CreatedAt,
 		})
 	}
+	s.enrichShiftActivityZoneTransferServiceLabels(items)
 	resp := &ShiftActivityResponse{Items: items}
 	if hasMore && len(rows) > 0 {
 		last := rows[len(rows)-1]
@@ -297,7 +400,26 @@ func (s *shiftService) GetShiftActivity(unitID string, limit int, cursor string,
 	return resp, nil
 }
 
-func (s *shiftService) ListShiftActivityActors(unitID string) ([]ShiftActivityActorOption, error) {
+func (s *shiftService) ListShiftActivityActors(unitID, viewerUserID string) ([]ShiftActivityActorOption, error) {
+	seesAll, err := s.userRepo.ShiftJournalSeesAllActivity(viewerUserID, unitID)
+	if err != nil {
+		return nil, err
+	}
+	if !seesAll {
+		uid := strings.TrimSpace(viewerUserID)
+		if uid == "" {
+			return []ShiftActivityActorOption{}, nil
+		}
+		names, err := s.userRepo.ResolveJournalActorDisplayNames([]string{uid})
+		if err != nil {
+			return nil, err
+		}
+		name := strings.TrimSpace(names[uid])
+		if name == "" {
+			name = uid
+		}
+		return []ShiftActivityActorOption{{UserID: uid, Name: name}}, nil
+	}
 	rows, err := s.ticketRepo.ListShiftActivityActorRows(unitID, 200)
 	if err != nil {
 		return nil, err

@@ -194,7 +194,8 @@ export function SubdivisionStationsAndZonesPanel({
         <CardContent className='space-y-10'>
           <section className='space-y-4'>
             <UnitCountersSection
-              unitId={subdivisionId}
+              countersUnitId={subdivisionId}
+              serviceZoneFilter={null}
               variant='embedded'
               embeddedHeading={t('counters_direct_on_subdivision_title')}
               embeddedDescription={t(
@@ -246,7 +247,8 @@ export function SubdivisionStationsAndZonesPanel({
                     </Button>
                   </div>
                   <UnitCountersSection
-                    unitId={zone.id}
+                    countersUnitId={subdivisionId}
+                    serviceZoneFilter={zone.id}
                     variant='embedded'
                     hideEmbeddedHeading
                   />

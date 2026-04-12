@@ -41,6 +41,9 @@ export interface StaffQueuePanelProps {
   /** When true, list shows all waiting tickets in the unit; false = only tickets for services selected in scope modal. */
   showAllTicketsInQueue: boolean;
   onShowAllTicketsInQueueChange: (value: boolean) => void;
+  /** When true, waiting list is limited to the same waiting pool as this counter (service zone vs subdivision-wide). */
+  onlyMyZone?: boolean;
+  onOnlyMyZoneChange?: (value: boolean) => void;
   serviceNames: Record<string, string>;
   /** Leaf services in scope — for “create ticket” menu */
   leafServicesForCreate: { id: string; label: string }[];
@@ -78,6 +81,8 @@ export function StaffQueuePanel({
   waitingTickets,
   showAllTicketsInQueue,
   onShowAllTicketsInQueueChange,
+  onlyMyZone = false,
+  onOnlyMyZoneChange,
   serviceNames,
   leafServicesForCreate,
   createTicketPending,
@@ -170,6 +175,28 @@ export function StaffQueuePanel({
                 ? t('queue.list_show_all_hint')
                 : t('queue.list_scoped_hint')}
             </p>
+            {onOnlyMyZoneChange ? (
+              <div className='flex items-center justify-between gap-2 pt-0.5'>
+                <Label
+                  htmlFor='staff-queue-only-my-zone'
+                  className='text-foreground cursor-pointer text-[11px] leading-snug font-normal'
+                >
+                  {t('queue.only_my_zone')}
+                </Label>
+                <Switch
+                  id='staff-queue-only-my-zone'
+                  checked={onlyMyZone}
+                  onCheckedChange={onOnlyMyZoneChange}
+                />
+              </div>
+            ) : null}
+            {onOnlyMyZoneChange ? (
+              <p className='text-muted-foreground text-[10px] leading-tight'>
+                {onlyMyZone
+                  ? t('queue.only_my_zone_hint_on')
+                  : t('queue.only_my_zone_hint_off')}
+              </p>
+            ) : null}
           </div>
         </CardHeader>
         <CardContent className='max-h-[min(70vh,32rem)] overflow-y-auto pt-2 lg:max-h-[calc(100vh-10rem)]'>

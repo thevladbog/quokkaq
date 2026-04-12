@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -33,6 +34,7 @@ import {
   useUpdateService,
   useDeleteService
 } from '@/lib/hooks';
+import { unitsApi } from '@/lib/api';
 import { useTranslations, useLocale } from 'next-intl';
 import { ImageUpload } from '@/components/ui/image-upload';
 
@@ -57,6 +59,7 @@ interface Service {
   parentId?: string | null;
   parent?: Service | null;
   children?: Service[];
+  restrictedServiceZoneId?: string | null;
 }
 
 interface UnitServicesManagerProps {
@@ -315,7 +318,8 @@ function buildInitialFormValues(
       maxWaitingTime: editingService.maxWaitingTime ?? undefined,
       prebook: editingService.prebook ?? false,
       isLeaf: editingService.isLeaf ?? false,
-      parentId: editingService.parentId ?? ''
+      parentId: editingService.parentId ?? '',
+      restrictedServiceZoneId: editingService.restrictedServiceZoneId ?? null
     };
   }
   if (isCreating) {
@@ -334,7 +338,8 @@ function buildInitialFormValues(
       maxWaitingTime: undefined,
       prebook: false,
       isLeaf: false,
-      parentId: ''
+      parentId: '',
+      restrictedServiceZoneId: null
     };
   }
   return {};
@@ -356,7 +361,8 @@ function snapshotServiceFormValues(v: Partial<Service>): string {
     maxWaitingTime: v.maxWaitingTime ?? null,
     prebook: !!v.prebook,
     isLeaf: !!v.isLeaf,
-    parentId: v.parentId ?? ''
+    parentId: v.parentId ?? '',
+    restrictedServiceZoneId: v.restrictedServiceZoneId ?? null
   });
 }
 
@@ -388,6 +394,17 @@ function ServiceForm({
   const tRoot = useTranslations();
   const createServiceMutation = useCreateService();
   const updateServiceMutation = useUpdateService();
+
+  const { data: childUnits = [] } = useQuery({
+    queryKey: ['units', selectedUnitId, 'child-units'],
+    queryFn: () => unitsApi.getChildUnits(selectedUnitId),
+    enabled: !!selectedUnitId && (!!editingService || isCreating)
+  });
+
+  const serviceZones = useMemo(
+    () => childUnits.filter((u) => u.kind === 'service_zone'),
+    [childUnits]
+  );
 
   const [baselineValues] = useState<Partial<Service>>(() =>
     structuredClone(buildInitialFormValues(editingService, isCreating))
@@ -433,7 +450,8 @@ function ServiceForm({
           ...formValues,
           name: formValues.name || editingService.name,
           prebook: formValues.prebook ?? editingService.prebook ?? false,
-          isLeaf: formValues.isLeaf ?? editingService.isLeaf ?? false
+          isLeaf: formValues.isLeaf ?? editingService.isLeaf ?? false,
+          restrictedServiceZoneId: formValues.restrictedServiceZoneId ?? null
         });
       } else {
         if (!formValues.name) return;
@@ -442,7 +460,8 @@ function ServiceForm({
           name: formValues.name,
           unitId: selectedUnitId,
           prebook: formValues.prebook ?? false,
-          isLeaf: formValues.isLeaf ?? false
+          isLeaf: formValues.isLeaf ?? false,
+          restrictedServiceZoneId: formValues.restrictedServiceZoneId ?? null
         });
       }
       onSaved();
@@ -579,6 +598,42 @@ function ServiceForm({
               ))}
           </SelectContent>
         </Select>
+      </div>
+
+      <div className='space-y-2'>
+        <Label htmlFor='restrictedServiceZoneId'>
+          {t('services.restricted_zone')}
+        </Label>
+        <Select
+          value={
+            formValues.restrictedServiceZoneId
+              ? formValues.restrictedServiceZoneId
+              : '__none__'
+          }
+          onValueChange={(value) =>
+            setFormValues((prev) => ({
+              ...prev,
+              restrictedServiceZoneId: value === '__none__' ? null : value
+            }))
+          }
+        >
+          <SelectTrigger id='restrictedServiceZoneId' className='w-full'>
+            <SelectValue placeholder={t('services.restricted_zone_none')} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value='__none__'>
+              {t('services.restricted_zone_none')}
+            </SelectItem>
+            {serviceZones.map((zone) => (
+              <SelectItem key={zone.id} value={zone.id}>
+                {zone.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className='text-muted-foreground text-xs'>
+          {t('services.restricted_zone_hint')}
+        </p>
       </div>
 
       <div className='space-y-2'>

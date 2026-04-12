@@ -100,6 +100,26 @@ const ConditionalLayout = ({ children }: ConditionalLayoutProps) => {
       };
     }
 
+    const isAuditJournalPath =
+      /^\/supervisor\/[^/]+\/journal(\/|$)/.test(pathWithoutLocale) ||
+      /^\/journal\//.test(pathWithoutLocale);
+
+    if (isAuditJournalPath) {
+      return {
+        useSidebar: true,
+        protected: true,
+        roles: ['admin', 'staff', 'supervisor', 'operator']
+      };
+    }
+
+    if (/^\/clients\//.test(pathWithoutLocale)) {
+      return {
+        useSidebar: true,
+        protected: true,
+        roles: ['admin', 'staff', 'supervisor', 'operator']
+      };
+    }
+
     if (
       pathWithoutLocale === '/supervisor' ||
       pathWithoutLocale.startsWith('/supervisor/')
