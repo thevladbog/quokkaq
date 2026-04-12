@@ -239,23 +239,22 @@ Once the server is running, access the interactive API documentation:
 
 **Scalar API Reference**: <http://localhost:3001/swagger/>
 
-### Swagger Specification
+### OpenAPI 3 specification
 
-The OpenAPI specification is available at:
+The published spec is OpenAPI 3.0 (converted from Swagger 2 annotations):
 
-- **JSON Format**: <http://localhost:3001/docs/swagger.json>
-- **YAML Format**: `./docs/swagger.yaml`
+- **JSON (preferred URL)**: <http://localhost:3001/docs/openapi.json>
+- **JSON (legacy path)**: <http://localhost:3001/docs/swagger.json>
+- **YAML**: `./docs/swagger.yaml`
 
-### Generating API Docs
+### Generating API docs
 
-To regenerate the Swagger documentation:
+Code annotations use swag (Swagger 2). Run the full pipeline:
 
 ```bash
-# Install swag
-go install github.com/swaggo/swag/cmd/swag@latest
-
-# Generate docs
-swag init -g cmd/api/main.go -o ./docs
+go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g cmd/api/main.go -o ./docs
+go run ./cmd/swagger-to-openapi3
+python3 scripts/post_swagger_openapi_tweaks.py
 ```
 
 ---
