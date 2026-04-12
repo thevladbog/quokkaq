@@ -15,6 +15,19 @@ definitions:
         type: string
       serviceId:
         type: string
+      serviceIds:
+        items:
+          type: string
+        type: array
+    type: object
+  handlers.ClientVisitsResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/models.Ticket'
+        type: array
+      nextCursor:
+        type: string
     type: object
   handlers.CreateCheckoutRequest:
     properties:
@@ -180,6 +193,12 @@ definitions:
       token:
         type: string
     type: object
+  handlers.OperatorCommentPatchDTO:
+    properties:
+      operatorComment:
+        example: VIP, повторный визит
+        type: string
+    type: object
   handlers.PatchPlatformCompanyBody:
     properties:
       billingAddress:
@@ -231,6 +250,17 @@ definitions:
       status:
         type: string
       trialEnd:
+        type: string
+    type: object
+  handlers.PatchTicketVisitorRequest:
+    properties:
+      clientId:
+        type: string
+      firstName:
+        type: string
+      lastName:
+        type: string
+      phone:
         type: string
     type: object
   handlers.PeriodResponse:
@@ -399,6 +429,24 @@ definitions:
       features:
         $ref: '#/definitions/handlers.FeaturesFlags'
     type: object
+  handlers.createVisitorTagDefinitionRequest:
+    properties:
+      color:
+        type: string
+      label:
+        type: string
+      sortOrder:
+        type: integer
+    type: object
+  handlers.patchVisitorTagDefinitionRequest:
+    properties:
+      color:
+        type: string
+      label:
+        type: string
+      sortOrder:
+        type: integer
+    type: object
   handlers.platformListResponse-models_CatalogItem:
     properties:
       items:
@@ -450,6 +498,15 @@ definitions:
         type: integer
       total:
         type: integer
+    type: object
+  handlers.putVisitorTagsRequest:
+    properties:
+      operatorComment:
+        type: string
+      tagDefinitionIds:
+        items:
+          type: string
+        type: array
     type: object
   handlers.setupFirstAdminRequest:
     properties:
@@ -648,6 +705,8 @@ definitions:
         type: string
       name:
         type: string
+      onBreak:
+        type: boolean
       unitId:
         type: string
     type: object
@@ -850,7 +909,9 @@ definitions:
         type: string
       createdAt:
         type: string
-      customerName:
+      customerFirstName:
+        type: string
+      customerLastName:
         type: string
       customerPhone:
         type: string
@@ -887,7 +948,9 @@ definitions:
     properties:
       comment:
         type: string
-      customerName:
+      customerFirstName:
+        type: string
+      customerLastName:
         type: string
       customerPhone:
         type: string
@@ -911,7 +974,9 @@ definitions:
     properties:
       comment:
         type: string
-      customerName:
+      customerFirstName:
+        type: string
+      customerLastName:
         type: string
       customerPhone:
         type: string
@@ -1133,6 +1198,10 @@ definitions:
         type: string
       calledAt:
         type: string
+      client:
+        $ref: '#/definitions/models.UnitClient'
+      clientId:
+        type: string
       completedAt:
         type: string
       confirmedAt:
@@ -1152,6 +1221,8 @@ definitions:
       maxWaitingTime:
         description: Snapshot from Service at creation
         type: integer
+      operatorComment:
+        type: string
       preRegistration:
         allOf:
         - $ref: '#/definitions/models.PreRegistration'
@@ -1222,6 +1293,33 @@ definitions:
       updatedAt:
         type: string
     type: object
+  models.UnitClient:
+    properties:
+      createdAt:
+        type: string
+      definitions:
+        description: Definitions are visitor tags assigned to this client (excludes
+          anonymous aggregate use in API).
+        items:
+          $ref: '#/definitions/models.UnitVisitorTagDefinition'
+        type: array
+      firstName:
+        type: string
+      id:
+        type: string
+      isAnonymous:
+        type: boolean
+      lastName:
+        type: string
+      phoneE164:
+        type: string
+      photoUrl:
+        type: string
+      unitId:
+        type: string
+      updatedAt:
+        type: string
+    type: object
   models.UnitMaterial:
     properties:
       createdAt:
@@ -1235,6 +1333,24 @@ definitions:
       unitId:
         type: string
       url:
+        type: string
+    type: object
+  models.UnitVisitorTagDefinition:
+    properties:
+      color:
+        description: 'e.g. #RRGGBB'
+        type: string
+      createdAt:
+        type: string
+      id:
+        type: string
+      label:
+        type: string
+      sortOrder:
+        type: integer
+      unitId:
+        type: string
+      updatedAt:
         type: string
     type: object
   models.UpdateDayScheduleRequest:
@@ -1380,6 +1496,11 @@ definitions:
       isOccupied:
         type: boolean
       name:
+        type: string
+      onBreak:
+        type: boolean
+      sessionState:
+        description: off_duty | idle | serving | break
         type: string
       unitId:
         type: string
@@ -2116,11 +2237,12 @@ paths:
       summary: Update a counter
       tags:
       - counters
-  /counters/{id}/call-next:
+  /counters/{id}/break/end:
     post:
       consumes:
       - application/json
-      description: Calls the next waiting ticket for the counter
+      description: 'Ends break and resumes idle. Idempotent failure: 409 if not on
+        break.'
       parameters:
       - description: Counter ID
         in: path
@@ -2133,10 +2255,94 @@ paths:
         "200":
           description: OK
           schema:
+            $ref: '#/definitions/models.Counter'
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "404":
+          description: Counter not found
+          schema:
+            type: string
+        "409":
+          description: Conflict (not occupied by user or not on break)
+          schema:
+            type: string
+      summary: End operator break
+      tags:
+      - counters
+  /counters/{id}/break/start:
+    post:
+      consumes:
+      - application/json
+      description: 'Puts the counter in break state (no active ticket). Idempotent
+        failure: 409 if already on break.'
+      parameters:
+      - description: Counter ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Counter'
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "404":
+          description: Counter not found
+          schema:
+            type: string
+        "409":
+          description: Conflict (not occupied by user, active ticket, or already on
+            break)
+          schema:
+            type: string
+      summary: Start operator break
+      tags:
+      - counters
+  /counters/{id}/call-next:
+    post:
+      consumes:
+      - application/json
+      description: Calls the next waiting ticket for the counter. Optional JSON body
+        with serviceIds or legacy serviceId limits the queue; omit or empty body means
+        all services.
+      parameters:
+      - description: Counter ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Optional service filter (serviceIds / serviceId); omit for all
+          services
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/handlers.CallNextRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
             additionalProperties: true
             type: object
+        "400":
+          description: Bad Request
+          schema:
+            type: string
         "404":
           description: Counter not found or no tickets
+          schema:
+            type: string
+        "409":
+          description: Counter on break
           schema:
             type: string
       summary: Call next ticket
@@ -3996,6 +4202,42 @@ paths:
       summary: Get ticket by ID
       tags:
       - tickets
+  /tickets/{id}/operator-comment:
+    patch:
+      consumes:
+      - application/json
+      description: Sets or clears operatorComment. Body must include operatorComment
+        (string or JSON null to clear).
+      parameters:
+      - description: Ticket ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Comment body
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.OperatorCommentPatchDTO'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Ticket'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "404":
+          description: Ticket not found
+          schema:
+            type: string
+      summary: Update operator comment on ticket
+      tags:
+      - tickets
   /tickets/{id}/pick:
     post:
       consumes:
@@ -4022,6 +4264,10 @@ paths:
             $ref: '#/definitions/models.Ticket'
         "404":
           description: Ticket not found
+          schema:
+            type: string
+        "409":
+          description: Counter on break
           schema:
             type: string
       summary: Pick ticket
@@ -4141,6 +4387,91 @@ paths:
           schema:
             type: string
       summary: Transfer ticket
+      tags:
+      - tickets
+  /tickets/{id}/visitor:
+    patch:
+      consumes:
+      - application/json
+      description: Allowed when status is called or in_service. Send either clientId
+        or firstName, lastName, and phone (creates or links by phone).
+      parameters:
+      - description: Ticket ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Visitor payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.PatchTicketVisitorRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Ticket'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+        "409":
+          description: Conflict
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Attach or change visitor on active ticket
+      tags:
+      - tickets
+  /tickets/{id}/visitor-tags:
+    put:
+      consumes:
+      - application/json
+      description: Full replacement of tag assignments on the ticket's visitor. Allowed
+        when status is called or in_service; not for anonymous kiosk client. operatorComment
+        is required and appended to the ticket operator comment.
+      parameters:
+      - description: Ticket ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: tagDefinitionIds (full set) and operatorComment
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.putVisitorTagsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Ticket'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+        "409":
+          description: Conflict
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Replace visitor tags for ticket's client
       tags:
       - tickets
   /units:
@@ -4345,7 +4676,9 @@ paths:
     post:
       consumes:
       - application/json
-      description: Calls the next waiting ticket for a unit
+      description: Calls the next waiting ticket for a unit. Optional serviceIds (or
+        legacy serviceId) limit the queue; omit or empty means all services in the
+        unit.
       parameters:
       - description: Unit ID
         in: path
@@ -4371,6 +4704,10 @@ paths:
             type: string
         "404":
           description: No waiting tickets
+          schema:
+            type: string
+        "409":
+          description: Counter on break
           schema:
             type: string
       summary: Call next ticket
@@ -4441,6 +4778,98 @@ paths:
       summary: List child subdivision units
       tags:
       - units
+  /units/{unitId}/clients/{clientId}/visits:
+    get:
+      description: Tickets linked to the client in this unit; empty for anonymous
+        client.
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        type: string
+      - description: Client ID
+        in: path
+        name: clientId
+        required: true
+        type: string
+      - description: Page size (default 20, max 100)
+        in: query
+        name: limit
+        type: integer
+      - description: Pagination cursor from previous nextCursor
+        in: query
+        name: cursor
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.ClientVisitsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: List past visits for a client
+      tags:
+      - clients
+  /units/{unitId}/clients/search:
+    get:
+      description: Search by phone (exact when parseable) and by name; excludes anonymous
+        aggregate client.
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        type: string
+      - description: Search query
+        in: query
+        name: q
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.UnitClient'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Search unit clients (visitors)
+      tags:
+      - clients
   /units/{unitId}/counters:
     get:
       description: Retrieves all counters for a specific unit
@@ -5328,6 +5757,131 @@ paths:
       summary: Create a new ticket
       tags:
       - tickets
+  /units/{unitId}/visitor-tag-definitions:
+    get:
+      description: Returns label/color tag definitions scoped to the unit, ordered
+        by sortOrder then label.
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.UnitVisitorTagDefinition'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: List visitor tag definitions for a unit
+      tags:
+      - units
+    post:
+      consumes:
+      - application/json
+      description: 'Creates a tag definition (label + #RRGGBB color) for the unit.'
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        type: string
+      - description: Payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.createVisitorTagDefinitionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.UnitVisitorTagDefinition'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Create visitor tag definition
+      tags:
+      - units
+  /units/{unitId}/visitor-tag-definitions/{definitionId}:
+    delete:
+      description: Deletes a tag definition; assignments on clients are removed (cascade).
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        type: string
+      - description: Definition ID
+        in: path
+        name: definitionId
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Delete visitor tag definition
+      tags:
+      - units
+    patch:
+      consumes:
+      - application/json
+      description: Partially updates a tag definition. Omitted fields are unchanged.
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        type: string
+      - description: Definition ID
+        in: path
+        name: definitionId
+        required: true
+        type: string
+      - description: Payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.patchVisitorTagDefinitionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.UnitVisitorTagDefinition'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Update visitor tag definition
+      tags:
+      - units
   /usage-metrics/me:
     get:
       description: Returns current resource usage and limits for the authenticated

@@ -10,13 +10,16 @@ import (
 )
 
 const (
-	ActionTicketCreated         = "ticket.created"
-	ActionTicketCalled          = "ticket.called"
-	ActionTicketRecalled        = "ticket.recalled"
-	ActionTicketStatusChanged   = "ticket.status_changed"
-	ActionTicketTransferred     = "ticket.transferred"
-	ActionTicketReturnedToQueue = "ticket.returned_to_queue"
-	ActionTicketEODFlagged      = "ticket.eod_flagged"
+	ActionTicketCreated                = "ticket.created"
+	ActionTicketCalled                 = "ticket.called"
+	ActionTicketRecalled               = "ticket.recalled"
+	ActionTicketStatusChanged          = "ticket.status_changed"
+	ActionTicketTransferred            = "ticket.transferred"
+	ActionTicketReturnedToQueue        = "ticket.returned_to_queue"
+	ActionTicketEODFlagged             = "ticket.eod_flagged"
+	ActionTicketOperatorCommentUpdated = "ticket.operator_comment_updated"
+	ActionTicketVisitorUpdated         = "ticket.visitor_updated"
+	ActionTicketVisitorTagsUpdated     = "ticket.visitor_tags_updated"
 )
 
 // NewHistory builds a TicketHistory row. Payload keys should be snake_case JSON for consumers.

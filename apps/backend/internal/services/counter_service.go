@@ -2,16 +2,31 @@ package services
 
 import (
 	"errors"
-	"log"
 	"time"
 
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/ticketaudit"
+	"quokkaq-go-backend/internal/ws"
 	"quokkaq-go-backend/pkg/database"
 
 	"gorm.io/gorm"
 )
+
+// ErrCounterOnBreak is returned when call-next/pick is attempted while the counter is on break.
+var ErrCounterOnBreak = errors.New("counter is on break; end break before calling tickets")
+
+// ErrCounterBreakActiveTicket is returned when starting a break while a ticket is active at the counter.
+var ErrCounterBreakActiveTicket = errors.New("cannot start break while a ticket is active at this counter")
+
+// ErrCounterNotOccupiedByUser is returned when the current user does not occupy the counter.
+var ErrCounterNotOccupiedByUser = errors.New("counter is not occupied by this user")
+
+// ErrCounterAlreadyOnBreak is returned when break/start is requested but the counter is already on break.
+var ErrCounterAlreadyOnBreak = errors.New("counter is already on break")
+
+// ErrCounterNotOnBreak is returned when break/end is requested but the counter is not on break.
+var ErrCounterNotOnBreak = errors.New("counter is not on break")
 
 type CounterService interface {
 	CreateCounter(counter *models.Counter) error
@@ -22,25 +37,59 @@ type CounterService interface {
 	Occupy(counterID, userID string) (*models.Counter, error)
 	Release(counterID string) (*models.Counter, error)
 	ForceRelease(counterID string, actorUserID *string) (*models.Counter, *models.Ticket, error)
-	CallNext(counterID string, serviceID *string, actorUserID *string) (*models.Ticket, error)
+	CallNext(counterID string, serviceIDs []string, actorUserID *string) (*models.Ticket, error)
+	StartBreak(counterID, userID string) (*models.Counter, error)
+	EndBreak(counterID, userID string) (*models.Counter, error)
 }
 
 type counterService struct {
-	repo       repository.CounterRepository
-	ticketRepo repository.TicketRepository
-	userRepo   repository.UserRepository
+	repo         repository.CounterRepository
+	ticketRepo   repository.TicketRepository
+	serviceRepo  repository.ServiceRepository
+	userRepo     repository.UserRepository
+	intervalRepo repository.OperatorIntervalRepository
+	hub          *ws.Hub
 }
 
-func NewCounterService(repo repository.CounterRepository, ticketRepo repository.TicketRepository, userRepo repository.UserRepository) CounterService {
-	return &counterService{repo: repo, ticketRepo: ticketRepo, userRepo: userRepo}
-}
-
-func (s *counterService) writeTicketHistory(ticketID string, actorUserID *string, action string, payload map[string]interface{}) error {
-	h, err := ticketaudit.NewHistory(ticketID, action, actorUserID, payload)
-	if err != nil {
-		return err
+func NewCounterService(
+	repo repository.CounterRepository,
+	ticketRepo repository.TicketRepository,
+	serviceRepo repository.ServiceRepository,
+	userRepo repository.UserRepository,
+	intervalRepo repository.OperatorIntervalRepository,
+	hub *ws.Hub,
+) CounterService {
+	return &counterService{
+		repo:         repo,
+		ticketRepo:   ticketRepo,
+		serviceRepo:  serviceRepo,
+		userRepo:     userRepo,
+		intervalRepo: intervalRepo,
+		hub:          hub,
 	}
-	return s.ticketRepo.CreateTicketHistory(h)
+}
+
+func (s *counterService) broadcastCounterUpdated(counter *models.Counter) {
+	if s.hub == nil || counter == nil {
+		return
+	}
+	s.hub.BroadcastEvent("counter.updated", counter, counter.UnitID)
+}
+
+func (s *counterService) hydrateBreakStartedAt(c *models.Counter) {
+	if c == nil {
+		return
+	}
+	if !c.OnBreak {
+		c.BreakStartedAt = nil
+		return
+	}
+	ts, err := s.intervalRepo.GetOpenBreakStartTime(c.ID)
+	if err != nil || ts == nil {
+		c.BreakStartedAt = nil
+		return
+	}
+	c.BreakStartedAt = ts
 }
 
 func (s *counterService) CreateCounter(counter *models.Counter) error {
@@ -56,20 +105,19 @@ func (s *counterService) GetCountersByUnit(unitID string) ([]models.Counter, err
 		return nil, err
 	}
 
-	// Populate AssignedUser
 	for i := range counters {
 		if counters[i].AssignedTo != nil {
 			user, err := s.userRepo.FindByID(*counters[i].AssignedTo)
 			if err == nil {
 				counters[i].AssignedUser = user
 			} else {
-				// User not found (deleted or invalid ID), return placeholder
 				counters[i].AssignedUser = &models.User{
 					ID:   *counters[i].AssignedTo,
 					Name: "Unknown User",
 				}
 			}
 		}
+		s.hydrateBreakStartedAt(&counters[i])
 	}
 
 	return counters, nil
@@ -87,6 +135,7 @@ func (s *counterService) GetCounterByID(id string) (*models.Counter, error) {
 			counter.AssignedUser = user
 		}
 	}
+	s.hydrateBreakStartedAt(counter)
 
 	return counter, nil
 }
@@ -100,17 +149,31 @@ func (s *counterService) DeleteCounter(id string) error {
 }
 
 func (s *counterService) Occupy(counterID, userID string) (*models.Counter, error) {
-	counter, err := s.repo.FindByID(counterID)
+	var counter *models.Counter
+	err := s.repo.Transaction(func(tx *gorm.DB) error {
+		now := time.Now()
+		c, err := s.repo.FindByIDTx(tx, counterID)
+		if err != nil {
+			return err
+		}
+		if c.AssignedTo != nil && *c.AssignedTo != userID {
+			return errors.New("counter already occupied")
+		}
+		if _, err := s.intervalRepo.CloseOpenIntervalsForCounterTx(tx, counterID, now); err != nil {
+			return err
+		}
+		c.AssignedTo = &userID
+		c.OnBreak = false
+		if err := s.repo.UpdateTx(tx, c); err != nil {
+			return err
+		}
+		if err := insertOperatorIntervalTx(tx, s.intervalRepo, c.UnitID, counterID, userID, models.OperatorIntervalKindIdle, now); err != nil {
+			return err
+		}
+		counter = c
+		return nil
+	})
 	if err != nil {
-		return nil, err
-	}
-
-	if counter.AssignedTo != nil && *counter.AssignedTo != userID {
-		return nil, errors.New("counter already occupied")
-	}
-
-	counter.AssignedTo = &userID
-	if err := s.repo.Update(counter); err != nil {
 		return nil, err
 	}
 
@@ -118,21 +181,35 @@ func (s *counterService) Occupy(counterID, userID string) (*models.Counter, erro
 	if err == nil {
 		counter.AssignedUser = user
 	}
-
+	s.hydrateBreakStartedAt(counter)
+	s.broadcastCounterUpdated(counter)
 	return counter, nil
 }
 
 func (s *counterService) Release(counterID string) (*models.Counter, error) {
-	counter, err := s.repo.FindByID(counterID)
+	var counter *models.Counter
+	err := s.repo.Transaction(func(tx *gorm.DB) error {
+		now := time.Now()
+		c, err := s.repo.FindByIDTx(tx, counterID)
+		if err != nil {
+			return err
+		}
+		if _, err := s.intervalRepo.CloseOpenIntervalsForCounterTx(tx, counterID, now); err != nil {
+			return err
+		}
+		c.AssignedTo = nil
+		c.OnBreak = false
+		if err := s.repo.UpdateTx(tx, c); err != nil {
+			return err
+		}
+		counter = c
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	counter.AssignedTo = nil
-	if err := s.repo.Update(counter); err != nil {
-		return nil, err
-	}
-
+	s.hydrateBreakStartedAt(counter)
+	s.broadcastCounterUpdated(counter)
 	return counter, nil
 }
 
@@ -142,10 +219,12 @@ func (s *counterService) ForceRelease(counterID string, actorUserID *string) (*m
 		return nil, nil, err
 	}
 
-	// Find active ticket for this counter
-	activeTicket, err := s.ticketRepo.GetActiveTicketByCounter(counterID)
-	if err == nil && activeTicket != nil {
-		// Mark the active ticket as completed when force releasing
+	var activeTicket *models.Ticket
+	activeTicket, err = s.ticketRepo.GetActiveTicketByCounter(counterID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if activeTicket != nil {
 		fromStatus := activeTicket.Status
 		now := time.Now()
 		activeTicket.Status = "completed"
@@ -178,53 +257,186 @@ func (s *counterService) ForceRelease(counterID string, actorUserID *string) (*m
 		}
 	}
 
-	counter.AssignedTo = nil
-	if err := s.repo.Update(counter); err != nil {
+	err = s.repo.Transaction(func(tx *gorm.DB) error {
+		now := time.Now()
+		if _, err := s.intervalRepo.CloseOpenIntervalsForCounterTx(tx, counterID, now); err != nil {
+			return err
+		}
+		c, err := s.repo.FindByIDTx(tx, counterID)
+		if err != nil {
+			return err
+		}
+		c.AssignedTo = nil
+		c.OnBreak = false
+		if err := s.repo.UpdateTx(tx, c); err != nil {
+			return err
+		}
+		counter = c
+		return nil
+	})
+	if err != nil {
 		return nil, nil, err
 	}
 
+	s.hydrateBreakStartedAt(counter)
+	s.broadcastCounterUpdated(counter)
 	return counter, activeTicket, nil
 }
 
-func (s *counterService) CallNext(counterID string, serviceID *string, actorUserID *string) (*models.Ticket, error) {
+func (s *counterService) StartBreak(counterID, userID string) (*models.Counter, error) {
+	var counter *models.Counter
+	err := s.repo.Transaction(func(tx *gorm.DB) error {
+		now := time.Now()
+		c, err := s.repo.FindByIDTx(tx, counterID)
+		if err != nil {
+			return err
+		}
+		if c.AssignedTo == nil || *c.AssignedTo != userID {
+			return ErrCounterNotOccupiedByUser
+		}
+		if c.OnBreak {
+			return ErrCounterAlreadyOnBreak
+		}
+		active, err := s.ticketRepo.GetActiveTicketByCounterTx(tx, counterID)
+		if err != nil {
+			return err
+		}
+		if active != nil {
+			return ErrCounterBreakActiveTicket
+		}
+		if _, err := s.intervalRepo.CloseOpenIntervalsForCounterTx(tx, counterID, now); err != nil {
+			return err
+		}
+		c.OnBreak = true
+		if err := s.repo.UpdateTx(tx, c); err != nil {
+			return err
+		}
+		if err := insertOperatorIntervalTx(tx, s.intervalRepo, c.UnitID, counterID, userID, models.OperatorIntervalKindBreak, now); err != nil {
+			return err
+		}
+		counter = c
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	user, err := s.userRepo.FindByID(userID)
+	if err == nil {
+		counter.AssignedUser = user
+	}
+	s.hydrateBreakStartedAt(counter)
+	s.broadcastCounterUpdated(counter)
+	return counter, nil
+}
+
+func (s *counterService) EndBreak(counterID, userID string) (*models.Counter, error) {
+	var counter *models.Counter
+	err := s.repo.Transaction(func(tx *gorm.DB) error {
+		now := time.Now()
+		c, err := s.repo.FindByIDTx(tx, counterID)
+		if err != nil {
+			return err
+		}
+		if c.AssignedTo == nil || *c.AssignedTo != userID {
+			return ErrCounterNotOccupiedByUser
+		}
+		if !c.OnBreak {
+			return ErrCounterNotOnBreak
+		}
+		if _, err := s.intervalRepo.CloseOpenIntervalsForCounterTx(tx, counterID, now); err != nil {
+			return err
+		}
+		c.OnBreak = false
+		if err := s.repo.UpdateTx(tx, c); err != nil {
+			return err
+		}
+		if err := insertOperatorIntervalTx(tx, s.intervalRepo, c.UnitID, counterID, userID, models.OperatorIntervalKindIdle, now); err != nil {
+			return err
+		}
+		counter = c
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	user, err := s.userRepo.FindByID(userID)
+	if err == nil {
+		counter.AssignedUser = user
+	}
+	s.hydrateBreakStartedAt(counter)
+	s.broadcastCounterUpdated(counter)
+	return counter, nil
+}
+
+func (s *counterService) CallNext(counterID string, serviceIDs []string, actorUserID *string) (*models.Ticket, error) {
 	counter, err := s.repo.FindByID(counterID)
 	if err != nil {
 		return nil, err
 	}
-
-	// Find next waiting ticket
-	ticket, err := s.ticketRepo.FindWaiting(counter.UnitID, serviceID)
-	if err != nil {
-		return nil, err // Likely "record not found" if no tickets
+	if counter.OnBreak {
+		return nil, ErrCounterOnBreak
 	}
 
-	// Update ticket status
-	fromStatus := ticket.Status
-	now := time.Now()
-	ticket.Status = "called"
-	ticket.CounterID = &counterID
-	ticket.CalledAt = &now
+	if len(serviceIDs) > 0 {
+		n, err := s.serviceRepo.CountByUnitAndIDs(counter.UnitID, serviceIDs)
+		if err != nil {
+			return nil, err
+		}
+		if int(n) != len(serviceIDs) {
+			return nil, ErrCallNextInvalidServices
+		}
+	}
 
-	if err := s.ticketRepo.Update(ticket); err != nil {
+	ticket, err := s.ticketRepo.FindWaiting(counter.UnitID, serviceIDs)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrNoWaitingTickets
+		}
 		return nil, err
 	}
 
-	payload := map[string]interface{}{
-		"unit_id":     ticket.UnitID,
-		"service_id":  ticket.ServiceID,
-		"counter_id":  counterID,
-		"from_status": fromStatus,
-		"to_status":   "called",
-		"source":      "counter_call_next",
-	}
-	if err := s.writeTicketHistory(ticket.ID, actorUserID, ticketaudit.ActionTicketCalled, payload); err != nil {
-		log.Printf(
-			"counter_service.CallNext: ticket history write failed (ticket_id=%s action=%s): %v",
-			ticket.ID,
-			ticketaudit.ActionTicketCalled,
-			err,
-		)
+	fromStatus := ticket.Status
+	now := time.Now()
+
+	err = s.ticketRepo.Transaction(func(tx *gorm.DB) error {
+		t, err := s.ticketRepo.FindByIDForUpdateTx(tx, ticket.ID)
+		if err != nil {
+			return err
+		}
+		if t.Status != "waiting" {
+			return ErrNoWaitingTickets
+		}
+		t.Status = "called"
+		t.CounterID = &counterID
+		t.CalledAt = &now
+		if err := s.ticketRepo.UpdateTx(tx, t); err != nil {
+			return err
+		}
+		ticket = t
+		if err := closeIdleOnCallTx(tx, s.intervalRepo, counterID, now); err != nil {
+			return err
+		}
+		payload := map[string]interface{}{
+			"unit_id":     ticket.UnitID,
+			"service_id":  ticket.ServiceID,
+			"counter_id":  counterID,
+			"from_status": fromStatus,
+			"to_status":   "called",
+			"source":      "counter_call_next",
+		}
+		if len(serviceIDs) > 0 {
+			payload["service_ids"] = serviceIDs
+		}
+		h, herr := ticketaudit.NewHistory(ticket.ID, ticketaudit.ActionTicketCalled, actorUserID, payload)
+		if herr != nil {
+			return herr
+		}
+		return s.ticketRepo.CreateTicketHistoryTx(tx, h)
+	})
+	if err != nil {
+		return nil, err
 	}
 
+	s.broadcastCounterUpdated(counter)
 	return ticket, nil
 }

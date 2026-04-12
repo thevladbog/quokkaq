@@ -9,7 +9,8 @@ import {
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
-  SidebarMenuItem
+  SidebarMenuItem,
+  SidebarRail
 } from '@/components/ui/sidebar';
 import {
   Home,
@@ -17,6 +18,7 @@ import {
   ClipboardList,
   CalendarClock,
   LogOut,
+  LogIn,
   Globe,
   Layers,
   Settings
@@ -38,6 +40,8 @@ import { useTranslations } from 'next-intl';
 import { getInitials, getAvatarColor } from '@/lib/utils';
 import { userCanOpenPlatformOperatorUI } from '@/lib/platform-access';
 import { SidebarActiveUnitSelect } from '@/components/SidebarActiveUnitSelect';
+import { SidebarCollapsedLogo } from '@/components/SidebarCollapsedLogo';
+import { SidebarCollapseToggle } from '@/components/SidebarCollapseToggle';
 
 const AppSidebar = () => {
   const tAdmin = useTranslations('admin');
@@ -106,7 +110,7 @@ const AppSidebar = () => {
   });
 
   return (
-    <Sidebar>
+    <Sidebar collapsible='icon'>
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
@@ -122,14 +126,8 @@ const AppSidebar = () => {
                       priority
                     />
                   </div>
-                  <div className='relative hidden h-8 w-8 group-data-[collapsible=icon]:block'>
-                    <Image
-                      src='/quokka-logo.svg'
-                      alt='QuokkaQ'
-                      fill
-                      className='object-contain'
-                      priority
-                    />
+                  <div className='relative hidden h-8 w-8 shrink-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:justify-center'>
+                    <SidebarCollapsedLogo className='size-8' />
                   </div>
                 </div>
               </Link>
@@ -161,14 +159,26 @@ const AppSidebar = () => {
       <SidebarFooter>
         {isAuthenticated ? (
           <SidebarGroup>
-            <SidebarGroupContent>
+            <SidebarGroupContent className='gap-1'>
               <SidebarActiveUnitSelect />
               <SidebarMenu>
                 <SidebarMenuItem>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <SidebarMenuButton className='h-12'>
-                        <Avatar size='sm'>
+                      <SidebarMenuButton
+                        className='h-12 min-h-12 gap-2 py-2 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:min-h-8! group-data-[collapsible=icon]:gap-0!'
+                        tooltip={{
+                          children:
+                            user?.name && user?.email
+                              ? `${user.name} · ${user.email}`
+                              : (user?.name ??
+                                user?.email ??
+                                tProfile('account_menu_aria', {
+                                  defaultValue: 'Account'
+                                }))
+                        }}
+                      >
+                        <Avatar size='sm' className='shrink-0'>
                           <AvatarFallback
                             bgColor={getAvatarColor(
                               user?.name || user?.email || undefined
@@ -180,7 +190,7 @@ const AppSidebar = () => {
                             )}
                           </AvatarFallback>
                         </Avatar>
-                        <div className='flex flex-col items-start overflow-hidden'>
+                        <div className='flex min-w-0 flex-col items-start overflow-hidden group-data-[collapsible=icon]:hidden'>
                           <span className='truncate text-sm font-medium'>
                             {user?.name || user?.email || 'User'}
                           </span>
@@ -290,14 +300,16 @@ const AppSidebar = () => {
                     </PopoverContent>
                   </Popover>
                 </SidebarMenuItem>
+                <SidebarCollapseToggle />
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
         ) : (
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild>
+              <SidebarMenuButton asChild tooltip={{ children: 'Login' }}>
                 <Link href='/login'>
+                  <LogIn />
                   <span>Login</span>
                 </Link>
               </SidebarMenuButton>
@@ -305,6 +317,7 @@ const AppSidebar = () => {
           </SidebarMenu>
         )}
       </SidebarFooter>
+      <SidebarRail />
     </Sidebar>
   );
 };

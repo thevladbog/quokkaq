@@ -5,7 +5,10 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"strings"
+
 	"quokkaq-go-backend/internal/models"
+	"quokkaq-go-backend/internal/phoneutil"
 	"quokkaq-go-backend/internal/services"
 
 	"github.com/go-chi/chi/v5"
@@ -68,14 +71,26 @@ func (h *PreRegistrationHandler) Create(w http.ResponseWriter, r *http.Request) 
 	}
 
 	unitID := chi.URLParam(r, "unitId")
+	fn := strings.TrimSpace(req.CustomerFirstName)
+	ln := strings.TrimSpace(req.CustomerLastName)
+	if fn == "" && ln == "" {
+		http.Error(w, "customer first name or last name is required", http.StatusBadRequest)
+		return
+	}
+	if _, err := phoneutil.ParseAndNormalize(req.CustomerPhone, phoneutil.DefaultRegion()); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	preReg := models.PreRegistration{
-		UnitID:        unitID,
-		ServiceID:     req.ServiceID,
-		Date:          req.Date,
-		Time:          req.Time,
-		CustomerName:  req.CustomerName,
-		CustomerPhone: req.CustomerPhone,
-		Comment:       req.Comment,
+		UnitID:            unitID,
+		ServiceID:         req.ServiceID,
+		Date:              req.Date,
+		Time:              req.Time,
+		CustomerFirstName: fn,
+		CustomerLastName:  ln,
+		CustomerPhone:     strings.TrimSpace(req.CustomerPhone),
+		Comment:           req.Comment,
 	}
 
 	if err := h.service.Create(&preReg); err != nil {
@@ -118,12 +133,24 @@ func (h *PreRegistrationHandler) Update(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	fn := strings.TrimSpace(updateData.CustomerFirstName)
+	ln := strings.TrimSpace(updateData.CustomerLastName)
+	if fn == "" && ln == "" {
+		http.Error(w, "customer first name or last name is required", http.StatusBadRequest)
+		return
+	}
+	if _, err := phoneutil.ParseAndNormalize(updateData.CustomerPhone, phoneutil.DefaultRegion()); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	// Update only editable fields
 	existing.ServiceID = updateData.ServiceID
 	existing.Date = updateData.Date
 	existing.Time = updateData.Time
-	existing.CustomerName = updateData.CustomerName
-	existing.CustomerPhone = updateData.CustomerPhone
+	existing.CustomerFirstName = fn
+	existing.CustomerLastName = ln
+	existing.CustomerPhone = strings.TrimSpace(updateData.CustomerPhone)
 	existing.Comment = updateData.Comment
 
 	if err := h.service.Update(existing); err != nil {
@@ -239,6 +266,16 @@ func (h *PreRegistrationHandler) Redeem(w http.ResponseWriter, r *http.Request) 
 	// 2. Create Ticket
 	ticket, err := h.ticketService.CreateTicketWithPreRegistration(preReg.UnitID, preReg.ServiceID, preReg.ID, nil)
 	if err != nil {
+		if errors.Is(err, phoneutil.ErrInvalidPhone) ||
+			errors.Is(err, services.ErrDuplicateClientPhone) ||
+			strings.Contains(err.Error(), "pre-registration phone") ||
+			strings.Contains(err.Error(), "customer name is empty") {
+			RespondJSON(w, models.PreRegistrationRedeemResponse{
+				Success: false,
+				Message: err.Error(),
+			})
+			return
+		}
 		log.Printf("Redeem CreateTicketWithPreRegistration: %v", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return

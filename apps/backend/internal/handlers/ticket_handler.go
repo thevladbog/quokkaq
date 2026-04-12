@@ -1,11 +1,17 @@
 package handlers
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
+	"strings"
+
+	"quokkaq-go-backend/internal/phoneutil"
 	"quokkaq-go-backend/internal/services"
 
 	"github.com/go-chi/chi/v5"
+	"gorm.io/gorm"
 )
 
 type TicketHandler struct {
@@ -17,8 +23,9 @@ func NewTicketHandler(service services.TicketService) *TicketHandler {
 }
 
 type CreateTicketRequest struct {
-	UnitID    string `json:"unitId"`
-	ServiceID string `json:"serviceId"`
+	UnitID    string  `json:"unitId"`
+	ServiceID string  `json:"serviceId"`
+	ClientID  *string `json:"clientId,omitempty"`
 }
 
 // CreateTicket godoc
@@ -41,10 +48,23 @@ func (h *TicketHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Use unitID from URL, ignore what's in body if any
-	ticket, err := h.service.CreateTicket(unitID, req.ServiceID, nil)
+	var staffClientID *string
+	if req.ClientID != nil && strings.TrimSpace(*req.ClientID) != "" {
+		s := strings.TrimSpace(*req.ClientID)
+		staffClientID = &s
+	}
+	ticket, err := h.service.CreateTicket(unitID, req.ServiceID, staffClientID, nil)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		switch {
+		case errors.Is(err, services.ErrVisitorAnonymousNotAllowed),
+			errors.Is(err, services.ErrTicketCreateClientNotInUnit),
+			errors.Is(err, services.ErrDuplicateClientPhone):
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		default:
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	w.WriteHeader(http.StatusCreated)
@@ -90,13 +110,14 @@ func (h *TicketHandler) GetTicketsByUnit(w http.ResponseWriter, r *http.Request)
 }
 
 type CallNextRequest struct {
-	CounterID string  `json:"counterId"`
-	ServiceID *string `json:"serviceId"`
+	CounterID  string   `json:"counterId"`
+	ServiceID  *string  `json:"serviceId"`
+	ServiceIDs []string `json:"serviceIds"`
 }
 
 // CallNext godoc
 // @Summary      Call next ticket
-// @Description  Calls the next waiting ticket for a unit
+// @Description  Calls the next waiting ticket for a unit. Optional serviceIds (or legacy serviceId) limit the queue; omit or empty means all services in the unit.
 // @Tags         tickets
 // @Accept       json
 // @Produce      json
@@ -105,6 +126,7 @@ type CallNextRequest struct {
 // @Success      200     {object}  models.Ticket
 // @Failure      400     {string}  string "Bad Request"
 // @Failure      404     {string}  string "No waiting tickets"
+// @Failure      409     {string}  string "Counter on break"
 // @Router       /units/{unitId}/call-next [post]
 func (h *TicketHandler) CallNext(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
@@ -115,9 +137,22 @@ func (h *TicketHandler) CallNext(w http.ResponseWriter, r *http.Request) {
 	}
 
 	actor := getActorFromRequest(r)
-	ticket, err := h.service.CallNext(unitID, req.CounterID, req.ServiceID, actor)
+	filter := normalizeCallNextServiceFilter(req.ServiceIDs, req.ServiceID)
+	ticket, err := h.service.CallNext(unitID, req.CounterID, filter, actor)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound) // Or 404 if no tickets
+		if errors.Is(err, services.ErrCallNextInvalidServices) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if errors.Is(err, services.ErrCounterOnBreak) {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
+		if errors.Is(err, services.ErrNoWaitingTickets) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -152,6 +187,63 @@ func (h *TicketHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 	ticket, err := h.service.UpdateStatus(id, req.Status, actor)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	RespondJSON(w, ticket)
+}
+
+// OperatorCommentPatchDTO documents the JSON body for PATCH /tickets/{id}/operator-comment (Swagger only).
+type OperatorCommentPatchDTO struct {
+	OperatorComment *string `json:"operatorComment" example:"VIP, повторный визит"`
+}
+
+// UpdateOperatorComment godoc
+// @Summary      Update operator comment on ticket
+// @Description  Sets or clears operatorComment. Body must include operatorComment (string or JSON null to clear).
+// @Tags         tickets
+// @Accept       json
+// @Produce      json
+// @Param        id      path      string                   true  "Ticket ID"
+// @Param        request body      OperatorCommentPatchDTO  true  "Comment body"
+// @Success      200     {object}  models.Ticket
+// @Failure      400     {string}  string "Bad Request"
+// @Failure      404     {string}  string "Ticket not found"
+// @Router       /tickets/{id}/operator-comment [patch]
+func (h *TicketHandler) UpdateOperatorComment(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	var rawBody map[string]json.RawMessage
+	if err := json.NewDecoder(r.Body).Decode(&rawBody); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	rawMsg, ok := rawBody["operatorComment"]
+	if !ok {
+		http.Error(w, "operatorComment is required", http.StatusBadRequest)
+		return
+	}
+
+	raw := bytes.TrimSpace(rawMsg)
+	var commentArg *string
+	if bytes.Equal(raw, []byte("null")) {
+		commentArg = nil
+	} else {
+		var s string
+		if err := json.Unmarshal(raw, &s); err != nil {
+			http.Error(w, "operatorComment must be a string or null", http.StatusBadRequest)
+			return
+		}
+		commentArg = &s
+	}
+
+	actor := getActorFromRequest(r)
+	ticket, err := h.service.UpdateOperatorComment(id, commentArg, actor)
+	if err != nil {
+		if errors.Is(err, services.ErrOperatorCommentTooLong) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
@@ -193,6 +285,7 @@ type PickRequest struct {
 // @Param        request  body      PickRequest  true  "Pick Request"
 // @Success      200      {object}  models.Ticket
 // @Failure      404      {string}  string "Ticket not found"
+// @Failure      409      {string}  string "Counter on break"
 // @Router       /tickets/{id}/pick [post]
 func (h *TicketHandler) Pick(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
@@ -205,6 +298,10 @@ func (h *TicketHandler) Pick(w http.ResponseWriter, r *http.Request) {
 	actor := getActorFromRequest(r)
 	ticket, err := h.service.Pick(id, req.CounterID, actor)
 	if err != nil {
+		if errors.Is(err, services.ErrCounterOnBreak) {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
@@ -260,6 +357,127 @@ func (h *TicketHandler) ReturnToQueue(w http.ResponseWriter, r *http.Request) {
 	ticket, err := h.service.ReturnToQueue(id, actor)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	RespondJSON(w, ticket)
+}
+
+// PatchTicketVisitorRequest is the JSON body for PATCH /tickets/{id}/visitor.
+type PatchTicketVisitorRequest struct {
+	ClientID  *string `json:"clientId"`
+	FirstName *string `json:"firstName"`
+	LastName  *string `json:"lastName"`
+	Phone     *string `json:"phone"`
+}
+
+// UpdateTicketVisitor godoc
+// @Summary      Attach or change visitor on active ticket
+// @Description  Allowed when status is called or in_service. Send clientId to link an existing visitor; optional firstName/lastName update that client's name. Do not send phone together with clientId. Or send firstName, lastName, and phone (without clientId) to find or create by phone.
+// @Tags         tickets
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id      path      string                    true  "Ticket ID"
+// @Param        request body      PatchTicketVisitorRequest true  "Visitor payload"
+// @Success      200     {object}  models.Ticket
+// @Failure      400     {string}  string "Bad Request"
+// @Failure      404     {string}  string "Not Found"
+// @Failure      409     {string}  string "Conflict"
+// @Router       /tickets/{id}/visitor [patch]
+func (h *TicketHandler) UpdateTicketVisitor(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	var req PatchTicketVisitorRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	actor := getActorFromRequest(r)
+	ticket, err := h.service.UpdateTicketVisitor(id, services.PatchTicketVisitorInput{
+		ClientID:  req.ClientID,
+		FirstName: req.FirstName,
+		LastName:  req.LastName,
+		Phone:     req.Phone,
+	}, actor)
+	if err != nil {
+		switch {
+		case errors.Is(err, services.ErrTicketVisitorWrongStatus),
+			errors.Is(err, services.ErrVisitorAnonymousNotAllowed),
+			errors.Is(err, services.ErrDuplicateClientPhone):
+			http.Error(w, err.Error(), http.StatusConflict)
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			http.Error(w, err.Error(), http.StatusNotFound)
+		default:
+			if errors.Is(err, phoneutil.ErrInvalidPhone) {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			msg := err.Error()
+			if strings.Contains(msg, "provide either") ||
+				strings.Contains(msg, "first name or last name") ||
+				strings.Contains(msg, "cannot provide both") {
+				http.Error(w, msg, http.StatusBadRequest)
+				return
+			}
+			http.Error(w, msg, http.StatusInternalServerError)
+		}
+		return
+	}
+	RespondJSON(w, ticket)
+}
+
+type putVisitorTagsRequest struct {
+	TagDefinitionIDs []string `json:"tagDefinitionIds"`
+	OperatorComment  string   `json:"operatorComment"`
+}
+
+// SetVisitorTags godoc
+// @Summary      Replace visitor tags for ticket's client
+// @Description  Full replacement of tag assignments on the ticket's visitor. Allowed when status is called or in_service; not for anonymous kiosk client. operatorComment is required and appended to the ticket operator comment.
+// @Tags         tickets
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "Ticket ID"
+// @Param        body body putVisitorTagsRequest true "tagDefinitionIds (full set) and operatorComment"
+// @Success      200 {object} models.Ticket
+// @Failure      400 {string} string "Bad Request"
+// @Failure      404 {string} string "Not Found"
+// @Failure      409 {string} string "Conflict"
+// @Router       /tickets/{id}/visitor-tags [put]
+func (h *TicketHandler) SetVisitorTags(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	var req putVisitorTagsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.TagDefinitionIDs == nil {
+		req.TagDefinitionIDs = []string{}
+	}
+
+	actor := getActorFromRequest(r)
+	ticket, err := h.service.SetVisitorTagsForTicket(id, req.TagDefinitionIDs, req.OperatorComment, actor)
+	if err != nil {
+		switch {
+		case errors.Is(err, services.ErrTicketVisitorWrongStatus),
+			errors.Is(err, services.ErrVisitorAnonymousNotAllowed),
+			errors.Is(err, services.ErrTicketNoVisitorForTags):
+			http.Error(w, err.Error(), http.StatusConflict)
+		case errors.Is(err, services.ErrVisitorTagsCommentRequired),
+			errors.Is(err, services.ErrVisitorTagIDsNotInUnit),
+			errors.Is(err, services.ErrOperatorCommentTooLong):
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			http.Error(w, err.Error(), http.StatusNotFound)
+		default:
+			msg := err.Error()
+			if strings.Contains(msg, "tagDefinitionIds must not contain empty") {
+				http.Error(w, msg, http.StatusBadRequest)
+				return
+			}
+			http.Error(w, msg, http.StatusInternalServerError)
+		}
 		return
 	}
 	RespondJSON(w, ticket)

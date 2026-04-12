@@ -2,12 +2,15 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/services"
 
 	"github.com/go-chi/chi/v5"
+	"gorm.io/gorm"
 )
 
 type CounterHandler struct {
@@ -159,6 +162,80 @@ func (h *CounterHandler) Occupy(w http.ResponseWriter, r *http.Request) {
 	RespondJSON(w, counter)
 }
 
+// StartBreak godoc
+// @Summary      Start operator break
+// @Description  Puts the counter in break state (no active ticket). Idempotent failure: 409 if already on break.
+// @Tags         counters
+// @Accept       json
+// @Produce      json
+// @Param        id   path      string  true  "Counter ID"
+// @Success      200  {object}  models.Counter
+// @Failure      401  {string}  string "Unauthorized"
+// @Failure      404  {string}  string "Counter not found"
+// @Failure      409  {string}  string "Conflict (not occupied by user, active ticket, or already on break)"
+// @Router       /counters/{id}/break/start [post]
+func (h *CounterHandler) StartBreak(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	userID, ok := r.Context().Value(middleware.UserIDKey).(string)
+	if !ok || userID == "" {
+		http.Error(w, "User ID not found in context", http.StatusUnauthorized)
+		return
+	}
+
+	counter, err := h.service.StartBreak(id, userID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "Counter not found", http.StatusNotFound)
+			return
+		}
+		if errors.Is(err, services.ErrCounterNotOccupiedByUser) ||
+			errors.Is(err, services.ErrCounterAlreadyOnBreak) ||
+			errors.Is(err, services.ErrCounterBreakActiveTicket) {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	RespondJSON(w, counter)
+}
+
+// EndBreak godoc
+// @Summary      End operator break
+// @Description  Ends break and resumes idle. Idempotent failure: 409 if not on break.
+// @Tags         counters
+// @Accept       json
+// @Produce      json
+// @Param        id   path      string  true  "Counter ID"
+// @Success      200  {object}  models.Counter
+// @Failure      401  {string}  string "Unauthorized"
+// @Failure      404  {string}  string "Counter not found"
+// @Failure      409  {string}  string "Conflict (not occupied by user or not on break)"
+// @Router       /counters/{id}/break/end [post]
+func (h *CounterHandler) EndBreak(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	userID, ok := r.Context().Value(middleware.UserIDKey).(string)
+	if !ok || userID == "" {
+		http.Error(w, "User ID not found in context", http.StatusUnauthorized)
+		return
+	}
+
+	counter, err := h.service.EndBreak(id, userID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "Counter not found", http.StatusNotFound)
+			return
+		}
+		if errors.Is(err, services.ErrCounterNotOccupiedByUser) || errors.Is(err, services.ErrCounterNotOnBreak) {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	RespondJSON(w, counter)
+}
+
 // Release godoc
 // @Summary      Release counter
 // @Description  Releases a counter
@@ -207,27 +284,42 @@ func (h *CounterHandler) ForceRelease(w http.ResponseWriter, r *http.Request) {
 
 // CallNext godoc
 // @Summary      Call next ticket
-// @Description  Calls the next waiting ticket for the counter
+// @Description  Calls the next waiting ticket for the counter. Optional JSON body with serviceIds or legacy serviceId limits the queue; omit or empty body means all services.
 // @Tags         counters
 // @Accept       json
 // @Produce      json
-// @Param        id   path      string  true  "Counter ID"
-// @Success      200  {object}  map[string]interface{}
-// @Failure      404  {string}  string "Counter not found or no tickets"
+// @Param        id       path      string                true  "Counter ID"
+// @Param        request  body      CallNextRequest  false "Optional service filter (serviceIds / serviceId); omit for all services"
+// @Success      200      {object}  map[string]interface{}
+// @Failure      400      {string}  string "Bad Request"
+// @Failure      404      {string}  string "Counter not found or no tickets"
+// @Failure      409      {string}  string "Counter on break"
 // @Router       /counters/{id}/call-next [post]
 func (h *CounterHandler) CallNext(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
-	// Parse optional body for specific service filtering (if needed later)
-	// For now, just call next.
+	var req CallNextRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
+	filter := normalizeCallNextServiceFilter(req.ServiceIDs, req.ServiceID)
 	actor := getActorFromRequest(r)
-	ticket, err := h.service.CallNext(id, nil, actor)
+	ticket, err := h.service.CallNext(id, filter, actor)
 	if err != nil {
-		// If error is "record not found" type, return 404 or 200 with message?
-		// Frontend expects { ok: boolean, ticket?: Ticket, message?: string }
-		// But standard REST would be 404 if no ticket.
-		// Let's return 404 if no ticket found.
+		if errors.Is(err, services.ErrCallNextInvalidServices) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if errors.Is(err, services.ErrCounterOnBreak) {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
+		if errors.Is(err, services.ErrNoWaitingTickets) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}

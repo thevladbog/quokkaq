@@ -364,6 +364,171 @@ func RunVersionedMigrations(models ...interface{}) error {
 		return fmt.Errorf("failed to run units remove workplace migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.1.1_tickets_operator_comment", func(db *gorm.DB) error {
+		if err := db.Exec(`
+			ALTER TABLE tickets ADD COLUMN IF NOT EXISTS operator_comment TEXT;
+		`).Error; err != nil {
+			return err
+		}
+		return db.AutoMigrate(&dbmodels.Ticket{})
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run tickets operator_comment migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.1.2_counters_on_break_operator_intervals", func(db *gorm.DB) error {
+		if err := db.Exec(`
+			ALTER TABLE counters ADD COLUMN IF NOT EXISTS on_break BOOLEAN NOT NULL DEFAULT false;
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.AutoMigrate(&dbmodels.Counter{}, &dbmodels.CounterOperatorInterval{}); err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			CREATE INDEX IF NOT EXISTS idx_counter_operator_intervals_unit_started
+			ON counter_operator_intervals (unit_id, started_at);
+		`).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run counters on_break operator_intervals migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.1.3_unit_clients_ticket_visitor_pre_reg_names", func(db *gorm.DB) error {
+		if err := db.AutoMigrate(&dbmodels.UnitClient{}); err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			CREATE UNIQUE INDEX IF NOT EXISTS idx_unit_clients_unit_phone_e164
+			ON unit_clients (unit_id, phone_e164)
+			WHERE phone_e164 IS NOT NULL AND btrim(phone_e164) <> '';
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			CREATE UNIQUE INDEX IF NOT EXISTS idx_unit_clients_unit_anonymous_one
+			ON unit_clients (unit_id)
+			WHERE is_anonymous = true;
+		`).Error; err != nil {
+			return err
+		}
+		// Split pre-registration name into first/last (legacy customer_name → first name).
+		if err := db.Exec(`
+			ALTER TABLE pre_registrations ADD COLUMN IF NOT EXISTS customer_first_name TEXT NOT NULL DEFAULT '';
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			ALTER TABLE pre_registrations ADD COLUMN IF NOT EXISTS customer_last_name TEXT NOT NULL DEFAULT '';
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			DO $$
+			BEGIN
+				IF EXISTS (
+					SELECT 1 FROM information_schema.columns
+					WHERE table_schema = 'public' AND table_name = 'pre_registrations' AND column_name = 'customer_name'
+				) THEN
+					UPDATE pre_registrations
+					SET customer_first_name = COALESCE(customer_name, ''),
+						customer_last_name = '';
+					ALTER TABLE pre_registrations DROP COLUMN customer_name;
+				END IF;
+			END $$;
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			ALTER TABLE tickets ADD COLUMN IF NOT EXISTS client_id UUID;
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			INSERT INTO unit_clients (id, unit_id, first_name, last_name, phone_e164, is_anonymous, created_at, updated_at)
+			SELECT gen_random_uuid(), u.id, 'Аноним', '', NULL, true, NOW(), NOW()
+			FROM units u
+			WHERE NOT EXISTS (
+				SELECT 1 FROM unit_clients uc WHERE uc.unit_id = u.id AND uc.is_anonymous = true
+			);
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			UPDATE tickets t
+			SET client_id = uc.id
+			FROM unit_clients uc
+			WHERE t.client_id IS NULL
+				AND uc.unit_id = t.unit_id
+				AND uc.is_anonymous = true;
+		`).Error; err != nil {
+			return err
+		}
+		// FK after backfill so existing rows are valid.
+		if err := db.Exec(`
+			DO $$
+			BEGIN
+				IF NOT EXISTS (
+					SELECT 1 FROM pg_constraint WHERE conname = 'fk_tickets_unit_client'
+				) THEN
+					ALTER TABLE tickets
+					ADD CONSTRAINT fk_tickets_unit_client
+					FOREIGN KEY (client_id) REFERENCES unit_clients(id) ON DELETE SET NULL ON UPDATE CASCADE;
+				END IF;
+			END $$;
+		`).Error; err != nil {
+			return err
+		}
+		return db.AutoMigrate(&dbmodels.Ticket{}, &dbmodels.PreRegistration{}, &dbmodels.UnitClient{})
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run unit_clients ticket visitor migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.1.4_unit_visitor_tags", func(db *gorm.DB) error {
+		if err := db.AutoMigrate(
+			&dbmodels.UnitVisitorTagDefinition{},
+			&dbmodels.UnitClientTagAssignment{},
+			&dbmodels.UnitClient{},
+		); err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			CREATE INDEX IF NOT EXISTS idx_unit_visitor_tag_definitions_unit_id
+			ON unit_visitor_tag_definitions (unit_id);
+		`).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run unit visitor tags migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.1.5_unit_client_tag_assignment_fks", func(db *gorm.DB) error {
+		return db.Exec(`
+			DO $$
+			BEGIN
+				IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_uc_tag_assign_unit_client') THEN
+					ALTER TABLE unit_client_tag_assignments
+						ADD CONSTRAINT fk_uc_tag_assign_unit_client
+						FOREIGN KEY (unit_client_id) REFERENCES unit_clients(id) ON DELETE CASCADE;
+				END IF;
+				IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_uc_tag_assign_tag_def') THEN
+					ALTER TABLE unit_client_tag_assignments
+						ADD CONSTRAINT fk_uc_tag_assign_tag_def
+						FOREIGN KEY (tag_definition_id) REFERENCES unit_visitor_tag_definitions(id) ON DELETE CASCADE;
+				END IF;
+			END $$;
+		`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run unit client tag assignment FK migration: %w", err)
+	}
+
 	fmt.Println("All migrations completed successfully")
 	return nil
 }

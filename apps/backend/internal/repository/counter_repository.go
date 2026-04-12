@@ -10,12 +10,15 @@ import (
 )
 
 type CounterRepository interface {
+	Transaction(fn func(tx *gorm.DB) error) error
 	Create(counter *models.Counter) error
 	FindAllByUnit(unitID string) ([]models.Counter, error)
 	FindByID(id string) (*models.Counter, error)
+	FindByIDTx(tx *gorm.DB, id string) (*models.Counter, error)
 	FindByUserID(userID string) (*models.Counter, error)
 	FindByUserIDTx(tx *gorm.DB, userID string) (*models.Counter, error)
 	Update(counter *models.Counter) error
+	UpdateTx(tx *gorm.DB, counter *models.Counter) error
 	Delete(id string) error
 
 	// Shift related
@@ -32,6 +35,10 @@ func NewCounterRepository() CounterRepository {
 	return &counterRepository{db: database.DB}
 }
 
+func (r *counterRepository) Transaction(fn func(tx *gorm.DB) error) error {
+	return r.db.Transaction(fn)
+}
+
 func (r *counterRepository) Create(counter *models.Counter) error {
 	return r.db.Create(counter).Error
 }
@@ -43,8 +50,15 @@ func (r *counterRepository) FindAllByUnit(unitID string) ([]models.Counter, erro
 }
 
 func (r *counterRepository) FindByID(id string) (*models.Counter, error) {
+	return r.FindByIDTx(r.db, id)
+}
+
+func (r *counterRepository) FindByIDTx(tx *gorm.DB, id string) (*models.Counter, error) {
+	if tx == nil {
+		return nil, errors.New("nil tx provided to FindByIDTx")
+	}
 	var counter models.Counter
-	err := r.db.First(&counter, "id = ?", id).Error
+	err := tx.First(&counter, "id = ?", id).Error
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +82,14 @@ func (r *counterRepository) FindByUserIDTx(tx *gorm.DB, userID string) (*models.
 }
 
 func (r *counterRepository) Update(counter *models.Counter) error {
-	return r.db.Save(counter).Error
+	return r.UpdateTx(r.db, counter)
+}
+
+func (r *counterRepository) UpdateTx(tx *gorm.DB, counter *models.Counter) error {
+	if tx == nil {
+		return errors.New("nil tx provided to UpdateTx")
+	}
+	return tx.Save(counter).Error
 }
 
 func (r *counterRepository) Delete(id string) error {
@@ -90,6 +111,9 @@ func (r *counterRepository) ReleaseAll(unitID string) (int64, error) {
 func (r *counterRepository) ReleaseAllTx(tx *gorm.DB, unitID string) (int64, error) {
 	result := tx.Model(&models.Counter{}).
 		Where("unit_id = ?", unitID).
-		Update("assigned_to", nil)
+		Updates(map[string]interface{}{
+			"assigned_to": nil,
+			"on_break":    false,
+		})
 	return result.RowsAffected, result.Error
 }

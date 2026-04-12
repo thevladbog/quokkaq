@@ -9,7 +9,8 @@ import {
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
-  SidebarMenuItem
+  SidebarMenuItem,
+  SidebarRail
 } from '@/components/ui/sidebar';
 import {
   Building,
@@ -19,26 +20,24 @@ import {
   Grid3X3,
   Home,
   LayoutDashboard,
-  LogOut,
   Mail,
   MessageSquare,
   Monitor,
   UserRound
 } from 'lucide-react';
 import Image from 'next/image';
-import { useAuthContext } from '@/contexts/AuthContext';
-import { Link, usePathname } from '@/src/i18n/navigation';
-import { Button } from '@/components/ui/button';
+import { Link, usePathname, useRouter } from '@/src/i18n/navigation';
 import { useTranslations } from 'next-intl';
+import { SidebarCollapsedLogo } from '@/components/SidebarCollapsedLogo';
+import { SidebarCollapseToggle } from '@/components/SidebarCollapseToggle';
 
 export default function SettingsSidebar() {
   const pathname = usePathname();
-  const { logout } = useAuthContext();
+  const router = useRouter();
   const tAdmin = useTranslations('admin');
   const tOrg = useTranslations('organization');
   const tPricing = useTranslations('pricing');
   const tNav = useTranslations('nav');
-  const tProfile = useTranslations('profile');
 
   const isActive = (path: string) => pathname === path;
   /** True only for real subpaths (e.g. /settings/units/foo), not sibling routes like /settings/units-archive. */
@@ -113,17 +112,11 @@ export default function SettingsSidebar() {
       active:
         isActive('/settings/organization/billing') ||
         isActiveSub('/settings/organization/billing')
-    },
-    {
-      icon: Home,
-      label: tNav('home'),
-      href: '/',
-      active: isActive('/')
     }
   ];
 
   return (
-    <Sidebar>
+    <Sidebar collapsible='icon'>
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
@@ -143,14 +136,8 @@ export default function SettingsSidebar() {
                     />
                   </div>
                 </div>
-                <div className='relative hidden h-8 w-8 group-data-[collapsible=icon]:block'>
-                  <Image
-                    src='/quokka-logo.svg'
-                    alt='QuokkaQ'
-                    fill
-                    className='object-contain'
-                    priority
-                  />
+                <div className='relative hidden h-8 w-8 shrink-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:justify-center'>
+                  <SidebarCollapsedLogo className='size-8' />
                 </div>
               </Link>
             </SidebarMenuButton>
@@ -183,19 +170,21 @@ export default function SettingsSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <Button
-                  variant='ghost'
-                  className='hover:text-destructive text-destructive w-full justify-start'
-                  onClick={() => logout()}
+                <SidebarMenuButton
+                  type='button'
+                  tooltip={{ children: tNav('home') }}
+                  onClick={() => router.push('/')}
                 >
-                  <LogOut className='mr-2 h-4 w-4' />
-                  {tProfile('logout')}
-                </Button>
+                  <Home />
+                  <span>{tNav('home')}</span>
+                </SidebarMenuButton>
               </SidebarMenuItem>
+              <SidebarCollapseToggle />
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarFooter>
+      <SidebarRail />
     </Sidebar>
   );
 }

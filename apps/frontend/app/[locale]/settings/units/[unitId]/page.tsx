@@ -26,6 +26,7 @@ import { AdScreenSettings } from '@/components/admin/units/ad-screen-settings';
 import { UnitServicesManager } from '@/components/admin/units/unit-services-manager';
 import { KioskSettings } from '@/components/admin/units/kiosk-settings';
 import { SlotConfiguration } from '@/components/admin/units/slot-configuration';
+import { UnitVisitorTagsSettings } from '@/components/admin/units/unit-visitor-tags-settings';
 
 import ServiceGridEditor from '@/components/ServiceGridEditor';
 
@@ -279,6 +280,14 @@ export default function UnitPage({ params }: UnitPageProps) {
           >
             <TabsTrigger value='kiosk'>{t('kiosk_settings.title')}</TabsTrigger>
           </PermissionGuard>
+          <PermissionGuard
+            permissions={['UNIT_SETTINGS_MANAGE']}
+            unitId={unitId}
+          >
+            <TabsTrigger value='visitor-tags'>
+              {t('units.visitor_tags.tab')}
+            </TabsTrigger>
+          </PermissionGuard>
         </TabsList>
 
         <TabsContent value='general' className='mt-6'>
@@ -409,6 +418,15 @@ export default function UnitPage({ params }: UnitPageProps) {
               unitName={unit.name}
               currentConfig={unit.config || {}}
             />
+          </PermissionGuard>
+        </TabsContent>
+        <TabsContent value='visitor-tags' className='mt-6'>
+          <PermissionGuard
+            permissions={['UNIT_SETTINGS_MANAGE']}
+            unitId={unitId}
+            fallback={<div>{t('access_denied')}</div>}
+          >
+            <UnitVisitorTagsSettings unitId={unitId} />
           </PermissionGuard>
         </TabsContent>
       </Tabs>

@@ -130,6 +130,7 @@ export const TicketModelSchema = z.object({
   calledAt: z.string().nullable().optional(),
   confirmedAt: z.string().nullable().optional(),
   maxWaitingTime: z.number().nullable().optional(),
+  operatorComment: z.string().nullable().optional(),
   service: z
     .object({
       id: z.string().optional(),
@@ -146,12 +147,34 @@ export const TicketModelSchema = z.object({
   preRegistration: z
     .object({
       id: z.string(),
-      customerName: z.string(),
+      customerFirstName: z.string(),
+      customerLastName: z.string(),
       customerPhone: z.string(),
       code: z.string(),
       date: z.string(),
       time: z.string(),
       comment: z.string().optional()
+    })
+    .nullable()
+    .optional(),
+  client: z
+    .object({
+      id: z.string(),
+      firstName: z.string(),
+      lastName: z.string(),
+      phoneE164: z.string().nullable().optional(),
+      photoUrl: z.string().nullable().optional(),
+      isAnonymous: z.boolean().optional(),
+      definitions: z
+        .array(
+          z.object({
+            id: z.string(),
+            label: z.string(),
+            color: z.string(),
+            sortOrder: z.number().optional()
+          })
+        )
+        .optional()
     })
     .nullable()
     .optional()
@@ -174,6 +197,8 @@ export const CounterModelSchema = z.object({
   unitId: z.string(),
   name: z.string(),
   assignedTo: z.string().nullable().optional(),
+  onBreak: z.boolean().optional(),
+  breakStartedAt: z.string().nullable().optional(),
   assignedUser: z
     .object({
       name: z.string()
@@ -282,7 +307,8 @@ export interface PreRegistration {
   date: string;
   time: string;
   code: string;
-  customerName: string;
+  customerFirstName: string;
+  customerLastName: string;
   customerPhone: string;
   comment?: string;
   status: string;
@@ -299,7 +325,8 @@ export interface PreRegistration {
 export type CreateTicketRequest = {
   unitId: string;
   serviceId: string;
-  preferredName?: string;
+  /** Optional: link ticket to an existing unit visitor (staff/kiosk API). */
+  clientId?: string;
 };
 
 export type CreateBookingRequest = {
@@ -320,7 +347,11 @@ export type TransferTicketRequest = {
 };
 
 export type CallNextRequest = {
+  counterId: string;
   strategy?: 'fifo' | 'by_service';
+  /** When set and non-empty after trim/dedupe, limits call-next to these services. Omit or empty = all services in the unit. */
+  serviceIds?: string[];
+  /** @deprecated Prefer serviceIds; single-service filter */
   serviceId?: string;
 };
 

@@ -1125,9 +1125,109 @@ const docTemplate = `{
                 }
             }
         },
+        "/counters/{id}/break/end": {
+            "post": {
+                "description": "Ends break and resumes idle. Idempotent failure: 409 if not on break.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "counters"
+                ],
+                "summary": "End operator break",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Counter ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.Counter"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Counter not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict (not occupied by user or not on break)",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/counters/{id}/break/start": {
+            "post": {
+                "description": "Puts the counter in break state (no active ticket). Idempotent failure: 409 if already on break.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "counters"
+                ],
+                "summary": "Start operator break",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Counter ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.Counter"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Counter not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict (not occupied by user, active ticket, or already on break)",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/counters/{id}/call-next": {
             "post": {
-                "description": "Calls the next waiting ticket for the counter",
+                "description": "Calls the next waiting ticket for the counter. Optional JSON body with serviceIds or legacy serviceId limits the queue; omit or empty body means all services.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1145,6 +1245,14 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "description": "Optional service filter (serviceIds / serviceId); omit for all services",
+                        "name": "request",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CallNextRequest"
+                        }
                     }
                 ],
                 "responses": {
@@ -1155,8 +1263,20 @@ const docTemplate = `{
                             "additionalProperties": true
                         }
                     },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     "404": {
                         "description": "Counter not found or no tickets",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "409": {
+                        "description": "Counter on break",
                         "schema": {
                             "type": "string"
                         }
@@ -4013,6 +4133,59 @@ const docTemplate = `{
                 }
             }
         },
+        "/tickets/{id}/operator-comment": {
+            "patch": {
+                "description": "Sets or clears operatorComment. Body must include operatorComment (string or JSON null to clear).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tickets"
+                ],
+                "summary": "Update operator comment on ticket",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Ticket ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Comment body",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.OperatorCommentPatchDTO"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.Ticket"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Ticket not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/tickets/{id}/pick": {
             "post": {
                 "description": "Picks a specific ticket for a counter",
@@ -4053,6 +4226,12 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Ticket not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "409": {
+                        "description": "Counter on break",
                         "schema": {
                             "type": "string"
                         }
@@ -4229,6 +4408,134 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Ticket not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/tickets/{id}/visitor": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Allowed when status is called or in_service. Send either clientId or firstName, lastName, and phone (creates or links by phone).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tickets"
+                ],
+                "summary": "Attach or change visitor on active ticket",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Ticket ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Visitor payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.PatchTicketVisitorRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.Ticket"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/tickets/{id}/visitor-tags": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Full replacement of tag assignments on the ticket's visitor. Allowed when status is called or in_service; not for anonymous kiosk client. operatorComment is required and appended to the ticket operator comment.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tickets"
+                ],
+                "summary": "Replace visitor tags for ticket's client",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Ticket ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "tagDefinitionIds (full set) and operatorComment",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.putVisitorTagsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.Ticket"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "type": "string"
                         }
@@ -4537,7 +4844,7 @@ const docTemplate = `{
         },
         "/units/{unitId}/call-next": {
             "post": {
-                "description": "Calls the next waiting ticket for a unit",
+                "description": "Calls the next waiting ticket for a unit. Optional serviceIds (or legacy serviceId) limit the queue; omit or empty means all services in the unit.",
                 "consumes": [
                     "application/json"
                 ],
@@ -4581,6 +4888,12 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "No waiting tickets",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "409": {
+                        "description": "Counter on break",
                         "schema": {
                             "type": "string"
                         }
@@ -4679,6 +4992,145 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/units/{unitId}/clients/search": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Search by phone (exact when parseable) and by name; excludes anonymous aggregate client.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "clients"
+                ],
+                "summary": "Search unit clients (visitors)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Unit ID",
+                        "name": "unitId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Search query",
+                        "name": "q",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.UnitClient"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/units/{unitId}/clients/{clientId}/visits": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Tickets linked to the client in this unit; empty for anonymous client.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "clients"
+                ],
+                "summary": "List past visits for a client",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Unit ID",
+                        "name": "unitId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Client ID",
+                        "name": "clientId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (default 20, max 100)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Pagination cursor from previous nextCursor",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ClientVisitsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "type": "string"
                         }
@@ -6024,6 +6476,200 @@ const docTemplate = `{
                 }
             }
         },
+        "/units/{unitId}/visitor-tag-definitions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns label/color tag definitions scoped to the unit, ordered by sortOrder then label.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "units"
+                ],
+                "summary": "List visitor tag definitions for a unit",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Unit ID",
+                        "name": "unitId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.UnitVisitorTagDefinition"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates a tag definition (label + #RRGGBB color) for the unit.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "units"
+                ],
+                "summary": "Create visitor tag definition",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Unit ID",
+                        "name": "unitId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.createVisitorTagDefinitionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnitVisitorTagDefinition"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/units/{unitId}/visitor-tag-definitions/{definitionId}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Deletes a tag definition; assignments on clients are removed (cascade).",
+                "tags": [
+                    "units"
+                ],
+                "summary": "Delete visitor tag definition",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Unit ID",
+                        "name": "unitId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Definition ID",
+                        "name": "definitionId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Partially updates a tag definition. Omitted fields are unchanged.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "units"
+                ],
+                "summary": "Update visitor tag definition",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Unit ID",
+                        "name": "unitId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Definition ID",
+                        "name": "definitionId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.patchVisitorTagDefinitionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnitVisitorTagDefinition"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/usage-metrics/me": {
             "get": {
                 "security": [
@@ -6508,6 +7154,26 @@ const docTemplate = `{
                 },
                 "serviceId": {
                     "type": "string"
+                },
+                "serviceIds": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "handlers.ClientVisitsResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Ticket"
+                    }
+                },
+                "nextCursor": {
+                    "type": "string"
                 }
             }
         },
@@ -6750,6 +7416,15 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.OperatorCommentPatchDTO": {
+            "type": "object",
+            "properties": {
+                "operatorComment": {
+                    "type": "string",
+                    "example": "VIP, повторный визит"
+                }
+            }
+        },
         "handlers.PatchPlatformCompanyBody": {
             "type": "object",
             "properties": {
@@ -6827,6 +7502,23 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "trialEnd": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.PatchTicketVisitorRequest": {
+            "type": "object",
+            "properties": {
+                "clientId": {
+                    "type": "string"
+                },
+                "firstName": {
+                    "type": "string"
+                },
+                "lastName": {
+                    "type": "string"
+                },
+                "phone": {
                     "type": "string"
                 }
             }
@@ -7085,6 +7777,34 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.createVisitorTagDefinitionRequest": {
+            "type": "object",
+            "properties": {
+                "color": {
+                    "type": "string"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "sortOrder": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handlers.patchVisitorTagDefinitionRequest": {
+            "type": "object",
+            "properties": {
+                "color": {
+                    "type": "string"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "sortOrder": {
+                    "type": "integer"
+                }
+            }
+        },
         "handlers.platformListResponse-models_CatalogItem": {
             "type": "object",
             "properties": {
@@ -7162,6 +7882,20 @@ const docTemplate = `{
                 },
                 "total": {
                     "type": "integer"
+                }
+            }
+        },
+        "handlers.putVisitorTagsRequest": {
+            "type": "object",
+            "properties": {
+                "operatorComment": {
+                    "type": "string"
+                },
+                "tagDefinitionIds": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -7456,6 +8190,9 @@ const docTemplate = `{
                 },
                 "name": {
                     "type": "string"
+                },
+                "onBreak": {
+                    "type": "boolean"
                 },
                 "unitId": {
                     "type": "string"
@@ -7752,7 +8489,10 @@ const docTemplate = `{
                 "createdAt": {
                     "type": "string"
                 },
-                "customerName": {
+                "customerFirstName": {
+                    "type": "string"
+                },
+                "customerLastName": {
                     "type": "string"
                 },
                 "customerPhone": {
@@ -7807,7 +8547,10 @@ const docTemplate = `{
                 "comment": {
                     "type": "string"
                 },
-                "customerName": {
+                "customerFirstName": {
+                    "type": "string"
+                },
+                "customerLastName": {
                     "type": "string"
                 },
                 "customerPhone": {
@@ -7844,7 +8587,10 @@ const docTemplate = `{
                 "comment": {
                     "type": "string"
                 },
-                "customerName": {
+                "customerFirstName": {
+                    "type": "string"
+                },
+                "customerLastName": {
                     "type": "string"
                 },
                 "customerPhone": {
@@ -8173,6 +8919,12 @@ const docTemplate = `{
                 "calledAt": {
                     "type": "string"
                 },
+                "client": {
+                    "$ref": "#/definitions/models.UnitClient"
+                },
+                "clientId": {
+                    "type": "string"
+                },
                 "completedAt": {
                     "type": "string"
                 },
@@ -8200,6 +8952,9 @@ const docTemplate = `{
                 "maxWaitingTime": {
                     "description": "Snapshot from Service at creation",
                     "type": "integer"
+                },
+                "operatorComment": {
+                    "type": "string"
                 },
                 "preRegistration": {
                     "description": "No DB FK: avoids AutoMigrate cycle with pre_registrations.ticket_id → tickets.id",
@@ -8307,6 +9062,45 @@ const docTemplate = `{
                 }
             }
         },
+        "models.UnitClient": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "definitions": {
+                    "description": "Definitions are visitor tags assigned to this client (excludes anonymous aggregate use in API).",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.UnitVisitorTagDefinition"
+                    }
+                },
+                "firstName": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "isAnonymous": {
+                    "type": "boolean"
+                },
+                "lastName": {
+                    "type": "string"
+                },
+                "phoneE164": {
+                    "type": "string"
+                },
+                "photoUrl": {
+                    "type": "string"
+                },
+                "unitId": {
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
         "models.UnitMaterial": {
             "type": "object",
             "properties": {
@@ -8326,6 +9120,33 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.UnitVisitorTagDefinition": {
+            "type": "object",
+            "properties": {
+                "color": {
+                    "description": "e.g. #RRGGBB",
+                    "type": "string"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "sortOrder": {
+                    "type": "integer"
+                },
+                "unitId": {
+                    "type": "string"
+                },
+                "updatedAt": {
                     "type": "string"
                 }
             }
@@ -8543,6 +9364,13 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "name": {
+                    "type": "string"
+                },
+                "onBreak": {
+                    "type": "boolean"
+                },
+                "sessionState": {
+                    "description": "off_duty | idle | serving | break",
                     "type": "string"
                 },
                 "unitId": {

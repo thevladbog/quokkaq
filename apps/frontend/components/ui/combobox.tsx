@@ -36,6 +36,8 @@ interface ComboboxProps {
   emptyText?: string;
   className?: string;
   disabled?: boolean;
+  /** When false, selecting the current option again does not clear the value. */
+  allowClear?: boolean;
 }
 
 export function Combobox({
@@ -46,7 +48,8 @@ export function Combobox({
   searchPlaceholder = 'Search...',
   emptyText = 'No option found.',
   className,
-  disabled = false
+  disabled = false,
+  allowClear = true
 }: ComboboxProps) {
   const [open, setOpen] = React.useState(false);
 
@@ -83,7 +86,11 @@ export function Combobox({
                   disabled={option.disabled}
                   onSelect={() => {
                     if (option.disabled) return;
-                    onChange(option.value === value ? '' : option.value);
+                    if (allowClear && option.value === value) {
+                      onChange('');
+                    } else {
+                      onChange(option.value);
+                    }
                     setOpen(false);
                   }}
                 >

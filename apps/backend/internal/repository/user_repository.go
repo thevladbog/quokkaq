@@ -2,6 +2,8 @@ package repository
 
 import (
 	"errors"
+	"strings"
+
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/pkg/database"
 
@@ -42,6 +44,8 @@ type UserRepository interface {
 	GetCompanyIDByUserID(userID string) (companyID string, err error)
 	// GetFirstUserUnit returns the first user_units row joined to units for the user (same shape as legacy usage handler query).
 	GetFirstUserUnit(userID string) (UserUnitResult, error)
+	// ResolveJournalActorDisplayNames returns a display label per user id (non-empty trimmed name, else email). Omitted ids are not in the map.
+	ResolveJournalActorDisplayNames(userIDs []string) (map[string]string, error)
 }
 
 type userRepository struct {
@@ -327,4 +331,39 @@ func (r *userRepository) GetFirstUserUnit(userID string) (UserUnitResult, error)
 		return UserUnitResult{}, gorm.ErrRecordNotFound
 	}
 	return res, nil
+}
+
+func (r *userRepository) ResolveJournalActorDisplayNames(userIDs []string) (map[string]string, error) {
+	seen := make(map[string]struct{}, len(userIDs))
+	unique := make([]string, 0, len(userIDs))
+	for _, raw := range userIDs {
+		id := strings.TrimSpace(raw)
+		if id == "" {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		unique = append(unique, id)
+	}
+	if len(unique) == 0 {
+		return map[string]string{}, nil
+	}
+	var users []models.User
+	if err := r.db.Select("id", "name", "email").Where("id IN ?", unique).Find(&users).Error; err != nil {
+		return nil, err
+	}
+	out := make(map[string]string, len(users))
+	for i := range users {
+		u := users[i]
+		label := strings.TrimSpace(u.Name)
+		if label == "" && u.Email != nil {
+			label = strings.TrimSpace(*u.Email)
+		}
+		if label != "" {
+			out[u.ID] = label
+		}
+	}
+	return out, nil
 }

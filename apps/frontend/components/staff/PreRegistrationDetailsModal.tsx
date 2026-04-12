@@ -49,7 +49,13 @@ export function PreRegistrationDetailsModal({
                 {t('customer_name', { defaultValue: 'Customer Name' })}
               </div>
               <div className='text-muted-foreground text-sm'>
-                {preRegistration.customerName}
+                {[
+                  preRegistration.customerFirstName,
+                  preRegistration.customerLastName
+                ]
+                  .map((s) => s?.trim())
+                  .filter(Boolean)
+                  .join(' ') || '—'}
               </div>
             </div>
           </div>

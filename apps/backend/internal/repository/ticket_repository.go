@@ -2,12 +2,15 @@ package repository
 
 import (
 	"encoding/json"
+	"errors"
+	"strings"
 	"time"
 
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/ticketaudit"
 	"quokkaq-go-backend/pkg/database"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -19,8 +22,121 @@ type TicketHistoryListRow struct {
 	QueueNumber string
 	Action      string
 	UserID      *string
+	ActorName   string `gorm:"column:actor_name"` // from users.name via LEFT JOIN
 	Payload     []byte
 	CreatedAt   time.Time
+}
+
+// TicketHistoryListFilters narrows journal rows (predicates are AND-combined). Nil pointer fields are ignored.
+// Weekdays and date range use PostgreSQL in the unit's timezone (single INNER JOIN units AS u_f).
+// Weekdays: EXTRACT(DOW) 0=Sunday … 6=Saturday. DateFrom/DateTo: YYYY-MM-DD inclusive on (history created_at AT TIME ZONE unit.timezone)::date.
+type TicketHistoryListFilters struct {
+	CounterID   *string
+	ActorUserID *string
+	ClientID    *string
+	Ticket      *string // UUID → exact ticket id; otherwise queue_number ILIKE
+	Search      *string // q: queue, ticket id, visitor name
+	Weekdays    []int   // 0–6, deduplicated in applyTicketHistoryFilters
+	DateFrom    *string // YYYY-MM-DD inclusive lower bound (unit TZ calendar date)
+	DateTo      *string // YYYY-MM-DD inclusive upper bound (unit TZ calendar date)
+}
+
+// ShiftActivityActorRow is a distinct actor who appears in ticket history for a unit.
+type ShiftActivityActorRow struct {
+	UserID string
+	Name   string
+}
+
+func escapeSQLLike(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `%`, `\%`)
+	s = strings.ReplaceAll(s, `_`, `\_`)
+	return s
+}
+
+func normalizeWeekdaysDOW(w []int) []int {
+	seen := make(map[int]struct{}, len(w))
+	out := make([]int, 0, len(w))
+	for _, d := range w {
+		if d < 0 || d > 6 {
+			continue
+		}
+		if _, ok := seen[d]; ok {
+			continue
+		}
+		seen[d] = struct{}{}
+		out = append(out, d)
+	}
+	return out
+}
+
+func applyTicketHistoryFilters(q *gorm.DB, filters *TicketHistoryListFilters) *gorm.DB {
+	if filters == nil {
+		return q
+	}
+	if filters.CounterID != nil && strings.TrimSpace(*filters.CounterID) != "" {
+		q = q.Where("t.counter_id = ?", strings.TrimSpace(*filters.CounterID))
+	}
+	if filters.ActorUserID != nil && strings.TrimSpace(*filters.ActorUserID) != "" {
+		q = q.Where("h.user_id = ?", strings.TrimSpace(*filters.ActorUserID))
+	}
+	if filters.ClientID != nil && strings.TrimSpace(*filters.ClientID) != "" {
+		q = q.Where("t.client_id = ?", strings.TrimSpace(*filters.ClientID))
+	}
+	if filters.Ticket != nil {
+		ticketTrim := strings.TrimSpace(*filters.Ticket)
+		if ticketTrim != "" {
+			if _, err := uuid.Parse(ticketTrim); err == nil {
+				q = q.Where("t.id = ?", ticketTrim)
+			} else {
+				like := "%" + escapeSQLLike(ticketTrim) + "%"
+				q = q.Where("t.queue_number ILIKE ? ESCAPE '\\'", like)
+			}
+		}
+	}
+	if filters.Search != nil {
+		searchTrim := strings.TrimSpace(*filters.Search)
+		if searchTrim != "" {
+			q = q.Joins("LEFT JOIN unit_clients AS c ON c.id = t.client_id AND c.unit_id = t.unit_id")
+			like := "%" + escapeSQLLike(searchTrim) + "%"
+			sub := "t.queue_number ILIKE ? ESCAPE '\\'"
+			args := []interface{}{like}
+			if parsed, err := uuid.Parse(searchTrim); err == nil {
+				sub += " OR t.id = ?"
+				args = append(args, parsed.String())
+			}
+			sub += " OR (c.id IS NOT NULL AND CONCAT(TRIM(c.first_name), ' ', TRIM(c.last_name)) ILIKE ? ESCAPE '\\')"
+			args = append(args, like)
+			q = q.Where("("+sub+")", args...)
+		}
+	}
+	wd := normalizeWeekdaysDOW(filters.Weekdays)
+	needsUnitTZ := len(wd) > 0
+	if filters.DateFrom != nil && strings.TrimSpace(*filters.DateFrom) != "" {
+		needsUnitTZ = true
+	}
+	if filters.DateTo != nil && strings.TrimSpace(*filters.DateTo) != "" {
+		needsUnitTZ = true
+	}
+	if needsUnitTZ {
+		q = q.Joins("INNER JOIN units AS u_f ON u_f.id = t.unit_id")
+	}
+	if len(wd) > 0 {
+		q = q.Where("EXTRACT(DOW FROM (h.created_at AT TIME ZONE u_f.timezone)) IN ?", wd)
+	}
+	if filters.DateFrom != nil {
+		df := strings.TrimSpace(*filters.DateFrom)
+		if df != "" {
+			q = q.Where("(h.created_at AT TIME ZONE u_f.timezone)::date >= ?::date", df)
+		}
+	}
+	if filters.DateTo != nil {
+		dt := strings.TrimSpace(*filters.DateTo)
+		if dt != "" {
+			q = q.Where("(h.created_at AT TIME ZONE u_f.timezone)::date <= ?::date", dt)
+		}
+	}
+	return q
 }
 
 type TicketRepository interface {
@@ -35,8 +151,8 @@ type TicketRepository interface {
 	FindByID(id string) (*models.Ticket, error)
 	FindByIDForUpdateTx(tx *gorm.DB, id string) (*models.Ticket, error)
 	FindByUnitID(unitID string) ([]models.Ticket, error)
-	FindWaiting(unitID string, serviceID *string) (*models.Ticket, error)
-	FindWaitingForUpdateTx(tx *gorm.DB, unitID string, serviceID *string) (*models.Ticket, error)
+	FindWaiting(unitID string, serviceIDs []string) (*models.Ticket, error)
+	FindWaitingForUpdateTx(tx *gorm.DB, unitID string, serviceIDs []string) (*models.Ticket, error)
 	Update(ticket *models.Ticket) error
 	UpdateTx(tx *gorm.DB, ticket *models.Ticket) error
 	Delete(id string) error
@@ -51,6 +167,7 @@ type TicketRepository interface {
 	GetWaitingTickets(unitID string) ([]models.Ticket, error)
 	UpdateStatusByUnit(unitID string, oldStatuses []string, newStatus string) (int64, error)
 	GetActiveTicketByCounter(counterID string) (*models.Ticket, error)
+	GetActiveTicketByCounterTx(tx *gorm.DB, counterID string) (*models.Ticket, error)
 	MarkAsEODTicketIDsTx(tx *gorm.DB, ticketIDs []string) (int64, error)
 	// CountEODTicketSplitTx counts tickets already marked end-of-day (is_eod=true), split into waiting vs non-waiting status, for EOD messaging.
 	CountEODTicketSplitTx(tx *gorm.DB, unitID string) (waiting int64, nonWaiting int64, err error)
@@ -59,7 +176,11 @@ type TicketRepository interface {
 	ResetSequencesTx(tx *gorm.DB, unitID, date string) error
 
 	// ListTicketHistoryByUnitID returns recent history for tickets belonging to the unit (keyset pagination).
-	ListTicketHistoryByUnitID(unitID string, limit int, beforeTime *time.Time, beforeID *string) ([]TicketHistoryListRow, error)
+	ListTicketHistoryByUnitID(unitID string, limit int, beforeTime *time.Time, beforeID *string, filters *TicketHistoryListFilters) ([]TicketHistoryListRow, error)
+	// ListShiftActivityActorRows returns distinct users who authored ticket history in the unit (for journal filters).
+	ListShiftActivityActorRows(unitID string, limit int) ([]ShiftActivityActorRow, error)
+	// ListVisitsByClientID returns tickets for a client in the unit (newest first, keyset pagination).
+	ListVisitsByClientID(unitID, clientID string, limit int, beforeTime *time.Time, beforeID *string) ([]models.Ticket, error)
 }
 
 type ticketRepository struct {
@@ -122,13 +243,13 @@ func (r *ticketRepository) AppendEODFlaggedHistoryForUnitTx(tx *gorm.DB, unitID 
 
 func (r *ticketRepository) FindAll() ([]models.Ticket, error) {
 	var tickets []models.Ticket
-	err := r.db.Preload("Unit").Preload("Service").Preload("Counter").Preload("PreRegistration").Find(&tickets).Error
+	err := r.db.Preload("Unit").Preload("Service").Preload("Counter").Preload("PreRegistration").Preload("Client.Definitions").Find(&tickets).Error
 	return tickets, err
 }
 
 func (r *ticketRepository) FindByID(id string) (*models.Ticket, error) {
 	var ticket models.Ticket
-	err := r.db.Preload("Unit").Preload("Service").Preload("Counter").Preload("PreRegistration").First(&ticket, "id = ?", id).Error
+	err := r.db.Preload("Unit").Preload("Service").Preload("Counter").Preload("PreRegistration").Preload("Client.Definitions").First(&ticket, "id = ?", id).Error
 	if err != nil {
 		return nil, err
 	}
@@ -146,17 +267,17 @@ func (r *ticketRepository) FindByIDForUpdateTx(tx *gorm.DB, id string) (*models.
 
 func (r *ticketRepository) FindByUnitID(unitID string) ([]models.Ticket, error) {
 	var tickets []models.Ticket
-	err := r.db.Preload("Unit").Preload("Service").Preload("Counter").Preload("PreRegistration").
+	err := r.db.Preload("Unit").Preload("Service").Preload("Counter").Preload("PreRegistration").Preload("Client.Definitions").
 		Where("unit_id = ? AND is_eod = ?", unitID, false).
 		Order("created_at asc").
 		Find(&tickets).Error
 	return tickets, err
 }
 
-func (r *ticketRepository) FindWaiting(unitID string, serviceID *string) (*models.Ticket, error) {
+func (r *ticketRepository) FindWaiting(unitID string, serviceIDs []string) (*models.Ticket, error) {
 	query := r.db.Where("unit_id = ? AND status = ? AND is_eod = ?", unitID, "waiting", false)
-	if serviceID != nil {
-		query = query.Where("service_id = ?", *serviceID)
+	if len(serviceIDs) > 0 {
+		query = query.Where("service_id IN ?", serviceIDs)
 	}
 	var ticket models.Ticket
 	err := query.Order("priority desc, created_at asc").First(&ticket).Error
@@ -166,11 +287,11 @@ func (r *ticketRepository) FindWaiting(unitID string, serviceID *string) (*model
 	return &ticket, nil
 }
 
-func (r *ticketRepository) FindWaitingForUpdateTx(tx *gorm.DB, unitID string, serviceID *string) (*models.Ticket, error) {
+func (r *ticketRepository) FindWaitingForUpdateTx(tx *gorm.DB, unitID string, serviceIDs []string) (*models.Ticket, error) {
 	query := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("unit_id = ? AND status = ? AND is_eod = ?", unitID, "waiting", false)
-	if serviceID != nil {
-		query = query.Where("service_id = ?", *serviceID)
+	if len(serviceIDs) > 0 {
+		query = query.Where("service_id IN ?", serviceIDs)
 	}
 	var ticket models.Ticket
 	err := query.Order("priority desc, created_at asc").First(&ticket).Error
@@ -245,7 +366,7 @@ func (r *ticketRepository) CountWaiting(unitID string) (int64, error) {
 
 func (r *ticketRepository) GetWaitingTickets(unitID string) ([]models.Ticket, error) {
 	var tickets []models.Ticket
-	err := r.db.Preload("Service").Preload("PreRegistration").
+	err := r.db.Preload("Service").Preload("PreRegistration").Preload("Client.Definitions").
 		Where("unit_id = ? AND status = ? AND is_eod = ?", unitID, "waiting", false).
 		Order("priority desc, created_at asc").
 		Find(&tickets).Error
@@ -260,8 +381,15 @@ func (r *ticketRepository) UpdateStatusByUnit(unitID string, oldStatuses []strin
 }
 
 func (r *ticketRepository) GetActiveTicketByCounter(counterID string) (*models.Ticket, error) {
+	return r.GetActiveTicketByCounterTx(r.db, counterID)
+}
+
+func (r *ticketRepository) GetActiveTicketByCounterTx(tx *gorm.DB, counterID string) (*models.Ticket, error) {
+	if tx == nil {
+		return nil, errors.New("nil tx for GetActiveTicketByCounterTx")
+	}
 	var tickets []models.Ticket
-	err := r.db.Preload("Service").Preload("PreRegistration").
+	err := tx.Preload("Service").Preload("PreRegistration").Preload("Client.Definitions").
 		Where("counter_id = ? AND status IN ? AND is_eod = ?", counterID, []string{"called", "in_service"}, false).
 		Limit(1).
 		Find(&tickets).Error
@@ -315,7 +443,7 @@ func (r *ticketRepository) CountEODTicketSplitByIDsTx(tx *gorm.DB, ticketIDs []s
 	return waiting, nonWaiting, nil
 }
 
-func (r *ticketRepository) ListTicketHistoryByUnitID(unitID string, limit int, beforeTime *time.Time, beforeID *string) ([]TicketHistoryListRow, error) {
+func (r *ticketRepository) ListTicketHistoryByUnitID(unitID string, limit int, beforeTime *time.Time, beforeID *string, filters *TicketHistoryListFilters) ([]TicketHistoryListRow, error) {
 	if limit <= 0 {
 		limit = 20
 	}
@@ -323,11 +451,16 @@ func (r *ticketRepository) ListTicketHistoryByUnitID(unitID string, limit int, b
 		limit = 200
 	}
 	q := r.db.Table("ticket_histories AS h").
-		Select("h.id, h.ticket_id, t.queue_number AS queue_number, h.action, h.user_id, h.payload, h.created_at").
+		Select(`h.id, h.ticket_id, t.queue_number AS queue_number, h.action, h.user_id,
+			COALESCE(
+				NULLIF(TRIM(u.name), ''),
+				NULLIF(TRIM(COALESCE(u.email, '')), '')
+			) AS actor_name, h.payload, h.created_at`).
 		Joins("INNER JOIN tickets AS t ON t.id = h.ticket_id").
-		Where("t.unit_id = ?", unitID).
-		Order("h.created_at DESC, h.id DESC").
-		Limit(limit)
+		Joins("LEFT JOIN users AS u ON u.id::text = h.user_id::text").
+		Where("t.unit_id = ?", unitID)
+	q = applyTicketHistoryFilters(q, filters)
+	q = q.Order("h.created_at DESC, h.id DESC").Limit(limit)
 	if beforeTime != nil && beforeID != nil && *beforeID != "" {
 		q = q.Where("(h.created_at < ?) OR (h.created_at = ? AND h.id < ?)", *beforeTime, *beforeTime, *beforeID)
 	}
@@ -336,4 +469,51 @@ func (r *ticketRepository) ListTicketHistoryByUnitID(unitID string, limit int, b
 		return nil, err
 	}
 	return rows, nil
+}
+
+func (r *ticketRepository) ListShiftActivityActorRows(unitID string, limit int) ([]ShiftActivityActorRow, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	if limit > 300 {
+		limit = 300
+	}
+	var rows []ShiftActivityActorRow
+	err := r.db.Table("ticket_histories AS h").
+		Select(`h.user_id AS user_id, COALESCE(
+			NULLIF(TRIM(MAX(u.name)), ''),
+			NULLIF(TRIM(MAX(COALESCE(u.email, ''))), '')
+		) AS name`).
+		Joins("INNER JOIN tickets AS t ON t.id = h.ticket_id").
+		Joins("LEFT JOIN users AS u ON u.id::text = h.user_id::text").
+		Where("t.unit_id = ? AND h.user_id IS NOT NULL", unitID).
+		Group("h.user_id").
+		Order("COALESCE(MAX(u.name), '') ASC, h.user_id ASC").
+		Limit(limit).
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	return rows, nil
+}
+
+func (r *ticketRepository) ListVisitsByClientID(unitID, clientID string, limit int, beforeTime *time.Time, beforeID *string) ([]models.Ticket, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	q := r.db.Where("unit_id = ? AND client_id = ?", unitID, clientID).
+		Preload("Service").Preload("Counter").
+		Order("created_at DESC, id DESC").
+		Limit(limit)
+	if beforeTime != nil && beforeID != nil && *beforeID != "" {
+		q = q.Where("(created_at < ?) OR (created_at = ? AND id < ?)", *beforeTime, *beforeTime, *beforeID)
+	}
+	var tickets []models.Ticket
+	if err := q.Find(&tickets).Error; err != nil {
+		return nil, err
+	}
+	return tickets, nil
 }

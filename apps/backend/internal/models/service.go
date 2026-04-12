@@ -1,5 +1,7 @@
 package models
 
+import "time"
+
 type Service struct {
 	ID              string  `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
 	UnitID          string  `gorm:"not null" json:"unitId"`
@@ -33,11 +35,14 @@ type Service struct {
 }
 
 type Counter struct {
-	ID           string  `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
-	UnitID       string  `gorm:"not null" json:"unitId"`
-	Name         string  `gorm:"not null" json:"name"`
-	AssignedTo   *string `gorm:"column:assigned_to" json:"assignedTo,omitempty"`
-	AssignedUser *User   `gorm:"foreignKey:AssignedTo" json:"assignedUser,omitempty"`
+	ID         string  `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
+	UnitID     string  `gorm:"not null" json:"unitId"`
+	Name       string  `gorm:"not null" json:"name"`
+	AssignedTo *string `gorm:"column:assigned_to" json:"assignedTo,omitempty"`
+	OnBreak    bool    `gorm:"default:false" json:"onBreak"`
+	// BreakStartedAt is hydrated for JSON when OnBreak is true (open break interval); not stored on counters row.
+	BreakStartedAt *time.Time `json:"breakStartedAt,omitempty" gorm:"-" swaggerignore:"true"`
+	AssignedUser   *User      `gorm:"foreignKey:AssignedTo" json:"assignedUser,omitempty"`
 
 	// Relations
 	Unit Unit `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-" swaggerignore:"true"`

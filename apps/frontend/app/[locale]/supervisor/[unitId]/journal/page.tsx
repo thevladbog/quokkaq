@@ -1,13 +1,16 @@
 'use client';
 
-import { use, useMemo } from 'react';
+import { use, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
-import { formatDistanceToNow } from 'date-fns';
 import { enUS, ru } from 'date-fns/locale';
 import { ArrowLeft, Loader2 } from 'lucide-react';
-import { shiftApi } from '@/lib/api';
+import {
+  shiftApi,
+  type ShiftActivityQueryOpts,
+  type UnitClient
+} from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -16,10 +19,49 @@ import {
   CardHeader,
   CardTitle
 } from '@/components/ui/card';
-import { getSupervisorActivityPresentation } from '@/components/supervisor/supervisor-activity-presenter';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select';
+import { SupervisorActivityRow } from '@/components/supervisor/SupervisorActivityRow';
+import {
+  emptyJournalFilterState,
+  SupervisorJournalFiltersBar,
+  type JournalFilterState
+} from '@/components/supervisor/SupervisorJournalFiltersBar';
 import { Link } from '@/src/i18n/navigation';
 
-const PAGE_SIZE = 40;
+const PAGE_SIZE_OPTIONS = [20, 40, 60, 100] as const;
+
+function buildActivityOpts(
+  f: JournalFilterState,
+  pageSize: number,
+  cursor?: string
+): ShiftActivityQueryOpts {
+  const o: ShiftActivityQueryOpts = { limit: pageSize, cursor };
+  const c = f.counterId.trim();
+  if (c) o.counterId = c;
+  const u = f.userId.trim();
+  if (u) o.userId = u;
+  const cl = f.clientId.trim();
+  if (cl) o.clientId = cl;
+  const tk = f.ticket.trim();
+  if (tk) o.ticket = tk;
+  const q = f.q.trim();
+  if (q) o.q = q;
+  if (f.weekdays.length > 0) {
+    o.weekdays = [...f.weekdays].sort((a, b) => a - b);
+  }
+  const df = f.dateFrom.trim();
+  if (df) o.dateFrom = df;
+  const dto = f.dateTo.trim();
+  if (dto) o.dateTo = dto;
+  return o;
+}
 
 export default function SupervisorJournalPage({
   params
@@ -38,32 +80,115 @@ export default function SupervisorJournalPage({
 
   const dashboardHref = `/supervisor/${dashboardUnitId}`;
 
-  const {
-    data,
-    isLoading,
-    isError,
-    error,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage
-  } = useInfiniteQuery({
-    queryKey: ['shift-activity', apiUnitId, 'journal'],
-    queryFn: ({ pageParam }) =>
-      shiftApi.getActivity(apiUnitId, {
-        limit: PAGE_SIZE,
-        cursor: pageParam
-      }),
-    initialPageParam: undefined as string | undefined,
-    getNextPageParam: (last) => last.nextCursor
-  });
+  const [draft, setDraft] = useState<JournalFilterState>(
+    emptyJournalFilterState
+  );
+  const [applied, setApplied] = useState<JournalFilterState>(
+    emptyJournalFilterState
+  );
+  const [selectedVisitor, setSelectedVisitor] = useState<UnitClient | null>(
+    null
+  );
+  const [journalFiltersBarKey, setJournalFiltersBarKey] = useState(0);
 
-  const rows = useMemo(
-    () => data?.pages.flatMap((p) => p.items) ?? [],
-    [data?.pages]
+  const [pageSize, setPageSize] =
+    useState<(typeof PAGE_SIZE_OPTIONS)[number]>(40);
+  const [pageIndex, setPageIndex] = useState(0);
+  /** cursors[k] = API cursor when loading page k (k=0 → undefined). */
+  const [pageCursors, setPageCursors] = useState<(string | undefined)[]>([
+    undefined
+  ]);
+
+  const appliedKey = useMemo(
+    () => ({
+      counterId: applied.counterId,
+      userId: applied.userId,
+      clientId: applied.clientId,
+      ticket: applied.ticket,
+      q: applied.q,
+      weekdays: [...applied.weekdays].sort((a, b) => a - b).join(','),
+      dateFrom: applied.dateFrom,
+      dateTo: applied.dateTo
+    }),
+    [applied]
   );
 
+  const cursorForApi = pageIndex === 0 ? undefined : pageCursors[pageIndex];
+
+  const queryEnabled = pageIndex === 0 || Boolean(cursorForApi);
+
+  const { data, isLoading, isFetching, isError, error } = useQuery({
+    queryKey: [
+      'shift-activity',
+      apiUnitId,
+      'journal',
+      appliedKey,
+      pageSize,
+      pageIndex,
+      cursorForApi ?? '__first__'
+    ],
+    queryFn: () =>
+      shiftApi.getActivity(
+        apiUnitId,
+        buildActivityOpts(applied, pageSize, cursorForApi)
+      ),
+    enabled: queryEnabled
+  });
+
+  const resetPagination = () => {
+    setPageIndex(0);
+    setPageCursors([undefined]);
+  };
+
+  const goNextPage = () => {
+    const nc = data?.nextCursor;
+    if (!nc) return;
+    setPageCursors((prev) => {
+      const out = [...prev];
+      const slot = pageIndex + 1;
+      while (out.length <= slot) {
+        out.push(undefined);
+      }
+      out[slot] = nc;
+      return out;
+    });
+    setPageIndex((i) => i + 1);
+  };
+
+  const goPrevPage = () => {
+    setPageIndex((i) => Math.max(0, i - 1));
+  };
+
+  const { data: counters = [] } = useQuery({
+    queryKey: ['shift-counters', apiUnitId, 'journal-filters'],
+    queryFn: () => shiftApi.getCounters(apiUnitId),
+    staleTime: 60_000
+  });
+
+  const { data: actorsData } = useQuery({
+    queryKey: ['shift-activity-actors', apiUnitId],
+    queryFn: () => shiftApi.getActivityActors(apiUnitId),
+    staleTime: 60_000
+  });
+  const actors = actorsData?.items ?? [];
+
+  const rows = data?.items ?? [];
+
+  const handleApply = () => {
+    setApplied({ ...draft });
+    resetPagination();
+  };
+
+  const handleReset = () => {
+    setDraft(emptyJournalFilterState);
+    setApplied(emptyJournalFilterState);
+    setSelectedVisitor(null);
+    setJournalFiltersBarKey((k) => k + 1);
+    resetPagination();
+  };
+
   return (
-    <div className='container mx-auto max-w-3xl space-y-6 p-4'>
+    <div className='container mx-auto max-w-4xl space-y-6 p-4'>
       <div>
         <Button variant='ghost' size='sm' className='mb-4 -ml-2' asChild>
           <Link href={dashboardHref}>
@@ -77,10 +202,50 @@ export default function SupervisorJournalPage({
         </p>
       </div>
 
+      <SupervisorJournalFiltersBar
+        key={journalFiltersBarKey}
+        unitId={apiUnitId}
+        draft={draft}
+        onDraftChange={setDraft}
+        counters={counters}
+        actors={actors}
+        selectedVisitor={selectedVisitor}
+        onSelectedVisitorChange={setSelectedVisitor}
+        onApply={handleApply}
+        onReset={handleReset}
+      />
+
       <Card>
-        <CardHeader>
-          <CardTitle>{t('activityTitle')}</CardTitle>
-          <CardDescription>{t('journalCardDescription')}</CardDescription>
+        <CardHeader className='space-y-4'>
+          <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
+            <div>
+              <CardTitle>{t('activityTitle')}</CardTitle>
+              <CardDescription>{t('journalCardDescription')}</CardDescription>
+            </div>
+            <div className='flex shrink-0 items-center gap-2'>
+              <Label htmlFor='journal-page-size' className='whitespace-nowrap'>
+                {t('journalPageSize')}
+              </Label>
+              <Select
+                value={String(pageSize)}
+                onValueChange={(v) => {
+                  setPageSize(Number(v) as (typeof PAGE_SIZE_OPTIONS)[number]);
+                  resetPagination();
+                }}
+              >
+                <SelectTrigger id='journal-page-size' className='w-[5.5rem]'>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAGE_SIZE_OPTIONS.map((n) => (
+                    <SelectItem key={n} value={String(n)}>
+                      {n}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className='space-y-4'>
           {isLoading ? (
@@ -98,44 +263,41 @@ export default function SupervisorJournalPage({
           ) : (
             <>
               <ul className='divide-border divide-y rounded-lg border'>
-                {rows.map((item) => {
-                  const { icon: Icon, line } =
-                    getSupervisorActivityPresentation(item, t);
-                  const rel = formatDistanceToNow(new Date(item.createdAt), {
-                    addSuffix: true,
-                    locale: dateLocale
-                  });
-                  return (
-                    <li key={item.id} className='flex gap-3 p-3 text-sm'>
-                      <Icon className='text-muted-foreground mt-0.5 h-4 w-4 shrink-0' />
-                      <div className='min-w-0 flex-1'>
-                        <p className='text-foreground'>{line}</p>
-                        <p className='text-muted-foreground mt-1 text-xs'>
-                          {rel}
-                        </p>
-                      </div>
-                    </li>
-                  );
-                })}
+                {rows.map((item) => (
+                  <SupervisorActivityRow
+                    key={item.id}
+                    item={item}
+                    t={t}
+                    dateLocale={dateLocale}
+                    timeFormat='PPpp'
+                  />
+                ))}
               </ul>
-              {hasNextPage ? (
-                <Button
-                  type='button'
-                  variant='outline'
-                  className='w-full'
-                  disabled={isFetchingNextPage}
-                  onClick={() => fetchNextPage()}
-                >
-                  {isFetchingNextPage ? (
-                    <>
-                      <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                      {t('journalLoadingMore')}
-                    </>
-                  ) : (
-                    t('journalLoadMore')
-                  )}
-                </Button>
-              ) : null}
+              <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+                <p className='text-muted-foreground text-sm'>
+                  {t('journalPageLabel', { page: pageIndex + 1 })}
+                </p>
+                <div className='flex flex-wrap gap-2'>
+                  <Button
+                    type='button'
+                    variant='outline'
+                    size='sm'
+                    disabled={pageIndex === 0 || isFetching}
+                    onClick={goPrevPage}
+                  >
+                    {t('journalPagePrev')}
+                  </Button>
+                  <Button
+                    type='button'
+                    variant='outline'
+                    size='sm'
+                    disabled={!data?.nextCursor || isFetching}
+                    onClick={goNextPage}
+                  >
+                    {t('journalPageNext')}
+                  </Button>
+                </div>
+              </div>
             </>
           )}
         </CardContent>

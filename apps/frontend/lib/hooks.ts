@@ -245,6 +245,171 @@ export const useNoShowTicket = () => {
   });
 };
 
+export const useUpdateOperatorComment = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      operatorComment
+    }: {
+      id: string;
+      operatorComment: string | null;
+    }) => ticketsApi.updateOperatorComment(id, operatorComment),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tickets'] });
+      queryClient.invalidateQueries({ queryKey: ['clientVisits'] });
+    }
+  });
+};
+
+export type UpdateTicketVisitorVars =
+  | {
+      ticketId: string;
+      clientId: string;
+      firstName?: string;
+      lastName?: string;
+    }
+  | {
+      ticketId: string;
+      firstName: string;
+      lastName: string;
+      phone: string;
+    };
+
+export const useUpdateTicketVisitor = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (vars: UpdateTicketVisitorVars) => {
+      const { ticketId, ...body } = vars;
+      if ('clientId' in body) {
+        const payload: {
+          clientId: string;
+          firstName?: string;
+          lastName?: string;
+        } = { clientId: body.clientId };
+        if (body.firstName !== undefined) {
+          payload.firstName = body.firstName;
+        }
+        if (body.lastName !== undefined) {
+          payload.lastName = body.lastName;
+        }
+        return ticketsApi.updateTicketVisitor(ticketId, payload);
+      }
+      return ticketsApi.updateTicketVisitor(ticketId, {
+        firstName: body.firstName,
+        lastName: body.lastName,
+        phone: body.phone
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tickets'] });
+      queryClient.invalidateQueries({ queryKey: ['clientVisits'] });
+    }
+  });
+};
+
+export const useClientVisits = (
+  unitId: string,
+  clientId: string | undefined,
+  options: { enabled?: boolean } = {}
+) => {
+  return useQuery({
+    queryKey: ['clientVisits', unitId, clientId],
+    queryFn: () => unitsApi.getClientVisits(unitId, clientId!),
+    enabled: !!unitId && !!clientId && (options.enabled ?? true)
+  });
+};
+
+export const useVisitorTagDefinitions = (
+  unitId: string,
+  options: { enabled?: boolean } = {}
+) => {
+  return useQuery({
+    queryKey: ['visitorTagDefinitions', unitId],
+    queryFn: () => unitsApi.listVisitorTagDefinitions(unitId),
+    enabled: !!unitId && (options.enabled ?? true)
+  });
+};
+
+export const useCreateVisitorTagDefinition = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (vars: {
+      unitId: string;
+      label: string;
+      color: string;
+      sortOrder?: number;
+    }) => {
+      const { unitId, ...body } = vars;
+      return unitsApi.createVisitorTagDefinition(unitId, body);
+    },
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({
+        queryKey: ['visitorTagDefinitions', vars.unitId]
+      });
+    }
+  });
+};
+
+export const usePatchVisitorTagDefinition = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (vars: {
+      unitId: string;
+      definitionId: string;
+      label?: string;
+      color?: string;
+      sortOrder?: number;
+    }) => {
+      const { unitId, definitionId, ...body } = vars;
+      return unitsApi.patchVisitorTagDefinition(unitId, definitionId, body);
+    },
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({
+        queryKey: ['visitorTagDefinitions', vars.unitId]
+      });
+    }
+  });
+};
+
+export const useDeleteVisitorTagDefinition = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (vars: { unitId: string; definitionId: string }) =>
+      unitsApi.deleteVisitorTagDefinition(vars.unitId, vars.definitionId),
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({
+        queryKey: ['visitorTagDefinitions', vars.unitId]
+      });
+    }
+  });
+};
+
+export const useSetVisitorTags = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (vars: {
+      ticketId: string;
+      tagDefinitionIds: string[];
+      operatorComment: string;
+    }) =>
+      ticketsApi.setVisitorTags(vars.ticketId, {
+        tagDefinitionIds: vars.tagDefinitionIds,
+        operatorComment: vars.operatorComment
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tickets'] });
+      queryClient.invalidateQueries({ queryKey: ['clientVisits'] });
+    }
+  });
+};
+
 export const useRecallTicket = () => {
   const queryClient = useQueryClient();
 
@@ -316,11 +481,11 @@ export const useCreateTicketInUnit = () => {
     mutationFn: (createData: {
       unitId: string;
       serviceId: string;
-      preferredName?: string;
+      clientId?: string;
     }) =>
       unitsApi.createTicket(createData.unitId, {
         serviceId: createData.serviceId,
-        preferredName: createData.preferredName
+        clientId: createData.clientId
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tickets'] });
@@ -358,14 +523,9 @@ export const useCounters = (unitId: string) => {
 
 export const useCallNextTicket = () => {
   return useMutation({
-    mutationFn: (callData: {
-      counterId: string;
-      strategy?: 'fifo' | 'by_service';
-      serviceId?: string;
-    }) =>
+    mutationFn: (callData: { counterId: string; serviceIds?: string[] }) =>
       countersApi.callNext(callData.counterId, {
-        strategy: callData.strategy,
-        serviceId: callData.serviceId
+        serviceIds: callData.serviceIds
       })
   });
 };

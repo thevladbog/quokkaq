@@ -1347,12 +1347,11 @@ const ServiceGridEditor: React.FC<ServiceGridEditorProps> = ({ unitId }) => {
       };
     }
 
-    const ac = new AbortController();
     const seq = ++servicesTreeFetchSeqRef.current;
     startTransition(() => setIsLoading(true));
 
     unitsApi
-      .getServicesTree(id, { signal: ac.signal })
+      .getServicesTree(id)
       .then((servicesTree) => {
         if (!effectAlive || seq !== servicesTreeFetchSeqRef.current) {
           return;
@@ -1395,12 +1394,6 @@ const ServiceGridEditor: React.FC<ServiceGridEditorProps> = ({ unitId }) => {
         if (!effectAlive || seq !== servicesTreeFetchSeqRef.current) {
           return;
         }
-        if (error instanceof DOMException && error.name === 'AbortError') {
-          return;
-        }
-        if (error instanceof Error && error.name === 'AbortError') {
-          return;
-        }
         console.error('Error loading services:', error);
       })
       .finally(() => {
@@ -1412,7 +1405,6 @@ const ServiceGridEditor: React.FC<ServiceGridEditorProps> = ({ unitId }) => {
 
     return () => {
       effectAlive = false;
-      ac.abort();
     };
   }, [unitId, selectedUnitId, t]);
 

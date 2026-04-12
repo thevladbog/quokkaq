@@ -163,7 +163,12 @@ export function PreRegistrationTable({
               <TableCell className='font-mono'>{preReg.code}</TableCell>
               <TableCell>
                 <div className='flex flex-col'>
-                  <span>{preReg.customerName}</span>
+                  <span>
+                    {[preReg.customerFirstName, preReg.customerLastName]
+                      .map((s) => s?.trim())
+                      .filter(Boolean)
+                      .join(' ') || '—'}
+                  </span>
                   <span className='text-muted-foreground text-xs'>
                     {preReg.customerPhone}
                   </span>

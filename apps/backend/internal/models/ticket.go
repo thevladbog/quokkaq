@@ -12,6 +12,7 @@ type Ticket struct {
 	BookingID         *string    `json:"bookingId,omitempty"`
 	CounterID         *string    `json:"counterId,omitempty"`
 	PreRegistrationID *string    `json:"preRegistrationId,omitempty"`
+	ClientID          *string    `json:"clientId,omitempty"`
 	Status            string     `gorm:"default:'waiting'" json:"status"`
 	Priority          int        `gorm:"default:0" json:"priority"`
 	IsEOD             bool       `gorm:"default:false" json:"isEod"`
@@ -22,14 +23,16 @@ type Ticket struct {
 	CompletedAt       *time.Time `json:"completedAt,omitempty"`
 	LastCalledAt      *time.Time `json:"lastCalledAt,omitempty"`
 	MaxWaitingTime    *int       `json:"maxWaitingTime,omitempty"` // Snapshot from Service at creation
+	OperatorComment   *string    `gorm:"type:text" json:"operatorComment,omitempty"`
 
 	// Relations
-	Unit            Unit             `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-" swaggerignore:"true"`
-	Service         Service          `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"service,omitempty"`
-	Booking         *Booking         `gorm:"constraint:OnUpdate:CASCADE,OnDelete:SET NULL;" json:"booking,omitempty"`
-	Counter         *Counter         `gorm:"constraint:OnUpdate:CASCADE,OnDelete:SET NULL;" json:"counter,omitempty"`
+	Unit    Unit     `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-" swaggerignore:"true"`
+	Service Service  `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"service,omitempty"`
+	Booking *Booking `gorm:"constraint:OnUpdate:CASCADE,OnDelete:SET NULL;" json:"booking,omitempty"`
+	Counter *Counter `gorm:"constraint:OnUpdate:CASCADE,OnDelete:SET NULL;" json:"counter,omitempty"`
 	// No DB FK: avoids AutoMigrate cycle with pre_registrations.ticket_id → tickets.id
 	PreRegistration *PreRegistration `gorm:"foreignKey:PreRegistrationID;references:ID;constraint:false" json:"preRegistration,omitempty"`
+	Client          *UnitClient      `gorm:"foreignKey:ClientID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;" json:"client,omitempty"`
 	Histories       []TicketHistory  `gorm:"foreignKey:TicketID" json:"-"`
 }
 

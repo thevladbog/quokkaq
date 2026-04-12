@@ -28,6 +28,9 @@ func main() {
 		&models.DesktopTerminal{},
 		&models.TicketHistory{},
 		&models.Ticket{},
+		&models.UnitClientTagAssignment{},
+		&models.UnitVisitorTagDefinition{},
+		&models.UnitClient{},
 		&models.TicketNumberSequence{},
 		&models.Booking{},
 		&models.Counter{},
@@ -67,6 +70,9 @@ func main() {
 		&models.UserUnit{},
 		&models.Service{},
 		&models.Counter{},
+		&models.UnitClient{},
+		&models.UnitVisitorTagDefinition{},
+		&models.UnitClientTagAssignment{},
 		&models.Ticket{},
 		&models.TicketHistory{},
 		&models.TicketNumberSequence{},
@@ -104,6 +110,16 @@ func main() {
 	}
 	database.DB.Create(&unit)
 	fmt.Printf("Created unit: %s (ID: %s)\n", unit.Name, unit.ID)
+
+	anonymousClient := models.UnitClient{
+		UnitID:      unit.ID,
+		FirstName:   "Аноним",
+		LastName:    "",
+		PhoneE164:   nil,
+		IsAnonymous: true,
+	}
+	database.DB.Create(&anonymousClient)
+	fmt.Println("Created anonymous unit client for kiosk tickets")
 
 	// Create roles
 	adminRole := models.Role{Name: "admin"}
@@ -220,6 +236,7 @@ func main() {
 		QueueNumber: "A001",
 		Status:      "waiting",
 		CreatedAt:   now,
+		ClientID:    &anonymousClient.ID,
 	}
 	database.DB.Create(&ticket1)
 
@@ -229,6 +246,7 @@ func main() {
 		QueueNumber: "B001",
 		Status:      "waiting",
 		CreatedAt:   now.Add(1 * time.Minute),
+		ClientID:    &anonymousClient.ID,
 	}
 	database.DB.Create(&ticket2)
 
@@ -238,6 +256,7 @@ func main() {
 		QueueNumber: "A002",
 		Status:      "waiting",
 		CreatedAt:   now.Add(2 * time.Minute),
+		ClientID:    &anonymousClient.ID,
 	}
 	database.DB.Create(&ticket3)
 
