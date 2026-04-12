@@ -58,7 +58,7 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
 
     const fetchTickets = async () => {
       try {
-        const data = await ticketsApi.getByUnitId(unitId);
+        const data = await ticketsApi.getByUnitId(wsRoomId);
         if (!cancelled) {
           setTickets(data);
           setIsLoading(false);

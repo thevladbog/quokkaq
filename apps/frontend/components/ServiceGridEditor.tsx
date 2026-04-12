@@ -1523,7 +1523,10 @@ const ServiceGridEditor: React.FC<ServiceGridEditorProps> = ({
     const controller = new AbortController();
     const id = resolvedTreeFetchId;
     if (!id) {
-      startTransition(() => setIsLoading(false));
+      startTransition(() => {
+        setIsLoading(false);
+        setServices([]);
+      });
       return () => {
         effectAlive = false;
         controller.abort();

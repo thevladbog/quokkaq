@@ -864,6 +864,28 @@ export type InvoiceDraftCreateBody = z.infer<
 export type UsageMetric = z.infer<typeof UsageMetricSchema>;
 export type UsageMetrics = z.infer<typeof UsageMetricsSchema>;
 
+/** One row from GET .../clients/{clientId}/history */
+export const UnitClientHistoryItemSchema = z.object({
+  id: z.string(),
+  unitId: z.string(),
+  unitClientId: z.string(),
+  actorUserId: z.string().nullish(),
+  actorName: z.string().nullish(),
+  action: z.string(),
+  payload: z.record(z.string(), z.unknown()),
+  createdAt: z.string()
+});
+
+export const UnitClientHistoryListResponseSchema = z.object({
+  items: z.array(UnitClientHistoryItemSchema),
+  nextCursor: z.string().nullish()
+});
+
+export type UnitClientHistoryItem = z.infer<typeof UnitClientHistoryItemSchema>;
+export type UnitClientHistoryListResponse = z.infer<
+  typeof UnitClientHistoryListResponseSchema
+>;
+
 // Signup Request
 export type SignupRequest = {
   name: string;

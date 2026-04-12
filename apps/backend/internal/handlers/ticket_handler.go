@@ -354,7 +354,7 @@ type TransferRequest struct {
 	ToUserID        *string `json:"toUserId,omitempty"`
 	ToServiceZoneID *string `json:"toServiceZoneId,omitempty"`
 	ToServiceID     *string `json:"toServiceId,omitempty"`
-	OperatorComment *string `json:"operatorComment,omitempty"`
+	OperatorComment *string `json:"operatorComment,omitempty" extensions:"x-nullable"`
 }
 
 // Transfer godoc
@@ -440,6 +440,8 @@ func (h *TicketHandler) Transfer(w http.ResponseWriter, r *http.Request) {
 			errors.Is(err, services.ErrTicketCounterZoneMismatch),
 			errors.Is(err, services.ErrInvalidServiceZone),
 			errors.Is(err, services.ErrTransferServiceRequiredForZone),
+			errors.Is(err, services.ErrTransferTargetMustBeLeafService),
+			errors.Is(err, services.ErrTransferServiceNotAllowedOnTargetCounter),
 			errors.Is(err, services.ErrOperatorCommentTooLong),
 			errors.Is(err, services.ErrTicketServiceNotInUnit),
 			errors.Is(err, services.ErrCounterUnitMismatch):

@@ -6,6 +6,8 @@ import (
 
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
+
+	"gorm.io/gorm"
 )
 
 // ErrInvalidServiceZone is returned when a unit id is not a direct service_zone child of the subdivision.
@@ -19,6 +21,9 @@ func ValidateChildServiceZone(ur repository.UnitRepository, subdivisionID, zoneI
 	}
 	u, err := ur.FindByIDLight(zoneID)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrInvalidServiceZone
+		}
 		return err
 	}
 	if u.Kind != models.UnitKindServiceZone {

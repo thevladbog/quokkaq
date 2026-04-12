@@ -29,6 +29,7 @@
     "colName": "Имя",
     "colPhone": "Телефон",
     "colTags": "Теги",
+    "openClientRowAria": "Открыть карточку клиента: {name}",
     "pageLabel": "Страница {page}",
     "prevPage": "Назад",
     "nextPage": "Далее",

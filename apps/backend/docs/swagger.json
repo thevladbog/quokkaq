@@ -627,6 +627,7 @@
             "handlers.TransferRequest": {
                 "properties": {
                     "operatorComment": {
+                        "nullable": true,
                         "type": "string"
                     },
                     "toCounterId": {
@@ -9167,6 +9168,16 @@
                             }
                         },
                         "description": "Not Found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
                     }
                 },
                 "security": [
@@ -11024,10 +11035,10 @@
         },
         "/units/{unitId}/tickets": {
             "get": {
-                "description": "Retrieves all tickets for a specific unit",
+                "description": "Subdivision: all non-EOD tickets for that unit (all service zones + subdivision-wide pool). Service zone: non-EOD tickets for the parent subdivision with service_zone_id equal to this zone's id.",
                 "parameters": [
                     {
-                        "description": "Unit ID",
+                        "description": "Unit ID (subdivision or service_zone)",
                         "in": "path",
                         "name": "unitId",
                         "required": true,
@@ -11049,6 +11060,16 @@
                             }
                         },
                         "description": "OK"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unit not found"
                     },
                     "500": {
                         "content": {

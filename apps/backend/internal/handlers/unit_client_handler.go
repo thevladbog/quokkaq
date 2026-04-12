@@ -33,20 +33,7 @@ type ClientVisitsResponse struct {
 	NextCursor *string         `json:"nextCursor,omitempty"`
 }
 
-// SearchClients godoc
-// @Summary      Search unit clients (visitors)
-// @Description  Search by phone (exact when parseable) and by name; excludes anonymous aggregate client.
-// @Tags         clients
-// @Produce      json
-// @Security     BearerAuth
-// @Param        unitId path      string  true  "Unit ID"
-// @Param        q      query     string  true  "Search query"
-// @Success      200    {array}   models.UnitClient
-// @Failure      400    {string}  string "Bad Request"
-// @Failure      401    {string}  string "Unauthorized"
-// @Failure      403    {string}  string "Forbidden"
-// @Failure      500    {string}  string "Internal Server Error"
-// @Router       /units/{unitId}/clients/search [get]
+// parseUnitClientTagIDsQuery splits a comma-separated tagIds query value into non-empty IDs.
 func parseUnitClientTagIDsQuery(q string) []string {
 	q = strings.TrimSpace(q)
 	if q == "" {
@@ -194,6 +181,20 @@ func (h *UnitClientHandler) PatchUnitClient(w http.ResponseWriter, r *http.Reque
 	RespondJSON(w, c)
 }
 
+// SearchClients godoc
+// @Summary      Search unit clients (visitors)
+// @Description  Search by phone (exact when parseable) and by name; excludes anonymous aggregate client.
+// @Tags         clients
+// @Produce      json
+// @Security     BearerAuth
+// @Param        unitId path      string  true  "Unit ID"
+// @Param        q      query     string  true  "Search query"
+// @Success      200    {array}   models.UnitClient
+// @Failure      400    {string}  string "Bad Request"
+// @Failure      401    {string}  string "Unauthorized"
+// @Failure      403    {string}  string "Forbidden"
+// @Failure      500    {string}  string "Internal Server Error"
+// @Router       /units/{unitId}/clients/search [get]
 func (h *UnitClientHandler) SearchClients(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
@@ -267,6 +268,7 @@ func (h *UnitClientHandler) ListClientVisits(w http.ResponseWriter, r *http.Requ
 // @Failure      401    {string}  string "Unauthorized"
 // @Failure      403    {string}  string "Forbidden"
 // @Failure      404    {string}  string "Not Found"
+// @Failure      500    {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/clients/{clientId}/history [get]
 func (h *UnitClientHandler) ListClientHistory(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")

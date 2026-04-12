@@ -1,13 +1,11 @@
-'use client';
+import { redirect } from '@/src/i18n/navigation';
 
-import { use } from 'react';
-import { SupervisorJournalView } from '@/components/supervisor/SupervisorJournalView';
-
-export default function SupervisorJournalPage({
+/** Canonical journal lives under `/journal/{unitId}`; keep this route for bookmarks. */
+export default async function SupervisorJournalRedirectPage({
   params
 }: {
-  params: Promise<{ unitId: string }>;
+  params: Promise<{ locale: string; unitId: string }>;
 }) {
-  const { unitId } = use(params);
-  return <SupervisorJournalView routeUnitId={unitId} />;
+  const { locale, unitId } = await params;
+  redirect({ href: `/journal/${unitId}`, locale });
 }

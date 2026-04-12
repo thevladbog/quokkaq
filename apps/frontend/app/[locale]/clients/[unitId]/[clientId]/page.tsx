@@ -148,11 +148,17 @@ function ClientDetailForm({
   const [tagsModalOpen, setTagsModalOpen] = useState(false);
   const [tagsSavePending, setTagsSavePending] = useState(false);
 
-  const { data: tagDefs = [] } = useQuery({
+  const tagDefsQuery = useQuery({
     queryKey: ['visitor-tag-definitions', unitId, 'client-detail'],
     queryFn: () => unitsApi.listVisitorTagDefinitions(unitId),
     staleTime: 60_000
   });
+  const catalogTagDefs = useMemo(
+    () => tagDefsQuery.data ?? initial.definitions ?? [],
+    [tagDefsQuery.data, initial.definitions]
+  );
+  const noUnitTagDefinitions =
+    tagDefsQuery.isSuccess && tagDefsQuery.data.length === 0;
 
   const visitsQuery = useInfiniteQuery({
     queryKey: ['client-visits', unitId, clientId],
@@ -239,12 +245,12 @@ function ClientDetailForm({
 
   const sortedProfileTags = useMemo(() => {
     const selected = new Set(selectedTagIds);
-    const list = tagDefs.filter((d) => selected.has(d.id));
+    const list = catalogTagDefs.filter((d) => selected.has(d.id));
     return [...list].sort((a, b) => {
       if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
       return a.label.localeCompare(b.label);
     });
-  }, [tagDefs, selectedTagIds]);
+  }, [catalogTagDefs, selectedTagIds]);
 
   return (
     <>
@@ -283,7 +289,7 @@ function ClientDetailForm({
           </div>
           <div className='space-y-2'>
             <Label>{t('fieldTags')}</Label>
-            {tagDefs.length === 0 ? (
+            {noUnitTagDefinitions ? (
               <p className='text-muted-foreground text-sm'>
                 {t('noTagDefinitions')}
               </p>

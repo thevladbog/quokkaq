@@ -609,8 +609,13 @@ export const useCreateService = () => {
           'restrictedServiceZoneId'
         )
       ) {
+        const z = serviceData.restrictedServiceZoneId;
         filteredData.restrictedServiceZoneId =
-          serviceData.restrictedServiceZoneId ?? null;
+          z === undefined ||
+          z === null ||
+          (typeof z === 'string' && z.trim() === '')
+            ? null
+            : z;
       }
       return servicesApi.create(filteredData);
     },
@@ -653,8 +658,13 @@ export const useUpdateService = () => {
           'restrictedServiceZoneId'
         )
       ) {
+        const z = serviceData.restrictedServiceZoneId;
         filteredData.restrictedServiceZoneId =
-          serviceData.restrictedServiceZoneId ?? null;
+          z === undefined ||
+          z === null ||
+          (typeof z === 'string' && z.trim() === '')
+            ? null
+            : z;
       }
       return servicesApi.update(id, filteredData);
     },

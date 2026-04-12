@@ -10,6 +10,7 @@ import (
 	"quokkaq-go-backend/internal/phoneutil"
 	"quokkaq-go-backend/pkg/database"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -273,26 +274,23 @@ func (r *unitClientRepository) GetByIDInUnitWithDefinitions(unitID, clientID str
 	return &c, nil
 }
 
+func isPostgresUniqueViolation(err error) bool {
+	var pe *pgconn.PgError
+	return errors.As(err, &pe) && pe.Code == "23505"
+}
+
 // phoneE164 is the normalized E.164 value or nil to store NULL (no phone).
 func (r *unitClientRepository) UpdateClientPhoneE164Tx(tx *gorm.DB, unitID, clientID string, phoneE164 *string) error {
 	if tx == nil {
 		return errors.New("nil tx in UpdateClientPhoneE164Tx")
 	}
-	if phoneE164 != nil && *phoneE164 != "" {
-		var n int64
-		if err := tx.Model(&models.UnitClient{}).
-			Where("unit_id = ? AND phone_e164 = ? AND is_anonymous = ? AND id <> ?", unitID, *phoneE164, false, clientID).
-			Count(&n).Error; err != nil {
-			return err
-		}
-		if n > 0 {
-			return ErrDuplicateUnitClientPhone
-		}
-	}
 	res := tx.Model(&models.UnitClient{}).
 		Where("id = ? AND unit_id = ? AND is_anonymous = ?", clientID, unitID, false).
 		Updates(map[string]interface{}{"phone_e164": phoneE164})
 	if res.Error != nil {
+		if isPostgresUniqueViolation(res.Error) {
+			return ErrDuplicateUnitClientPhone
+		}
 		return res.Error
 	}
 	if res.RowsAffected == 0 {

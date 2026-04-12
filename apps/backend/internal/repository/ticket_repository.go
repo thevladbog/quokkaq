@@ -552,7 +552,8 @@ func (r *ticketRepository) ListTerminalVisitActorNamesByTicketIDs(ticketIDs []st
 		ActorName sql.NullString `gorm:"column:actor_name"`
 	}
 	err := r.db.Raw(`
-		SELECT DISTINCT ON (h.ticket_id) h.ticket_id, u.name AS actor_name
+		SELECT DISTINCT ON (h.ticket_id) h.ticket_id,
+			COALESCE(NULLIF(TRIM(u.name), ''), NULLIF(TRIM(u.email), '')) AS actor_name
 		FROM ticket_histories h
 		LEFT JOIN users u ON u.id = h.user_id
 		WHERE h.ticket_id IN ?

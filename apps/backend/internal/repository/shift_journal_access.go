@@ -29,7 +29,6 @@ func shiftJournalSeesAllActivityFromLoadedUser(user *models.User, unitID string)
 				return true
 			}
 		}
-		break
 	}
 	return false
 }

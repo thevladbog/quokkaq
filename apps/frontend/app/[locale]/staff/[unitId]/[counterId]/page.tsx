@@ -26,6 +26,7 @@ import { countersApi, unitsApi, Ticket, type Service } from '@/lib/api';
 const EMPTY_TICKET_LIST: Ticket[] = [];
 const EMPTY_SERVICE_LIST: Service[] = [];
 import { socketClient } from '@/lib/socket';
+import { logger } from '@/lib/logger';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/src/i18n/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -156,7 +157,7 @@ export default function StaffWorkspacePage({
       router.push('/staff');
     },
     onError: (error: Error) => {
-      console.error('Failed to release counter:', error);
+      logger.error('Failed to release counter', { error });
       toast.error(t('logout_failed', { error: error.message }));
     }
   });
@@ -420,7 +421,7 @@ export default function StaffWorkspacePage({
       }
       await refetch();
     } catch (error) {
-      console.error('Failed to call next:', error);
+      logger.error('Failed to call next', { error });
       toast.error(t('messages.failed', { action: 'call' }));
     }
   };
@@ -434,7 +435,7 @@ export default function StaffWorkspacePage({
       );
       await refetch();
     } catch (error) {
-      console.error('Failed to start service:', error);
+      logger.error('Failed to start service', { error });
       toast.error(t('messages.failed', { action: 'start service' }));
     }
   };
@@ -448,7 +449,7 @@ export default function StaffWorkspacePage({
       );
       await refetch();
     } catch (error) {
-      console.error('Failed to complete ticket:', error);
+      logger.error('Failed to complete ticket', { error });
       toast.error(t('messages.failed', { action: 'complete' }));
     }
   };
@@ -462,7 +463,7 @@ export default function StaffWorkspacePage({
       );
       await refetch();
     } catch (error) {
-      console.error('Failed to mark no-show:', error);
+      logger.error('Failed to mark no-show', { error });
       toast.error(t('messages.failed', { action: 'mark no-show' }));
     }
   };
@@ -476,7 +477,12 @@ export default function StaffWorkspacePage({
       );
       await refetch();
     } catch (error) {
-      console.error('Failed to return ticket to queue:', error);
+      logger.error('Failed to return ticket to queue', {
+        error,
+        ticketId: currentTicket.id,
+        counterId,
+        unitId
+      });
       toast.error(t('messages.failed', { action: 'return to queue' }));
     }
   };
@@ -584,7 +590,7 @@ export default function StaffWorkspacePage({
       setTransferServiceId('');
       await refetch();
     } catch (error) {
-      console.error('Failed to transfer ticket:', error);
+      logger.error('Failed to transfer ticket', { error });
       toast.error(t('messages.failed', { action: 'transfer' }));
     }
   };

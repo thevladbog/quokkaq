@@ -54,34 +54,14 @@ import {
   CompanySchema,
   SaasVendorSchema,
   CompanyMeResponseSchema,
-  CatalogItemSchema
+  CatalogItemSchema,
+  UnitClientHistoryListResponseSchema
 } from '@quokkaq/shared-types';
 
 const ClientVisitsResponseSchema = z.object({
   items: z.array(TicketModelSchema),
   nextCursor: z.string().nullish()
 });
-
-const UnitClientHistoryItemSchema = z.object({
-  id: z.string(),
-  unitId: z.string(),
-  unitClientId: z.string(),
-  actorUserId: z.string().nullish(),
-  actorName: z.string().nullish(),
-  action: z.string(),
-  payload: z.record(z.string(), z.unknown()),
-  createdAt: z.string()
-});
-
-const UnitClientHistoryListResponseSchema = z.object({
-  items: z.array(UnitClientHistoryItemSchema),
-  nextCursor: z.string().nullish()
-});
-
-export type UnitClientHistoryItem = z.infer<typeof UnitClientHistoryItemSchema>;
-export type UnitClientHistoryListResponse = z.infer<
-  typeof UnitClientHistoryListResponseSchema
->;
 
 const UnitClientModelSchema = z.object({
   id: z.string(),
@@ -428,7 +408,9 @@ async function apiRequest<T>(
           }
         }
       } catch (refreshError) {
-        logger.error('Token refresh failed:', refreshError);
+        if (!isRequestAbortError(refreshError)) {
+          logger.error('Token refresh failed:', refreshError);
+        }
       }
 
       // If refresh failed or no refresh token, clear stored tokens
@@ -584,7 +566,9 @@ async function apiRequestBlob(
           }
           throw refreshError;
         }
-        logger.error('Token refresh failed:', refreshError);
+        if (!isRequestAbortError(refreshError)) {
+          logger.error('Token refresh failed:', refreshError);
+        }
       }
 
       clearClientAuthSession();

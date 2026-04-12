@@ -53,11 +53,12 @@ func (r *unitClientHistoryRepository) ListByUnitClientPaged(unitID, unitClientID
 	if limit <= 0 {
 		limit = 20
 	}
-	if limit > 100 {
-		limit = 100
+	// Allow 101 so callers can over-fetch by 1 for reliable nextCursor without phantom pages.
+	if limit > 101 {
+		limit = 101
 	}
 	q := r.db.Table("unit_client_histories AS h").
-		Select("h.id, h.unit_id, h.unit_client_id, h.actor_user_id, h.action, h.payload, h.created_at, u.name AS actor_name").
+		Select("h.id, h.unit_id, h.unit_client_id, h.actor_user_id, h.action, h.payload, h.created_at, COALESCE(NULLIF(TRIM(u.name), ''), u.email) AS actor_name").
 		Joins("LEFT JOIN users AS u ON u.id = h.actor_user_id").
 		Where("h.unit_id = ? AND h.unit_client_id = ?", unitID, unitClientID).
 		Order("h.created_at DESC, h.id DESC").

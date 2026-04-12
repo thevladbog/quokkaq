@@ -699,11 +699,11 @@ func RunVersionedMigrations(models ...interface{}) error {
 
 	err = manager.RunMigration("v1.1.9_unit_client_histories", func(db *gorm.DB) error {
 		// IDs match units.id / users.id / unit_clients (text), not uuid — FK 42804 otherwise.
-		if err := db.Exec(`DROP TABLE IF EXISTS unit_client_histories CASCADE`).Error; err != nil {
-			return err
-		}
+		// Never DROP here: environments that already ran an older revision of this migration
+		// with DROP+CASCADE have lost historical rows; changing this block only helps new DBs
+		// and idempotent re-runs on partially migrated schemas.
 		if err := db.Exec(`
-			CREATE TABLE unit_client_histories (
+			CREATE TABLE IF NOT EXISTS unit_client_histories (
 				id text PRIMARY KEY DEFAULT (gen_random_uuid()::text),
 				unit_id text NOT NULL,
 				unit_client_id text NOT NULL,

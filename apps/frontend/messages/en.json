@@ -29,6 +29,7 @@
     "colName": "Name",
     "colPhone": "Phone",
     "colTags": "Tags",
+    "openClientRowAria": "Open client profile: {name}",
     "pageLabel": "Page {page}",
     "prevPage": "Previous",
     "nextPage": "Next",

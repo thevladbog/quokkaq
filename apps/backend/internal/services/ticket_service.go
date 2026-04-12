@@ -148,6 +148,12 @@ var ErrTransferConflictingTargets = errors.New("cannot combine counter transfer 
 // ErrTransferServiceRequiredForZone is returned when the current service is not allowed in the target zone and toServiceId is missing.
 var ErrTransferServiceRequiredForZone = errors.New("toServiceId is required: current service is not available in the target zone")
 
+// ErrTransferTargetMustBeLeafService is returned from counter transfer when toServiceId is not a leaf.
+var ErrTransferTargetMustBeLeafService = errors.New("target service must be a leaf service")
+
+// ErrTransferServiceNotAllowedOnTargetCounter is returned when toServiceId is not allowed on the target counter's waiting pool.
+var ErrTransferServiceNotAllowedOnTargetCounter = errors.New("target service is not available for the target counter's service zone")
+
 // ErrTicketCounterZoneMismatch is returned when pick/call would pair a counter with a ticket from another waiting pool.
 var ErrTicketCounterZoneMismatch = errors.New("ticket and counter belong to different waiting pools")
 
@@ -389,16 +395,47 @@ func (s *ticketService) GetTicketByID(id string) (*models.Ticket, error) {
 	return s.repo.FindByID(id)
 }
 
+// resolveSubdivisionIDForServiceZoneUnit walks parent units until a subdivision (nested service zones).
+func (s *ticketService) resolveSubdivisionIDForServiceZoneUnit(zone *models.Unit) (subdivisionID string, ok bool) {
+	if zone == nil || zone.Kind != models.UnitKindServiceZone {
+		return "", false
+	}
+	cur := zone
+	visited := map[string]struct{}{zone.ID: {}}
+	for {
+		if cur.ParentID == nil || strings.TrimSpace(*cur.ParentID) == "" {
+			return "", false
+		}
+		pid := strings.TrimSpace(*cur.ParentID)
+		parent, err := s.unitRepo.FindByID(pid)
+		if err != nil {
+			return "", false
+		}
+		if parent.Kind == models.UnitKindSubdivision {
+			return parent.ID, true
+		}
+		if parent.Kind != models.UnitKindServiceZone {
+			return "", false
+		}
+		if _, seen := visited[parent.ID]; seen {
+			return "", false
+		}
+		visited[parent.ID] = struct{}{}
+		cur = parent
+	}
+}
+
 func (s *ticketService) GetTicketsByUnit(unitID string) ([]models.Ticket, error) {
 	u, err := s.unitRepo.FindByID(unitID)
 	if err != nil {
 		return nil, err
 	}
 	if u.Kind == models.UnitKindServiceZone {
-		if u.ParentID == nil || strings.TrimSpace(*u.ParentID) == "" {
+		subID, ok := s.resolveSubdivisionIDForServiceZoneUnit(u)
+		if !ok {
 			return []models.Ticket{}, nil
 		}
-		return s.repo.FindBySubdivisionAndServiceZoneID(*u.ParentID, u.ID)
+		return s.repo.FindBySubdivisionAndServiceZoneID(subID, u.ID)
 	}
 	return s.repo.FindByUnitID(unitID)
 }
@@ -764,9 +801,42 @@ func (s *ticketService) Transfer(ticketID string, in TransferTicketInput, actorU
 			return ErrCounterUnitMismatch
 		}
 
+		curSvc, err := s.serviceRepo.FindByIDTx(tx, ticket.ServiceID)
+		if err != nil {
+			return err
+		}
+		needNewService := !ServiceAllowedInTicketPool(curSvc, targetCounter.ServiceZoneID)
+		if needNewService {
+			var resolvedServiceID string
+			if in.ToServiceID != nil && strings.TrimSpace(*in.ToServiceID) != "" {
+				resolvedServiceID = strings.TrimSpace(*in.ToServiceID)
+			} else {
+				return ErrTransferServiceRequiredForZone
+			}
+			newSvc, err := s.serviceRepo.FindByIDTx(tx, resolvedServiceID)
+			if err != nil {
+				return err
+			}
+			if newSvc.UnitID != ticket.UnitID {
+				return ErrTicketServiceNotInUnit
+			}
+			if !newSvc.IsLeaf {
+				return ErrTransferTargetMustBeLeafService
+			}
+			if !ServiceAllowedInTicketPool(newSvc, targetCounter.ServiceZoneID) {
+				return ErrTransferServiceNotAllowedOnTargetCounter
+			}
+			ticket.ServiceID = resolvedServiceID
+			if newSvc.MaxWaitingTime != nil {
+				ticket.MaxWaitingTime = newSvc.MaxWaitingTime
+			}
+		}
+
 		ticket.CounterID = &targetCounterID
 		ticket.Status = "waiting"
 		ticket.ServiceZoneID = targetCounter.ServiceZoneID
+		ticket.CalledAt = nil
+		ticket.ConfirmedAt = nil
 
 		payload := map[string]interface{}{
 			"transfer_kind":      "counter",
@@ -776,6 +846,8 @@ func (s *ticketService) Transfer(ticketID string, in TransferTicketInput, actorU
 			"to_status":          "waiting",
 			"to_counter_id":      targetCounterID,
 			"to_service_zone_id": serviceZoneIDJSON(ticket.ServiceZoneID),
+			"from_service_id":    fromServiceID,
+			"to_service_id":      ticket.ServiceID,
 		}
 		if in.ToUserID != nil {
 			payload["target_user_id"] = strings.TrimSpace(*in.ToUserID)

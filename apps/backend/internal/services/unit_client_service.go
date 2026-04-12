@@ -183,12 +183,18 @@ func (s *unitClientService) ListHistoryForClient(unitID, clientID string, limit 
 			beforeID = &id
 		}
 	}
-	rows, err := s.histRepo.ListByUnitClientPaged(unitID, clientID, limit, beforeTime, beforeID)
+	fetchLimit := limit + 1
+	rows, err := s.histRepo.ListByUnitClientPaged(unitID, clientID, fetchLimit, beforeTime, beforeID)
 	if err != nil {
 		return nil, err
 	}
-	items := make([]UnitClientHistoryItem, 0, len(rows))
-	for _, r := range rows {
+	hasNextPage := len(rows) > limit
+	displayRows := rows
+	if hasNextPage {
+		displayRows = rows[:limit]
+	}
+	items := make([]UnitClientHistoryItem, 0, len(displayRows))
+	for _, r := range displayRows {
 		var payload map[string]interface{}
 		if len(r.Payload) > 0 {
 			if err := json.Unmarshal(r.Payload, &payload); err != nil {
@@ -215,8 +221,8 @@ func (s *unitClientService) ListHistoryForClient(unitID, clientID string, limit 
 		})
 	}
 	resp := &UnitClientHistoryListResponse{Items: items}
-	if len(rows) == limit {
-		last := rows[len(rows)-1]
+	if hasNextPage {
+		last := displayRows[len(displayRows)-1]
 		nc := repository.EncodeUnitClientHistoryCursor(last.CreatedAt, last.ID)
 		resp.NextCursor = &nc
 	}

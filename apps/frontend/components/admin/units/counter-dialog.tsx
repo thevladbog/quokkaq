@@ -85,14 +85,16 @@ function CounterForm({
   const queryClient = useQueryClient();
   const isEditing = !!counter;
   const [name, setName] = useState(counter?.name || '');
-  const [serviceZoneId, setServiceZoneId] = useState<string | null>(
-    counter?.serviceZoneId ??
-      (serviceZoneFilter === null
-        ? null
-        : typeof serviceZoneFilter === 'string' && serviceZoneFilter
-          ? serviceZoneFilter
-          : null)
-  );
+  const [serviceZoneId, setServiceZoneId] = useState<string | null>(() => {
+    if (counter) {
+      return counter.serviceZoneId ?? null;
+    }
+    return serviceZoneFilter === null
+      ? null
+      : typeof serviceZoneFilter === 'string' && serviceZoneFilter
+        ? serviceZoneFilter
+        : null;
+  });
 
   const lockZoneForNewCounter =
     !isEditing &&

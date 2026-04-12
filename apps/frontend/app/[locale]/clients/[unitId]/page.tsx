@@ -77,11 +77,14 @@ function UnitClientsListContent({ unitId }: { unitId: string }) {
     enabled: queryEnabled
   });
 
-  const { data: tagDefs = [] } = useQuery({
+  const tagDefsQuery = useQuery({
     queryKey: ['visitor-tag-definitions', unitId, 'clients-list'],
     queryFn: () => unitsApi.listVisitorTagDefinitions(unitId),
     staleTime: 60_000
   });
+  const tagDefsForFilter = tagDefsQuery.data ?? [];
+  const noUnitTagDefinitionsForFilter =
+    tagDefsQuery.isSuccess && tagDefsQuery.data.length === 0;
 
   const rows = data?.items ?? [];
   const nextCursor = data?.nextCursor ?? undefined;
@@ -142,12 +145,12 @@ function UnitClientsListContent({ unitId }: { unitId: string }) {
           <PopoverContent className='w-72' align='end'>
             <p className='mb-2 text-sm font-medium'>{t('tagsFilterHint')}</p>
             <div className='max-h-64 space-y-2 overflow-y-auto'>
-              {tagDefs.length === 0 ? (
+              {noUnitTagDefinitionsForFilter ? (
                 <p className='text-muted-foreground text-xs'>
                   {t('noTagDefinitions')}
                 </p>
               ) : (
-                tagDefs.map((def) => (
+                tagDefsForFilter.map((def) => (
                   <label
                     key={def.id}
                     className='flex cursor-pointer items-center gap-2 text-sm'
@@ -193,8 +196,24 @@ function UnitClientsListContent({ unitId }: { unitId: string }) {
               {rows.map((c) => (
                 <TableRow
                   key={c.id}
-                  className={cn('hover:bg-muted/50 cursor-pointer')}
+                  role='button'
+                  tabIndex={0}
+                  className={cn(
+                    'hover:bg-muted/50 focus-visible:ring-ring cursor-pointer focus-visible:ring-2 focus-visible:outline-none'
+                  )}
                   onClick={() => openRow(c)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      openRow(c);
+                    }
+                  }}
+                  aria-label={t('openClientRowAria', {
+                    name:
+                      [c.firstName, c.lastName].filter(Boolean).join(' ') ||
+                      c.phoneE164 ||
+                      c.id
+                  })}
                 >
                   <TableCell className='font-medium'>
                     {[c.firstName, c.lastName].filter(Boolean).join(' ') || '—'}

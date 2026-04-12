@@ -600,41 +600,43 @@ function ServiceForm({
         </Select>
       </div>
 
-      <div className='space-y-2'>
-        <Label htmlFor='restrictedServiceZoneId'>
-          {t('services.restricted_zone')}
-        </Label>
-        <Select
-          value={
-            formValues.restrictedServiceZoneId
-              ? formValues.restrictedServiceZoneId
-              : '__none__'
-          }
-          onValueChange={(value) =>
-            setFormValues((prev) => ({
-              ...prev,
-              restrictedServiceZoneId: value === '__none__' ? null : value
-            }))
-          }
-        >
-          <SelectTrigger id='restrictedServiceZoneId' className='w-full'>
-            <SelectValue placeholder={t('services.restricted_zone_none')} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value='__none__'>
-              {t('services.restricted_zone_none')}
-            </SelectItem>
-            {serviceZones.map((zone) => (
-              <SelectItem key={zone.id} value={zone.id}>
-                {zone.name}
+      {(formValues.isLeaf ?? editingService?.isLeaf ?? false) ? (
+        <div className='space-y-2'>
+          <Label htmlFor='restrictedServiceZoneId'>
+            {t('services.restricted_zone')}
+          </Label>
+          <Select
+            value={
+              formValues.restrictedServiceZoneId
+                ? formValues.restrictedServiceZoneId
+                : '__none__'
+            }
+            onValueChange={(value) =>
+              setFormValues((prev) => ({
+                ...prev,
+                restrictedServiceZoneId: value === '__none__' ? null : value
+              }))
+            }
+          >
+            <SelectTrigger id='restrictedServiceZoneId' className='w-full'>
+              <SelectValue placeholder={t('services.restricted_zone_none')} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value='__none__'>
+                {t('services.restricted_zone_none')}
               </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <p className='text-muted-foreground text-xs'>
-          {t('services.restricted_zone_hint')}
-        </p>
-      </div>
+              {serviceZones.map((zone) => (
+                <SelectItem key={zone.id} value={zone.id}>
+                  {zone.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className='text-muted-foreground text-xs'>
+            {t('services.restricted_zone_hint')}
+          </p>
+        </div>
+      ) : null}
 
       <div className='space-y-2'>
         <Label htmlFor='duration'>{tRoot('forms.fields.max_duration')}</Label>

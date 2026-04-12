@@ -183,6 +183,17 @@ export function SupervisorJournalFiltersBar({
     return () => window.clearTimeout(timerId);
   }, [visitorQuery]);
 
+  useEffect(() => {
+    if (!hideOperatorFilter) return;
+    onDraftChange((prev) => {
+      const hasOperatorSelection =
+        prev.activeKinds.includes('operator') ||
+        (prev.userId?.trim() ?? '') !== '';
+      if (!hasOperatorSelection) return prev;
+      return stripKind(prev, 'operator');
+    });
+  }, [hideOperatorFilter, onDraftChange]);
+
   const visitorSearchEnabled =
     editingKind === 'visitor' && debouncedVisitorQ.length >= 2;
 
