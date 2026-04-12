@@ -372,7 +372,7 @@ func (s *ticketService) CallNext(unitID, counterID string, serviceIDs []string, 
 			return ErrCounterOnBreak
 		}
 		if c.UnitID != unitID {
-			return errors.New("counter does not belong to this unit")
+			return ErrCounterUnitMismatch
 		}
 
 		t, err := s.repo.FindWaitingForUpdateTx(tx, unitID, serviceIDs)

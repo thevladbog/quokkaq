@@ -35,8 +35,8 @@ auth, users, units, tickets, services, counters, shifts, slots, bookings, pre-re
 - `go run cmd/api/main.go` или `air`
 - `docker-compose.yml`: postgres, redis, minio, backend — API **:3001**
 - После старта: Scalar `http://localhost:3001/swagger/`, OpenAPI в `docs/`
-- Новые эндпоинты: model → repository → service → handler → регистрация в `main.go` → аннотации swag → `swag init -g cmd/api/main.go -o ./docs`
-- Pull request: GitHub Actions — [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (gofmt, vet, test, build, `go mod tidy`, сверка `docs/docs.go` / `swagger.json` / `swagger.yaml` с `swag init`, golangci-lint с `only-new-issues`).
+- Новые эндпоинты: model → repository → service → handler → регистрация в `main.go` → аннотации swag → `swag init -g cmd/api/main.go -o ./docs` → затем `python3 scripts/post_swagger_visitor_minprops.py` (добавляет `minProperties: 1` для `PatchTicketVisitorRequest`, чего swag не генерирует).
+- Pull request: GitHub Actions — [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (gofmt, vet, test, build, `go mod tidy`, `swag init` + тот же post-hook, затем `git diff` по `docs/*`, golangci-lint с `only-new-issues`).
 
 ## Фронтенд (соседний репозиторий)
 

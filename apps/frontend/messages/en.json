@@ -135,7 +135,7 @@
       "service_zone_folder_description": "Groups stations in this branch only. Services, pre-booking slots, service grid, ticket screen, and kiosk are configured on the parent subdivision.",
       "go_to_units_list": "Go to units list",
       "go_to_stations_tab": "Open Stations tab",
-      "create_hierarchy_hint": "Child units can only be created under a **subdivision** or **service zone**. Typical setup: Subdivision (root) → optional service zones → optional nested subdivisions → stations on the unit where you run the queue.",
+      "create_hierarchy_hint": "Child units can only be created under a subdivision or service zone. Typical setup: Subdivision (root) → optional service zones → optional nested subdivisions → stations on the unit where you run the queue.",
       "visitor_tags": {
         "tab": "Visitor tags",
         "title": "Visitor tags",

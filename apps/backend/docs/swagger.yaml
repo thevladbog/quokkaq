@@ -269,6 +269,7 @@ definitions:
         type: string
     type: object
   handlers.PatchTicketVisitorRequest:
+    minProperties: 1
     properties:
       clientId:
         type: string
@@ -4755,19 +4756,20 @@ paths:
     post:
       consumes:
       - application/json
-      description: Calls the next waiting ticket for a unit. JSON body must include
-        counterId. Optional serviceIds (or legacy serviceId) limit the queue; omit
-        or empty means all services in the unit.
+      description: Calls the next waiting ticket for a unit. Request body is required
+        and must include counterId. Optional serviceIds (or legacy serviceId) limit
+        the queue; omit or empty filter means all services in the unit.
       parameters:
       - description: Unit ID
         in: path
         name: unitId
         required: true
         type: string
-      - description: Optional counterId plus serviceIds (or legacy serviceId); omit
-          or empty body for defaults
+      - description: counterId (required) and optional serviceIds or legacy serviceId
+          filter
         in: body
         name: request
+        required: true
         schema:
           $ref: '#/definitions/handlers.CallNextRequest'
       produces:
@@ -4782,11 +4784,15 @@ paths:
           schema:
             type: string
         "404":
-          description: No waiting tickets
+          description: Not found (e.g. unknown counter or no waiting tickets)
           schema:
             type: string
         "409":
           description: Counter on break
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
           schema:
             type: string
       summary: Call next ticket

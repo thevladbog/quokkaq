@@ -59,7 +59,8 @@ func (h *TicketHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 		s := strings.TrimSpace(*req.ClientID)
 		staffClientID = &s
 	}
-	ticket, err := h.service.CreateTicket(unitID, req.ServiceID, staffClientID, nil)
+	actor := getActorFromRequest(r)
+	ticket, err := h.service.CreateTicket(unitID, req.ServiceID, staffClientID, actor)
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrVisitorAnonymousNotAllowed),
@@ -123,16 +124,17 @@ type CallNextRequest struct {
 
 // CallNext godoc
 // @Summary      Call next ticket
-// @Description  Calls the next waiting ticket for a unit. JSON body must include counterId. Optional serviceIds (or legacy serviceId) limit the queue; omit or empty means all services in the unit.
+// @Description  Calls the next waiting ticket for a unit. Request body is required and must include counterId. Optional serviceIds (or legacy serviceId) limit the queue; omit or empty filter means all services in the unit.
 // @Tags         tickets
 // @Accept       json
 // @Produce      json
 // @Param        unitId  path      string           true  "Unit ID"
-// @Param        request body      CallNextRequest  false "Optional counterId plus serviceIds (or legacy serviceId); omit or empty body for defaults"
+// @Param        request body      CallNextRequest  true  "counterId (required) and optional serviceIds or legacy serviceId filter"
 // @Success      200     {object}  models.Ticket
 // @Failure      400     {string}  string "Bad Request"
-// @Failure      404     {string}  string "No waiting tickets"
+// @Failure      404     {string}  string "Not found (e.g. unknown counter or no waiting tickets)"
 // @Failure      409     {string}  string "Counter on break"
+// @Failure      500     {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/call-next [post]
 func (h *TicketHandler) CallNext(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
@@ -154,11 +156,15 @@ func (h *TicketHandler) CallNext(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		if errors.Is(err, services.ErrCounterUnitMismatch) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		if errors.Is(err, services.ErrCounterOnBreak) {
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}
-		if errors.Is(err, services.ErrNoWaitingTickets) {
+		if errors.Is(err, services.ErrNoWaitingTickets) || errors.Is(err, gorm.ErrRecordNotFound) {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}

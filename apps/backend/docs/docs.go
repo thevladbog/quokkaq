@@ -4907,7 +4907,7 @@ const docTemplate = `{
         },
         "/units/{unitId}/call-next": {
             "post": {
-                "description": "Calls the next waiting ticket for a unit. JSON body must include counterId. Optional serviceIds (or legacy serviceId) limit the queue; omit or empty means all services in the unit.",
+                "description": "Calls the next waiting ticket for a unit. Request body is required and must include counterId. Optional serviceIds (or legacy serviceId) limit the queue; omit or empty filter means all services in the unit.",
                 "consumes": [
                     "application/json"
                 ],
@@ -4927,9 +4927,10 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "Optional counterId plus serviceIds (or legacy serviceId); omit or empty body for defaults",
+                        "description": "counterId (required) and optional serviceIds or legacy serviceId filter",
                         "name": "request",
                         "in": "body",
+                        "required": true,
                         "schema": {
                             "$ref": "#/definitions/handlers.CallNextRequest"
                         }
@@ -4949,13 +4950,19 @@ const docTemplate = `{
                         }
                     },
                     "404": {
-                        "description": "No waiting tickets",
+                        "description": "Not found (e.g. unknown counter or no waiting tickets)",
                         "schema": {
                             "type": "string"
                         }
                     },
                     "409": {
                         "description": "Counter on break",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "type": "string"
                         }
@@ -7769,6 +7776,7 @@ const docTemplate = `{
         },
         "handlers.PatchTicketVisitorRequest": {
             "type": "object",
+            "minProperties": 1,
             "properties": {
                 "clientId": {
                     "type": "string"

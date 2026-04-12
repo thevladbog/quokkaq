@@ -53,6 +53,7 @@ jobs:
       - name: Verify Swagger artifacts match swag init
         run: |
           go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g cmd/api/main.go -o ./docs
+          python3 scripts/post_swagger_visitor_minprops.py
           git diff --exit-code docs/docs.go docs/swagger.json docs/swagger.yaml
 
   lint:

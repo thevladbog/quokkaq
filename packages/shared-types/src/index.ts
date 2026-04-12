@@ -323,11 +323,44 @@ export interface PreRegistration {
 // ==========================
 
 /** POST /units/{unitId}/tickets — unit id is in the path, not the body. */
-export type CreateTicketRequest = {
-  serviceId: string;
-  /** Optional: link ticket to an existing unit visitor (staff/kiosk API). */
-  clientId?: string;
-};
+export const createTicketRequestSchema = z.object({
+  serviceId: z.string().min(1),
+  clientId: z.string().optional()
+});
+
+export type CreateTicketRequest = z.infer<typeof createTicketRequestSchema>;
+
+const callNextStrategySchema = z.enum(['fifo', 'by_service']);
+
+/** POST /units/{unitId}/call-next — matches backend handlers.CallNextRequest after trim/dedupe. */
+export const callNextRequestSchema = z
+  .object({
+    counterId: z.string().min(1),
+    strategy: callNextStrategySchema.optional(),
+    serviceIds: z.array(z.string()).optional(),
+    /** @deprecated Prefer serviceIds */
+    serviceId: z.string().optional()
+  })
+  .transform((data) => {
+    const counterId = data.counterId.trim();
+    let serviceIds = data.serviceIds;
+    if (serviceIds?.length) {
+      serviceIds = [
+        ...new Set(serviceIds.map((s) => s.trim()).filter((s) => s.length > 0))
+      ];
+    } else {
+      serviceIds = undefined;
+    }
+    const sid = data.serviceId?.trim();
+    return {
+      counterId,
+      ...(data.strategy !== undefined ? { strategy: data.strategy } : {}),
+      ...(serviceIds?.length ? { serviceIds } : {}),
+      ...(sid ? { serviceId: sid } : {})
+    };
+  });
+
+export type CallNextRequest = z.infer<typeof callNextRequestSchema>;
 
 export type CreateBookingRequest = {
   unitId: string;
@@ -344,15 +377,6 @@ export type UpdateServiceRequest = Partial<Service>;
 export type TransferTicketRequest = {
   toCounterId?: string;
   toUserId?: string;
-};
-
-export type CallNextRequest = {
-  counterId: string;
-  strategy?: 'fifo' | 'by_service';
-  /** When set and non-empty after trim/dedupe, limits call-next to these services. Omit or empty = all services in the unit. */
-  serviceIds?: string[];
-  /** @deprecated Prefer serviceIds; single-service filter */
-  serviceId?: string;
 };
 
 // ==========================
