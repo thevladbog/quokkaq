@@ -564,7 +564,30 @@ func RunVersionedMigrations(models ...interface{}) error {
 	}
 
 	err = manager.RunMigration("v1.1.7_unit_client_tag_assignments_unit_scope", func(db *gorm.DB) error {
-		if err := db.Exec(`ALTER TABLE unit_client_tag_assignments ADD COLUMN IF NOT EXISTS unit_id UUID`).Error; err != nil {
+		// Match unit_clients.unit_id type (uuid vs text) so UPDATE and composite FKs align with existing DBs.
+		if err := db.Exec(`
+			DO $$
+			DECLARE
+				coltype text;
+			BEGIN
+				SELECT format_type(a.atttypid, a.atttypmod) INTO coltype
+				FROM pg_attribute a
+				JOIN pg_class c ON a.attrelid = c.oid
+				JOIN pg_namespace n ON c.relnamespace = n.oid
+				WHERE n.nspname = 'public'
+				  AND c.relname = 'unit_clients'
+				  AND a.attname = 'unit_id'
+				  AND NOT a.attisdropped
+				  AND a.attnum > 0;
+				IF coltype IS NULL THEN
+					RAISE EXCEPTION 'unit_clients.unit_id column not found';
+				END IF;
+				EXECUTE format(
+					'ALTER TABLE unit_client_tag_assignments ADD COLUMN IF NOT EXISTS unit_id %s',
+					coltype
+				);
+			END $$;
+		`).Error; err != nil {
 			return err
 		}
 		if err := db.Exec(`

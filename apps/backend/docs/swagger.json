@@ -400,7 +400,6 @@
                 "type": "object"
             },
             "handlers.PatchTicketVisitorRequest": {
-                "minProperties": 1,
                 "properties": {
                     "clientId": {
                         "type": "string"
@@ -415,7 +414,8 @@
                         "type": "string"
                     }
                 },
-                "type": "object"
+                "type": "object",
+                "minProperties": 1
             },
             "handlers.PeriodResponse": {
                 "properties": {
@@ -674,8 +674,8 @@
             "handlers.createVisitorTagDefinitionRequest": {
                 "properties": {
                     "color": {
-                        "pattern": "^#[0-9A-Fa-f]{6}$",
-                        "type": "string"
+                        "type": "string",
+                        "pattern": "^#[0-9A-Fa-f]{6}$"
                     },
                     "label": {
                         "type": "string"
@@ -691,11 +691,10 @@
                 "type": "object"
             },
             "handlers.patchVisitorTagDefinitionRequest": {
-                "minProperties": 1,
                 "properties": {
                     "color": {
-                        "pattern": "^#[0-9A-Fa-f]{6}$",
-                        "type": "string"
+                        "type": "string",
+                        "pattern": "^#[0-9A-Fa-f]{6}$"
                     },
                     "label": {
                         "type": "string"
@@ -704,7 +703,8 @@
                         "type": "integer"
                     }
                 },
-                "type": "object"
+                "type": "object",
+                "minProperties": 1
             },
             "handlers.platformListResponse-models_CatalogItem": {
                 "properties": {

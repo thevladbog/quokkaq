@@ -36,6 +36,8 @@ func main() {
 		fmt.Fprintf(os.Stderr, "convert to OpenAPI 3: %v\n", err)
 		os.Exit(1)
 	}
+	// Key order can vary with kin-openapi releases; scripts/post_swagger_openapi_tweaks.py
+	// rewrites swagger.json with structural edits + json.dumps so CI/docs stay stable.
 	jsonOut, err := json.MarshalIndent(doc3, "", "    ")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "marshal json: %v\n", err)
