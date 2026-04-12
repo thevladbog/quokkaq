@@ -9,6 +9,7 @@ import {
 } from '@tanstack/react-query';
 import { useFormatter, useLocale, useTranslations } from 'next-intl';
 import { ChevronLeft, Loader2, Tags } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   ApiHttpError,
   unitsApi,
@@ -358,6 +359,7 @@ function ClientDetailForm({
             title={t('tagsEditModalTitle')}
             description={t('tagsEditModalHint')}
             t={tStaff}
+            skipBuiltInSaveErrorToast
             onSave={async ({ tagDefinitionIds }) => {
               setTagsSavePending(true);
               try {
@@ -377,6 +379,10 @@ function ClientDetailForm({
                 void queryClient.invalidateQueries({
                   queryKey: ['client-history', unitId, clientId]
                 });
+              } catch (err) {
+                const msg = err instanceof Error ? err.message : String(err);
+                toast.error(t('tagsSaveError'), { description: msg });
+                throw err;
               } finally {
                 setTagsSavePending(false);
               }

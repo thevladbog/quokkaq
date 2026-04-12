@@ -104,18 +104,58 @@ func (h *CounterHandler) GetCounterByID(w http.ResponseWriter, r *http.Request) 
 // @Router       /counters/{id} [put]
 func (h *CounterHandler) UpdateCounter(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	var counter models.Counter
-	if err := json.NewDecoder(r.Body).Decode(&counter); err != nil {
+	var raw map[string]json.RawMessage
+	if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	counter.ID = id
+	updates := map[string]interface{}{}
+	if v, ok := raw["name"]; ok {
+		var s string
+		if err := json.Unmarshal(v, &s); err != nil {
+			http.Error(w, "name: invalid JSON", http.StatusBadRequest)
+			return
+		}
+		updates["name"] = s
+	}
+	if v, ok := raw["serviceZoneId"]; ok {
+		var z *string
+		if err := json.Unmarshal(v, &z); err != nil {
+			http.Error(w, "serviceZoneId: invalid JSON", http.StatusBadRequest)
+			return
+		}
+		if z == nil {
+			updates["service_zone_id"] = nil
+		} else {
+			updates["service_zone_id"] = *z
+		}
+	}
+	if v, ok := raw["assignedTo"]; ok {
+		var z *string
+		if err := json.Unmarshal(v, &z); err != nil {
+			http.Error(w, "assignedTo: invalid JSON", http.StatusBadRequest)
+			return
+		}
+		updates["assigned_to"] = z
+	}
+	if v, ok := raw["onBreak"]; ok {
+		var b bool
+		if err := json.Unmarshal(v, &b); err != nil {
+			http.Error(w, "onBreak: invalid JSON", http.StatusBadRequest)
+			return
+		}
+		updates["on_break"] = b
+	}
 
-	if err := h.service.UpdateCounter(&counter); err != nil {
+	if err := h.service.UpdateCounter(id, updates); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
+	counter, err := h.service.GetCounterByID(id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	RespondJSON(w, counter)
 }
 

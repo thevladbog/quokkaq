@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"strings"
 	"time"
 
 	"quokkaq-go-backend/internal/models"
@@ -32,7 +33,7 @@ type CounterService interface {
 	CreateCounter(counter *models.Counter) error
 	GetCountersByUnit(unitID string) ([]models.Counter, error)
 	GetCounterByID(id string) (*models.Counter, error)
-	UpdateCounter(counter *models.Counter) error
+	UpdateCounter(id string, updates map[string]interface{}) error
 	DeleteCounter(id string) error
 	Occupy(counterID, userID string) (*models.Counter, error)
 	Release(counterID string) (*models.Counter, error)
@@ -146,16 +147,31 @@ func (s *counterService) GetCounterByID(id string) (*models.Counter, error) {
 	return counter, nil
 }
 
-func (s *counterService) UpdateCounter(counter *models.Counter) error {
-	existing, err := s.repo.FindByID(counter.ID)
+func (s *counterService) UpdateCounter(id string, updates map[string]interface{}) error {
+	existing, err := s.repo.FindByID(id)
 	if err != nil {
 		return err
 	}
-	counter.UnitID = existing.UnitID
-	if err := ValidateOptionalChildServiceZone(s.unitRepo, counter.UnitID, &counter.ServiceZoneID); err != nil {
-		return err
+	if _, has := updates["service_zone_id"]; has {
+		var zonePtr *string
+		if v, ok := updates["service_zone_id"]; !ok || v == nil {
+			zonePtr = nil
+		} else if s, ok := v.(string); ok {
+			t := strings.TrimSpace(s)
+			if t == "" {
+				zonePtr = nil
+			} else {
+				zonePtr = &t
+			}
+		} else {
+			return errors.New("invalid service_zone_id type")
+		}
+		if err := ValidateOptionalChildServiceZone(s.unitRepo, existing.UnitID, &zonePtr); err != nil {
+			return err
+		}
+		updates["service_zone_id"] = zonePtr
 	}
-	return s.repo.Update(counter)
+	return s.repo.UpdatePartial(id, updates)
 }
 
 func (s *counterService) DeleteCounter(id string) error {

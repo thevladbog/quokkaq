@@ -145,6 +145,9 @@ var ErrClientVisitsInvalidCursor = errors.New("invalid visits cursor")
 // ErrTransferConflictingTargets is returned when both counter/user and zone targets are set.
 var ErrTransferConflictingTargets = errors.New("cannot combine counter transfer with zone transfer")
 
+// ErrTransferConflictingCounterAndUser is returned when both toCounterId and toUserId are set.
+var ErrTransferConflictingCounterAndUser = errors.New("cannot specify both toCounterId and toUserId")
+
 // ErrTransferTargetRequired is returned when no transfer target (counter, user, or zone) is provided.
 var ErrTransferTargetRequired = errors.New("target counter, user, or service zone required")
 
@@ -402,29 +405,29 @@ func (s *ticketService) GetTicketByID(id string) (*models.Ticket, error) {
 }
 
 // resolveSubdivisionIDForServiceZoneUnit walks parent units until a subdivision (nested service zones).
-func (s *ticketService) resolveSubdivisionIDForServiceZoneUnit(zone *models.Unit) (subdivisionID string, ok bool) {
+func (s *ticketService) resolveSubdivisionIDForServiceZoneUnit(zone *models.Unit) (subdivisionID string, ok bool, err error) {
 	if zone == nil || zone.Kind != models.UnitKindServiceZone {
-		return "", false
+		return "", false, nil
 	}
 	cur := zone
 	visited := map[string]struct{}{zone.ID: {}}
 	for {
 		if cur.ParentID == nil || strings.TrimSpace(*cur.ParentID) == "" {
-			return "", false
+			return "", false, nil
 		}
 		pid := strings.TrimSpace(*cur.ParentID)
-		parent, err := s.unitRepo.FindByID(pid)
-		if err != nil {
-			return "", false
+		parent, perr := s.unitRepo.FindByID(pid)
+		if perr != nil {
+			return "", false, perr
 		}
 		if parent.Kind == models.UnitKindSubdivision {
-			return parent.ID, true
+			return parent.ID, true, nil
 		}
 		if parent.Kind != models.UnitKindServiceZone {
-			return "", false
+			return "", false, nil
 		}
 		if _, seen := visited[parent.ID]; seen {
-			return "", false
+			return "", false, nil
 		}
 		visited[parent.ID] = struct{}{}
 		cur = parent
@@ -437,7 +440,10 @@ func (s *ticketService) GetTicketsByUnit(unitID string) ([]models.Ticket, error)
 		return nil, err
 	}
 	if u.Kind == models.UnitKindServiceZone {
-		subID, ok := s.resolveSubdivisionIDForServiceZoneUnit(u)
+		subID, ok, rerr := s.resolveSubdivisionIDForServiceZoneUnit(u)
+		if rerr != nil {
+			return nil, rerr
+		}
 		if !ok {
 			return []models.Ticket{}, nil
 		}
@@ -673,6 +679,11 @@ func (s *ticketService) Transfer(ticketID string, in TransferTicketInput, actorU
 	}
 	if !zoneTransfer && !counterTransfer {
 		return nil, ErrTransferTargetRequired
+	}
+	hasCounterID := in.ToCounterID != nil && strings.TrimSpace(*in.ToCounterID) != ""
+	hasUserID := in.ToUserID != nil && strings.TrimSpace(*in.ToUserID) != ""
+	if hasCounterID && hasUserID {
+		return nil, ErrTransferConflictingCounterAndUser
 	}
 
 	var ticket *models.Ticket
@@ -1270,6 +1281,13 @@ func (s *ticketService) ListVisitsByClient(unitID, clientID string, limit int, c
 	if c.IsAnonymous {
 		return []models.Ticket{}, nil, nil
 	}
+	if limit < 1 {
+		limit = 1
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	fetchLimit := limit + 1
 	var beforeTime *time.Time
 	var beforeID *string
 	if cursor != nil {
@@ -1287,7 +1305,6 @@ func (s *ticketService) ListVisitsByClient(unitID, clientID string, limit int, c
 			beforeID = &parts[1]
 		}
 	}
-	fetchLimit := limit + 1
 	items, err := s.repo.ListVisitsByClientID(unitID, clientID, fetchLimit, beforeTime, beforeID)
 	if err != nil {
 		return nil, nil, err

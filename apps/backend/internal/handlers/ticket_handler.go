@@ -439,6 +439,7 @@ func (h *TicketHandler) Transfer(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrTransferConflictingTargets),
+			errors.Is(err, services.ErrTransferConflictingCounterAndUser),
 			errors.Is(err, services.ErrTransferTargetRequired),
 			errors.Is(err, services.ErrTicketCounterZoneMismatch),
 			errors.Is(err, services.ErrInvalidServiceZone),

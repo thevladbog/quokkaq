@@ -45,6 +45,7 @@
     "fieldTags": "Tags",
     "tagsEditModalTitle": "Visitor tags",
     "tagsEditModalHint": "Profile tags for this unit. Saving updates the client record immediately.",
+    "tagsSaveError": "Could not save tags",
     "save": "Save changes",
     "visitsTitle": "Visit history",
     "visitsDescription": "Tickets linked to this client in this unit.",

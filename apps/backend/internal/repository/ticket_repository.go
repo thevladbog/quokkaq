@@ -555,7 +555,7 @@ func (r *ticketRepository) ListTerminalVisitActorNamesByTicketIDs(ticketIDs []st
 		SELECT DISTINCT ON (h.ticket_id) h.ticket_id,
 			COALESCE(NULLIF(TRIM(u.name), ''), NULLIF(TRIM(u.email), '')) AS actor_name
 		FROM ticket_histories h
-		LEFT JOIN users u ON u.id = h.user_id
+		LEFT JOIN users u ON u.id::text = h.user_id::text
 		WHERE h.ticket_id IN ?
 		AND h.action = ?
 		AND (h.payload::jsonb->>'to_status') IN ('served', 'no_show', 'cancelled', 'completed')

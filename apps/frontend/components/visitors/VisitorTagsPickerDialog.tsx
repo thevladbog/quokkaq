@@ -41,6 +41,8 @@ export type VisitorTagsPickerDialogProps = {
   title?: string;
   /** Overrides `staff.visitor_context.tags_hint` when set */
   description?: string;
+  /** When true, `onSave` failures are not toasted here (parent handles feedback). */
+  skipBuiltInSaveErrorToast?: boolean;
 };
 
 export function VisitorTagsPickerDialog(props: VisitorTagsPickerDialogProps) {
@@ -69,7 +71,8 @@ function VisitorTagsPickerDialogInner({
   onSave,
   t,
   title,
-  description
+  description,
+  skipBuiltInSaveErrorToast = false
 }: VisitorTagsPickerDialogProps) {
   const reasonFieldId = useId();
   const searchFieldId = useId();
@@ -141,10 +144,12 @@ function VisitorTagsPickerDialogInner({
       toast.success(t('visitor_context.tags_saved'));
       onOpenChange(false);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      toast.error(t('visitor_context.tags_save_error'), {
-        description: msg
-      });
+      if (!skipBuiltInSaveErrorToast) {
+        const msg = err instanceof Error ? err.message : String(err);
+        toast.error(t('visitor_context.tags_save_error'), {
+          description: msg
+        });
+      }
     }
   };
 
