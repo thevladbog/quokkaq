@@ -13,7 +13,7 @@
 - Фоновые задачи: Asynq + Redis (`internal/jobs/`)
 - Файлы: AWS SDK v2 → MinIO/S3
 - Почта: gomail v2, шаблоны в сервисах
-- API docs: Swagger → Scalar (`/swagger/`)
+- API docs: OpenAPI 3 (Scalar `/swagger/`, файлы в `docs/`)
 
 ## Архитектура
 
@@ -34,9 +34,10 @@ auth, users, units, tickets, services, counters, shifts, slots, bookings, pre-re
 
 - `go run cmd/api/main.go` или `air`
 - `docker-compose.yml`: postgres, redis, minio, backend — API **:3001**
-- После старта: Scalar `http://localhost:3001/swagger/`, OpenAPI в `docs/`
-- Новые эндпоинты: model → repository → service → handler → регистрация в `main.go` → аннотации swag → `swag init -g cmd/api/main.go -o ./docs` → затем `python3 scripts/post_swagger_visitor_minprops.py` (доп. ограничения OpenAPI, которые swag не генерирует: `minProperties` на части PATCH-тел, паттерн `#RRGGBB` для цвета тегов посетителя).
-- Pull request: GitHub Actions — [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (gofmt, vet, test, build, `go mod tidy`, `swag init` + тот же post-hook, затем `git diff` по `docs/*`, golangci-lint с `only-new-issues`).
+- После старта: Scalar `http://localhost:3001/swagger/`, спека OpenAPI 3: `http://localhost:3001/docs/openapi.json` (и исторический путь `/docs/swagger.json`).
+- Новые эндпоинты: model → repository → service → handler → регистрация в `main.go` → аннотации swag (Swagger 2) → пайплайн доков из `apps/backend`:
+  `swag init -g cmd/api/main.go -o ./docs` → `go run ./cmd/swagger-to-openapi3` (конвертация в OpenAPI 3 через kin-openapi) → `python3 scripts/post_swagger_openapi_tweaks.py` (`minProperties` / паттерн цвета; для YAML нужен PyYAML: `pip install pyyaml`).
+- Pull request: корневой CI — `swag init` + конвертер + post-hook + `git diff` по `docs/*` при затронутом backend; отдельный workflow в `apps/backend/.github/` — тот же порядок.
 
 ## Фронтенд (соседний репозиторий)
 

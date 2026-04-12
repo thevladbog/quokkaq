@@ -234,23 +234,23 @@ air
 
 **Scalar API Reference**: <http://localhost:3001/swagger/>
 
-### Спецификация Swagger
+### Спецификация OpenAPI 3
 
-OpenAPI спецификация доступна по адресам:
+Спецификация (OpenAPI 3.0 после конвертации из Swagger 2):
 
-- **JSON формат**: <http://localhost:3001/docs/swagger.json>
-- **YAML формат**: `./docs/swagger.yaml`
+- **JSON (рекомендуемый URL)**: <http://localhost:3001/docs/openapi.json>
+- **JSON (исторический путь)**: <http://localhost:3001/docs/swagger.json>
+- **YAML**: `./docs/swagger.yaml`
 
 ### Генерация документации API
 
-Для повторной генерации Swagger документации:
+Аннотации в коде — в формате swag (Swagger 2). Публикуемая спека — OpenAPI 3:
 
 ```bash
-# Установка swag
-go install github.com/swaggo/swag/cmd/swag@latest
-
-# Генерация документации
-swag init -g cmd/api/main.go -o ./docs
+python3 -m pip install 'PyYAML>=6.0,<7'
+go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g cmd/api/main.go -o ./docs
+go run ./cmd/swagger-to-openapi3
+python3 scripts/post_swagger_openapi_tweaks.py
 ```
 
 ---

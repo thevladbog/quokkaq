@@ -26,7 +26,7 @@ import (
 
 // @title           QuokkaQ Go Backend API
 // @version         1.0
-// @description     This is the backend API for QuokkaQ, rewritten in Go.
+// @description     This is the backend API for QuokkaQ, rewritten in Go. Published docs are OpenAPI 3 (see /docs/openapi.json); annotations target Swagger 2 for swag, then converted.
 // @termsOfService  http://swagger.io/terms/
 
 // @contact.name    API Support
@@ -263,7 +263,7 @@ func main() {
 	r.Get("/swagger/*", func(w http.ResponseWriter, r *http.Request) {
 		content, err := os.ReadFile("./docs/swagger.json")
 		if err != nil {
-			http.Error(w, "Failed to read swagger.json", http.StatusInternalServerError)
+			http.Error(w, "Failed to read OpenAPI spec", http.StatusInternalServerError)
 			return
 		}
 
@@ -286,6 +286,9 @@ func main() {
 	})
 
 	r.Get("/docs/swagger.json", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./docs/swagger.json")
+	})
+	r.Get("/docs/openapi.json", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./docs/swagger.json")
 	})
 
