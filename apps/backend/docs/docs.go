@@ -6644,6 +6644,13 @@ const docTemplate = `{
                 "summary": "Create a new ticket",
                 "parameters": [
                     {
+                        "type": "string",
+                        "description": "Unit ID",
+                        "name": "unitId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
                         "description": "Ticket Request",
                         "name": "request",
                         "in": "body",
@@ -8054,7 +8061,8 @@ const docTemplate = `{
             ],
             "properties": {
                 "color": {
-                    "type": "string"
+                    "type": "string",
+                    "pattern": "^#[0-9A-Fa-f]{6}$"
                 },
                 "label": {
                     "type": "string"
@@ -8066,9 +8074,11 @@ const docTemplate = `{
         },
         "handlers.patchVisitorTagDefinitionRequest": {
             "type": "object",
+            "minProperties": 1,
             "properties": {
                 "color": {
-                    "type": "string"
+                    "type": "string",
+                    "pattern": "^#[0-9A-Fa-f]{6}$"
                 },
                 "label": {
                     "type": "string"

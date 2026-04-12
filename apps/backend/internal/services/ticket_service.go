@@ -115,6 +115,15 @@ var ErrDuplicateClientPhone = errors.New("a client with this phone number alread
 // ErrPreRegistrationPhoneInvalid wraps phone parse/normalize failures when issuing a ticket from a pre-registration.
 var ErrPreRegistrationPhoneInvalid = errors.New("invalid pre-registration phone number")
 
+// ErrVisitorPhoneInvalid wraps phone parse/normalize failures when PATCHing ticket visitor by phone.
+var ErrVisitorPhoneInvalid = errors.New("invalid visitor phone number")
+
+// ErrPreRegistrationServiceMismatch is returned when a pre-registration's service does not match the requested service.
+var ErrPreRegistrationServiceMismatch = errors.New("pre-registration does not match the requested service")
+
+// ErrTicketServiceNotInUnit is returned when the target service belongs to a different unit than the ticket request.
+var ErrTicketServiceNotInUnit = errors.New("service does not belong to this unit")
+
 // ErrCustomerNameEmpty is returned when a new unit client would be created from a pre-registration but both names are empty after trim.
 var ErrCustomerNameEmpty = errors.New("pre-registration customer name is empty")
 
@@ -226,6 +235,9 @@ func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID 
 		if pr.UnitID != unitID {
 			return nil, errors.New("pre-registration does not belong to this unit")
 		}
+		if pr.ServiceID != serviceID {
+			return nil, ErrPreRegistrationServiceMismatch
+		}
 		preReg = pr
 	}
 
@@ -239,6 +251,9 @@ func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID 
 		service, err := s.serviceRepo.FindByIDTx(tx, serviceID)
 		if err != nil {
 			return err
+		}
+		if service.UnitID != unitID {
+			return ErrTicketServiceNotInUnit
 		}
 
 		queueNumber := fmt.Sprintf("%03d", seq)
@@ -809,7 +824,7 @@ func (s *ticketService) UpdateTicketVisitor(ticketID string, in PatchTicketVisit
 		} else {
 			e164, err := phoneutil.ParseAndNormalize(phoneTrim, phoneutil.DefaultRegion())
 			if err != nil {
-				return err
+				return fmt.Errorf("%w: %w", ErrVisitorPhoneInvalid, err)
 			}
 			c, err := s.clientRepo.FindByUnitAndPhoneE164Tx(tx, ticket.UnitID, e164)
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -851,7 +866,13 @@ func (s *ticketService) UpdateTicketVisitor(ticketID string, in PatchTicketVisit
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.FindByID(ticketID)
+
+	ticket, err = s.repo.FindByID(ticketID)
+	if err != nil {
+		return nil, err
+	}
+	s.hub.BroadcastEvent("ticket.updated", ticket, ticket.UnitID)
+	return ticket, nil
 }
 
 func (s *ticketService) SetVisitorTagsForTicket(ticketID string, tagDefinitionIDs []string, operatorComment string, actorUserID *string) (*models.Ticket, error) {

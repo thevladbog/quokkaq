@@ -36,7 +36,8 @@ type CreateTicketRequest struct {
 // @Tags         tickets
 // @Accept       json
 // @Produce      json
-// @Param        request body CreateTicketRequest true "Ticket Request"
+// @Param        unitId  path      string              true  "Unit ID"
+// @Param        request body      CreateTicketRequest true  "Ticket Request"
 // @Success      201  {object}  models.Ticket
 // @Failure      400  {string}  string "Bad Request"
 // @Failure      500  {string}  string "Internal Server Error"
@@ -63,7 +64,8 @@ func (h *TicketHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 	ticket, err := h.service.CreateTicket(unitID, req.ServiceID, staffClientID, actor)
 	if err != nil {
 		switch {
-		case errors.Is(err, services.ErrVisitorAnonymousNotAllowed),
+		case errors.Is(err, services.ErrTicketServiceNotInUnit),
+			errors.Is(err, services.ErrVisitorAnonymousNotAllowed),
 			errors.Is(err, services.ErrTicketCreateClientNotInUnit),
 			errors.Is(err, services.ErrDuplicateClientPhone):
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -451,7 +453,8 @@ func (h *TicketHandler) UpdateTicketVisitor(w http.ResponseWriter, r *http.Reque
 			}
 			if errors.Is(err, services.ErrVisitorMutuallyExclusive) ||
 				errors.Is(err, services.ErrVisitorPayloadInvalid) ||
-				errors.Is(err, services.ErrVisitorNameRequired) {
+				errors.Is(err, services.ErrVisitorNameRequired) ||
+				errors.Is(err, services.ErrVisitorPhoneInvalid) {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}

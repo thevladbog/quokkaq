@@ -449,6 +449,7 @@ definitions:
   handlers.createVisitorTagDefinitionRequest:
     properties:
       color:
+        pattern: '^#[0-9A-Fa-f]{6}$'
         type: string
       label:
         type: string
@@ -459,8 +460,10 @@ definitions:
     - label
     type: object
   handlers.patchVisitorTagDefinitionRequest:
+    minProperties: 1
     properties:
       color:
+        pattern: '^#[0-9A-Fa-f]{6}$'
         type: string
       label:
         type: string
@@ -5910,6 +5913,11 @@ paths:
       description: Creates a new ticket for a service in a unit. Unit is taken from
         the path; body requires serviceId (optional clientId).
       parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        type: string
       - description: Ticket Request
         in: body
         name: request

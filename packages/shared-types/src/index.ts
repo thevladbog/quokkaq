@@ -330,13 +330,10 @@ export const createTicketRequestSchema = z.object({
 
 export type CreateTicketRequest = z.infer<typeof createTicketRequestSchema>;
 
-const callNextStrategySchema = z.enum(['fifo', 'by_service']);
-
 /** POST /units/{unitId}/call-next — matches backend handlers.CallNextRequest after trim/dedupe. */
 export const callNextRequestSchema = z
   .object({
     counterId: z.string().min(1),
-    strategy: callNextStrategySchema.optional(),
     serviceIds: z.array(z.string()).optional(),
     /** @deprecated Prefer serviceIds */
     serviceId: z.string().optional()
@@ -354,7 +351,6 @@ export const callNextRequestSchema = z
     const sid = data.serviceId?.trim();
     return {
       counterId,
-      ...(data.strategy !== undefined ? { strategy: data.strategy } : {}),
       ...(serviceIds?.length ? { serviceIds } : {}),
       ...(sid ? { serviceId: sid } : {})
     };
