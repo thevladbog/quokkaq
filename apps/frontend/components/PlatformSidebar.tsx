@@ -9,7 +9,8 @@ import {
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
-  SidebarMenuItem
+  SidebarMenuItem,
+  SidebarRail
 } from '@/components/ui/sidebar';
 import {
   Building2,
@@ -17,18 +18,16 @@ import {
   FileText,
   Home,
   Layers,
-  LogOut,
   Package
 } from 'lucide-react';
 import Image from 'next/image';
-import { useAuthContext } from '@/contexts/AuthContext';
 import { Link, usePathname } from '@/src/i18n/navigation';
-import { Button } from '@/components/ui/button';
 import { useTranslations } from 'next-intl';
+import { SidebarCollapsedLogo } from '@/components/SidebarCollapsedLogo';
+import { SidebarCollapseToggle } from '@/components/SidebarCollapseToggle';
 
 export default function PlatformSidebar() {
   const pathname = usePathname();
-  const { logout } = useAuthContext();
   const t = useTranslations('platform.nav');
 
   const items = [
@@ -74,7 +73,7 @@ export default function PlatformSidebar() {
   ];
 
   return (
-    <Sidebar>
+    <Sidebar collapsible='icon'>
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
@@ -94,14 +93,8 @@ export default function PlatformSidebar() {
                     />
                   </div>
                 </div>
-                <div className='relative hidden h-8 w-8 group-data-[collapsible=icon]:block'>
-                  <Image
-                    src='/quokka-logo.svg'
-                    alt='QuokkaQ'
-                    fill
-                    className='object-contain'
-                    priority
-                  />
+                <div className='relative hidden h-8 w-8 shrink-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:justify-center'>
+                  <SidebarCollapsedLogo className='size-8' />
                 </div>
               </Link>
             </SidebarMenuButton>
@@ -142,20 +135,12 @@ export default function PlatformSidebar() {
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              <SidebarMenuItem>
-                <Button
-                  variant='ghost'
-                  className='h-9 w-full justify-start gap-2 px-2'
-                  onClick={() => logout()}
-                >
-                  <LogOut className='h-4 w-4' />
-                  {t('logout', { defaultValue: 'Log out' })}
-                </Button>
-              </SidebarMenuItem>
+              <SidebarCollapseToggle />
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarFooter>
+      <SidebarRail />
     </Sidebar>
   );
 }

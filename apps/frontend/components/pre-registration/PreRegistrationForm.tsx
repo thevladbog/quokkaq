@@ -45,8 +45,11 @@ export function PreRegistrationForm({
   const [serviceId, setServiceId] = useState(initialData?.serviceId || '');
   const [date, setDate] = useState(initialData?.date || '');
   const [time, setTime] = useState(initialData?.time || '');
-  const [customerName, setCustomerName] = useState(
-    initialData?.customerName || ''
+  const [customerFirstName, setCustomerFirstName] = useState(
+    initialData?.customerFirstName || ''
+  );
+  const [customerLastName, setCustomerLastName] = useState(
+    initialData?.customerLastName || ''
   );
   const [customerPhone, setCustomerPhone] = useState(
     initialData?.customerPhone || ''
@@ -121,7 +124,8 @@ export function PreRegistrationForm({
       serviceId: string;
       date: string;
       time: string;
-      customerName: string;
+      customerFirstName: string;
+      customerLastName: string;
       customerPhone: string;
       comment?: string;
     }) => preRegistrationsApi.create(unitId, data),
@@ -140,7 +144,8 @@ export function PreRegistrationForm({
       serviceId: string;
       date: string;
       time: string;
-      customerName: string;
+      customerFirstName: string;
+      customerLastName: string;
       customerPhone: string;
       comment?: string;
     }) => preRegistrationsApi.update(unitId, initialData!.id, data),
@@ -156,11 +161,22 @@ export function PreRegistrationForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const trimmedFirstName = customerFirstName.trim();
+    const trimmedLastName = customerLastName.trim();
+    if (!trimmedFirstName && !trimmedLastName) {
+      toast.error(
+        t('name_required', { defaultValue: 'Enter first or last name' })
+      );
+      return;
+    }
+    setCustomerFirstName(trimmedFirstName);
+    setCustomerLastName(trimmedLastName);
     const data = {
       serviceId,
       date,
       time,
-      customerName,
+      customerFirstName: trimmedFirstName,
+      customerLastName: trimmedLastName,
       customerPhone,
       comment
     };
@@ -250,14 +266,23 @@ export function PreRegistrationForm({
         </div>
       </div>
 
-      <div className='space-y-2'>
-        <Label htmlFor='name'>{t('customer_name')}</Label>
-        <Input
-          id='name'
-          value={customerName}
-          onChange={(e) => setCustomerName(e.target.value)}
-          required
-        />
+      <div className='grid gap-4 sm:grid-cols-2'>
+        <div className='space-y-2'>
+          <Label htmlFor='firstName'>{t('customer_first_name')}</Label>
+          <Input
+            id='firstName'
+            value={customerFirstName}
+            onChange={(e) => setCustomerFirstName(e.target.value)}
+          />
+        </div>
+        <div className='space-y-2'>
+          <Label htmlFor='lastName'>{t('customer_last_name')}</Label>
+          <Input
+            id='lastName'
+            value={customerLastName}
+            onChange={(e) => setCustomerLastName(e.target.value)}
+          />
+        </div>
       </div>
 
       <div className='space-y-2'>

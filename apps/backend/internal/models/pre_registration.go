@@ -5,19 +5,20 @@ import (
 )
 
 type PreRegistration struct {
-	ID            string    `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
-	UnitID        string    `gorm:"not null" json:"unitId"`
-	ServiceID     string    `gorm:"not null" json:"serviceId"`
-	Date          string    `gorm:"not null" json:"date"` // YYYY-MM-DD
-	Time          string    `gorm:"not null" json:"time"` // HH:MM
-	Code          string    `gorm:"not null" json:"code"` // 6-digit unique code
-	CustomerName  string    `gorm:"not null" json:"customerName"`
-	CustomerPhone string    `gorm:"not null" json:"customerPhone"`
-	Comment       string    `json:"comment,omitempty"`
-	Status        string    `gorm:"default:'created'" json:"status"` // created, canceled, ticket_issued, completed
-	TicketID      *string   `json:"ticketId,omitempty"`
-	CreatedAt     time.Time `gorm:"default:now()" json:"createdAt"`
-	UpdatedAt     time.Time `gorm:"autoUpdateTime" json:"updatedAt"`
+	ID                string    `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
+	UnitID            string    `gorm:"not null" json:"unitId"`
+	ServiceID         string    `gorm:"not null" json:"serviceId"`
+	Date              string    `gorm:"not null" json:"date"` // YYYY-MM-DD
+	Time              string    `gorm:"not null" json:"time"` // HH:MM
+	Code              string    `gorm:"not null" json:"code"` // 6-digit unique code
+	CustomerFirstName string    `gorm:"not null" json:"customerFirstName"`
+	CustomerLastName  string    `gorm:"not null" json:"customerLastName"`
+	CustomerPhone     string    `gorm:"not null" json:"customerPhone"`
+	Comment           string    `json:"comment,omitempty"`
+	Status            string    `gorm:"default:'created'" json:"status"` // created, canceled, ticket_issued, completed
+	TicketID          *string   `json:"ticketId,omitempty"`
+	CreatedAt         time.Time `gorm:"default:now()" json:"createdAt"`
+	UpdatedAt         time.Time `gorm:"autoUpdateTime" json:"updatedAt"`
 
 	// Relations
 	Unit    Unit    `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-" swaggerignore:"true"`
@@ -27,22 +28,24 @@ type PreRegistration struct {
 
 // PreRegistrationCreateRequest is the JSON body for creating a pre-registration (server sets id, code, status, timestamps).
 type PreRegistrationCreateRequest struct {
-	ServiceID     string `json:"serviceId"`
-	Date          string `json:"date"`
-	Time          string `json:"time"`
-	CustomerName  string `json:"customerName"`
-	CustomerPhone string `json:"customerPhone"`
-	Comment       string `json:"comment,omitempty"`
+	ServiceID         string `json:"serviceId"`
+	Date              string `json:"date"`
+	Time              string `json:"time"`
+	CustomerFirstName string `json:"customerFirstName"`
+	CustomerLastName  string `json:"customerLastName"`
+	CustomerPhone     string `json:"customerPhone"`
+	Comment           string `json:"comment,omitempty"`
 }
 
 // PreRegistrationUpdateRequest is the JSON body for updating an existing pre-registration.
 type PreRegistrationUpdateRequest struct {
-	ServiceID     string `json:"serviceId"`
-	Date          string `json:"date"`
-	Time          string `json:"time"`
-	CustomerName  string `json:"customerName"`
-	CustomerPhone string `json:"customerPhone"`
-	Comment       string `json:"comment,omitempty"`
+	ServiceID         string `json:"serviceId"`
+	Date              string `json:"date"`
+	Time              string `json:"time"`
+	CustomerFirstName string `json:"customerFirstName"`
+	CustomerLastName  string `json:"customerLastName"`
+	CustomerPhone     string `json:"customerPhone"`
+	Comment           string `json:"comment,omitempty"`
 }
 
 // PreRegistrationCodeRequest is the JSON body for kiosk validate and redeem endpoints.

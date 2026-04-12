@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	"quokkaq-go-backend/internal/config"
@@ -28,6 +29,9 @@ func main() {
 		&models.DesktopTerminal{},
 		&models.TicketHistory{},
 		&models.Ticket{},
+		&models.UnitClientTagAssignment{},
+		&models.UnitVisitorTagDefinition{},
+		&models.UnitClient{},
 		&models.TicketNumberSequence{},
 		&models.Booking{},
 		&models.Counter{},
@@ -67,6 +71,9 @@ func main() {
 		&models.UserUnit{},
 		&models.Service{},
 		&models.Counter{},
+		&models.UnitClient{},
+		&models.UnitVisitorTagDefinition{},
+		&models.UnitClientTagAssignment{},
 		&models.Ticket{},
 		&models.TicketHistory{},
 		&models.TicketNumberSequence{},
@@ -104,6 +111,18 @@ func main() {
 	}
 	database.DB.Create(&unit)
 	fmt.Printf("Created unit: %s (ID: %s)\n", unit.Name, unit.ID)
+
+	anonymousClient := models.UnitClient{
+		UnitID:      unit.ID,
+		FirstName:   "Аноним",
+		LastName:    "",
+		PhoneE164:   nil,
+		IsAnonymous: true,
+	}
+	if err := database.DB.Create(&anonymousClient).Error; err != nil {
+		log.Fatalf("seed: create anonymous unit client: %v", err)
+	}
+	fmt.Println("Created anonymous unit client for kiosk tickets")
 
 	// Create roles
 	adminRole := models.Role{Name: "admin"}
@@ -220,8 +239,11 @@ func main() {
 		QueueNumber: "A001",
 		Status:      "waiting",
 		CreatedAt:   now,
+		ClientID:    &anonymousClient.ID,
 	}
-	database.DB.Create(&ticket1)
+	if err := database.DB.Create(&ticket1).Error; err != nil {
+		log.Fatalf("seed: create sample ticket %s: %v", ticket1.QueueNumber, err)
+	}
 
 	ticket2 := models.Ticket{
 		UnitID:      unit.ID,
@@ -229,8 +251,11 @@ func main() {
 		QueueNumber: "B001",
 		Status:      "waiting",
 		CreatedAt:   now.Add(1 * time.Minute),
+		ClientID:    &anonymousClient.ID,
 	}
-	database.DB.Create(&ticket2)
+	if err := database.DB.Create(&ticket2).Error; err != nil {
+		log.Fatalf("seed: create sample ticket %s: %v", ticket2.QueueNumber, err)
+	}
 
 	ticket3 := models.Ticket{
 		UnitID:      unit.ID,
@@ -238,8 +263,11 @@ func main() {
 		QueueNumber: "A002",
 		Status:      "waiting",
 		CreatedAt:   now.Add(2 * time.Minute),
+		ClientID:    &anonymousClient.ID,
 	}
-	database.DB.Create(&ticket3)
+	if err := database.DB.Create(&ticket3).Error; err != nil {
+		log.Fatalf("seed: create sample ticket %s: %v", ticket3.QueueNumber, err)
+	}
 
 	fmt.Println("Created 3 sample tickets")
 

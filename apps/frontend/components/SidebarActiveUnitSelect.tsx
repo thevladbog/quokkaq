@@ -1,8 +1,9 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useQueries } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
+import { Building2 } from 'lucide-react';
 import { usePathname, useRouter } from '@/src/i18n/navigation';
 import { useActiveUnit } from '@/contexts/ActiveUnitContext';
 import { unitsApi } from '@/lib/api';
@@ -14,6 +15,12 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger
+} from '@/components/ui/popover';
+import { SidebarMenuButton, useSidebar } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
 
 export function SidebarActiveUnitSelect({ className }: { className?: string }) {
@@ -21,6 +28,8 @@ export function SidebarActiveUnitSelect({ className }: { className?: string }) {
   const { activeUnitId, setActiveUnitId, assignableUnitIds } = useActiveUnit();
   const pathname = usePathname();
   const router = useRouter();
+  const { state, isMobile } = useSidebar();
+  const [unitPopoverOpen, setUnitPopoverOpen] = useState(false);
 
   const queries = useQueries({
     queries: assignableUnitIds.map((id) => ({
@@ -70,35 +79,93 @@ export function SidebarActiveUnitSelect({ className }: { className?: string }) {
       ? activeUnitId
       : assignableUnitIds[0];
 
+  const currentLabel = labelById.get(value) ?? value;
+  const tooltipTitle = currentLabel || tNav('active_unit_placeholder');
+
+  const desktopCollapsed = !isMobile && state === 'collapsed';
+
+  const renderSelect = (triggerId: string, afterChange?: () => void) => (
+    <Select
+      value={value}
+      onValueChange={(id) => {
+        handleChange(id);
+        afterChange?.();
+      }}
+      disabled={disabled}
+    >
+      <SelectTrigger
+        id={triggerId}
+        size='sm'
+        className='h-8 w-full max-w-full min-w-0'
+      >
+        <SelectValue
+          placeholder={tNav('active_unit_placeholder')}
+          className='truncate'
+        />
+      </SelectTrigger>
+      <SelectContent position='popper' align='start' className='z-50'>
+        {assignableUnitIds.map((id) => (
+          <SelectItem key={id} value={id}>
+            <span className='truncate' title={labelById.get(id) ?? id}>
+              {labelById.get(id) ?? id}
+            </span>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+
+  if (desktopCollapsed) {
+    if (disabled) {
+      return (
+        <div className='flex w-full justify-center px-0 pb-1'>
+          <SidebarMenuButton
+            type='button'
+            disabled
+            aria-disabled
+            aria-label={`${tooltipTitle}. ${tNav('active_unit')}`}
+            tooltip={{ children: tooltipTitle }}
+          >
+            <Building2 className='size-4' />
+          </SidebarMenuButton>
+        </div>
+      );
+    }
+    return (
+      <div className='flex w-full justify-center px-0 pb-1'>
+        <Popover open={unitPopoverOpen} onOpenChange={setUnitPopoverOpen}>
+          <PopoverTrigger asChild>
+            <SidebarMenuButton
+              type='button'
+              tooltip={{ children: tooltipTitle }}
+            >
+              <Building2 className='size-4' />
+            </SidebarMenuButton>
+          </PopoverTrigger>
+          <PopoverContent side='right' align='start' className='z-50 w-72'>
+            <div className='space-y-2'>
+              <Label htmlFor='sidebar-active-unit-popover'>
+                {tNav('active_unit')}
+              </Label>
+              {renderSelect('sidebar-active-unit-popover', () =>
+                setUnitPopoverOpen(false)
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
+      </div>
+    );
+  }
+
   return (
     <div className={cn('space-y-1.5 px-2 pb-2', className)}>
       <Label
-        htmlFor='sidebar-active-unit'
+        htmlFor='sidebar-active-unit-expanded'
         className='text-muted-foreground px-1 text-xs font-medium'
       >
         {tNav('active_unit')}
       </Label>
-      <Select value={value} onValueChange={handleChange} disabled={disabled}>
-        <SelectTrigger
-          id='sidebar-active-unit'
-          size='sm'
-          className='h-8 w-full max-w-full min-w-0'
-        >
-          <SelectValue
-            placeholder={tNav('active_unit_placeholder')}
-            className='truncate'
-          />
-        </SelectTrigger>
-        <SelectContent position='popper' align='start' className='z-50'>
-          {assignableUnitIds.map((id) => (
-            <SelectItem key={id} value={id}>
-              <span className='truncate' title={labelById.get(id) ?? id}>
-                {labelById.get(id) ?? id}
-              </span>
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      {renderSelect('sidebar-active-unit-expanded')}
     </div>
   );
 }

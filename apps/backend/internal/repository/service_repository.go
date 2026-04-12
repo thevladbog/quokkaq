@@ -14,6 +14,8 @@ type ServiceRepository interface {
 	FindAllByUnit(unitID string) ([]models.Service, error)
 	FindByID(id string) (*models.Service, error)
 	FindByIDTx(tx *gorm.DB, id string) (*models.Service, error)
+	// CountByUnitAndIDs returns how many of the given service IDs belong to the unit (distinct rows).
+	CountByUnitAndIDs(unitID string, ids []string) (int64, error)
 	Update(service *models.Service) error
 	Delete(id string) error
 }
@@ -50,6 +52,17 @@ func (r *serviceRepository) FindByIDTx(tx *gorm.DB, id string) (*models.Service,
 		return nil, err
 	}
 	return &service, nil
+}
+
+func (r *serviceRepository) CountByUnitAndIDs(unitID string, ids []string) (int64, error) {
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	var n int64
+	err := r.db.Model(&models.Service{}).
+		Where("unit_id = ? AND id IN ?", unitID, ids).
+		Count(&n).Error
+	return n, err
 }
 
 func (r *serviceRepository) Update(service *models.Service) error {

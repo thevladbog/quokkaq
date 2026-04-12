@@ -13,10 +13,9 @@ import { useQuery } from '@tanstack/react-query';
 import { shiftApi } from '@/lib/api';
 import { Link } from '@/src/i18n/navigation';
 import { Loader2 } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
 import { enUS, ru } from 'date-fns/locale';
 import { useLocale } from 'next-intl';
-import { getSupervisorActivityPresentation } from './supervisor-activity-presenter';
+import { SupervisorActivityRow } from '@/components/supervisor/SupervisorActivityRow';
 
 export function SupervisorRecentActivity({
   dashboardUnitId,
@@ -71,28 +70,17 @@ export function SupervisorRecentActivity({
         ) : showEmpty ? (
           <p className='text-muted-foreground text-sm'>{t('activityEmpty')}</p>
         ) : (
-          <ul className='space-y-3'>
-            {items.map((item) => {
-              const { icon: Icon, line } = getSupervisorActivityPresentation(
-                item,
-                t
-              );
-              const rel = formatDistanceToNow(new Date(item.createdAt), {
-                addSuffix: true,
-                locale: dateLocale
-              });
-              return (
-                <li key={item.id} className='flex gap-3 text-sm'>
-                  <Icon className='text-muted-foreground mt-0.5 h-4 w-4 shrink-0' />
-                  <div className='min-w-0 flex-1'>
-                    <p className='text-foreground'>{line}</p>
-                    <p className='text-muted-foreground mt-0.5 text-xs'>
-                      {rel}
-                    </p>
-                  </div>
-                </li>
-              );
-            })}
+          <ul className='space-y-1 rounded-lg border'>
+            {items.map((item) => (
+              <SupervisorActivityRow
+                key={item.id}
+                item={item}
+                t={t}
+                dateLocale={dateLocale}
+                timeFormat='PPp'
+                className='border-border/60 border-b last:border-b-0'
+              />
+            ))}
           </ul>
         )}
 

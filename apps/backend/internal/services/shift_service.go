@@ -26,7 +26,8 @@ type ShiftService interface {
 	GetDashboardStats(unitID string) (map[string]interface{}, error)
 	GetQueueTickets(unitID string) ([]models.Ticket, error)
 	GetShiftCounters(unitID string) ([]ShiftCounterDTO, error)
-	GetShiftActivity(unitID string, limit int, cursor string) (*ShiftActivityResponse, error)
+	GetShiftActivity(unitID string, limit int, cursor string, filters *repository.TicketHistoryListFilters) (*ShiftActivityResponse, error)
+	ListShiftActivityActors(unitID string) ([]ShiftActivityActorOption, error)
 	ExecuteEndOfDay(ctx context.Context, unitID string, userID *string) (map[string]interface{}, error)
 }
 
@@ -37,6 +38,7 @@ type ShiftActivityItem struct {
 	QueueNumber string          `json:"queueNumber"`
 	Action      string          `json:"action"`
 	UserID      *string         `json:"userId,omitempty"`
+	ActorName   *string         `json:"actorName,omitempty"`
 	Payload     json.RawMessage `json:"payload,omitempty" swaggertype:"object"`
 	CreatedAt   time.Time       `json:"createdAt"`
 }
@@ -47,30 +49,48 @@ type ShiftActivityResponse struct {
 	NextCursor *string             `json:"nextCursor,omitempty"`
 }
 
+// ShiftActivityActorOption is a user who appears in ticket history (journal operator filter).
+type ShiftActivityActorOption struct {
+	UserID string `json:"userId"`
+	Name   string `json:"name"`
+}
+
+// ShiftActivityActorsResponse wraps actor options for GET .../shift/activity/actors.
+type ShiftActivityActorsResponse struct {
+	Items []ShiftActivityActorOption `json:"items"`
+}
+
 type ShiftCounterDTO struct {
 	models.Counter
 	IsOccupied   bool           `json:"isOccupied"`
 	ActiveTicket *models.Ticket `json:"activeTicket,omitempty"`
+	SessionState string         `json:"sessionState"` // off_duty | idle | serving | break
 }
 
 type shiftService struct {
 	ticketRepo   repository.TicketRepository
 	counterRepo  repository.CounterRepository
+	intervalRepo repository.OperatorIntervalRepository
 	auditLogRepo repository.AuditLogRepository
 	hub          *ws.Hub
+	userRepo     repository.UserRepository
 }
 
 func NewShiftService(
 	ticketRepo repository.TicketRepository,
 	counterRepo repository.CounterRepository,
 	auditLogRepo repository.AuditLogRepository,
+	intervalRepo repository.OperatorIntervalRepository,
 	hub *ws.Hub,
+	userRepo repository.UserRepository,
 ) ShiftService {
 	return &shiftService{
 		ticketRepo:   ticketRepo,
 		counterRepo:  counterRepo,
+		intervalRepo: intervalRepo,
 		auditLogRepo: auditLogRepo,
 		hub:          hub,
+		userRepo:     userRepo,
 	}
 }
 
@@ -118,7 +138,15 @@ func (s *shiftService) GetShiftCounters(unitID string) ([]ShiftCounterDTO, error
 	}
 
 	dtos := make([]ShiftCounterDTO, len(counters))
-	for i, counter := range counters {
+	for i := range counters {
+		counter := counters[i]
+		if counter.OnBreak {
+			ts, err := s.intervalRepo.GetOpenBreakStartTime(counter.ID)
+			if err == nil && ts != nil {
+				counter.BreakStartedAt = ts
+			}
+		}
+
 		dto := ShiftCounterDTO{
 			Counter: counter,
 		}
@@ -130,6 +158,17 @@ func (s *shiftService) GetShiftCounters(unitID string) ([]ShiftCounterDTO, error
 			if err == nil && activeTicket != nil {
 				dto.ActiveTicket = activeTicket
 			}
+		}
+
+		switch {
+		case !dto.IsOccupied:
+			dto.SessionState = "off_duty"
+		case counter.OnBreak:
+			dto.SessionState = "break"
+		case dto.ActiveTicket != nil:
+			dto.SessionState = "serving"
+		default:
+			dto.SessionState = "idle"
 		}
 
 		dtos[i] = dto
@@ -169,7 +208,7 @@ func decodeShiftActivityCursor(cursor string) (time.Time, string, error) {
 	return ts, parts[1], nil
 }
 
-func (s *shiftService) GetShiftActivity(unitID string, limit int, cursor string) (*ShiftActivityResponse, error) {
+func (s *shiftService) GetShiftActivity(unitID string, limit int, cursor string, filters *repository.TicketHistoryListFilters) (*ShiftActivityResponse, error) {
 	if limit <= 0 {
 		limit = 20
 	}
@@ -186,13 +225,39 @@ func (s *shiftService) GetShiftActivity(unitID string, limit int, cursor string)
 		beforeTime = &ts
 		beforeID = &id
 	}
-	rows, err := s.ticketRepo.ListTicketHistoryByUnitID(unitID, limit+1, beforeTime, beforeID)
+	rows, err := s.ticketRepo.ListTicketHistoryByUnitID(unitID, limit+1, beforeTime, beforeID, filters)
 	if err != nil {
 		return nil, err
 	}
 	hasMore := len(rows) > limit
 	if hasMore {
 		rows = rows[:limit]
+	}
+	needActorName := make([]string, 0)
+	seenActorID := make(map[string]struct{})
+	for _, row := range rows {
+		if row.UserID == nil {
+			continue
+		}
+		uid := strings.TrimSpace(*row.UserID)
+		if uid == "" || strings.TrimSpace(row.ActorName) != "" {
+			continue
+		}
+		if _, ok := seenActorID[uid]; ok {
+			continue
+		}
+		seenActorID[uid] = struct{}{}
+		needActorName = append(needActorName, uid)
+	}
+	var nameByID map[string]string
+	if len(needActorName) > 0 {
+		m, err := s.userRepo.ResolveJournalActorDisplayNames(needActorName)
+		if err != nil {
+			log.Printf("GetShiftActivity: ResolveJournalActorDisplayNames: %v", err)
+			nameByID = nil
+		} else {
+			nameByID = m
+		}
 	}
 	items := make([]ShiftActivityItem, 0, len(rows))
 	for _, row := range rows {
@@ -202,12 +267,23 @@ func (s *shiftService) GetShiftActivity(unitID string, limit int, cursor string)
 		} else {
 			raw = json.RawMessage([]byte("{}"))
 		}
+		n := strings.TrimSpace(row.ActorName)
+		if n == "" && row.UserID != nil && nameByID != nil {
+			if v := nameByID[strings.TrimSpace(*row.UserID)]; v != "" {
+				n = v
+			}
+		}
+		var actorName *string
+		if n != "" {
+			actorName = &n
+		}
 		items = append(items, ShiftActivityItem{
 			ID:          row.ID,
 			TicketID:    row.TicketID,
 			QueueNumber: row.QueueNumber,
 			Action:      row.Action,
 			UserID:      row.UserID,
+			ActorName:   actorName,
 			Payload:     raw,
 			CreatedAt:   row.CreatedAt,
 		})
@@ -221,6 +297,22 @@ func (s *shiftService) GetShiftActivity(unitID string, limit int, cursor string)
 	return resp, nil
 }
 
+func (s *shiftService) ListShiftActivityActors(unitID string) ([]ShiftActivityActorOption, error) {
+	rows, err := s.ticketRepo.ListShiftActivityActorRows(unitID, 200)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]ShiftActivityActorOption, 0, len(rows))
+	for _, r := range rows {
+		name := strings.TrimSpace(r.Name)
+		if name == "" {
+			name = r.UserID
+		}
+		out = append(out, ShiftActivityActorOption{UserID: r.UserID, Name: name})
+	}
+	return out, nil
+}
+
 func (s *shiftService) ExecuteEndOfDay(ctx context.Context, unitID string, userID *string) (map[string]interface{}, error) {
 	today := time.Now().Format("2006-01-02")
 
@@ -231,6 +323,10 @@ func (s *shiftService) ExecuteEndOfDay(ctx context.Context, unitID string, userI
 
 	err := database.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var err error
+		eodCloseAt := time.Now()
+		if _, err := s.intervalRepo.CloseOpenIntervalsForUnitTx(tx, unitID, eodCloseAt); err != nil {
+			return fmt.Errorf("end of day: close operator intervals: %w", err)
+		}
 		eodIDs, err := s.ticketRepo.AppendEODFlaggedHistoryForUnitTx(tx, unitID, userID)
 		if err != nil {
 			return fmt.Errorf("end of day: ticket history: %w", err)

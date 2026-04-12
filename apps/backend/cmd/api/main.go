@@ -76,6 +76,10 @@ func main() {
 			&models.UserUnit{},
 			&models.Service{},
 			&models.Counter{},
+			&models.CounterOperatorInterval{},
+			&models.UnitClient{},
+			&models.UnitVisitorTagDefinition{},
+			&models.UnitClientTagAssignment{},
 			&models.Ticket{},
 			&models.TicketHistory{},
 			&models.TicketNumberSequence{},
@@ -126,6 +130,7 @@ func main() {
 	invoiceRepo := repository.NewInvoiceRepository()
 	catalogRepo := repository.NewCatalogRepository()
 	companyRepo := repository.NewCompanyRepository()
+	operatorIntervalRepo := repository.NewOperatorIntervalRepository()
 
 	jobWorker := jobs.NewJobWorker(ttsService, ticketRepo)
 	jobWorker.Start()
@@ -134,13 +139,17 @@ func main() {
 	userService := services.NewUserService(userRepo)
 	mailService := services.NewMailService()
 	authService := services.NewAuthService(userRepo, mailService, subscriptionRepo)
-	unitService := services.NewUnitService(unitRepo)
-	ticketService := services.NewTicketService(ticketRepo, counterRepo, serviceRepo, hub, jobClient)
+	unitClientRepo := repository.NewUnitClientRepository()
+	visitorTagDefRepo := repository.NewVisitorTagDefinitionRepository()
+	unitClientService := services.NewUnitClientService(unitClientRepo, database.DB)
+	unitService := services.NewUnitService(unitRepo, unitClientService)
+	visitorTagDefService := services.NewVisitorTagDefinitionService(visitorTagDefRepo)
+	ticketService := services.NewTicketService(ticketRepo, counterRepo, serviceRepo, operatorIntervalRepo, unitClientRepo, visitorTagDefRepo, preRegRepo, hub, jobClient)
 	serviceService := services.NewServiceService(serviceRepo)
-	counterService := services.NewCounterService(counterRepo, ticketRepo, userRepo)
+	counterService := services.NewCounterService(counterRepo, ticketRepo, serviceRepo, userRepo, operatorIntervalRepo, hub)
 	bookingService := services.NewBookingService(bookingRepo)
 	auditLogRepo := repository.NewAuditLogRepository()
-	shiftService := services.NewShiftService(ticketRepo, counterRepo, auditLogRepo, hub)
+	shiftService := services.NewShiftService(ticketRepo, counterRepo, auditLogRepo, operatorIntervalRepo, hub, userRepo)
 	templateService := services.NewTemplateService(templateRepo)
 	invitationService := services.NewInvitationService(invitationRepo, mailService, userRepo, templateService)
 	slotService := services.NewSlotService(slotRepo, preRegRepo)
@@ -160,6 +169,8 @@ func main() {
 	invitationHandler := handlers.NewInvitationHandler(invitationService)
 	slotHandler := handlers.NewSlotHandler(slotService)
 	preRegHandler := handlers.NewPreRegistrationHandler(preRegService, ticketService)
+	unitClientHandler := handlers.NewUnitClientHandler(unitClientService, ticketService)
+	visitorTagHandler := handlers.NewVisitorTagHandler(visitorTagDefService)
 	uploadHandler := handlers.NewUploadHandler(storageService)
 	desktopTerminalHandler := handlers.NewDesktopTerminalHandler(desktopTerminalService)
 	usageHandler := handlers.NewUsageHandler(quotaService, userRepo)
@@ -340,6 +351,7 @@ func main() {
 			r.Get("/{unitId}/child-workplaces", unitHandler.GetUnitChildWorkplaces)
 			r.Get("/{unitId}/child-units", unitHandler.GetUnitChildUnits)
 			r.Get("/{unitId}/shift/counters", shiftHandler.GetShiftCounters)
+			r.Get("/{unitId}/shift/activity/actors", shiftHandler.ListShiftActivityActors)
 			r.Get("/{unitId}/shift/activity", shiftHandler.GetShiftActivity)
 			r.Post("/{unitId}/shift/eod", shiftHandler.ExecuteEndOfDay)
 			r.Post("/{unitId}/materials", unitHandler.AddMaterial)
@@ -354,6 +366,12 @@ func main() {
 			r.Put("/{unitId}/slots/day/{date}", slotHandler.UpdateDay)
 			r.Get("/{unitId}/pre-registrations", preRegHandler.GetByUnit)
 			r.Put("/{unitId}/pre-registrations/{id}", preRegHandler.Update)
+			r.Get("/{unitId}/clients/search", unitClientHandler.SearchClients)
+			r.Get("/{unitId}/clients/{clientId}/visits", unitClientHandler.ListClientVisits)
+			r.Get("/{unitId}/visitor-tag-definitions", visitorTagHandler.ListVisitorTagDefinitions)
+			r.Post("/{unitId}/visitor-tag-definitions", visitorTagHandler.CreateVisitorTagDefinition)
+			r.Patch("/{unitId}/visitor-tag-definitions/{definitionId}", visitorTagHandler.PatchVisitorTagDefinition)
+			r.Delete("/{unitId}/visitor-tag-definitions/{definitionId}", visitorTagHandler.DeleteVisitorTagDefinition)
 			r.Post("/{unitId}/counters", counterHandler.CreateCounter)
 		})
 	})
@@ -380,6 +398,8 @@ func main() {
 			r.Post("/{id}/release", counterHandler.Release)
 			r.Post("/{id}/force-release", counterHandler.ForceRelease)
 			r.Post("/{id}/call-next", counterHandler.CallNext)
+			r.Post("/{id}/break/start", counterHandler.StartBreak)
+			r.Post("/{id}/break/end", counterHandler.EndBreak)
 		})
 	})
 
@@ -513,10 +533,13 @@ func main() {
 			r.Use(authmiddleware.JWTAuth)
 			r.Use(authmiddleware.RequireTicketUnit(userRepo, ticketRepo))
 			r.Patch("/{id}/status", ticketHandler.UpdateStatus)
+			r.Patch("/{id}/operator-comment", ticketHandler.UpdateOperatorComment)
 			r.Post("/{id}/recall", ticketHandler.Recall)
 			r.Post("/{id}/pick", ticketHandler.Pick)
 			r.Post("/{id}/transfer", ticketHandler.Transfer)
 			r.Post("/{id}/return", ticketHandler.ReturnToQueue)
+			r.Patch("/{id}/visitor", ticketHandler.UpdateTicketVisitor)
+			r.Put("/{id}/visitor-tags", ticketHandler.SetVisitorTags)
 		})
 	})
 

@@ -160,8 +160,11 @@ export default function ShiftDashboardPage({
     id: c.id,
     name: c.name,
     isOccupied: c.isOccupied,
+    onBreak: c.onBreak,
+    sessionState: c.sessionState,
     assignedUser: c.assignedUser,
-    activeTicket: c.activeTicket
+    activeTicket: c.activeTicket,
+    breakStartedAt: c.breakStartedAt ?? null
   }));
 
   return (

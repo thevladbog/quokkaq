@@ -4,9 +4,33 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"quokkaq-go-backend/internal/middleware"
 )
+
+const (
+	defaultQueryPageLimit = 20
+	maxQueryPageLimit     = 100
+)
+
+// clampQueryPageLimit parses limit from a query string: empty or invalid → default; ≤0 → default; >max → max.
+func clampQueryPageLimit(raw string) int {
+	if raw == "" {
+		return defaultQueryPageLimit
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil {
+		return defaultQueryPageLimit
+	}
+	if n <= 0 {
+		return defaultQueryPageLimit
+	}
+	if n > maxQueryPageLimit {
+		return maxQueryPageLimit
+	}
+	return n
+}
 
 // encodeJSONResponse marshals data to JSON in a buffer without writing to the ResponseWriter.
 func encodeJSONResponse(data interface{}) ([]byte, error) {

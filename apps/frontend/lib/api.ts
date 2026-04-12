@@ -57,6 +57,47 @@ import {
   CatalogItemSchema
 } from '@quokkaq/shared-types';
 
+const ClientVisitsResponseSchema = z.object({
+  items: z.array(TicketModelSchema),
+  nextCursor: z.string().nullish()
+});
+
+const UnitClientModelSchema = z.object({
+  id: z.string(),
+  unitId: z.string(),
+  firstName: z.string(),
+  lastName: z.string(),
+  phoneE164: z.string().nullable().optional(),
+  photoUrl: z.string().nullable().optional(),
+  isAnonymous: z.boolean().optional(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+  definitions: z
+    .array(
+      z.object({
+        id: z.string(),
+        label: z.string(),
+        color: z.string(),
+        sortOrder: z.number().optional()
+      })
+    )
+    .optional()
+});
+
+export type UnitClient = z.infer<typeof UnitClientModelSchema>;
+
+const VisitorTagDefinitionSchema = z.object({
+  id: z.string(),
+  unitId: z.string(),
+  label: z.string(),
+  color: z.string(),
+  sortOrder: z.number(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional()
+});
+
+export type VisitorTagDefinition = z.infer<typeof VisitorTagDefinitionSchema>;
+
 /** Shape-only summary for logs — never includes raw API payload values. */
 function summarizeApiResponseForLog(data: unknown): Record<string, unknown> {
   if (data === null) return { kind: 'null' };
@@ -723,16 +764,22 @@ export const unitsApi = {
 
   createTicket: (
     unitId: string,
-    ticketData: { serviceId: string; preferredName?: string }
-  ) =>
-    apiRequest<Ticket>(
+    ticketData: { serviceId: string; clientId?: string }
+  ) => {
+    const body: { serviceId: string; clientId?: string } = {
+      serviceId: ticketData.serviceId
+    };
+    const cid = ticketData.clientId?.trim();
+    if (cid) body.clientId = cid;
+    return apiRequest<Ticket>(
       `/units/${unitId}/tickets`,
       {
         method: 'POST',
-        body: JSON.stringify(ticketData)
+        body: JSON.stringify(body)
       },
       TicketModelSchema
-    ),
+    );
+  },
 
   // Material and Ad Settings endpoints
   uploadMaterial: async (unitId: string, file: File) => {
@@ -778,7 +825,70 @@ export const unitsApi = {
     apiRequest<Unit>(`/units/${unitId}/ad-settings`, {
       method: 'PATCH',
       body: JSON.stringify(settings)
-    })
+    }),
+
+  getClientVisits: (
+    unitId: string,
+    clientId: string,
+    params?: { limit?: number; cursor?: string }
+  ) => {
+    const qs = new URLSearchParams();
+    if (params?.limit != null) qs.set('limit', String(params.limit));
+    if (params?.cursor) qs.set('cursor', params.cursor);
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    return apiRequest<{ items: Ticket[]; nextCursor?: string | null }>(
+      `/units/${unitId}/clients/${clientId}/visits${suffix}`,
+      {},
+      ClientVisitsResponseSchema
+    );
+  },
+
+  searchClients: (unitId: string, q: string) =>
+    apiRequest<UnitClient[]>(
+      `/units/${unitId}/clients/search?q=${encodeURIComponent(q)}`,
+      { cache: 'no-store' },
+      z.array(UnitClientModelSchema)
+    ),
+
+  listVisitorTagDefinitions: (unitId: string) =>
+    apiRequest<VisitorTagDefinition[]>(
+      `/units/${unitId}/visitor-tag-definitions`,
+      { cache: 'no-store' },
+      z.array(VisitorTagDefinitionSchema)
+    ),
+
+  createVisitorTagDefinition: (
+    unitId: string,
+    body: { label: string; color: string; sortOrder?: number }
+  ) =>
+    apiRequest<VisitorTagDefinition>(
+      `/units/${unitId}/visitor-tag-definitions`,
+      {
+        method: 'POST',
+        body: JSON.stringify(body)
+      },
+      VisitorTagDefinitionSchema
+    ),
+
+  patchVisitorTagDefinition: (
+    unitId: string,
+    definitionId: string,
+    body: { label?: string; color?: string; sortOrder?: number }
+  ) =>
+    apiRequest<VisitorTagDefinition>(
+      `/units/${unitId}/visitor-tag-definitions/${definitionId}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(body)
+      },
+      VisitorTagDefinitionSchema
+    ),
+
+  deleteVisitorTagDefinition: (unitId: string, definitionId: string) =>
+    apiRequest<void>(
+      `/units/${unitId}/visitor-tag-definitions/${definitionId}`,
+      { method: 'DELETE' }
+    )
 };
 
 // Ticket API functions
@@ -875,6 +985,52 @@ export const ticketsApi = {
         method: 'POST'
       },
       TicketModelSchema
+    ),
+
+  updateOperatorComment: (id: string, operatorComment: string | null) =>
+    apiRequest<Ticket>(
+      `/tickets/${id}/operator-comment`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ operatorComment })
+      },
+      TicketModelSchema
+    ),
+
+  /**
+   * Attach or replace visitor while ticket is `called` or `in_service`.
+   * Either `clientId` (optional `firstName`/`lastName` to update that client's name; do not send `phone`) OR `firstName` + `lastName` + `phone` without `clientId` (find/create by phone).
+   */
+  updateTicketVisitor: (
+    id: string,
+    body:
+      | { clientId: string; firstName?: string; lastName?: string }
+      | { firstName: string; lastName: string; phone: string }
+  ) =>
+    apiRequest<Ticket>(
+      `/tickets/${id}/visitor`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(body)
+      },
+      TicketModelSchema
+    ),
+
+  /** Full replacement of visitor tag assignments; `operatorComment` is required (reason for change). */
+  setVisitorTags: (
+    id: string,
+    body: { tagDefinitionIds: string[]; operatorComment: string }
+  ) =>
+    apiRequest<Ticket>(
+      `/tickets/${id}/visitor-tags`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({
+          tagDefinitionIds: body.tagDefinitionIds,
+          operatorComment: body.operatorComment
+        })
+      },
+      TicketModelSchema
     )
 };
 
@@ -940,15 +1096,17 @@ export const servicesApi = {
 
 // Counter API functions
 export const countersApi = {
-  callNext: (
-    counterId: string,
-    callData?: { strategy?: 'fifo' | 'by_service'; serviceId?: string }
-  ) =>
+  /** Optional serviceIds limits which waiting tickets are considered; omit or empty = all services in the unit. */
+  callNext: (counterId: string, callData?: { serviceIds?: string[] }) =>
     apiRequest<{ ok: boolean; ticket?: Ticket; message?: string }>(
       `/counters/${counterId}/call-next`,
       {
         method: 'POST',
-        body: JSON.stringify(callData || {})
+        body: JSON.stringify(
+          callData?.serviceIds && callData.serviceIds.length > 0
+            ? { serviceIds: callData.serviceIds }
+            : {}
+        )
       }
     ),
 
@@ -1000,6 +1158,24 @@ export const countersApi = {
         method: 'POST'
       },
       CounterModelSchema
+    ),
+
+  startBreak: (id: string) =>
+    apiRequest<Counter>(
+      `/counters/${id}/break/start`,
+      {
+        method: 'POST'
+      },
+      CounterModelSchema
+    ),
+
+  endBreak: (id: string) =>
+    apiRequest<Counter>(
+      `/counters/${id}/break/end`,
+      {
+        method: 'POST'
+      },
+      CounterModelSchema
     )
 };
 
@@ -1009,6 +1185,7 @@ export const ShiftActivityItemSchema = z.object({
   queueNumber: z.string(),
   action: z.string(),
   userId: z.string().nullish(),
+  actorName: z.string().nullish(),
   payload: z.record(z.string(), z.unknown()).nullish(),
   createdAt: z.string()
 });
@@ -1020,6 +1197,32 @@ export const ShiftActivityResponseSchema = z.object({
 
 export type ShiftActivityItem = z.infer<typeof ShiftActivityItemSchema>;
 export type ShiftActivityResponse = z.infer<typeof ShiftActivityResponseSchema>;
+
+const ShiftActivityActorSchema = z.object({
+  userId: z.string(),
+  name: z.string()
+});
+
+const ShiftActivityActorsResponseSchema = z.object({
+  items: z.array(ShiftActivityActorSchema)
+});
+
+export type ShiftActivityActor = z.infer<typeof ShiftActivityActorSchema>;
+
+export type ShiftActivityQueryOpts = {
+  limit?: number;
+  cursor?: string;
+  counterId?: string;
+  userId?: string;
+  clientId?: string;
+  ticket?: string;
+  q?: string;
+  weekdays?: number[];
+  /** Inclusive YYYY-MM-DD (unit timezone calendar date of history row) */
+  dateFrom?: string;
+  /** Inclusive YYYY-MM-DD (unit timezone calendar date of history row) */
+  dateTo?: string;
+};
 
 // Shift API functions
 export const shiftApi = {
@@ -1042,13 +1245,16 @@ export const shiftApi = {
         id: string;
         name: string;
         assignedTo: string | null;
+        onBreak?: boolean;
+        sessionState?: 'off_duty' | 'idle' | 'serving' | 'break';
         assignedUser?: { name: string };
         isOccupied: boolean;
         activeTicket: Ticket | null;
+        breakStartedAt?: string | null;
       }>
     >(`/units/${unitId}/shift/counters`, {}),
 
-  getActivity: (unitId: string, opts?: { limit?: number; cursor?: string }) => {
+  getActivity: (unitId: string, opts?: ShiftActivityQueryOpts) => {
     const params = new URLSearchParams();
     if (opts?.limit != null && opts.limit > 0) {
       params.set('limit', String(opts.limit));
@@ -1056,6 +1262,23 @@ export const shiftApi = {
     if (opts?.cursor) {
       params.set('cursor', opts.cursor);
     }
+    const c = opts?.counterId?.trim();
+    if (c) params.set('counterId', c);
+    const u = opts?.userId?.trim();
+    if (u) params.set('userId', u);
+    const cl = opts?.clientId?.trim();
+    if (cl) params.set('clientId', cl);
+    const tk = opts?.ticket?.trim();
+    if (tk) params.set('ticket', tk);
+    const q = opts?.q?.trim();
+    if (q) params.set('q', q);
+    if (opts?.weekdays != null && opts.weekdays.length > 0) {
+      params.set('weekdays', opts.weekdays.join(','));
+    }
+    const df = opts?.dateFrom?.trim();
+    if (df) params.set('dateFrom', df);
+    const dto = opts?.dateTo?.trim();
+    if (dto) params.set('dateTo', dto);
     const qs = params.toString();
     const path =
       qs.length > 0
@@ -1067,6 +1290,13 @@ export const shiftApi = {
       ShiftActivityResponseSchema
     );
   },
+
+  getActivityActors: (unitId: string) =>
+    apiRequest<{ items: ShiftActivityActor[] }>(
+      `/units/${unitId}/shift/activity/actors`,
+      { cache: 'no-store' },
+      ShiftActivityActorsResponseSchema
+    ),
 
   forceReleaseCounter: (counterId: string) =>
     apiRequest<{
@@ -1192,7 +1422,8 @@ export const preRegistrationsApi = {
       serviceId: string;
       date: string;
       time: string;
-      customerName: string;
+      customerFirstName: string;
+      customerLastName: string;
       customerPhone: string;
       comment?: string;
     }

@@ -10,6 +10,7 @@ import React, {
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { Service, Unit, unitsApi } from '@/lib/api';
+import { logger } from '@/lib/logger';
 import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -1339,20 +1340,21 @@ const ServiceGridEditor: React.FC<ServiceGridEditorProps> = ({ unitId }) => {
 
   useEffect(() => {
     let effectAlive = true;
+    const controller = new AbortController();
     const id = unitId || selectedUnitId;
     if (!id) {
       startTransition(() => setIsLoading(false));
       return () => {
         effectAlive = false;
+        controller.abort();
       };
     }
 
-    const ac = new AbortController();
     const seq = ++servicesTreeFetchSeqRef.current;
     startTransition(() => setIsLoading(true));
 
     unitsApi
-      .getServicesTree(id, { signal: ac.signal })
+      .getServicesTree(id, { signal: controller.signal })
       .then((servicesTree) => {
         if (!effectAlive || seq !== servicesTreeFetchSeqRef.current) {
           return;
@@ -1395,13 +1397,13 @@ const ServiceGridEditor: React.FC<ServiceGridEditorProps> = ({ unitId }) => {
         if (!effectAlive || seq !== servicesTreeFetchSeqRef.current) {
           return;
         }
-        if (error instanceof DOMException && error.name === 'AbortError') {
+        if (
+          (error instanceof DOMException && error.name === 'AbortError') ||
+          (error instanceof Error && error.name === 'AbortError')
+        ) {
           return;
         }
-        if (error instanceof Error && error.name === 'AbortError') {
-          return;
-        }
-        console.error('Error loading services:', error);
+        logger.error('Error loading services:', error);
       })
       .finally(() => {
         if (!effectAlive || seq !== servicesTreeFetchSeqRef.current) {
@@ -1412,7 +1414,7 @@ const ServiceGridEditor: React.FC<ServiceGridEditorProps> = ({ unitId }) => {
 
     return () => {
       effectAlive = false;
-      ac.abort();
+      controller.abort();
     };
   }, [unitId, selectedUnitId, t]);
 

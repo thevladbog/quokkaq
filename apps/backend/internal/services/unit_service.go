@@ -35,12 +35,20 @@ type UnitService interface {
 	UpdateAdSettings(unitID string, settings map[string]interface{}) error
 }
 
-type unitService struct {
-	repo repository.UnitRepository
+// UnitAnonymousEnsurer creates the per-unit synthetic "anonymous" client row after a unit is created.
+type UnitAnonymousEnsurer interface {
+	EnsureAnonymousClient(unitID string) error
+	// EnsureAnonymousClientTx runs the same bootstrap on tx (caller owns the transaction).
+	EnsureAnonymousClientTx(tx *gorm.DB, unitID string) error
 }
 
-func NewUnitService(repo repository.UnitRepository) UnitService {
-	return &unitService{repo: repo}
+type unitService struct {
+	repo      repository.UnitRepository
+	anonymous UnitAnonymousEnsurer
+}
+
+func NewUnitService(repo repository.UnitRepository, anonymous UnitAnonymousEnsurer) UnitService {
+	return &unitService{repo: repo, anonymous: anonymous}
 }
 
 func normalizeUnitKind(kind string) string {
@@ -142,7 +150,17 @@ func (s *unitService) CreateUnit(unit *models.Unit) error {
 	if err := s.validateHierarchy("", unit.CompanyID, unit.ParentID); err != nil {
 		return err
 	}
-	return s.repo.Create(unit)
+	return s.repo.Transaction(func(tx *gorm.DB) error {
+		if err := s.repo.CreateTx(tx, unit); err != nil {
+			return err
+		}
+		if s.anonymous != nil {
+			if err := s.anonymous.EnsureAnonymousClientTx(tx, unit.ID); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func (s *unitService) GetAllUnits() ([]models.Unit, error) {

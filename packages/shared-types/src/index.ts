@@ -130,6 +130,7 @@ export const TicketModelSchema = z.object({
   calledAt: z.string().nullable().optional(),
   confirmedAt: z.string().nullable().optional(),
   maxWaitingTime: z.number().nullable().optional(),
+  operatorComment: z.string().nullable().optional(),
   service: z
     .object({
       id: z.string().optional(),
@@ -146,12 +147,34 @@ export const TicketModelSchema = z.object({
   preRegistration: z
     .object({
       id: z.string(),
-      customerName: z.string(),
+      customerFirstName: z.string(),
+      customerLastName: z.string(),
       customerPhone: z.string(),
       code: z.string(),
       date: z.string(),
       time: z.string(),
       comment: z.string().optional()
+    })
+    .nullable()
+    .optional(),
+  client: z
+    .object({
+      id: z.string(),
+      firstName: z.string(),
+      lastName: z.string(),
+      phoneE164: z.string().nullable().optional(),
+      photoUrl: z.string().nullable().optional(),
+      isAnonymous: z.boolean().optional(),
+      definitions: z
+        .array(
+          z.object({
+            id: z.string(),
+            label: z.string(),
+            color: z.string(),
+            sortOrder: z.number().optional()
+          })
+        )
+        .optional()
     })
     .nullable()
     .optional()
@@ -174,6 +197,8 @@ export const CounterModelSchema = z.object({
   unitId: z.string(),
   name: z.string(),
   assignedTo: z.string().nullable().optional(),
+  onBreak: z.boolean().optional(),
+  breakStartedAt: z.string().nullable().optional(),
   assignedUser: z
     .object({
       name: z.string()
@@ -282,7 +307,8 @@ export interface PreRegistration {
   date: string;
   time: string;
   code: string;
-  customerName: string;
+  customerFirstName: string;
+  customerLastName: string;
   customerPhone: string;
   comment?: string;
   status: string;
@@ -296,11 +322,41 @@ export interface PreRegistration {
 // API Request/Response Types
 // ==========================
 
-export type CreateTicketRequest = {
-  unitId: string;
-  serviceId: string;
-  preferredName?: string;
-};
+/** POST /units/{unitId}/tickets — unit id is in the path, not the body. */
+export const createTicketRequestSchema = z.object({
+  serviceId: z.string().min(1),
+  clientId: z.string().optional()
+});
+
+export type CreateTicketRequest = z.infer<typeof createTicketRequestSchema>;
+
+/** POST /units/{unitId}/call-next — matches backend handlers.CallNextRequest after trim/dedupe. */
+export const callNextRequestSchema = z
+  .object({
+    counterId: z.string().min(1),
+    serviceIds: z.array(z.string()).optional(),
+    /** @deprecated Prefer serviceIds */
+    serviceId: z.string().optional()
+  })
+  .transform((data) => {
+    const counterId = data.counterId.trim();
+    let serviceIds = data.serviceIds;
+    if (serviceIds?.length) {
+      serviceIds = [
+        ...new Set(serviceIds.map((s) => s.trim()).filter((s) => s.length > 0))
+      ];
+    } else {
+      serviceIds = undefined;
+    }
+    const sid = data.serviceId?.trim();
+    return {
+      counterId,
+      ...(serviceIds?.length ? { serviceIds } : {}),
+      ...(sid ? { serviceId: sid } : {})
+    };
+  });
+
+export type CallNextRequest = z.infer<typeof callNextRequestSchema>;
 
 export type CreateBookingRequest = {
   unitId: string;
@@ -317,11 +373,6 @@ export type UpdateServiceRequest = Partial<Service>;
 export type TransferTicketRequest = {
   toCounterId?: string;
   toUserId?: string;
-};
-
-export type CallNextRequest = {
-  strategy?: 'fifo' | 'by_service';
-  serviceId?: string;
 };
 
 // ==========================

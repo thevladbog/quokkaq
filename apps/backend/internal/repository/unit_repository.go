@@ -9,6 +9,8 @@ import (
 )
 
 type UnitRepository interface {
+	Transaction(fn func(tx *gorm.DB) error) error
+	CreateTx(tx *gorm.DB, unit *models.Unit) error
 	Create(unit *models.Unit) error
 	FindAll() ([]models.Unit, error)
 	FindByID(id string) (*models.Unit, error)
@@ -34,6 +36,14 @@ type unitRepository struct {
 
 func NewUnitRepository() UnitRepository {
 	return &unitRepository{db: database.DB}
+}
+
+func (r *unitRepository) Transaction(fn func(tx *gorm.DB) error) error {
+	return r.db.Transaction(fn)
+}
+
+func (r *unitRepository) CreateTx(tx *gorm.DB, unit *models.Unit) error {
+	return tx.Create(unit).Error
 }
 
 func (r *unitRepository) Create(unit *models.Unit) error {
