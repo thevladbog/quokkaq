@@ -43,6 +43,17 @@ def _schema(components: dict[str, Any], name: str) -> dict[str, Any]:
     return s
 
 
+def _patch_color_pattern(schema_obj: dict[str, Any], schema_label: str) -> None:
+    """Set properties.color.pattern on a components.schemas entry; schema_label is used in errors."""
+    props = schema_obj.get("properties")
+    if not isinstance(props, dict):
+        sys.exit(f"post_swagger_openapi_tweaks: {schema_label}.properties missing")
+    color = props.get("color")
+    if not isinstance(color, dict):
+        sys.exit(f"post_swagger_openapi_tweaks: {schema_label}.properties.color missing")
+    color["pattern"] = COLOR_PATTERN
+
+
 def apply_openapi_tweaks(doc: dict[str, Any]) -> None:
     """Apply extra schema constraints by path under components.schemas.
 
@@ -56,23 +67,11 @@ def apply_openapi_tweaks(doc: dict[str, Any]) -> None:
     patch_visitor["minProperties"] = 1
 
     create_tag = _schema(comp, "handlers.createVisitorTagDefinitionRequest")
-    props = create_tag.get("properties")
-    if not isinstance(props, dict):
-        sys.exit("post_swagger_openapi_tweaks: createVisitorTagDefinitionRequest.properties missing")
-    color = props.get("color")
-    if not isinstance(color, dict):
-        sys.exit("post_swagger_openapi_tweaks: createVisitorTagDefinitionRequest.properties.color missing")
-    color["pattern"] = COLOR_PATTERN
+    _patch_color_pattern(create_tag, "createVisitorTagDefinitionRequest")
 
     patch_tag = _schema(comp, "handlers.patchVisitorTagDefinitionRequest")
     patch_tag["minProperties"] = 1
-    pprops = patch_tag.get("properties")
-    if not isinstance(pprops, dict):
-        sys.exit("post_swagger_openapi_tweaks: patchVisitorTagDefinitionRequest.properties missing")
-    pcolor = pprops.get("color")
-    if not isinstance(pcolor, dict):
-        sys.exit("post_swagger_openapi_tweaks: patchVisitorTagDefinitionRequest.properties.color missing")
-    pcolor["pattern"] = COLOR_PATTERN
+    _patch_color_pattern(patch_tag, "patchVisitorTagDefinitionRequest")
 
 
 def _write_json(path: Path, doc: dict[str, Any]) -> None:
