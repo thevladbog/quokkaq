@@ -35,7 +35,8 @@ import type {
   CatalogItem,
   InvoiceDraftUpsertBody,
   InvoiceDraftCreateBody,
-  PaymentAccount
+  PaymentAccount,
+  UnitClientHistoryListResponse
 } from '@quokkaq/shared-types';
 
 import {
@@ -891,7 +892,7 @@ export const unitsApi = {
     if (params?.cursor) qs.set('cursor', params.cursor);
     const suffix = qs.toString() ? `?${qs.toString()}` : '';
     return apiRequest<UnitClientHistoryListResponse>(
-      `/units/${unitId}/clients/${clientId}/history${suffix}`,
+      `/units/${unitId}/clients/${encodeURIComponent(clientId)}/history${suffix}`,
       { cache: 'no-store' },
       UnitClientHistoryListResponseSchema
     );

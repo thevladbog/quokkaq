@@ -30,7 +30,7 @@ func (s *serviceService) CreateService(service *models.Service) error {
 	if service.UnitID == "" {
 		return errors.New("unit ID is required")
 	}
-	if err := ValidateOptionalChildServiceZone(s.unitRepo, service.UnitID, service.RestrictedServiceZoneID); err != nil {
+	if err := ValidateOptionalChildServiceZone(s.unitRepo, service.UnitID, &service.RestrictedServiceZoneID); err != nil {
 		return err
 	}
 	return s.repo.Create(service)
@@ -54,7 +54,7 @@ func (s *serviceService) UpdateService(service *models.Service) error {
 	}
 	// Never persist a caller-supplied unit change; keep the row's unit.
 	service.UnitID = existing.UnitID
-	if err := ValidateOptionalChildServiceZone(s.unitRepo, service.UnitID, service.RestrictedServiceZoneID); err != nil {
+	if err := ValidateOptionalChildServiceZone(s.unitRepo, service.UnitID, &service.RestrictedServiceZoneID); err != nil {
 		return err
 	}
 	return s.repo.Update(service)

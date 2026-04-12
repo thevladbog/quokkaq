@@ -116,7 +116,9 @@ function CounterForm({
     mutationFn: (data: { name: string; serviceZoneId?: string | null }) =>
       countersApi.create(countersUnitId, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['counters', countersUnitId] });
+      queryClient.invalidateQueries({
+        queryKey: ['units', countersUnitId, 'counters']
+      });
       toast.success(t('created_success'));
       onOpenChange(false);
     },
@@ -130,7 +132,7 @@ function CounterForm({
       countersApi.update(counter!.id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: ['counters', countersUnitId]
+        queryKey: ['units', countersUnitId, 'counters']
       });
       toast.success(t('updated_success'));
       onOpenChange(false);

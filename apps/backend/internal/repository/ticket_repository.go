@@ -525,8 +525,8 @@ func (r *ticketRepository) ListVisitsByClientID(unitID, clientID string, limit i
 	if limit <= 0 {
 		limit = 20
 	}
-	if limit > 100 {
-		limit = 100
+	if limit > 101 {
+		limit = 101
 	}
 	q := r.db.Where("unit_id = ? AND client_id = ?", unitID, clientID).
 		Preload("Service").Preload("Counter").
@@ -559,7 +559,7 @@ func (r *ticketRepository) ListTerminalVisitActorNamesByTicketIDs(ticketIDs []st
 		WHERE h.ticket_id IN ?
 		AND h.action = ?
 		AND (h.payload::jsonb->>'to_status') IN ('served', 'no_show', 'cancelled', 'completed')
-		ORDER BY h.ticket_id, h.created_at DESC
+		ORDER BY h.ticket_id, h.created_at DESC, h.id DESC
 	`, ticketIDs, ticketaudit.ActionTicketStatusChanged).Scan(&rows).Error
 	if err != nil {
 		return nil, err

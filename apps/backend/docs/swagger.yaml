@@ -4951,12 +4951,24 @@ paths:
               schema:
                 $ref: '#/components/schemas/models.Ticket'
           description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad request (validation / transfer rules)
         '404':
           content:
             application/json:
               schema:
                 type: string
           description: Ticket not found
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal server error
       summary: Transfer ticket
       tags:
       - tickets

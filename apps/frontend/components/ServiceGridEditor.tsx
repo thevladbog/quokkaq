@@ -1408,8 +1408,9 @@ const ServiceGridWorkArea: React.FC<{
 }) => {
   const servicesForGridEditor = useMemo(() => {
     if (lockedZoneScope) {
-      return services.filter((s) =>
-        serviceMatchesGridZoneScope(s, lockedZoneScope)
+      return services.filter(
+        (s) =>
+          s.isLeaf !== true || serviceMatchesGridZoneScope(s, lockedZoneScope)
       );
     }
     return services;

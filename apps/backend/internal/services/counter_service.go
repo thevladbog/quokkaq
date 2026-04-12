@@ -99,7 +99,7 @@ func (s *counterService) CreateCounter(counter *models.Counter) error {
 	if counter.UnitID == "" {
 		return errors.New("unit ID is required")
 	}
-	if err := ValidateOptionalChildServiceZone(s.unitRepo, counter.UnitID, counter.ServiceZoneID); err != nil {
+	if err := ValidateOptionalChildServiceZone(s.unitRepo, counter.UnitID, &counter.ServiceZoneID); err != nil {
 		return err
 	}
 	return s.repo.Create(counter)
@@ -152,7 +152,7 @@ func (s *counterService) UpdateCounter(counter *models.Counter) error {
 		return err
 	}
 	counter.UnitID = existing.UnitID
-	if err := ValidateOptionalChildServiceZone(s.unitRepo, counter.UnitID, counter.ServiceZoneID); err != nil {
+	if err := ValidateOptionalChildServiceZone(s.unitRepo, counter.UnitID, &counter.ServiceZoneID); err != nil {
 		return err
 	}
 	return s.repo.Update(counter)

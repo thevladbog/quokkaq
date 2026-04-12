@@ -366,7 +366,9 @@ type TransferRequest struct {
 // @Param        id       path      string           true  "Ticket ID"
 // @Param        request  body      TransferRequest  true  "Transfer Request"
 // @Success      200      {object}  models.Ticket
+// @Failure      400      {string}  string "Bad request (validation / transfer rules)"
 // @Failure      404      {string}  string "Ticket not found"
+// @Failure      500      {string}  string "Internal server error"
 // @Router       /tickets/{id}/transfer [post]
 func (h *TicketHandler) Transfer(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
@@ -437,10 +439,12 @@ func (h *TicketHandler) Transfer(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrTransferConflictingTargets),
+			errors.Is(err, services.ErrTransferTargetRequired),
 			errors.Is(err, services.ErrTicketCounterZoneMismatch),
 			errors.Is(err, services.ErrInvalidServiceZone),
 			errors.Is(err, services.ErrTransferServiceRequiredForZone),
 			errors.Is(err, services.ErrTransferTargetMustBeLeafService),
+			errors.Is(err, services.ErrTransferTargetServiceNotInZone),
 			errors.Is(err, services.ErrTransferServiceNotAllowedOnTargetCounter),
 			errors.Is(err, services.ErrOperatorCommentTooLong),
 			errors.Is(err, services.ErrTicketServiceNotInUnit),

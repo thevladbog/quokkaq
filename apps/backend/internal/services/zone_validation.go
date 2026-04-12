@@ -72,9 +72,17 @@ func CounterPoolMatchesTicket(counterPool, ticketPool *string) bool {
 }
 
 // ValidateOptionalChildServiceZone validates zoneID when non-nil; nil is allowed (no zone restriction).
-func ValidateOptionalChildServiceZone(ur repository.UnitRepository, subdivisionID string, zoneID *string) error {
-	if zoneID == nil || strings.TrimSpace(*zoneID) == "" {
+// It normalizes *zoneID: whitespace-only becomes nil; non-blank values are trimmed in place via **zoneID.
+func ValidateOptionalChildServiceZone(ur repository.UnitRepository, subdivisionID string, zoneID **string) error {
+	if zoneID == nil || *zoneID == nil {
 		return nil
 	}
-	return ValidateChildServiceZone(ur, subdivisionID, strings.TrimSpace(*zoneID))
+	s := strings.TrimSpace(**zoneID)
+	if s == "" {
+		*zoneID = nil
+		return nil
+	}
+	t := s
+	*zoneID = &t
+	return ValidateChildServiceZone(ur, subdivisionID, s)
 }

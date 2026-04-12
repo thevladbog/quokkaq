@@ -135,9 +135,8 @@ const AppSidebar = () => {
     if (!isAuthenticated) return false;
     if (user?.roles?.includes('admin')) return true;
 
-    const hasRole =
-      !item.roles ||
-      user?.roles?.some((role: string) => item.roles?.includes(role));
+    const roles = item.roles as readonly string[] | undefined;
+    const hasRole = !roles || user?.roles?.some((role) => roles.includes(role));
 
     const hasPermission = item.requiredPermission
       ? hasPermissionInAnyUnit(item.requiredPermission)

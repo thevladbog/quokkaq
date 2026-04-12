@@ -184,6 +184,29 @@ function ClientDetailForm({
     enabled: Boolean(initial && !initial.isAnonymous)
   });
 
+  const isPristine = useMemo(() => {
+    const tagIdsSorted = [...selectedTagIds].sort();
+    const origTagIds = (initial.definitions ?? []).map((d) => d.id).sort();
+    const tagsEqual =
+      tagIdsSorted.length === origTagIds.length &&
+      tagIdsSorted.every((id, i) => id === origTagIds[i]);
+    return (
+      firstName.trim() === initial.firstName &&
+      lastName.trim() === initial.lastName &&
+      phone.trim() === (initial.phoneE164 ?? '').trim() &&
+      tagsEqual
+    );
+  }, [
+    firstName,
+    lastName,
+    phone,
+    selectedTagIds,
+    initial.firstName,
+    initial.lastName,
+    initial.phoneE164,
+    initial.definitions
+  ]);
+
   const saveMutation = useMutation({
     mutationFn: () => {
       const tagIdsSorted = [...selectedTagIds].sort();
@@ -213,6 +236,10 @@ function ClientDetailForm({
       }
       if (tagsChanged) {
         body.tagDefinitionIds = [...selectedTagIds];
+      }
+
+      if (Object.keys(body).length === 0) {
+        return Promise.resolve(initial);
       }
 
       return unitsApi.patchUnitClient(unitId, clientId, body);
@@ -247,7 +274,9 @@ function ClientDetailForm({
     const selected = new Set(selectedTagIds);
     const list = catalogTagDefs.filter((d) => selected.has(d.id));
     return [...list].sort((a, b) => {
-      if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+      const ao = a.sortOrder ?? 0;
+      const bo = b.sortOrder ?? 0;
+      if (ao !== bo) return ao - bo;
       return a.label.localeCompare(b.label);
     });
   }, [catalogTagDefs, selectedTagIds]);
@@ -358,7 +387,7 @@ function ClientDetailForm({
           ) : null}
           <Button
             type='button'
-            disabled={saveMutation.isPending}
+            disabled={saveMutation.isPending || isPristine}
             onClick={() => saveMutation.mutate()}
           >
             {saveMutation.isPending ? (

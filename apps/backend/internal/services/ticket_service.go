@@ -145,11 +145,17 @@ var ErrClientVisitsInvalidCursor = errors.New("invalid visits cursor")
 // ErrTransferConflictingTargets is returned when both counter/user and zone targets are set.
 var ErrTransferConflictingTargets = errors.New("cannot combine counter transfer with zone transfer")
 
+// ErrTransferTargetRequired is returned when no transfer target (counter, user, or zone) is provided.
+var ErrTransferTargetRequired = errors.New("target counter, user, or service zone required")
+
 // ErrTransferServiceRequiredForZone is returned when the current service is not allowed in the target zone and toServiceId is missing.
 var ErrTransferServiceRequiredForZone = errors.New("toServiceId is required: current service is not available in the target zone")
 
 // ErrTransferTargetMustBeLeafService is returned from counter transfer when toServiceId is not a leaf.
 var ErrTransferTargetMustBeLeafService = errors.New("target service must be a leaf service")
+
+// ErrTransferTargetServiceNotInZone is returned from zone transfer when the resolved service is not allowed in the target zone.
+var ErrTransferTargetServiceNotInZone = errors.New("target service is not available in the selected zone")
 
 // ErrTransferServiceNotAllowedOnTargetCounter is returned when toServiceId is not allowed on the target counter's waiting pool.
 var ErrTransferServiceNotAllowedOnTargetCounter = errors.New("target service is not available for the target counter's service zone")
@@ -666,7 +672,7 @@ func (s *ticketService) Transfer(ticketID string, in TransferTicketInput, actorU
 		return nil, ErrTransferConflictingTargets
 	}
 	if !zoneTransfer && !counterTransfer {
-		return nil, errors.New("target counter, user, or service zone required")
+		return nil, ErrTransferTargetRequired
 	}
 
 	var ticket *models.Ticket
@@ -718,10 +724,10 @@ func (s *ticketService) Transfer(ticketID string, in TransferTicketInput, actorU
 				return ErrTicketServiceNotInUnit
 			}
 			if !newSvc.IsLeaf {
-				return errors.New("target service must be a leaf service")
+				return ErrTransferTargetMustBeLeafService
 			}
 			if !ServiceAllowedInZone(newSvc, zoneIDTrim) {
-				return errors.New("target service is not available in the selected zone")
+				return ErrTransferTargetServiceNotInZone
 			}
 
 			zCopy := zoneIDTrim
@@ -731,9 +737,7 @@ func (s *ticketService) Transfer(ticketID string, in TransferTicketInput, actorU
 			ticket.CounterID = nil
 			ticket.CalledAt = nil
 			ticket.ConfirmedAt = nil
-			if newSvc.MaxWaitingTime != nil {
-				ticket.MaxWaitingTime = newSvc.MaxWaitingTime
-			}
+			ticket.MaxWaitingTime = newSvc.MaxWaitingTime
 
 			payload := map[string]interface{}{
 				"transfer_kind":        "zone",
@@ -805,14 +809,9 @@ func (s *ticketService) Transfer(ticketID string, in TransferTicketInput, actorU
 		if err != nil {
 			return err
 		}
-		needNewService := !ServiceAllowedInTicketPool(curSvc, targetCounter.ServiceZoneID)
-		if needNewService {
-			var resolvedServiceID string
-			if in.ToServiceID != nil && strings.TrimSpace(*in.ToServiceID) != "" {
-				resolvedServiceID = strings.TrimSpace(*in.ToServiceID)
-			} else {
-				return ErrTransferServiceRequiredForZone
-			}
+		explicitToSvc := in.ToServiceID != nil && strings.TrimSpace(*in.ToServiceID) != ""
+		if explicitToSvc {
+			resolvedServiceID := strings.TrimSpace(*in.ToServiceID)
 			newSvc, err := s.serviceRepo.FindByIDTx(tx, resolvedServiceID)
 			if err != nil {
 				return err
@@ -827,9 +826,9 @@ func (s *ticketService) Transfer(ticketID string, in TransferTicketInput, actorU
 				return ErrTransferServiceNotAllowedOnTargetCounter
 			}
 			ticket.ServiceID = resolvedServiceID
-			if newSvc.MaxWaitingTime != nil {
-				ticket.MaxWaitingTime = newSvc.MaxWaitingTime
-			}
+			ticket.MaxWaitingTime = newSvc.MaxWaitingTime
+		} else if !ServiceAllowedInTicketPool(curSvc, targetCounter.ServiceZoneID) {
+			return ErrTransferServiceRequiredForZone
 		}
 
 		ticket.CounterID = &targetCounterID
@@ -1288,33 +1287,38 @@ func (s *ticketService) ListVisitsByClient(unitID, clientID string, limit int, c
 			beforeID = &parts[1]
 		}
 	}
-	items, err := s.repo.ListVisitsByClientID(unitID, clientID, limit, beforeTime, beforeID)
+	fetchLimit := limit + 1
+	items, err := s.repo.ListVisitsByClientID(unitID, clientID, fetchLimit, beforeTime, beforeID)
 	if err != nil {
 		return nil, nil, err
 	}
-	if len(items) > 0 {
-		ids := make([]string, 0, len(items))
-		for i := range items {
-			ids = append(ids, items[i].ID)
+	displayItems := items
+	if len(items) > limit {
+		displayItems = items[:limit]
+	}
+	if len(displayItems) > 0 {
+		ids := make([]string, 0, len(displayItems))
+		for i := range displayItems {
+			ids = append(ids, displayItems[i].ID)
 		}
 		byID, err := s.repo.ListTerminalVisitActorNamesByTicketIDs(ids)
 		if err != nil {
 			return nil, nil, err
 		}
-		for i := range items {
-			if name, ok := byID[items[i].ID]; ok && name != "" {
+		for i := range displayItems {
+			if name, ok := byID[displayItems[i].ID]; ok && name != "" {
 				n := name
-				items[i].ServedByName = &n
+				displayItems[i].ServedByName = &n
 			}
 		}
 	}
 	var next *string
-	if len(items) > 0 && len(items) == limit {
-		last := items[len(items)-1]
+	if len(items) > limit {
+		last := displayItems[len(displayItems)-1]
 		s := fmt.Sprintf("%s|%s", last.CreatedAt.Format(time.RFC3339Nano), last.ID)
 		next = &s
 	}
-	return items, next, nil
+	return displayItems, next, nil
 }
 
 func (s *ticketService) enqueueTTS(ticket *models.Ticket, counterID string) {

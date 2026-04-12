@@ -789,6 +789,43 @@ func RunVersionedMigrations(models ...interface{}) error {
 		`).Error; err != nil {
 			return err
 		}
+		// Explicit FKs: columns may exist from AutoMigrate with FK disabled; inline REFERENCES on ADD COLUMN is then a no-op.
+		if err := db.Exec(`
+			DO $$
+			BEGIN
+				IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_services_restricted_service_zone') THEN
+					ALTER TABLE services
+						ADD CONSTRAINT fk_services_restricted_service_zone
+						FOREIGN KEY (restricted_service_zone_id) REFERENCES units(id) ON DELETE SET NULL;
+				END IF;
+			END $$;
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			DO $$
+			BEGIN
+				IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_tickets_service_zone') THEN
+					ALTER TABLE tickets
+						ADD CONSTRAINT fk_tickets_service_zone
+						FOREIGN KEY (service_zone_id) REFERENCES units(id) ON DELETE SET NULL;
+				END IF;
+			END $$;
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			DO $$
+			BEGIN
+				IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_counters_service_zone') THEN
+					ALTER TABLE counters
+						ADD CONSTRAINT fk_counters_service_zone
+						FOREIGN KEY (service_zone_id) REFERENCES units(id) ON DELETE SET NULL;
+				END IF;
+			END $$;
+		`).Error; err != nil {
+			return err
+		}
 		return db.AutoMigrate(&dbmodels.Service{}, &dbmodels.Ticket{}, &dbmodels.Counter{})
 	})
 	if err != nil {

@@ -48,13 +48,16 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
     return () => clearInterval(timer);
   }, []);
 
+  const unitKind = unit?.kind;
+  const unitParentId = unit?.parentId;
+
   // WebSocket + tickets: WS room is always the subdivision (ticket.UnitID); screen URL may be a service_zone.
   useEffect(() => {
-    if (!unitId || !unit) return;
+    if (!unitId || unitKind == null) return;
 
     let cancelled = false;
     const wsRoomId =
-      unit.kind === 'service_zone' && unit.parentId ? unit.parentId : unitId;
+      unitKind === 'service_zone' && unitParentId ? unitParentId : unitId;
 
     const fetchTickets = async () => {
       try {
@@ -96,7 +99,7 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
       socketClient.off('unit.eod', handleEOD);
       socketClient.disconnect();
     };
-  }, [unitId, unit]);
+  }, [unitId, unitKind, unitParentId]);
 
   // Fetch materials
   useEffect(() => {

@@ -444,6 +444,10 @@ function ServiceForm({
     if (!selectedUnitId) return;
 
     try {
+      const isLeafNow = formValues.isLeaf ?? editingService?.isLeaf ?? false;
+      const restrictedPayload = isLeafNow
+        ? (formValues.restrictedServiceZoneId ?? null)
+        : null;
       if (editingService) {
         await updateServiceMutation.mutateAsync({
           id: editingService.id,
@@ -451,7 +455,7 @@ function ServiceForm({
           name: formValues.name || editingService.name,
           prebook: formValues.prebook ?? editingService.prebook ?? false,
           isLeaf: formValues.isLeaf ?? editingService.isLeaf ?? false,
-          restrictedServiceZoneId: formValues.restrictedServiceZoneId ?? null
+          restrictedServiceZoneId: restrictedPayload
         });
       } else {
         if (!formValues.name) return;
@@ -461,7 +465,7 @@ function ServiceForm({
           unitId: selectedUnitId,
           prebook: formValues.prebook ?? false,
           isLeaf: formValues.isLeaf ?? false,
-          restrictedServiceZoneId: formValues.restrictedServiceZoneId ?? null
+          restrictedServiceZoneId: restrictedPayload
         });
       }
       onSaved();
