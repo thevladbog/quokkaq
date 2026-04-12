@@ -253,9 +253,11 @@ func (s *shiftService) GetShiftActivity(unitID string, limit int, cursor string,
 	if len(needActorName) > 0 {
 		m, err := s.userRepo.ResolveJournalActorDisplayNames(needActorName)
 		if err != nil {
-			return nil, err
+			log.Printf("GetShiftActivity: ResolveJournalActorDisplayNames: %v", err)
+			nameByID = nil
+		} else {
+			nameByID = m
 		}
-		nameByID = m
 	}
 	items := make([]ShiftActivityItem, 0, len(rows))
 	for _, row := range rows {

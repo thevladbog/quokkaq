@@ -54,6 +54,8 @@ definitions:
     type: object
   handlers.CreateTicketRequest:
     properties:
+      clientId:
+        type: string
       serviceId:
         type: string
       unitId:
@@ -198,6 +200,7 @@ definitions:
       operatorComment:
         example: VIP, повторный визит
         type: string
+        x-nullable: true
     type: object
   handlers.PatchPlatformCompanyBody:
     properties:
@@ -437,6 +440,9 @@ definitions:
         type: string
       sortOrder:
         type: integer
+    required:
+    - color
+    - label
     type: object
   handlers.patchVisitorTagDefinitionRequest:
     properties:
@@ -507,6 +513,8 @@ definitions:
         items:
           type: string
         type: array
+    required:
+    - operatorComment
     type: object
   handlers.setupFirstAdminRequest:
     properties:
@@ -1298,8 +1306,9 @@ definitions:
       createdAt:
         type: string
       definitions:
-        description: Definitions are visitor tags assigned to this client (excludes
-          anonymous aggregate use in API).
+        description: |-
+          Definitions are visitor tags assigned to this client (excludes anonymous aggregate use in API).
+          Join table FKs are defined in SQL migrations (unit-scoped composites); constraint:false avoids duplicate AutoMigrate constraints.
         items:
           $ref: '#/definitions/models.UnitVisitorTagDefinition'
         type: array
@@ -1457,9 +1466,25 @@ definitions:
       updatedAt:
         type: string
     type: object
+  services.ShiftActivityActorOption:
+    properties:
+      name:
+        type: string
+      userId:
+        type: string
+    type: object
+  services.ShiftActivityActorsResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/services.ShiftActivityActorOption'
+        type: array
+    type: object
   services.ShiftActivityItem:
     properties:
       action:
+        type: string
+      actorName:
         type: string
       createdAt:
         type: string
@@ -2343,6 +2368,10 @@ paths:
             type: string
         "409":
           description: Counter on break
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
           schema:
             type: string
       summary: Call next ticket
@@ -4206,15 +4235,15 @@ paths:
     patch:
       consumes:
       - application/json
-      description: Sets or clears operatorComment. Body must include operatorComment
-        (string or JSON null to clear).
+      description: Body must include operatorComment. Send a string to set the comment,
+        or JSON null to clear it.
       parameters:
       - description: Ticket ID
         in: path
         name: id
         required: true
         type: string
-      - description: Comment body
+      - description: 'operatorComment: string to set, or JSON null to clear'
         in: body
         name: request
         required: true
@@ -4235,6 +4264,8 @@ paths:
           description: Ticket not found
           schema:
             type: string
+      security:
+      - BearerAuth: []
       summary: Update operator comment on ticket
       tags:
       - tickets
@@ -4393,8 +4424,10 @@ paths:
     patch:
       consumes:
       - application/json
-      description: Allowed when status is called or in_service. Send either clientId
-        or firstName, lastName, and phone (creates or links by phone).
+      description: Allowed when status is called or in_service. Send clientId to link
+        an existing visitor; optional firstName/lastName update that client's name.
+        Do not send phone together with clientId. Or send firstName, lastName, and
+        phone (without clientId) to find or create by phone.
       parameters:
       - description: Ticket ID
         in: path
@@ -4685,10 +4718,10 @@ paths:
         name: unitId
         required: true
         type: string
-      - description: Call Next Request
+      - description: Optional counterId plus serviceIds (or legacy serviceId); omit
+          or empty body for defaults
         in: body
         name: request
-        required: true
         schema:
           $ref: '#/definitions/handlers.CallNextRequest'
       produces:
@@ -4863,6 +4896,10 @@ paths:
             type: string
         "403":
           description: Forbidden
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
           schema:
             type: string
       security:
@@ -5258,8 +5295,13 @@ paths:
       - services
   /units/{unitId}/shift/activity:
     get:
-      description: Paginated ticket history rows for tickets belonging to the unit
-        (supervisor dashboard / journal). Limit is capped at 100.
+      description: 'Paginated ticket history rows for tickets belonging to the unit
+        (supervisor dashboard / journal). Limit is capped at 100. Optional filters:
+        counterId (current ticket counter_id), userId (history actor), clientId, ticket
+        (UUID or queue substring), q (search queue/id/visitor name), weekdays (comma-separated
+        PostgreSQL DOW 0=Sun..6=Sat in unit timezone), dateFrom/dateTo (YYYY-MM-DD
+        inclusive, history timestamp calendar date in unit timezone). counter_id reflects
+        the ticket''s current assignment, not necessarily the desk at event time.'
       parameters:
       - description: Unit ID
         in: path
@@ -5273,6 +5315,38 @@ paths:
       - description: Opaque keyset pagination cursor
         in: query
         name: cursor
+        type: string
+      - description: Filter by ticket.counter_id
+        in: query
+        name: counterId
+        type: string
+      - description: Filter by history actor user id
+        in: query
+        name: userId
+        type: string
+      - description: Filter by ticket.client_id
+        in: query
+        name: clientId
+        type: string
+      - description: Ticket UUID or queue number substring
+        in: query
+        name: ticket
+        type: string
+      - description: Search queue number, ticket id, or visitor name
+        in: query
+        name: q
+        type: string
+      - description: Comma-separated DOW 0-6 (unit timezone)
+        in: query
+        name: weekdays
+        type: string
+      - description: Inclusive start date YYYY-MM-DD (unit timezone)
+        in: query
+        name: dateFrom
+        type: string
+      - description: Inclusive end date YYYY-MM-DD (unit timezone)
+        in: query
+        name: dateTo
         type: string
       produces:
       - application/json
@@ -5292,6 +5366,32 @@ paths:
       security:
       - BearerAuth: []
       summary: Shift ticket activity feed
+      tags:
+      - shift
+  /units/{unitId}/shift/activity/actors:
+    get:
+      description: User ids and display names for journal filter dropdown (from ticket_histories
+        in this unit).
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/services.ShiftActivityActorsResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Distinct operators in unit ticket history
       tags:
       - shift
   /units/{unitId}/shift/counters:
@@ -5830,8 +5930,6 @@ paths:
       responses:
         "204":
           description: No Content
-          schema:
-            type: string
         "404":
           description: Not Found
           schema:

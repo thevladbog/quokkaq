@@ -18,7 +18,8 @@ type UnitClient struct {
 
 	Unit Unit `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-" swaggerignore:"true"`
 	// Definitions are visitor tags assigned to this client (excludes anonymous aggregate use in API).
-	Definitions []UnitVisitorTagDefinition `gorm:"many2many:unit_client_tag_assignments;joinForeignKey:unit_client_id;joinReferences:tag_definition_id" json:"definitions,omitempty"`
+	// Join table FKs are defined in SQL migrations (unit-scoped composites); constraint:false avoids duplicate AutoMigrate constraints.
+	Definitions []UnitVisitorTagDefinition `gorm:"many2many:unit_client_tag_assignments;joinForeignKey:unit_client_id;joinReferences:tag_definition_id;constraint:false" json:"definitions,omitempty"`
 }
 
 func (UnitClient) TableName() string {

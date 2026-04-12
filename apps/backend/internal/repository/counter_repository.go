@@ -7,6 +7,7 @@ import (
 	"quokkaq-go-backend/pkg/database"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type CounterRepository interface {
@@ -15,6 +16,7 @@ type CounterRepository interface {
 	FindAllByUnit(unitID string) ([]models.Counter, error)
 	FindByID(id string) (*models.Counter, error)
 	FindByIDTx(tx *gorm.DB, id string) (*models.Counter, error)
+	FindByIDForUpdateTx(tx *gorm.DB, id string) (*models.Counter, error)
 	FindByUserID(userID string) (*models.Counter, error)
 	FindByUserIDTx(tx *gorm.DB, userID string) (*models.Counter, error)
 	Update(counter *models.Counter) error
@@ -65,6 +67,18 @@ func (r *counterRepository) FindByIDTx(tx *gorm.DB, id string) (*models.Counter,
 	return &counter, nil
 }
 
+func (r *counterRepository) FindByIDForUpdateTx(tx *gorm.DB, id string) (*models.Counter, error) {
+	if tx == nil {
+		return nil, errors.New("nil tx provided to FindByIDForUpdateTx")
+	}
+	var counter models.Counter
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&counter, "id = ?", id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &counter, nil
+}
+
 func (r *counterRepository) FindByUserID(userID string) (*models.Counter, error) {
 	return r.FindByUserIDTx(r.db, userID)
 }
@@ -109,6 +123,9 @@ func (r *counterRepository) ReleaseAll(unitID string) (int64, error) {
 }
 
 func (r *counterRepository) ReleaseAllTx(tx *gorm.DB, unitID string) (int64, error) {
+	if tx == nil {
+		return 0, errors.New("nil tx provided to ReleaseAllTx")
+	}
 	result := tx.Model(&models.Counter{}).
 		Where("unit_id = ?", unitID).
 		Updates(map[string]interface{}{

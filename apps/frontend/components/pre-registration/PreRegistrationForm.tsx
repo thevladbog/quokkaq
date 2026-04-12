@@ -161,18 +161,22 @@ export function PreRegistrationForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!customerFirstName.trim() && !customerLastName.trim()) {
+    const trimmedFirstName = customerFirstName.trim();
+    const trimmedLastName = customerLastName.trim();
+    if (!trimmedFirstName && !trimmedLastName) {
       toast.error(
         t('name_required', { defaultValue: 'Enter first or last name' })
       );
       return;
     }
+    setCustomerFirstName(trimmedFirstName);
+    setCustomerLastName(trimmedLastName);
     const data = {
       serviceId,
       date,
       time,
-      customerFirstName,
-      customerLastName,
+      customerFirstName: trimmedFirstName,
+      customerLastName: trimmedLastName,
       customerPhone,
       comment
     };

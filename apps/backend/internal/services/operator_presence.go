@@ -9,11 +9,6 @@ import (
 	"gorm.io/gorm"
 )
 
-func closeOperatorIntervalsForCounterTx(tx *gorm.DB, intervalRepo repository.OperatorIntervalRepository, counterID string, endAt time.Time) error {
-	_, err := intervalRepo.CloseOpenIntervalsForCounterTx(tx, counterID, endAt)
-	return err
-}
-
 func insertOperatorIntervalTx(tx *gorm.DB, intervalRepo repository.OperatorIntervalRepository, unitID, counterID, userID, kind string, startedAt time.Time) error {
 	return intervalRepo.InsertTx(tx, &models.CounterOperatorInterval{
 		UnitID:    unitID,
@@ -58,8 +53,13 @@ func ensureIdleIfCounterAvailableTx(
 	return insertOperatorIntervalTx(tx, intervalRepo, counter.UnitID, counterID, *counter.AssignedTo, models.OperatorIntervalKindIdle, now)
 }
 
+// closeIdleOnCallTx ends only open idle intervals (models.OperatorIntervalKindIdle) when a ticket is called.
+// It uses intervalRepo.CloseOpenIdleIntervalsForCounterTx instead of intervalRepo.CloseOpenIntervalsForCounterTx
+// (previously reached through closeOperatorIntervalsForCounterTx), which would set ended_at on every open row for the
+// counter, including non-idle kinds such as break.
 func closeIdleOnCallTx(tx *gorm.DB, intervalRepo repository.OperatorIntervalRepository, counterID string, now time.Time) error {
-	return closeOperatorIntervalsForCounterTx(tx, intervalRepo, counterID, now)
+	_, err := intervalRepo.CloseOpenIdleIntervalsForCounterTx(tx, counterID, now)
+	return err
 }
 
 func ticketStatusIsActiveAtCounter(status string) bool {

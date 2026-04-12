@@ -13,6 +13,8 @@ import (
 type OperatorIntervalRepository interface {
 	InsertTx(tx *gorm.DB, row *models.CounterOperatorInterval) error
 	CloseOpenIntervalsForCounterTx(tx *gorm.DB, counterID string, endAt time.Time) (int64, error)
+	// CloseOpenIdleIntervalsForCounterTx sets ended_at only on open intervals with kind idle (not break).
+	CloseOpenIdleIntervalsForCounterTx(tx *gorm.DB, counterID string, endAt time.Time) (int64, error)
 	CloseOpenIntervalsForUnitTx(tx *gorm.DB, unitID string, endAt time.Time) (int64, error)
 	HasOpenIntervalForCounterTx(tx *gorm.DB, counterID string) (bool, error)
 	// GetOpenBreakStartTime returns startedAt for the open break interval on this counter, if any.
@@ -40,6 +42,16 @@ func (r *operatorIntervalRepository) CloseOpenIntervalsForCounterTx(tx *gorm.DB,
 	}
 	res := tx.Model(&models.CounterOperatorInterval{}).
 		Where("counter_id = ? AND ended_at IS NULL", counterID).
+		Update("ended_at", endAt)
+	return res.RowsAffected, res.Error
+}
+
+func (r *operatorIntervalRepository) CloseOpenIdleIntervalsForCounterTx(tx *gorm.DB, counterID string, endAt time.Time) (int64, error) {
+	if tx == nil {
+		return 0, errors.New("nil tx for CloseOpenIdleIntervalsForCounterTx")
+	}
+	res := tx.Model(&models.CounterOperatorInterval{}).
+		Where("counter_id = ? AND ended_at IS NULL AND kind = ?", counterID, models.OperatorIntervalKindIdle).
 		Update("ended_at", endAt)
 	return res.RowsAffected, res.Error
 }

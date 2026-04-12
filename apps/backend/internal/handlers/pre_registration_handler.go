@@ -77,7 +77,8 @@ func (h *PreRegistrationHandler) Create(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "customer first name or last name is required", http.StatusBadRequest)
 		return
 	}
-	if _, err := phoneutil.ParseAndNormalize(req.CustomerPhone, phoneutil.DefaultRegion()); err != nil {
+	normalizedPhone, err := phoneutil.ParseAndNormalize(req.CustomerPhone, phoneutil.DefaultRegion())
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -89,7 +90,7 @@ func (h *PreRegistrationHandler) Create(w http.ResponseWriter, r *http.Request) 
 		Time:              req.Time,
 		CustomerFirstName: fn,
 		CustomerLastName:  ln,
-		CustomerPhone:     strings.TrimSpace(req.CustomerPhone),
+		CustomerPhone:     normalizedPhone,
 		Comment:           req.Comment,
 	}
 
@@ -139,7 +140,8 @@ func (h *PreRegistrationHandler) Update(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "customer first name or last name is required", http.StatusBadRequest)
 		return
 	}
-	if _, err := phoneutil.ParseAndNormalize(updateData.CustomerPhone, phoneutil.DefaultRegion()); err != nil {
+	normalizedPhone, err := phoneutil.ParseAndNormalize(updateData.CustomerPhone, phoneutil.DefaultRegion())
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -150,7 +152,7 @@ func (h *PreRegistrationHandler) Update(w http.ResponseWriter, r *http.Request) 
 	existing.Time = updateData.Time
 	existing.CustomerFirstName = fn
 	existing.CustomerLastName = ln
-	existing.CustomerPhone = strings.TrimSpace(updateData.CustomerPhone)
+	existing.CustomerPhone = normalizedPhone
 	existing.Comment = updateData.Comment
 
 	if err := h.service.Update(existing); err != nil {
@@ -267,9 +269,9 @@ func (h *PreRegistrationHandler) Redeem(w http.ResponseWriter, r *http.Request) 
 	ticket, err := h.ticketService.CreateTicketWithPreRegistration(preReg.UnitID, preReg.ServiceID, preReg.ID, nil)
 	if err != nil {
 		if errors.Is(err, phoneutil.ErrInvalidPhone) ||
+			errors.Is(err, services.ErrPreRegistrationPhoneInvalid) ||
 			errors.Is(err, services.ErrDuplicateClientPhone) ||
-			strings.Contains(err.Error(), "pre-registration phone") ||
-			strings.Contains(err.Error(), "customer name is empty") {
+			errors.Is(err, services.ErrCustomerNameEmpty) {
 			RespondJSON(w, models.PreRegistrationRedeemResponse{
 				Success: false,
 				Message: err.Error(),

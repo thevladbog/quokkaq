@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Ticket } from '@/lib/api';
+import { formatFullName } from '@/lib/format';
 import { useTranslations } from 'next-intl';
 import { Calendar, Clock, Phone, User, FileText, Hash } from 'lucide-react';
 
@@ -49,13 +50,10 @@ export function PreRegistrationDetailsModal({
                 {t('customer_name', { defaultValue: 'Customer Name' })}
               </div>
               <div className='text-muted-foreground text-sm'>
-                {[
+                {formatFullName(
                   preRegistration.customerFirstName,
                   preRegistration.customerLastName
-                ]
-                  .map((s) => s?.trim())
-                  .filter(Boolean)
-                  .join(' ') || '—'}
+                )}
               </div>
             </div>
           </div>

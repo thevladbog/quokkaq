@@ -49,6 +49,7 @@ const AppSidebar = () => {
   const tProfile = useTranslations('profile');
   const { user, isAuthenticated, logout } = useAuthContext();
   const pathname = usePathname();
+  const loginNavLabel = tNav('login', { defaultValue: 'Login' });
 
   const isActive = (path: string) => pathname === path;
   const isActiveSub = (path: string) =>
@@ -307,10 +308,10 @@ const AppSidebar = () => {
         ) : (
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip={{ children: 'Login' }}>
+              <SidebarMenuButton asChild tooltip={{ children: loginNavLabel }}>
                 <Link href='/login'>
                   <LogIn />
-                  <span>Login</span>
+                  <span>{loginNavLabel}</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>

@@ -32,7 +32,7 @@ type Ticket struct {
 	Counter *Counter `gorm:"constraint:OnUpdate:CASCADE,OnDelete:SET NULL;" json:"counter,omitempty"`
 	// No DB FK: avoids AutoMigrate cycle with pre_registrations.ticket_id → tickets.id
 	PreRegistration *PreRegistration `gorm:"foreignKey:PreRegistrationID;references:ID;constraint:false" json:"preRegistration,omitempty"`
-	Client          *UnitClient      `gorm:"foreignKey:ClientID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;" json:"client,omitempty"`
+	Client          *UnitClient      `gorm:"foreignKey:ClientID,UnitID;references:ID,UnitID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT" json:"client,omitempty"`
 	Histories       []TicketHistory  `gorm:"foreignKey:TicketID" json:"-"`
 }
 

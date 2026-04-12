@@ -141,7 +141,7 @@ func main() {
 	authService := services.NewAuthService(userRepo, mailService, subscriptionRepo)
 	unitClientRepo := repository.NewUnitClientRepository()
 	visitorTagDefRepo := repository.NewVisitorTagDefinitionRepository()
-	unitClientService := services.NewUnitClientService(unitClientRepo)
+	unitClientService := services.NewUnitClientService(unitClientRepo, database.DB)
 	unitService := services.NewUnitService(unitRepo, unitClientService)
 	visitorTagDefService := services.NewVisitorTagDefinitionService(visitorTagDefRepo)
 	ticketService := services.NewTicketService(ticketRepo, counterRepo, serviceRepo, operatorIntervalRepo, unitClientRepo, visitorTagDefRepo, preRegRepo, hub, jobClient)

@@ -1,12 +1,8 @@
 'use client';
 
 import { VisitorPhotoFrame } from '@/components/staff/VisitorPhotoFrame';
+import type { TFn } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
-
-type TFn = (
-  key: string,
-  values?: Record<string, string | number | Date>
-) => string;
 
 export interface StaffIdleWorkstationHeroProps {
   waitingCount: number;

@@ -22,7 +22,9 @@ func (UnitVisitorTagDefinition) TableName() string {
 }
 
 // UnitClientTagAssignment is the many-to-many join between unit_clients and tag definitions.
+// unit_id duplicates the client's unit and enforces composite FKs so assignments cannot cross units.
 type UnitClientTagAssignment struct {
+	UnitID          string `gorm:"primaryKey;column:unit_id;not null" json:"unitId"`
 	UnitClientID    string `gorm:"primaryKey;column:unit_client_id" json:"unitClientId"`
 	TagDefinitionID string `gorm:"primaryKey;column:tag_definition_id" json:"tagDefinitionId"`
 }

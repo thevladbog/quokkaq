@@ -18,6 +18,7 @@ import {
   DialogTitle
 } from '@/components/ui/dialog';
 import { Ticket } from '@/lib/api';
+import { logger } from '@/lib/logger';
 import { useTicketTimer } from '@/lib/ticket-timer';
 import { StaffServiceScopeSelector } from '@/components/staff/StaffServiceScopeSelector';
 import { StaffCreateTicketModal } from '@/components/staff/StaffCreateTicketModal';
@@ -189,7 +190,12 @@ export function StaffQueuePanel({
                     try {
                       await onPickTicket(ticket);
                     } catch (e) {
-                      console.error('Failed to pick ticket:', e);
+                      logger.error('Failed to pick ticket from staff queue', {
+                        ticketId: ticket.id,
+                        queueNumber: ticket.queueNumber,
+                        serviceId: ticket.serviceId,
+                        error: e
+                      });
                     } finally {
                       setInProgressTicketId(null);
                     }
@@ -197,7 +203,7 @@ export function StaffQueuePanel({
                   disabled={
                     counterOnBreak ||
                     pickPending ||
-                    inProgressTicketId === ticket.id ||
+                    Boolean(inProgressTicketId) ||
                     !!currentTicket
                   }
                   t={t}
@@ -272,6 +278,9 @@ function StaffQueueTicketRow({
     useTicketTimer(ticket.createdAt || undefined, ticket.maxWaitingTime);
   const hasMaxBudget =
     ticket.maxWaitingTime != null && ticket.maxWaitingTime > 0;
+  const preRegistrationDetailsLabel = t('pre_registration.details_title', {
+    defaultValue: 'Pre-registration Details'
+  });
 
   return (
     <div
@@ -330,15 +339,18 @@ function StaffQueueTicketRow({
         <div className='flex items-center gap-1'>
           {ticket.preRegistration && (
             <Button
+              type='button'
               size='sm'
               variant='ghost'
               className='h-8 w-8 p-0'
+              aria-label={preRegistrationDetailsLabel}
+              title={preRegistrationDetailsLabel}
               onClick={(e) => {
                 e.stopPropagation();
                 onShowDetails();
               }}
             >
-              <Info className='h-3.5 w-3.5' />
+              <Info className='h-3.5 w-3.5' aria-hidden />
             </Button>
           )}
           <Button

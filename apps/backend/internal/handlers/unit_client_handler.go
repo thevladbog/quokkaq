@@ -3,7 +3,6 @@ package handlers
 import (
 	"errors"
 	"net/http"
-	"strconv"
 
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/services"
@@ -42,6 +41,7 @@ type ClientVisitsResponse struct {
 // @Failure      400    {string}  string "Bad Request"
 // @Failure      401    {string}  string "Unauthorized"
 // @Failure      403    {string}  string "Forbidden"
+// @Failure      500    {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/clients/search [get]
 func (h *UnitClientHandler) SearchClients(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
@@ -80,12 +80,7 @@ func (h *UnitClientHandler) SearchClients(w http.ResponseWriter, r *http.Request
 func (h *UnitClientHandler) ListClientVisits(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
 	clientID := chi.URLParam(r, "clientId")
-	limit := 20
-	if ls := r.URL.Query().Get("limit"); ls != "" {
-		if n, err := strconv.Atoi(ls); err == nil && n > 0 {
-			limit = n
-		}
-	}
+	limit := clampQueryPageLimit(r.URL.Query().Get("limit"))
 	var cursor *string
 	if c := r.URL.Query().Get("cursor"); c != "" {
 		cursor = &c

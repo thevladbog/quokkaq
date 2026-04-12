@@ -94,11 +94,26 @@ var ErrTicketVisitorWrongStatus = errors.New("visitor can only be updated while 
 // ErrVisitorAnonymousNotAllowed is returned when assigning the unit anonymous aggregate client to a ticket.
 var ErrVisitorAnonymousNotAllowed = errors.New("cannot assign anonymous client to ticket")
 
+// ErrVisitorMutuallyExclusive is returned when PATCH visitor sends both clientId and phone.
+var ErrVisitorMutuallyExclusive = errors.New("cannot provide both clientId and phone")
+
+// ErrVisitorPayloadInvalid is returned when PATCH visitor omits both clientId and phone (with required name context for phone path).
+var ErrVisitorPayloadInvalid = errors.New("provide either clientId or phone with first and last name")
+
+// ErrVisitorNameRequired is returned when a name-bearing path would leave the visitor without first or last name.
+var ErrVisitorNameRequired = errors.New("first name or last name is required")
+
 // ErrTicketCreateClientNotInUnit is returned when staff passes a clientId that is missing or belongs to another unit.
 var ErrTicketCreateClientNotInUnit = errors.New("client not found in this unit")
 
 // ErrDuplicateClientPhone is returned on unique phone violation when creating a unit client.
 var ErrDuplicateClientPhone = errors.New("a client with this phone number already exists")
+
+// ErrPreRegistrationPhoneInvalid wraps phone parse/normalize failures when issuing a ticket from a pre-registration.
+var ErrPreRegistrationPhoneInvalid = errors.New("invalid pre-registration phone number")
+
+// ErrCustomerNameEmpty is returned when a new unit client would be created from a pre-registration but both names are empty after trim.
+var ErrCustomerNameEmpty = errors.New("pre-registration customer name is empty")
 
 // ErrVisitorTagsCommentRequired is returned when operatorComment is empty after trim.
 var ErrVisitorTagsCommentRequired = errors.New("operatorComment is required")
@@ -226,14 +241,14 @@ func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID 
 		if preReg != nil {
 			phoneE164, err := phoneutil.ParseAndNormalize(preReg.CustomerPhone, phoneutil.DefaultRegion())
 			if err != nil {
-				return fmt.Errorf("pre-registration phone: %w", err)
+				return fmt.Errorf("%w: %w", ErrPreRegistrationPhoneInvalid, err)
 			}
 			c, err := s.clientRepo.FindByUnitAndPhoneE164Tx(tx, unitID, phoneE164)
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				fn := strings.TrimSpace(preReg.CustomerFirstName)
 				ln := strings.TrimSpace(preReg.CustomerLastName)
 				if fn == "" && ln == "" {
-					return errors.New("pre-registration customer name is empty")
+					return ErrCustomerNameEmpty
 				}
 				ph := phoneE164
 				c = &models.UnitClient{
@@ -315,13 +330,8 @@ func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID 
 }
 
 func isUniqueViolation(err error) bool {
-	for e := err; e != nil; e = errors.Unwrap(e) {
-		var pe *pgconn.PgError
-		if errors.As(e, &pe) && pe.Code == "23505" {
-			return true
-		}
-	}
-	return false
+	var pe *pgconn.PgError
+	return errors.As(err, &pe) && pe.Code == "23505"
 }
 
 func (s *ticketService) GetTicketByID(id string) (*models.Ticket, error) {
@@ -333,17 +343,6 @@ func (s *ticketService) GetTicketsByUnit(unitID string) ([]models.Ticket, error)
 }
 
 func (s *ticketService) CallNext(unitID, counterID string, serviceIDs []string, actorUserID *string) (*models.Ticket, error) {
-	counter, err := s.counterRepo.FindByID(counterID)
-	if err != nil {
-		return nil, err
-	}
-	if counter.OnBreak {
-		return nil, ErrCounterOnBreak
-	}
-	if counter.UnitID != unitID {
-		return nil, errors.New("counter does not belong to this unit")
-	}
-
 	if len(serviceIDs) > 0 {
 		n, err := s.serviceRepo.CountByUnitAndIDs(unitID, serviceIDs)
 		if err != nil {
@@ -355,9 +354,23 @@ func (s *ticketService) CallNext(unitID, counterID string, serviceIDs []string, 
 	}
 
 	var ticket *models.Ticket
-	err = s.repo.Transaction(func(tx *gorm.DB) error {
+	err := s.repo.Transaction(func(tx *gorm.DB) error {
+		c, err := s.counterRepo.FindByIDForUpdateTx(tx, counterID)
+		if err != nil {
+			return err
+		}
+		if c.OnBreak {
+			return ErrCounterOnBreak
+		}
+		if c.UnitID != unitID {
+			return errors.New("counter does not belong to this unit")
+		}
+
 		t, err := s.repo.FindWaitingForUpdateTx(tx, unitID, serviceIDs)
 		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrNoWaitingTickets
+			}
 			return err
 		}
 		ticket = t
@@ -387,7 +400,10 @@ func (s *ticketService) CallNext(unitID, counterID string, serviceIDs []string, 
 		return s.writeTicketHistoryTx(tx, ticket.ID, actorUserID, ticketaudit.ActionTicketCalled, payload)
 	})
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if errors.Is(err, ErrCounterOnBreak) {
+			return nil, ErrCounterOnBreak
+		}
+		if errors.Is(err, ErrNoWaitingTickets) {
 			return nil, ErrNoWaitingTickets
 		}
 		return nil, err
@@ -490,16 +506,16 @@ func (s *ticketService) Recall(ticketID string, actorUserID *string) (*models.Ti
 }
 
 func (s *ticketService) Pick(ticketID, counterID string, actorUserID *string) (*models.Ticket, error) {
-	counter, err := s.counterRepo.FindByID(counterID)
-	if err != nil {
-		return nil, err
-	}
-	if counter.OnBreak {
-		return nil, ErrCounterOnBreak
-	}
-
 	var ticket *models.Ticket
-	err = s.repo.Transaction(func(tx *gorm.DB) error {
+	err := s.repo.Transaction(func(tx *gorm.DB) error {
+		c, err := s.counterRepo.FindByIDForUpdateTx(tx, counterID)
+		if err != nil {
+			return err
+		}
+		if c.OnBreak {
+			return ErrCounterOnBreak
+		}
+
 		t, err := s.repo.FindByIDForUpdateTx(tx, ticketID)
 		if err != nil {
 			return err
@@ -720,10 +736,10 @@ func (s *ticketService) UpdateTicketVisitor(ticketID string, in PatchTicketVisit
 	hasPhone := phoneTrim != ""
 
 	if hasClient && hasPhone {
-		return nil, errors.New("cannot provide both clientId and phone")
+		return nil, ErrVisitorMutuallyExclusive
 	}
 	if !hasClient && !hasPhone {
-		return nil, errors.New("provide either clientId or phone with first and last name")
+		return nil, ErrVisitorPayloadInvalid
 	}
 
 	fn := ""
@@ -735,7 +751,7 @@ func (s *ticketService) UpdateTicketVisitor(ticketID string, in PatchTicketVisit
 		ln = strings.TrimSpace(*in.LastName)
 	}
 	if hasPhone && fn == "" && ln == "" {
-		return nil, errors.New("first name or last name is required")
+		return nil, ErrVisitorNameRequired
 	}
 
 	var ticket *models.Ticket
@@ -778,7 +794,7 @@ func (s *ticketService) UpdateTicketVisitor(ticketID string, in PatchTicketVisit
 					newLast = ln
 				}
 				if strings.TrimSpace(newFirst) == "" && strings.TrimSpace(newLast) == "" {
-					return errors.New("first name or last name is required")
+					return ErrVisitorNameRequired
 				}
 				if err := s.clientRepo.UpdateNamesTx(tx, c.ID, newFirst, newLast); err != nil {
 					return err
@@ -889,7 +905,7 @@ func (s *ticketService) SetVisitorTagsForTicket(ticketID string, tagDefinitionID
 			return err
 		}
 		sort.Strings(fromIDs)
-		if err := s.clientRepo.ReplaceClientTagAssignmentsTx(tx, client.ID, unique); err != nil {
+		if err := s.clientRepo.ReplaceClientTagAssignmentsTx(tx, client.UnitID, client.ID, unique); err != nil {
 			return err
 		}
 

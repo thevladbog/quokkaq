@@ -30,6 +30,9 @@ func parseWeekdaysQuery(s string) []int {
 		if err != nil {
 			continue
 		}
+		if n < 0 || n > 6 {
+			continue
+		}
 		out = append(out, n)
 	}
 	return out
@@ -177,12 +180,7 @@ func (h *ShiftHandler) GetShiftCounters(w http.ResponseWriter, r *http.Request) 
 // @Router       /units/{unitId}/shift/activity [get]
 func (h *ShiftHandler) GetShiftActivity(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
-	limit := 20
-	if l := r.URL.Query().Get("limit"); l != "" {
-		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 {
-			limit = parsed
-		}
-	}
+	limit := clampQueryPageLimit(r.URL.Query().Get("limit"))
 	cursor := r.URL.Query().Get("cursor")
 	filters := parseShiftActivityFilters(r)
 	resp, err := h.service.GetShiftActivity(unitID, limit, cursor, filters)

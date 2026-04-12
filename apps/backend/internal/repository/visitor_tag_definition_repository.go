@@ -78,7 +78,7 @@ func (r *visitorTagDefinitionRepository) CountInUnitWithIDs(unitID string, ids [
 
 func (r *visitorTagDefinitionRepository) ListByIDsInUnitTx(tx *gorm.DB, unitID string, ids []string) ([]models.UnitVisitorTagDefinition, error) {
 	if len(ids) == 0 {
-		return nil, nil
+		return []models.UnitVisitorTagDefinition{}, nil
 	}
 	if tx == nil {
 		return nil, errors.New("nil tx in ListByIDsInUnitTx")

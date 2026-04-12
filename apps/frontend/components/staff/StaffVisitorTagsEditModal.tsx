@@ -34,7 +34,24 @@ export interface StaffVisitorTagsEditModalProps {
   t: TFn;
 }
 
-export function StaffVisitorTagsEditModal({
+function visitorTagsModalRemountKey(
+  client: NonNullable<Ticket['client']>
+): string {
+  const defIds = [...(client.definitions ?? []).map((d) => d.id)]
+    .sort()
+    .join(',');
+  return `${client.id}:${defIds}`;
+}
+
+/** Resets draft state when `client` or `client.definitions` change (inner remount). */
+export function StaffVisitorTagsEditModal(
+  props: StaffVisitorTagsEditModalProps
+) {
+  const k = visitorTagsModalRemountKey(props.client);
+  return <StaffVisitorTagsEditModalInner key={k} {...props} />;
+}
+
+function StaffVisitorTagsEditModalInner({
   open,
   onOpenChange,
   unitId,

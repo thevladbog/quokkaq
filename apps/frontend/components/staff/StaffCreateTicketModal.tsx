@@ -44,11 +44,11 @@ export interface StaffCreateTicketModalProps {
 }
 
 function formatVisitorChip(c: UnitClient): string {
-  const name = [c.firstName, c.lastName]
+  const name = [c.firstName ?? '', c.lastName ?? '']
     .map((s) => s.trim())
     .filter(Boolean)
     .join(' ');
-  const phone = c.phoneE164?.trim();
+  const phone = (c.phoneE164 ?? '').trim();
   if (name && phone) return `${name} · ${phone}`;
   return name || phone || '—';
 }
@@ -69,6 +69,18 @@ export function StaffCreateTicketModal({
   const [visitorPopoverOpen, setVisitorPopoverOpen] = useState(false);
   const [visitorQuery, setVisitorQuery] = useState('');
   const [debouncedVisitorQ, setDebouncedVisitorQ] = useState('');
+
+  useEffect(() => {
+    if (!open) return;
+    // Clear stale service/visitor/search when the dialog opens (belt-and-suspenders with parent key remount).
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setServiceId('');
+    setSelectedVisitor(null);
+    setVisitorPopoverOpen(false);
+    setVisitorQuery('');
+    setDebouncedVisitorQ('');
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [open]);
 
   useEffect(() => {
     const timerId = window.setTimeout(
@@ -215,7 +227,7 @@ export function StaffCreateTicketModal({
                             }}
                           >
                             <span className='block truncate font-medium'>
-                              {[c.firstName, c.lastName]
+                              {[c.firstName ?? '', c.lastName ?? '']
                                 .map((s) => s.trim())
                                 .filter(Boolean)
                                 .join(' ') || '—'}

@@ -2,6 +2,7 @@
 
 import { useTranslations, useLocale } from 'next-intl';
 import { useQuery } from '@tanstack/react-query';
+import { formatFullName } from '@/lib/format';
 import { formatAppDate, intlLocaleFromAppLocale } from '@/lib/format-datetime';
 import { Edit, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -164,10 +165,10 @@ export function PreRegistrationTable({
               <TableCell>
                 <div className='flex flex-col'>
                   <span>
-                    {[preReg.customerFirstName, preReg.customerLastName]
-                      .map((s) => s?.trim())
-                      .filter(Boolean)
-                      .join(' ') || '—'}
+                    {formatFullName(
+                      preReg.customerFirstName,
+                      preReg.customerLastName
+                    )}
                   </span>
                   <span className='text-muted-foreground text-xs'>
                     {preReg.customerPhone}

@@ -10,7 +10,8 @@
     "active_unit": "Active unit",
     "active_unit_placeholder": "Select unit",
     "sidebar_collapse": "Collapse menu",
-    "sidebar_expand": "Expand menu"
+    "sidebar_expand": "Expand menu",
+    "login": "Login"
   },
   "home": {
     "title": "QuokkaQ",
@@ -1117,6 +1118,7 @@
       "activityPendingScope": "Select a workplace above or wait for the list to load.",
       "activityEmpty": "No ticket events for this unit yet.",
       "activityError": "Could not load events: {message}",
+      "activityUnknownTimestamp": "Unknown time",
       "activityFullLog": "Full log",
       "journalTitle": "Event log",
       "journalDescription": "Ticket transition history (audit trail).",

@@ -1280,6 +1280,12 @@ const docTemplate = `{
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 }
             }
@@ -4135,7 +4141,12 @@ const docTemplate = `{
         },
         "/tickets/{id}/operator-comment": {
             "patch": {
-                "description": "Sets or clears operatorComment. Body must include operatorComment (string or JSON null to clear).",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Body must include operatorComment. Send a string to set the comment, or JSON null to clear it.",
                 "consumes": [
                     "application/json"
                 ],
@@ -4155,7 +4166,7 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "Comment body",
+                        "description": "operatorComment: string to set, or JSON null to clear",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -4422,7 +4433,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Allowed when status is called or in_service. Send either clientId or firstName, lastName, and phone (creates or links by phone).",
+                "description": "Allowed when status is called or in_service. Send clientId to link an existing visitor; optional firstName/lastName update that client's name. Do not send phone together with clientId. Or send firstName, lastName, and phone (without clientId) to find or create by phone.",
                 "consumes": [
                     "application/json"
                 ],
@@ -4864,10 +4875,9 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "Call Next Request",
+                        "description": "Optional counterId plus serviceIds (or legacy serviceId); omit or empty body for defaults",
                         "name": "request",
                         "in": "body",
-                        "required": true,
                         "schema": {
                             "$ref": "#/definitions/handlers.CallNextRequest"
                         }
@@ -5054,6 +5064,12 @@ const docTemplate = `{
                     },
                     "403": {
                         "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "type": "string"
                         }
@@ -5722,7 +5738,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Paginated ticket history rows for tickets belonging to the unit (supervisor dashboard / journal). Limit is capped at 100.",
+                "description": "Paginated ticket history rows for tickets belonging to the unit (supervisor dashboard / journal). Limit is capped at 100. Optional filters: counterId (current ticket counter_id), userId (history actor), clientId, ticket (UUID or queue substring), q (search queue/id/visitor name), weekdays (comma-separated PostgreSQL DOW 0=Sun..6=Sat in unit timezone), dateFrom/dateTo (YYYY-MM-DD inclusive, history timestamp calendar date in unit timezone). counter_id reflects the ticket's current assignment, not necessarily the desk at event time.",
                 "produces": [
                     "application/json"
                 ],
@@ -5749,6 +5765,54 @@ const docTemplate = `{
                         "description": "Opaque keyset pagination cursor",
                         "name": "cursor",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by ticket.counter_id",
+                        "name": "counterId",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by history actor user id",
+                        "name": "userId",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by ticket.client_id",
+                        "name": "clientId",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Ticket UUID or queue number substring",
+                        "name": "ticket",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Search queue number, ticket id, or visitor name",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Comma-separated DOW 0-6 (unit timezone)",
+                        "name": "weekdays",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Inclusive start date YYYY-MM-DD (unit timezone)",
+                        "name": "dateFrom",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Inclusive end date YYYY-MM-DD (unit timezone)",
+                        "name": "dateTo",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -5762,6 +5826,46 @@ const docTemplate = `{
                         "description": "Bad Request",
                         "schema": {
                             "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/units/{unitId}/shift/activity/actors": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "User ids and display names for journal filter dropdown (from ticket_histories in this unit).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "shift"
+                ],
+                "summary": "Distinct operators in unit ticket history",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Unit ID",
+                        "name": "unitId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/services.ShiftActivityActorsResponse"
                         }
                     },
                     "500": {
@@ -6593,10 +6697,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "204": {
-                        "description": "No Content",
-                        "schema": {
-                            "type": "string"
-                        }
+                        "description": "No Content"
                     },
                     "404": {
                         "description": "Not Found",
@@ -7216,6 +7317,9 @@ const docTemplate = `{
         "handlers.CreateTicketRequest": {
             "type": "object",
             "properties": {
+                "clientId": {
+                    "type": "string"
+                },
                 "serviceId": {
                     "type": "string"
                 },
@@ -7421,6 +7525,7 @@ const docTemplate = `{
             "properties": {
                 "operatorComment": {
                     "type": "string",
+                    "x-nullable": true,
                     "example": "VIP, повторный визит"
                 }
             }
@@ -7779,6 +7884,10 @@ const docTemplate = `{
         },
         "handlers.createVisitorTagDefinitionRequest": {
             "type": "object",
+            "required": [
+                "color",
+                "label"
+            ],
             "properties": {
                 "color": {
                     "type": "string"
@@ -7887,6 +7996,9 @@ const docTemplate = `{
         },
         "handlers.putVisitorTagsRequest": {
             "type": "object",
+            "required": [
+                "operatorComment"
+            ],
             "properties": {
                 "operatorComment": {
                     "type": "string"
@@ -9069,7 +9181,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "definitions": {
-                    "description": "Definitions are visitor tags assigned to this client (excludes anonymous aggregate use in API).",
+                    "description": "Definitions are visitor tags assigned to this client (excludes anonymous aggregate use in API).\nJoin table FKs are defined in SQL migrations (unit-scoped composites); constraint:false avoids duplicate AutoMigrate constraints.",
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/models.UnitVisitorTagDefinition"
@@ -9305,10 +9417,35 @@ const docTemplate = `{
                 }
             }
         },
+        "services.ShiftActivityActorOption": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "userId": {
+                    "type": "string"
+                }
+            }
+        },
+        "services.ShiftActivityActorsResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/services.ShiftActivityActorOption"
+                    }
+                }
+            }
+        },
         "services.ShiftActivityItem": {
             "type": "object",
             "properties": {
                 "action": {
+                    "type": "string"
+                },
+                "actorName": {
                     "type": "string"
                 },
                 "createdAt": {

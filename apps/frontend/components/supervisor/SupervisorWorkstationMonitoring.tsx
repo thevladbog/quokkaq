@@ -77,7 +77,7 @@ function ticketVisitorDisplayName(ticket: Ticket): string | null {
   const c = ticket.client;
   if (c && !c.isAnonymous) {
     const name = [c.firstName, c.lastName]
-      .map((s) => s.trim())
+      .map((s) => (s ?? '').trim())
       .filter(Boolean)
       .join(' ');
     if (name.length > 0) return name;
@@ -85,7 +85,7 @@ function ticketVisitorDisplayName(ticket: Ticket): string | null {
   const pr = ticket.preRegistration;
   if (pr) {
     const name = [pr.customerFirstName, pr.customerLastName]
-      .map((s) => s.trim())
+      .map((s) => (s ?? '').trim())
       .filter(Boolean)
       .join(' ');
     if (name.length > 0) return name;

@@ -1,4 +1,7 @@
 // Package ticketduration defines duration calculations aligned with supervisor UI (see apps/frontend supervisor-queue-utils).
+//
+// TODO: Wire these into ticket/shift HTTP DTOs when the API should return server-computed wait/service seconds
+// (e.g. journal exports or kiosk) instead of duplicating logic in clients.
 package ticketduration
 
 import (
@@ -13,12 +16,11 @@ func QueueWaitSeconds(t *models.Ticket) (int, bool) {
 	if t == nil || t.CalledAt == nil {
 		return 0, false
 	}
-	start := t.CreatedAt.Unix()
-	called := t.CalledAt.Unix()
-	if called < start {
+	if t.CalledAt.Before(t.CreatedAt) {
 		return 0, false
 	}
-	return int(called - start), true
+	d := t.CalledAt.Sub(t.CreatedAt)
+	return int(d / time.Second), true
 }
 
 // ServiceSeconds is seconds from in_service (confirmed_at) until service end (completed_at), floored, non-negative.
@@ -27,12 +29,11 @@ func ServiceSeconds(t *models.Ticket) (int, bool) {
 	if t == nil || t.ConfirmedAt == nil || t.CompletedAt == nil {
 		return 0, false
 	}
-	a := t.ConfirmedAt.Unix()
-	b := t.CompletedAt.Unix()
-	if b < a {
+	if t.CompletedAt.Before(*t.ConfirmedAt) {
 		return 0, false
 	}
-	return int(b - a), true
+	d := t.CompletedAt.Sub(*t.ConfirmedAt)
+	return int(d / time.Second), true
 }
 
 // IntervalSeconds returns floor(max(0, end-start)) in seconds for operator idle/break intervals (same discretization as TS floor).

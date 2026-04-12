@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	"quokkaq-go-backend/internal/config"
@@ -118,7 +119,9 @@ func main() {
 		PhoneE164:   nil,
 		IsAnonymous: true,
 	}
-	database.DB.Create(&anonymousClient)
+	if err := database.DB.Create(&anonymousClient).Error; err != nil {
+		log.Fatalf("seed: create anonymous unit client: %v", err)
+	}
 	fmt.Println("Created anonymous unit client for kiosk tickets")
 
 	// Create roles
@@ -238,7 +241,9 @@ func main() {
 		CreatedAt:   now,
 		ClientID:    &anonymousClient.ID,
 	}
-	database.DB.Create(&ticket1)
+	if err := database.DB.Create(&ticket1).Error; err != nil {
+		log.Fatalf("seed: create sample ticket %s: %v", ticket1.QueueNumber, err)
+	}
 
 	ticket2 := models.Ticket{
 		UnitID:      unit.ID,
@@ -248,7 +253,9 @@ func main() {
 		CreatedAt:   now.Add(1 * time.Minute),
 		ClientID:    &anonymousClient.ID,
 	}
-	database.DB.Create(&ticket2)
+	if err := database.DB.Create(&ticket2).Error; err != nil {
+		log.Fatalf("seed: create sample ticket %s: %v", ticket2.QueueNumber, err)
+	}
 
 	ticket3 := models.Ticket{
 		UnitID:      unit.ID,
@@ -258,7 +265,9 @@ func main() {
 		CreatedAt:   now.Add(2 * time.Minute),
 		ClientID:    &anonymousClient.ID,
 	}
-	database.DB.Create(&ticket3)
+	if err := database.DB.Create(&ticket3).Error; err != nil {
+		log.Fatalf("seed: create sample ticket %s: %v", ticket3.QueueNumber, err)
+	}
 
 	fmt.Println("Created 3 sample tickets")
 

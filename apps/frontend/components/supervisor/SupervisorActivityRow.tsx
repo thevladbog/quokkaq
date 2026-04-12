@@ -31,9 +31,22 @@ export function SupervisorActivityRow({
     line,
     iconClassName
   } = getSupervisorActivityPresentation(item, t);
-  const when = format(new Date(item.createdAt), timeFormat, {
-    locale: dateLocale
-  });
+  const createdRaw =
+    typeof item.createdAt === 'string' ? item.createdAt.trim() : '';
+  let when: string;
+  if (!createdRaw) {
+    when = t('activityUnknownTimestamp');
+  } else {
+    const ts = Date.parse(createdRaw);
+    if (Number.isNaN(ts)) {
+      when = t('activityUnknownTimestamp');
+    } else {
+      const d = new Date(ts);
+      when = Number.isNaN(d.getTime())
+        ? t('activityUnknownTimestamp')
+        : format(d, timeFormat, { locale: dateLocale });
+    }
+  }
   const actorLine =
     item.actorName && item.actorName.trim()
       ? t('activityActor', { name: item.actorName.trim() })

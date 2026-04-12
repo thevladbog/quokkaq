@@ -437,6 +437,17 @@ func (s *counterService) CallNext(counterID string, serviceIDs []string, actorUs
 		return nil, err
 	}
 
-	s.broadcastCounterUpdated(counter)
+	updatedCounter, err := s.repo.FindByID(counterID)
+	if err != nil {
+		return nil, err
+	}
+	if updatedCounter.AssignedTo != nil {
+		user, uerr := s.userRepo.FindByID(*updatedCounter.AssignedTo)
+		if uerr == nil {
+			updatedCounter.AssignedUser = user
+		}
+	}
+	s.hydrateBreakStartedAt(updatedCounter)
+	s.broadcastCounterUpdated(updatedCounter)
 	return ticket, nil
 }

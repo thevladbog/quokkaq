@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/nyaruka/phonenumbers"
 )
@@ -12,13 +13,23 @@ import (
 // ErrInvalidPhone is returned when the number cannot be parsed or is not a valid E.164 number.
 var ErrInvalidPhone = errors.New("invalid phone number")
 
+var (
+	defaultRegionOnce sync.Once
+	defaultRegion     string
+)
+
 // DefaultRegion returns PHONE_DEFAULT_REGION or "RU" for parsing national-format numbers.
+// The value is read from the environment once on first use.
 func DefaultRegion() string {
-	r := strings.TrimSpace(os.Getenv("PHONE_DEFAULT_REGION"))
-	if r == "" {
-		return "RU"
-	}
-	return strings.ToUpper(r)
+	defaultRegionOnce.Do(func() {
+		r := strings.TrimSpace(os.Getenv("PHONE_DEFAULT_REGION"))
+		if r == "" {
+			defaultRegion = "RU"
+			return
+		}
+		defaultRegion = strings.ToUpper(r)
+	})
+	return defaultRegion
 }
 
 // ParseAndNormalize parses input and returns E.164 (e.g. +79001234567).

@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strings"
 
 	"quokkaq-go-backend/internal/phoneutil"
+	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
 
 	"github.com/go-chi/chi/v5"
@@ -122,7 +124,7 @@ type CallNextRequest struct {
 // @Accept       json
 // @Produce      json
 // @Param        unitId  path      string           true  "Unit ID"
-// @Param        request body      CallNextRequest  true  "Call Next Request"
+// @Param        request body      CallNextRequest  false "Optional counterId plus serviceIds (or legacy serviceId); omit or empty body for defaults"
 // @Success      200     {object}  models.Ticket
 // @Failure      400     {string}  string "Bad Request"
 // @Failure      404     {string}  string "No waiting tickets"
@@ -131,7 +133,7 @@ type CallNextRequest struct {
 func (h *TicketHandler) CallNext(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
 	var req CallNextRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -194,18 +196,20 @@ func (h *TicketHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 // OperatorCommentPatchDTO documents the JSON body for PATCH /tickets/{id}/operator-comment (Swagger only).
+// operatorComment must be present: use a string to set the comment, or JSON null to clear it.
 type OperatorCommentPatchDTO struct {
-	OperatorComment *string `json:"operatorComment" example:"VIP, повторный визит"`
+	OperatorComment *string `json:"operatorComment" example:"VIP, повторный визит" extensions:"x-nullable"`
 }
 
 // UpdateOperatorComment godoc
 // @Summary      Update operator comment on ticket
-// @Description  Sets or clears operatorComment. Body must include operatorComment (string or JSON null to clear).
+// @Description  Body must include operatorComment. Send a string to set the comment, or JSON null to clear it.
 // @Tags         tickets
 // @Accept       json
 // @Produce      json
+// @Security     BearerAuth
 // @Param        id      path      string                   true  "Ticket ID"
-// @Param        request body      OperatorCommentPatchDTO  true  "Comment body"
+// @Param        request body      OperatorCommentPatchDTO  true  "operatorComment: string to set, or JSON null to clear"
 // @Success      200     {object}  models.Ticket
 // @Failure      400     {string}  string "Bad Request"
 // @Failure      404     {string}  string "Ticket not found"
@@ -405,21 +409,21 @@ func (h *TicketHandler) UpdateTicketVisitor(w http.ResponseWriter, r *http.Reque
 			errors.Is(err, services.ErrVisitorAnonymousNotAllowed),
 			errors.Is(err, services.ErrDuplicateClientPhone):
 			http.Error(w, err.Error(), http.StatusConflict)
-		case errors.Is(err, gorm.ErrRecordNotFound):
+		case errors.Is(err, gorm.ErrRecordNotFound),
+			errors.Is(err, repository.ErrNoNamedUnitClientUpdated):
 			http.Error(w, err.Error(), http.StatusNotFound)
 		default:
 			if errors.Is(err, phoneutil.ErrInvalidPhone) {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
-			msg := err.Error()
-			if strings.Contains(msg, "provide either") ||
-				strings.Contains(msg, "first name or last name") ||
-				strings.Contains(msg, "cannot provide both") {
-				http.Error(w, msg, http.StatusBadRequest)
+			if errors.Is(err, services.ErrVisitorMutuallyExclusive) ||
+				errors.Is(err, services.ErrVisitorPayloadInvalid) ||
+				errors.Is(err, services.ErrVisitorNameRequired) {
+				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
-			http.Error(w, msg, http.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return
 	}
@@ -428,7 +432,7 @@ func (h *TicketHandler) UpdateTicketVisitor(w http.ResponseWriter, r *http.Reque
 
 type putVisitorTagsRequest struct {
 	TagDefinitionIDs []string `json:"tagDefinitionIds"`
-	OperatorComment  string   `json:"operatorComment"`
+	OperatorComment  string   `json:"operatorComment" binding:"required"`
 }
 
 // SetVisitorTags godoc

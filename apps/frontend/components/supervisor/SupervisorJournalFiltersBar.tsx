@@ -45,6 +45,14 @@ const JOURNAL_WEEKDAY_KEYS = {
   6: 'journalWeekday6'
 } as const satisfies Record<number, string>;
 
+type JournalWeekdayDOW = keyof typeof JOURNAL_WEEKDAY_KEYS;
+
+function isJournalWeekdayDOW(d: number): d is JournalWeekdayDOW {
+  return (
+    d === 0 || d === 1 || d === 2 || d === 3 || d === 4 || d === 5 || d === 6
+  );
+}
+
 const ALL_MENU_ORDER = [
   'counter',
   'operator',
@@ -269,7 +277,9 @@ export function SupervisorJournalFiltersBar({
           return `${t('journalFilterWeekdays')}: ${t('journalFilterNotSet')}`;
         }
         const sorted = [...draft.weekdays].sort((a, b) => a - b);
-        const parts = sorted.map((d) => t(JOURNAL_WEEKDAY_KEYS[d]));
+        const parts = sorted
+          .filter(isJournalWeekdayDOW)
+          .map((d) => t(JOURNAL_WEEKDAY_KEYS[d]));
         return `${t('journalFilterWeekdays')}: ${parts.join(', ')}`;
       }
       case 'daterange': {
@@ -278,12 +288,10 @@ export function SupervisorJournalFiltersBar({
         if (!a && !b) {
           return `${t('journalFilterDateRange')}: ${t('journalFilterNotSet')}`;
         }
-        const fa = a
-          ? format(parseYmdLocal(a)!, 'P', { locale: dateLocale })
-          : '…';
-        const fb = b
-          ? format(parseYmdLocal(b)!, 'P', { locale: dateLocale })
-          : '…';
+        const parsedA = a ? parseYmdLocal(a) : undefined;
+        const parsedB = b ? parseYmdLocal(b) : undefined;
+        const fa = parsedA ? format(parsedA, 'P', { locale: dateLocale }) : '…';
+        const fb = parsedB ? format(parsedB, 'P', { locale: dateLocale }) : '…';
         if (a && b && a === b) {
           return `${t('journalFilterDateRange')}: ${fa}`;
         }

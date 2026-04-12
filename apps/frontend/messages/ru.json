@@ -10,7 +10,8 @@
     "active_unit": "Активное подразделение",
     "active_unit_placeholder": "Выберите подразделение",
     "sidebar_collapse": "Свернуть меню",
-    "sidebar_expand": "Развернуть меню"
+    "sidebar_expand": "Развернуть меню",
+    "login": "Войти"
   },
   "home": {
     "title": "QuokkaQ",
@@ -1117,6 +1118,7 @@
       "activityPendingScope": "Выберите рабочее место выше или дождитесь загрузки списка.",
       "activityEmpty": "Пока нет событий по талонам в этом юните.",
       "activityError": "Не удалось загрузить события: {message}",
+      "activityUnknownTimestamp": "Неизвестное время",
       "activityFullLog": "Полный журнал",
       "journalTitle": "Журнал событий",
       "journalDescription": "История переходов талонов (аудит).",

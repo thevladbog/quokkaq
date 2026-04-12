@@ -116,6 +116,21 @@ export function SidebarActiveUnitSelect({ className }: { className?: string }) {
   );
 
   if (desktopCollapsed) {
+    if (disabled) {
+      return (
+        <div className='flex w-full justify-center px-0 pb-1'>
+          <SidebarMenuButton
+            type='button'
+            disabled
+            aria-disabled
+            aria-label={`${tooltipTitle}. ${tNav('active_unit')}`}
+            tooltip={{ children: tooltipTitle }}
+          >
+            <Building2 className='size-4' />
+          </SidebarMenuButton>
+        </div>
+      );
+    }
     return (
       <div className='flex w-full justify-center px-0 pb-1'>
         <Popover open={unitPopoverOpen} onOpenChange={setUnitPopoverOpen}>

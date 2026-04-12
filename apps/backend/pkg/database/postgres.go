@@ -467,21 +467,8 @@ func RunVersionedMigrations(models ...interface{}) error {
 		`).Error; err != nil {
 			return err
 		}
-		// FK after backfill so existing rows are valid.
-		if err := db.Exec(`
-			DO $$
-			BEGIN
-				IF NOT EXISTS (
-					SELECT 1 FROM pg_constraint WHERE conname = 'fk_tickets_unit_client'
-				) THEN
-					ALTER TABLE tickets
-					ADD CONSTRAINT fk_tickets_unit_client
-					FOREIGN KEY (client_id) REFERENCES unit_clients(id) ON DELETE SET NULL ON UPDATE CASCADE;
-				END IF;
-			END $$;
-		`).Error; err != nil {
-			return err
-		}
+		// Composite fk_tickets_unit_client is added in v1.1.6_tickets_unit_client_composite_fk
+		// so new installs do not briefly create a single-column FK on client_id only.
 		return db.AutoMigrate(&dbmodels.Ticket{}, &dbmodels.PreRegistration{}, &dbmodels.UnitClient{})
 	})
 	if err != nil {
@@ -508,6 +495,7 @@ func RunVersionedMigrations(models ...interface{}) error {
 		return fmt.Errorf("failed to run unit visitor tags migration: %w", err)
 	}
 
+	// Initial single-column FKs; v1.1.7_unit_client_tag_assignments_unit_scope replaces them with composite unit-scoped FKs.
 	err = manager.RunMigration("v1.1.5_unit_client_tag_assignment_fks", func(db *gorm.DB) error {
 		return db.Exec(`
 			DO $$
@@ -527,6 +515,163 @@ func RunVersionedMigrations(models ...interface{}) error {
 	})
 	if err != nil {
 		return fmt.Errorf("failed to run unit client tag assignment FK migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.1.6_tickets_unit_client_composite_fk", func(db *gorm.DB) error {
+		if err := db.Exec(`
+			CREATE UNIQUE INDEX IF NOT EXISTS idx_unit_clients_id_unit_id
+			ON unit_clients (id, unit_id);
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			ALTER TABLE tickets DROP CONSTRAINT IF EXISTS fk_tickets_unit_client;
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			UPDATE tickets t
+			SET client_id = NULL
+			WHERE t.client_id IS NOT NULL
+				AND NOT EXISTS (
+					SELECT 1 FROM unit_clients uc
+					WHERE uc.id = t.client_id AND uc.unit_id = t.unit_id
+				);
+		`).Error; err != nil {
+			return err
+		}
+		// PostgreSQL does not allow ON DELETE SET NULL when the FK includes tickets.unit_id,
+		// because unit_id is NOT NULL; use NO ACTION so (client_id, unit_id) always matches a unit_clients row when client_id is set.
+		if err := db.Exec(`
+			DO $$
+			BEGIN
+				IF NOT EXISTS (
+					SELECT 1 FROM pg_constraint WHERE conname = 'fk_tickets_unit_client'
+				) THEN
+					ALTER TABLE tickets
+					ADD CONSTRAINT fk_tickets_unit_client
+					FOREIGN KEY (client_id, unit_id) REFERENCES unit_clients(id, unit_id)
+					ON DELETE NO ACTION ON UPDATE CASCADE;
+				END IF;
+			END $$;
+		`).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run tickets unit_client composite FK migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.1.7_unit_client_tag_assignments_unit_scope", func(db *gorm.DB) error {
+		if err := db.Exec(`ALTER TABLE unit_client_tag_assignments ADD COLUMN IF NOT EXISTS unit_id UUID`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			UPDATE unit_client_tag_assignments a
+			SET unit_id = uc.unit_id
+			FROM unit_clients uc
+			WHERE a.unit_client_id = uc.id
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			DELETE FROM unit_client_tag_assignments a
+			WHERE a.unit_id IS NULL
+			   OR NOT EXISTS (
+					SELECT 1 FROM unit_visitor_tag_definitions t
+					WHERE t.id = a.tag_definition_id AND t.unit_id = a.unit_id
+				);
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`ALTER TABLE unit_client_tag_assignments ALTER COLUMN unit_id SET NOT NULL`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`ALTER TABLE unit_client_tag_assignments DROP CONSTRAINT IF EXISTS fk_uc_tag_assign_unit_client`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`ALTER TABLE unit_client_tag_assignments DROP CONSTRAINT IF EXISTS fk_uc_tag_assign_tag_def`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			DO $$
+			DECLARE pkname text;
+			BEGIN
+				SELECT c.conname INTO pkname
+				FROM pg_constraint c
+				JOIN pg_class t ON c.conrelid = t.oid
+				WHERE t.relname = 'unit_client_tag_assignments' AND c.contype = 'p';
+				IF pkname IS NOT NULL THEN
+					EXECUTE format('ALTER TABLE unit_client_tag_assignments DROP CONSTRAINT %I', pkname);
+				END IF;
+			END $$;
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			CREATE UNIQUE INDEX IF NOT EXISTS idx_unit_visitor_tag_definitions_id_unit_id
+			ON unit_visitor_tag_definitions (id, unit_id);
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			ALTER TABLE unit_client_tag_assignments
+				ADD CONSTRAINT pk_unit_client_tag_assignments PRIMARY KEY (unit_id, unit_client_id, tag_definition_id);
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			DO $$
+			BEGIN
+				IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_uc_tag_assign_unit_client_composite') THEN
+					ALTER TABLE unit_client_tag_assignments
+						ADD CONSTRAINT fk_uc_tag_assign_unit_client_composite
+						FOREIGN KEY (unit_client_id, unit_id) REFERENCES unit_clients(id, unit_id)
+						ON DELETE CASCADE ON UPDATE CASCADE;
+				END IF;
+			END $$;
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			DO $$
+			BEGIN
+				IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_uc_tag_assign_tag_def_composite') THEN
+					ALTER TABLE unit_client_tag_assignments
+						ADD CONSTRAINT fk_uc_tag_assign_tag_def_composite
+						FOREIGN KEY (tag_definition_id, unit_id) REFERENCES unit_visitor_tag_definitions(id, unit_id)
+						ON DELETE CASCADE ON UPDATE CASCADE;
+				END IF;
+			END $$;
+		`).Error; err != nil {
+			return err
+		}
+		return db.AutoMigrate(&dbmodels.UnitClientTagAssignment{}, &dbmodels.UnitClient{})
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run unit client tag assignment unit scope migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.1.8_ticket_history_journal_indexes", func(db *gorm.DB) error {
+		// ListTicketHistoryByUnitID: ORDER BY h.created_at DESC, h.id DESC + keyset (created_at, id).
+		if err := db.Exec(`
+			CREATE INDEX IF NOT EXISTS idx_ticket_histories_created_at_id_desc
+			ON ticket_histories (created_at DESC, id DESC);
+		`).Error; err != nil {
+			return err
+		}
+		// Same query filters joined rows with t.unit_id = ? — btree on unit_id helps the tickets side of the join.
+		if err := db.Exec(`
+			CREATE INDEX IF NOT EXISTS idx_tickets_unit_id
+			ON tickets (unit_id);
+		`).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run ticket history journal indexes migration: %w", err)
 	}
 
 	fmt.Println("All migrations completed successfully")

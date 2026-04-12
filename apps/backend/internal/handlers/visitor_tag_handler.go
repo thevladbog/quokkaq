@@ -40,8 +40,8 @@ func (h *VisitorTagHandler) ListVisitorTagDefinitions(w http.ResponseWriter, r *
 }
 
 type createVisitorTagDefinitionRequest struct {
-	Label     string `json:"label"`
-	Color     string `json:"color"`
+	Label     string `json:"label" binding:"required"`
+	Color     string `json:"color" binding:"required"`
 	SortOrder *int   `json:"sortOrder"`
 }
 
@@ -73,8 +73,7 @@ func (h *VisitorTagHandler) CreateVisitorTagDefinition(w http.ResponseWriter, r 
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	w.WriteHeader(http.StatusCreated)
-	RespondJSON(w, row)
+	RespondJSONWithStatus(w, http.StatusCreated, row)
 }
 
 type patchVisitorTagDefinitionRequest struct {
@@ -128,7 +127,7 @@ func (h *VisitorTagHandler) PatchVisitorTagDefinition(w http.ResponseWriter, r *
 // @Security     BearerAuth
 // @Param        unitId path string true "Unit ID"
 // @Param        definitionId path string true "Definition ID"
-// @Success      204 {string} string "No Content"
+// @Success      204  {object}  nil
 // @Failure      404 {string} string "Not Found"
 // @Router       /units/{unitId}/visitor-tag-definitions/{definitionId} [delete]
 func (h *VisitorTagHandler) DeleteVisitorTagDefinition(w http.ResponseWriter, r *http.Request) {

@@ -2,12 +2,8 @@
 
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
+import type { TFn } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
-
-type TFn = (
-  key: string,
-  values?: Record<string, string | number | Date>
-) => string;
 
 export interface StaffServiceScopeLeaf {
   id: string;
@@ -22,6 +18,29 @@ export interface StaffServiceScopeSelectorProps {
   className?: string;
   /** In a dialog, omit outer card chrome and duplicate headings (title lives in DialogHeader). */
   variant?: 'card' | 'dialog';
+}
+
+function SelectAllButton({
+  onSelectAll,
+  disabled,
+  label
+}: {
+  onSelectAll: () => void;
+  disabled: boolean;
+  label: string;
+}) {
+  return (
+    <Button
+      type='button'
+      size='sm'
+      variant='outline'
+      className='h-8 text-xs'
+      onClick={onSelectAll}
+      disabled={disabled}
+    >
+      {label}
+    </Button>
+  );
 }
 
 export function StaffServiceScopeSelector({
@@ -70,31 +89,21 @@ export function StaffServiceScopeSelector({
             </p>
           </div>
           <div className='flex shrink-0 flex-wrap gap-1.5'>
-            <Button
-              type='button'
-              size='sm'
-              variant='outline'
-              className='h-8 text-xs'
-              onClick={() => onChange([...allIds])}
+            <SelectAllButton
+              onSelectAll={() => onChange([...allIds])}
               disabled={allSelected}
-            >
-              {t('scope.select_all')}
-            </Button>
+              label={t('scope.select_all')}
+            />
           </div>
         </div>
       )}
       {isDialog && (
         <div className='flex justify-end'>
-          <Button
-            type='button'
-            size='sm'
-            variant='outline'
-            className='h-8 text-xs'
-            onClick={() => onChange([...allIds])}
+          <SelectAllButton
+            onSelectAll={() => onChange([...allIds])}
             disabled={allSelected}
-          >
-            {t('scope.select_all')}
-          </Button>
+            label={t('scope.select_all')}
+          />
         </div>
       )}
       <ul

@@ -294,6 +294,7 @@ func (h *CounterHandler) ForceRelease(w http.ResponseWriter, r *http.Request) {
 // @Failure      400      {string}  string "Bad Request"
 // @Failure      404      {string}  string "Counter not found or no tickets"
 // @Failure      409      {string}  string "Counter on break"
+// @Failure      500      {string}  string "Internal Server Error"
 // @Router       /counters/{id}/call-next [post]
 func (h *CounterHandler) CallNext(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
@@ -316,11 +317,11 @@ func (h *CounterHandler) CallNext(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}
-		if errors.Is(err, services.ErrNoWaitingTickets) {
+		if errors.Is(err, services.ErrNoWaitingTickets) || errors.Is(err, gorm.ErrRecordNotFound) {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
-		http.Error(w, err.Error(), http.StatusNotFound)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
