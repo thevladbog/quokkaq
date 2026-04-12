@@ -201,6 +201,8 @@ definitions:
         example: VIP, повторный визит
         type: string
         x-nullable: true
+    required:
+    - operatorComment
     type: object
   handlers.PatchPlatformCompanyBody:
     properties:
@@ -515,6 +517,7 @@ definitions:
         type: array
     required:
     - operatorComment
+    - tagDefinitionIds
     type: object
   handlers.setupFirstAdminRequest:
     properties:
@@ -2293,6 +2296,8 @@ paths:
           description: Conflict (not occupied by user or not on break)
           schema:
             type: string
+      security:
+      - BearerAuth: []
       summary: End operator break
       tags:
       - counters
@@ -2328,6 +2333,8 @@ paths:
             break)
           schema:
             type: string
+      security:
+      - BearerAuth: []
       summary: Start operator break
       tags:
       - counters
@@ -4260,6 +4267,14 @@ paths:
           description: Bad Request
           schema:
             type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
         "404":
           description: Ticket not found
           schema:
@@ -4451,6 +4466,14 @@ paths:
           description: Bad Request
           schema:
             type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
         "404":
           description: Not Found
           schema:
@@ -4492,6 +4515,14 @@ paths:
             $ref: '#/definitions/models.Ticket'
         "400":
           description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
           schema:
             type: string
         "404":

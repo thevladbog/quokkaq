@@ -14,6 +14,22 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+var errPreRegVisitorNameRequired = errors.New("customer first name or last name is required")
+
+// preRegistrationVisitorValidation trims visitor names and normalizes phone for create/update flows.
+func preRegistrationVisitorValidation(customerFirstName, customerLastName, customerPhone string) (fn, ln, normalizedPhone string, err error) {
+	fn = strings.TrimSpace(customerFirstName)
+	ln = strings.TrimSpace(customerLastName)
+	if fn == "" && ln == "" {
+		return "", "", "", errPreRegVisitorNameRequired
+	}
+	normalizedPhone, err = phoneutil.ParseAndNormalize(customerPhone, phoneutil.DefaultRegion())
+	if err != nil {
+		return "", "", "", err
+	}
+	return fn, ln, normalizedPhone, nil
+}
+
 type PreRegistrationHandler struct {
 	service       *services.PreRegistrationService
 	ticketService services.TicketService // Interface
@@ -71,15 +87,9 @@ func (h *PreRegistrationHandler) Create(w http.ResponseWriter, r *http.Request) 
 	}
 
 	unitID := chi.URLParam(r, "unitId")
-	fn := strings.TrimSpace(req.CustomerFirstName)
-	ln := strings.TrimSpace(req.CustomerLastName)
-	if fn == "" && ln == "" {
-		http.Error(w, "customer first name or last name is required", http.StatusBadRequest)
-		return
-	}
-	normalizedPhone, err := phoneutil.ParseAndNormalize(req.CustomerPhone, phoneutil.DefaultRegion())
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	fn, ln, normalizedPhone, vErr := preRegistrationVisitorValidation(req.CustomerFirstName, req.CustomerLastName, req.CustomerPhone)
+	if vErr != nil {
+		http.Error(w, vErr.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -134,15 +144,9 @@ func (h *PreRegistrationHandler) Update(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	fn := strings.TrimSpace(updateData.CustomerFirstName)
-	ln := strings.TrimSpace(updateData.CustomerLastName)
-	if fn == "" && ln == "" {
-		http.Error(w, "customer first name or last name is required", http.StatusBadRequest)
-		return
-	}
-	normalizedPhone, err := phoneutil.ParseAndNormalize(updateData.CustomerPhone, phoneutil.DefaultRegion())
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	fn, ln, normalizedPhone, vErr := preRegistrationVisitorValidation(updateData.CustomerFirstName, updateData.CustomerLastName, updateData.CustomerPhone)
+	if vErr != nil {
+		http.Error(w, vErr.Error(), http.StatusBadRequest)
 		return
 	}
 

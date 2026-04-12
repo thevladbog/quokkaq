@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -14,10 +15,10 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-func parseWeekdaysQuery(s string) []int {
+func parseWeekdaysQuery(s string) ([]int, error) {
 	s = strings.TrimSpace(s)
 	if s == "" {
-		return nil
+		return nil, nil
 	}
 	parts := strings.Split(s, ",")
 	var out []int
@@ -28,28 +29,31 @@ func parseWeekdaysQuery(s string) []int {
 		}
 		n, err := strconv.Atoi(p)
 		if err != nil {
-			continue
+			return nil, fmt.Errorf("invalid weekdays value %q: must be comma-separated integers 0-6", p)
 		}
 		if n < 0 || n > 6 {
-			continue
+			return nil, fmt.Errorf("invalid weekdays value %d: must be between 0 and 6", n)
 		}
 		out = append(out, n)
 	}
-	return out
+	return out, nil
 }
 
-func parseJournalDateParam(raw string) *string {
+func parseJournalDateParam(raw string) (*string, error) {
 	s := strings.TrimSpace(raw)
+	if s == "" {
+		return nil, nil
+	}
 	if len(s) != 10 {
-		return nil
+		return nil, fmt.Errorf("invalid date %q: expected YYYY-MM-DD", raw)
 	}
 	if _, err := time.Parse("2006-01-02", s); err != nil {
-		return nil
+		return nil, fmt.Errorf("invalid date %q: %w", raw, err)
 	}
-	return &s
+	return &s, nil
 }
 
-func parseShiftActivityFilters(r *http.Request) *repository.TicketHistoryListFilters {
+func parseShiftActivityFilters(r *http.Request) (*repository.TicketHistoryListFilters, error) {
 	q := r.URL.Query()
 	var f repository.TicketHistoryListFilters
 	nonEmpty := false
@@ -73,22 +77,40 @@ func parseShiftActivityFilters(r *http.Request) *repository.TicketHistoryListFil
 		f.Search = &v
 		nonEmpty = true
 	}
-	if wd := parseWeekdaysQuery(q.Get("weekdays")); len(wd) > 0 {
-		f.Weekdays = wd
-		nonEmpty = true
+	if _, has := q["weekdays"]; has {
+		wd, err := parseWeekdaysQuery(q.Get("weekdays"))
+		if err != nil {
+			return nil, err
+		}
+		if len(wd) > 0 {
+			f.Weekdays = wd
+			nonEmpty = true
+		}
 	}
-	if df := parseJournalDateParam(q.Get("dateFrom")); df != nil {
-		f.DateFrom = df
-		nonEmpty = true
+	if _, has := q["dateFrom"]; has {
+		df, err := parseJournalDateParam(q.Get("dateFrom"))
+		if err != nil {
+			return nil, err
+		}
+		if df != nil {
+			f.DateFrom = df
+			nonEmpty = true
+		}
 	}
-	if dt := parseJournalDateParam(q.Get("dateTo")); dt != nil {
-		f.DateTo = dt
-		nonEmpty = true
+	if _, has := q["dateTo"]; has {
+		dt, err := parseJournalDateParam(q.Get("dateTo"))
+		if err != nil {
+			return nil, err
+		}
+		if dt != nil {
+			f.DateTo = dt
+			nonEmpty = true
+		}
 	}
 	if !nonEmpty {
-		return nil
+		return nil, nil
 	}
-	return &f
+	return &f, nil
 }
 
 type ShiftHandler struct {
@@ -182,7 +204,11 @@ func (h *ShiftHandler) GetShiftActivity(w http.ResponseWriter, r *http.Request) 
 	unitID := chi.URLParam(r, "unitId")
 	limit := clampQueryPageLimit(r.URL.Query().Get("limit"))
 	cursor := r.URL.Query().Get("cursor")
-	filters := parseShiftActivityFilters(r)
+	filters, ferr := parseShiftActivityFilters(r)
+	if ferr != nil {
+		http.Error(w, ferr.Error(), http.StatusBadRequest)
+		return
+	}
 	resp, err := h.service.GetShiftActivity(unitID, limit, cursor, filters)
 	if err != nil {
 		if errors.Is(err, services.ErrInvalidShiftActivityCursor) {

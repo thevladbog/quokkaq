@@ -232,15 +232,16 @@ func (r *unitClientRepository) ReplaceClientTagAssignmentsTx(tx *gorm.DB, unitID
 		seen[tid] = struct{}{}
 		uniqueTagIDs = append(uniqueTagIDs, tid)
 	}
+	if len(uniqueTagIDs) == 0 {
+		return nil
+	}
+	rows := make([]models.UnitClientTagAssignment, 0, len(uniqueTagIDs))
 	for _, tid := range uniqueTagIDs {
-		row := models.UnitClientTagAssignment{
+		rows = append(rows, models.UnitClientTagAssignment{
 			UnitID:          unitID,
 			UnitClientID:    unitClientID,
 			TagDefinitionID: tid,
-		}
-		if err := tx.Create(&row).Error; err != nil {
-			return err
-		}
+		})
 	}
-	return nil
+	return tx.Create(&rows).Error
 }

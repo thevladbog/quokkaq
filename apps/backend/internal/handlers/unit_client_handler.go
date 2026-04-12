@@ -91,7 +91,11 @@ func (h *UnitClientHandler) ListClientVisits(w http.ResponseWriter, r *http.Requ
 			http.Error(w, "client not found", http.StatusNotFound)
 			return
 		}
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		if errors.Is(err, services.ErrClientVisitsInvalidCursor) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	RespondJSON(w, ClientVisitsResponse{Items: items, NextCursor: next})

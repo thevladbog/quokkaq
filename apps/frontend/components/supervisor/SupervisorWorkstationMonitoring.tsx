@@ -115,7 +115,7 @@ function stationStatusLabel(
 ): string {
   if (!counter.isOccupied) return t('stationStatusDowntime');
   if (isCounterOnBreak(counter)) return t('statusOnBreak');
-  if (!ticket) return t('statusNoActiveTicket');
+  if (!ticket) return t('statusIdleAtDesk');
   if (ticket.status === 'called') return t('ticketStatusCalling');
   if (ticket.status === 'in_service') return t('ticketStatusInService');
   return t('statusOnline');

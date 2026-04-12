@@ -214,30 +214,29 @@ func (s *counterService) Release(counterID string) (*models.Counter, error) {
 }
 
 func (s *counterService) ForceRelease(counterID string, actorUserID *string) (*models.Counter, *models.Ticket, error) {
-	counter, err := s.repo.FindByID(counterID)
-	if err != nil {
-		return nil, nil, err
-	}
-
+	var counter *models.Counter
 	var activeTicket *models.Ticket
-	activeTicket, err = s.ticketRepo.GetActiveTicketByCounter(counterID)
-	if err != nil {
-		return nil, nil, err
-	}
-	if activeTicket != nil {
-		fromStatus := activeTicket.Status
-		now := time.Now()
-		activeTicket.Status = "completed"
-		activeTicket.CompletedAt = &now
-		payload := map[string]interface{}{
-			"unit_id":     activeTicket.UnitID,
-			"service_id":  activeTicket.ServiceID,
-			"counter_id":  counterID,
-			"from_status": fromStatus,
-			"to_status":   "completed",
-			"reason":      "force_release",
+
+	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		at, err := s.ticketRepo.GetActiveTicketByCounterTx(tx, counterID)
+		if err != nil {
+			return err
 		}
-		txErr := database.DB.Transaction(func(tx *gorm.DB) error {
+		activeTicket = at
+
+		if activeTicket != nil {
+			fromStatus := activeTicket.Status
+			now := time.Now()
+			activeTicket.Status = "completed"
+			activeTicket.CompletedAt = &now
+			payload := map[string]interface{}{
+				"unit_id":     activeTicket.UnitID,
+				"service_id":  activeTicket.ServiceID,
+				"counter_id":  counterID,
+				"from_status": fromStatus,
+				"to_status":   "completed",
+				"reason":      "force_release",
+			}
 			if err := s.ticketRepo.UpdateTx(tx, activeTicket); err != nil {
 				return err
 			}
@@ -250,14 +249,11 @@ func (s *counterService) ForceRelease(counterID string, actorUserID *string) (*m
 			if err != nil {
 				return err
 			}
-			return s.ticketRepo.CreateTicketHistoryTx(tx, h)
-		})
-		if txErr != nil {
-			return nil, nil, txErr
+			if err := s.ticketRepo.CreateTicketHistoryTx(tx, h); err != nil {
+				return err
+			}
 		}
-	}
 
-	err = s.repo.Transaction(func(tx *gorm.DB) error {
 		now := time.Now()
 		if _, err := s.intervalRepo.CloseOpenIntervalsForCounterTx(tx, counterID, now); err != nil {
 			return err
@@ -373,9 +369,6 @@ func (s *counterService) CallNext(counterID string, serviceIDs []string, actorUs
 	if err != nil {
 		return nil, err
 	}
-	if counter.OnBreak {
-		return nil, ErrCounterOnBreak
-	}
 
 	if len(serviceIDs) > 0 {
 		n, err := s.serviceRepo.CountByUnitAndIDs(counter.UnitID, serviceIDs)
@@ -399,6 +392,13 @@ func (s *counterService) CallNext(counterID string, serviceIDs []string, actorUs
 	now := time.Now()
 
 	err = s.ticketRepo.Transaction(func(tx *gorm.DB) error {
+		c, err := s.repo.FindByIDForUpdateTx(tx, counterID)
+		if err != nil {
+			return err
+		}
+		if c.OnBreak {
+			return ErrCounterOnBreak
+		}
 		t, err := s.ticketRepo.FindByIDForUpdateTx(tx, ticket.ID)
 		if err != nil {
 			return err

@@ -124,6 +124,12 @@ var ErrTicketNoVisitorForTags = errors.New("ticket has no visitor assigned")
 // ErrVisitorTagIDsNotInUnit is returned when one or more tag definition IDs are missing or belong to another unit.
 var ErrVisitorTagIDsNotInUnit = errors.New("one or more tag definitions are invalid for this unit")
 
+// ErrTagDefinitionIDsContainEmpty is returned when visitor-tags payload includes a blank tag id entry.
+var ErrTagDefinitionIDsContainEmpty = errors.New("tagDefinitionIds must not contain empty values")
+
+// ErrClientVisitsInvalidCursor is returned when the visits list cursor cannot be parsed.
+var ErrClientVisitsInvalidCursor = errors.New("invalid visits cursor")
+
 // PatchTicketVisitorInput is body for UpdateTicketVisitor: either ClientID (optional FirstName/LastName to patch that client) or Phone with FirstName/LastName (find/create by phone).
 type PatchTicketVisitorInput struct {
 	ClientID  *string
@@ -400,12 +406,6 @@ func (s *ticketService) CallNext(unitID, counterID string, serviceIDs []string, 
 		return s.writeTicketHistoryTx(tx, ticket.ID, actorUserID, ticketaudit.ActionTicketCalled, payload)
 	})
 	if err != nil {
-		if errors.Is(err, ErrCounterOnBreak) {
-			return nil, ErrCounterOnBreak
-		}
-		if errors.Is(err, ErrNoWaitingTickets) {
-			return nil, ErrNoWaitingTickets
-		}
 		return nil, err
 	}
 
@@ -858,7 +858,7 @@ func (s *ticketService) SetVisitorTagsForTicket(ticketID string, tagDefinitionID
 	for _, id := range tagDefinitionIDs {
 		t := strings.TrimSpace(id)
 		if t == "" {
-			return nil, errors.New("tagDefinitionIds must not contain empty values")
+			return nil, ErrTagDefinitionIDsContainEmpty
 		}
 		trimmed = append(trimmed, t)
 	}
@@ -973,11 +973,11 @@ func (s *ticketService) ListVisitsByClient(unitID, clientID string, limit int, c
 		if raw != "" {
 			parts := strings.SplitN(raw, "|", 2)
 			if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
-				return nil, nil, fmt.Errorf("invalid cursor")
+				return nil, nil, fmt.Errorf("%w", ErrClientVisitsInvalidCursor)
 			}
 			t, err := time.Parse(time.RFC3339Nano, parts[0])
 			if err != nil {
-				return nil, nil, fmt.Errorf("invalid cursor: %w", err)
+				return nil, nil, errors.Join(ErrClientVisitsInvalidCursor, err)
 			}
 			beforeTime = &t
 			beforeID = &parts[1]

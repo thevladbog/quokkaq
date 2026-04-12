@@ -168,6 +168,7 @@ func (h *CounterHandler) Occupy(w http.ResponseWriter, r *http.Request) {
 // @Tags         counters
 // @Accept       json
 // @Produce      json
+// @Security     BearerAuth
 // @Param        id   path      string  true  "Counter ID"
 // @Success      200  {object}  models.Counter
 // @Failure      401  {string}  string "Unauthorized"
@@ -206,6 +207,7 @@ func (h *CounterHandler) StartBreak(w http.ResponseWriter, r *http.Request) {
 // @Tags         counters
 // @Accept       json
 // @Produce      json
+// @Security     BearerAuth
 // @Param        id   path      string  true  "Counter ID"
 // @Success      200  {object}  models.Counter
 // @Failure      401  {string}  string "Unauthorized"

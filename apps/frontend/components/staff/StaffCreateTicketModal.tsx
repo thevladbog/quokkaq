@@ -71,18 +71,6 @@ export function StaffCreateTicketModal({
   const [debouncedVisitorQ, setDebouncedVisitorQ] = useState('');
 
   useEffect(() => {
-    if (!open) return;
-    // Clear stale service/visitor/search when the dialog opens (belt-and-suspenders with parent key remount).
-    /* eslint-disable react-hooks/set-state-in-effect */
-    setServiceId('');
-    setSelectedVisitor(null);
-    setVisitorPopoverOpen(false);
-    setVisitorQuery('');
-    setDebouncedVisitorQ('');
-    /* eslint-enable react-hooks/set-state-in-effect */
-  }, [open]);
-
-  useEffect(() => {
     const timerId = window.setTimeout(
       () => setDebouncedVisitorQ(visitorQuery.trim()),
       400
@@ -103,7 +91,12 @@ export function StaffCreateTicketModal({
   const visitorSearchEnabled =
     open && visitorPopoverOpen && debouncedVisitorQ.length >= 2;
 
-  const { data: visitorHits = [], isFetching: visitorsFetching } = useQuery({
+  const {
+    data: visitorHits = [],
+    isFetching: visitorsFetching,
+    isError: visitorsSearchError,
+    error: visitorsSearchErr
+  } = useQuery({
     queryKey: ['unitClientSearch', unitId, debouncedVisitorQ],
     queryFn: () => unitsApi.searchClients(unitId, debouncedVisitorQ),
     enabled: visitorSearchEnabled
@@ -205,6 +198,19 @@ export function StaffCreateTicketModal({
                     )}
                     {visitorSearchEnabled &&
                       !visitorsFetching &&
+                      visitorsSearchError && (
+                        <p className='text-destructive p-2 text-xs'>
+                          {t('create_ticket.visitor_search_error', {
+                            message:
+                              visitorsSearchErr instanceof Error
+                                ? visitorsSearchErr.message
+                                : ''
+                          })}
+                        </p>
+                      )}
+                    {visitorSearchEnabled &&
+                      !visitorsFetching &&
+                      !visitorsSearchError &&
                       visitorHits.length === 0 &&
                       debouncedVisitorQ.length >= 2 && (
                         <p className='text-muted-foreground p-2 text-xs'>
@@ -212,34 +218,36 @@ export function StaffCreateTicketModal({
                         </p>
                       )}
                     <ul className='divide-border/40 divide-y'>
-                      {visitorHits.map((c) => (
-                        <li key={c.id}>
-                          <button
-                            type='button'
-                            className={cn(
-                              'hover:bg-muted/50 w-full px-2 py-2 text-left text-sm',
-                              'focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none'
-                            )}
-                            onClick={() => {
-                              setSelectedVisitor(c);
-                              setVisitorPopoverOpen(false);
-                              setVisitorQuery('');
-                            }}
-                          >
-                            <span className='block truncate font-medium'>
-                              {[c.firstName ?? '', c.lastName ?? '']
-                                .map((s) => s.trim())
-                                .filter(Boolean)
-                                .join(' ') || '—'}
-                            </span>
-                            {c.phoneE164 && (
-                              <span className='text-muted-foreground font-mono text-xs'>
-                                {c.phoneE164}
+                      {visitorSearchEnabled &&
+                        !visitorsSearchError &&
+                        visitorHits.map((c) => (
+                          <li key={c.id}>
+                            <button
+                              type='button'
+                              className={cn(
+                                'hover:bg-muted/50 w-full px-2 py-2 text-left text-sm',
+                                'focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none'
+                              )}
+                              onClick={() => {
+                                setSelectedVisitor(c);
+                                setVisitorPopoverOpen(false);
+                                setVisitorQuery('');
+                              }}
+                            >
+                              <span className='block truncate font-medium'>
+                                {[c.firstName ?? '', c.lastName ?? '']
+                                  .map((s) => s.trim())
+                                  .filter(Boolean)
+                                  .join(' ') || '—'}
                               </span>
-                            )}
-                          </button>
-                        </li>
-                      ))}
+                              {c.phoneE164 && (
+                                <span className='text-muted-foreground font-mono text-xs'>
+                                  {c.phoneE164}
+                                </span>
+                              )}
+                            </button>
+                          </li>
+                        ))}
                     </ul>
                   </div>
                 </PopoverContent>

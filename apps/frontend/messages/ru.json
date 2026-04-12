@@ -664,6 +664,7 @@
       "visitor_min_chars": "Введите не менее 2 символов для поиска.",
       "visitor_loading": "Поиск…",
       "visitor_empty": "Посетители не найдены.",
+      "visitor_search_error": "Не удалось загрузить посетителей: {message}",
       "visitor_clear": "Сбросить посетителя",
       "submit": "Создать талон",
       "submitting": "Создание…"

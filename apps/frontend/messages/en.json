@@ -664,6 +664,7 @@
       "visitor_min_chars": "Enter at least 2 characters to search.",
       "visitor_loading": "Searching…",
       "visitor_empty": "No visitors found.",
+      "visitor_search_error": "Could not load visitors: {message}",
       "visitor_clear": "Remove visitor",
       "submit": "Create ticket",
       "submitting": "Creating…"

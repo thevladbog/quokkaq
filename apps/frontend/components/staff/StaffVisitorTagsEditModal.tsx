@@ -187,6 +187,7 @@ function StaffVisitorTagsEditModalInner({
                     <button
                       key={def.id}
                       type='button'
+                      aria-pressed={on}
                       disabled={setVisitorTags.isPending}
                       onClick={() => toggleVisitorTag(def.id)}
                       className={cn(

@@ -198,7 +198,7 @@ func (h *TicketHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 // OperatorCommentPatchDTO documents the JSON body for PATCH /tickets/{id}/operator-comment (Swagger only).
 // operatorComment must be present: use a string to set the comment, or JSON null to clear it.
 type OperatorCommentPatchDTO struct {
-	OperatorComment *string `json:"operatorComment" example:"VIP, повторный визит" extensions:"x-nullable"`
+	OperatorComment *string `json:"operatorComment" binding:"required" example:"VIP, повторный визит" extensions:"x-nullable"`
 }
 
 // UpdateOperatorComment godoc
@@ -212,6 +212,8 @@ type OperatorCommentPatchDTO struct {
 // @Param        request body      OperatorCommentPatchDTO  true  "operatorComment: string to set, or JSON null to clear"
 // @Success      200     {object}  models.Ticket
 // @Failure      400     {string}  string "Bad Request"
+// @Failure      401     {string}  string "Unauthorized"
+// @Failure      403     {string}  string "Forbidden"
 // @Failure      404     {string}  string "Ticket not found"
 // @Router       /tickets/{id}/operator-comment [patch]
 func (h *TicketHandler) UpdateOperatorComment(w http.ResponseWriter, r *http.Request) {
@@ -247,7 +249,11 @@ func (h *TicketHandler) UpdateOperatorComment(w http.ResponseWriter, r *http.Req
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		http.Error(w, err.Error(), http.StatusNotFound)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -385,6 +391,8 @@ type PatchTicketVisitorRequest struct {
 // @Param        request body      PatchTicketVisitorRequest true  "Visitor payload"
 // @Success      200     {object}  models.Ticket
 // @Failure      400     {string}  string "Bad Request"
+// @Failure      401     {string}  string "Unauthorized"
+// @Failure      403     {string}  string "Forbidden"
 // @Failure      404     {string}  string "Not Found"
 // @Failure      409     {string}  string "Conflict"
 // @Router       /tickets/{id}/visitor [patch]
@@ -431,7 +439,7 @@ func (h *TicketHandler) UpdateTicketVisitor(w http.ResponseWriter, r *http.Reque
 }
 
 type putVisitorTagsRequest struct {
-	TagDefinitionIDs []string `json:"tagDefinitionIds"`
+	TagDefinitionIDs []string `json:"tagDefinitionIds" binding:"required"`
 	OperatorComment  string   `json:"operatorComment" binding:"required"`
 }
 
@@ -446,13 +454,29 @@ type putVisitorTagsRequest struct {
 // @Param        body body putVisitorTagsRequest true "tagDefinitionIds (full set) and operatorComment"
 // @Success      200 {object} models.Ticket
 // @Failure      400 {string} string "Bad Request"
+// @Failure      401 {string} string "Unauthorized"
+// @Failure      403 {string} string "Forbidden"
 // @Failure      404 {string} string "Not Found"
 // @Failure      409 {string} string "Conflict"
 // @Router       /tickets/{id}/visitor-tags [put]
 func (h *TicketHandler) SetVisitorTags(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
+	var raw map[string]json.RawMessage
+	if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if _, ok := raw["tagDefinitionIds"]; !ok {
+		http.Error(w, "tagDefinitionIds is required", http.StatusBadRequest)
+		return
+	}
+	reencoded, err := json.Marshal(raw)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	var req putVisitorTagsRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.Unmarshal(reencoded, &req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -474,13 +498,10 @@ func (h *TicketHandler) SetVisitorTags(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		case errors.Is(err, gorm.ErrRecordNotFound):
 			http.Error(w, err.Error(), http.StatusNotFound)
+		case errors.Is(err, services.ErrTagDefinitionIDsContainEmpty):
+			http.Error(w, err.Error(), http.StatusBadRequest)
 		default:
-			msg := err.Error()
-			if strings.Contains(msg, "tagDefinitionIds must not contain empty") {
-				http.Error(w, msg, http.StatusBadRequest)
-				return
-			}
-			http.Error(w, msg, http.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return
 	}

@@ -29,16 +29,16 @@ func ensureIdleIfCounterAvailableTx(
 	counterID string,
 	now time.Time,
 ) error {
+	counter, err := counterRepo.FindByIDForUpdateTx(tx, counterID)
+	if err != nil {
+		return err
+	}
 	hasOpen, err := intervalRepo.HasOpenIntervalForCounterTx(tx, counterID)
 	if err != nil {
 		return err
 	}
 	if hasOpen {
 		return nil
-	}
-	counter, err := counterRepo.FindByIDTx(tx, counterID)
-	if err != nil {
-		return err
 	}
 	if counter.AssignedTo == nil || counter.OnBreak {
 		return nil

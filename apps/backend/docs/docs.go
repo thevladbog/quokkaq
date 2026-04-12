@@ -1127,6 +1127,11 @@ const docTemplate = `{
         },
         "/counters/{id}/break/end": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Ends break and resumes idle. Idempotent failure: 409 if not on break.",
                 "consumes": [
                     "application/json"
@@ -1177,6 +1182,11 @@ const docTemplate = `{
         },
         "/counters/{id}/break/start": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Puts the counter in break state (no active ticket). Idempotent failure: 409 if already on break.",
                 "consumes": [
                     "application/json"
@@ -4188,6 +4198,18 @@ const docTemplate = `{
                             "type": "string"
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     "404": {
                         "description": "Ticket not found",
                         "schema": {
@@ -4475,6 +4497,18 @@ const docTemplate = `{
                             "type": "string"
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     "404": {
                         "description": "Not Found",
                         "schema": {
@@ -4535,6 +4569,18 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "type": "string"
                         }
@@ -7522,6 +7568,9 @@ const docTemplate = `{
         },
         "handlers.OperatorCommentPatchDTO": {
             "type": "object",
+            "required": [
+                "operatorComment"
+            ],
             "properties": {
                 "operatorComment": {
                     "type": "string",
@@ -7997,7 +8046,8 @@ const docTemplate = `{
         "handlers.putVisitorTagsRequest": {
             "type": "object",
             "required": [
-                "operatorComment"
+                "operatorComment",
+                "tagDefinitionIds"
             ],
             "properties": {
                 "operatorComment": {
