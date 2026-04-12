@@ -24,15 +24,15 @@ func NewTicketHandler(service services.TicketService) *TicketHandler {
 	return &TicketHandler{service: service}
 }
 
+// CreateTicketRequest is the JSON body for POST /units/{unitId}/tickets (unit comes from the path).
 type CreateTicketRequest struct {
-	UnitID    string  `json:"unitId"`
-	ServiceID string  `json:"serviceId"`
+	ServiceID string  `json:"serviceId" binding:"required"`
 	ClientID  *string `json:"clientId,omitempty"`
 }
 
 // CreateTicket godoc
 // @Summary      Create a new ticket
-// @Description  Creates a new ticket for a service in a unit
+// @Description  Creates a new ticket for a service in a unit. Unit is taken from the path; body requires serviceId (optional clientId).
 // @Tags         tickets
 // @Accept       json
 // @Produce      json
@@ -46,6 +46,10 @@ func (h *TicketHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 	var req CreateTicketRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if strings.TrimSpace(req.ServiceID) == "" {
+		http.Error(w, "serviceId is required", http.StatusBadRequest)
 		return
 	}
 
@@ -112,14 +116,14 @@ func (h *TicketHandler) GetTicketsByUnit(w http.ResponseWriter, r *http.Request)
 }
 
 type CallNextRequest struct {
-	CounterID  string   `json:"counterId"`
+	CounterID  string   `json:"counterId" binding:"required"`
 	ServiceID  *string  `json:"serviceId"`
 	ServiceIDs []string `json:"serviceIds"`
 }
 
 // CallNext godoc
 // @Summary      Call next ticket
-// @Description  Calls the next waiting ticket for a unit. Optional serviceIds (or legacy serviceId) limit the queue; omit or empty means all services in the unit.
+// @Description  Calls the next waiting ticket for a unit. JSON body must include counterId. Optional serviceIds (or legacy serviceId) limit the queue; omit or empty means all services in the unit.
 // @Tags         tickets
 // @Accept       json
 // @Produce      json
@@ -137,10 +141,14 @@ func (h *TicketHandler) CallNext(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	if strings.TrimSpace(req.CounterID) == "" {
+		http.Error(w, "counterId is required", http.StatusBadRequest)
+		return
+	}
 
 	actor := getActorFromRequest(r)
 	filter := normalizeCallNextServiceFilter(req.ServiceIDs, req.ServiceID)
-	ticket, err := h.service.CallNext(unitID, req.CounterID, filter, actor)
+	ticket, err := h.service.CallNext(unitID, strings.TrimSpace(req.CounterID), filter, actor)
 	if err != nil {
 		if errors.Is(err, services.ErrCallNextInvalidServices) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -294,6 +302,7 @@ type PickRequest struct {
 // @Param        id       path      string       true  "Ticket ID"
 // @Param        request  body      PickRequest  true  "Pick Request"
 // @Success      200      {object}  models.Ticket
+// @Failure      400      {string}  string "Bad Request (e.g. counter not in ticket unit)"
 // @Failure      404      {string}  string "Ticket not found"
 // @Failure      409      {string}  string "Counter on break"
 // @Router       /tickets/{id}/pick [post]
@@ -308,6 +317,10 @@ func (h *TicketHandler) Pick(w http.ResponseWriter, r *http.Request) {
 	actor := getActorFromRequest(r)
 	ticket, err := h.service.Pick(id, req.CounterID, actor)
 	if err != nil {
+		if errors.Is(err, services.ErrCounterUnitMismatch) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		if errors.Is(err, services.ErrCounterOnBreak) {
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
@@ -373,6 +386,7 @@ func (h *TicketHandler) ReturnToQueue(w http.ResponseWriter, r *http.Request) {
 }
 
 // PatchTicketVisitorRequest is the JSON body for PATCH /tickets/{id}/visitor.
+// At least one of clientId, firstName, lastName, or phone must be sent; {} is invalid (OpenAPI 2 cannot express the XOR of clientId vs phone+names).
 type PatchTicketVisitorRequest struct {
 	ClientID  *string `json:"clientId"`
 	FirstName *string `json:"firstName"`
@@ -382,7 +396,7 @@ type PatchTicketVisitorRequest struct {
 
 // UpdateTicketVisitor godoc
 // @Summary      Attach or change visitor on active ticket
-// @Description  Allowed when status is called or in_service. Send clientId to link an existing visitor; optional firstName/lastName update that client's name. Do not send phone together with clientId. Or send firstName, lastName, and phone (without clientId) to find or create by phone.
+// @Description  Allowed when status is called or in_service. Body must not be empty. Either: (A) clientId — optional firstName/lastName to rename that client; do not send phone, or (B) firstName, lastName, and phone without clientId to find/create by phone.
 // @Tags         tickets
 // @Accept       json
 // @Produce      json
@@ -401,6 +415,10 @@ func (h *TicketHandler) UpdateTicketVisitor(w http.ResponseWriter, r *http.Reque
 	var req PatchTicketVisitorRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.ClientID == nil && req.FirstName == nil && req.LastName == nil && req.Phone == nil {
+		http.Error(w, "visitor payload is required", http.StatusBadRequest)
 		return
 	}
 

@@ -19,6 +19,8 @@ definitions:
         items:
           type: string
         type: array
+    required:
+    - counterId
     type: object
   handlers.ClientVisitsResponse:
     properties:
@@ -28,6 +30,15 @@ definitions:
         type: array
       nextCursor:
         type: string
+    type: object
+  handlers.CounterCallNextRequest:
+    properties:
+      serviceId:
+        type: string
+      serviceIds:
+        items:
+          type: string
+        type: array
     type: object
   handlers.CreateCheckoutRequest:
     properties:
@@ -58,8 +69,8 @@ definitions:
         type: string
       serviceId:
         type: string
-      unitId:
-        type: string
+    required:
+    - serviceId
     type: object
   handlers.DaDataFindPartyByInnRequest:
     properties:
@@ -2356,7 +2367,7 @@ paths:
         in: body
         name: request
         schema:
-          $ref: '#/definitions/handlers.CallNextRequest'
+          $ref: '#/definitions/handlers.CounterCallNextRequest'
       produces:
       - application/json
       responses:
@@ -4308,6 +4319,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/models.Ticket'
+        "400":
+          description: Bad Request (e.g. counter not in ticket unit)
+          schema:
+            type: string
         "404":
           description: Ticket not found
           schema:
@@ -4439,10 +4454,10 @@ paths:
     patch:
       consumes:
       - application/json
-      description: Allowed when status is called or in_service. Send clientId to link
-        an existing visitor; optional firstName/lastName update that client's name.
-        Do not send phone together with clientId. Or send firstName, lastName, and
-        phone (without clientId) to find or create by phone.
+      description: 'Allowed when status is called or in_service. Body must not be
+        empty. Either: (A) clientId — optional firstName/lastName to rename that client;
+        do not send phone, or (B) firstName, lastName, and phone without clientId
+        to find/create by phone.'
       parameters:
       - description: Ticket ID
         in: path
@@ -4740,9 +4755,9 @@ paths:
     post:
       consumes:
       - application/json
-      description: Calls the next waiting ticket for a unit. Optional serviceIds (or
-        legacy serviceId) limit the queue; omit or empty means all services in the
-        unit.
+      description: Calls the next waiting ticket for a unit. JSON body must include
+        counterId. Optional serviceIds (or legacy serviceId) limit the queue; omit
+        or empty means all services in the unit.
       parameters:
       - description: Unit ID
         in: path
@@ -5390,6 +5405,14 @@ paths:
           description: Bad Request
           schema:
             type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
         "500":
           description: Internal Server Error
           schema:
@@ -5416,6 +5439,14 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/services.ShiftActivityActorsResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
         "500":
           description: Internal Server Error
           schema:
@@ -5444,6 +5475,14 @@ paths:
             items:
               $ref: '#/definitions/services.ShiftCounterDTO'
             type: array
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
         "500":
           description: Internal Server Error
           schema:
@@ -5862,7 +5901,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: Creates a new ticket for a service in a unit
+      description: Creates a new ticket for a service in a unit. Unit is taken from
+        the path; body requires serviceId (optional clientId).
       parameters:
       - description: Ticket Request
         in: body
@@ -5907,6 +5947,14 @@ paths:
             items:
               $ref: '#/definitions/models.UnitVisitorTagDefinition'
             type: array
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
       security:
       - BearerAuth: []
       summary: List visitor tag definitions for a unit
@@ -5939,6 +5987,14 @@ paths:
           description: Bad Request
           schema:
             type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
       security:
       - BearerAuth: []
       summary: Create visitor tag definition
@@ -5961,6 +6017,14 @@ paths:
       responses:
         "204":
           description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
         "404":
           description: Not Found
           schema:
@@ -6000,6 +6064,14 @@ paths:
             $ref: '#/definitions/models.UnitVisitorTagDefinition'
         "400":
           description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: Forbidden
           schema:
             type: string
         "404":

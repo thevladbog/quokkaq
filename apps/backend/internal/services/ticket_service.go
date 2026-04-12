@@ -29,6 +29,9 @@ var ErrNoWaitingTickets = errors.New("no waiting tickets")
 // ErrCallNextInvalidServices is returned when call-next is scoped to service IDs not all belonging to the unit.
 var ErrCallNextInvalidServices = errors.New("invalid service selection: one or more services are not in this unit")
 
+// ErrCounterUnitMismatch is returned when assigning a ticket to a counter that belongs to a different unit.
+var ErrCounterUnitMismatch = errors.New("counter does not belong to the ticket's unit")
+
 const maxOperatorCommentRunes = 2000
 
 func diffSortedTagIDSets(fromSorted, toSorted []string) (addedIDs, removedIDs []string) {
@@ -512,15 +515,18 @@ func (s *ticketService) Pick(ticketID, counterID string, actorUserID *string) (*
 		if err != nil {
 			return err
 		}
-		if c.OnBreak {
-			return ErrCounterOnBreak
-		}
 
 		t, err := s.repo.FindByIDForUpdateTx(tx, ticketID)
 		if err != nil {
 			return err
 		}
 		ticket = t
+		if c.UnitID != ticket.UnitID {
+			return ErrCounterUnitMismatch
+		}
+		if c.OnBreak {
+			return ErrCounterOnBreak
+		}
 		fromStatus := ticket.Status
 		now := time.Now()
 		ticket.Status = "called"

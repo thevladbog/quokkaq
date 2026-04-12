@@ -1261,7 +1261,7 @@ const docTemplate = `{
                         "name": "request",
                         "in": "body",
                         "schema": {
-                            "$ref": "#/definitions/handlers.CallNextRequest"
+                            "$ref": "#/definitions/handlers.CounterCallNextRequest"
                         }
                     }
                 ],
@@ -4257,6 +4257,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/models.Ticket"
                         }
                     },
+                    "400": {
+                        "description": "Bad Request (e.g. counter not in ticket unit)",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     "404": {
                         "description": "Ticket not found",
                         "schema": {
@@ -4455,7 +4461,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Allowed when status is called or in_service. Send clientId to link an existing visitor; optional firstName/lastName update that client's name. Do not send phone together with clientId. Or send firstName, lastName, and phone (without clientId) to find or create by phone.",
+                "description": "Allowed when status is called or in_service. Body must not be empty. Either: (A) clientId — optional firstName/lastName to rename that client; do not send phone, or (B) firstName, lastName, and phone without clientId to find/create by phone.",
                 "consumes": [
                     "application/json"
                 ],
@@ -4901,7 +4907,7 @@ const docTemplate = `{
         },
         "/units/{unitId}/call-next": {
             "post": {
-                "description": "Calls the next waiting ticket for a unit. Optional serviceIds (or legacy serviceId) limit the queue; omit or empty means all services in the unit.",
+                "description": "Calls the next waiting ticket for a unit. JSON body must include counterId. Optional serviceIds (or legacy serviceId) limit the queue; omit or empty means all services in the unit.",
                 "consumes": [
                     "application/json"
                 ],
@@ -5874,6 +5880,18 @@ const docTemplate = `{
                             "type": "string"
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -5912,6 +5930,18 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/services.ShiftActivityActorsResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
                         }
                     },
                     "500": {
@@ -5955,6 +5985,18 @@ const docTemplate = `{
                             "items": {
                                 "$ref": "#/definitions/services.ShiftCounterDTO"
                             }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
                         }
                     },
                     "500": {
@@ -6582,7 +6624,7 @@ const docTemplate = `{
                 }
             },
             "post": {
-                "description": "Creates a new ticket for a service in a unit",
+                "description": "Creates a new ticket for a service in a unit. Unit is taken from the path; body requires serviceId (optional clientId).",
                 "consumes": [
                     "application/json"
                 ],
@@ -6659,6 +6701,18 @@ const docTemplate = `{
                                 "$ref": "#/definitions/models.UnitVisitorTagDefinition"
                             }
                         }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 }
             },
@@ -6709,6 +6763,18 @@ const docTemplate = `{
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 }
             }
@@ -6744,6 +6810,18 @@ const docTemplate = `{
                 "responses": {
                     "204": {
                         "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
                     },
                     "404": {
                         "description": "Not Found",
@@ -6804,6 +6882,18 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "type": "string"
                         }
@@ -7295,6 +7385,9 @@ const docTemplate = `{
         },
         "handlers.CallNextRequest": {
             "type": "object",
+            "required": [
+                "counterId"
+            ],
             "properties": {
                 "counterId": {
                     "type": "string"
@@ -7321,6 +7414,20 @@ const docTemplate = `{
                 },
                 "nextCursor": {
                     "type": "string"
+                }
+            }
+        },
+        "handlers.CounterCallNextRequest": {
+            "type": "object",
+            "properties": {
+                "serviceId": {
+                    "type": "string"
+                },
+                "serviceIds": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -7362,14 +7469,14 @@ const docTemplate = `{
         },
         "handlers.CreateTicketRequest": {
             "type": "object",
+            "required": [
+                "serviceId"
+            ],
             "properties": {
                 "clientId": {
                     "type": "string"
                 },
                 "serviceId": {
-                    "type": "string"
-                },
-                "unitId": {
                     "type": "string"
                 }
             }

@@ -585,6 +585,7 @@
       "tags_title": "Visitor tags",
       "tags_hint": "Toggle tags for this visitor profile in the unit directory. Changes are audited; your reason is appended to operator notes.",
       "tags_loading": "Loading tags…",
+      "tags_definitions_load_error": "Could not load tag presets: {message}",
       "tags_no_definitions": "No tag presets exist for this unit yet. An organization admin can add them.",
       "tags_search_label": "Search",
       "tags_search_placeholder": "Tag name…",

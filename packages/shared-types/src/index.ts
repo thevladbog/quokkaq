@@ -322,8 +322,8 @@ export interface PreRegistration {
 // API Request/Response Types
 // ==========================
 
+/** POST /units/{unitId}/tickets — unit id is in the path, not the body. */
 export type CreateTicketRequest = {
-  unitId: string;
   serviceId: string;
   /** Optional: link ticket to an existing unit visitor (staff/kiosk API). */
   clientId?: string;

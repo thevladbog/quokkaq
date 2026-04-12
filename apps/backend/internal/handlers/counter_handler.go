@@ -284,14 +284,20 @@ func (h *CounterHandler) ForceRelease(w http.ResponseWriter, r *http.Request) {
 	RespondJSON(w, response)
 }
 
+// CounterCallNextRequest is the optional JSON body for POST /counters/{id}/call-next (counter id is taken from the path only).
+type CounterCallNextRequest struct {
+	ServiceID  *string  `json:"serviceId"`
+	ServiceIDs []string `json:"serviceIds"`
+}
+
 // CallNext godoc
 // @Summary      Call next ticket
 // @Description  Calls the next waiting ticket for the counter. Optional JSON body with serviceIds or legacy serviceId limits the queue; omit or empty body means all services.
 // @Tags         counters
 // @Accept       json
 // @Produce      json
-// @Param        id       path      string                true  "Counter ID"
-// @Param        request  body      CallNextRequest  false "Optional service filter (serviceIds / serviceId); omit for all services"
+// @Param        id       path      string                   true  "Counter ID"
+// @Param        request  body      CounterCallNextRequest   false "Optional service filter (serviceIds / serviceId); omit for all services"
 // @Success      200      {object}  map[string]interface{}
 // @Failure      400      {string}  string "Bad Request"
 // @Failure      404      {string}  string "Counter not found or no tickets"
@@ -301,7 +307,7 @@ func (h *CounterHandler) ForceRelease(w http.ResponseWriter, r *http.Request) {
 func (h *CounterHandler) CallNext(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
-	var req CallNextRequest
+	var req CounterCallNextRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

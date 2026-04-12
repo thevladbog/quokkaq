@@ -3,6 +3,7 @@ package handlers
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/services"
@@ -45,7 +46,7 @@ type ClientVisitsResponse struct {
 // @Router       /units/{unitId}/clients/search [get]
 func (h *UnitClientHandler) SearchClients(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
-	q := r.URL.Query().Get("q")
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
 	if q == "" {
 		http.Error(w, "q is required", http.StatusBadRequest)
 		return

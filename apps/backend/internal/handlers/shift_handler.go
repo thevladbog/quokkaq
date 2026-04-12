@@ -167,6 +167,8 @@ func (h *ShiftHandler) GetQueueTickets(w http.ResponseWriter, r *http.Request) {
 // @Security     BearerAuth
 // @Param        unitId path      string  true  "Unit ID"
 // @Success      200    {array}   services.ShiftCounterDTO
+// @Failure      401    {string}  string "Unauthorized"
+// @Failure      403    {string}  string "Forbidden"
 // @Failure      500    {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/shift/counters [get]
 func (h *ShiftHandler) GetShiftCounters(w http.ResponseWriter, r *http.Request) {
@@ -198,6 +200,8 @@ func (h *ShiftHandler) GetShiftCounters(w http.ResponseWriter, r *http.Request) 
 // @Param        dateTo    query     string  false "Inclusive end date YYYY-MM-DD (unit timezone)"
 // @Success      200    {object}  services.ShiftActivityResponse
 // @Failure      400    {string}  string "Bad Request"
+// @Failure      401    {string}  string "Unauthorized"
+// @Failure      403    {string}  string "Forbidden"
 // @Failure      500    {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/shift/activity [get]
 func (h *ShiftHandler) GetShiftActivity(w http.ResponseWriter, r *http.Request) {
@@ -229,6 +233,8 @@ func (h *ShiftHandler) GetShiftActivity(w http.ResponseWriter, r *http.Request) 
 // @Security     BearerAuth
 // @Param        unitId path string true "Unit ID"
 // @Success      200    {object}  services.ShiftActivityActorsResponse
+// @Failure      401    {string}  string "Unauthorized"
+// @Failure      403    {string}  string "Forbidden"
 // @Failure      500    {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/shift/activity/actors [get]
 func (h *ShiftHandler) ListShiftActivityActors(w http.ResponseWriter, r *http.Request) {

@@ -1255,7 +1255,7 @@
                         "name": "request",
                         "in": "body",
                         "schema": {
-                            "$ref": "#/definitions/handlers.CallNextRequest"
+                            "$ref": "#/definitions/handlers.CounterCallNextRequest"
                         }
                     }
                 ],
@@ -4251,6 +4251,12 @@
                             "$ref": "#/definitions/models.Ticket"
                         }
                     },
+                    "400": {
+                        "description": "Bad Request (e.g. counter not in ticket unit)",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     "404": {
                         "description": "Ticket not found",
                         "schema": {
@@ -4449,7 +4455,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Allowed when status is called or in_service. Send clientId to link an existing visitor; optional firstName/lastName update that client's name. Do not send phone together with clientId. Or send firstName, lastName, and phone (without clientId) to find or create by phone.",
+                "description": "Allowed when status is called or in_service. Body must not be empty. Either: (A) clientId — optional firstName/lastName to rename that client; do not send phone, or (B) firstName, lastName, and phone without clientId to find/create by phone.",
                 "consumes": [
                     "application/json"
                 ],
@@ -4895,7 +4901,7 @@
         },
         "/units/{unitId}/call-next": {
             "post": {
-                "description": "Calls the next waiting ticket for a unit. Optional serviceIds (or legacy serviceId) limit the queue; omit or empty means all services in the unit.",
+                "description": "Calls the next waiting ticket for a unit. JSON body must include counterId. Optional serviceIds (or legacy serviceId) limit the queue; omit or empty means all services in the unit.",
                 "consumes": [
                     "application/json"
                 ],
@@ -5868,6 +5874,18 @@
                             "type": "string"
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -5906,6 +5924,18 @@
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/services.ShiftActivityActorsResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
                         }
                     },
                     "500": {
@@ -5949,6 +5979,18 @@
                             "items": {
                                 "$ref": "#/definitions/services.ShiftCounterDTO"
                             }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
                         }
                     },
                     "500": {
@@ -6576,7 +6618,7 @@
                 }
             },
             "post": {
-                "description": "Creates a new ticket for a service in a unit",
+                "description": "Creates a new ticket for a service in a unit. Unit is taken from the path; body requires serviceId (optional clientId).",
                 "consumes": [
                     "application/json"
                 ],
@@ -6653,6 +6695,18 @@
                                 "$ref": "#/definitions/models.UnitVisitorTagDefinition"
                             }
                         }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 }
             },
@@ -6703,6 +6757,18 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 }
             }
@@ -6738,6 +6804,18 @@
                 "responses": {
                     "204": {
                         "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
                     },
                     "404": {
                         "description": "Not Found",
@@ -6798,6 +6876,18 @@
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "type": "string"
                         }
@@ -7289,6 +7379,9 @@
         },
         "handlers.CallNextRequest": {
             "type": "object",
+            "required": [
+                "counterId"
+            ],
             "properties": {
                 "counterId": {
                     "type": "string"
@@ -7315,6 +7408,20 @@
                 },
                 "nextCursor": {
                     "type": "string"
+                }
+            }
+        },
+        "handlers.CounterCallNextRequest": {
+            "type": "object",
+            "properties": {
+                "serviceId": {
+                    "type": "string"
+                },
+                "serviceIds": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -7356,14 +7463,14 @@
         },
         "handlers.CreateTicketRequest": {
             "type": "object",
+            "required": [
+                "serviceId"
+            ],
             "properties": {
                 "clientId": {
                     "type": "string"
                 },
                 "serviceId": {
-                    "type": "string"
-                },
-                "unitId": {
                     "type": "string"
                 }
             }

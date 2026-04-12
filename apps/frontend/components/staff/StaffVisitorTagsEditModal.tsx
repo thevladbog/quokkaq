@@ -67,8 +67,12 @@ function StaffVisitorTagsEditModalInner({
   );
   const [reasonDraft, setReasonDraft] = useState('');
 
-  const { data: tagDefinitions = [], isLoading: tagDefinitionsLoading } =
-    useVisitorTagDefinitions(unitId, { enabled: open && !!unitId });
+  const {
+    data: tagDefinitions = [],
+    isLoading: tagDefinitionsLoading,
+    isError: tagDefinitionsError,
+    error: tagDefinitionsErr
+  } = useVisitorTagDefinitions(unitId, { enabled: open && !!unitId });
 
   const setVisitorTags = useSetVisitorTags();
 
@@ -171,6 +175,15 @@ function StaffVisitorTagsEditModalInner({
                 <Loader2 className='h-3.5 w-3.5 animate-spin' />
                 {t('visitor_context.tags_loading')}
               </div>
+            ) : tagDefinitionsError ? (
+              <p className='text-destructive text-sm'>
+                {t('visitor_context.tags_definitions_load_error', {
+                  message:
+                    tagDefinitionsErr instanceof Error
+                      ? tagDefinitionsErr.message
+                      : ''
+                })}
+              </p>
             ) : sortedTagDefinitions.length === 0 ? (
               <p className='text-muted-foreground text-sm'>
                 {t('visitor_context.tags_no_definitions')}

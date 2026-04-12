@@ -28,6 +28,8 @@ func NewVisitorTagHandler(svc services.VisitorTagDefinitionService) *VisitorTagH
 // @Security     BearerAuth
 // @Param        unitId path string true "Unit ID"
 // @Success      200 {array} models.UnitVisitorTagDefinition
+// @Failure      401 {string} string "Unauthorized"
+// @Failure      403 {string} string "Forbidden"
 // @Router       /units/{unitId}/visitor-tag-definitions [get]
 func (h *VisitorTagHandler) ListVisitorTagDefinitions(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
@@ -56,6 +58,8 @@ type createVisitorTagDefinitionRequest struct {
 // @Param        body body createVisitorTagDefinitionRequest true "Payload"
 // @Success      201 {object} models.UnitVisitorTagDefinition
 // @Failure      400 {string} string "Bad Request"
+// @Failure      401 {string} string "Unauthorized"
+// @Failure      403 {string} string "Forbidden"
 // @Router       /units/{unitId}/visitor-tag-definitions [post]
 func (h *VisitorTagHandler) CreateVisitorTagDefinition(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
@@ -94,6 +98,8 @@ type patchVisitorTagDefinitionRequest struct {
 // @Param        body body patchVisitorTagDefinitionRequest true "Payload"
 // @Success      200 {object} models.UnitVisitorTagDefinition
 // @Failure      400 {string} string "Bad Request"
+// @Failure      401 {string} string "Unauthorized"
+// @Failure      403 {string} string "Forbidden"
 // @Failure      404 {string} string "Not Found"
 // @Router       /units/{unitId}/visitor-tag-definitions/{definitionId} [patch]
 func (h *VisitorTagHandler) PatchVisitorTagDefinition(w http.ResponseWriter, r *http.Request) {
@@ -128,6 +134,8 @@ func (h *VisitorTagHandler) PatchVisitorTagDefinition(w http.ResponseWriter, r *
 // @Param        unitId path string true "Unit ID"
 // @Param        definitionId path string true "Definition ID"
 // @Success      204  {object}  nil
+// @Failure      401 {string} string "Unauthorized"
+// @Failure      403 {string} string "Forbidden"
 // @Failure      404 {string} string "Not Found"
 // @Router       /units/{unitId}/visitor-tag-definitions/{definitionId} [delete]
 func (h *VisitorTagHandler) DeleteVisitorTagDefinition(w http.ResponseWriter, r *http.Request) {
