@@ -16,6 +16,7 @@ import {
   CardTitle
 } from '@/components/ui/card';
 import { Combobox } from '@/components/ui/combobox';
+import { getGetUnitsIdQueryKey } from '@/lib/api/generated/units';
 import { unitsApi } from '@/lib/api';
 import { useUpdateUnit } from '@/lib/hooks';
 import { CountersList } from '@/components/admin/units/counters-list';
@@ -49,7 +50,7 @@ export default function UnitPage({ params }: UnitPageProps) {
   const [activeTab, setActiveTab] = useState('general');
 
   const { data: unit } = useQuery({
-    queryKey: ['unit', unitId],
+    queryKey: getGetUnitsIdQueryKey(unitId),
     queryFn: () => unitsApi.getById(unitId)
   });
 

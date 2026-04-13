@@ -4,6 +4,7 @@ import { use, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { ChevronLeft, Loader2, SlidersHorizontal } from 'lucide-react';
+import { getGetUnitsUnitIdVisitorTagDefinitionsQueryKey } from '@/lib/api/generated/units';
 import { unitsApi, type UnitClient } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -78,7 +79,7 @@ function UnitClientsListContent({ unitId }: { unitId: string }) {
   });
 
   const tagDefsQuery = useQuery({
-    queryKey: ['visitor-tag-definitions', unitId, 'clients-list'],
+    queryKey: getGetUnitsUnitIdVisitorTagDefinitionsQueryKey(unitId),
     queryFn: () => unitsApi.listVisitorTagDefinitions(unitId),
     staleTime: 60_000
   });

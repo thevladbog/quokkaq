@@ -65,7 +65,7 @@
     "orval:check": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "orval --config orval.config.ts && git diff --exit-code lib/api/generated/platform.ts",
+        "command": "orval --config orval.config.ts && untracked=$(git ls-files --others --exclude-standard -- lib/api/generated/) && if [ -n \"$untracked\" ]; then echo 'Untracked files under lib/api/generated/ (run from repo root or commit generated output):' && echo \"$untracked\" && exit 1; fi && git diff --exit-code lib/api/generated/",
         "cwd": "apps/frontend"
       }
     }

@@ -34,6 +34,7 @@ import {
   useUpdateService,
   useDeleteService
 } from '@/lib/hooks';
+import { getGetUnitsUnitIdChildUnitsQueryKey } from '@/lib/api/generated/units';
 import { unitsApi } from '@/lib/api';
 import { useTranslations, useLocale } from 'next-intl';
 import { ImageUpload } from '@/components/ui/image-upload';
@@ -396,7 +397,7 @@ function ServiceForm({
   const updateServiceMutation = useUpdateService();
 
   const { data: childUnits = [] } = useQuery({
-    queryKey: ['units', selectedUnitId, 'child-units'],
+    queryKey: getGetUnitsUnitIdChildUnitsQueryKey(selectedUnitId),
     queryFn: () => unitsApi.getChildUnits(selectedUnitId),
     enabled: !!selectedUnitId && (!!editingService || isCreating)
   });

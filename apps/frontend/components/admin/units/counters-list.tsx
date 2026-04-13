@@ -29,6 +29,7 @@ import {
   DialogDescription,
   DialogFooter
 } from '@/components/ui/dialog';
+import { getGetUnitsUnitIdCountersQueryKey } from '@/lib/api/generated/tickets-counters';
 import { countersApi, Counter } from '@/lib/api';
 import { formatApiToastErrorMessage } from '@/lib/format-api-toast-error';
 import { CounterDialog } from './counter-dialog';
@@ -84,7 +85,7 @@ export function UnitCountersSection({
     isError,
     error
   } = useQuery({
-    queryKey: ['counters', countersUnitId],
+    queryKey: getGetUnitsUnitIdCountersQueryKey(countersUnitId),
     queryFn: () => countersApi.getByUnitId(countersUnitId)
   });
 
@@ -96,7 +97,9 @@ export function UnitCountersSection({
   const deleteMutation = useMutation({
     mutationFn: (id: string) => countersApi.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['counters', countersUnitId] });
+      queryClient.invalidateQueries({
+        queryKey: getGetUnitsUnitIdCountersQueryKey(countersUnitId)
+      });
       toast.success(t('deleted_success'));
       setDeletingCounter(null);
     },

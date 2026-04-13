@@ -6,6 +6,9 @@ import {
   isRequestAbortError
 } from './authenticated-api-fetch';
 import { logger } from './logger';
+import * as orvalTc from './api/generated/tickets-counters';
+import * as orvalTenantBilling from './api/generated/tenant-billing';
+import * as orvalUnits from './api/generated/units';
 
 export { ApiHttpError } from './api-errors';
 export { isRequestAbortError } from './authenticated-api-fetch';
@@ -35,9 +38,6 @@ import type {
   Material,
   PreRegistration,
   UsageMetrics,
-  Subscription,
-  SubscriptionPlan,
-  Invoice,
   Company,
   SaasVendor,
   CompanyMeResponse,
@@ -405,26 +405,31 @@ export const desktopTerminalsApi = {
 
 // Unit API functions
 export const unitsApi = {
-  getAll: () => apiRequest<Unit[]>('/units', {}, z.array(UnitModelSchema)),
+  getAll: async () => {
+    const res = await orvalUnits.getUnits();
+    return z.array(UnitModelSchema).parse(res.data ?? []);
+  },
 
-  getById: (id: string) =>
-    apiRequest<Unit>(`/units/${id}`, { cache: 'no-store' }, UnitModelSchema),
+  getById: async (id: string) => {
+    const res = await orvalUnits.getUnitsId(id, { cache: 'no-store' });
+    return UnitModelSchema.parse(res.data);
+  },
 
   /** Workplace units under a service zone (empty if parent is not a service zone). Requires unit membership. */
-  getChildWorkplaces: (unitId: string) =>
-    apiRequest<Unit[]>(
-      `/units/${unitId}/child-workplaces`,
-      { cache: 'no-store' },
-      z.array(UnitModelSchema)
-    ),
+  getChildWorkplaces: async (unitId: string) => {
+    const res = await orvalUnits.getUnitsUnitIdChildWorkplaces(unitId, {
+      cache: 'no-store'
+    });
+    return z.array(UnitModelSchema).parse(res.data ?? []);
+  },
 
   /** Direct child units under a service zone (any kind). Empty if parent is not a service zone. */
-  getChildUnits: (unitId: string) =>
-    apiRequest<Unit[]>(
-      `/units/${unitId}/child-units`,
-      { cache: 'no-store' },
-      z.array(UnitModelSchema)
-    ),
+  getChildUnits: async (unitId: string) => {
+    const res = await orvalUnits.getUnitsUnitIdChildUnits(unitId, {
+      cache: 'no-store'
+    });
+    return z.array(UnitModelSchema).parse(res.data ?? []);
+  },
 
   getServices: (unitId: string) =>
     apiRequest<Service[]>(
@@ -433,12 +438,10 @@ export const unitsApi = {
       z.array(ServiceModelSchema)
     ),
 
-  getTickets: (unitId: string) =>
-    apiRequest<Ticket[]>(
-      `/units/${unitId}/tickets`,
-      {},
-      z.array(TicketModelSchema)
-    ),
+  getTickets: async (unitId: string) => {
+    const res = await orvalTc.getUnitsUnitIdTickets(unitId);
+    return z.array(TicketModelSchema).parse(res.data ?? []);
+  },
 
   getServicesTree: (unitId: string, init?: RequestInit) =>
     apiRequest<Service[]>(
@@ -447,7 +450,7 @@ export const unitsApi = {
       z.array(ServiceModelSchema)
     ),
 
-  create: (data: {
+  create: async (data: {
     name: string;
     code: string;
     companyId: string;
@@ -455,35 +458,38 @@ export const unitsApi = {
     parentId?: string | null;
     kind?: 'subdivision' | 'service_zone';
     sortOrder?: number;
-  }) =>
-    apiRequest<Unit>('/units', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    }),
+  }) => {
+    const res = await orvalUnits.postUnits({
+      name: data.name,
+      code: data.code,
+      companyId: data.companyId,
+      timezone: data.timezone,
+      parentId: data.parentId ?? undefined,
+      kind: data.kind,
+      sortOrder: data.sortOrder
+    });
+    return UnitModelSchema.parse(res.data);
+  },
 
-  update: (id: string, data: Partial<Unit>) =>
-    apiRequest<Unit>(`/units/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify(data)
-    }),
+  update: async (id: string, data: Partial<Unit>) => {
+    const res = await orvalUnits.patchUnitsId(
+      id,
+      data as orvalUnits.ModelsUnit
+    );
+    return UnitModelSchema.parse(res.data);
+  },
 
-  createTicket: (
+  createTicket: async (
     unitId: string,
     ticketData: { serviceId: string; clientId?: string }
   ) => {
-    const body: { serviceId: string; clientId?: string } = {
+    const body: orvalTc.HandlersCreateTicketRequest = {
       serviceId: ticketData.serviceId
     };
     const cid = ticketData.clientId?.trim();
     if (cid) body.clientId = cid;
-    return apiRequest<Ticket>(
-      `/units/${unitId}/tickets`,
-      {
-        method: 'POST',
-        body: JSON.stringify(body)
-      },
-      TicketModelSchema
-    );
+    const res = await orvalTc.postUnitsUnitIdTickets(unitId, body);
+    return TicketModelSchema.parse(res.data);
   },
 
   // Material and Ad Settings endpoints
@@ -511,26 +517,31 @@ export const unitsApi = {
     return response.json();
   },
 
-  getMaterials: (unitId: string) =>
-    apiRequest<Material[]>(`/units/${unitId}/materials`, {}),
+  getMaterials: async (unitId: string) => {
+    const res = await orvalUnits.getUnitsUnitIdMaterials(unitId);
+    return (res.data ?? []) as Material[];
+  },
 
-  deleteMaterial: (unitId: string, materialId: string) =>
-    apiRequest<unknown>(`/units/${unitId}/materials/${materialId}`, {
+  deleteMaterial: async (unitId: string, materialId: string) => {
+    await orvalUnits.deleteUnitsUnitIdMaterialsMaterialId(unitId, materialId, {
       method: 'DELETE'
-    }),
+    });
+  },
 
-  updateAdSettings: (
+  updateAdSettings: async (
     unitId: string,
     settings: {
       width?: number;
       duration?: number;
       activeMaterialIds?: string[];
     }
-  ) =>
-    apiRequest<Unit>(`/units/${unitId}/ad-settings`, {
-      method: 'PATCH',
-      body: JSON.stringify(settings)
-    }),
+  ) => {
+    const res = await orvalUnits.patchUnitsUnitIdAdSettings(
+      unitId,
+      settings as orvalUnits.PatchUnitsUnitIdAdSettingsBody
+    );
+    return UnitModelSchema.parse(res.data);
+  },
 
   getClientVisits: (
     unitId: string,
@@ -614,122 +625,94 @@ export const unitsApi = {
       UnitClientModelSchema
     ),
 
-  listVisitorTagDefinitions: (unitId: string) =>
-    apiRequest<VisitorTagDefinition[]>(
-      `/units/${unitId}/visitor-tag-definitions`,
-      { cache: 'no-store' },
-      z.array(VisitorTagDefinitionSchema)
-    ),
+  listVisitorTagDefinitions: async (unitId: string) => {
+    const res = await orvalUnits.getUnitsUnitIdVisitorTagDefinitions(unitId, {
+      cache: 'no-store'
+    });
+    return z.array(VisitorTagDefinitionSchema).parse(res.data ?? []);
+  },
 
-  createVisitorTagDefinition: (
+  createVisitorTagDefinition: async (
     unitId: string,
     body: { label: string; color: string; sortOrder?: number }
-  ) =>
-    apiRequest<VisitorTagDefinition>(
-      `/units/${unitId}/visitor-tag-definitions`,
-      {
-        method: 'POST',
-        body: JSON.stringify(body)
-      },
-      VisitorTagDefinitionSchema
-    ),
+  ) => {
+    const res = await orvalUnits.postUnitsUnitIdVisitorTagDefinitions(
+      unitId,
+      body
+    );
+    return VisitorTagDefinitionSchema.parse(res.data);
+  },
 
-  patchVisitorTagDefinition: (
+  patchVisitorTagDefinition: async (
     unitId: string,
     definitionId: string,
     body: { label?: string; color?: string; sortOrder?: number }
-  ) =>
-    apiRequest<VisitorTagDefinition>(
-      `/units/${unitId}/visitor-tag-definitions/${definitionId}`,
-      {
-        method: 'PATCH',
-        body: JSON.stringify(body)
-      },
-      VisitorTagDefinitionSchema
-    ),
+  ) => {
+    const res =
+      await orvalUnits.patchUnitsUnitIdVisitorTagDefinitionsDefinitionId(
+        unitId,
+        definitionId,
+        body
+      );
+    return VisitorTagDefinitionSchema.parse(res.data);
+  },
 
-  deleteVisitorTagDefinition: (unitId: string, definitionId: string) =>
-    apiRequest<void>(
-      `/units/${unitId}/visitor-tag-definitions/${definitionId}`,
+  deleteVisitorTagDefinition: async (unitId: string, definitionId: string) => {
+    await orvalUnits.deleteUnitsUnitIdVisitorTagDefinitionsDefinitionId(
+      unitId,
+      definitionId,
       { method: 'DELETE' }
-    )
+    );
+  }
 };
 
-// Ticket API functions
+// Ticket API functions (HTTP via Orval-generated clients + Zod parse)
 export const ticketsApi = {
   getAll: () =>
     apiRequest<Ticket[]>('/tickets', {}, z.array(TicketModelSchema)),
 
-  getByUnitId: (unitId: string) =>
-    apiRequest<Ticket[]>(
-      `/units/${unitId}/tickets`,
-      {},
-      z.array(TicketModelSchema)
-    ),
+  getByUnitId: (unitId: string) => unitsApi.getTickets(unitId),
 
-  getById: (id: string) =>
-    apiRequest<Ticket>(`/tickets/${id}`, {}, TicketModelSchema),
+  getById: async (id: string) => {
+    const res = await orvalTc.getTicketsId(id);
+    return TicketModelSchema.parse(res.data);
+  },
 
-  create: (ticketData: { unitId: string; serviceId: string }) =>
-    apiRequest<Ticket>(
-      '/tickets',
-      {
-        method: 'POST',
-        body: JSON.stringify(ticketData)
-      },
-      TicketModelSchema
-    ),
+  create: async (ticketData: { unitId: string; serviceId: string }) => {
+    const res = await orvalTc.postUnitsUnitIdTickets(ticketData.unitId, {
+      serviceId: ticketData.serviceId
+    });
+    return TicketModelSchema.parse(res.data);
+  },
 
-  complete: (id: string) =>
-    apiRequest<Ticket>(
-      `/tickets/${id}/status`,
-      {
-        method: 'PATCH',
-        body: JSON.stringify({ status: 'served' })
-      },
-      TicketModelSchema
-    ),
+  complete: async (id: string) => {
+    const res = await orvalTc.patchTicketsIdStatus(id, { status: 'served' });
+    return TicketModelSchema.parse(res.data);
+  },
 
-  noShow: (id: string) =>
-    apiRequest<Ticket>(
-      `/tickets/${id}/status`,
-      {
-        method: 'PATCH',
-        body: JSON.stringify({ status: 'no_show' })
-      },
-      TicketModelSchema
-    ),
+  noShow: async (id: string) => {
+    const res = await orvalTc.patchTicketsIdStatus(id, { status: 'no_show' });
+    return TicketModelSchema.parse(res.data);
+  },
 
-  recall: (id: string) =>
-    apiRequest<Ticket>(
-      `/tickets/${id}/recall`,
-      {
-        method: 'POST'
-      },
-      TicketModelSchema
-    ),
+  recall: async (id: string) => {
+    const res = await orvalTc.postTicketsIdRecall(id);
+    return TicketModelSchema.parse(res.data);
+  },
 
-  pick: (id: string, counterId: string) =>
-    apiRequest<Ticket>(
-      `/tickets/${id}/pick`,
-      {
-        method: 'POST',
-        body: JSON.stringify({ counterId })
-      },
-      TicketModelSchema
-    ),
+  pick: async (id: string, counterId: string) => {
+    const res = await orvalTc.postTicketsIdPick(id, { counterId });
+    return TicketModelSchema.parse(res.data);
+  },
 
-  confirmArrival: (id: string) =>
-    apiRequest<Ticket>(
-      `/tickets/${id}/status`,
-      {
-        method: 'PATCH',
-        body: JSON.stringify({ status: 'in_service' })
-      },
-      TicketModelSchema
-    ),
+  confirmArrival: async (id: string) => {
+    const res = await orvalTc.patchTicketsIdStatus(id, {
+      status: 'in_service'
+    });
+    return TicketModelSchema.parse(res.data);
+  },
 
-  transfer: (
+  transfer: async (
     id: string,
     transferData: {
       toCounterId?: string;
@@ -739,79 +722,69 @@ export const ticketsApi = {
       operatorComment?: string | null;
     }
   ) => {
-    const body: Record<string, unknown> = {};
+    const body: orvalTc.HandlersTransferRequest = {};
     if (transferData.toCounterId) body.toCounterId = transferData.toCounterId;
     if (transferData.toUserId) body.toUserId = transferData.toUserId;
-    if (transferData.toServiceZoneId)
+    if (transferData.toServiceZoneId) {
       body.toServiceZoneId = transferData.toServiceZoneId;
+    }
     if (transferData.toServiceId) body.toServiceId = transferData.toServiceId;
     if (transferData.operatorComment !== undefined) {
       body.operatorComment = transferData.operatorComment;
     }
-    return apiRequest<Ticket>(
-      `/tickets/${id}/transfer`,
-      {
-        method: 'POST',
-        body: JSON.stringify(body)
-      },
-      TicketModelSchema
-    );
+    const res = await orvalTc.postTicketsIdTransfer(id, body);
+    return TicketModelSchema.parse(res.data);
   },
 
-  returnToQueue: (id: string) =>
-    apiRequest<Ticket>(
-      `/tickets/${id}/return`,
-      {
-        method: 'POST'
-      },
-      TicketModelSchema
-    ),
+  returnToQueue: async (id: string) => {
+    const res = await orvalTc.postTicketsIdReturn(id);
+    return TicketModelSchema.parse(res.data);
+  },
 
-  updateOperatorComment: (id: string, operatorComment: string | null) =>
-    apiRequest<Ticket>(
-      `/tickets/${id}/operator-comment`,
-      {
-        method: 'PATCH',
-        body: JSON.stringify({ operatorComment })
-      },
-      TicketModelSchema
-    ),
+  updateOperatorComment: async (id: string, operatorComment: string | null) => {
+    const res = await orvalTc.patchTicketsIdOperatorComment(id, {
+      operatorComment
+    });
+    return TicketModelSchema.parse(res.data);
+  },
 
   /**
    * Attach or replace visitor while ticket is `called` or `in_service`.
    * Either `clientId` (optional `firstName`/`lastName` to update that client's name; do not send `phone`) OR `firstName` + `lastName` + `phone` without `clientId` (find/create by phone).
    */
-  updateTicketVisitor: (
+  updateTicketVisitor: async (
     id: string,
     body:
       | { clientId: string; firstName?: string; lastName?: string }
       | { firstName: string; lastName: string; phone: string }
-  ) =>
-    apiRequest<Ticket>(
-      `/tickets/${id}/visitor`,
-      {
-        method: 'PATCH',
-        body: JSON.stringify(body)
-      },
-      TicketModelSchema
-    ),
+  ) => {
+    const payload: orvalTc.HandlersPatchTicketVisitorRequest =
+      'clientId' in body
+        ? {
+            clientId: body.clientId,
+            firstName: body.firstName,
+            lastName: body.lastName
+          }
+        : {
+            firstName: body.firstName,
+            lastName: body.lastName,
+            phone: body.phone
+          };
+    const res = await orvalTc.patchTicketsIdVisitor(id, payload);
+    return TicketModelSchema.parse(res.data);
+  },
 
   /** Full replacement of visitor tag assignments; `operatorComment` is required (reason for change). */
-  setVisitorTags: (
+  setVisitorTags: async (
     id: string,
     body: { tagDefinitionIds: string[]; operatorComment: string }
-  ) =>
-    apiRequest<Ticket>(
-      `/tickets/${id}/visitor-tags`,
-      {
-        method: 'PUT',
-        body: JSON.stringify({
-          tagDefinitionIds: body.tagDefinitionIds,
-          operatorComment: body.operatorComment
-        })
-      },
-      TicketModelSchema
-    )
+  ) => {
+    const res = await orvalTc.putTicketsIdVisitorTags(id, {
+      tagDefinitionIds: body.tagDefinitionIds,
+      operatorComment: body.operatorComment
+    });
+    return TicketModelSchema.parse(res.data);
+  }
 };
 
 // Booking API functions
@@ -874,95 +847,69 @@ export const servicesApi = {
     })
 };
 
-// Counter API functions
+// Counter API functions (HTTP via Orval-generated clients + Zod where applicable)
 export const countersApi = {
   /** Optional serviceIds limits which waiting tickets are considered; omit or empty = all services in the unit. */
-  callNext: (counterId: string, callData?: { serviceIds?: string[] }) =>
-    apiRequest<{ ok: boolean; ticket?: Ticket; message?: string }>(
-      `/counters/${counterId}/call-next`,
-      {
-        method: 'POST',
-        body: JSON.stringify(
-          callData?.serviceIds && callData.serviceIds.length > 0
-            ? { serviceIds: callData.serviceIds }
-            : {}
-        )
-      }
-    ),
+  callNext: async (counterId: string, callData?: { serviceIds?: string[] }) => {
+    const body: orvalTc.HandlersCounterCallNextRequest =
+      callData?.serviceIds && callData.serviceIds.length > 0
+        ? { serviceIds: callData.serviceIds }
+        : {};
+    const res = await orvalTc.postCountersIdCallNext(counterId, body);
+    return res.data as { ok: boolean; ticket?: Ticket; message?: string };
+  },
 
-  getByUnitId: (unitId: string) =>
-    apiRequest<Counter[]>(
-      `/units/${unitId}/counters`,
-      {},
-      z.array(CounterModelSchema)
-    ),
+  getByUnitId: async (unitId: string) => {
+    const res = await orvalTc.getUnitsUnitIdCounters(unitId);
+    return z.array(CounterModelSchema).parse(res.data ?? []);
+  },
 
-  create: (
+  create: async (
     unitId: string,
     data: { name: string; serviceZoneId?: string | null }
-  ) =>
-    apiRequest<Counter>(
-      `/units/${unitId}/counters`,
-      {
-        method: 'POST',
-        body: JSON.stringify(data)
-      },
-      CounterModelSchema
-    ),
+  ) => {
+    const res = await orvalTc.postCounters({
+      unitId,
+      name: data.name,
+      serviceZoneId: data.serviceZoneId ?? undefined
+    });
+    return CounterModelSchema.parse(res.data);
+  },
 
-  update: (
+  update: async (
     id: string,
     data: { name?: string; assignedTo?: string; serviceZoneId?: string | null }
-  ) =>
-    apiRequest<Counter>(
-      `/counters/${id}`,
-      {
-        method: 'PUT',
-        body: JSON.stringify(data)
-      },
-      CounterModelSchema
-    ),
+  ) => {
+    const res = await orvalTc.putCountersId(id, {
+      name: data.name,
+      serviceZoneId: data.serviceZoneId ?? undefined
+    });
+    return CounterModelSchema.parse(res.data);
+  },
 
-  delete: (id: string) =>
-    apiRequest<unknown>(`/counters/${id}`, {
-      method: 'DELETE'
-    }),
+  delete: async (id: string) => {
+    await orvalTc.deleteCountersId(id, { method: 'DELETE' });
+  },
 
-  occupy: (id: string) =>
-    apiRequest<Counter>(
-      `/counters/${id}/occupy`,
-      {
-        method: 'POST'
-      },
-      CounterModelSchema
-    ),
+  occupy: async (id: string) => {
+    const res = await orvalTc.postCountersIdOccupy(id);
+    return CounterModelSchema.parse(res.data);
+  },
 
-  release: (id: string) =>
-    apiRequest<Counter>(
-      `/counters/${id}/release`,
-      {
-        method: 'POST'
-      },
-      CounterModelSchema
-    ),
+  release: async (id: string) => {
+    const res = await orvalTc.postCountersIdRelease(id);
+    return CounterModelSchema.parse(res.data);
+  },
 
-  startBreak: (id: string) =>
-    apiRequest<Counter>(
-      `/counters/${id}/break/start`,
-      {
-        method: 'POST'
-      },
-      CounterModelSchema
-    ),
+  startBreak: async (id: string) => {
+    const res = await orvalTc.postCountersIdBreakStart(id);
+    return CounterModelSchema.parse(res.data);
+  },
 
-  endBreak: (id: string) =>
-    apiRequest<Counter>(
-      `/counters/${id}/break/end`,
-      {
-        method: 'POST'
-      },
-      CounterModelSchema
-    )
+  endBreak: async (id: string) => {
+    const res = await orvalTc.postCountersIdBreakEnd(id);
+    return CounterModelSchema.parse(res.data);
+  }
 };
 
 export const ShiftActivityItemSchema = z.object({
@@ -1262,61 +1209,61 @@ export const companiesApi = {
 
 // Subscription API functions
 export const subscriptionsApi = {
-  getMySubscription: () =>
-    apiRequest<Subscription>(`/subscriptions/me`, {}, SubscriptionSchema),
+  getMySubscription: async () => {
+    const res = await orvalTenantBilling.getSubscriptionsMe();
+    return SubscriptionSchema.parse(res.data);
+  },
 
-  getPlans: () =>
-    apiRequest<SubscriptionPlan[]>(
-      `/subscriptions/plans`,
-      {},
-      z.array(SubscriptionPlanSchema)
-    ),
+  getPlans: async () => {
+    const res = await orvalTenantBilling.getSubscriptionPlans();
+    return z.array(SubscriptionPlanSchema).parse(res.data ?? []);
+  },
 
-  createCheckout: (planCode: string) =>
-    apiRequest<{ checkoutUrl: string; sessionId: string }>(
-      `/subscriptions/checkout`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planCode })
-      },
-      z.object({
+  createCheckout: async (planCode: string) => {
+    const res = await orvalTenantBilling.postSubscriptionsCheckout({
+      planCode
+    });
+    return z
+      .object({
         checkoutUrl: z.string(),
         sessionId: z.string()
       })
-    ),
+      .parse(res.data);
+  },
 
-  cancelSubscription: (subscriptionId: string) =>
-    apiRequest<Subscription>(
-      `/subscriptions/${subscriptionId}/cancel`,
-      {
-        method: 'POST'
-      },
-      SubscriptionSchema
-    )
+  cancelSubscription: async (subscriptionId: string) => {
+    const res = await orvalTenantBilling.postSubscriptionsIdCancel(
+      subscriptionId,
+      { method: 'POST' }
+    );
+    return SubscriptionSchema.parse(res.data);
+  }
 };
 
 // Invoice API functions
 export const invoicesApi = {
-  getMyInvoices: () =>
-    apiRequest<Invoice[]>(`/invoices/me`, {}, z.array(InvoiceSchema)),
+  getMyInvoices: async () => {
+    const res = await orvalTenantBilling.getInvoicesMe();
+    return z.array(InvoiceSchema).parse(res.data ?? []);
+  },
 
-  getMyInvoiceById: (invoiceId: string) =>
-    apiRequest<Invoice>(
-      `/invoices/${encodeURIComponent(invoiceId)}`,
-      {},
-      InvoiceSchema
-    ),
+  getMyInvoiceById: async (invoiceId: string) => {
+    const res = await orvalTenantBilling.getInvoicesId(invoiceId);
+    return InvoiceSchema.parse(res.data);
+  },
 
-  requestYooKassaPaymentLink: (invoiceId: string) =>
-    apiRequest<{ confirmationUrl: string; paymentId: string }>(
-      `/invoices/${encodeURIComponent(invoiceId)}/yookassa-payment-link`,
-      { method: 'POST' },
-      z.object({
+  requestYooKassaPaymentLink: async (invoiceId: string) => {
+    const res = await orvalTenantBilling.postInvoicesIdYookassaPaymentLink(
+      invoiceId,
+      { method: 'POST' }
+    );
+    return z
+      .object({
         confirmationUrl: z.string(),
         paymentId: z.string()
       })
-    ),
+      .parse(res.data);
+  },
 
   downloadInvoice: async (invoiceId: string) => {
     const { blob, headers } = await apiRequestBlob(
@@ -1329,10 +1276,17 @@ export const invoicesApi = {
   },
 
   /** SaaS operator company for invoice header / bank QR (tenant). `null` if not configured (404). */
-  getSaaSVendor: () =>
-    apiRequest<SaasVendor | null>(`/invoices/me/vendor`, {}, SaasVendorSchema, {
-      notFoundValue: null
-    })
+  getSaaSVendor: async (): Promise<SaasVendor | null> => {
+    try {
+      const res = await orvalTenantBilling.getInvoicesMeVendor();
+      return SaasVendorSchema.parse(res.data);
+    } catch (e) {
+      if (e instanceof ApiHttpError && e.status === 404) {
+        return null;
+      }
+      throw e;
+    }
+  }
 };
 
 // Company API functions

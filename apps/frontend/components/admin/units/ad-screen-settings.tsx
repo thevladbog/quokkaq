@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
+import { getGetUnitsUnitIdMaterialsQueryKey } from '@/lib/api/generated/units';
 import { unitsApi, Material } from '@/lib/api';
 import {
   Card,
@@ -73,7 +74,7 @@ export function AdScreenSettings({
 
   // Queries and Mutations
   const { data: materials = [] as Material[], isLoading } = useQuery({
-    queryKey: ['units', unitId, 'materials'],
+    queryKey: getGetUnitsUnitIdMaterialsQueryKey(unitId),
     queryFn: () => unitsApi.getMaterials(unitId)
   });
 
@@ -83,7 +84,7 @@ export function AdScreenSettings({
     mutationFn: (file: File) => unitsApi.uploadMaterial(unitId, file),
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: ['units', unitId, 'materials']
+        queryKey: getGetUnitsUnitIdMaterialsQueryKey(unitId)
       });
       toast.success(t('upload_success'));
       setUploading(false);
@@ -99,7 +100,7 @@ export function AdScreenSettings({
       unitsApi.deleteMaterial(unitId, materialId),
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: ['units', unitId, 'materials']
+        queryKey: getGetUnitsUnitIdMaterialsQueryKey(unitId)
       });
       toast.success(t('delete_success'));
     },

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import { useRouter } from '@/src/i18n/navigation';
 import { useTranslations } from 'next-intl';
+import { getGetInvoicesMeQueryKey } from '@/lib/api/generated/tenant-billing';
 import { invoicesApi } from '@/lib/api';
 import {
   downloadInvoicePdf,
@@ -22,7 +23,7 @@ export function OrganizationInvoicesContent() {
   const tCommon = useTranslations('common');
 
   const { data: invoices, isLoading } = useQuery({
-    queryKey: ['invoices-me'],
+    queryKey: getGetInvoicesMeQueryKey(),
     queryFn: () => invoicesApi.getMyInvoices()
   });
 

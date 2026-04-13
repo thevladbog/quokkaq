@@ -6,6 +6,10 @@ import { InvoiceDocumentLinesAndTotals } from '@/components/billing/InvoiceDocum
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
+import {
+  getGetInvoicesIdQueryKey,
+  getGetInvoicesMeVendorQueryKey
+} from '@/lib/api/generated/tenant-billing';
 import { invoicesApi } from '@/lib/api';
 import {
   downloadInvoicePdf,
@@ -80,7 +84,9 @@ export function OrganizationInvoiceDetailContent() {
     isLoading,
     isError
   } = useQuery({
-    queryKey: ['invoice-me', id],
+    queryKey: id
+      ? getGetInvoicesIdQueryKey(id)
+      : ['invoice-detail', 'disabled'],
     queryFn: () => invoicesApi.getMyInvoiceById(id),
     enabled: !!id
   });
@@ -90,7 +96,7 @@ export function OrganizationInvoiceDetailContent() {
     isLoading: vendorLoading,
     isError: vendorQueryError
   } = useQuery({
-    queryKey: ['invoice-saas-vendor'],
+    queryKey: getGetInvoicesMeVendorQueryKey(),
     queryFn: fetchSaaSVendor,
     staleTime: 5 * 60 * 1000
   });
@@ -114,7 +120,7 @@ export function OrganizationInvoiceDetailContent() {
     mutationFn: () => invoicesApi.requestYooKassaPaymentLink(id),
     onSuccess: (data) => {
       setLinkError(null);
-      void qc.invalidateQueries({ queryKey: ['invoice-me', id] });
+      void qc.invalidateQueries({ queryKey: getGetInvoicesIdQueryKey(id) });
       if (typeof window !== 'undefined' && data.confirmationUrl) {
         window.open(data.confirmationUrl, '_blank', 'noopener,noreferrer');
       }
