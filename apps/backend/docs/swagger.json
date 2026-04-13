@@ -3781,6 +3781,16 @@
                         },
                         "description": "Bad Request"
                     },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Not Found"
+                    },
                     "500": {
                         "content": {
                             "application/json": {
