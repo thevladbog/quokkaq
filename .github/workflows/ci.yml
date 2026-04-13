@@ -39,8 +39,6 @@ jobs:
           fetch-depth: 0
 
       - uses: pnpm/action-setup@v6
-        with:
-          version: 10.22.0
 
       - uses: actions/setup-node@v6
         with:
@@ -114,8 +112,6 @@ jobs:
           fetch-depth: 0
 
       - uses: pnpm/action-setup@v6
-        with:
-          version: 10.22.0
 
       - uses: actions/setup-node@v6
         with:
