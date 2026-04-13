@@ -10,6 +10,7 @@ import {
 import { useFormatter, useLocale, useTranslations } from 'next-intl';
 import { ChevronLeft, Loader2, Tags } from 'lucide-react';
 import { toast } from 'sonner';
+import { getGetUnitsUnitIdVisitorTagDefinitionsQueryKey } from '@/lib/api/generated/units';
 import { ApiHttpError, unitsApi, type UnitClient } from '@/lib/api';
 import { ticketServiceDisplayName } from '@/lib/ticket-display';
 import { visitorTagPillStyles } from '@/lib/visitor-tag-styles';
@@ -67,7 +68,7 @@ function ClientDetailForm({
   const [tagsSavePending, setTagsSavePending] = useState(false);
 
   const tagDefsQuery = useQuery({
-    queryKey: ['visitor-tag-definitions', unitId, 'client-detail'],
+    queryKey: getGetUnitsUnitIdVisitorTagDefinitionsQueryKey(unitId),
     queryFn: () => unitsApi.listVisitorTagDefinitions(unitId),
     staleTime: 60_000
   });

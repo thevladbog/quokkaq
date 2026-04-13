@@ -21,6 +21,8 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
+import { getGetUnitsUnitIdCountersQueryKey } from '@/lib/api/generated/tickets-counters';
+import { getGetUnitsUnitIdChildUnitsQueryKey } from '@/lib/api/generated/units';
 import { countersApi, Counter, unitsApi } from '@/lib/api';
 import type { CounterServiceZoneFilter } from '@/components/admin/units/counter-zone-filter';
 
@@ -102,7 +104,7 @@ function CounterForm({
       (typeof serviceZoneFilter === 'string' && Boolean(serviceZoneFilter)));
 
   const { data: childUnits = [] } = useQuery({
-    queryKey: ['units', countersUnitId, 'child-units'],
+    queryKey: getGetUnitsUnitIdChildUnitsQueryKey(countersUnitId),
     queryFn: () => unitsApi.getChildUnits(countersUnitId),
     enabled: !!countersUnitId
   });
@@ -117,7 +119,7 @@ function CounterForm({
       countersApi.create(countersUnitId, data),
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: ['units', countersUnitId, 'counters']
+        queryKey: getGetUnitsUnitIdCountersQueryKey(countersUnitId)
       });
       toast.success(t('created_success'));
       onOpenChange(false);
@@ -132,7 +134,7 @@ function CounterForm({
       countersApi.update(counter!.id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: ['units', countersUnitId, 'counters']
+        queryKey: getGetUnitsUnitIdCountersQueryKey(countersUnitId)
       });
       toast.success(t('updated_success'));
       onOpenChange(false);

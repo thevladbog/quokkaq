@@ -10,6 +10,10 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog';
+import {
+  getGetUnitsIdQueryKey,
+  getGetUnitsUnitIdChildWorkplacesQueryKey
+} from '@/lib/api/generated/units';
 import { shiftApi, unitsApi, Ticket } from '@/lib/api';
 import { useTranslations } from 'next-intl';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -44,7 +48,7 @@ export default function ShiftDashboardPage({
   };
 
   const { data: unit } = useQuery({
-    queryKey: ['unit', unitId],
+    queryKey: getGetUnitsIdQueryKey(unitId),
     queryFn: () => unitsApi.getById(unitId)
   });
 
@@ -52,7 +56,7 @@ export default function ShiftDashboardPage({
 
   const { data: childWorkplaces, isLoading: childWorkplacesLoading } = useQuery(
     {
-      queryKey: ['unit-child-workplaces', unitId],
+      queryKey: getGetUnitsUnitIdChildWorkplacesQueryKey(unitId),
       queryFn: () => unitsApi.getChildWorkplaces(unitId),
       enabled: Boolean(unitListsChildWorkplaces)
     }

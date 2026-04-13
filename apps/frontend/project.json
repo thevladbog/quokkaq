@@ -65,7 +65,7 @@
     "orval:check": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "orval --config orval.config.ts && git diff --exit-code lib/api/generated/platform.ts",
+        "command": "orval --config orval.config.ts && git diff --exit-code lib/api/generated/",
         "cwd": "apps/frontend"
       }
     }

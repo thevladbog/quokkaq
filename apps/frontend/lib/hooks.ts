@@ -1,6 +1,16 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from '@/src/i18n/navigation';
 import {
+  getGetTicketsIdQueryKey,
+  getGetUnitsUnitIdCountersQueryKey,
+  getGetUnitsUnitIdTicketsQueryKey
+} from '../lib/api/generated/tickets-counters';
+import {
+  getGetUnitsIdQueryKey,
+  getGetUnitsQueryKey,
+  getGetUnitsUnitIdVisitorTagDefinitionsQueryKey
+} from '../lib/api/generated/units';
+import {
   usersApi,
   unitsApi,
   ticketsApi,
@@ -11,6 +21,7 @@ import {
   Unit,
   Service
 } from '../lib/api';
+import { invalidateTicketListQueries } from '../lib/ticket-query-invalidation';
 
 // User-related hooks
 export const useUsers = (search?: string) => {
@@ -45,7 +56,7 @@ export const useCreateUser = () => {
 // Unit-related hooks
 export const useUnits = () => {
   return useQuery({
-    queryKey: ['units'],
+    queryKey: getGetUnitsQueryKey(),
     queryFn: () => unitsApi.getAll()
   });
 };
@@ -58,7 +69,7 @@ export const useUnit = (
   } = {}
 ) => {
   return useQuery({
-    queryKey: ['units', id],
+    queryKey: getGetUnitsIdQueryKey(id),
     queryFn: () => unitsApi.getById(id),
     enabled: !!id,
     refetchInterval: options.refetchInterval,
@@ -80,7 +91,7 @@ export const useCreateUnit = () => {
       sortOrder?: number;
     }) => unitsApi.create(unitData),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['units'] });
+      queryClient.invalidateQueries({ queryKey: getGetUnitsQueryKey() });
     }
   });
 };
@@ -92,9 +103,10 @@ export const useUpdateUnit = () => {
     mutationFn: ({ id, ...data }: { id: string } & Partial<Unit>) =>
       unitsApi.update(id, data),
     onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['units'] });
-      queryClient.invalidateQueries({ queryKey: ['units', variables.id] });
-      queryClient.invalidateQueries({ queryKey: ['unit', variables.id] });
+      queryClient.invalidateQueries({ queryKey: getGetUnitsQueryKey() });
+      queryClient.invalidateQueries({
+        queryKey: getGetUnitsIdQueryKey(variables.id)
+      });
     }
   });
 };
@@ -201,7 +213,7 @@ export const useTickets = (
   options: { enabled?: boolean } = {}
 ) => {
   return useQuery({
-    queryKey: unitId ? ['tickets', unitId] : ['tickets'],
+    queryKey: unitId ? getGetUnitsUnitIdTicketsQueryKey(unitId) : ['tickets'],
     queryFn: () =>
       unitId ? ticketsApi.getByUnitId(unitId) : ticketsApi.getAll(),
     enabled: options.enabled ?? (!!unitId || options.enabled === undefined)
@@ -210,7 +222,7 @@ export const useTickets = (
 
 export const useTicket = (id: string) => {
   return useQuery({
-    queryKey: ['tickets', id],
+    queryKey: getGetTicketsIdQueryKey(id),
     queryFn: () => ticketsApi.getById(id)
   });
 };
@@ -222,8 +234,8 @@ export const useCreateTicket = () => {
     mutationFn: (ticketData: { unitId: string; serviceId: string }) =>
       ticketsApi.create(ticketData),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tickets'] });
-      queryClient.invalidateQueries({ queryKey: ['units'] });
+      invalidateTicketListQueries(queryClient);
+      queryClient.invalidateQueries({ queryKey: getGetUnitsQueryKey() });
     }
   });
 };
@@ -234,7 +246,7 @@ export const useCompleteTicket = () => {
   return useMutation({
     mutationFn: (id: string) => ticketsApi.complete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tickets'] });
+      invalidateTicketListQueries(queryClient);
     }
   });
 };
@@ -245,7 +257,7 @@ export const useNoShowTicket = () => {
   return useMutation({
     mutationFn: (id: string) => ticketsApi.noShow(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tickets'] });
+      invalidateTicketListQueries(queryClient);
     }
   });
 };
@@ -262,7 +274,7 @@ export const useUpdateOperatorComment = () => {
       operatorComment: string | null;
     }) => ticketsApi.updateOperatorComment(id, operatorComment),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tickets'] });
+      invalidateTicketListQueries(queryClient);
       queryClient.invalidateQueries({ queryKey: ['clientVisits'] });
     }
   });
@@ -309,7 +321,7 @@ export const useUpdateTicketVisitor = () => {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tickets'] });
+      invalidateTicketListQueries(queryClient);
       queryClient.invalidateQueries({ queryKey: ['clientVisits'] });
     }
   });
@@ -332,7 +344,7 @@ export const useVisitorTagDefinitions = (
   options: { enabled?: boolean } = {}
 ) => {
   return useQuery({
-    queryKey: ['visitorTagDefinitions', unitId],
+    queryKey: getGetUnitsUnitIdVisitorTagDefinitionsQueryKey(unitId),
     queryFn: () => unitsApi.listVisitorTagDefinitions(unitId),
     enabled: !!unitId && (options.enabled ?? true)
   });
@@ -353,7 +365,7 @@ export const useCreateVisitorTagDefinition = () => {
     },
     onSuccess: (_data, vars) => {
       queryClient.invalidateQueries({
-        queryKey: ['visitorTagDefinitions', vars.unitId]
+        queryKey: getGetUnitsUnitIdVisitorTagDefinitionsQueryKey(vars.unitId)
       });
     }
   });
@@ -375,7 +387,7 @@ export const usePatchVisitorTagDefinition = () => {
     },
     onSuccess: (_data, vars) => {
       queryClient.invalidateQueries({
-        queryKey: ['visitorTagDefinitions', vars.unitId]
+        queryKey: getGetUnitsUnitIdVisitorTagDefinitionsQueryKey(vars.unitId)
       });
     }
   });
@@ -389,7 +401,7 @@ export const useDeleteVisitorTagDefinition = () => {
       unitsApi.deleteVisitorTagDefinition(vars.unitId, vars.definitionId),
     onSuccess: (_data, vars) => {
       queryClient.invalidateQueries({
-        queryKey: ['visitorTagDefinitions', vars.unitId]
+        queryKey: getGetUnitsUnitIdVisitorTagDefinitionsQueryKey(vars.unitId)
       });
     }
   });
@@ -409,7 +421,7 @@ export const useSetVisitorTags = () => {
         operatorComment: vars.operatorComment
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tickets'] });
+      invalidateTicketListQueries(queryClient);
       queryClient.invalidateQueries({ queryKey: ['clientVisits'] });
     }
   });
@@ -421,7 +433,7 @@ export const useRecallTicket = () => {
   return useMutation({
     mutationFn: (id: string) => ticketsApi.recall(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tickets'] });
+      invalidateTicketListQueries(queryClient);
     }
   });
 };
@@ -433,7 +445,7 @@ export const usePickTicket = () => {
     mutationFn: ({ id, counterId }: { id: string; counterId: string }) =>
       ticketsApi.pick(id, counterId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tickets'] });
+      invalidateTicketListQueries(queryClient);
     }
   });
 };
@@ -444,7 +456,7 @@ export const useConfirmArrivalTicket = () => {
   return useMutation({
     mutationFn: (id: string) => ticketsApi.confirmArrival(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tickets'] });
+      invalidateTicketListQueries(queryClient);
     }
   });
 };
@@ -469,7 +481,7 @@ export const useTransferTicket = () => {
         operatorComment: transferData.operatorComment
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tickets'] });
+      invalidateTicketListQueries(queryClient);
     }
   });
 };
@@ -480,7 +492,7 @@ export const useReturnToQueueTicket = () => {
   return useMutation({
     mutationFn: (id: string) => ticketsApi.returnToQueue(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tickets'] });
+      invalidateTicketListQueries(queryClient);
     }
   });
 };
@@ -499,8 +511,8 @@ export const useCreateTicketInUnit = () => {
         clientId: createData.clientId
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tickets'] });
-      queryClient.invalidateQueries({ queryKey: ['units'] });
+      invalidateTicketListQueries(queryClient);
+      queryClient.invalidateQueries({ queryKey: getGetUnitsQueryKey() });
     }
   });
 };
@@ -526,7 +538,7 @@ export const useCreateBooking = () => {
 // Counter-related hooks
 export const useCounters = (unitId: string) => {
   return useQuery({
-    queryKey: ['units', unitId, 'counters'],
+    queryKey: getGetUnitsUnitIdCountersQueryKey(unitId),
     queryFn: () => countersApi.getByUnitId(unitId),
     enabled: !!unitId
   });

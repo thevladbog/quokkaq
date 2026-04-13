@@ -13,7 +13,7 @@
     "format:fix": "prettier --write .",
     "format:check": "prettier --check .",
     "orval": "orval --config orval.config.ts",
-    "orval:check": "orval --config orval.config.ts && git diff --exit-code lib/api/generated/platform.ts"
+    "orval:check": "orval --config orval.config.ts && git diff --exit-code lib/api/generated/"
   },
   "dependencies": {
     "@formatjs/intl-localematcher": "^0.8.2",

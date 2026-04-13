@@ -20,6 +20,11 @@ import {
   useReturnToQueueTicket,
   useUnitServices
 } from '@/lib/hooks';
+import { getGetUnitsUnitIdCountersQueryKey } from '@/lib/api/generated/tickets-counters';
+import {
+  getGetUnitsIdQueryKey,
+  getGetUnitsUnitIdChildUnitsQueryKey
+} from '@/lib/api/generated/units';
 import { countersApi, unitsApi, Ticket, type Service } from '@/lib/api';
 
 /** Stable empty refs so React Query “no data yet” does not allocate a new [] every render (avoids effect loops on [data]). */
@@ -98,13 +103,13 @@ export default function StaffWorkspacePage({
 
   // Fetch Unit Info for display
   const { data: unit } = useQuery({
-    queryKey: ['unit', unitId],
+    queryKey: getGetUnitsIdQueryKey(unitId),
     queryFn: () => unitsApi.getById(unitId)
   });
 
   // Fetch Counter Info for display
   const { data: counters } = useQuery({
-    queryKey: ['counters', unitId],
+    queryKey: getGetUnitsUnitIdCountersQueryKey(unitId),
     queryFn: () => countersApi.getByUnitId(unitId)
   });
   const myCounter = useMemo(
@@ -153,7 +158,9 @@ export default function StaffWorkspacePage({
   const releaseMutation = useMutation({
     mutationFn: () => countersApi.release(counterId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['counters'] });
+      queryClient.invalidateQueries({
+        queryKey: getGetUnitsUnitIdCountersQueryKey(unitId)
+      });
       router.push('/staff');
     },
     onError: (error: Error) => {
@@ -165,8 +172,9 @@ export default function StaffWorkspacePage({
   const startBreakMutation = useMutation({
     mutationFn: () => countersApi.startBreak(counterId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['counters', unitId] });
-      queryClient.invalidateQueries({ queryKey: ['counters'] });
+      queryClient.invalidateQueries({
+        queryKey: getGetUnitsUnitIdCountersQueryKey(unitId)
+      });
       queryClient.invalidateQueries({ queryKey: ['shift-counters'] });
       toast.success(t('workstation.break_started'));
       refetch();
@@ -185,8 +193,9 @@ export default function StaffWorkspacePage({
   const endBreakMutation = useMutation({
     mutationFn: () => countersApi.endBreak(counterId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['counters', unitId] });
-      queryClient.invalidateQueries({ queryKey: ['counters'] });
+      queryClient.invalidateQueries({
+        queryKey: getGetUnitsUnitIdCountersQueryKey(unitId)
+      });
       queryClient.invalidateQueries({ queryKey: ['shift-counters'] });
       toast.success(t('workstation.break_ended'));
       refetch();
@@ -500,7 +509,7 @@ export default function StaffWorkspacePage({
   const countersForTransfer = counters ?? [];
 
   const { data: childUnits = [] } = useQuery({
-    queryKey: ['units', unitId, 'child-units'],
+    queryKey: getGetUnitsUnitIdChildUnitsQueryKey(unitId),
     queryFn: () => unitsApi.getChildUnits(unitId),
     enabled: !!unitId && isTransferOpen
   });
