@@ -161,6 +161,9 @@ export default function StaffWorkspacePage({
       queryClient.invalidateQueries({
         queryKey: getGetUnitsUnitIdCountersQueryKey(unitId)
       });
+      queryClient.invalidateQueries({
+        queryKey: ['shift-counters', unitId]
+      });
       router.push('/staff');
     },
     onError: (error: Error) => {
