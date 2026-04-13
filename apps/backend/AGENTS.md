@@ -6,7 +6,7 @@
 
 ## Стек
 
-- Go 1.26.0, модуль `quokkaq-go-backend`
+- Go 1.26.2, модуль `quokkaq-go-backend`
 - HTTP: Chi v5, CORS, JWT (`golang-jwt/jwt`)
 - БД: PostgreSQL + GORM
 - Real-time: Gorilla WebSocket (`internal/ws/`) — комнаты по подразделениям

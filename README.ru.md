@@ -5,7 +5,7 @@
   
   [![Nx](https://img.shields.io/badge/Nx-22.6.1-143055?style=flat&logo=nx)](https://nx.dev/)
   [![Node.js](https://img.shields.io/badge/Node.js-22+-339933?style=flat&logo=node.js&logoColor=white)](https://nodejs.org/)
-  [![Go](https://img.shields.io/badge/Go-1.26+-00ADD8?style=flat&logo=go&logoColor=white)](https://golang.org/)
+  [![Go](https://img.shields.io/badge/Go-1.26.2+-00ADD8?style=flat&logo=go&logoColor=white)](https://golang.org/)
   [![pnpm](https://img.shields.io/badge/pnpm-10+-F69220?style=flat&logo=pnpm&logoColor=white)](https://pnpm.io/)
   [![Next.js](https://img.shields.io/badge/Next.js-16+-000000?style=flat&logo=next.js&logoColor=white)](https://nextjs.org/)
   [![Tauri](https://img.shields.io/badge/Tauri-2.1+-FFC131?style=flat&logo=tauri&logoColor=white)](https://tauri.app/)
@@ -37,7 +37,7 @@
 ### Что включено
 
 - 🌐 **Веб-приложение** - Next.js 16 с React 19, TanStack Query и shadcn/ui
-- 🔧 **API Backend** - Go 1.26 с PostgreSQL, Redis, WebSocket и MinIO
+- 🔧 **API Backend** - Go 1.26.2 с PostgreSQL, Redis, WebSocket и MinIO
 - 🖥️ **Киоск Desktop** - Tauri 2.1 десктоп-приложение с поддержкой термопринтеров
 - 📦 **Общие пакеты** - TypeScript типы (Zod схемы), React UI компоненты и утилиты для киоска
 
@@ -64,7 +64,7 @@ graph TB
     subgraph monorepo [QuokkaQ Монорепо]
         subgraph apps [Приложения]
             frontend[Frontend<br/>Next.js 16 + React 19<br/>Порт 3000]
-            backend[Backend<br/>Go 1.26 + PostgreSQL<br/>Порт 3001]
+            backend[Backend<br/>Go 1.26.2 + PostgreSQL<br/>Порт 3001]
             kiosk[Kiosk Desktop<br/>Tauri 2.1 + Rust]
         end
         
@@ -109,7 +109,7 @@ graph TB
 | **Frontend UI** | React | 19.2.4 |
 | **Стили** | Tailwind CSS | 4+ |
 | **UI компоненты** | shadcn/ui (Radix) | Latest |
-| **Backend** | Go | 1.26.0 |
+| **Backend** | Go | 1.26.2 |
 | **Backend фреймворк** | Chi Router | v5 |
 | **Desktop** | Tauri | 2.1+ |
 | **База данных** | PostgreSQL | 16+ |
@@ -168,7 +168,7 @@ graph TB
 
 **Технологии:**
 
-- Go 1.26
+- Go 1.26.2
 - Chi Router v5
 - PostgreSQL (GORM)
 - Redis (Asynq)
@@ -200,7 +200,7 @@ graph TB
 - Tauri 2.1 (Rust)
 - React 19
 - TypeScript
-- Go 1.26 (агент для принтера)
+- Go 1.26.2 (агент для принтера)
 - Протокол печати ESC/POS
 
 **Документация:** [apps/kiosk-desktop/README.md](apps/kiosk-desktop/README.md)
@@ -298,7 +298,7 @@ Nx автоматически определяет эти зависимости
 
 - **Node.js** 22+ ([Скачать](https://nodejs.org/))
 - **pnpm** 10+ ([Установка](https://pnpm.io/installation))
-- **Go** 1.26+ ([Скачать](https://golang.org/dl/)) - для backend
+- **Go** 1.26.2+ ([Скачать](https://golang.org/dl/)) - для backend
 - **Rust** (stable) ([Установка](https://rustup.rs/)) - для kiosk-desktop
 - **Docker** ([Скачать](https://www.docker.com/)) - для инфраструктурных сервисов
 

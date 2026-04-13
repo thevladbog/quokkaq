@@ -39,8 +39,6 @@ jobs:
           fetch-depth: 0
 
       - uses: pnpm/action-setup@v5
-        with:
-          version: 10
 
       - uses: actions/setup-node@v6
         with:
@@ -90,8 +88,6 @@ jobs:
           fetch-depth: 0
 
       - uses: pnpm/action-setup@v5
-        with:
-          version: 10
 
       - uses: actions/setup-node@v6
         with:
@@ -101,7 +97,7 @@ jobs:
       - uses: actions/setup-go@v5
         if: needs.affected.outputs.backend == 'true'
         with:
-          go-version: '1.26'
+          go-version-file: apps/backend/go.mod
 
       # Always on this runner: nx affected can include kiosk-desktop even if the detect job
       # previously disagreed (e.g. base/head drift). GTK/WebKit are required for tauri build on Linux.
@@ -151,8 +147,11 @@ jobs:
       - name: Build affected
         run: pnpm nx affected -t build --base=$NX_BASE --head=$NX_HEAD
 
-      - name: Test affected
-        run: pnpm nx affected -t test --base=$NX_BASE --head=$NX_HEAD --skip-nx-cache
+      - name: Test affected (non-backend)
+        run: pnpm nx affected -t test --base=$NX_BASE --head=$NX_HEAD --skip-nx-cache --exclude=backend
+
+      - name: Test affected backend (coverage)
+        run: pnpm nx affected -t test:ci --base=$NX_BASE --head=$NX_HEAD --skip-nx-cache
 
       - name: Lint affected
         run: pnpm nx affected -t lint --base=$NX_BASE --head=$NX_HEAD --skip-nx-cache

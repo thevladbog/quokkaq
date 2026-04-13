@@ -59,7 +59,7 @@ The system automatically determines the next version by:
 ### 2. Docker Image Build
 
 A Docker image is built using the multi-stage Dockerfile:
-- Base image: golang:1.26.0-alpine for building
+- Base image: golang:1.26.2-alpine for building
 - Runtime image: alpine:latest for minimal size
 - The final image contains only the compiled binary and necessary assets
 

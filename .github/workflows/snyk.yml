@@ -12,23 +12,25 @@ permissions:
 jobs:
   snyk:
     runs-on: ubuntu-latest
-    if: ${{ secrets.SNYK_TOKEN != '' }}
+    env:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
     steps:
       - uses: actions/checkout@v6
+        if: env.SNYK_TOKEN != ''
 
       - uses: pnpm/action-setup@v5
-        with:
-          version: 10
+        if: env.SNYK_TOKEN != ''
 
       - uses: actions/setup-node@v6
+        if: env.SNYK_TOKEN != ''
         with:
           node-version: '22'
           cache: 'pnpm'
 
       - name: Install dependencies
+        if: env.SNYK_TOKEN != ''
         run: pnpm install --frozen-lockfile
 
       - name: Snyk test (monorepo)
+        if: env.SNYK_TOKEN != ''
         run: npx snyk test --all-projects --severity-threshold=high
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}

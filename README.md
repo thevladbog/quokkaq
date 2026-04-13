@@ -5,7 +5,7 @@
   
   [![Nx](https://img.shields.io/badge/Nx-22.6.1-143055?style=flat&logo=nx)](https://nx.dev/)
   [![Node.js](https://img.shields.io/badge/Node.js-22+-339933?style=flat&logo=node.js&logoColor=white)](https://nodejs.org/)
-  [![Go](https://img.shields.io/badge/Go-1.26+-00ADD8?style=flat&logo=go&logoColor=white)](https://golang.org/)
+  [![Go](https://img.shields.io/badge/Go-1.26.2+-00ADD8?style=flat&logo=go&logoColor=white)](https://golang.org/)
   [![pnpm](https://img.shields.io/badge/pnpm-10+-F69220?style=flat&logo=pnpm&logoColor=white)](https://pnpm.io/)
   [![Next.js](https://img.shields.io/badge/Next.js-16+-000000?style=flat&logo=next.js&logoColor=white)](https://nextjs.org/)
   [![Tauri](https://img.shields.io/badge/Tauri-2.1+-FFC131?style=flat&logo=tauri&logoColor=white)](https://tauri.app/)
@@ -37,7 +37,7 @@
 ### What's Included
 
 - 🌐 **Web Application** - Next.js 16 with React 19, TanStack Query, and shadcn/ui
-- 🔧 **API Backend** - Go 1.26 with PostgreSQL, Redis, WebSocket, and MinIO
+- 🔧 **API Backend** - Go 1.26.2 with PostgreSQL, Redis, WebSocket, and MinIO
 - 🖥️ **Desktop Kiosk** - Tauri 2.1 desktop application with thermal printer support
 - 📦 **Shared Packages** - TypeScript types (Zod schemas), React UI components, and kiosk utilities
 
@@ -64,7 +64,7 @@ graph TB
     subgraph monorepo [QuokkaQ Monorepo]
         subgraph apps [Applications]
             frontend[Frontend<br/>Next.js 16 + React 19<br/>Port 3000]
-            backend[Backend<br/>Go 1.26 + PostgreSQL<br/>Port 3001]
+            backend[Backend<br/>Go 1.26.2 + PostgreSQL<br/>Port 3001]
             kiosk[Kiosk Desktop<br/>Tauri 2.1 + Rust]
         end
         
@@ -109,7 +109,7 @@ graph TB
 | **Frontend UI** | React | 19.2.4 |
 | **Styling** | Tailwind CSS | 4+ |
 | **UI Components** | shadcn/ui (Radix) | Latest |
-| **Backend** | Go | 1.26.0 |
+| **Backend** | Go | 1.26.2 |
 | **Backend Framework** | Chi Router | v5 |
 | **Desktop** | Tauri | 2.1+ |
 | **Database** | PostgreSQL | 16+ |
@@ -164,7 +164,7 @@ graph TB
 - 📝 **Audit Logging** - Comprehensive activity tracking
 
 **Technology:**
-- Go 1.26
+- Go 1.26.2
 - Chi Router v5
 - PostgreSQL (GORM)
 - Redis (Asynq)
@@ -194,7 +194,7 @@ graph TB
 - Tauri 2.1 (Rust)
 - React 19
 - TypeScript
-- Go 1.26 (printer agent sidecar)
+- Go 1.26.2 (printer agent sidecar)
 - ESC/POS printing protocol
 
 **Documentation:** [apps/kiosk-desktop/README.md](apps/kiosk-desktop/README.md)
@@ -285,7 +285,7 @@ Before running QuokkaQ, ensure you have:
 
 - **Node.js** 22+ ([Download](https://nodejs.org/))
 - **pnpm** 10+ ([Installation](https://pnpm.io/installation))
-- **Go** 1.26+ ([Download](https://golang.org/dl/)) - for backend
+- **Go** 1.26.2+ ([Download](https://golang.org/dl/)) - for backend
 - **Rust** (stable) ([Installation](https://rustup.rs/)) - for kiosk-desktop
 - **Docker** ([Download](https://www.docker.com/)) - for infrastructure services
 

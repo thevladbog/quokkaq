@@ -23,7 +23,14 @@
     "test": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "bash -lc 'if [[ -n \"$CI\" ]]; then go test ./... -coverprofile=coverage.out -covermode=atomic; else go test ./...; fi'",
+        "command": "go test ./...",
+        "cwd": "apps/backend"
+      }
+    },
+    "test:ci": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "go test ./... -coverprofile=coverage.out -covermode=atomic",
         "cwd": "apps/backend"
       }
     },
