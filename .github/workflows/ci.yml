@@ -2,6 +2,7 @@ name: CI
 
 on:
   pull_request:
+  merge_group:
   push:
     branches:
       - main
@@ -17,7 +18,8 @@ env:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Merge queue builds must not be cancelled by newer queue entries on the same ref pattern.
+  cancel-in-progress: ${{ github.event_name != 'merge_group' }}
 
 jobs:
   affected:
@@ -25,8 +27,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       # Same base/head as build-and-test so "kiosk affected" matches nx affected -t build
-      NX_BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}
-      NX_HEAD: ${{ github.sha }}
+      NX_BASE: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha || github.event.before || 'origin/main' }}
+      NX_HEAD: ${{ github.event.merge_group.head_sha || github.sha }}
     outputs:
       frontend: ${{ steps.check.outputs.frontend }}
       backend: ${{ steps.check.outputs.backend }}
@@ -77,8 +79,8 @@ jobs:
     needs: affected
     if: ${{ needs.affected.outputs.frontend == 'true' || needs.affected.outputs.backend == 'true' || needs.affected.outputs.kiosk == 'true' }}
     env:
-      NX_BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}
-      NX_HEAD: ${{ github.sha }}
+      NX_BASE: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha || github.event.before || 'origin/main' }}
+      NX_HEAD: ${{ github.event.merge_group.head_sha || github.sha }}
     steps:
       - uses: actions/checkout@v6
         with:
