@@ -266,10 +266,10 @@ export default function PlatformSubscriptionsPage() {
         );
       }
       qc.invalidateQueries({
-        queryKey: getPlatformListSubscriptionsQueryKey({ limit: 200 })
+        queryKey: getPlatformListSubscriptionsQueryKey()
       });
       qc.invalidateQueries({
-        queryKey: getPlatformListCompaniesQueryKey({ limit: 100 })
+        queryKey: getPlatformListCompaniesQueryKey()
       });
       qc.invalidateQueries({ queryKey: ['platform-company'] });
       qc.invalidateQueries({ queryKey: ['platform-invoices'] });

@@ -58,14 +58,14 @@
     "orval": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "orval --config orval.config.ts && node scripts/fix-orval-query-signal.mjs",
+        "command": "orval --config orval.config.ts",
         "cwd": "apps/frontend"
       }
     },
     "orval:check": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "orval --config orval.config.ts && node scripts/fix-orval-query-signal.mjs && git diff --exit-code lib/api/generated/platform.ts",
+        "command": "orval --config orval.config.ts && git diff --exit-code lib/api/generated/platform.ts",
         "cwd": "apps/frontend"
       }
     }

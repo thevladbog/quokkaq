@@ -1,3 +1,9 @@
+/**
+ * Browser-oriented fetch (localStorage, window, refresh). Safe from Client Components
+ * and other client-only code; do not call authenticated flows from React Server Components.
+ * This file intentionally does not use the Next.js `"use client"` directive so `@/lib/api`
+ * can stay importable from the server for types and non-browser paths.
+ */
 import { logger } from './logger';
 
 export const API_BASE_URL = '/api';

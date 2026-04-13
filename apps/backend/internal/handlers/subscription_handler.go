@@ -163,6 +163,7 @@ func (h *SubscriptionHandler) GetMySubscription(w http.ResponseWriter, r *http.R
 // @Description  Returns all active subscription plans
 // @Tags         subscriptions
 // @Produce      json
+// @ID           getSubscriptionPlans
 // @Success      200  {array}   models.SubscriptionPlan
 // @Failure      500  {string}  string "Internal Server Error"
 // @Router       /subscriptions/plans [get]

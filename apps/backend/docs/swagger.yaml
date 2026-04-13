@@ -4512,6 +4512,7 @@ paths:
   /subscriptions/plans:
     get:
       description: Returns all active subscription plans
+      operationId: getSubscriptionPlans
       responses:
         '200':
           content:
