@@ -29,6 +29,43 @@ export function isRequestAbortError(error: unknown): boolean {
 }
 
 /**
+ * Check if caller provided Content-Type header (case-insensitive).
+ */
+function hasContentTypeHeader(callerHeaders: HeadersInit | undefined): boolean {
+  if (!callerHeaders) return false;
+  if (callerHeaders instanceof Headers) {
+    return callerHeaders.has('content-type');
+  }
+  if (Array.isArray(callerHeaders)) {
+    return callerHeaders.some(
+      (pair) => pair.length >= 2 && pair[0].toLowerCase() === 'content-type'
+    );
+  }
+  if (typeof callerHeaders === 'object') {
+    return Object.keys(callerHeaders).some(
+      (k) => k.toLowerCase() === 'content-type'
+    );
+  }
+  return false;
+}
+
+/**
+ * Check if body is multipart-like (should not have Content-Type set by default).
+ */
+function isMultipartBody(body: unknown): boolean {
+  if (body == null) return false;
+  return (
+    body instanceof FormData ||
+    body instanceof URLSearchParams ||
+    body instanceof Blob ||
+    body instanceof ArrayBuffer ||
+    (typeof SharedArrayBuffer !== 'undefined' &&
+      body instanceof SharedArrayBuffer) ||
+    ArrayBuffer.isView(body)
+  );
+}
+
+/**
  * Defaults first, then caller headers on top — so explicit `Authorization` (refresh/me)
  * wins over the access token from localStorage, while `Content-Type` from callers no longer
  * wipes auth (the old `...options` after `headers` bug).
@@ -119,16 +156,20 @@ export async function authenticatedApiFetch(
   }
 
   const url = `${API_BASE_URL}${endpoint}`;
-  const { headers: callerHeaders, ...restOptions } = options;
+  const { headers: callerHeaders, body, ...restOptions } = options;
+
+  const shouldSetContentType =
+    !hasContentTypeHeader(callerHeaders) && !isMultipartBody(body);
 
   const authHeaders: Record<string, string> = {
-    'Content-Type': 'application/json',
+    ...(shouldSetContentType && { 'Content-Type': 'application/json' }),
     ...(token && { Authorization: `Bearer ${token}` }),
     ...(currentLocale && { 'Accept-Language': currentLocale })
   };
 
   const config: RequestInit = {
     ...restOptions,
+    ...(body !== undefined && { body }),
     headers: mergeRequestInitHeaders(callerHeaders, authHeaders)
   };
 
@@ -163,20 +204,27 @@ export async function authenticatedApiFetch(
                 'Token refresh: response OK but no access token field',
                 {
                   status: refreshResponse.status,
-                  url: refreshResponse.url,
-                  body: refreshData
+                  url: refreshResponse.url
                 }
               );
             } else {
               localStorage.setItem('access_token', newAccessToken);
 
+              const retryShouldSetContentType =
+                !hasContentTypeHeader(
+                  headersInitWithoutAuthorization(callerHeaders)
+                ) && !isMultipartBody(body);
+
               const retryAuthHeaders: Record<string, string> = {
-                'Content-Type': 'application/json',
+                ...(retryShouldSetContentType && {
+                  'Content-Type': 'application/json'
+                }),
                 Authorization: `Bearer ${newAccessToken}`,
                 ...(currentLocale && { 'Accept-Language': currentLocale })
               };
               const retryConfig: RequestInit = {
                 ...restOptions,
+                ...(body !== undefined && { body }),
                 headers: mergeRequestInitHeaders(
                   headersInitWithoutAuthorization(callerHeaders),
                   retryAuthHeaders
@@ -195,7 +243,7 @@ export async function authenticatedApiFetch(
 
       if (response.status === 401) {
         clearClientAuthSession();
-        throw new Error(`Unauthorized: ${await response.text()}`);
+        return response;
       }
     }
 
