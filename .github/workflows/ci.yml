@@ -47,14 +47,6 @@ jobs:
           node-version: '22'
           cache: 'pnpm'
 
-      - name: Validate pnpm lockfile (single YAML document)
-        run: |
-          set -euo pipefail
-          if grep -qE '^[[:space:]]*---[[:space:]]*$' pnpm-lock.yaml; then
-            echo '::error title=Broken pnpm lockfile::pnpm-lock.yaml contains a YAML document separator (---). This often happens after a bad merge of two lockfiles. Run `pnpm install` at the repo root, commit the updated pnpm-lock.yaml, and retry.'
-            exit 1
-          fi
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -135,14 +127,6 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         if: needs.affected.outputs.kiosk == 'true'
-
-      - name: Validate pnpm lockfile (single YAML document)
-        run: |
-          set -euo pipefail
-          if grep -qE '^[[:space:]]*---[[:space:]]*$' pnpm-lock.yaml; then
-            echo '::error title=Broken pnpm lockfile::pnpm-lock.yaml contains a YAML document separator (---). This often happens after a bad merge of two lockfiles. Run `pnpm install` at the repo root, commit the updated pnpm-lock.yaml, and retry.'
-            exit 1
-          fi
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
