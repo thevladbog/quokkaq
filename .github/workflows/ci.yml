@@ -38,6 +38,16 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Debug lockfile after checkout (before pnpm setup)
+        run: |
+          echo "=== Lockfile first 5 lines (with line numbers) ==="
+          head -5 pnpm-lock.yaml | cat -n
+          echo "=== Hex dump of first 200 bytes ==="
+          xxd -l 200 pnpm-lock.yaml || hexdump -C -n 200 pnpm-lock.yaml
+          echo "=== File info ==="
+          file pnpm-lock.yaml
+          wc -l pnpm-lock.yaml
+
       - uses: pnpm/action-setup@v6
 
       - uses: actions/setup-node@v6
@@ -99,6 +109,16 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+
+      - name: Debug lockfile after checkout (before pnpm setup)
+        run: |
+          echo "=== Lockfile first 5 lines (with line numbers) ==="
+          head -5 pnpm-lock.yaml | cat -n
+          echo "=== Hex dump of first 200 bytes ==="
+          xxd -l 200 pnpm-lock.yaml || hexdump -C -n 200 pnpm-lock.yaml
+          echo "=== File info ==="
+          file pnpm-lock.yaml
+          wc -l pnpm-lock.yaml
 
       - uses: pnpm/action-setup@v6
 
