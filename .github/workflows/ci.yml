@@ -45,28 +45,17 @@ jobs:
           node-version: '22'
           cache: 'pnpm'
 
-      - name: Debug lockfile integrity
+      - name: Debug lockfile integrity (job: affected)
         run: |
-          echo "=== Lockfile first 10 lines ==="
-          head -10 pnpm-lock.yaml
-          echo "=== Check for YAML document separators ==="
-          if grep -n "^---$" pnpm-lock.yaml 2>/dev/null; then
-            echo "ERROR: Found document separators"
-            exit 1
-          else
-            echo "No document separators found"
-          fi
-          echo "=== Check for conflict markers ==="
-          if grep -n "^<<<<<<< " pnpm-lock.yaml 2>/dev/null; then
-            echo "ERROR: Found conflict markers"
-            exit 1
-          else
-            echo "No conflict markers found"
-          fi
-          echo "=== Lockfile stats ==="
+          echo "=== Lockfile first 5 lines (with line numbers) ==="
+          head -5 pnpm-lock.yaml | cat -n
+          echo "=== Hex dump of first 200 bytes ==="
+          xxd -l 200 pnpm-lock.yaml || hexdump -C -n 200 pnpm-lock.yaml
+          echo "=== File info ==="
+          file pnpm-lock.yaml
           wc -l pnpm-lock.yaml
-          echo "=== Try loading with Python YAML parser ==="
-          python3 -c "import yaml; docs=list(yaml.safe_load_all(open('pnpm-lock.yaml'))); print(f'Documents: {len(docs)}')"
+          echo "=== Git status ==="
+          git status pnpm-lock.yaml
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -147,28 +136,17 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         if: needs.affected.outputs.kiosk == 'true'
 
-      - name: Debug lockfile integrity
+      - name: Debug lockfile integrity (job: build-and-test)
         run: |
-          echo "=== Lockfile first 10 lines ==="
-          head -10 pnpm-lock.yaml
-          echo "=== Check for YAML document separators ==="
-          if grep -n "^---$" pnpm-lock.yaml 2>/dev/null; then
-            echo "ERROR: Found document separators"
-            exit 1
-          else
-            echo "No document separators found"
-          fi
-          echo "=== Check for conflict markers ==="
-          if grep -n "^<<<<<<< " pnpm-lock.yaml 2>/dev/null; then
-            echo "ERROR: Found conflict markers"
-            exit 1
-          else
-            echo "No conflict markers found"
-          fi
-          echo "=== Lockfile stats ==="
+          echo "=== Lockfile first 5 lines (with line numbers) ==="
+          head -5 pnpm-lock.yaml | cat -n
+          echo "=== Hex dump of first 200 bytes ==="
+          xxd -l 200 pnpm-lock.yaml || hexdump -C -n 200 pnpm-lock.yaml
+          echo "=== File info ==="
+          file pnpm-lock.yaml
           wc -l pnpm-lock.yaml
-          echo "=== Try loading with Python YAML parser ==="
-          python3 -c "import yaml; docs=list(yaml.safe_load_all(open('pnpm-lock.yaml'))); print(f'Documents: {len(docs)}')"
+          echo "=== Git status ==="
+          git status pnpm-lock.yaml
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
