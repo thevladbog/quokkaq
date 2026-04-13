@@ -13,7 +13,6 @@ func TestNewMailService_InsecureSkipVerifyWhenEnvTrue(t *testing.T) {
 	t.Setenv("SMTP_FROM", "f@example.com")
 	t.Setenv("SMTP_SECURE", "false")
 	t.Setenv("SMTP_TLS_INSECURE_SKIP_VERIFY", "true")
-	t.Cleanup(func() { _ = os.Unsetenv("SMTP_TLS_INSECURE_SKIP_VERIFY") })
 
 	ms, ok := NewMailService().(*mailService)
 	if !ok {
