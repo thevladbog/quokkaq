@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Upload, X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
-import { postUpload, postUploadPrinterLogo } from '@/lib/api/generated/upload';
+import { uploadLogo, uploadPrinterLogo } from '@/lib/api/generated/upload';
 
 interface LogoUploadProps {
   currentLogoUrl?: string;
@@ -60,11 +60,13 @@ export function LogoUpload({
 
     if (!isAllowedImageFile(file, allowBmpByExtension)) {
       toast.error(t('invalidType'));
+      e.target.value = '';
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
       toast.error(t('fileTooLarge'));
+      e.target.value = '';
       return;
     }
 
@@ -73,8 +75,8 @@ export function LogoUpload({
     try {
       const res =
         uploadTarget === 'printer'
-          ? await postUploadPrinterLogo({ file })
-          : await postUpload({ file });
+          ? await uploadPrinterLogo({ file })
+          : await uploadLogo({ file });
 
       if (res.status !== 200) {
         throw new Error('Upload failed');

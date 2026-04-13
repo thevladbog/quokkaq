@@ -450,6 +450,16 @@ export interface HandlersPatchUnitClientRequest {
   tagDefinitionIds?: string[];
 }
 
+export type HandlersPatchUnitKioskConfigRequestConfigKiosk = { [key: string]: unknown };
+
+export type HandlersPatchUnitKioskConfigRequestConfig = {
+  kiosk: HandlersPatchUnitKioskConfigRequestConfigKiosk;
+};
+
+export interface HandlersPatchUnitKioskConfigRequest {
+  config: HandlersPatchUnitKioskConfigRequestConfig;
+}
+
 export interface HandlersPeriodResponse {
   end?: string;
   start?: string;

@@ -488,13 +488,19 @@ export const unitsApi = {
    * Use from kiosk settings UI instead of `update` when staff/terminal must not be tenant admin.
    */
   patchKioskConfig: async (unitId: string, config: Record<string, unknown>) => {
-    const res = await orvalUnits.patchUnitsUnitIdKioskConfig(unitId, {
-      config
+    const kiosk = (config as { kiosk?: Record<string, unknown> }).kiosk;
+    const res = await orvalUnits.patchUnitKioskConfig(unitId, {
+      config: {
+        kiosk: (kiosk ??
+          {}) as orvalUnits.HandlersPatchUnitKioskConfigRequestConfigKiosk
+      }
     });
     if (res.status !== 200) {
-      const errData =
-        typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
-      throw new Error(`API Error: ${res.status} - ${errData}`);
+      const errBody =
+        typeof res.data === 'string'
+          ? res.data
+          : JSON.stringify(res.data ?? {});
+      throwApiHttpErrorFromBody(res.status, errBody);
     }
     return UnitModelSchema.parse(res.data);
   },

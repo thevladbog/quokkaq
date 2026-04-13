@@ -220,7 +220,16 @@ function KioskSettingsForm({
   };
 
   const handleTestPrint = async () => {
-    if (!isTauriKiosk() && !isPrintEnabled) {
+    if (!isTauriKiosk()) {
+      toast.info(
+        t('test_print_desktop_only', {
+          defaultValue:
+            'Hardware print runs only in the QuokkaQ Kiosk desktop application.'
+        })
+      );
+      return;
+    }
+    if (!isPrintEnabled) {
       return;
     }
     if (printerType === 'label') {
@@ -257,13 +266,6 @@ function KioskSettingsForm({
       }
       if (native) {
         toast.success(t('test_print_sent'));
-      } else if (!isTauriKiosk()) {
-        toast.info(
-          t('test_print_desktop_only', {
-            defaultValue:
-              'Hardware print runs only in the QuokkaQ Kiosk desktop application.'
-          })
-        );
       } else {
         toast.error(
           t('printerTestError', {

@@ -18,6 +18,14 @@ import (
 // maxUnitPatchBodyBytes caps PATCH /units/{id} JSON body size (DoS / memory bound).
 const maxUnitPatchBodyBytes = 1 << 20 // 1 MiB
 
+// PatchUnitKioskConfigRequest is the wire JSON for PATCH /units/{unitId}/kiosk-config: { "config": { "kiosk": { ... } } }.
+// The handler merges only `config.kiosk` into the stored unit config.
+type PatchUnitKioskConfigRequest struct {
+	Config struct {
+		Kiosk map[string]interface{} `json:"kiosk"`
+	} `json:"config"`
+}
+
 type UnitHandler struct {
 	service        services.UnitService
 	storageService services.StorageService
@@ -321,13 +329,14 @@ func (h *UnitHandler) UpdateAdSettings(w http.ResponseWriter, r *http.Request) {
 }
 
 // PatchUnitKioskConfig godoc
+// @Id           PatchUnitKioskConfig
 // @Summary      Merge kiosk settings into unit config
-// @Description  Updates only config.kiosk (other config keys unchanged). Allowed for desktop terminal JWT bound to this unit, unit members, and admins.
+// @Description  Body must be {"config":{"kiosk":{...}}}. Updates only config.kiosk (other config keys unchanged). Allowed for desktop terminal JWT bound to this unit, unit members, and admins.
 // @Tags         units
 // @Accept       json
 // @Produce      json
-// @Param        unitId path      string true "Unit ID"
-// @Param        body   body      object true "Payload with config.kiosk"
+// @Param        unitId path      string                       true  "Unit ID"
+// @Param        body   body      PatchUnitKioskConfigRequest  true  "Wrapper with config.kiosk object"
 // @Success      200    {object}  models.Unit
 // @Failure      400    {string}  string "Bad Request"
 // @Failure      403    {string}  string "Forbidden"

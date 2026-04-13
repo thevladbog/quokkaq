@@ -105,6 +105,7 @@ fn print_raw_via_tcp(target: &str, raw: &[u8]) -> Result<(), String> {
         .set_write_timeout(Some(Duration::from_secs(10)))
         .map_err(|e| e.to_string())?;
     stream.write_all(raw).map_err(|e| e.to_string())?;
+    stream.flush().map_err(|e| e.to_string())?;
     Ok(())
 }
 

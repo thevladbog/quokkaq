@@ -67,12 +67,15 @@ export const useUnit = (
   options: {
     refetchInterval?: number;
     refetchOnMount?: boolean | 'always';
+    enabled?: boolean;
   } = {}
 ) => {
+  const enabled =
+    options.enabled !== undefined ? options.enabled && !!id : !!id;
   return useQuery({
     queryKey: getGetUnitsIdQueryKey(id),
     queryFn: () => unitsApi.getById(id),
-    enabled: !!id,
+    enabled,
     refetchInterval: options.refetchInterval,
     refetchOnMount: options.refetchOnMount
   });

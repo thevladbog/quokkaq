@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { useUnitServicesTree, useCreateTicketInUnit } from '@/lib/hooks';
 import type { Ticket, Service } from '@/lib/api';
@@ -23,6 +24,7 @@ import { useLocale } from 'next-intl';
 import { getLocalizedName } from '@/lib/utils';
 import KioskLanguageSwitcher from '@/components/KioskLanguageSwitcher';
 import { useUnit } from '@/lib/hooks';
+import { getGetUnitsIdQueryKey } from '@/lib/api/generated/units';
 import { PinCodeModal } from '@/components/kiosk/pin-code-modal';
 import { KioskSettingsSheet } from '@/components/kiosk/kiosk-settings-sheet';
 import { LockScreen } from '@/components/kiosk/lock-screen';
@@ -38,6 +40,7 @@ import {
   resetDesktopPairingViaTauri
 } from '@/lib/kiosk-print';
 import { intlLocaleFromAppLocale } from '@/lib/format-datetime';
+import { logger } from '@/lib/logger';
 import {
   GRID_ZONE_SCOPE_NONE,
   SERVICE_GRID_CELL_COUNT,
@@ -48,6 +51,7 @@ import {
 } from '@/lib/service-grid';
 
 export default function UnitKioskPage() {
+  const queryClient = useQueryClient();
   const params = useParams() as { unitId?: string };
   const unitId = params.unitId;
   const [selectedServicePath, setSelectedServicePath] = useState<Service[]>([]);
@@ -73,14 +77,22 @@ export default function UnitKioskPage() {
   const {
     data: unit,
     isError: unitQueryError,
-    isPending: unitPending,
-    refetch: refetchUnit
+    isPending: unitPending
   } = useUnit(unitId ?? '', {
     enabled: Boolean(unitId),
     refetchInterval: 120000,
     // Desktop WebView + React Query cache: always pick up fresh kiosk PIN / config.
     refetchOnMount: 'always'
   });
+
+  const invalidateUnitQuery = useCallback(() => {
+    if (!unitId) {
+      return;
+    }
+    void queryClient.invalidateQueries({
+      queryKey: getGetUnitsIdQueryKey(unitId)
+    });
+  }, [queryClient, unitId]);
 
   const [unitSlowLoad, setUnitSlowLoad] = useState(false);
   useEffect(() => {
@@ -98,7 +110,7 @@ export default function UnitKioskPage() {
     try {
       await resetDesktopPairingViaTauri();
     } catch (e) {
-      console.error('resetDesktopPairingViaTauri failed:', e);
+      logger.error('resetDesktopPairingViaTauri failed', { unitId, error: e });
     }
   };
 
@@ -462,7 +474,8 @@ export default function UnitKioskPage() {
             <div className='flex flex-col items-center gap-3 sm:flex-row sm:justify-center'>
               <Button
                 className='rounded-full px-8'
-                onClick={() => void refetchUnit()}
+                disabled={!unitId}
+                onClick={invalidateUnitQuery}
               >
                 {t('retryServices')}
               </Button>
@@ -518,7 +531,8 @@ export default function UnitKioskPage() {
             <div className='flex flex-col items-center gap-3 sm:flex-row sm:justify-center'>
               <Button
                 className='rounded-full px-8'
-                onClick={() => void refetchUnit()}
+                disabled={!unitId}
+                onClick={invalidateUnitQuery}
               >
                 {t('retryServices')}
               </Button>

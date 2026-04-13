@@ -1,13 +1,20 @@
 package handlers
 
 import (
+	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"path/filepath"
 	"strings"
 
 	"quokkaq-go-backend/internal/services"
 )
+
+// UploadLogoResponse is the JSON body after a successful public image upload.
+type UploadLogoResponse struct {
+	URL string `json:"url"`
+}
 
 type UploadHandler struct {
 	storageService services.StorageService
@@ -19,10 +26,41 @@ func NewUploadHandler(storageService services.StorageService) *UploadHandler {
 	}
 }
 
+// UploadLogo godoc
+// @Id           uploadLogo
+// @Summary      Upload logo file
+// @Description  Upload kiosk/ad logo (JPG, PNG, SVG, WebP). Admin JWT. Stored under public/logos/.
+// @Tags         upload
+// @Accept       multipart/form-data
+// @Produce      json
+// @Param        file  formData  file  true  "Image file"
+// @Success      200  {object}  UploadLogoResponse
+// @Failure      400  {string}  string "Bad Request"
+// @Failure      401  {string}  string "Unauthorized"
+// @Failure      403  {string}  string "Forbidden"
+// @Failure      500  {string}  string "Internal Server Error"
+// @Router       /upload [post]
+// @Security     BearerAuth
 func (h *UploadHandler) UploadLogo(w http.ResponseWriter, r *http.Request) {
 	h.uploadPublicImage(w, r, "logos", []string{".jpg", ".jpeg", ".png", ".svg", ".webp"})
 }
 
+// UploadPrinterLogo godoc
+// @Id           uploadPrinterLogo
+// @Summary      Upload printer logo file
+// @Description  Upload thermal-receipt logo (includes BMP). Admin JWT. Stored under public/printer-logos/.
+// @Tags         upload
+// @Accept       multipart/form-data
+// @Produce      json
+// @Param        file  formData  file  true  "Image file"
+// @Success      200  {object}  UploadLogoResponse
+// @Failure      400  {string}  string "Bad Request"
+// @Failure      401  {string}  string "Unauthorized"
+// @Failure      403  {string}  string "Forbidden"
+// @Failure      500  {string}  string "Internal Server Error"
+// @Router       /upload-printer-logo [post]
+// @Security     BearerAuth
+//
 // UploadPrinterLogo stores assets for ESC/POS raster (B&W-friendly); allows BMP in addition to common web images.
 func (h *UploadHandler) UploadPrinterLogo(w http.ResponseWriter, r *http.Request) {
 	h.uploadPublicImage(w, r, "printer-logos", []string{".jpg", ".jpeg", ".png", ".svg", ".webp", ".bmp", ".dib"})
@@ -51,7 +89,11 @@ func (h *UploadHandler) uploadPublicImage(w http.ResponseWriter, r *http.Request
 		}
 	}
 	if !ok {
-		http.Error(w, "Invalid file type for this upload.", http.StatusBadRequest)
+		http.Error(
+			w,
+			fmt.Sprintf("Invalid file type; allowed extensions: %s", strings.Join(allowedExts, ", ")),
+			http.StatusBadRequest,
+		)
 		return
 	}
 
@@ -78,7 +120,14 @@ func (h *UploadHandler) uploadPublicImage(w http.ResponseWriter, r *http.Request
 			contentType = "image/jpeg"
 		case ".webp":
 			contentType = "image/webp"
+		default:
+			if mt := mime.TypeByExtension(ext); mt != "" {
+				contentType = mt
+			}
 		}
+	}
+	if contentType == "" {
+		contentType = "application/octet-stream"
 	}
 
 	url, _, err := h.storageService.UploadFile(r.Context(), fileBytes, header.Filename, folder, contentType)
@@ -88,7 +137,5 @@ func (h *UploadHandler) uploadPublicImage(w http.ResponseWriter, r *http.Request
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	RespondJSON(w, map[string]string{
-		"url": url,
-	})
+	RespondJSON(w, UploadLogoResponse{URL: url})
 }

@@ -14,8 +14,7 @@ describe('buildEscPosReceipt', () => {
 
   it('writes UTF-8 lines with LF', () => {
     const bytes = buildEscPosReceipt(['a']);
-    const hi = new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.length);
-    const text = new TextDecoder('utf-8').decode(hi.subarray(2));
+    const text = new TextDecoder('utf-8').decode(bytes.subarray(2));
     expect(text.startsWith('a\n')).toBe(true);
   });
 });

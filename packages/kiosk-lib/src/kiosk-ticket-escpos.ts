@@ -143,9 +143,12 @@ function imageDataToEscPosRaster(img: ImageData): Uint8Array {
       for (let bit = 0; bit < 8; bit++) {
         const x = xb * 8 + bit;
         const i = (y * width + x) * 4;
-        const r = data[i]!;
-        const g = data[i + 1]!;
-        const b = data[i + 2]!;
+        if (i < 0 || i + 2 >= data.length) {
+          continue;
+        }
+        const r = data[i] ?? 255;
+        const g = data[i + 1] ?? 255;
+        const b = data[i + 2] ?? 255;
         const lum = (r * 299 + g * 587 + b * 114) / 1000;
         if (lum < 180) {
           byte |= 0x80 >> bit;

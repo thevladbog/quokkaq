@@ -75,6 +75,15 @@ def apply_openapi_tweaks(doc: dict[str, Any]) -> None:
 
     _patch_create_ticket_request(comp)
 
+    upload_logo = _schema(comp, "handlers.UploadLogoResponse")
+    upload_logo["required"] = ["url"]
+
+    kiosk_patch = _schema(comp, "handlers.PatchUnitKioskConfigRequest")
+    kiosk_patch["required"] = ["config"]
+    cfg = kiosk_patch.get("properties", {}).get("config")
+    if isinstance(cfg, dict):
+        cfg["required"] = ["kiosk"]
+
 
 def _patch_create_ticket_request(components: dict[str, Any]) -> None:
     """Model POST /units/{unitId}/tickets body as oneOf: anonymous | staff | kiosk."""

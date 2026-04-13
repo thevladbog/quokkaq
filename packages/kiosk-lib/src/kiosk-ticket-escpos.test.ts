@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { encodeCp1251 } from './cp1251-encode';
 import { buildKioskTicketEscPos } from './kiosk-ticket-escpos';
 import type { Ticket } from '@quokkaq/shared-types';
 
@@ -138,5 +139,20 @@ describe('buildKioskTicketEscPos', () => {
     });
     const asLatin = new TextDecoder('latin1').decode(bytes);
     expect(asLatin).toContain(hdr);
+  });
+
+  it('encodes Cyrillic service label as CP1251 (not 0x3f replacement)', async () => {
+    const label = 'Привет';
+    const expected = encodeCp1251(label);
+    expect(expected.some((b) => b === 0x3f)).toBe(false);
+    const bytes = await buildKioskTicketEscPos({
+      kiosk: {},
+      ticket: sampleTicket,
+      serviceLabel: label,
+      ticketPageUrl: 'https://x/y',
+      unitDisplayTitle: ''
+    });
+    const needle = [...expected];
+    expect(findSubarray(bytes, needle)).toBeGreaterThanOrEqual(0);
   });
 });

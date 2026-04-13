@@ -441,6 +441,16 @@ export interface HandlersPatchUnitClientRequest {
   tagDefinitionIds?: string[];
 }
 
+export type HandlersPatchUnitKioskConfigRequestConfigKiosk = { [key: string]: unknown };
+
+export type HandlersPatchUnitKioskConfigRequestConfig = {
+  kiosk: HandlersPatchUnitKioskConfigRequestConfigKiosk;
+};
+
+export interface HandlersPatchUnitKioskConfigRequest {
+  config: HandlersPatchUnitKioskConfigRequestConfig;
+}
+
 export interface HandlersPeriodResponse {
   end?: string;
   start?: string;
@@ -1079,11 +1089,13 @@ export interface ServicesUnitClientListResponse {
   nextCursor?: string;
 }
 
-export type PostUploadBody = {
+export type UploadLogoBody = {
+  /** Image file */
   file: Blob;
 };
 
-export type PostUploadPrinterLogoBody = {
+export type UploadPrinterLogoBody = {
+  /** Image file */
   file: Blob;
 };
 
@@ -1095,41 +1107,41 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
  * Upload kiosk/ad logo (JPG, PNG, SVG, WebP). Admin JWT. Stored under public/logos/.
  * @summary Upload logo file
  */
-export type postUploadResponse200 = {
+export type uploadLogoResponse200 = {
   data: HandlersUploadLogoResponse
   status: 200
 }
 
-export type postUploadResponse400 = {
+export type uploadLogoResponse400 = {
   data: string
   status: 400
 }
 
-export type postUploadResponse401 = {
+export type uploadLogoResponse401 = {
   data: string
   status: 401
 }
 
-export type postUploadResponse403 = {
+export type uploadLogoResponse403 = {
   data: string
   status: 403
 }
 
-export type postUploadResponse500 = {
+export type uploadLogoResponse500 = {
   data: string
   status: 500
 }
 
-export type postUploadResponseSuccess = (postUploadResponse200) & {
+export type uploadLogoResponseSuccess = (uploadLogoResponse200) & {
   headers: Headers;
 };
-export type postUploadResponseError = (postUploadResponse400 | postUploadResponse401 | postUploadResponse403 | postUploadResponse500) & {
+export type uploadLogoResponseError = (uploadLogoResponse400 | uploadLogoResponse401 | uploadLogoResponse403 | uploadLogoResponse500) & {
   headers: Headers;
 };
 
-export type postUploadResponse = (postUploadResponseSuccess | postUploadResponseError)
+export type uploadLogoResponse = (uploadLogoResponseSuccess | uploadLogoResponseError)
 
-export const getPostUploadUrl = () => {
+export const getUploadLogoUrl = () => {
 
 
 
@@ -1137,11 +1149,11 @@ export const getPostUploadUrl = () => {
   return `/upload`
 }
 
-export const postUpload = async (postUploadBody: PostUploadBody, options?: RequestInit): Promise<postUploadResponse> => {
+export const uploadLogo = async (uploadLogoBody: UploadLogoBody, options?: RequestInit): Promise<uploadLogoResponse> => {
     const formData = new FormData();
-formData.append(`file`, postUploadBody.file);
+formData.append(`file`, uploadLogoBody.file);
 
-  return orvalMutator<postUploadResponse>(getPostUploadUrl(),
+  return orvalMutator<uploadLogoResponse>(getUploadLogoUrl(),
   {
     ...options,
     method: 'POST'
@@ -1154,11 +1166,11 @@ formData.append(`file`, postUploadBody.file);
 
 
 
-export const getPostUploadMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUpload>>, TError,{data: PostUploadBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof postUpload>>, TError,{data: PostUploadBody}, TContext> => {
+export const getUploadLogoMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadLogo>>, TError,{data: UploadLogoBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof uploadLogo>>, TError,{data: UploadLogoBody}, TContext> => {
 
-const mutationKey = ['postUpload'];
+const mutationKey = ['uploadLogo'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -1168,10 +1180,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postUpload>>, {data: PostUploadBody}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadLogo>>, {data: UploadLogoBody}> = (props) => {
           const {data} = props ?? {};
 
-          return  postUpload(data,requestOptions)
+          return  uploadLogo(data,requestOptions)
         }
 
 
@@ -1181,63 +1193,63 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PostUploadMutationResult = NonNullable<Awaited<ReturnType<typeof postUpload>>>
-    export type PostUploadMutationBody = PostUploadBody
-    export type PostUploadMutationError = string
+    export type UploadLogoMutationResult = NonNullable<Awaited<ReturnType<typeof uploadLogo>>>
+    export type UploadLogoMutationBody = UploadLogoBody
+    export type UploadLogoMutationError = string
 
     /**
  * @summary Upload logo file
  */
-export const usePostUpload = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUpload>>, TError,{data: PostUploadBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const useUploadLogo = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadLogo>>, TError,{data: UploadLogoBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof postUpload>>,
+        Awaited<ReturnType<typeof uploadLogo>>,
         TError,
-        {data: PostUploadBody},
+        {data: UploadLogoBody},
         TContext
       > => {
-      return useMutation(getPostUploadMutationOptions(options), queryClient);
+      return useMutation(getUploadLogoMutationOptions(options), queryClient);
     }
 
 /**
  * Upload thermal-receipt logo (includes BMP). Admin JWT. Stored under public/printer-logos/.
  * @summary Upload printer logo file
  */
-export type postUploadPrinterLogoResponse200 = {
+export type uploadPrinterLogoResponse200 = {
   data: HandlersUploadLogoResponse
   status: 200
 }
 
-export type postUploadPrinterLogoResponse400 = {
+export type uploadPrinterLogoResponse400 = {
   data: string
   status: 400
 }
 
-export type postUploadPrinterLogoResponse401 = {
+export type uploadPrinterLogoResponse401 = {
   data: string
   status: 401
 }
 
-export type postUploadPrinterLogoResponse403 = {
+export type uploadPrinterLogoResponse403 = {
   data: string
   status: 403
 }
 
-export type postUploadPrinterLogoResponse500 = {
+export type uploadPrinterLogoResponse500 = {
   data: string
   status: 500
 }
 
-export type postUploadPrinterLogoResponseSuccess = (postUploadPrinterLogoResponse200) & {
+export type uploadPrinterLogoResponseSuccess = (uploadPrinterLogoResponse200) & {
   headers: Headers;
 };
-export type postUploadPrinterLogoResponseError = (postUploadPrinterLogoResponse400 | postUploadPrinterLogoResponse401 | postUploadPrinterLogoResponse403 | postUploadPrinterLogoResponse500) & {
+export type uploadPrinterLogoResponseError = (uploadPrinterLogoResponse400 | uploadPrinterLogoResponse401 | uploadPrinterLogoResponse403 | uploadPrinterLogoResponse500) & {
   headers: Headers;
 };
 
-export type postUploadPrinterLogoResponse = (postUploadPrinterLogoResponseSuccess | postUploadPrinterLogoResponseError)
+export type uploadPrinterLogoResponse = (uploadPrinterLogoResponseSuccess | uploadPrinterLogoResponseError)
 
-export const getPostUploadPrinterLogoUrl = () => {
+export const getUploadPrinterLogoUrl = () => {
 
 
 
@@ -1245,11 +1257,11 @@ export const getPostUploadPrinterLogoUrl = () => {
   return `/upload-printer-logo`
 }
 
-export const postUploadPrinterLogo = async (postUploadPrinterLogoBody: PostUploadPrinterLogoBody, options?: RequestInit): Promise<postUploadPrinterLogoResponse> => {
+export const uploadPrinterLogo = async (uploadPrinterLogoBody: UploadPrinterLogoBody, options?: RequestInit): Promise<uploadPrinterLogoResponse> => {
     const formData = new FormData();
-formData.append(`file`, postUploadPrinterLogoBody.file);
+formData.append(`file`, uploadPrinterLogoBody.file);
 
-  return orvalMutator<postUploadPrinterLogoResponse>(getPostUploadPrinterLogoUrl(),
+  return orvalMutator<uploadPrinterLogoResponse>(getUploadPrinterLogoUrl(),
   {
     ...options,
     method: 'POST'
@@ -1262,11 +1274,11 @@ formData.append(`file`, postUploadPrinterLogoBody.file);
 
 
 
-export const getPostUploadPrinterLogoMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUploadPrinterLogo>>, TError,{data: PostUploadPrinterLogoBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof postUploadPrinterLogo>>, TError,{data: PostUploadPrinterLogoBody}, TContext> => {
+export const getUploadPrinterLogoMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadPrinterLogo>>, TError,{data: UploadPrinterLogoBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof uploadPrinterLogo>>, TError,{data: UploadPrinterLogoBody}, TContext> => {
 
-const mutationKey = ['postUploadPrinterLogo'];
+const mutationKey = ['uploadPrinterLogo'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -1276,10 +1288,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postUploadPrinterLogo>>, {data: PostUploadPrinterLogoBody}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadPrinterLogo>>, {data: UploadPrinterLogoBody}> = (props) => {
           const {data} = props ?? {};
 
-          return  postUploadPrinterLogo(data,requestOptions)
+          return  uploadPrinterLogo(data,requestOptions)
         }
 
 
@@ -1289,20 +1301,20 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PostUploadPrinterLogoMutationResult = NonNullable<Awaited<ReturnType<typeof postUploadPrinterLogo>>>
-    export type PostUploadPrinterLogoMutationBody = PostUploadPrinterLogoBody
-    export type PostUploadPrinterLogoMutationError = string
+    export type UploadPrinterLogoMutationResult = NonNullable<Awaited<ReturnType<typeof uploadPrinterLogo>>>
+    export type UploadPrinterLogoMutationBody = UploadPrinterLogoBody
+    export type UploadPrinterLogoMutationError = string
 
     /**
  * @summary Upload printer logo file
  */
-export const usePostUploadPrinterLogo = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUploadPrinterLogo>>, TError,{data: PostUploadPrinterLogoBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const useUploadPrinterLogo = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadPrinterLogo>>, TError,{data: UploadPrinterLogoBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof postUploadPrinterLogo>>,
+        Awaited<ReturnType<typeof uploadPrinterLogo>>,
         TError,
-        {data: PostUploadPrinterLogoBody},
+        {data: UploadPrinterLogoBody},
         TContext
       > => {
-      return useMutation(getPostUploadPrinterLogoMutationOptions(options), queryClient);
+      return useMutation(getUploadPrinterLogoMutationOptions(options), queryClient);
     }
