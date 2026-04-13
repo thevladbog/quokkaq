@@ -108,6 +108,7 @@ export interface ModelsService {
   nameEn?: string;
   nameRu?: string;
   numberSequence?: string;
+  offerIdentification?: boolean;
   parentId?: string;
   prebook?: boolean;
   prefix?: string;
@@ -209,6 +210,17 @@ export interface ModelsCounter {
   unitId?: string;
 }
 
+export interface ModelsClientVisitTransferEvent {
+  at?: string;
+  fromCounterName?: string;
+  fromServiceName?: string;
+  fromZoneLabel?: string;
+  toCounterName?: string;
+  toServiceName?: string;
+  toZoneLabel?: string;
+  transferKind?: string;
+}
+
 export interface ModelsTicket {
   booking?: ModelsBooking;
   bookingId?: string;
@@ -238,6 +250,8 @@ export interface ModelsTicket {
   /** ServiceZoneID: waiting pool within the subdivision; NULL = subdivision-wide pool. */
   serviceZoneId?: string;
   status?: string;
+  /** TransferTrail lists ticket.transferred events in chronological order (client visit APIs only). */
+  transferTrail?: ModelsClientVisitTransferEvent[];
   /** URL to the generated TTS audio file */
   ttsUrl?: string;
   unitId?: string;
@@ -273,10 +287,35 @@ export interface HandlersCreateInvitationRequest {
   templateId?: string;
 }
 
-export interface HandlersCreateTicketRequest {
-  clientId?: string;
+export interface HandlersCreateTicketRequestAnonymous {
+  /** @minLength 1 */
   serviceId: string;
 }
+
+export interface HandlersCreateTicketRequestStaff {
+  /** @minLength 1 */
+  serviceId: string;
+  /** @minLength 1 */
+  clientId: string;
+}
+
+export type HandlersCreateTicketRequestKioskVisitorLocale = typeof HandlersCreateTicketRequestKioskVisitorLocale[keyof typeof HandlersCreateTicketRequestKioskVisitorLocale];
+
+
+export const HandlersCreateTicketRequestKioskVisitorLocale = {
+  en: 'en',
+  ru: 'ru',
+} as const;
+
+export interface HandlersCreateTicketRequestKiosk {
+  /** @minLength 1 */
+  serviceId: string;
+  /** @minLength 1 */
+  visitorPhone: string;
+  visitorLocale: HandlersCreateTicketRequestKioskVisitorLocale;
+}
+
+export type HandlersCreateTicketRequest = HandlersCreateTicketRequestAnonymous | HandlersCreateTicketRequestStaff | HandlersCreateTicketRequestKiosk;
 
 export interface HandlersDaDataFindPartyByInnRequest {
   inn: string;

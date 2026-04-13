@@ -61,7 +61,9 @@ import {
   CompanySchema,
   SaasVendorSchema,
   CompanyMeResponseSchema,
-  UnitClientHistoryListResponseSchema
+  UnitClientHistoryListResponseSchema,
+  createTicketRequestSchema,
+  type CreateTicketRequestInput
 } from '@quokkaq/shared-types';
 
 const ClientVisitsResponseSchema = z.object({
@@ -481,14 +483,25 @@ export const unitsApi = {
 
   createTicket: async (
     unitId: string,
-    ticketData: { serviceId: string; clientId?: string }
+    ticketData: CreateTicketRequestInput
   ) => {
-    const body: orvalTc.HandlersCreateTicketRequest = {
-      serviceId: ticketData.serviceId
-    };
-    const cid = ticketData.clientId?.trim();
-    if (cid) body.clientId = cid;
-    const res = await orvalTc.postUnitsUnitIdTickets(unitId, body);
+    const normalized = createTicketRequestSchema.parse(ticketData);
+    let body: orvalTc.HandlersCreateTicketRequest;
+    if (normalized.visitorPhone && normalized.visitorLocale) {
+      body = {
+        serviceId: normalized.serviceId,
+        visitorPhone: normalized.visitorPhone,
+        visitorLocale: normalized.visitorLocale
+      };
+    } else if (normalized.clientId) {
+      body = {
+        serviceId: normalized.serviceId,
+        clientId: normalized.clientId
+      };
+    } else {
+      body = { serviceId: normalized.serviceId };
+    }
+    const res = await orvalTc.createUnitTicket(unitId, body);
     return TicketModelSchema.parse(res.data);
   },
 
@@ -679,7 +692,7 @@ export const ticketsApi = {
   },
 
   create: async (ticketData: { unitId: string; serviceId: string }) => {
-    const res = await orvalTc.postUnitsUnitIdTickets(ticketData.unitId, {
+    const res = await orvalTc.createUnitTicket(ticketData.unitId, {
       serviceId: ticketData.serviceId
     });
     return TicketModelSchema.parse(res.data);

@@ -1,6 +1,7 @@
 package services
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"quokkaq-go-backend/internal/localeutil"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/phoneutil"
 	"quokkaq-go-backend/internal/repository"
@@ -127,6 +129,9 @@ var ErrTicketServiceNotInUnit = errors.New("service does not belong to this unit
 // ErrCustomerNameEmpty is returned when a new unit client would be created from a pre-registration but both names are empty after trim.
 var ErrCustomerNameEmpty = errors.New("pre-registration customer name is empty")
 
+// ErrTicketCreateVisitorConflict is returned when both clientId and visitorPhone are set on ticket creation.
+var ErrTicketCreateVisitorConflict = errors.New("cannot provide both clientId and visitor phone")
+
 // ErrVisitorTagsCommentRequired is returned when operatorComment is empty after trim.
 var ErrVisitorTagsCommentRequired = errors.New("operatorComment is required")
 
@@ -187,7 +192,8 @@ type TransferTicketInput struct {
 
 type TicketService interface {
 	// optionalStaffClientID: when set, ticket is linked to this non-anonymous unit client; otherwise anonymous kiosk client is used.
-	CreateTicket(unitID, serviceID string, optionalStaffClientID *string, actorUserID *string) (*models.Ticket, error)
+	// visitorPhone + visitorLocale: optional kiosk identification; locale must be en or ru when phone is set; mutually exclusive with optionalStaffClientID.
+	CreateTicket(unitID, serviceID string, optionalStaffClientID *string, visitorPhone *string, visitorLocale *string, actorUserID *string) (*models.Ticket, error)
 	CreateTicketWithPreRegistration(unitID, serviceID, preRegID string, actorUserID *string) (*models.Ticket, error)
 	GetTicketByID(id string) (*models.Ticket, error)
 	GetTicketsByUnit(unitID string) ([]models.Ticket, error)
@@ -255,15 +261,15 @@ func (s *ticketService) writeTicketHistoryTx(tx *gorm.DB, ticketID string, actor
 	return s.repo.CreateTicketHistoryTx(tx, h)
 }
 
-func (s *ticketService) CreateTicket(unitID, serviceID string, optionalStaffClientID *string, actorUserID *string) (*models.Ticket, error) {
-	return s.createTicketInternal(unitID, serviceID, nil, optionalStaffClientID, actorUserID)
+func (s *ticketService) CreateTicket(unitID, serviceID string, optionalStaffClientID *string, visitorPhone *string, visitorLocale *string, actorUserID *string) (*models.Ticket, error) {
+	return s.createTicketInternal(unitID, serviceID, nil, optionalStaffClientID, visitorPhone, visitorLocale, actorUserID)
 }
 
 func (s *ticketService) CreateTicketWithPreRegistration(unitID, serviceID, preRegID string, actorUserID *string) (*models.Ticket, error) {
-	return s.createTicketInternal(unitID, serviceID, &preRegID, nil, actorUserID)
+	return s.createTicketInternal(unitID, serviceID, &preRegID, nil, nil, nil, actorUserID)
 }
 
-func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID *string, optionalStaffClientID *string, actorUserID *string) (*models.Ticket, error) {
+func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID *string, optionalStaffClientID *string, visitorPhone *string, visitorLocale *string, actorUserID *string) (*models.Ticket, error) {
 	var preReg *models.PreRegistration
 	if preRegID != nil {
 		if s.preRegRepo == nil {
@@ -333,6 +339,38 @@ func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID 
 				return err
 			}
 			resolvedClientID = c.ID
+		} else if kioskPhone := strings.TrimSpace(derefString(visitorPhone)); kioskPhone != "" {
+			if optionalStaffClientID != nil && strings.TrimSpace(*optionalStaffClientID) != "" {
+				return ErrTicketCreateVisitorConflict
+			}
+			fn, ln, lerr := localeutil.UnknownVisitorPlaceholderNames(derefString(visitorLocale))
+			if lerr != nil {
+				return lerr
+			}
+			phoneE164, err := phoneutil.ParseAndNormalize(kioskPhone, phoneutil.DefaultRegion())
+			if err != nil {
+				return fmt.Errorf("%w: %w", ErrVisitorPhoneInvalid, err)
+			}
+			c, err := s.clientRepo.FindByUnitAndPhoneE164Tx(tx, unitID, phoneE164)
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				ph := phoneE164
+				c = &models.UnitClient{
+					UnitID:      unitID,
+					FirstName:   fn,
+					LastName:    ln,
+					PhoneE164:   &ph,
+					IsAnonymous: false,
+				}
+				if err := s.clientRepo.CreateTx(tx, c); err != nil {
+					if isUniqueViolation(err) {
+						return ErrDuplicateClientPhone
+					}
+					return err
+				}
+			} else if err != nil {
+				return err
+			}
+			resolvedClientID = c.ID
 		} else if optionalStaffClientID != nil && strings.TrimSpace(*optionalStaffClientID) != "" {
 			cid := strings.TrimSpace(*optionalStaffClientID)
 			c, err := s.clientRepo.GetByIDTx(tx, cid)
@@ -378,6 +416,8 @@ func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID 
 		if preRegID != nil {
 			payload["pre_registration_id"] = *preRegID
 			payload["source"] = "pre_registration_redeem"
+		} else if strings.TrimSpace(derefString(visitorPhone)) != "" {
+			payload["source"] = "public_issue_kiosk_phone"
 		} else if optionalStaffClientID != nil && strings.TrimSpace(*optionalStaffClientID) != "" {
 			payload["source"] = "staff_issue_named"
 		} else {
@@ -393,6 +433,13 @@ func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID 
 
 	s.hub.BroadcastEvent("ticket.created", ticket, ticket.UnitID)
 	return ticket, nil
+}
+
+func derefString(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return *p
 }
 
 func isUniqueViolation(err error) bool {
@@ -1328,6 +1375,9 @@ func (s *ticketService) ListVisitsByClient(unitID, clientID string, limit int, c
 				displayItems[i].ServedByName = &n
 			}
 		}
+		if err := s.hydrateClientVisitTransferTrails(displayItems); err != nil {
+			return nil, nil, err
+		}
 	}
 	var next *string
 	if len(items) > limit {
@@ -1336,6 +1386,181 @@ func (s *ticketService) ListVisitsByClient(unitID, clientID string, limit int, c
 		next = &s
 	}
 	return displayItems, next, nil
+}
+
+func visitHistoryPayloadString(p map[string]interface{}, key string) string {
+	v, ok := p[key]
+	if !ok || v == nil {
+		return ""
+	}
+	if s, ok := v.(string); ok {
+		return strings.TrimSpace(s)
+	}
+	return strings.TrimSpace(fmt.Sprint(v))
+}
+
+func (s *ticketService) hydrateClientVisitTransferTrails(tickets []models.Ticket) error {
+	if len(tickets) == 0 {
+		return nil
+	}
+	ids := make([]string, len(tickets))
+	for i := range tickets {
+		ids[i] = tickets[i].ID
+	}
+	rows, err := s.repo.ListTransferHistoriesByTicketIDs(ids)
+	if err != nil {
+		return err
+	}
+	if len(rows) == 0 {
+		return nil
+	}
+
+	type transferHistoryParsed struct {
+		h models.TicketHistory
+		p map[string]interface{}
+	}
+
+	byTicket := make(map[string][]transferHistoryParsed)
+	svcSeen := make(map[string]struct{})
+	var svcIDs []string
+	ctrSeen := make(map[string]struct{})
+	var ctrIDs []string
+	zoneSeen := make(map[string]struct{})
+	var zoneIDs []string
+
+	addSvc := func(id string) {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			return
+		}
+		if _, ok := svcSeen[id]; ok {
+			return
+		}
+		svcSeen[id] = struct{}{}
+		svcIDs = append(svcIDs, id)
+	}
+	addCtr := func(id string) {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			return
+		}
+		if _, ok := ctrSeen[id]; ok {
+			return
+		}
+		ctrSeen[id] = struct{}{}
+		ctrIDs = append(ctrIDs, id)
+	}
+	addZone := func(id string) {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			return
+		}
+		if _, ok := zoneSeen[id]; ok {
+			return
+		}
+		zoneSeen[id] = struct{}{}
+		zoneIDs = append(zoneIDs, id)
+	}
+
+	for _, h := range rows {
+		if len(h.Payload) == 0 {
+			continue
+		}
+		var p map[string]interface{}
+		if err := json.Unmarshal(h.Payload, &p); err != nil || len(p) == 0 {
+			continue
+		}
+		addSvc(visitHistoryPayloadString(p, "from_service_id"))
+		addSvc(visitHistoryPayloadString(p, "to_service_id"))
+		addCtr(visitHistoryPayloadString(p, "from_counter_id"))
+		addCtr(visitHistoryPayloadString(p, "to_counter_id"))
+		if visitHistoryPayloadString(p, "to_zone_name") == "" {
+			addZone(visitHistoryPayloadString(p, "to_service_zone_id"))
+		}
+		addZone(visitHistoryPayloadString(p, "from_service_zone_id"))
+		byTicket[h.TicketID] = append(byTicket[h.TicketID], transferHistoryParsed{h: h, p: p})
+	}
+
+	svcMap, err := s.serviceRepo.FindMapByIDs(svcIDs)
+	if err != nil {
+		return err
+	}
+	ctrMap, err := s.counterRepo.FindMapByIDs(ctrIDs)
+	if err != nil {
+		return err
+	}
+	zoneLabels := make(map[string]string, len(zoneIDs))
+	for _, zid := range zoneIDs {
+		u, uerr := s.unitRepo.FindByIDLight(zid)
+		if uerr != nil || u == nil {
+			continue
+		}
+		n := strings.TrimSpace(u.Name)
+		if n != "" {
+			zoneLabels[zid] = n
+		}
+	}
+
+	for i := range tickets {
+		hist := byTicket[tickets[i].ID]
+		if len(hist) == 0 {
+			continue
+		}
+		trail := make([]models.ClientVisitTransferEvent, 0, len(hist))
+		for _, row := range hist {
+			h := row.h
+			p := row.p
+			if len(p) == 0 {
+				continue
+			}
+			ev := models.ClientVisitTransferEvent{
+				At:           h.CreatedAt.UTC(),
+				TransferKind: visitHistoryPayloadString(p, "transfer_kind"),
+			}
+			fromSID := visitHistoryPayloadString(p, "from_service_id")
+			toSID := visitHistoryPayloadString(p, "to_service_id")
+			ev.FromServiceName = visitHistoryPayloadString(p, "from_service_label")
+			if ev.FromServiceName == "" && fromSID != "" {
+				if svc := svcMap[fromSID]; svc != nil {
+					ev.FromServiceName = strings.TrimSpace(svc.Name)
+				}
+			}
+			ev.ToServiceName = visitHistoryPayloadString(p, "to_service_label")
+			if ev.ToServiceName == "" && toSID != "" {
+				if svc := svcMap[toSID]; svc != nil {
+					ev.ToServiceName = strings.TrimSpace(svc.Name)
+				}
+			}
+			fromCID := visitHistoryPayloadString(p, "from_counter_id")
+			toCID := visitHistoryPayloadString(p, "to_counter_id")
+			if fromCID != "" {
+				if c := ctrMap[fromCID]; c != nil {
+					ev.FromCounterName = strings.TrimSpace(c.Name)
+				}
+			}
+			if toCID != "" {
+				if c := ctrMap[toCID]; c != nil {
+					ev.ToCounterName = strings.TrimSpace(c.Name)
+				}
+			}
+			ev.ToZoneLabel = visitHistoryPayloadString(p, "to_zone_name")
+			if ev.ToZoneLabel == "" {
+				tzid := visitHistoryPayloadString(p, "to_service_zone_id")
+				if tzid != "" {
+					ev.ToZoneLabel = zoneLabels[tzid]
+				}
+			}
+			fzid := visitHistoryPayloadString(p, "from_service_zone_id")
+			if fzid != "" {
+				ev.FromZoneLabel = zoneLabels[fzid]
+			}
+			trail = append(trail, ev)
+		}
+		if len(trail) > 0 {
+			tickets[i].TransferTrail = trail
+		}
+	}
+	return nil
 }
 
 func (s *ticketService) enqueueTTS(ticket *models.Ticket, counterID string) {

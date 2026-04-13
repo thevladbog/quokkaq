@@ -121,6 +121,7 @@ export default function ShiftDashboardPage({
       queryClient.invalidateQueries({ queryKey: ['shift-counters'] });
       queryClient.invalidateQueries({ queryKey: ['shift-activity'] });
       queryClient.invalidateQueries({ queryKey: ['shift-dashboard', unitId] });
+      queryClient.removeQueries({ queryKey: ['staff-workstation-bootstrap'] });
       setForceReleaseDialogOpen(false);
       setSelectedCounter(null);
     },

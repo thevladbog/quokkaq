@@ -108,6 +108,7 @@ export interface ModelsService {
   nameEn?: string;
   nameRu?: string;
   numberSequence?: string;
+  offerIdentification?: boolean;
   parentId?: string;
   prebook?: boolean;
   prefix?: string;
@@ -209,6 +210,17 @@ export interface ModelsCounter {
   unitId?: string;
 }
 
+export interface ModelsClientVisitTransferEvent {
+  at?: string;
+  fromCounterName?: string;
+  fromServiceName?: string;
+  fromZoneLabel?: string;
+  toCounterName?: string;
+  toServiceName?: string;
+  toZoneLabel?: string;
+  transferKind?: string;
+}
+
 export interface ModelsTicket {
   booking?: ModelsBooking;
   bookingId?: string;
@@ -238,6 +250,8 @@ export interface ModelsTicket {
   /** ServiceZoneID: waiting pool within the subdivision; NULL = subdivision-wide pool. */
   serviceZoneId?: string;
   status?: string;
+  /** TransferTrail lists ticket.transferred events in chronological order (client visit APIs only). */
+  transferTrail?: ModelsClientVisitTransferEvent[];
   /** URL to the generated TTS audio file */
   ttsUrl?: string;
   unitId?: string;
@@ -273,10 +287,35 @@ export interface HandlersCreateInvitationRequest {
   templateId?: string;
 }
 
-export interface HandlersCreateTicketRequest {
-  clientId?: string;
+export interface HandlersCreateTicketRequestAnonymous {
+  /** @minLength 1 */
   serviceId: string;
 }
+
+export interface HandlersCreateTicketRequestStaff {
+  /** @minLength 1 */
+  serviceId: string;
+  /** @minLength 1 */
+  clientId: string;
+}
+
+export type HandlersCreateTicketRequestKioskVisitorLocale = typeof HandlersCreateTicketRequestKioskVisitorLocale[keyof typeof HandlersCreateTicketRequestKioskVisitorLocale];
+
+
+export const HandlersCreateTicketRequestKioskVisitorLocale = {
+  en: 'en',
+  ru: 'ru',
+} as const;
+
+export interface HandlersCreateTicketRequestKiosk {
+  /** @minLength 1 */
+  serviceId: string;
+  /** @minLength 1 */
+  visitorPhone: string;
+  visitorLocale: HandlersCreateTicketRequestKioskVisitorLocale;
+}
+
+export type HandlersCreateTicketRequest = HandlersCreateTicketRequestAnonymous | HandlersCreateTicketRequestStaff | HandlersCreateTicketRequestKiosk;
 
 export interface HandlersDaDataFindPartyByInnRequest {
   inn: string;
@@ -3323,34 +3362,34 @@ export function useGetUnitsUnitIdTickets<TData = Awaited<ReturnType<typeof getUn
 
 
 /**
- * Creates a new ticket for a service in a unit. Unit is taken from the path; body requires serviceId (optional clientId).
+ * Creates a new ticket for a service in a unit. Unit is taken from the path; body requires serviceId. Optional clientId (staff) or visitorPhone+visitorLocale (kiosk identification, en|ru); clientId and visitorPhone are mutually exclusive.
  * @summary Create a new ticket
  */
-export type postUnitsUnitIdTicketsResponse201 = {
+export type createUnitTicketResponse201 = {
   data: ModelsTicket
   status: 201
 }
 
-export type postUnitsUnitIdTicketsResponse400 = {
+export type createUnitTicketResponse400 = {
   data: string
   status: 400
 }
 
-export type postUnitsUnitIdTicketsResponse500 = {
+export type createUnitTicketResponse500 = {
   data: string
   status: 500
 }
 
-export type postUnitsUnitIdTicketsResponseSuccess = (postUnitsUnitIdTicketsResponse201) & {
+export type createUnitTicketResponseSuccess = (createUnitTicketResponse201) & {
   headers: Headers;
 };
-export type postUnitsUnitIdTicketsResponseError = (postUnitsUnitIdTicketsResponse400 | postUnitsUnitIdTicketsResponse500) & {
+export type createUnitTicketResponseError = (createUnitTicketResponse400 | createUnitTicketResponse500) & {
   headers: Headers;
 };
 
-export type postUnitsUnitIdTicketsResponse = (postUnitsUnitIdTicketsResponseSuccess | postUnitsUnitIdTicketsResponseError)
+export type createUnitTicketResponse = (createUnitTicketResponseSuccess | createUnitTicketResponseError)
 
-export const getPostUnitsUnitIdTicketsUrl = (unitId: string,) => {
+export const getCreateUnitTicketUrl = (unitId: string,) => {
 
 
 
@@ -3358,10 +3397,10 @@ export const getPostUnitsUnitIdTicketsUrl = (unitId: string,) => {
   return `/units/${unitId}/tickets`
 }
 
-export const postUnitsUnitIdTickets = async (unitId: string,
-    handlersCreateTicketRequest: HandlersCreateTicketRequest, options?: RequestInit): Promise<postUnitsUnitIdTicketsResponse> => {
+export const createUnitTicket = async (unitId: string,
+    handlersCreateTicketRequest: HandlersCreateTicketRequest, options?: RequestInit): Promise<createUnitTicketResponse> => {
 
-  return orvalMutator<postUnitsUnitIdTicketsResponse>(getPostUnitsUnitIdTicketsUrl(unitId),
+  return orvalMutator<createUnitTicketResponse>(getCreateUnitTicketUrl(unitId),
   {
     ...options,
     method: 'POST',
@@ -3374,11 +3413,11 @@ export const postUnitsUnitIdTickets = async (unitId: string,
 
 
 
-export const getPostUnitsUnitIdTicketsMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdTickets>>, TError,{unitId: string;data: HandlersCreateTicketRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdTickets>>, TError,{unitId: string;data: HandlersCreateTicketRequest}, TContext> => {
+export const getCreateUnitTicketMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createUnitTicket>>, TError,{unitId: string;data: HandlersCreateTicketRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof createUnitTicket>>, TError,{unitId: string;data: HandlersCreateTicketRequest}, TContext> => {
 
-const mutationKey = ['postUnitsUnitIdTickets'];
+const mutationKey = ['createUnitTicket'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -3388,10 +3427,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postUnitsUnitIdTickets>>, {unitId: string;data: HandlersCreateTicketRequest}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createUnitTicket>>, {unitId: string;data: HandlersCreateTicketRequest}> = (props) => {
           const {unitId,data} = props ?? {};
 
-          return  postUnitsUnitIdTickets(unitId,data,requestOptions)
+          return  createUnitTicket(unitId,data,requestOptions)
         }
 
 
@@ -3401,20 +3440,20 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PostUnitsUnitIdTicketsMutationResult = NonNullable<Awaited<ReturnType<typeof postUnitsUnitIdTickets>>>
-    export type PostUnitsUnitIdTicketsMutationBody = HandlersCreateTicketRequest
-    export type PostUnitsUnitIdTicketsMutationError = string
+    export type CreateUnitTicketMutationResult = NonNullable<Awaited<ReturnType<typeof createUnitTicket>>>
+    export type CreateUnitTicketMutationBody = HandlersCreateTicketRequest
+    export type CreateUnitTicketMutationError = string
 
     /**
  * @summary Create a new ticket
  */
-export const usePostUnitsUnitIdTickets = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdTickets>>, TError,{unitId: string;data: HandlersCreateTicketRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const useCreateUnitTicket = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createUnitTicket>>, TError,{unitId: string;data: HandlersCreateTicketRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof postUnitsUnitIdTickets>>,
+        Awaited<ReturnType<typeof createUnitTicket>>,
         TError,
         {unitId: string;data: HandlersCreateTicketRequest},
         TContext
       > => {
-      return useMutation(getPostUnitsUnitIdTicketsMutationOptions(options), queryClient);
+      return useMutation(getCreateUnitTicketMutationOptions(options), queryClient);
     }

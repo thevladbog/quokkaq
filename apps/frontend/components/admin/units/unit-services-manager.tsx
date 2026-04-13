@@ -38,30 +38,7 @@ import { getGetUnitsUnitIdChildUnitsQueryKey } from '@/lib/api/generated/units';
 import { unitsApi } from '@/lib/api';
 import { useTranslations, useLocale } from 'next-intl';
 import { ImageUpload } from '@/components/ui/image-upload';
-
-interface Service {
-  id: string;
-  name: string;
-  nameRu?: string | null;
-  nameEn?: string | null;
-  description?: string | null;
-  descriptionRu?: string | null;
-  descriptionEn?: string | null;
-  imageUrl?: string | null;
-  backgroundColor?: string | null;
-  textColor?: string | null;
-  prefix?: string | null;
-  numberSequence?: string | null;
-  duration?: number | null; // Maximum service time in seconds
-  maxWaitingTime?: number | null; // Maximum waiting time in seconds
-  prebook?: boolean;
-  isLeaf?: boolean;
-  unitId: string;
-  parentId?: string | null;
-  parent?: Service | null;
-  children?: Service[];
-  restrictedServiceZoneId?: string | null;
-}
+import type { Service } from '@quokkaq/shared-types';
 
 interface UnitServicesManagerProps {
   unitId: string;
@@ -318,6 +295,7 @@ function buildInitialFormValues(
       duration: editingService.duration ?? undefined,
       maxWaitingTime: editingService.maxWaitingTime ?? undefined,
       prebook: editingService.prebook ?? false,
+      offerIdentification: editingService.offerIdentification ?? false,
       isLeaf: editingService.isLeaf ?? false,
       parentId: editingService.parentId ?? '',
       restrictedServiceZoneId: editingService.restrictedServiceZoneId ?? null
@@ -338,6 +316,7 @@ function buildInitialFormValues(
       duration: undefined,
       maxWaitingTime: undefined,
       prebook: false,
+      offerIdentification: false,
       isLeaf: false,
       parentId: '',
       restrictedServiceZoneId: null
@@ -361,6 +340,7 @@ function snapshotServiceFormValues(v: Partial<Service>): string {
     duration: v.duration ?? null,
     maxWaitingTime: v.maxWaitingTime ?? null,
     prebook: !!v.prebook,
+    offerIdentification: !!v.offerIdentification,
     isLeaf: !!v.isLeaf,
     parentId: v.parentId ?? '',
     restrictedServiceZoneId: v.restrictedServiceZoneId ?? null
@@ -455,6 +435,10 @@ function ServiceForm({
           ...formValues,
           name: formValues.name || editingService.name,
           prebook: formValues.prebook ?? editingService.prebook ?? false,
+          offerIdentification:
+            formValues.offerIdentification ??
+            editingService.offerIdentification ??
+            false,
           isLeaf: formValues.isLeaf ?? editingService.isLeaf ?? false,
           restrictedServiceZoneId: restrictedPayload
         });
@@ -465,6 +449,7 @@ function ServiceForm({
           name: formValues.name,
           unitId: selectedUnitId,
           prebook: formValues.prebook ?? false,
+          offerIdentification: formValues.offerIdentification ?? false,
           isLeaf: formValues.isLeaf ?? false,
           restrictedServiceZoneId: restrictedPayload
         });
@@ -804,6 +789,20 @@ function ServiceForm({
           />
           <Label htmlFor='prebook'>
             {tRoot('forms.fields.allow_prebooking')}
+          </Label>
+        </div>
+
+        <div className='flex items-center'>
+          <input
+            id='offerIdentification'
+            name='offerIdentification'
+            type='checkbox'
+            checked={!!formValues.offerIdentification}
+            onChange={handleInputChange}
+            className='mr-2'
+          />
+          <Label htmlFor='offerIdentification'>
+            {tRoot('forms.fields.offer_identification')}
           </Label>
         </div>
 

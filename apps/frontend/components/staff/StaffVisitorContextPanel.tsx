@@ -14,6 +14,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { VisitTransferTrail } from '@/components/visitors/VisitTransferTrail';
 import { Ticket, unitsApi } from '@/lib/api';
 import {
   useClientVisits,
@@ -571,6 +572,10 @@ export function StaffVisitorContextPanel({
                         </>
                       ) : null}
                     </div>
+                    <VisitTransferTrail
+                      trail={v.transferTrail}
+                      locale={locale}
+                    />
                     {visitComment ? (
                       <div className='border-border/30 border-t pt-1'>
                         <p className='text-muted-foreground mb-0.5 text-[10px] font-semibold tracking-wide uppercase'>

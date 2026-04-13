@@ -832,6 +832,19 @@ func RunVersionedMigrations(models ...interface{}) error {
 		return fmt.Errorf("failed to run service zones migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.1.11_services_offer_identification", func(db *gorm.DB) error {
+		if err := db.Exec(`
+			ALTER TABLE services
+			ADD COLUMN IF NOT EXISTS offer_identification boolean NOT NULL DEFAULT false;
+		`).Error; err != nil {
+			return err
+		}
+		return db.AutoMigrate(&dbmodels.Service{})
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run services offer_identification migration: %w", err)
+	}
+
 	fmt.Println("All migrations completed successfully")
 	return nil
 }

@@ -212,8 +212,10 @@ export function useWorkstationBootstrap({
 
   useEffect(() => {
     if (query.data?.kind !== 'redirect') return;
+    // Stale cache can still say "redirect" while counters refetch after release; do not bounce back to the workstation.
+    if (query.isFetching) return;
     router.replace(`/staff/${query.data.unitId}/${query.data.counterId}`);
-  }, [query.data, router]);
+  }, [query.data, query.isFetching, router]);
 
   const loadErrorToastShown = useRef(false);
   useEffect(() => {

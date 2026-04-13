@@ -27,6 +27,7 @@ import { PinCodeModal } from '@/components/kiosk/pin-code-modal';
 import { KioskSettingsSheet } from '@/components/kiosk/kiosk-settings-sheet';
 import { LockScreen } from '@/components/kiosk/lock-screen';
 import { PreRegRedemptionModal } from '@/components/kiosk/PreRegRedemptionModal';
+import { KioskPhoneIdentificationModal } from '@/components/kiosk/kiosk-phone-identification-modal';
 import { KioskTopBar } from '@/components/kiosk/kiosk-top-bar';
 import { KioskWelcomeHero } from '@/components/kiosk/kiosk-welcome-hero';
 import { KioskServiceTile } from '@/components/kiosk/kiosk-service-tile';
@@ -127,6 +128,13 @@ export default function UnitKioskPage() {
   const [isLocked, setIsLocked] = useState(false);
   const [, setClockClicks] = useState(0);
   const [isRedemptionModalOpen, setIsRedemptionModalOpen] = useState(false);
+  const [isPhoneIdentificationOpen, setIsPhoneIdentificationOpen] =
+    useState(false);
+  const [pendingPhoneService, setPendingPhoneService] =
+    useState<Service | null>(null);
+  const [phoneIdentificationError, setPhoneIdentificationError] = useState('');
+  const [phoneIdentificationSessionKey, setPhoneIdentificationSessionKey] =
+    useState(0);
 
   // Custom colors from config
   const isCustomColorsEnabled =
@@ -261,70 +269,120 @@ export default function UnitKioskPage() {
     });
   }, [unitServicesTree, selectedServicePath, kioskGridZoneScope, unit?.kind]);
 
+  const openTicketSuccessFlow = (ticket: Ticket, service: Service) => {
+    setCreatedTicket(ticket);
+    setIsTicketModalOpen(true);
+    setSelectedServicePath([]);
+    setCountdown(5);
+    if (autoCloseTimerId) {
+      clearInterval(autoCloseTimerId);
+    }
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          setIsTicketModalOpen(false);
+          setCreatedTicket(null);
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    setAutoCloseTimerId(timer);
+    const serviceLabel = getLocalizedName(
+      service.name,
+      service.nameRu || '',
+      service.nameEn || '',
+      locale
+    );
+    void tryPrintTicket(ticket, serviceLabel);
+    setMessage(
+      t('ticketCreated', {
+        defaultValue: 'Ticket created successfully!',
+        service: serviceLabel
+      })
+    );
+  };
+
+  const createTicketForService = async (
+    service: Service,
+    opts?: { visitorPhone: string; visitorLocale: 'en' | 'ru' },
+    failTarget?: 'phoneModal' | 'page'
+  ) => {
+    setMessage('');
+    try {
+      const ticket = await createTicketMutation.mutateAsync(
+        opts
+          ? {
+              unitId: kioskApiUnitId!,
+              serviceId: service.id,
+              visitorPhone: opts.visitorPhone,
+              visitorLocale: opts.visitorLocale
+            }
+          : {
+              unitId: kioskApiUnitId!,
+              serviceId: service.id
+            }
+      );
+      setPhoneIdentificationError('');
+      setIsPhoneIdentificationOpen(false);
+      setPendingPhoneService(null);
+      openTicketSuccessFlow(ticket, service);
+    } catch (error) {
+      console.error('Failed to create ticket:', error);
+      const failDefault = t('ticketCreationFailed', {
+        defaultValue: 'Failed to create ticket. Please try again.'
+      });
+      if (failTarget === 'phoneModal') {
+        setPhoneIdentificationError(
+          t('phone_identification.submit_failed', {
+            defaultValue: failDefault
+          })
+        );
+      } else {
+        setMessage(failDefault);
+      }
+    }
+  };
+
   const handleServiceSelection = async (service: Service) => {
     if (service.isLeaf) {
-      // This is a leaf service, create a ticket
-      setMessage('');
-      try {
-        const ticket = await createTicketMutation.mutateAsync({
-          unitId: kioskApiUnitId!,
-          serviceId: service.id
-        });
-        setCreatedTicket(ticket);
-        setIsTicketModalOpen(true);
-        setSelectedServicePath([]);
-
-        // Reset countdown and start timer
-        setCountdown(5);
-        if (autoCloseTimerId) {
-          clearInterval(autoCloseTimerId);
-        }
-
-        const timer = setInterval(() => {
-          setCountdown((prev) => {
-            if (prev <= 1) {
-              setIsTicketModalOpen(false);
-              setCreatedTicket(null);
-              clearInterval(timer);
-              return 0;
-            }
-            return prev - 1;
-          });
-        }, 1000);
-
-        setAutoCloseTimerId(timer);
-
-        const serviceLabel = getLocalizedName(
-          service.name,
-          service.nameRu || '',
-          service.nameEn || '',
-          locale
-        );
-        void tryPrintTicket(ticket, serviceLabel);
-
-        setMessage(
-          t('ticketCreated', {
-            defaultValue: 'Ticket created successfully!',
-            service: getLocalizedName(
-              service.name,
-              service.nameRu,
-              service.nameEn,
-              locale
-            )
-          })
-        );
-      } catch (error) {
-        console.error('Failed to create ticket:', error);
-        setMessage(
-          t('ticketCreationFailed', {
-            defaultValue: 'Failed to create ticket. Please try again.'
-          })
-        );
+      if (service.offerIdentification) {
+        setPhoneIdentificationError('');
+        setPendingPhoneService(service);
+        setPhoneIdentificationSessionKey((k) => k + 1);
+        setIsPhoneIdentificationOpen(true);
+        return;
       }
-    } else {
-      // This is a parent service, navigate to its children
-      setSelectedServicePath((prev) => [...prev, service]);
+      await createTicketForService(service);
+      return;
     }
+    setSelectedServicePath((prev) => [...prev, service]);
+  };
+
+  const handlePhoneIdentificationSkip = () => {
+    setIsPhoneIdentificationOpen(false);
+    setPhoneIdentificationError('');
+    const svc = pendingPhoneService;
+    setPendingPhoneService(null);
+    if (svc) {
+      void createTicketForService(svc, undefined, 'page');
+    }
+  };
+
+  const handlePhoneIdentificationConfirm = (visitorPhone: string) => {
+    const svc = pendingPhoneService;
+    if (!svc) {
+      return;
+    }
+    void createTicketForService(
+      svc,
+      {
+        visitorPhone,
+        visitorLocale: locale === 'ru' ? 'ru' : 'en'
+      },
+      'phoneModal'
+    );
   };
 
   const handleGoBack = () => {
@@ -672,6 +730,15 @@ export default function UnitKioskPage() {
       <LockScreen
         isLocked={isLocked}
         onUnlockRequest={() => setIsPinModalOpen(true)}
+      />
+
+      <KioskPhoneIdentificationModal
+        isOpen={isPhoneIdentificationOpen}
+        sessionKey={phoneIdentificationSessionKey}
+        onSkip={handlePhoneIdentificationSkip}
+        onConfirm={handlePhoneIdentificationConfirm}
+        isPending={createTicketMutation.isPending}
+        errorMessage={phoneIdentificationError || undefined}
       />
 
       <PreRegRedemptionModal

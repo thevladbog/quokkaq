@@ -8,7 +8,7 @@ alwaysApply: true
 ## Before finishing a task that changes code
 
 1. **Run linters** and fix all reported issues. Do not leave the workspace in a failing lint state.
-2. **Restart local dev servers** when your edits affect runtime and the user (or session) is using locally running instances—so running processes pick up changes without asking the user to restart manually.
+2. **Restart local dev stands yourself** after changes that affect runtime (backend and/or frontend): stop whatever is listening on `localhost:3000` and `localhost:3001`, then start `pnpm nx run backend:serve` and `pnpm nx run frontend:dev` again in the background from the repo root. Do this **without asking** the user to restart—treat it as part of handing off the task. **Skip entirely** if the user has explicitly asked not to touch running processes in this session (do not send signals to those PIDs).
 
 ## Lint & format commands (repository root: `pnpm nx …`)
 
@@ -31,18 +31,49 @@ alwaysApply: true
 
 ## Restart API + Next.js (default local ports)
 
-After backend and/or frontend code changes when dev servers are in use (`localhost:3001`, `localhost:3000`):
+After backend and/or frontend code changes that require a running process to pick up new code or config (including migrations, env, routes), **run the restart yourself**—even if you are unsure whether the user still has dev servers open.
 
-```bash
-lsof -tiTCP:3000 -sTCP:LISTEN | xargs kill -9 2>/dev/null
-lsof -tiTCP:3001 -sTCP:LISTEN | xargs kill -9 2>/dev/null
-sleep 1
-```
+Prefer a **scoped, graceful** shutdown (not an immediate `kill -9` on every listener):
+
+1. For each port **3000** and **3001**, resolve the listening PID (`lsof -tiTCP:$PORT -sTCP:LISTEN`).
+2. **Verify** the process looks like this repo’s dev servers (command line mentions e.g. `next dev`, `nx run frontend:dev`, `go run`, `cmd/api`, or the workspace path). If it does not match, **do not kill it**—leave that port alone.
+3. Send **SIGTERM** to the matched PID, wait up to a few seconds, and re-check the port. If it is still listening and the process still matches, escalate to **SIGKILL** only then.
 
 Then start again in the background from repo root: `pnpm nx run backend:serve`, then `pnpm nx run frontend:dev` (short delay between starts is fine).
+
+Example helper (adjust patterns if your `ps` output differs):
+
+```bash
+graceful_port() {
+  port="$1"
+  pid="$(lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null | head -1)"
+  [ -z "$pid" ] && return 0
+  args="$(ps -p "$pid" -o args= 2>/dev/null || true)"
+  case "$args" in
+    *next*dev*|*nx*run*frontend:dev*|*go*run*|*cmd/api*)
+      ;;
+    *)
+      echo "Port $port: skip PID $pid (not recognized as repo dev server)"
+      return 0
+      ;;
+  esac
+  kill -TERM "$pid" 2>/dev/null || true
+  i=0
+  while [ "$i" -lt 20 ]; do
+    sleep 0.25
+    lsof -tiTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1 || return 0
+    i=$((i + 1))
+  done
+  lsof -tiTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1 && kill -KILL "$pid" 2>/dev/null || true
+}
+graceful_port 3000
+graceful_port 3001
+sleep 1
+```
 
 ## Principles
 
 - Run commands yourself; do not only suggest that the user run lint or restart servers.
+- **Dev stands:** proactively restart API + Next.js after relevant edits; do not end the turn with “please restart” unless the user opted out of restarts.
 - Prefer `nx run-many -t lint --all` before handing off a multi-area change.
 - If you only touched one app, you may scope lint to that project to save time, but run the full matrix before merge-ready work.

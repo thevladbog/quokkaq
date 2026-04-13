@@ -2,6 +2,7 @@ package repository
 
 import (
 	"errors"
+	"strings"
 
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/pkg/database"
@@ -15,6 +16,8 @@ type CounterRepository interface {
 	Create(counter *models.Counter) error
 	FindAllByUnit(unitID string) ([]models.Counter, error)
 	FindByID(id string) (*models.Counter, error)
+	// FindMapByIDs returns counters keyed by id; missing rows are omitted.
+	FindMapByIDs(ids []string) (map[string]*models.Counter, error)
 	FindByIDTx(tx *gorm.DB, id string) (*models.Counter, error)
 	FindByIDForUpdateTx(tx *gorm.DB, id string) (*models.Counter, error)
 	FindByUserID(userID string) (*models.Counter, error)
@@ -54,6 +57,39 @@ func (r *counterRepository) FindAllByUnit(unitID string) ([]models.Counter, erro
 
 func (r *counterRepository) FindByID(id string) (*models.Counter, error) {
 	return r.FindByIDTx(r.db, id)
+}
+
+func (r *counterRepository) FindMapByIDs(ids []string) (map[string]*models.Counter, error) {
+	out := make(map[string]*models.Counter)
+	if len(ids) == 0 {
+		return out, nil
+	}
+	uniq := make([]string, 0, len(ids))
+	seen := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		uniq = append(uniq, id)
+	}
+	if len(uniq) == 0 {
+		return out, nil
+	}
+	var list []models.Counter
+	if err := r.db.Where("id IN ?", uniq).Find(&list).Error; err != nil {
+		return nil, err
+	}
+	for i := range list {
+		c := list[i]
+		cp := c
+		out[c.ID] = &cp
+	}
+	return out, nil
 }
 
 func (r *counterRepository) FindByIDTx(tx *gorm.DB, id string) (*models.Counter, error) {

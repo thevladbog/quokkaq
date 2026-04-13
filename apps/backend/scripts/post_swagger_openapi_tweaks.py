@@ -73,6 +73,55 @@ def apply_openapi_tweaks(doc: dict[str, Any]) -> None:
     patch_tag["minProperties"] = 1
     _patch_color_pattern(patch_tag, "patchVisitorTagDefinitionRequest")
 
+    _patch_create_ticket_request(comp)
+
+
+def _patch_create_ticket_request(components: dict[str, Any]) -> None:
+    """Model POST /units/{unitId}/tickets body as oneOf: anonymous | staff | kiosk."""
+    schemas = components.get("schemas")
+    if not isinstance(schemas, dict):
+        sys.exit("post_swagger_openapi_tweaks: components.schemas missing for create ticket patch")
+
+    anonymous = {
+        "type": "object",
+        "properties": {
+            "serviceId": {"type": "string", "minLength": 1},
+        },
+        "required": ["serviceId"],
+        "additionalProperties": False,
+    }
+    staff = {
+        "type": "object",
+        "properties": {
+            "serviceId": {"type": "string", "minLength": 1},
+            "clientId": {"type": "string", "minLength": 1},
+        },
+        "required": ["serviceId", "clientId"],
+        "additionalProperties": False,
+    }
+    kiosk = {
+        "type": "object",
+        "properties": {
+            "serviceId": {"type": "string", "minLength": 1},
+            "visitorPhone": {"type": "string", "minLength": 1},
+            "visitorLocale": {"type": "string", "enum": ["en", "ru"]},
+        },
+        "required": ["serviceId", "visitorPhone", "visitorLocale"],
+        "additionalProperties": False,
+    }
+    schemas["handlers.CreateTicketRequestAnonymous"] = anonymous
+    schemas["handlers.CreateTicketRequestStaff"] = staff
+    schemas["handlers.CreateTicketRequestKiosk"] = kiosk
+    schemas["handlers.CreateTicketRequest"] = {
+        "oneOf": [
+            {
+                "$ref": "#/components/schemas/handlers.CreateTicketRequestAnonymous",
+            },
+            {"$ref": "#/components/schemas/handlers.CreateTicketRequestStaff"},
+            {"$ref": "#/components/schemas/handlers.CreateTicketRequestKiosk"},
+        ],
+    }
+
 
 def _write_json(path: Path, doc: dict[str, Any]) -> None:
     text = json.dumps(doc, indent=4, ensure_ascii=False) + "\n"
