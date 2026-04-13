@@ -28,7 +28,7 @@ area/ci:
           - 'pnpm-workspace.yaml'
           - 'pnpm-lock.yaml'
 
-Documentation:
+documentation:
   - changed-files:
       - any-glob-to-any-file: 'docs/**'
 

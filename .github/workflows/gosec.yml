@@ -1,0 +1,38 @@
+name: Gosec
+
+on:
+  pull_request:
+    paths:
+      - 'apps/backend/**'
+      - '.github/workflows/gosec.yml'
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'apps/backend/**'
+      - '.github/workflows/gosec.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  gosec:
+    name: Scan Go backend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/backend
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/backend/go.mod
+          cache-dependency-path: apps/backend/go.sum
+
+      - name: Install gosec
+        run: go install github.com/securego/gosec/v2/cmd/gosec@v2.25.0
+
+      - name: Run Gosec
+        run: gosec -conf .gosec.json -fmt text -stdout ./...

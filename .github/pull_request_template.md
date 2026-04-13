@@ -16,6 +16,13 @@ Check all that apply (CI may also add `area/*` labels from paths):
 
 Steps you ran or reviewers should follow:
 
+**Frontend (copy-paste when applicable)**
+
+- Changes matching `**/{apps,packages}/frontend/**/*.{js,jsx,ts,tsx}` → `pnpm nx run frontend:test`
+- Changes matching `**/{apps,packages}/frontend/**/*.{js,jsx,ts,tsx,json,css,scss,md}` → `pnpm nx run frontend:format:check`
+
+_(In this monorepo the app lives under `apps/frontend/`; use the same Nx targets if you only touched shared UI under `packages/` that the frontend consumes.)_
+
 ## Notes
 
 Risks, rollout, or follow-ups (optional):

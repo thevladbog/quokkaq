@@ -1,0 +1,52 @@
+name: Vulnerability scan
+
+on:
+  pull_request:
+    paths:
+      - 'pnpm-lock.yaml'
+      - 'package.json'
+      - 'apps/frontend/package.json'
+      - 'apps/backend/go.mod'
+      - 'apps/backend/go.sum'
+      - 'packages/**/package.json'
+      - '.github/workflows/vuln-scan.yml'
+  merge_group:
+
+permissions:
+  contents: read
+
+jobs:
+  pnpm-audit:
+    name: pnpm audit (high+)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: pnpm audit
+        run: pnpm audit --audit-level=high
+
+  govulncheck:
+    name: govulncheck (Go)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/backend/go.mod
+
+      - name: Run govulncheck
+        working-directory: apps/backend
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...

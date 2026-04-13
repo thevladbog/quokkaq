@@ -23,7 +23,7 @@ jobs:
               { name: 'area/kiosk', color: '5319E7', description: 'Changes under apps/kiosk-desktop' },
               { name: 'area/shared', color: 'FBCA04', description: 'Changes under packages/' },
               { name: 'area/ci', color: 'C5DEF5', description: 'CI, Nx, pnpm workspace, GitHub Actions' },
-              { name: 'Documentation', color: '0075CA', description: 'Root docs/ tree' },
+              { name: 'documentation', color: '0075CA', description: 'Root docs/ tree' },
               { name: 'release-pr', color: 'B60205', description: 'Pull request targets the release branch' },
             ];
             for (const label of labels) {

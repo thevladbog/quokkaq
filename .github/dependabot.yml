@@ -1,0 +1,20 @@
+# Also enable in the repo: Settings → Code security → Dependency graph,
+# Dependabot alerts, Dependabot security updates (not expressible in this file).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      nx:
+        patterns:
+          - '@nx/*'
+          - 'nx'
+
+  - package-ecosystem: gomod
+    directory: /apps/backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5

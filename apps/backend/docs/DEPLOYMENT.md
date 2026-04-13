@@ -38,6 +38,7 @@ The following environment variables need to be configured in the CI/CD environme
 - `SMTP_PASS` - SMTP password
 - `SMTP_FROM` - SMTP from address
 - `SMTP_SECURE` - SMTP secure setting
+- `SMTP_TLS_INSECURE_SKIP_VERIFY` - optional; set to `true` only for dev or self-signed SMTP (STARTTLS otherwise uses normal certificate verification)
 - `JWT_SECRET` - JWT secret for authentication
 - `APP_BASE_URL` - Application base URL
 

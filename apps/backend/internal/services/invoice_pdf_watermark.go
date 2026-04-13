@@ -52,7 +52,8 @@ func watermarkOpacityOnWhite(src []byte) ([]byte, error) {
 	for y := b.Min.Y; y < b.Max.Y; y++ {
 		for x := b.Min.X; x < b.Max.X; x++ {
 			r16, g16, b16, a16 := img.At(x, y).RGBA()
-			a8 := uint8(a16 >> 8)
+			// color.RGBA channels are pre-multiplied 16-bit; >>8 yields 0..255 for standard 8-bit assets.
+			a8 := uint8(a16 >> 8) // #nosec G115
 			if a8 == 0 {
 				out.SetNRGBA(x, y, color.NRGBA{R: 255, G: 255, B: 255, A: 255})
 				continue
