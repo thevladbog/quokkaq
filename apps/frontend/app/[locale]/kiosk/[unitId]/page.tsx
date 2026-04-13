@@ -306,17 +306,24 @@ export default function UnitKioskPage() {
 
   const createTicketForService = async (
     service: Service,
-    opts?: { visitorPhone?: string; visitorLocale?: string },
+    opts?: { visitorPhone: string; visitorLocale: 'en' | 'ru' },
     failTarget?: 'phoneModal' | 'page'
   ) => {
     setMessage('');
     try {
-      const ticket = await createTicketMutation.mutateAsync({
-        unitId: kioskApiUnitId!,
-        serviceId: service.id,
-        visitorPhone: opts?.visitorPhone,
-        visitorLocale: opts?.visitorLocale
-      });
+      const ticket = await createTicketMutation.mutateAsync(
+        opts
+          ? {
+              unitId: kioskApiUnitId!,
+              serviceId: service.id,
+              visitorPhone: opts.visitorPhone,
+              visitorLocale: opts.visitorLocale
+            }
+          : {
+              unitId: kioskApiUnitId!,
+              serviceId: service.id
+            }
+      );
       setPhoneIdentificationError('');
       setIsPhoneIdentificationOpen(false);
       setPendingPhoneService(null);
@@ -370,7 +377,10 @@ export default function UnitKioskPage() {
     }
     void createTicketForService(
       svc,
-      { visitorPhone, visitorLocale: locale },
+      {
+        visitorPhone,
+        visitorLocale: locale === 'ru' ? 'ru' : 'en'
+      },
       'phoneModal'
     );
   };

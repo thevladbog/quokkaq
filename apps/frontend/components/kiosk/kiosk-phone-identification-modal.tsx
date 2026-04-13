@@ -14,8 +14,6 @@ import {
 
 /** ITU-T E.164 max significant digits (excluding country code nuances). */
 const MAX_PHONE_DIGITS = 15;
-/** Minimum digits after "+" before submit (country code + national number). */
-const MIN_PHONE_DIGITS = 10;
 
 export interface KioskPhoneIdentificationModalProps {
   isOpen: boolean;
@@ -58,7 +56,7 @@ function KioskPhoneIdentificationModalBody({
   };
 
   const handleConfirm = () => {
-    if (digits.length < MIN_PHONE_DIGITS || isPending) {
+    if (digits.length < 1 || isPending) {
       return;
     }
     onConfirm(`+${digits}`);
@@ -164,7 +162,7 @@ function KioskPhoneIdentificationModalBody({
             type='button'
             className='h-12 flex-1 text-base sm:h-14 sm:text-lg'
             onClick={handleConfirm}
-            disabled={digits.length < MIN_PHONE_DIGITS || isPending}
+            disabled={digits.length < 1 || isPending}
           >
             {isPending ? (
               <Loader2 className='size-6 animate-spin sm:size-7' />

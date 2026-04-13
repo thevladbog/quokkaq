@@ -1415,7 +1415,12 @@ func (s *ticketService) hydrateClientVisitTransferTrails(tickets []models.Ticket
 		return nil
 	}
 
-	byTicket := make(map[string][]models.TicketHistory)
+	type transferHistoryParsed struct {
+		h models.TicketHistory
+		p map[string]interface{}
+	}
+
+	byTicket := make(map[string][]transferHistoryParsed)
 	svcSeen := make(map[string]struct{})
 	var svcIDs []string
 	ctrSeen := make(map[string]struct{})
@@ -1473,7 +1478,7 @@ func (s *ticketService) hydrateClientVisitTransferTrails(tickets []models.Ticket
 			addZone(visitHistoryPayloadString(p, "to_service_zone_id"))
 		}
 		addZone(visitHistoryPayloadString(p, "from_service_zone_id"))
-		byTicket[h.TicketID] = append(byTicket[h.TicketID], h)
+		byTicket[h.TicketID] = append(byTicket[h.TicketID], transferHistoryParsed{h: h, p: p})
 	}
 
 	svcMap, err := s.serviceRepo.FindMapByIDs(svcIDs)
@@ -1502,12 +1507,10 @@ func (s *ticketService) hydrateClientVisitTransferTrails(tickets []models.Ticket
 			continue
 		}
 		trail := make([]models.ClientVisitTransferEvent, 0, len(hist))
-		for _, h := range hist {
-			if len(h.Payload) == 0 {
-				continue
-			}
-			var p map[string]interface{}
-			if err := json.Unmarshal(h.Payload, &p); err != nil || len(p) == 0 {
+		for _, row := range hist {
+			h := row.h
+			p := row.p
+			if len(p) == 0 {
 				continue
 			}
 			ev := models.ClientVisitTransferEvent{

@@ -34,6 +34,7 @@ type CreateTicketRequest struct {
 }
 
 // CreateTicket godoc
+// @ID           createUnitTicket
 // @Summary      Create a new ticket
 // @Description  Creates a new ticket for a service in a unit. Unit is taken from the path; body requires serviceId. Optional clientId (staff) or visitorPhone+visitorLocale (kiosk identification, en|ru); clientId and visitorPhone are mutually exclusive.
 // @Tags         tickets
@@ -52,7 +53,8 @@ func (h *TicketHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if strings.TrimSpace(req.ServiceID) == "" {
+	serviceID := strings.TrimSpace(req.ServiceID)
+	if serviceID == "" {
 		http.Error(w, "serviceId is required", http.StatusBadRequest)
 		return
 	}
@@ -79,7 +81,7 @@ func (h *TicketHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	actor := getActorFromRequest(r)
-	ticket, err := h.service.CreateTicket(unitID, req.ServiceID, staffClientID, visitorPhone, visitorLocale, actor)
+	ticket, err := h.service.CreateTicket(unitID, serviceID, staffClientID, visitorPhone, visitorLocale, actor)
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrTicketServiceNotInUnit),

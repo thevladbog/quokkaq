@@ -100,24 +100,17 @@
                 "type": "object"
             },
             "handlers.CreateTicketRequest": {
-                "properties": {
-                    "clientId": {
-                        "type": "string"
+                "oneOf": [
+                    {
+                        "$ref": "#/components/schemas/handlers.CreateTicketRequestAnonymous"
                     },
-                    "serviceId": {
-                        "type": "string"
+                    {
+                        "$ref": "#/components/schemas/handlers.CreateTicketRequestStaff"
                     },
-                    "visitorLocale": {
-                        "type": "string"
-                    },
-                    "visitorPhone": {
-                        "type": "string"
+                    {
+                        "$ref": "#/components/schemas/handlers.CreateTicketRequestKiosk"
                     }
-                },
-                "required": [
-                    "serviceId"
-                ],
-                "type": "object"
+                ]
             },
             "handlers.DaDataFindPartyByInnRequest": {
                 "properties": {
@@ -2471,6 +2464,63 @@
                     }
                 },
                 "type": "object"
+            },
+            "handlers.CreateTicketRequestAnonymous": {
+                "type": "object",
+                "properties": {
+                    "serviceId": {
+                        "type": "string",
+                        "minLength": 1
+                    }
+                },
+                "required": [
+                    "serviceId"
+                ],
+                "additionalProperties": false
+            },
+            "handlers.CreateTicketRequestStaff": {
+                "type": "object",
+                "properties": {
+                    "serviceId": {
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "clientId": {
+                        "type": "string",
+                        "minLength": 1
+                    }
+                },
+                "required": [
+                    "serviceId",
+                    "clientId"
+                ],
+                "additionalProperties": false
+            },
+            "handlers.CreateTicketRequestKiosk": {
+                "type": "object",
+                "properties": {
+                    "serviceId": {
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "visitorPhone": {
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "visitorLocale": {
+                        "type": "string",
+                        "enum": [
+                            "en",
+                            "ru"
+                        ]
+                    }
+                },
+                "required": [
+                    "serviceId",
+                    "visitorPhone",
+                    "visitorLocale"
+                ],
+                "additionalProperties": false
             }
         },
         "securitySchemes": {
@@ -11187,6 +11237,7 @@
             },
             "post": {
                 "description": "Creates a new ticket for a service in a unit. Unit is taken from the path; body requires serviceId. Optional clientId (staff) or visitorPhone+visitorLocale (kiosk identification, en|ru); clientId and visitorPhone are mutually exclusive.",
+                "operationId": "createUnitTicket",
                 "parameters": [
                     {
                         "description": "Unit ID",

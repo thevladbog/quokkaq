@@ -19,7 +19,8 @@ import {
   authApi,
   servicesApi,
   Unit,
-  Service
+  Service,
+  type CreateTicketInUnitMutationVariables
 } from '../lib/api';
 import { invalidateTicketListQueries } from '../lib/ticket-query-invalidation';
 
@@ -501,19 +502,10 @@ export const useCreateTicketInUnit = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (createData: {
-      unitId: string;
-      serviceId: string;
-      clientId?: string;
-      visitorPhone?: string;
-      visitorLocale?: string;
-    }) =>
-      unitsApi.createTicket(createData.unitId, {
-        serviceId: createData.serviceId,
-        clientId: createData.clientId,
-        visitorPhone: createData.visitorPhone,
-        visitorLocale: createData.visitorLocale
-      }),
+    mutationFn: (createData: CreateTicketInUnitMutationVariables) => {
+      const { unitId, ...ticketBody } = createData;
+      return unitsApi.createTicket(unitId, ticketBody);
+    },
     onSuccess: () => {
       invalidateTicketListQueries(queryClient);
       queryClient.invalidateQueries({ queryKey: getGetUnitsQueryKey() });

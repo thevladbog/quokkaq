@@ -38,31 +38,7 @@ import { getGetUnitsUnitIdChildUnitsQueryKey } from '@/lib/api/generated/units';
 import { unitsApi } from '@/lib/api';
 import { useTranslations, useLocale } from 'next-intl';
 import { ImageUpload } from '@/components/ui/image-upload';
-
-interface Service {
-  id: string;
-  name: string;
-  nameRu?: string | null;
-  nameEn?: string | null;
-  description?: string | null;
-  descriptionRu?: string | null;
-  descriptionEn?: string | null;
-  imageUrl?: string | null;
-  backgroundColor?: string | null;
-  textColor?: string | null;
-  prefix?: string | null;
-  numberSequence?: string | null;
-  duration?: number | null; // Maximum service time in seconds
-  maxWaitingTime?: number | null; // Maximum waiting time in seconds
-  prebook?: boolean;
-  offerIdentification?: boolean;
-  isLeaf?: boolean;
-  unitId: string;
-  parentId?: string | null;
-  parent?: Service | null;
-  children?: Service[];
-  restrictedServiceZoneId?: string | null;
-}
+import type { Service } from '@quokkaq/shared-types';
 
 interface UnitServicesManagerProps {
   unitId: string;

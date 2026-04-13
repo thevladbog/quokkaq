@@ -1,18 +1,8 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import type { ClientVisitTransferEvent } from '@quokkaq/shared-types';
 import { cn } from '@/lib/utils';
-
-export type VisitTransferTrailStep = {
-  at: string;
-  transferKind?: string;
-  fromServiceName?: string;
-  toServiceName?: string;
-  fromCounterName?: string;
-  toCounterName?: string;
-  fromZoneLabel?: string;
-  toZoneLabel?: string;
-};
 
 function dash(v: string | undefined) {
   const s = (v ?? '').trim();
@@ -25,7 +15,7 @@ export function VisitTransferTrail({
   className,
   embedded
 }: {
-  trail: VisitTransferTrailStep[] | undefined;
+  trail: ClientVisitTransferEvent[] | undefined;
   locale: string;
   className?: string;
   /** When true, omit top rule (e.g. inside a table cell). */

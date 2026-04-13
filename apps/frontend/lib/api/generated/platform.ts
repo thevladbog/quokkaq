@@ -287,12 +287,35 @@ export interface HandlersCreateInvitationRequest {
   templateId?: string;
 }
 
-export interface HandlersCreateTicketRequest {
-  clientId?: string;
+export interface HandlersCreateTicketRequestAnonymous {
+  /** @minLength 1 */
   serviceId: string;
-  visitorLocale?: string;
-  visitorPhone?: string;
 }
+
+export interface HandlersCreateTicketRequestStaff {
+  /** @minLength 1 */
+  serviceId: string;
+  /** @minLength 1 */
+  clientId: string;
+}
+
+export type HandlersCreateTicketRequestKioskVisitorLocale = typeof HandlersCreateTicketRequestKioskVisitorLocale[keyof typeof HandlersCreateTicketRequestKioskVisitorLocale];
+
+
+export const HandlersCreateTicketRequestKioskVisitorLocale = {
+  en: 'en',
+  ru: 'ru',
+} as const;
+
+export interface HandlersCreateTicketRequestKiosk {
+  /** @minLength 1 */
+  serviceId: string;
+  /** @minLength 1 */
+  visitorPhone: string;
+  visitorLocale: HandlersCreateTicketRequestKioskVisitorLocale;
+}
+
+export type HandlersCreateTicketRequest = HandlersCreateTicketRequestAnonymous | HandlersCreateTicketRequestStaff | HandlersCreateTicketRequestKiosk;
 
 export interface HandlersDaDataFindPartyByInnRequest {
   inn: string;
