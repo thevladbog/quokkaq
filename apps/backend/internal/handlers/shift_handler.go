@@ -183,7 +183,7 @@ func (h *ShiftHandler) GetShiftCounters(w http.ResponseWriter, r *http.Request) 
 
 // GetShiftActivity godoc
 // @Summary      Shift ticket activity feed
-// @Description  Paginated ticket history rows for tickets belonging to the unit (supervisor dashboard / journal). Limit is capped at 100. Optional filters: counterId (current ticket counter_id), userId (history actor), clientId, ticket (UUID or queue substring), q (search queue/id/visitor name), weekdays (comma-separated PostgreSQL DOW 0=Sun..6=Sat in unit timezone), dateFrom/dateTo (YYYY-MM-DD inclusive, history timestamp calendar date in unit timezone). counter_id reflects the ticket's current assignment, not necessarily the desk at event time.
+// @Description  Paginated ticket history rows for tickets belonging to the unit (supervisor dashboard / journal). Limit is capped at 100. Optional filters: counterId (current ticket counter_id), userId (history actor), clientId, ticket (UUID or queue substring), q (search queue/id/visitor name), weekdays (comma-separated PostgreSQL DOW 0=Sun..6=Sat in unit timezone), dateFrom/dateTo (YYYY-MM-DD inclusive, history timestamp calendar date in unit timezone). counter_id reflects the ticket's current assignment, not necessarily the desk at event time. For users without full journal access (not admin/supervisor/platform_admin and no ACCESS_SUPERVISOR_PANEL on this unit), results are restricted to rows where the authenticated user is the history actor; userId filter is ignored/overridden in that case.
 // @Tags         shift
 // @Produce      json
 // @Security     BearerAuth
@@ -206,6 +206,11 @@ func (h *ShiftHandler) GetShiftCounters(w http.ResponseWriter, r *http.Request) 
 // @Router       /units/{unitId}/shift/activity [get]
 func (h *ShiftHandler) GetShiftActivity(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
+	viewerID, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok || strings.TrimSpace(viewerID) == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
 	limit := clampQueryPageLimit(r.URL.Query().Get("limit"))
 	cursor := r.URL.Query().Get("cursor")
 	filters, ferr := parseShiftActivityFilters(r)
@@ -213,7 +218,7 @@ func (h *ShiftHandler) GetShiftActivity(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, ferr.Error(), http.StatusBadRequest)
 		return
 	}
-	resp, err := h.service.GetShiftActivity(unitID, limit, cursor, filters)
+	resp, err := h.service.GetShiftActivity(unitID, viewerID, limit, cursor, filters)
 	if err != nil {
 		if errors.Is(err, services.ErrInvalidShiftActivityCursor) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -227,7 +232,7 @@ func (h *ShiftHandler) GetShiftActivity(w http.ResponseWriter, r *http.Request) 
 
 // ListShiftActivityActors godoc
 // @Summary      Distinct operators in unit ticket history
-// @Description  User ids and display names for journal filter dropdown (from ticket_histories in this unit).
+// @Description  User ids and display names for journal filter dropdown (from ticket_histories in this unit). For users without full journal access, only the authenticated user is returned.
 // @Tags         shift
 // @Produce      json
 // @Security     BearerAuth
@@ -239,7 +244,12 @@ func (h *ShiftHandler) GetShiftActivity(w http.ResponseWriter, r *http.Request) 
 // @Router       /units/{unitId}/shift/activity/actors [get]
 func (h *ShiftHandler) ListShiftActivityActors(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
-	items, err := h.service.ListShiftActivityActors(unitID)
+	viewerID, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok || strings.TrimSpace(viewerID) == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	items, err := h.service.ListShiftActivityActors(unitID, viewerID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

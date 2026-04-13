@@ -21,6 +21,7 @@ type CounterRepository interface {
 	FindByUserIDTx(tx *gorm.DB, userID string) (*models.Counter, error)
 	Update(counter *models.Counter) error
 	UpdateTx(tx *gorm.DB, counter *models.Counter) error
+	UpdatePartial(id string, updates map[string]interface{}) error
 	Delete(id string) error
 
 	// Shift related
@@ -104,6 +105,13 @@ func (r *counterRepository) UpdateTx(tx *gorm.DB, counter *models.Counter) error
 		return errors.New("nil tx provided to UpdateTx")
 	}
 	return tx.Save(counter).Error
+}
+
+func (r *counterRepository) UpdatePartial(id string, updates map[string]interface{}) error {
+	if len(updates) == 0 {
+		return nil
+	}
+	return r.db.Model(&models.Counter{}).Where("id = ?", id).Updates(updates).Error
 }
 
 func (r *counterRepository) Delete(id string) error {

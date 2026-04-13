@@ -17,6 +17,8 @@ import {
   Users,
   ClipboardList,
   CalendarClock,
+  ScrollText,
+  Contact,
   LogOut,
   LogIn,
   Globe,
@@ -42,12 +44,14 @@ import { userCanOpenPlatformOperatorUI } from '@/lib/platform-access';
 import { SidebarActiveUnitSelect } from '@/components/SidebarActiveUnitSelect';
 import { SidebarCollapsedLogo } from '@/components/SidebarCollapsedLogo';
 import { SidebarCollapseToggle } from '@/components/SidebarCollapseToggle';
+import { useActiveUnit } from '@/contexts/ActiveUnitContext';
 
 const AppSidebar = () => {
   const tAdmin = useTranslations('admin');
   const tNav = useTranslations('nav');
   const tProfile = useTranslations('profile');
   const { user, isAuthenticated, logout } = useAuthContext();
+  const { activeUnitId } = useActiveUnit();
   const pathname = usePathname();
   const loginNavLabel = tNav('login', { defaultValue: 'Login' });
 
@@ -61,6 +65,16 @@ const AppSidebar = () => {
       (perms: string[]) => perms.includes(permission)
     );
   };
+
+  const auditJournalHref =
+    activeUnitId != null && activeUnitId !== ''
+      ? `/journal/${activeUnitId}`
+      : null;
+
+  const clientsHref =
+    activeUnitId != null && activeUnitId !== ''
+      ? `/clients/${activeUnitId}`
+      : null;
 
   const navItems = [
     {
@@ -94,14 +108,35 @@ const AppSidebar = () => {
       href: '/pre-registrations',
       active: pathname.startsWith('/pre-registrations'),
       roles: ['admin', 'staff', 'supervisor']
-    }
+    },
+    ...(auditJournalHref
+      ? [
+          {
+            icon: ScrollText,
+            label: tNav('audit_journal', { defaultValue: 'Audit log' }),
+            href: auditJournalHref,
+            active: pathname.startsWith(`/journal/${activeUnitId}`),
+            roles: ['admin', 'staff', 'supervisor', 'operator'] as const
+          }
+        ]
+      : []),
+    ...(clientsHref
+      ? [
+          {
+            icon: Contact,
+            label: tNav('clients', { defaultValue: 'Clients' }),
+            href: clientsHref,
+            active: pathname.startsWith(`/clients/${activeUnitId}`),
+            roles: ['admin', 'staff', 'supervisor', 'operator'] as const
+          }
+        ]
+      : [])
   ].filter((item) => {
     if (!isAuthenticated) return false;
     if (user?.roles?.includes('admin')) return true;
 
-    const hasRole =
-      !item.roles ||
-      user?.roles?.some((role: string) => item.roles?.includes(role));
+    const roles = item.roles as readonly string[] | undefined;
+    const hasRole = !roles || user?.roles?.some((role) => roles.includes(role));
 
     const hasPermission = item.requiredPermission
       ? hasPermissionInAnyUnit(item.requiredPermission)

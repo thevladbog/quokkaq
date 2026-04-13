@@ -59,7 +59,21 @@ export function SidebarActiveUnitSelect({ className }: { className?: string }) {
     if (pl.startsWith('/supervisor/')) {
       const seg = pl.split('/').filter(Boolean);
       if (seg.length >= 2 && seg[0] === 'supervisor') {
-        router.replace(`/supervisor/${id}`);
+        if (seg[2] === 'journal') {
+          router.replace(`/journal/${id}`);
+        } else {
+          router.replace(`/supervisor/${id}`);
+        }
+      }
+    } else if (pl.startsWith('/journal/')) {
+      const seg = pl.split('/').filter(Boolean);
+      if (seg.length >= 2 && seg[0] === 'journal') {
+        router.replace(`/journal/${id}`);
+      }
+    } else if (pl.startsWith('/clients/')) {
+      const seg = pl.split('/').filter(Boolean);
+      if (seg.length >= 2 && seg[0] === 'clients') {
+        router.replace(`/clients/${id}`);
       }
     } else if (pl.startsWith('/pre-registrations/')) {
       const seg = pl.split('/').filter(Boolean);

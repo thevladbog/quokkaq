@@ -101,17 +101,22 @@ func (h *TicketHandler) GetTicketByID(w http.ResponseWriter, r *http.Request) {
 
 // GetTicketsByUnit godoc
 // @Summary      Get tickets by unit
-// @Description  Retrieves all tickets for a specific unit
+// @Description  Subdivision: all non-EOD tickets for that unit (all service zones + subdivision-wide pool). Service zone: non-EOD tickets for the parent subdivision with service_zone_id equal to this zone's id.
 // @Tags         tickets
 // @Produce      json
-// @Param        unitId path      string  true  "Unit ID"
+// @Param        unitId path      string  true  "Unit ID (subdivision or service_zone)"
 // @Success      200    {array}   models.Ticket
+// @Failure      404    {string}  string "Unit not found"
 // @Failure      500    {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/tickets [get]
 func (h *TicketHandler) GetTicketsByUnit(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
 	tickets, err := h.service.GetTicketsByUnit(unitID)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "unit not found", http.StatusNotFound)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -333,39 +338,128 @@ func (h *TicketHandler) Pick(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}
+		if errors.Is(err, services.ErrTicketCounterZoneMismatch) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 	RespondJSON(w, ticket)
 }
 
+// TransferRequest documents POST /tickets/{id}/transfer JSON (partial updates supported via raw decode in handler).
 type TransferRequest struct {
-	ToCounterID *string `json:"toCounterId,omitempty"`
-	ToUserID    *string `json:"toUserId,omitempty"`
+	ToCounterID     *string `json:"toCounterId,omitempty"`
+	ToUserID        *string `json:"toUserId,omitempty"`
+	ToServiceZoneID *string `json:"toServiceZoneId,omitempty"`
+	ToServiceID     *string `json:"toServiceId,omitempty"`
+	OperatorComment *string `json:"operatorComment,omitempty" extensions:"x-nullable"`
 }
 
 // Transfer godoc
 // @Summary      Transfer ticket
-// @Description  Transfers a ticket to another counter or user
+// @Description  Transfers a ticket to another counter or user, or to a service zone (optional service change, queue number preserved). Optional operatorComment updates atomically.
 // @Tags         tickets
 // @Accept       json
 // @Produce      json
 // @Param        id       path      string           true  "Ticket ID"
 // @Param        request  body      TransferRequest  true  "Transfer Request"
 // @Success      200      {object}  models.Ticket
+// @Failure      400      {string}  string "Bad request (validation / transfer rules)"
 // @Failure      404      {string}  string "Ticket not found"
+// @Failure      500      {string}  string "Internal server error"
 // @Router       /tickets/{id}/transfer [post]
 func (h *TicketHandler) Transfer(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	var req TransferRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	rawBody := map[string]json.RawMessage{}
+	if err := json.NewDecoder(r.Body).Decode(&rawBody); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
+	in := services.TransferTicketInput{}
+	if v, ok := rawBody["toCounterId"]; ok && len(v) > 0 && string(v) != "null" {
+		var s string
+		if err := json.Unmarshal(v, &s); err != nil {
+			http.Error(w, "toCounterId invalid", http.StatusBadRequest)
+			return
+		}
+		if t := strings.TrimSpace(s); t != "" {
+			in.ToCounterID = &t
+		}
+	}
+	if v, ok := rawBody["toUserId"]; ok && len(v) > 0 && string(v) != "null" {
+		var s string
+		if err := json.Unmarshal(v, &s); err != nil {
+			http.Error(w, "toUserId invalid", http.StatusBadRequest)
+			return
+		}
+		if t := strings.TrimSpace(s); t != "" {
+			in.ToUserID = &t
+		}
+	}
+	if v, ok := rawBody["toServiceZoneId"]; ok && len(v) > 0 && string(v) != "null" {
+		var s string
+		if err := json.Unmarshal(v, &s); err != nil {
+			http.Error(w, "toServiceZoneId invalid", http.StatusBadRequest)
+			return
+		}
+		if t := strings.TrimSpace(s); t != "" {
+			in.ToServiceZoneID = &t
+		}
+	}
+	if v, ok := rawBody["toServiceId"]; ok && len(v) > 0 && string(v) != "null" {
+		var s string
+		if err := json.Unmarshal(v, &s); err != nil {
+			http.Error(w, "toServiceId invalid", http.StatusBadRequest)
+			return
+		}
+		if t := strings.TrimSpace(s); t != "" {
+			in.ToServiceID = &t
+		}
+	}
+	if v, ok := rawBody["operatorComment"]; ok {
+		in.OperatorCommentUpdate = true
+		b := bytes.TrimSpace(v)
+		if len(b) == 0 || string(b) == "null" {
+			in.OperatorComment = nil
+		} else {
+			var s string
+			if err := json.Unmarshal(b, &s); err != nil {
+				http.Error(w, "operatorComment must be a string or null", http.StatusBadRequest)
+				return
+			}
+			in.OperatorComment = &s
+		}
+	}
+
 	actor := getActorFromRequest(r)
-	ticket, err := h.service.Transfer(id, req.ToCounterID, req.ToUserID, actor)
+	ticket, err := h.service.Transfer(id, in, actor)
 	if err != nil {
+		switch {
+		case errors.Is(err, services.ErrTransferConflictingTargets),
+			errors.Is(err, services.ErrTransferConflictingCounterAndUser),
+			errors.Is(err, services.ErrTransferTargetRequired),
+			errors.Is(err, services.ErrTicketCounterZoneMismatch),
+			errors.Is(err, services.ErrInvalidServiceZone),
+			errors.Is(err, services.ErrTransferServiceRequiredForZone),
+			errors.Is(err, services.ErrTransferTargetMustBeLeafService),
+			errors.Is(err, services.ErrTransferTargetServiceNotInZone),
+			errors.Is(err, services.ErrTransferServiceNotAllowedOnTargetCounter),
+			errors.Is(err, services.ErrOperatorCommentTooLong),
+			errors.Is(err, services.ErrTicketServiceNotInUnit),
+			errors.Is(err, services.ErrCounterUnitMismatch):
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		case errors.Is(err, services.ErrCounterNotFoundForUser):
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

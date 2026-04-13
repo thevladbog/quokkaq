@@ -277,6 +277,19 @@ components:
           type: string
       type: object
       minProperties: 1
+    handlers.PatchUnitClientRequest:
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        phone:
+          type: string
+        tagDefinitionIds:
+          items:
+            type: string
+          type: array
+      type: object
     handlers.PeriodResponse:
       properties:
         end:
@@ -402,9 +415,23 @@ components:
       type: object
     handlers.TransferRequest:
       properties:
+        operatorComment:
+          nullable: true
+          type: string
         toCounterId:
           type: string
+        toServiceId:
+          type: string
+        toServiceZoneId:
+          type: string
         toUserId:
+          type: string
+      type: object
+    handlers.UpdateCounterRequest:
+      properties:
+        name:
+          type: string
+        serviceZoneId:
           type: string
       type: object
     handlers.UpdateStatusRequest:
@@ -730,6 +757,9 @@ components:
           type: string
         onBreak:
           type: boolean
+        serviceZoneId:
+          description: 'ServiceZoneID: when set, this counter serves only the waiting pool for that service_zone (direct child of UnitID).'
+          type: string
         unitId:
           type: string
       type: object
@@ -1063,6 +1093,9 @@ components:
           type: boolean
         prefix:
           type: string
+        restrictedServiceZoneId:
+          description: 'RestrictedServiceZoneID: when set, this leaf service is only offered in that service_zone''s waiting pool (child of UnitID subdivision).'
+          type: string
         textColor:
           type: string
         unitId:
@@ -1253,9 +1286,15 @@ components:
           type: integer
         queueNumber:
           type: string
+        servedByName:
+          description: ServedByName is hydrated for client visit lists from ticket_histories (not stored on tickets).
+          type: string
         service:
           $ref: '#/components/schemas/models.Service'
         serviceId:
+          type: string
+        serviceZoneId:
+          description: 'ServiceZoneID: waiting pool within the subdivision; NULL = subdivision-wide pool.'
           type: string
         status:
           type: string
@@ -1534,10 +1573,51 @@ components:
           type: string
         onBreak:
           type: boolean
+        serviceZoneId:
+          description: 'ServiceZoneID: when set, this counter serves only the waiting pool for that service_zone (direct child of UnitID).'
+          type: string
         sessionState:
           description: off_duty | idle | serving | break
           type: string
         unitId:
+          type: string
+      type: object
+    services.UnitClientHistoryItem:
+      properties:
+        action:
+          type: string
+        actorName:
+          type: string
+        actorUserId:
+          type: string
+        createdAt:
+          type: string
+        id:
+          type: string
+        payload:
+          additionalProperties: true
+          type: object
+        unitClientId:
+          type: string
+        unitId:
+          type: string
+      type: object
+    services.UnitClientHistoryListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/services.UnitClientHistoryItem'
+          type: array
+        nextCursor:
+          type: string
+      type: object
+    services.UnitClientListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/models.UnitClient'
+          type: array
+        nextCursor:
           type: string
       type: object
   securitySchemes:
@@ -2361,8 +2441,8 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/models.Counter'
-        description: Counter Data
+              $ref: '#/components/schemas/handlers.UpdateCounterRequest'
+        description: Sparse counter fields (name, serviceZoneId)
         required: true
         x-originalParamName: counter
       responses:
@@ -2378,6 +2458,12 @@ paths:
               schema:
                 type: string
           description: Bad Request
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Not Found
         '500':
           content:
             application/json:
@@ -4855,7 +4941,7 @@ paths:
       - tickets
   /tickets/{id}/transfer:
     post:
-      description: Transfers a ticket to another counter or user
+      description: Transfers a ticket to another counter or user, or to a service zone (optional service change, queue number preserved). Optional operatorComment updates atomically.
       parameters:
       - description: Ticket ID
         in: path
@@ -4878,12 +4964,24 @@ paths:
               schema:
                 $ref: '#/components/schemas/models.Ticket'
           description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad request (validation / transfer rules)
         '404':
           content:
             application/json:
               schema:
                 type: string
           description: Ticket not found
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal server error
       summary: Transfer ticket
       tags:
       - tickets
@@ -5359,6 +5457,263 @@ paths:
       summary: List child subdivision units
       tags:
       - units
+  /units/{unitId}/clients:
+    get:
+      description: Non-anonymous clients in the unit. Optional q filters by name or phone; tagIds (comma-separated) keeps clients that have any of the tags (OR). Keyset cursor in nextCursor.
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        schema:
+          type: string
+      - description: Search by name or phone
+        in: query
+        name: q
+        schema:
+          type: string
+      - description: Comma-separated tag definition IDs (OR)
+        in: query
+        name: tagIds
+        schema:
+          type: string
+      - description: Page size (default 20, max 100)
+        in: query
+        name: limit
+        schema:
+          type: integer
+      - description: Opaque pagination cursor
+        in: query
+        name: cursor
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/services.UnitClientListResponse'
+          description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad Request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: List unit clients (paginated)
+      tags:
+      - clients
+  /units/{unitId}/clients/{clientId}:
+    get:
+      description: Non-anonymous client with tag definitions preloaded.
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        schema:
+          type: string
+      - description: Client ID
+        in: path
+        name: clientId
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.UnitClient'
+          description: OK
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Not Found
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: Get unit client by ID
+      tags:
+      - clients
+    patch:
+      description: 'Partial update: omitted fields unchanged. Phone is raw input (normalized to E.164); empty string clears phone. tagDefinitionIds replaces the full tag set when present (including empty array).'
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        schema:
+          type: string
+      - description: Client ID
+        in: path
+        name: clientId
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/handlers.PatchUnitClientRequest'
+        description: Fields to update
+        required: true
+        x-originalParamName: body
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.UnitClient'
+          description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad Request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Not Found
+        '409':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Conflict
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: Update unit client
+      tags:
+      - clients
+  /units/{unitId}/clients/{clientId}/history:
+    get:
+      description: Audit rows for CRM patches and staff ticket flows (newest first). Keyset cursor in nextCursor.
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        schema:
+          type: string
+      - description: Client ID
+        in: path
+        name: clientId
+        required: true
+        schema:
+          type: string
+      - description: Page size (default 20, max 100)
+        in: query
+        name: limit
+        schema:
+          type: integer
+      - description: Pagination cursor from previous nextCursor
+        in: query
+        name: cursor
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/services.UnitClientHistoryListResponse'
+          description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad Request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Not Found
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: List profile and tag change history for a client
+      tags:
+      - clients
   /units/{unitId}/clients/{clientId}/visits:
     get:
       description: Tickets linked to the client in this unit; empty for anonymous client.
@@ -5921,7 +6276,7 @@ paths:
       - services
   /units/{unitId}/shift/activity:
     get:
-      description: 'Paginated ticket history rows for tickets belonging to the unit (supervisor dashboard / journal). Limit is capped at 100. Optional filters: counterId (current ticket counter_id), userId (history actor), clientId, ticket (UUID or queue substring), q (search queue/id/visitor name), weekdays (comma-separated PostgreSQL DOW 0=Sun..6=Sat in unit timezone), dateFrom/dateTo (YYYY-MM-DD inclusive, history timestamp calendar date in unit timezone). counter_id reflects the ticket''s current assignment, not necessarily the desk at event time.'
+      description: 'Paginated ticket history rows for tickets belonging to the unit (supervisor dashboard / journal). Limit is capped at 100. Optional filters: counterId (current ticket counter_id), userId (history actor), clientId, ticket (UUID or queue substring), q (search queue/id/visitor name), weekdays (comma-separated PostgreSQL DOW 0=Sun..6=Sat in unit timezone), dateFrom/dateTo (YYYY-MM-DD inclusive, history timestamp calendar date in unit timezone). counter_id reflects the ticket''s current assignment, not necessarily the desk at event time. For users without full journal access (not admin/supervisor/platform_admin and no ACCESS_SUPERVISOR_PANEL on this unit), results are restricted to rows where the authenticated user is the history actor; userId filter is ignored/overridden in that case.'
       parameters:
       - description: Unit ID
         in: path
@@ -6017,7 +6372,7 @@ paths:
       - shift
   /units/{unitId}/shift/activity/actors:
     get:
-      description: User ids and display names for journal filter dropdown (from ticket_histories in this unit).
+      description: User ids and display names for journal filter dropdown (from ticket_histories in this unit). For users without full journal access, only the authenticated user is returned.
       parameters:
       - description: Unit ID
         in: path
@@ -6544,9 +6899,9 @@ paths:
       - slots
   /units/{unitId}/tickets:
     get:
-      description: Retrieves all tickets for a specific unit
+      description: 'Subdivision: all non-EOD tickets for that unit (all service zones + subdivision-wide pool). Service zone: non-EOD tickets for the parent subdivision with service_zone_id equal to this zone''s id.'
       parameters:
-      - description: Unit ID
+      - description: Unit ID (subdivision or service_zone)
         in: path
         name: unitId
         required: true
@@ -6561,6 +6916,12 @@ paths:
                   $ref: '#/components/schemas/models.Ticket'
                 type: array
           description: OK
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unit not found
         '500':
           content:
             application/json:

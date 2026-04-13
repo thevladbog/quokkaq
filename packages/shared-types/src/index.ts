@@ -72,6 +72,7 @@ export type ServiceModel = {
   gridCol?: number | null;
   gridRowSpan?: number | null;
   gridColSpan?: number | null;
+  restrictedServiceZoneId?: string | null;
 };
 
 export const ServiceModelSchema: z.ZodType<ServiceModel> = z.object({
@@ -101,7 +102,8 @@ export const ServiceModelSchema: z.ZodType<ServiceModel> = z.object({
   gridRow: z.number().nullable().optional(),
   gridCol: z.number().nullable().optional(),
   gridRowSpan: z.number().nullable().optional(),
-  gridColSpan: z.number().nullable().optional()
+  gridColSpan: z.number().nullable().optional(),
+  restrictedServiceZoneId: z.string().nullable().optional()
 });
 
 export const UnitKindSchema = z.enum(['subdivision', 'service_zone']);
@@ -123,6 +125,7 @@ export const TicketModelSchema = z.object({
   id: z.string(),
   queueNumber: z.string(),
   unitId: z.string(),
+  serviceZoneId: z.string().nullable().optional(),
   serviceId: z.string(),
   status: z.string(),
   priority: z.number().nullable().optional(),
@@ -131,9 +134,13 @@ export const TicketModelSchema = z.object({
   confirmedAt: z.string().nullable().optional(),
   maxWaitingTime: z.number().nullable().optional(),
   operatorComment: z.string().nullable().optional(),
+  servedByName: z.string().nullable().optional(),
   service: z
     .object({
       id: z.string().optional(),
+      name: z.string().optional(),
+      nameRu: z.string().nullable().optional(),
+      nameEn: z.string().nullable().optional(),
       duration: z.number().nullable().optional()
     })
     .optional(),
@@ -195,6 +202,7 @@ export const BookingModelSchema = z.object({
 export const CounterModelSchema = z.object({
   id: z.string(),
   unitId: z.string(),
+  serviceZoneId: z.string().nullable().optional(),
   name: z.string(),
   assignedTo: z.string().nullable().optional(),
   onBreak: z.boolean().optional(),
@@ -855,6 +863,28 @@ export type InvoiceDraftCreateBody = z.infer<
 >;
 export type UsageMetric = z.infer<typeof UsageMetricSchema>;
 export type UsageMetrics = z.infer<typeof UsageMetricsSchema>;
+
+/** One row from GET .../clients/{clientId}/history */
+export const UnitClientHistoryItemSchema = z.object({
+  id: z.string(),
+  unitId: z.string(),
+  unitClientId: z.string(),
+  actorUserId: z.string().nullish(),
+  actorName: z.string().nullish(),
+  action: z.string(),
+  payload: z.record(z.string(), z.unknown()),
+  createdAt: z.string()
+});
+
+export const UnitClientHistoryListResponseSchema = z.object({
+  items: z.array(UnitClientHistoryItemSchema),
+  nextCursor: z.string().nullish()
+});
+
+export type UnitClientHistoryItem = z.infer<typeof UnitClientHistoryItemSchema>;
+export type UnitClientHistoryListResponse = z.infer<
+  typeof UnitClientHistoryListResponseSchema
+>;
 
 // Signup Request
 export type SignupRequest = {

@@ -35,7 +35,8 @@ import type {
   CatalogItem,
   InvoiceDraftUpsertBody,
   InvoiceDraftCreateBody,
-  PaymentAccount
+  PaymentAccount,
+  UnitClientHistoryListResponse
 } from '@quokkaq/shared-types';
 
 import {
@@ -54,7 +55,8 @@ import {
   CompanySchema,
   SaasVendorSchema,
   CompanyMeResponseSchema,
-  CatalogItemSchema
+  CatalogItemSchema,
+  UnitClientHistoryListResponseSchema
 } from '@quokkaq/shared-types';
 
 const ClientVisitsResponseSchema = z.object({
@@ -85,6 +87,15 @@ const UnitClientModelSchema = z.object({
 });
 
 export type UnitClient = z.infer<typeof UnitClientModelSchema>;
+
+const UnitClientListResponseSchema = z.object({
+  items: z.array(UnitClientModelSchema),
+  nextCursor: z.string().nullish()
+});
+
+export type UnitClientListResponse = z.infer<
+  typeof UnitClientListResponseSchema
+>;
 
 const VisitorTagDefinitionSchema = z.object({
   id: z.string(),
@@ -254,6 +265,26 @@ function headersInitWithoutAuthorization(
 // Base API configuration
 const API_BASE_URL = '/api';
 
+export function isRequestAbortError(error: unknown): boolean {
+  if (error instanceof DOMException && error.name === 'AbortError') {
+    return true;
+  }
+  if (error instanceof Error) {
+    if (error.name === 'AbortError') {
+      return true;
+    }
+    const msg = error.message.toLowerCase();
+    if (
+      msg.includes('signal is aborted') ||
+      msg.includes('the operation was aborted') ||
+      msg.includes('user aborted')
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // Create a base fetch function with proper error handling and authentication
 type ApiRequestExtra<T> = {
   /** When the server returns 404, return this value instead of throwing (no JSON parse). */
@@ -378,7 +409,9 @@ async function apiRequest<T>(
           }
         }
       } catch (refreshError) {
-        logger.error('Token refresh failed:', refreshError);
+        if (!isRequestAbortError(refreshError)) {
+          logger.error('Token refresh failed:', refreshError);
+        }
       }
 
       // If refresh failed or no refresh token, clear stored tokens
@@ -438,7 +471,9 @@ async function apiRequest<T>(
 
     return data;
   } catch (error) {
-    logger.error(`API request failed for ${url}:`, error);
+    if (!isRequestAbortError(error)) {
+      logger.error(`API request failed for ${url}:`, error);
+    }
     throw error;
   }
 }
@@ -532,7 +567,9 @@ async function apiRequestBlob(
           }
           throw refreshError;
         }
-        logger.error('Token refresh failed:', refreshError);
+        if (!isRequestAbortError(refreshError)) {
+          logger.error('Token refresh failed:', refreshError);
+        }
       }
 
       clearClientAuthSession();
@@ -549,7 +586,9 @@ async function apiRequestBlob(
     const blob = await readBodyAsBlob(response);
     return { blob, headers: response.headers };
   } catch (error) {
-    logger.error(`API request failed for ${url}:`, error);
+    if (!isRequestAbortError(error)) {
+      logger.error(`API request failed for ${url}:`, error);
+    }
     throw error;
   }
 }
@@ -843,11 +882,70 @@ export const unitsApi = {
     );
   },
 
+  getClientHistory: (
+    unitId: string,
+    clientId: string,
+    params?: { limit?: number; cursor?: string }
+  ) => {
+    const qs = new URLSearchParams();
+    if (params?.limit != null) qs.set('limit', String(params.limit));
+    if (params?.cursor) qs.set('cursor', params.cursor);
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    return apiRequest<UnitClientHistoryListResponse>(
+      `/units/${unitId}/clients/${encodeURIComponent(clientId)}/history${suffix}`,
+      { cache: 'no-store' },
+      UnitClientHistoryListResponseSchema
+    );
+  },
+
   searchClients: (unitId: string, q: string) =>
     apiRequest<UnitClient[]>(
       `/units/${unitId}/clients/search?q=${encodeURIComponent(q)}`,
       { cache: 'no-store' },
       z.array(UnitClientModelSchema)
+    ),
+
+  listUnitClients: (
+    unitId: string,
+    opts?: { q?: string; tagIds?: string[]; limit?: number; cursor?: string }
+  ) => {
+    const qs = new URLSearchParams();
+    if (opts?.q != null && opts.q.trim() !== '') qs.set('q', opts.q.trim());
+    if (opts?.tagIds?.length) qs.set('tagIds', opts.tagIds.join(','));
+    if (opts?.limit != null) qs.set('limit', String(opts.limit));
+    if (opts?.cursor) qs.set('cursor', opts.cursor);
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    return apiRequest<UnitClientListResponse>(
+      `/units/${unitId}/clients${suffix}`,
+      { cache: 'no-store' },
+      UnitClientListResponseSchema
+    );
+  },
+
+  getUnitClient: (unitId: string, clientId: string) =>
+    apiRequest<UnitClient>(
+      `/units/${unitId}/clients/${encodeURIComponent(clientId)}`,
+      { cache: 'no-store' },
+      UnitClientModelSchema
+    ),
+
+  patchUnitClient: (
+    unitId: string,
+    clientId: string,
+    body: {
+      firstName?: string;
+      lastName?: string;
+      phone?: string;
+      tagDefinitionIds?: string[];
+    }
+  ) =>
+    apiRequest<UnitClient>(
+      `/units/${unitId}/clients/${encodeURIComponent(clientId)}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(body)
+      },
+      UnitClientModelSchema
     ),
 
   listVisitorTagDefinitions: (unitId: string) =>
@@ -967,16 +1065,32 @@ export const ticketsApi = {
 
   transfer: (
     id: string,
-    transferData: { toCounterId?: string; toUserId?: string }
-  ) =>
-    apiRequest<Ticket>(
+    transferData: {
+      toCounterId?: string;
+      toUserId?: string;
+      toServiceZoneId?: string;
+      toServiceId?: string;
+      operatorComment?: string | null;
+    }
+  ) => {
+    const body: Record<string, unknown> = {};
+    if (transferData.toCounterId) body.toCounterId = transferData.toCounterId;
+    if (transferData.toUserId) body.toUserId = transferData.toUserId;
+    if (transferData.toServiceZoneId)
+      body.toServiceZoneId = transferData.toServiceZoneId;
+    if (transferData.toServiceId) body.toServiceId = transferData.toServiceId;
+    if (transferData.operatorComment !== undefined) {
+      body.operatorComment = transferData.operatorComment;
+    }
+    return apiRequest<Ticket>(
       `/tickets/${id}/transfer`,
       {
         method: 'POST',
-        body: JSON.stringify(transferData)
+        body: JSON.stringify(body)
       },
       TicketModelSchema
-    ),
+    );
+  },
 
   returnToQueue: (id: string) =>
     apiRequest<Ticket>(
@@ -1117,7 +1231,10 @@ export const countersApi = {
       z.array(CounterModelSchema)
     ),
 
-  create: (unitId: string, data: { name: string }) =>
+  create: (
+    unitId: string,
+    data: { name: string; serviceZoneId?: string | null }
+  ) =>
     apiRequest<Counter>(
       `/units/${unitId}/counters`,
       {
@@ -1127,11 +1244,14 @@ export const countersApi = {
       CounterModelSchema
     ),
 
-  update: (id: string, data: { name?: string; assignedTo?: string }) =>
+  update: (
+    id: string,
+    data: { name?: string; assignedTo?: string; serviceZoneId?: string | null }
+  ) =>
     apiRequest<Counter>(
       `/counters/${id}`,
       {
-        method: 'PATCH',
+        method: 'PUT',
         body: JSON.stringify(data)
       },
       CounterModelSchema

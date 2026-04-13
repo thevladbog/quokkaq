@@ -36,9 +36,12 @@ import {
 } from '@/lib/kiosk-print';
 import { intlLocaleFromAppLocale } from '@/lib/format-datetime';
 import {
+  GRID_ZONE_SCOPE_NONE,
   SERVICE_GRID_CELL_COUNT,
   SERVICE_GRID_COLS,
-  SERVICE_GRID_ROWS
+  SERVICE_GRID_ROWS,
+  isServicePlacedOnGrid,
+  serviceMatchesGridZoneScope
 } from '@/lib/service-grid';
 
 export default function UnitKioskPage() {
@@ -47,12 +50,6 @@ export default function UnitKioskPage() {
   const [selectedServicePath, setSelectedServicePath] = useState<Service[]>([]);
   const [, setMessage] = useState('');
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
-  const {
-    data: unitServicesTree,
-    isLoading: servicesLoading,
-    isError: servicesQueryError,
-    refetch: refetchServicesTree
-  } = useUnitServicesTree(unitId!);
   const createTicketMutation = useCreateTicketInUnit();
   const [createdTicket, setCreatedTicket] = useState<Ticket | null>(null);
   const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
@@ -75,6 +72,39 @@ export default function UnitKioskPage() {
     // Desktop WebView + React Query cache: always pick up fresh kiosk PIN / config.
     refetchOnMount: 'always'
   });
+
+  /** Subdivision id for services API and ticket creation (always the branch unit). */
+  const kioskApiUnitId = useMemo(() => {
+    if (!unit) return undefined;
+    if (unit.kind === 'service_zone') {
+      return unit.parentId ?? undefined;
+    }
+    return unit.id;
+  }, [unit]);
+
+  /** Which grid column (pool) the kiosk shows: subdivision-wide vs this zone. */
+  const kioskGridZoneScope = useMemo(() => {
+    if (!unit || !unitId) return GRID_ZONE_SCOPE_NONE;
+    if (unit.kind === 'service_zone') return unitId;
+    return GRID_ZONE_SCOPE_NONE;
+  }, [unit, unitId]);
+
+  const {
+    data: unitServicesTree,
+    isLoading: servicesLoading,
+    isError: servicesQueryError,
+    refetch: refetchServicesTree
+  } = useUnitServicesTree(kioskApiUnitId ?? '', {
+    enabled: Boolean(kioskApiUnitId)
+  });
+
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      setSelectedServicePath([]);
+    });
+    return () => cancelAnimationFrame(id);
+  }, [kioskGridZoneScope]);
+
   const tryPrintTicket = async (ticket: Ticket, serviceLabel: string) => {
     const kc = unit?.config?.kiosk;
     if (!kc || kc.isPrintEnabled === false) {
@@ -212,14 +242,24 @@ export default function UnitKioskPage() {
     if (!unitServicesTree) {
       return [];
     }
-    if (selectedServicePath.length === 0) {
-      return unitServicesTree.filter((service) => !service.parentId);
-    }
-    const lastService = selectedServicePath[selectedServicePath.length - 1];
-    return unitServicesTree.filter(
-      (service) => service.parentId === lastService.id
-    );
-  }, [unitServicesTree, selectedServicePath]);
+    const atLevel =
+      selectedServicePath.length === 0
+        ? unitServicesTree.filter((service) => !service.parentId)
+        : unitServicesTree.filter(
+            (service) =>
+              service.parentId ===
+              selectedServicePath[selectedServicePath.length - 1].id
+          );
+    return atLevel.filter((service) => {
+      if (!isServicePlacedOnGrid(service)) {
+        return false;
+      }
+      if (unit?.kind === 'subdivision') {
+        return true;
+      }
+      return serviceMatchesGridZoneScope(service, kioskGridZoneScope);
+    });
+  }, [unitServicesTree, selectedServicePath, kioskGridZoneScope, unit?.kind]);
 
   const handleServiceSelection = async (service: Service) => {
     if (service.isLeaf) {
@@ -227,7 +267,7 @@ export default function UnitKioskPage() {
       setMessage('');
       try {
         const ticket = await createTicketMutation.mutateAsync({
-          unitId: unitId!,
+          unitId: kioskApiUnitId!,
           serviceId: service.id
         });
         setCreatedTicket(ticket);
@@ -312,7 +352,23 @@ export default function UnitKioskPage() {
         beforeClock={topBarBeforeClock}
       />
 
-      {servicesLoading ? (
+      {!unit ? (
+        <div className='flex min-h-0 flex-1 items-center justify-center overflow-hidden'>
+          <div className='text-center'>
+            <div className='border-kiosk-ink/30 mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-2 border-b-transparent'></div>
+            <p className='text-kiosk-ink-muted'>{t('loading')}</p>
+          </div>
+        </div>
+      ) : unit.kind === 'service_zone' && !unit.parentId ? (
+        <div className='flex min-h-0 flex-1 items-center justify-center overflow-hidden px-4'>
+          <p className='text-kiosk-ink-muted text-center text-base'>
+            {t('kiosk_zone_missing_parent', {
+              defaultValue:
+                'This service zone is not linked to a parent branch. Kiosk cannot load services.'
+            })}
+          </p>
+        </div>
+      ) : servicesLoading ? (
         <div className='flex min-h-0 flex-1 items-center justify-center overflow-hidden'>
           <div className='text-center'>
             <div className='border-kiosk-ink/30 mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-2 border-b-transparent'></div>
@@ -435,31 +491,27 @@ export default function UnitKioskPage() {
           >
             {/* Render services with their exact grid positions */}
             {visibleServices.map((service) => {
-              if (service.gridRow !== null && service.gridCol !== null) {
-                const startRow = (service.gridRow ?? 0) + 1;
-                const startCol = (service.gridCol ?? 0) + 1;
-                const rowSpan = service.gridRowSpan || 1;
-                const colSpan = service.gridColSpan || 1;
+              const startRow = (service.gridRow ?? 0) + 1;
+              const startCol = (service.gridCol ?? 0) + 1;
+              const rowSpan = service.gridRowSpan || 1;
+              const colSpan = service.gridColSpan || 1;
 
-                return (
-                  <div
-                    key={service.id}
-                    className='h-full min-h-0 w-full min-w-0'
-                    style={{
-                      gridRow: `${startRow} / span ${rowSpan}`,
-                      gridColumn: `${startCol} / span ${colSpan}`
-                    }}
-                  >
-                    <KioskServiceTile
-                      service={service}
-                      locale={locale}
-                      onSelect={handleServiceSelection}
-                    />
-                  </div>
-                );
-              }
-
-              return null;
+              return (
+                <div
+                  key={service.id}
+                  className='h-full min-h-0 w-full min-w-0'
+                  style={{
+                    gridRow: `${startRow} / span ${rowSpan}`,
+                    gridColumn: `${startCol} / span ${colSpan}`
+                  }}
+                >
+                  <KioskServiceTile
+                    service={service}
+                    locale={locale}
+                    onSelect={handleServiceSelection}
+                  />
+                </div>
+              );
             })}
 
             {/* Add empty cells to fill up the grid structure where no services are positioned */}
@@ -469,16 +521,17 @@ export default function UnitKioskPage() {
 
               // Check if this cell is already occupied by a service
               const isOccupied = visibleServices.some((service) => {
-                if (service.gridRow === null || service.gridCol === null) {
+                if (!isServicePlacedOnGrid(service)) {
                   return false;
                 }
 
                 // Check if this cell falls within the service's grid position
                 return (
-                  row >= (service.gridRow || 0) &&
-                  row < (service.gridRow || 0) + (service.gridRowSpan || 1) &&
-                  col >= (service.gridCol || 0) &&
-                  col < (service.gridCol || 0) + (service.gridColSpan || 1)
+                  row >= (service.gridRow as number) &&
+                  row <
+                    (service.gridRow as number) + (service.gridRowSpan || 1) &&
+                  col >= (service.gridCol as number) &&
+                  col < (service.gridCol as number) + (service.gridColSpan || 1)
                 );
               });
 
@@ -624,7 +677,7 @@ export default function UnitKioskPage() {
       <PreRegRedemptionModal
         isOpen={isRedemptionModalOpen}
         onClose={() => setIsRedemptionModalOpen(false)}
-        unitId={unitId!}
+        unitId={kioskApiUnitId ?? unitId!}
         onSuccess={(ticket) => {
           setCreatedTicket(ticket);
           setIsTicketModalOpen(true);

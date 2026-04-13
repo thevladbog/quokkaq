@@ -1,3 +1,28 @@
+/** Sentinel for admin/kiosk: services without `restrictedServiceZoneId` (subdivision-wide pool). */
+export const GRID_ZONE_SCOPE_NONE = 'none' as const;
+
+export type GridZoneScope = typeof GRID_ZONE_SCOPE_NONE | string;
+
+/**
+ * Whether a service belongs to the same waiting-pool column as the admin grid tab / kiosk URL.
+ * - `GRID_ZONE_SCOPE_NONE`: unrestricted services only (empty `restrictedServiceZoneId`).
+ * - otherwise: `restrictedServiceZoneId` must equal that zone unit id.
+ */
+export function serviceMatchesGridZoneScope(
+  service: { restrictedServiceZoneId?: string | null },
+  zoneScope: GridZoneScope
+): boolean {
+  const z = service.restrictedServiceZoneId?.trim() ?? '';
+  if (zoneScope === GRID_ZONE_SCOPE_NONE) {
+    return z === '';
+  }
+  return z === zoneScope;
+}
+
+// Note: each service row has a single `restrictedServiceZoneId` and one grid placement. Showing the
+// same logical service on both subdivision-wide and zone-specific grids would require a separate
+// model (e.g. per-zone grid cells), not two conflicting values on one row.
+
 /** Shared kiosk + admin service grid layout (columns × rows). */
 export const SERVICE_GRID_COLS = 8;
 export const SERVICE_GRID_ROWS = 8;
@@ -23,6 +48,36 @@ export function indexToPosition(index: number): { row: number; col: number } {
 }
 
 /** Clamp top-left so a block with given spans stays inside the grid. */
+/**
+ * True when the service occupies at least one cell on the 8×8 kiosk/admin grid.
+ * Uses `== null` so both missing JSON fields (`undefined`) and explicit `null` count as “not placed”.
+ */
+export function isServicePlacedOnGrid(service: {
+  gridRow?: number | null;
+  gridCol?: number | null;
+}): boolean {
+  const r = service.gridRow;
+  const c = service.gridCol;
+  if (r == null || c == null) {
+    return false;
+  }
+  if (typeof r !== 'number' || typeof c !== 'number') {
+    return false;
+  }
+  if (!Number.isFinite(r) || !Number.isFinite(c)) {
+    return false;
+  }
+  const ri = Math.floor(r);
+  const ci = Math.floor(c);
+  if (ri < 0 || ci < 0) {
+    return false;
+  }
+  if (ri >= SERVICE_GRID_ROWS || ci >= SERVICE_GRID_COLS) {
+    return false;
+  }
+  return true;
+}
+
 export function clampGridOrigin(
   row: number,
   col: number,

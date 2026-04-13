@@ -32,8 +32,8 @@ export function SupervisorRecentActivity({
 
   const journalHref =
     activityUnitId && activityUnitId !== dashboardUnitId
-      ? `/supervisor/${dashboardUnitId}/journal?scopeUnitId=${encodeURIComponent(activityUnitId)}`
-      : `/supervisor/${dashboardUnitId}/journal`;
+      ? `/journal/${dashboardUnitId}?scopeUnitId=${encodeURIComponent(activityUnitId)}`
+      : `/journal/${dashboardUnitId}`;
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['shift-activity', activityUnitId, 'short'],

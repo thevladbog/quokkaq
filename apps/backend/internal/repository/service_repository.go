@@ -2,6 +2,7 @@ package repository
 
 import (
 	"errors"
+	"strings"
 
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/pkg/database"
@@ -14,6 +15,8 @@ type ServiceRepository interface {
 	FindAllByUnit(unitID string) ([]models.Service, error)
 	FindByID(id string) (*models.Service, error)
 	FindByIDTx(tx *gorm.DB, id string) (*models.Service, error)
+	// FindMapByIDs returns services keyed by id; missing rows are omitted.
+	FindMapByIDs(ids []string) (map[string]*models.Service, error)
 	// CountByUnitAndIDs returns how many of the given service IDs belong to the unit (distinct rows).
 	CountByUnitAndIDs(unitID string, ids []string) (int64, error)
 	Update(service *models.Service) error
@@ -52,6 +55,39 @@ func (r *serviceRepository) FindByIDTx(tx *gorm.DB, id string) (*models.Service,
 		return nil, err
 	}
 	return &service, nil
+}
+
+func (r *serviceRepository) FindMapByIDs(ids []string) (map[string]*models.Service, error) {
+	out := make(map[string]*models.Service)
+	if len(ids) == 0 {
+		return out, nil
+	}
+	uniq := make([]string, 0, len(ids))
+	seen := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		uniq = append(uniq, id)
+	}
+	if len(uniq) == 0 {
+		return out, nil
+	}
+	var list []models.Service
+	if err := r.db.Where("id IN ?", uniq).Find(&list).Error; err != nil {
+		return nil, err
+	}
+	for i := range list {
+		s := list[i]
+		cp := s
+		out[s.ID] = &cp
+	}
+	return out, nil
 }
 
 func (r *serviceRepository) CountByUnitAndIDs(unitID string, ids []string) (int64, error) {

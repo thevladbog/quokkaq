@@ -13,12 +13,32 @@ import (
 	"gorm.io/gorm"
 )
 
+// UpdateCounterRequest is the JSON body for PUT /counters/{id} (sparse update).
+// Only name and/or serviceZoneId are applied; assignedTo and onBreak are rejected by the handler.
+type UpdateCounterRequest struct {
+	Name          *string `json:"name,omitempty"`
+	ServiceZoneID *string `json:"serviceZoneId,omitempty"`
+}
+
 type CounterHandler struct {
 	service services.CounterService
 }
 
 func NewCounterHandler(service services.CounterService) *CounterHandler {
 	return &CounterHandler{service: service}
+}
+
+func writeCounterServiceError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, gorm.ErrRecordNotFound):
+		http.Error(w, err.Error(), http.StatusNotFound)
+	case errors.Is(err, services.ErrCounterOccupancyOrBreakViaUpdate),
+		errors.Is(err, services.ErrCounterInvalidServiceZoneIDType),
+		errors.Is(err, services.ErrInvalidServiceZone):
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	default:
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 // CreateCounter godoc
@@ -84,7 +104,7 @@ func (h *CounterHandler) GetCounterByID(w http.ResponseWriter, r *http.Request) 
 	id := chi.URLParam(r, "id")
 	counter, err := h.service.GetCounterByID(id)
 	if err != nil {
-		http.Error(w, "Counter not found", http.StatusNotFound)
+		writeCounterServiceError(w, err)
 		return
 	}
 	RespondJSON(w, counter)
@@ -97,25 +117,78 @@ func (h *CounterHandler) GetCounterByID(w http.ResponseWriter, r *http.Request) 
 // @Accept       json
 // @Produce      json
 // @Param        id      path      string          true  "Counter ID"
-// @Param        counter body      models.Counter  true  "Counter Data"
+// @Param        counter body      UpdateCounterRequest  true  "Sparse counter fields (name, serviceZoneId)"
 // @Success      200     {object}  models.Counter
 // @Failure      400     {string}  string "Bad Request"
+// @Failure      404     {string}  string "Not Found"
 // @Failure      500     {string}  string "Internal Server Error"
 // @Router       /counters/{id} [put]
 func (h *CounterHandler) UpdateCounter(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	var counter models.Counter
-	if err := json.NewDecoder(r.Body).Decode(&counter); err != nil {
+	var raw map[string]json.RawMessage
+	if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	counter.ID = id
-
-	if err := h.service.UpdateCounter(&counter); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	for k := range raw {
+		switch k {
+		case "name", "serviceZoneId", "assignedTo", "onBreak":
+		default:
+			http.Error(w, "unknown field: "+k, http.StatusBadRequest)
+			return
+		}
+	}
+	if _, ok := raw["assignedTo"]; ok {
+		http.Error(w, services.ErrCounterOccupancyOrBreakViaUpdate.Error(), http.StatusBadRequest)
+		return
+	}
+	if _, ok := raw["onBreak"]; ok {
+		http.Error(w, services.ErrCounterOccupancyOrBreakViaUpdate.Error(), http.StatusBadRequest)
 		return
 	}
 
+	var req UpdateCounterRequest
+	if v, ok := raw["name"]; ok {
+		var nameStr string
+		if err := json.Unmarshal(v, &nameStr); err != nil {
+			http.Error(w, "name: invalid JSON", http.StatusBadRequest)
+			return
+		}
+		req.Name = &nameStr
+	}
+	if v, ok := raw["serviceZoneId"]; ok {
+		var z *string
+		if err := json.Unmarshal(v, &z); err != nil {
+			http.Error(w, "serviceZoneId: invalid JSON", http.StatusBadRequest)
+			return
+		}
+		req.ServiceZoneID = z
+	}
+	updates := map[string]interface{}{}
+	if req.Name != nil {
+		updates["name"] = *req.Name
+	}
+	if _, ok := raw["serviceZoneId"]; ok {
+		if req.ServiceZoneID == nil {
+			updates["service_zone_id"] = nil
+		} else {
+			updates["service_zone_id"] = *req.ServiceZoneID
+		}
+	}
+	if len(updates) == 0 {
+		http.Error(w, "no fields to update", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.service.UpdateCounter(id, updates); err != nil {
+		writeCounterServiceError(w, err)
+		return
+	}
+	counter, err := h.service.GetCounterByID(id)
+	if err != nil {
+		writeCounterServiceError(w, err)
+		return
+	}
 	RespondJSON(w, counter)
 }
 

@@ -46,6 +46,8 @@ type UserRepository interface {
 	GetFirstUserUnit(userID string) (UserUnitResult, error)
 	// ResolveJournalActorDisplayNames returns a display label per user id (non-empty trimmed name, else email). Omitted ids are not in the map.
 	ResolveJournalActorDisplayNames(userIDs []string) (map[string]string, error)
+	// ShiftJournalSeesAllActivity is true when the user may list all ticket history in the unit (not restricted to own actions).
+	ShiftJournalSeesAllActivity(userID, unitID string) (bool, error)
 }
 
 type userRepository struct {
@@ -366,4 +368,18 @@ func (r *userRepository) ResolveJournalActorDisplayNames(userIDs []string) (map[
 		}
 	}
 	return out, nil
+}
+
+func (r *userRepository) ShiftJournalSeesAllActivity(userID, unitID string) (bool, error) {
+	if userID == "" || unitID == "" {
+		return false, nil
+	}
+	user, err := r.FindByID(userID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
+		return false, err
+	}
+	return shiftJournalSeesAllActivityFromLoadedUser(user, unitID), nil
 }

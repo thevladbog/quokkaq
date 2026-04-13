@@ -58,7 +58,31 @@ async function loadUnitsWithAncestors(
   return map;
 }
 
-function resolveZone(
+/** Load units referenced by id (e.g. counter.serviceZoneId) and their parent chain into the map. */
+async function enrichMapWithUnitIds(
+  map: Map<string, Unit>,
+  ids: string[]
+): Promise<void> {
+  const unique = [...new Set(ids.map((id) => id?.trim()).filter(Boolean))];
+  for (const id of unique) {
+    if (map.has(id)) continue;
+    const u = await fetchUnitOrNull(id);
+    if (!u) continue;
+    map.set(u.id, u);
+    let p = u.parentId;
+    let steps = 0;
+    while (p && !map.has(p) && steps < MAX_ANCESTOR_DEPTH) {
+      steps += 1;
+      const pu = await fetchUnitOrNull(p);
+      if (!pu) break;
+      map.set(pu.id, pu);
+      p = pu.parentId;
+    }
+  }
+}
+
+/** Fallback when the counter’s unit is not itself a service_zone: walk up to the nearest zone, else use workplace name (subdivision-wide pool). */
+function resolveZoneFromWorkplaceUnit(
   workplaceUnit: Unit,
   unitsById: Map<string, Unit>
 ): { zoneFilterKey: string; zoneLabel: string } {
@@ -78,13 +102,35 @@ function resolveZone(
   };
 }
 
+/**
+ * Queue pool shown in the directory: prefer explicit `counter.serviceZoneId` (counter on subdivision
+ * but tied to a zone); otherwise infer from unit hierarchy (counter placed on a zone unit).
+ */
+function resolveWorkstationZone(
+  counter: Counter,
+  workplaceUnit: Unit,
+  unitsById: Map<string, Unit>,
+  unknownZoneLabel: string
+): { zoneFilterKey: string; zoneLabel: string } {
+  const sz = counter.serviceZoneId?.trim();
+  if (sz) {
+    const zoneUnit = unitsById.get(sz);
+    if (zoneUnit) {
+      return { zoneFilterKey: `sz:${sz}`, zoneLabel: zoneUnit.name };
+    }
+    return { zoneFilterKey: `sz:${sz}`, zoneLabel: unknownZoneLabel };
+  }
+  return resolveZoneFromWorkplaceUnit(workplaceUnit, unitsById);
+}
+
 type WorkstationBootstrapResult =
   | { kind: 'rows'; rows: WorkstationRow[] }
   | { kind: 'redirect'; unitId: string; counterId: string };
 
 async function fetchWorkstationBootstrap(
   userId: string,
-  seedUnitIds: string[]
+  seedUnitIds: string[],
+  unknownZoneLabel: string
 ): Promise<WorkstationBootstrapResult> {
   const unitsById = await loadUnitsWithAncestors(seedUnitIds);
 
@@ -102,11 +148,21 @@ async function fetchWorkstationBootstrap(
     };
   }
 
+  const zoneRefIds = flat
+    .map((c) => c.serviceZoneId?.trim())
+    .filter((id): id is string => Boolean(id));
+  await enrichMapWithUnitIds(unitsById, zoneRefIds);
+
   const built: WorkstationRow[] = [];
   for (const counter of flat) {
     const workplaceUnit = unitsById.get(counter.unitId);
     if (!workplaceUnit) continue;
-    const { zoneFilterKey, zoneLabel } = resolveZone(workplaceUnit, unitsById);
+    const { zoneFilterKey, zoneLabel } = resolveWorkstationZone(
+      counter,
+      workplaceUnit,
+      unitsById,
+      unknownZoneLabel
+    );
     built.push({ counter, workplaceUnit, zoneFilterKey, zoneLabel });
   }
 
@@ -129,9 +185,17 @@ export function useWorkstationBootstrap({
 
   const enabled = !authLoading && hasUser && !!userId && seedUnitIds.length > 0;
 
+  const unknownZoneLabel = t('unknownServiceZone');
+
   const query = useQuery({
-    queryKey: ['staff-workstation-bootstrap', userId, seedUnitIds] as const,
-    queryFn: () => fetchWorkstationBootstrap(userId!, seedUnitIds),
+    queryKey: [
+      'staff-workstation-bootstrap',
+      userId,
+      seedUnitIds,
+      unknownZoneLabel
+    ] as const,
+    queryFn: () =>
+      fetchWorkstationBootstrap(userId!, seedUnitIds, unknownZoneLabel),
     enabled,
     retry(failureCount, error) {
       if (failureCount >= 2) return false;

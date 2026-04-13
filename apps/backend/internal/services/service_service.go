@@ -18,16 +18,20 @@ type ServiceService interface {
 }
 
 type serviceService struct {
-	repo repository.ServiceRepository
+	repo     repository.ServiceRepository
+	unitRepo repository.UnitRepository
 }
 
-func NewServiceService(repo repository.ServiceRepository) ServiceService {
-	return &serviceService{repo: repo}
+func NewServiceService(repo repository.ServiceRepository, unitRepo repository.UnitRepository) ServiceService {
+	return &serviceService{repo: repo, unitRepo: unitRepo}
 }
 
 func (s *serviceService) CreateService(service *models.Service) error {
 	if service.UnitID == "" {
 		return errors.New("unit ID is required")
+	}
+	if err := ValidateOptionalChildServiceZone(s.unitRepo, service.UnitID, &service.RestrictedServiceZoneID); err != nil {
+		return err
 	}
 	return s.repo.Create(service)
 }
@@ -50,6 +54,9 @@ func (s *serviceService) UpdateService(service *models.Service) error {
 	}
 	// Never persist a caller-supplied unit change; keep the row's unit.
 	service.UnitID = existing.UnitID
+	if err := ValidateOptionalChildServiceZone(s.unitRepo, service.UnitID, &service.RestrictedServiceZoneID); err != nil {
+		return err
+	}
 	return s.repo.Update(service)
 }
 

@@ -5,9 +5,11 @@ import (
 )
 
 type Ticket struct {
-	ID                string     `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
-	QueueNumber       string     `gorm:"not null" json:"queueNumber"`
-	UnitID            string     `gorm:"not null" json:"unitId"`
+	ID          string `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
+	QueueNumber string `gorm:"not null" json:"queueNumber"`
+	UnitID      string `gorm:"not null" json:"unitId"`
+	// ServiceZoneID: waiting pool within the subdivision; NULL = subdivision-wide pool.
+	ServiceZoneID     *string    `json:"serviceZoneId,omitempty" gorm:"column:service_zone_id"`
 	ServiceID         string     `gorm:"not null" json:"serviceId"`
 	BookingID         *string    `json:"bookingId,omitempty"`
 	CounterID         *string    `json:"counterId,omitempty"`
@@ -24,6 +26,8 @@ type Ticket struct {
 	LastCalledAt      *time.Time `json:"lastCalledAt,omitempty"`
 	MaxWaitingTime    *int       `json:"maxWaitingTime,omitempty"` // Snapshot from Service at creation
 	OperatorComment   *string    `gorm:"type:text" json:"operatorComment,omitempty"`
+	// ServedByName is hydrated for client visit lists from ticket_histories (not stored on tickets).
+	ServedByName *string `json:"servedByName,omitempty" gorm:"-"`
 
 	// Relations
 	Unit    Unit     `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-" swaggerignore:"true"`

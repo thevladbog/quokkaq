@@ -424,7 +424,7 @@ import (
 func TestTicketService_CreateTicket(t *testing.T) {
     // Arrange
     mockRepo := &MockTicketRepository{}
-    service := NewTicketService(mockRepo, nil, nil)
+    service := NewTicketService(mockRepo, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
     
     // Act
     ticket, err := service.CreateTicket(ctx, request)

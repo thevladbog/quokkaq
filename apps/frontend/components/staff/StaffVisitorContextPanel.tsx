@@ -20,6 +20,7 @@ import {
   useUpdateOperatorComment,
   useUpdateTicketVisitor
 } from '@/lib/hooks';
+import { ticketServiceDisplayName } from '@/lib/ticket-display';
 import { cn } from '@/lib/utils';
 import { Loader2, UserRoundSearch } from 'lucide-react';
 import { toast } from 'sonner';
@@ -519,25 +520,70 @@ export function StaffVisitorContextPanel({
               {t('visitor_context.no_history')}
             </p>
           ) : (
-            <ul className='max-h-48 space-y-2 overflow-y-auto pr-1 text-sm'>
-              {historyItems.map((v) => (
-                <li
-                  key={v.id}
-                  className='border-border/40 bg-muted/20 flex flex-col gap-0.5 rounded-md border px-2 py-1.5'
-                >
-                  <div className='flex flex-wrap items-baseline justify-between gap-2'>
-                    <span className='font-mono font-semibold tabular-nums'>
-                      {v.queueNumber}
-                    </span>
-                    <span className='text-muted-foreground text-xs'>
-                      {formatWhen(v.createdAt)}
-                    </span>
-                  </div>
-                  <span className='text-muted-foreground text-xs'>
-                    {t(`statuses.${v.status}`)}
-                  </span>
-                </li>
-              ))}
+            <ul className='max-h-56 space-y-2 overflow-y-auto pr-1 text-sm'>
+              {historyItems.map((v) => {
+                const servedBy = (v.servedByName ?? '').trim();
+                const visitComment = (v.operatorComment ?? '').trim();
+                const serviceLabel = ticketServiceDisplayName(v, locale);
+                return (
+                  <li
+                    key={v.id}
+                    className='border-border/40 bg-muted/20 flex flex-col gap-1 rounded-md border px-2 py-1.5'
+                  >
+                    <div className='flex flex-wrap items-baseline justify-between gap-2'>
+                      <span className='font-mono font-semibold tabular-nums'>
+                        {v.queueNumber}
+                      </span>
+                      <span className='text-muted-foreground text-xs'>
+                        {formatWhen(v.createdAt)}
+                      </span>
+                    </div>
+                    <div className='text-muted-foreground flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-xs'>
+                      <span className='text-foreground/90 shrink-0'>
+                        {t(`statuses.${v.status}`)}
+                      </span>
+                      <span
+                        className='text-muted-foreground/45 shrink-0'
+                        aria-hidden
+                      >
+                        ·
+                      </span>
+                      <span className='min-w-0'>
+                        <span className='text-muted-foreground/80'>
+                          {t('visitor_context.history_service')}
+                        </span>
+                        : <span className='break-words'>{serviceLabel}</span>
+                      </span>
+                      {servedBy ? (
+                        <>
+                          <span
+                            className='text-muted-foreground/45 shrink-0'
+                            aria-hidden
+                          >
+                            ·
+                          </span>
+                          <span className='min-w-0'>
+                            <span className='text-muted-foreground/80'>
+                              {t('visitor_context.history_served_by')}
+                            </span>
+                            : {servedBy}
+                          </span>
+                        </>
+                      ) : null}
+                    </div>
+                    {visitComment ? (
+                      <div className='border-border/30 border-t pt-1'>
+                        <p className='text-muted-foreground mb-0.5 text-[10px] font-semibold tracking-wide uppercase'>
+                          {t('visitor_context.history_operator_note')}
+                        </p>
+                        <p className='text-muted-foreground text-xs break-words whitespace-pre-wrap'>
+                          {visitComment}
+                        </p>
+                      </div>
+                    ) : null}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

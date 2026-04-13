@@ -4,7 +4,8 @@ import {
   ArrowRightLeft,
   Ban,
   CheckCircle2,
-  PhoneForwarded
+  PhoneForwarded,
+  Undo2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Ticket } from '@/lib/api';
@@ -26,11 +27,13 @@ export interface StaffWorkstationActionPanelProps {
   completePending: boolean;
   transferPending: boolean;
   noShowPending: boolean;
+  returnToQueuePending?: boolean;
   onCallNext: () => void;
   onConfirmArrival: () => void;
   onComplete: () => void;
   onOpenTransfer: () => void;
   onNoShow: () => void;
+  onReturnToQueue?: () => void;
 }
 
 export function StaffWorkstationActionPanel({
@@ -43,40 +46,45 @@ export function StaffWorkstationActionPanel({
   completePending,
   transferPending,
   noShowPending,
+  returnToQueuePending = false,
   onCallNext,
   onConfirmArrival,
   onComplete,
   onOpenTransfer,
-  onNoShow
+  onNoShow,
+  onReturnToQueue
 }: StaffWorkstationActionPanelProps) {
   const hasCurrent = Boolean(currentTicket);
   const callNextDisabled =
     workstationOnBreak || callNextPending || waitingCount === 0 || hasCurrent;
+  /** Call next is always disabled here; hiding saves vertical space until the guest is confirmed. */
+  const showCallNext = currentTicket?.status !== 'called';
+  const showReturnToQueue =
+    Boolean(onReturnToQueue) &&
+    (currentTicket?.status === 'called' ||
+      currentTicket?.status === 'in_service');
 
   return (
-    <div
-      className={cn(
-        'border-border/60 bg-muted/20 flex flex-col gap-3 rounded-lg border p-2.5',
-        'sm:flex-row sm:flex-wrap sm:items-center'
-      )}
-    >
-      <div className='flex min-w-0 flex-1 flex-wrap gap-3'>
-        <Button
-          size='sm'
-          className={cn(
-            'h-9 flex-1 font-semibold sm:min-w-[10rem] sm:flex-none',
-            'bg-primary text-primary-foreground hover:bg-primary/90'
-          )}
-          onClick={onCallNext}
-          disabled={callNextDisabled}
-        >
-          <PhoneForwarded className='mr-1.5 h-4 w-4 shrink-0' />
-          {callNextPending ? t('processing') : t('actions.callNext')}
-        </Button>
+    <div className='border-border/60 bg-muted/20 flex flex-col gap-3 rounded-lg border p-2.5'>
+      <div className='flex min-w-0 flex-wrap items-start gap-3'>
+        {showCallNext ? (
+          <Button
+            size='sm'
+            className={cn(
+              'h-9 min-w-[10rem] shrink-0 font-semibold',
+              'bg-primary text-primary-foreground hover:bg-primary/90'
+            )}
+            onClick={onCallNext}
+            disabled={callNextDisabled}
+          >
+            <PhoneForwarded className='mr-1.5 h-4 w-4 shrink-0' />
+            {callNextPending ? t('processing') : t('actions.callNext')}
+          </Button>
+        ) : null}
         {currentTicket?.status === 'called' && (
           <Button
             size='sm'
-            className='h-9 flex-1 border-0 bg-emerald-600 font-semibold text-white hover:bg-emerald-700 sm:min-w-[11rem] sm:flex-none'
+            className='h-9 min-w-[11rem] shrink-0 border-0 bg-emerald-600 font-semibold text-white hover:bg-emerald-700'
             onClick={onConfirmArrival}
             disabled={workstationOnBreak || confirmArrivalPending}
           >
@@ -84,12 +92,10 @@ export function StaffWorkstationActionPanel({
             {t('actions.startService')}
           </Button>
         )}
-      </div>
-      <div className='flex flex-wrap gap-3 sm:ml-auto'>
         <Button
           size='sm'
           variant='outline'
-          className='h-9 min-w-[7rem] flex-1 font-medium sm:flex-none'
+          className='h-9 min-w-[7rem] shrink-0 font-medium'
           onClick={onComplete}
           disabled={workstationOnBreak || !hasCurrent || completePending}
         >
@@ -99,7 +105,7 @@ export function StaffWorkstationActionPanel({
         <Button
           size='sm'
           variant='outline'
-          className='h-9 min-w-[7rem] flex-1 font-medium sm:flex-none'
+          className='h-9 min-w-[7rem] shrink-0 font-medium'
           onClick={onOpenTransfer}
           disabled={workstationOnBreak || !hasCurrent || transferPending}
         >
@@ -109,7 +115,7 @@ export function StaffWorkstationActionPanel({
         <Button
           size='sm'
           variant='outline'
-          className='text-destructive hover:text-destructive h-9 min-w-[7rem] flex-1 border-red-200/80 bg-red-50/50 font-medium hover:bg-red-50 sm:flex-none dark:border-red-900/50 dark:bg-red-950/25 dark:hover:bg-red-950/40'
+          className='text-destructive hover:text-destructive h-9 min-w-[7rem] shrink-0 border-red-200/80 bg-red-50/50 font-medium hover:bg-red-50 dark:border-red-900/50 dark:bg-red-950/25 dark:hover:bg-red-950/40'
           onClick={onNoShow}
           disabled={workstationOnBreak || !hasCurrent || noShowPending}
         >
@@ -117,6 +123,30 @@ export function StaffWorkstationActionPanel({
           {t('actions.noShow')}
         </Button>
       </div>
+      {showReturnToQueue ? (
+        <div className='flex flex-wrap items-start gap-3'>
+          <Button
+            type='button'
+            size='sm'
+            variant='outline'
+            className='h-9 min-w-[9rem] shrink-0 font-medium'
+            title={t('actions.returnToQueue_hint')}
+            onClick={onReturnToQueue}
+            disabled={
+              workstationOnBreak ||
+              returnToQueuePending ||
+              transferPending ||
+              completePending ||
+              noShowPending
+            }
+          >
+            <Undo2 className='mr-1.5 h-4 w-4 shrink-0' />
+            {returnToQueuePending
+              ? t('processing')
+              : t('actions.returnToQueue')}
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -5,11 +5,13 @@ import React, {
   useEffect,
   useRef,
   useCallback,
+  useMemo,
   startTransition
 } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
-import { Service, Unit, unitsApi } from '@/lib/api';
+import { Service, Unit, unitsApi, isRequestAbortError } from '@/lib/api';
 import { logger } from '@/lib/logger';
 import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -36,7 +38,8 @@ import {
   indexToPosition,
   pixelSpanToColSpan,
   pixelSpanToRowSpan,
-  positionToIndex
+  positionToIndex,
+  serviceMatchesGridZoneScope
 } from '@/lib/service-grid';
 
 type ServiceWithPosition = Service & {
@@ -48,6 +51,15 @@ type ServiceWithPosition = Service & {
 };
 
 const GRID_DND_PALETTE = 'grid-service-palette';
+
+function serviceZoneDisplayName(
+  service: { restrictedServiceZoneId?: string | null },
+  zoneNameById: ReadonlyMap<string, string> | undefined
+): string | undefined {
+  const zid = service.restrictedServiceZoneId?.trim();
+  if (!zid || !zoneNameById?.size) return undefined;
+  return zoneNameById.get(zid);
+}
 const GRID_DND_PLACED = 'grid-service-placed';
 
 type GridPaletteDragItem = { type: typeof GRID_DND_PALETTE; serviceId: string };
@@ -115,7 +127,8 @@ const ServiceItem: React.FC<{
   service: ServiceWithPosition;
   onAdd: (service: ServiceWithPosition) => void;
   dragLabel: string;
-}> = ({ service, onAdd, dragLabel }) => {
+  zoneNameById?: ReadonlyMap<string, string>;
+}> = ({ service, onAdd, dragLabel, zoneNameById }) => {
   const [{ isDragging }, drag] = useDrag(
     () => ({
       type: GRID_DND_PALETTE,
@@ -128,6 +141,7 @@ const ServiceItem: React.FC<{
   if (service.gridRow !== null && service.gridCol !== null) return null;
 
   const isParentService = service.isLeaf === false;
+  const zoneLabel = serviceZoneDisplayName(service, zoneNameById);
 
   return (
     <div
@@ -144,7 +158,14 @@ const ServiceItem: React.FC<{
         }
       }}
     >
-      <span className='flex-grow'>{service.name}</span>
+      <span className='flex min-w-0 flex-grow flex-col items-start gap-0.5'>
+        <span className='w-full truncate font-medium'>{service.name}</span>
+        {zoneLabel ? (
+          <span className='text-muted-foreground w-full truncate text-xs font-normal'>
+            {zoneLabel}
+          </span>
+        ) : null}
+      </span>
       {isParentService && (
         <FolderIcon size={16} className='ml-2 flex-shrink-0' />
       )}
@@ -217,6 +238,7 @@ const GridServiceOverlay: React.FC<{
   cellHeight: number;
   dragLabel: string;
   resizeLabel: string;
+  zoneNameById?: ReadonlyMap<string, string>;
 }> = ({
   service,
   onChange,
@@ -225,7 +247,8 @@ const GridServiceOverlay: React.FC<{
   cellWidth,
   cellHeight,
   dragLabel,
-  resizeLabel
+  resizeLabel,
+  zoneNameById
 }) => {
   const overlayOuterRef = useRef<HTMLDivElement>(null);
   const resizeGestureCleanupRef = useRef<(() => void) | null>(null);
@@ -300,6 +323,7 @@ const GridServiceOverlay: React.FC<{
 
   const conflict = hasConflict();
   const isParentService = service.isLeaf === false;
+  const zoneLabel = serviceZoneDisplayName(service, zoneNameById);
 
   const handleRemoveService = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -420,10 +444,15 @@ const GridServiceOverlay: React.FC<{
       <div className='relative flex h-full w-full items-center justify-center p-1 text-center text-xs break-words'>
         <div
           ref={drag as unknown as React.Ref<HTMLDivElement>}
-          className='flex h-full min-h-0 w-full flex-col items-center justify-center'
+          className='flex h-full min-h-0 w-full flex-col items-center justify-center gap-0.5'
           title={dragLabel}
         >
-          {service.name}
+          <span className='line-clamp-3'>{service.name}</span>
+          {zoneLabel ? (
+            <span className='line-clamp-2 text-[10px] leading-tight opacity-80'>
+              {zoneLabel}
+            </span>
+          ) : null}
         </div>
         {isParentService && (
           <div className='pointer-events-none absolute right-1 bottom-6 z-10'>
@@ -478,6 +507,7 @@ const MainGridWithOverlays: React.FC<{
   ) => void;
   dragPlacedLabel: string;
   resizeLabel: string;
+  zoneNameById?: ReadonlyMap<string, string>;
 }> = ({
   services: gridServices,
   cellWidth,
@@ -486,7 +516,8 @@ const MainGridWithOverlays: React.FC<{
   onGridSpanCommit,
   onCellDrop,
   dragPlacedLabel,
-  resizeLabel
+  resizeLabel,
+  zoneNameById
 }) => {
   const gridContainerRef = useRef<HTMLDivElement>(null);
 
@@ -547,6 +578,7 @@ const MainGridWithOverlays: React.FC<{
             cellHeight={cellHeight}
             dragLabel={dragPlacedLabel}
             resizeLabel={resizeLabel}
+            zoneNameById={zoneNameById}
           />
         ))}
       </div>
@@ -572,6 +604,7 @@ const ChildGridWithOverlays: React.FC<{
   ) => void;
   dragPlacedLabel: string;
   resizeLabel: string;
+  zoneNameById?: ReadonlyMap<string, string>;
 }> = ({
   services: gridServices,
   cellWidth,
@@ -580,7 +613,8 @@ const ChildGridWithOverlays: React.FC<{
   onGridSpanCommit,
   onCellDrop,
   dragPlacedLabel,
-  resizeLabel
+  resizeLabel,
+  zoneNameById
 }) => {
   const childGridRef = useRef<HTMLDivElement>(null);
 
@@ -641,6 +675,7 @@ const ChildGridWithOverlays: React.FC<{
             cellHeight={cellHeight}
             dragLabel={dragPlacedLabel}
             resizeLabel={resizeLabel}
+            zoneNameById={zoneNameById}
           />
         ))}
       </div>
@@ -842,6 +877,7 @@ const ServiceGridWithTabs: React.FC<{
   setActiveTab: (tab: string) => void;
   dragPlacedLabel: string;
   resizeLabel: string;
+  zoneNameById?: ReadonlyMap<string, string>;
 }> = ({
   services,
   onPropertyChange,
@@ -850,7 +886,8 @@ const ServiceGridWithTabs: React.FC<{
   activeTab,
   setActiveTab,
   dragPlacedLabel,
-  resizeLabel
+  resizeLabel,
+  zoneNameById
 }) => {
   const parentServices = services.filter((service) => service.isLeaf === false);
 
@@ -940,6 +977,7 @@ const ServiceGridWithTabs: React.FC<{
                 onCellDrop={onCellDrop}
                 dragPlacedLabel={dragPlacedLabel}
                 resizeLabel={resizeLabel}
+                zoneNameById={zoneNameById}
               />
             </ResponsiveGridWrapper>
           </CardContent>
@@ -984,6 +1022,7 @@ const ServiceGridWithTabs: React.FC<{
                     onCellDrop={onCellDrop}
                     dragPlacedLabel={dragPlacedLabel}
                     resizeLabel={resizeLabel}
+                    zoneNameById={zoneNameById}
                   />
                 </ResponsiveGridWrapper>
               </CardContent>
@@ -1008,6 +1047,7 @@ const SimpleGrid: React.FC<{
   dragPaletteLabel: string;
   dragPlacedLabel: string;
   resizeLabel: string;
+  zoneNameById?: ReadonlyMap<string, string>;
 }> = ({
   services,
   onAddService,
@@ -1016,7 +1056,8 @@ const SimpleGrid: React.FC<{
   onPositionChange,
   dragPaletteLabel,
   dragPlacedLabel,
-  resizeLabel
+  resizeLabel,
+  zoneNameById
 }) => {
   const [activeTab, setActiveTab] = useState<string>('main-grid');
 
@@ -1189,6 +1230,7 @@ const SimpleGrid: React.FC<{
                         service={service}
                         onAdd={handleAddService}
                         dragLabel={dragPaletteLabel}
+                        zoneNameById={zoneNameById}
                       />
                     ))}
                   </CardContent>
@@ -1204,29 +1246,49 @@ const SimpleGrid: React.FC<{
                   </CardHeader>
                   <CardContent>
                     <Accordion type='multiple' className='w-full'>
-                      {placedServicesForTab.map((service) => (
-                        <AccordionItem
-                          key={`editor-${service.id}`}
-                          value={`editor-${service.id}`}
-                        >
-                          <AccordionTrigger className='hover:bg-accent rounded p-2 text-sm'>
-                            <div className='flex items-center'>
-                              {service.isLeaf === false && (
-                                <FolderIcon size={16} className='mr-2' />
-                              )}
-                              {service.name}
-                            </div>
-                          </AccordionTrigger>
-                          <AccordionContent>
-                            <ServiceEditor
-                              service={service}
-                              onChange={onPropertyChange}
-                              onPositionChange={onPositionChange}
-                              allServices={placedServicesForTab}
-                            />
-                          </AccordionContent>
-                        </AccordionItem>
-                      ))}
+                      {placedServicesForTab.map((service) => {
+                        const zoneLine = serviceZoneDisplayName(
+                          service,
+                          zoneNameById
+                        );
+                        return (
+                          <AccordionItem
+                            key={`editor-${service.id}`}
+                            value={`editor-${service.id}`}
+                          >
+                            <AccordionTrigger className='hover:bg-accent rounded p-2 text-sm'>
+                              <div className='flex min-w-0 flex-1 flex-col items-start gap-0.5 text-left'>
+                                <div className='flex w-full min-w-0 items-center'>
+                                  {service.isLeaf === false && (
+                                    <FolderIcon
+                                      size={16}
+                                      className='mr-2 shrink-0'
+                                    />
+                                  )}
+                                  <span className='truncate font-medium'>
+                                    {service.name}
+                                  </span>
+                                </div>
+                                {zoneLine ? (
+                                  <span
+                                    className={`text-muted-foreground w-full truncate text-xs font-normal ${service.isLeaf === false ? 'pl-6' : ''}`}
+                                  >
+                                    {zoneLine}
+                                  </span>
+                                ) : null}
+                              </div>
+                            </AccordionTrigger>
+                            <AccordionContent>
+                              <ServiceEditor
+                                service={service}
+                                onChange={onPropertyChange}
+                                onPositionChange={onPositionChange}
+                                allServices={placedServicesForTab}
+                              />
+                            </AccordionContent>
+                          </AccordionItem>
+                        );
+                      })}
                     </Accordion>
                   </CardContent>
                 </Card>
@@ -1250,6 +1312,7 @@ const SimpleGrid: React.FC<{
               setActiveTab={setActiveTab}
               dragPlacedLabel={dragPlacedLabel}
               resizeLabel={resizeLabel}
+              zoneNameById={zoneNameById}
             />
           </div>
         </div>
@@ -1307,9 +1370,80 @@ const NoUnitSelected: React.FC<{ t: (key: string) => string }> = ({ t }) => {
 
 interface ServiceGridEditorProps {
   unitId?: string;
+  /** Load the services tree from this subdivision when `unitId` is a service zone. */
+  servicesTreeUnitId?: string;
+  /** Lock editor to one zone column (no subdivision-wide / other-zone tabs). */
+  lockedServiceZoneId?: string;
 }
 
-const ServiceGridEditor: React.FC<ServiceGridEditorProps> = ({ unitId }) => {
+type AdminTranslate = (key: string) => string;
+
+const ServiceGridWorkArea: React.FC<{
+  services: ServiceWithPosition[];
+  /** When set, palette/grid is limited to this service zone pool (zone settings or global picker). */
+  lockedZoneScope?: string;
+  /** Show subdivision-wide help text (not shown on a single-zone grid). */
+  showBranchGridHint?: boolean;
+  /** Resolve `restrictedServiceZoneId` → zone unit name for labels (subdivision + zone editors). */
+  zoneNameById?: ReadonlyMap<string, string>;
+  t: AdminTranslate;
+  onAddService: (service: ServiceWithPosition) => void;
+  onPropertyChange: (id: string, field: string, value: number | null) => void;
+  onGridSpanCommit: (
+    id: string,
+    gridColSpan: number,
+    gridRowSpan: number
+  ) => void;
+  onPositionChange: (id: string, row: number, col: number) => void;
+}> = ({
+  services,
+  lockedZoneScope,
+  showBranchGridHint,
+  zoneNameById,
+  t,
+  onAddService,
+  onPropertyChange,
+  onGridSpanCommit,
+  onPositionChange
+}) => {
+  const servicesForGridEditor = useMemo(() => {
+    if (lockedZoneScope) {
+      return services.filter(
+        (s) =>
+          s.isLeaf !== true || serviceMatchesGridZoneScope(s, lockedZoneScope)
+      );
+    }
+    return services;
+  }, [services, lockedZoneScope]);
+
+  return (
+    <>
+      {showBranchGridHint ? (
+        <p className='text-muted-foreground mb-4 text-sm'>
+          {t('grid_configuration.zone_scope_hint')}
+        </p>
+      ) : null}
+      <SimpleGrid
+        key={lockedZoneScope ? `zone-lock-${lockedZoneScope}` : 'zone-all'}
+        services={servicesForGridEditor}
+        onAddService={onAddService}
+        onPropertyChange={onPropertyChange}
+        onGridSpanCommit={onGridSpanCommit}
+        onPositionChange={onPositionChange}
+        dragPaletteLabel={t('grid_configuration.drag_from_palette_hint')}
+        dragPlacedLabel={t('grid_configuration.drag_placed_hint')}
+        resizeLabel={t('grid_configuration.resize_corner_hint')}
+        zoneNameById={zoneNameById}
+      />
+    </>
+  );
+};
+
+const ServiceGridEditor: React.FC<ServiceGridEditorProps> = ({
+  unitId,
+  servicesTreeUnitId,
+  lockedServiceZoneId
+}) => {
   const t = useTranslations('admin');
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(
     unitId || null
@@ -1322,7 +1456,54 @@ const ServiceGridEditor: React.FC<ServiceGridEditorProps> = ({ unitId }) => {
 
   const activeUnitId = unitId ?? selectedUnitId;
 
+  const { data: gridContextUnit } = useQuery({
+    queryKey: ['unit', activeUnitId],
+    queryFn: () => unitsApi.getById(activeUnitId!),
+    enabled: !!activeUnitId
+  });
+
+  const resolvedTreeFetchId = useMemo(() => {
+    if (servicesTreeUnitId) return servicesTreeUnitId;
+    if (!activeUnitId || !gridContextUnit) return null;
+    if (gridContextUnit.kind === 'service_zone' && gridContextUnit.parentId) {
+      return gridContextUnit.parentId;
+    }
+    return activeUnitId;
+  }, [servicesTreeUnitId, activeUnitId, gridContextUnit]);
+
+  const effectiveLockedZoneId =
+    lockedServiceZoneId ??
+    (gridContextUnit?.kind === 'service_zone' ? gridContextUnit.id : undefined);
+
+  const zoneLabelsParentId = useMemo(() => {
+    if (gridContextUnit?.kind === 'subdivision') return gridContextUnit.id;
+    if (gridContextUnit?.kind === 'service_zone' && gridContextUnit.parentId) {
+      return gridContextUnit.parentId;
+    }
+    return null;
+  }, [gridContextUnit]);
+
+  const { data: zoneLabelChildUnits = [] } = useQuery({
+    queryKey: ['units', zoneLabelsParentId, 'child-units'],
+    queryFn: () => unitsApi.getChildUnits(zoneLabelsParentId!),
+    enabled: !!zoneLabelsParentId
+  });
+
+  const zoneNameById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const u of zoneLabelChildUnits) {
+      if (u.kind === 'service_zone') {
+        m.set(u.id, u.name);
+      }
+    }
+    return m;
+  }, [zoneLabelChildUnits]);
+
   const servicesTreeFetchSeqRef = useRef(0);
+  const tRef = useRef(t);
+  useEffect(() => {
+    tRef.current = t;
+  }, [t]);
 
   useEffect(() => {
     if (!unitId) {
@@ -1341,9 +1522,12 @@ const ServiceGridEditor: React.FC<ServiceGridEditorProps> = ({ unitId }) => {
   useEffect(() => {
     let effectAlive = true;
     const controller = new AbortController();
-    const id = unitId || selectedUnitId;
+    const id = resolvedTreeFetchId;
     if (!id) {
-      startTransition(() => setIsLoading(false));
+      startTransition(() => {
+        setIsLoading(false);
+        setServices([]);
+      });
       return () => {
         effectAlive = false;
         controller.abort();
@@ -1383,7 +1567,7 @@ const ServiceGridEditor: React.FC<ServiceGridEditorProps> = ({ unitId }) => {
                   ? Number(service.gridColSpan)
                   : 1,
               children: service.children || [],
-              t: t
+              t: tRef.current
             });
             if (service.children && service.children.length > 0) {
               flattenTree(service.children, level + 1);
@@ -1397,10 +1581,7 @@ const ServiceGridEditor: React.FC<ServiceGridEditorProps> = ({ unitId }) => {
         if (!effectAlive || seq !== servicesTreeFetchSeqRef.current) {
           return;
         }
-        if (
-          (error instanceof DOMException && error.name === 'AbortError') ||
-          (error instanceof Error && error.name === 'AbortError')
-        ) {
+        if (isRequestAbortError(error)) {
           return;
         }
         logger.error('Error loading services:', error);
@@ -1416,7 +1597,7 @@ const ServiceGridEditor: React.FC<ServiceGridEditorProps> = ({ unitId }) => {
       effectAlive = false;
       controller.abort();
     };
-  }, [unitId, selectedUnitId, t]);
+  }, [resolvedTreeFetchId]);
 
   const handleUnitSelect = (id: string) => {
     setSelectedUnitId(id);
@@ -1608,17 +1789,20 @@ const ServiceGridEditor: React.FC<ServiceGridEditorProps> = ({ unitId }) => {
         <Card>
           <CardContent className='p-6'>
             {activeUnitId ? (
-              <SimpleGrid
-                services={services as unknown as ServiceWithPosition[]}
+              <ServiceGridWorkArea
+                key={`${resolvedTreeFetchId ?? 'pending'}-${effectiveLockedZoneId ?? 'open'}`}
+                services={services}
+                lockedZoneScope={effectiveLockedZoneId}
+                showBranchGridHint={
+                  gridContextUnit?.kind === 'subdivision' &&
+                  !effectiveLockedZoneId
+                }
+                zoneNameById={zoneNameById}
+                t={t}
                 onAddService={handleAddService}
                 onPropertyChange={handlePropertyChange}
                 onGridSpanCommit={handleGridSpanCommit}
                 onPositionChange={handlePositionChange}
-                dragPaletteLabel={t(
-                  'grid_configuration.drag_from_palette_hint'
-                )}
-                dragPlacedLabel={t('grid_configuration.drag_placed_hint')}
-                resizeLabel={t('grid_configuration.resize_corner_hint')}
               />
             ) : (
               <NoUnitSelected t={t} />

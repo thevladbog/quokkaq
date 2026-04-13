@@ -697,6 +697,141 @@ func RunVersionedMigrations(models ...interface{}) error {
 		return fmt.Errorf("failed to run ticket history journal indexes migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.1.9_unit_client_histories", func(db *gorm.DB) error {
+		// IDs match units.id / users.id / unit_clients (text), not uuid — FK 42804 otherwise.
+		// Never DROP here: environments that already ran an older revision of this migration
+		// with DROP+CASCADE have lost historical rows; changing this block only helps new DBs
+		// and idempotent re-runs on partially migrated schemas.
+		if err := db.Exec(`
+			CREATE TABLE IF NOT EXISTS unit_client_histories (
+				id text PRIMARY KEY DEFAULT (gen_random_uuid()::text),
+				unit_id text NOT NULL,
+				unit_client_id text NOT NULL,
+				actor_user_id text NULL,
+				action text NOT NULL,
+				payload jsonb NOT NULL DEFAULT '{}'::jsonb,
+				created_at timestamptz NOT NULL DEFAULT now()
+			);
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			DO $$
+			BEGIN
+				IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_unit_client_histories_unit') THEN
+					ALTER TABLE unit_client_histories
+						ADD CONSTRAINT fk_unit_client_histories_unit
+						FOREIGN KEY (unit_id) REFERENCES units(id) ON DELETE CASCADE;
+				END IF;
+			END $$;
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			DO $$
+			BEGIN
+				IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_unit_client_histories_actor') THEN
+					ALTER TABLE unit_client_histories
+						ADD CONSTRAINT fk_unit_client_histories_actor
+						FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL;
+				END IF;
+			END $$;
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			DO $$
+			BEGIN
+				IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_unit_client_histories_client') THEN
+					ALTER TABLE unit_client_histories
+						ADD CONSTRAINT fk_unit_client_histories_client
+						FOREIGN KEY (unit_client_id, unit_id) REFERENCES unit_clients(id, unit_id) ON DELETE CASCADE;
+				END IF;
+			END $$;
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			CREATE INDEX IF NOT EXISTS idx_unit_client_histories_client_created
+			ON unit_client_histories (unit_id, unit_client_id, created_at DESC, id DESC);
+		`).Error; err != nil {
+			return err
+		}
+		return db.AutoMigrate(&dbmodels.UnitClientHistory{})
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run unit client histories migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.1.10_service_zones_tickets_counters", func(db *gorm.DB) error {
+		if err := db.Exec(`
+			ALTER TABLE services
+			ADD COLUMN IF NOT EXISTS restricted_service_zone_id text REFERENCES units(id) ON DELETE SET NULL;
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			ALTER TABLE tickets
+			ADD COLUMN IF NOT EXISTS service_zone_id text REFERENCES units(id) ON DELETE SET NULL;
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			ALTER TABLE counters
+			ADD COLUMN IF NOT EXISTS service_zone_id text REFERENCES units(id) ON DELETE SET NULL;
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			CREATE INDEX IF NOT EXISTS idx_tickets_unit_waiting_zone
+			ON tickets (unit_id, status, service_zone_id)
+			WHERE status = 'waiting' AND is_eod = false;
+		`).Error; err != nil {
+			return err
+		}
+		// Explicit FKs: columns may exist from AutoMigrate with FK disabled; inline REFERENCES on ADD COLUMN is then a no-op.
+		if err := db.Exec(`
+			DO $$
+			BEGIN
+				IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_services_restricted_service_zone') THEN
+					ALTER TABLE services
+						ADD CONSTRAINT fk_services_restricted_service_zone
+						FOREIGN KEY (restricted_service_zone_id) REFERENCES units(id) ON DELETE SET NULL;
+				END IF;
+			END $$;
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			DO $$
+			BEGIN
+				IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_tickets_service_zone') THEN
+					ALTER TABLE tickets
+						ADD CONSTRAINT fk_tickets_service_zone
+						FOREIGN KEY (service_zone_id) REFERENCES units(id) ON DELETE SET NULL;
+				END IF;
+			END $$;
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			DO $$
+			BEGIN
+				IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_counters_service_zone') THEN
+					ALTER TABLE counters
+						ADD CONSTRAINT fk_counters_service_zone
+						FOREIGN KEY (service_zone_id) REFERENCES units(id) ON DELETE SET NULL;
+				END IF;
+			END $$;
+		`).Error; err != nil {
+			return err
+		}
+		return db.AutoMigrate(&dbmodels.Service{}, &dbmodels.Ticket{}, &dbmodels.Counter{})
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run service zones migration: %w", err)
+	}
+
 	fmt.Println("All migrations completed successfully")
 	return nil
 }

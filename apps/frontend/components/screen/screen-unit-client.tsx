@@ -48,31 +48,42 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
     return () => clearInterval(timer);
   }, []);
 
-  // WebSocket Connection
-  useEffect(() => {
-    if (!unitId) return;
+  const unitKind = unit?.kind;
+  const unitParentId = unit?.parentId;
 
-    // Initial fetch
+  // WebSocket + tickets: WS room is always the subdivision (ticket.UnitID); screen URL may be a service_zone.
+  useEffect(() => {
+    if (!unitId || unitKind == null) return;
+
+    let cancelled = false;
+    const wsRoomId =
+      unitKind === 'service_zone' && unitParentId ? unitParentId : unitId;
+
     const fetchTickets = async () => {
       try {
-        const data = await ticketsApi.getByUnitId(unitId);
-        setTickets(data);
-        setIsLoading(false);
+        const data = await ticketsApi.getByUnitId(wsRoomId);
+        if (!cancelled) {
+          setTickets(data);
+          setIsLoading(false);
+        }
       } catch (error) {
         logger.error('Failed to fetch tickets:', error);
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       }
     };
-    fetchTickets();
+    void fetchTickets();
 
-    socketClient.connect(unitId);
+    socketClient.connect(wsRoomId);
 
     const handleTicketUpdate = () => {
-      fetchTickets();
+      void fetchTickets();
     };
 
     const handleEOD = () => {
       logger.log('EOD event received, refreshing tickets');
-      fetchTickets();
+      void fetchTickets();
     };
 
     socketClient.onTicketCreated(handleTicketUpdate);
@@ -81,13 +92,14 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
     socketClient.onUnitEOD(handleEOD);
 
     return () => {
+      cancelled = true;
       socketClient.off('ticket.created', handleTicketUpdate);
       socketClient.off('ticket.updated', handleTicketUpdate);
       socketClient.off('ticket.called', handleTicketUpdate);
       socketClient.off('unit.eod', handleEOD);
       socketClient.disconnect();
     };
-  }, [unitId]);
+  }, [unitId, unitKind, unitParentId]);
 
   // Fetch materials
   useEffect(() => {

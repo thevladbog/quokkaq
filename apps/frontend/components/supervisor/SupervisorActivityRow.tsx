@@ -8,6 +8,7 @@ import {
   type ActivityTranslate
 } from '@/components/supervisor/supervisor-activity-presenter';
 import { cn } from '@/lib/utils';
+import { useLocale } from 'next-intl';
 
 type Props = {
   item: ShiftActivityItem;
@@ -26,11 +27,12 @@ export function SupervisorActivityRow({
   timeFormat = 'PPpp',
   className
 }: Props) {
+  const locale = useLocale();
   const {
     icon: Icon,
     line,
     iconClassName
-  } = getSupervisorActivityPresentation(item, t);
+  } = getSupervisorActivityPresentation(item, t, locale);
   const createdRaw =
     typeof item.createdAt === 'string' ? item.createdAt.trim() : '';
   let when: string;

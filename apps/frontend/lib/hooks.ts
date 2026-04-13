@@ -107,11 +107,16 @@ export const useUnitServices = (unitId: string) => {
   });
 };
 
-export const useUnitServicesTree = (unitId: string) => {
+export const useUnitServicesTree = (
+  unitId: string,
+  options?: { enabled?: boolean }
+) => {
+  const enabled =
+    options?.enabled !== undefined ? options.enabled : Boolean(unitId);
   return useQuery({
     queryKey: ['units', unitId, 'services-tree'],
     queryFn: () => unitsApi.getServicesTree(unitId),
-    enabled: !!unitId
+    enabled: enabled && !!unitId
   });
 };
 
@@ -452,10 +457,16 @@ export const useTransferTicket = () => {
       id: string;
       toCounterId?: string;
       toUserId?: string;
+      toServiceZoneId?: string;
+      toServiceId?: string;
+      operatorComment?: string | null;
     }) =>
       ticketsApi.transfer(transferData.id, {
         toCounterId: transferData.toCounterId,
-        toUserId: transferData.toUserId
+        toUserId: transferData.toUserId,
+        toServiceZoneId: transferData.toServiceZoneId,
+        toServiceId: transferData.toServiceId,
+        operatorComment: transferData.operatorComment
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tickets'] });
@@ -589,8 +600,24 @@ export const useCreateService = () => {
 
   return useMutation({
     mutationFn: (serviceData: Omit<Service, 'id'>) => {
-      const filteredData = filterEmptyValues(serviceData);
-      return servicesApi.create(filteredData as Omit<Service, 'id'>);
+      const filteredData = filterEmptyValues(
+        serviceData as Record<string, unknown>
+      ) as Omit<Service, 'id'>;
+      if (
+        Object.prototype.hasOwnProperty.call(
+          serviceData,
+          'restrictedServiceZoneId'
+        )
+      ) {
+        const z = serviceData.restrictedServiceZoneId;
+        filteredData.restrictedServiceZoneId =
+          z === undefined ||
+          z === null ||
+          (typeof z === 'string' && z.trim() === '')
+            ? null
+            : z;
+      }
+      return servicesApi.create(filteredData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
@@ -622,7 +649,23 @@ export const useUpdateService = () => {
         });
       }
 
-      const filteredData = filterEmptyValues(serviceData);
+      const filteredData = filterEmptyValues(
+        serviceData as Record<string, unknown>
+      ) as Partial<Omit<Service, 'id'>>;
+      if (
+        Object.prototype.hasOwnProperty.call(
+          serviceData,
+          'restrictedServiceZoneId'
+        )
+      ) {
+        const z = serviceData.restrictedServiceZoneId;
+        filteredData.restrictedServiceZoneId =
+          z === undefined ||
+          z === null ||
+          (typeof z === 'string' && z.trim() === '')
+            ? null
+            : z;
+      }
       return servicesApi.update(id, filteredData);
     },
     onSuccess: () => {

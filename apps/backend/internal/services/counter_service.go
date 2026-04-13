@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"strings"
 	"time"
 
 	"quokkaq-go-backend/internal/models"
@@ -28,11 +29,17 @@ var ErrCounterAlreadyOnBreak = errors.New("counter is already on break")
 // ErrCounterNotOnBreak is returned when break/end is requested but the counter is not on break.
 var ErrCounterNotOnBreak = errors.New("counter is not on break")
 
+// ErrCounterOccupancyOrBreakViaUpdate is returned when PUT tries to change assignedTo or onBreak; use occupy, release, break/start, and break/end instead.
+var ErrCounterOccupancyOrBreakViaUpdate = errors.New("assignedTo and onBreak cannot be updated via this endpoint; use occupy, release, break/start, and break/end")
+
+// ErrCounterInvalidServiceZoneIDType is returned when service_zone_id in updates is not a string or null.
+var ErrCounterInvalidServiceZoneIDType = errors.New("invalid service_zone_id type")
+
 type CounterService interface {
 	CreateCounter(counter *models.Counter) error
 	GetCountersByUnit(unitID string) ([]models.Counter, error)
 	GetCounterByID(id string) (*models.Counter, error)
-	UpdateCounter(counter *models.Counter) error
+	UpdateCounter(id string, updates map[string]interface{}) error
 	DeleteCounter(id string) error
 	Occupy(counterID, userID string) (*models.Counter, error)
 	Release(counterID string) (*models.Counter, error)
@@ -47,6 +54,7 @@ type counterService struct {
 	ticketRepo   repository.TicketRepository
 	serviceRepo  repository.ServiceRepository
 	userRepo     repository.UserRepository
+	unitRepo     repository.UnitRepository
 	intervalRepo repository.OperatorIntervalRepository
 	hub          *ws.Hub
 }
@@ -57,6 +65,7 @@ func NewCounterService(
 	serviceRepo repository.ServiceRepository,
 	userRepo repository.UserRepository,
 	intervalRepo repository.OperatorIntervalRepository,
+	unitRepo repository.UnitRepository,
 	hub *ws.Hub,
 ) CounterService {
 	return &counterService{
@@ -64,6 +73,7 @@ func NewCounterService(
 		ticketRepo:   ticketRepo,
 		serviceRepo:  serviceRepo,
 		userRepo:     userRepo,
+		unitRepo:     unitRepo,
 		intervalRepo: intervalRepo,
 		hub:          hub,
 	}
@@ -95,6 +105,9 @@ func (s *counterService) hydrateBreakStartedAt(c *models.Counter) {
 func (s *counterService) CreateCounter(counter *models.Counter) error {
 	if counter.UnitID == "" {
 		return errors.New("unit ID is required")
+	}
+	if err := ValidateOptionalChildServiceZone(s.unitRepo, counter.UnitID, &counter.ServiceZoneID); err != nil {
+		return err
 	}
 	return s.repo.Create(counter)
 }
@@ -140,8 +153,37 @@ func (s *counterService) GetCounterByID(id string) (*models.Counter, error) {
 	return counter, nil
 }
 
-func (s *counterService) UpdateCounter(counter *models.Counter) error {
-	return s.repo.Update(counter)
+func (s *counterService) UpdateCounter(id string, updates map[string]interface{}) error {
+	if _, ok := updates["assigned_to"]; ok {
+		return ErrCounterOccupancyOrBreakViaUpdate
+	}
+	if _, ok := updates["on_break"]; ok {
+		return ErrCounterOccupancyOrBreakViaUpdate
+	}
+	existing, err := s.repo.FindByID(id)
+	if err != nil {
+		return err
+	}
+	if _, has := updates["service_zone_id"]; has {
+		var zonePtr *string
+		if v, ok := updates["service_zone_id"]; !ok || v == nil {
+			zonePtr = nil
+		} else if str, ok := v.(string); ok {
+			t := strings.TrimSpace(str)
+			if t == "" {
+				zonePtr = nil
+			} else {
+				zonePtr = &t
+			}
+		} else {
+			return ErrCounterInvalidServiceZoneIDType
+		}
+		if err := ValidateOptionalChildServiceZone(s.unitRepo, existing.UnitID, &zonePtr); err != nil {
+			return err
+		}
+		updates["service_zone_id"] = zonePtr
+	}
+	return s.repo.UpdatePartial(id, updates)
 }
 
 func (s *counterService) DeleteCounter(id string) error {
@@ -380,7 +422,7 @@ func (s *counterService) CallNext(counterID string, serviceIDs []string, actorUs
 		}
 	}
 
-	ticket, err := s.ticketRepo.FindWaiting(counter.UnitID, serviceIDs)
+	ticket, err := s.ticketRepo.FindWaiting(counter.UnitID, serviceIDs, counter.ServiceZoneID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrNoWaitingTickets

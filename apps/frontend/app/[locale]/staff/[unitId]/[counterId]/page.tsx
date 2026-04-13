@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, use } from 'react';
+import { useState, useEffect, useMemo, useRef, use } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -15,9 +15,9 @@ import {
   useNoShowTicket,
   useCallNextTicket,
   useTransferTicket,
-  useCounters,
   usePickTicket,
   useConfirmArrivalTicket,
+  useReturnToQueueTicket,
   useUnitServices
 } from '@/lib/hooks';
 import { countersApi, unitsApi, Ticket, type Service } from '@/lib/api';
@@ -26,6 +26,7 @@ import { countersApi, unitsApi, Ticket, type Service } from '@/lib/api';
 const EMPTY_TICKET_LIST: Ticket[] = [];
 const EMPTY_SERVICE_LIST: Service[] = [];
 import { socketClient } from '@/lib/socket';
+import { logger } from '@/lib/logger';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/src/i18n/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -39,6 +40,14 @@ import {
   DialogTitle
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select';
 import { PreRegistrationDetailsModal } from '@/components/staff/PreRegistrationDetailsModal';
 import { StaffCurrentTicketHero } from '@/components/staff/StaffCurrentTicketHero';
 import { StaffIdleWorkstationHero } from '@/components/staff/StaffIdleWorkstationHero';
@@ -49,6 +58,17 @@ import { useSyncActiveUnit } from '@/contexts/ActiveUnitContext';
 import { cn } from '@/lib/utils';
 import { formatWaitDurationSeconds } from '@/components/supervisor/supervisor-queue-utils';
 import { useLiveElapsedSecondsSince } from '@/lib/use-live-elapsed-since';
+
+function normPool(z?: string | null): string | null {
+  const x = z?.trim();
+  return x || null;
+}
+
+function serviceAllowedInZone(s: Service, zoneId: string): boolean {
+  const r = s.restrictedServiceZoneId?.trim();
+  if (!r) return true;
+  return r === zoneId;
+}
 
 interface StaffWorkspacePageProps {
   params: Promise<{
@@ -113,6 +133,7 @@ export default function StaffWorkspacePage({
   const transferMutation = useTransferTicket();
   const pickMutation = usePickTicket();
   const confirmArrivalMutation = useConfirmArrivalTicket();
+  const returnToQueueMutation = useReturnToQueueTicket();
 
   const createTicketMutation = useMutation({
     mutationFn: (vars: { serviceId: string; clientId?: string }) =>
@@ -136,7 +157,7 @@ export default function StaffWorkspacePage({
       router.push('/staff');
     },
     onError: (error: Error) => {
-      console.error('Failed to release counter:', error);
+      logger.error('Failed to release counter', { error });
       toast.error(t('logout_failed', { error: error.message }));
     }
   });
@@ -184,7 +205,8 @@ export default function StaffWorkspacePage({
     (ticket) => ticket.status === 'waiting'
   );
 
-  const { data: servicesData } = useUnitServices(unitId);
+  const { data: servicesData, isPending: servicesPending } =
+    useUnitServices(unitId);
   const services = servicesData ?? EMPTY_SERVICE_LIST;
 
   const leafServiceIds = useMemo(
@@ -200,6 +222,7 @@ export default function StaffWorkspacePage({
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (!leafServiceIds.length) {
+      if (servicesPending) return;
       setSelectedServiceIds([]);
       return;
     }
@@ -220,47 +243,74 @@ export default function StaffWorkspacePage({
       /* ignore corrupt storage */
     }
     setSelectedServiceIds(next);
-  }, [unitId, counterId, scopeStorageKey, leafServiceIds]);
+  }, [unitId, counterId, scopeStorageKey, leafServiceIds, servicesPending]);
 
   useEffect(() => {
     if (selectedServiceIds === null || typeof window === 'undefined') return;
+    if (servicesPending && leafServiceIds.length === 0) return;
     localStorage.setItem(scopeStorageKey, JSON.stringify(selectedServiceIds));
-  }, [scopeStorageKey, selectedServiceIds]);
+  }, [
+    scopeStorageKey,
+    selectedServiceIds,
+    servicesPending,
+    leafServiceIds.length
+  ]);
 
   const scopeForFilter =
     selectedServiceIds === null ? leafServiceIds : selectedServiceIds;
-
-  const scopedWaitingTickets = useMemo(() => {
-    if (!leafServiceIds.length) return waitingTickets;
-    if (!scopeForFilter.length) return [];
-    return waitingTickets.filter((t) => scopeForFilter.includes(t.serviceId));
-  }, [waitingTickets, scopeForFilter, leafServiceIds]);
 
   /** List-only: show whole unit queue vs only tickets for services selected in «Услуги». Call next always uses scope. */
   const queueViewAllKey = `staff-queue-show-all:${unitId}:${counterId}`;
   const [showAllQueueTickets, setShowAllQueueTickets] = useState(false);
 
+  const onlyMyZoneKey = `staff-queue-only-my-zone:${unitId}:${counterId}`;
+  const [onlyMyZone, setOnlyMyZone] = useState(false);
+
+  /** Avoid persisting default `false` before values are read from localStorage (same commit as load). */
+  const skipQueuePrefsPersistRef = useRef(true);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    skipQueuePrefsPersistRef.current = true;
     try {
       setShowAllQueueTickets(localStorage.getItem(queueViewAllKey) === '1');
+      setOnlyMyZone(localStorage.getItem(onlyMyZoneKey) === '1');
     } catch {
       /* ignore */
     }
-  }, [unitId, counterId, queueViewAllKey]);
+  }, [queueViewAllKey, onlyMyZoneKey]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (skipQueuePrefsPersistRef.current) {
+      skipQueuePrefsPersistRef.current = false;
+      return;
+    }
     try {
       localStorage.setItem(queueViewAllKey, showAllQueueTickets ? '1' : '0');
+      localStorage.setItem(onlyMyZoneKey, onlyMyZone ? '1' : '0');
     } catch {
       /* ignore */
     }
-  }, [queueViewAllKey, showAllQueueTickets]);
+  }, [queueViewAllKey, onlyMyZoneKey, showAllQueueTickets, onlyMyZone]);
+
+  const poolFilteredWaiting = useMemo(() => {
+    if (!onlyMyZone) return waitingTickets;
+    const cz = normPool(myCounter?.serviceZoneId);
+    return waitingTickets.filter((tk) => normPool(tk.serviceZoneId) === cz);
+  }, [waitingTickets, onlyMyZone, myCounter?.serviceZoneId]);
+
+  const scopedWaitingTickets = useMemo(() => {
+    if (!leafServiceIds.length) return poolFilteredWaiting;
+    if (!scopeForFilter.length) return [];
+    return poolFilteredWaiting.filter((t) =>
+      scopeForFilter.includes(t.serviceId)
+    );
+  }, [poolFilteredWaiting, scopeForFilter, leafServiceIds]);
 
   const queueDisplayTickets = useMemo(
-    () => (showAllQueueTickets ? waitingTickets : scopedWaitingTickets),
-    [showAllQueueTickets, waitingTickets, scopedWaitingTickets]
+    () => (showAllQueueTickets ? poolFilteredWaiting : scopedWaitingTickets),
+    [showAllQueueTickets, poolFilteredWaiting, scopedWaitingTickets]
   );
 
   // WebSocket Connection
@@ -371,7 +421,7 @@ export default function StaffWorkspacePage({
       }
       await refetch();
     } catch (error) {
-      console.error('Failed to call next:', error);
+      logger.error('Failed to call next', { error });
       toast.error(t('messages.failed', { action: 'call' }));
     }
   };
@@ -385,7 +435,7 @@ export default function StaffWorkspacePage({
       );
       await refetch();
     } catch (error) {
-      console.error('Failed to start service:', error);
+      logger.error('Failed to start service', { error });
       toast.error(t('messages.failed', { action: 'start service' }));
     }
   };
@@ -399,7 +449,7 @@ export default function StaffWorkspacePage({
       );
       await refetch();
     } catch (error) {
-      console.error('Failed to complete ticket:', error);
+      logger.error('Failed to complete ticket', { error });
       toast.error(t('messages.failed', { action: 'complete' }));
     }
   };
@@ -413,34 +463,144 @@ export default function StaffWorkspacePage({
       );
       await refetch();
     } catch (error) {
-      console.error('Failed to mark no-show:', error);
+      logger.error('Failed to mark no-show', { error });
       toast.error(t('messages.failed', { action: 'mark no-show' }));
+    }
+  };
+
+  const handleReturnToQueue = async () => {
+    if (!currentTicket) return;
+    try {
+      await returnToQueueMutation.mutateAsync(currentTicket.id);
+      toast.success(
+        t('messages.returnedToQueue', { number: currentTicket.queueNumber })
+      );
+      await refetch();
+    } catch (error) {
+      logger.error('Failed to return ticket to queue', {
+        error,
+        ticketId: currentTicket.id,
+        counterId,
+        unitId
+      });
+      toast.error(t('messages.failed', { action: 'return to queue' }));
     }
   };
 
   // Transfer Dialog State
   const [isTransferOpen, setIsTransferOpen] = useState(false);
+  const [transferMode, setTransferMode] = useState<'counter' | 'zone'>(
+    'counter'
+  );
   const [transferTargetId, setTransferTargetId] = useState('');
-  const { data: countersForTransfer = [] } = useCounters(unitId || '');
+  const [transferZoneId, setTransferZoneId] = useState('');
+  const [transferServiceId, setTransferServiceId] = useState('');
+  const [transferCommentDraft, setTransferCommentDraft] = useState('');
+
+  const countersForTransfer = counters ?? [];
+
+  const { data: childUnits = [] } = useQuery({
+    queryKey: ['units', unitId, 'child-units'],
+    queryFn: () => unitsApi.getChildUnits(unitId),
+    enabled: !!unitId && isTransferOpen
+  });
+
+  const serviceZones = useMemo(
+    () => childUnits.filter((u) => u.kind === 'service_zone'),
+    [childUnits]
+  );
+
+  const ticketServiceRow = useMemo(
+    () => services.find((s) => s.id === currentTicket?.serviceId),
+    [services, currentTicket?.serviceId]
+  );
+
+  const zoneTransferNeedsService =
+    transferMode === 'zone' &&
+    !!transferZoneId &&
+    !!ticketServiceRow &&
+    !serviceAllowedInZone(ticketServiceRow, transferZoneId);
+
+  const zoneTransferServices = useMemo(() => {
+    if (!transferZoneId) return [];
+    return services.filter(
+      (s) => s.isLeaf && serviceAllowedInZone(s, transferZoneId)
+    );
+  }, [services, transferZoneId]);
+
+  useEffect(() => {
+    if (!isTransferOpen) return;
+    setTransferServiceId('');
+  }, [transferZoneId, transferMode, isTransferOpen]);
+
+  const openTransferDialog = () => {
+    if (currentTicket) {
+      setTransferCommentDraft(currentTicket.operatorComment ?? '');
+      setTransferMode('counter');
+      setTransferTargetId('');
+      setTransferZoneId('');
+      setTransferServiceId('');
+    }
+    setIsTransferOpen(true);
+  };
 
   const handleTransfer = async () => {
-    if (!currentTicket || !transferTargetId) return;
+    if (!currentTicket) return;
+    const origComment = (currentTicket.operatorComment ?? '').trim();
+    const draft = transferCommentDraft.trim();
+    const commentPatch =
+      draft === origComment ? undefined : draft.length > 0 ? draft : null;
     try {
-      await transferMutation.mutateAsync({
-        id: currentTicket.id,
-        toCounterId: transferTargetId
-      });
+      if (transferMode === 'counter') {
+        if (!transferTargetId) return;
+        await transferMutation.mutateAsync({
+          id: currentTicket.id,
+          toCounterId: transferTargetId,
+          ...(commentPatch !== undefined
+            ? { operatorComment: commentPatch }
+            : {})
+        });
+      } else {
+        if (!transferZoneId) return;
+        if (zoneTransferNeedsService && !transferServiceId.trim()) {
+          toast.error(t('transfer_service_required'));
+          return;
+        }
+        let toServiceId: string | undefined;
+        if (zoneTransferNeedsService) {
+          toServiceId = transferServiceId.trim();
+        } else if (transferServiceId.trim()) {
+          toServiceId = transferServiceId.trim();
+        }
+        await transferMutation.mutateAsync({
+          id: currentTicket.id,
+          toServiceZoneId: transferZoneId,
+          toServiceId,
+          ...(commentPatch !== undefined
+            ? { operatorComment: commentPatch }
+            : {})
+        });
+      }
       toast.success(
         t('messages.transferred', { number: currentTicket.queueNumber })
       );
       setIsTransferOpen(false);
       setTransferTargetId('');
+      setTransferZoneId('');
+      setTransferServiceId('');
       await refetch();
     } catch (error) {
-      console.error('Failed to transfer ticket:', error);
+      logger.error('Failed to transfer ticket', { error });
       toast.error(t('messages.failed', { action: 'transfer' }));
     }
   };
+
+  const transferSubmitDisabled =
+    transferMutation.isPending ||
+    (transferMode === 'counter' && !transferTargetId) ||
+    (transferMode === 'zone' &&
+      (!transferZoneId ||
+        (zoneTransferNeedsService && !transferServiceId.trim())));
 
   if (error) {
     return (
@@ -510,44 +670,195 @@ export default function StaffWorkspacePage({
 
         {/* Transfer Dialog */}
         <Dialog open={isTransferOpen} onOpenChange={setIsTransferOpen}>
-          <DialogContent>
+          <DialogContent className='max-h-[min(90vh,40rem)] overflow-y-auto sm:max-w-lg'>
             <DialogHeader>
               <DialogTitle>{t('actions.transfer')}</DialogTitle>
             </DialogHeader>
-            <div className='py-4'>
-              <Label className='mb-2 block'>{t('select_counter_label')}</Label>
-              <div className='grid gap-2'>
-                {countersForTransfer
-                  .filter((c) => c.id !== counterId)
-                  .map((counter) => (
-                    <Button
-                      key={counter.id}
-                      variant={
-                        transferTargetId === counter.id ? 'default' : 'outline'
-                      }
-                      className='justify-start'
-                      onClick={() => setTransferTargetId(counter.id)}
+            <div className='space-y-4 py-2'>
+              <div className='space-y-2'>
+                <Label>{t('transfer_mode_label')}</Label>
+                <Select
+                  value={transferMode}
+                  onValueChange={(v) => {
+                    setTransferMode(v as 'counter' | 'zone');
+                    setTransferTargetId('');
+                    setTransferZoneId('');
+                    setTransferServiceId('');
+                  }}
+                >
+                  <SelectTrigger className='w-full'>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value='counter'>
+                      {t('transfer_mode_counter')}
+                    </SelectItem>
+                    <SelectItem value='zone'>
+                      {t('transfer_mode_zone')}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {transferMode === 'counter' ? (
+                <div>
+                  <Label className='mb-2 block'>
+                    {t('select_counter_label')}
+                  </Label>
+                  <div className='grid max-h-48 gap-2 overflow-y-auto'>
+                    {countersForTransfer
+                      .filter((c) => c.id !== counterId)
+                      .map((counter) => (
+                        <Button
+                          key={counter.id}
+                          type='button'
+                          variant={
+                            transferTargetId === counter.id
+                              ? 'default'
+                              : 'outline'
+                          }
+                          className='justify-start'
+                          onClick={() => setTransferTargetId(counter.id)}
+                        >
+                          {counter.name}
+                        </Button>
+                      ))}
+                    {countersForTransfer.filter((c) => c.id !== counterId)
+                      .length === 0 && (
+                      <p className='text-muted-foreground text-sm'>
+                        {t('no_other_counters')}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className='space-y-3'>
+                  <div className='space-y-2'>
+                    <Label>{t('transfer_zone_label')}</Label>
+                    <Select
+                      value={transferZoneId || undefined}
+                      onValueChange={setTransferZoneId}
                     >
-                      {counter.name}
-                    </Button>
-                  ))}
-                {countersForTransfer.length <= 1 && (
-                  <p className='text-muted-foreground text-sm'>
-                    {t('no_other_counters')}
-                  </p>
-                )}
+                      <SelectTrigger className='w-full'>
+                        <SelectValue
+                          placeholder={t('transfer_zone_placeholder')}
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {serviceZones.map((z) => (
+                          <SelectItem key={z.id} value={z.id}>
+                            {z.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {serviceZones.length === 0 && (
+                      <p className='text-muted-foreground text-xs'>
+                        {t('transfer_no_zones')}
+                      </p>
+                    )}
+                  </div>
+                  {transferZoneId ? (
+                    <div className='space-y-2'>
+                      <Label>
+                        {zoneTransferNeedsService
+                          ? t('transfer_service_required_label')
+                          : t('transfer_service_optional_label')}
+                      </Label>
+                      {zoneTransferNeedsService ? (
+                        <Select
+                          value={transferServiceId || undefined}
+                          onValueChange={setTransferServiceId}
+                        >
+                          <SelectTrigger className='w-full'>
+                            <SelectValue
+                              placeholder={t('transfer_service_placeholder')}
+                            />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {zoneTransferServices.map((s) => {
+                              const label =
+                                locale === 'ru'
+                                  ? s.nameRu || s.nameEn || s.name
+                                  : s.nameEn || s.nameRu || s.name;
+                              return (
+                                <SelectItem key={s.id} value={s.id}>
+                                  {label}
+                                </SelectItem>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Select
+                          value={transferServiceId || '__keep__'}
+                          onValueChange={(v) =>
+                            setTransferServiceId(v === '__keep__' ? '' : v)
+                          }
+                        >
+                          <SelectTrigger className='w-full'>
+                            <SelectValue
+                              placeholder={t('transfer_service_placeholder')}
+                            />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value='__keep__'>
+                              {t('transfer_service_keep_current')}
+                            </SelectItem>
+                            {zoneTransferServices.map((s) => {
+                              const label =
+                                locale === 'ru'
+                                  ? s.nameRu || s.nameEn || s.name
+                                  : s.nameEn || s.nameRu || s.name;
+                              return (
+                                <SelectItem key={s.id} value={s.id}>
+                                  {label}
+                                </SelectItem>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
+                      )}
+                      {zoneTransferNeedsService &&
+                        zoneTransferServices.length === 0 && (
+                          <p className='text-destructive text-xs'>
+                            {t('transfer_no_services_in_zone')}
+                          </p>
+                        )}
+                    </div>
+                  ) : null}
+                </div>
+              )}
+
+              <div className='space-y-2'>
+                <Label htmlFor='transfer-operator-comment'>
+                  {t('visitor_context.comment_label')}
+                </Label>
+                <Textarea
+                  id='transfer-operator-comment'
+                  rows={3}
+                  className='resize-y'
+                  placeholder={t('visitor_context.comment_placeholder')}
+                  value={transferCommentDraft}
+                  onChange={(e) => setTransferCommentDraft(e.target.value)}
+                />
+                <p className='text-muted-foreground text-[11px] leading-snug'>
+                  {t('transfer_comment_hint')}
+                </p>
               </div>
             </div>
             <DialogFooter>
               <Button
                 variant='outline'
+                type='button'
                 onClick={() => setIsTransferOpen(false)}
               >
                 {t('cancel')}
               </Button>
               <Button
+                type='button'
                 onClick={handleTransfer}
-                disabled={!transferTargetId || transferMutation.isPending}
+                disabled={transferSubmitDisabled}
               >
                 {t('transfer_button')}
               </Button>
@@ -627,11 +938,13 @@ export default function StaffWorkspacePage({
                     completePending={completeMutation.isPending}
                     transferPending={transferMutation.isPending}
                     noShowPending={noShowMutation.isPending}
+                    returnToQueuePending={returnToQueueMutation.isPending}
                     onCallNext={handleCallNext}
                     onConfirmArrival={handleConfirmArrival}
                     onComplete={handleComplete}
-                    onOpenTransfer={() => setIsTransferOpen(true)}
+                    onOpenTransfer={openTransferDialog}
                     onNoShow={handleNoShow}
+                    onReturnToQueue={handleReturnToQueue}
                   />
                 )}
                 {currentTicket && !workstationOnBreak && (
@@ -655,6 +968,8 @@ export default function StaffWorkspacePage({
             waitingTickets={queueDisplayTickets}
             showAllTicketsInQueue={showAllQueueTickets}
             onShowAllTicketsInQueueChange={setShowAllQueueTickets}
+            onlyMyZone={onlyMyZone}
+            onOnlyMyZoneChange={setOnlyMyZone}
             serviceNames={serviceNames}
             leafServicesForCreate={leafServicesForScope}
             createTicketPending={createTicketMutation.isPending}

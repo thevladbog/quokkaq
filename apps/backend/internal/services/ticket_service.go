@@ -20,8 +20,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// errCounterNotFoundForUser is returned from Transfer when resolving a counter by user ID fails.
-var errCounterNotFoundForUser = errors.New("counter not found for user")
+// ErrCounterNotFoundForUser is returned from Transfer when resolving a counter by user ID fails.
+var ErrCounterNotFoundForUser = errors.New("counter not found for user")
 
 // ErrNoWaitingTickets is returned when call-next finds no waiting tickets in scope.
 var ErrNoWaitingTickets = errors.New("no waiting tickets")
@@ -142,12 +142,47 @@ var ErrTagDefinitionIDsContainEmpty = errors.New("tagDefinitionIds must not cont
 // ErrClientVisitsInvalidCursor is returned when the visits list cursor cannot be parsed.
 var ErrClientVisitsInvalidCursor = errors.New("invalid visits cursor")
 
+// ErrTransferConflictingTargets is returned when both counter/user and zone targets are set.
+var ErrTransferConflictingTargets = errors.New("cannot combine counter transfer with zone transfer")
+
+// ErrTransferConflictingCounterAndUser is returned when both toCounterId and toUserId are set.
+var ErrTransferConflictingCounterAndUser = errors.New("cannot specify both toCounterId and toUserId")
+
+// ErrTransferTargetRequired is returned when no transfer target (counter, user, or zone) is provided.
+var ErrTransferTargetRequired = errors.New("target counter, user, or service zone required")
+
+// ErrTransferServiceRequiredForZone is returned when the current service is not allowed in the target zone and toServiceId is missing.
+var ErrTransferServiceRequiredForZone = errors.New("toServiceId is required: current service is not available in the target zone")
+
+// ErrTransferTargetMustBeLeafService is returned from counter transfer when toServiceId is not a leaf.
+var ErrTransferTargetMustBeLeafService = errors.New("target service must be a leaf service")
+
+// ErrTransferTargetServiceNotInZone is returned from zone transfer when the resolved service is not allowed in the target zone.
+var ErrTransferTargetServiceNotInZone = errors.New("target service is not available in the selected zone")
+
+// ErrTransferServiceNotAllowedOnTargetCounter is returned when toServiceId is not allowed on the target counter's waiting pool.
+var ErrTransferServiceNotAllowedOnTargetCounter = errors.New("target service is not available for the target counter's service zone")
+
+// ErrTicketCounterZoneMismatch is returned when pick/call would pair a counter with a ticket from another waiting pool.
+var ErrTicketCounterZoneMismatch = errors.New("ticket and counter belong to different waiting pools")
+
 // PatchTicketVisitorInput is body for UpdateTicketVisitor: either ClientID (optional FirstName/LastName to patch that client) or Phone with FirstName/LastName (find/create by phone).
 type PatchTicketVisitorInput struct {
 	ClientID  *string
 	FirstName *string
 	LastName  *string
 	Phone     *string
+}
+
+// TransferTicketInput is the body for POST /tickets/{id}/transfer (counter/user path XOR zone path).
+type TransferTicketInput struct {
+	ToCounterID     *string
+	ToUserID        *string
+	ToServiceZoneID *string
+	ToServiceID     *string
+	// OperatorCommentUpdate: true when JSON included operatorComment (including explicit null to clear).
+	OperatorCommentUpdate bool
+	OperatorComment       *string
 }
 
 type TicketService interface {
@@ -158,7 +193,7 @@ type TicketService interface {
 	GetTicketsByUnit(unitID string) ([]models.Ticket, error)
 	Recall(ticketID string, actorUserID *string) (*models.Ticket, error)
 	Pick(ticketID, counterID string, actorUserID *string) (*models.Ticket, error)
-	Transfer(ticketID string, toCounterID, toUserID *string, actorUserID *string) (*models.Ticket, error)
+	Transfer(ticketID string, in TransferTicketInput, actorUserID *string) (*models.Ticket, error)
 	ReturnToQueue(ticketID string, actorUserID *string) (*models.Ticket, error)
 	CallNext(unitID, counterID string, serviceIDs []string, actorUserID *string) (*models.Ticket, error)
 	UpdateOperatorComment(ticketID string, comment *string, actorUserID *string) (*models.Ticket, error)
@@ -169,40 +204,46 @@ type TicketService interface {
 }
 
 type ticketService struct {
-	repo         repository.TicketRepository
-	counterRepo  repository.CounterRepository
-	serviceRepo  repository.ServiceRepository
-	intervalRepo repository.OperatorIntervalRepository
-	clientRepo   repository.UnitClientRepository
-	tagDefRepo   repository.VisitorTagDefinitionRepository
-	preRegRepo   *repository.PreRegistrationRepository
-	hub          *ws.Hub
-	jobClient    JobEnqueuer
-	log          *slog.Logger
+	repo               repository.TicketRepository
+	counterRepo        repository.CounterRepository
+	serviceRepo        repository.ServiceRepository
+	unitRepo           repository.UnitRepository
+	intervalRepo       repository.OperatorIntervalRepository
+	clientRepo         repository.UnitClientRepository
+	tagDefRepo         repository.VisitorTagDefinitionRepository
+	unitClientHistRepo repository.UnitClientHistoryRepository
+	preRegRepo         *repository.PreRegistrationRepository
+	hub                *ws.Hub
+	jobClient          JobEnqueuer
+	log                *slog.Logger
 }
 
 func NewTicketService(
 	repo repository.TicketRepository,
 	counterRepo repository.CounterRepository,
 	serviceRepo repository.ServiceRepository,
+	unitRepo repository.UnitRepository,
 	intervalRepo repository.OperatorIntervalRepository,
 	clientRepo repository.UnitClientRepository,
 	tagDefRepo repository.VisitorTagDefinitionRepository,
+	unitClientHistRepo repository.UnitClientHistoryRepository,
 	preRegRepo *repository.PreRegistrationRepository,
 	hub *ws.Hub,
 	jobClient JobEnqueuer,
 ) TicketService {
 	return &ticketService{
-		repo:         repo,
-		counterRepo:  counterRepo,
-		serviceRepo:  serviceRepo,
-		intervalRepo: intervalRepo,
-		clientRepo:   clientRepo,
-		tagDefRepo:   tagDefRepo,
-		preRegRepo:   preRegRepo,
-		hub:          hub,
-		jobClient:    jobClient,
-		log:          slog.Default(),
+		repo:               repo,
+		counterRepo:        counterRepo,
+		serviceRepo:        serviceRepo,
+		unitRepo:           unitRepo,
+		intervalRepo:       intervalRepo,
+		clientRepo:         clientRepo,
+		tagDefRepo:         tagDefRepo,
+		unitClientHistRepo: unitClientHistRepo,
+		preRegRepo:         preRegRepo,
+		hub:                hub,
+		jobClient:          jobClient,
+		log:                slog.Default(),
 	}
 }
 
@@ -318,6 +359,7 @@ func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID 
 
 		ticket = &models.Ticket{
 			UnitID:            unitID,
+			ServiceZoneID:     service.RestrictedServiceZoneID,
 			ServiceID:         serviceID,
 			QueueNumber:       queueNumber,
 			Status:            "waiting",
@@ -362,7 +404,51 @@ func (s *ticketService) GetTicketByID(id string) (*models.Ticket, error) {
 	return s.repo.FindByID(id)
 }
 
+// resolveSubdivisionIDForServiceZoneUnit walks parent units until a subdivision (nested service zones).
+func (s *ticketService) resolveSubdivisionIDForServiceZoneUnit(zone *models.Unit) (subdivisionID string, ok bool, err error) {
+	if zone == nil || zone.Kind != models.UnitKindServiceZone {
+		return "", false, nil
+	}
+	cur := zone
+	visited := map[string]struct{}{zone.ID: {}}
+	for {
+		if cur.ParentID == nil || strings.TrimSpace(*cur.ParentID) == "" {
+			return "", false, nil
+		}
+		pid := strings.TrimSpace(*cur.ParentID)
+		parent, perr := s.unitRepo.FindByID(pid)
+		if perr != nil {
+			return "", false, perr
+		}
+		if parent.Kind == models.UnitKindSubdivision {
+			return parent.ID, true, nil
+		}
+		if parent.Kind != models.UnitKindServiceZone {
+			return "", false, nil
+		}
+		if _, seen := visited[parent.ID]; seen {
+			return "", false, nil
+		}
+		visited[parent.ID] = struct{}{}
+		cur = parent
+	}
+}
+
 func (s *ticketService) GetTicketsByUnit(unitID string) ([]models.Ticket, error) {
+	u, err := s.unitRepo.FindByID(unitID)
+	if err != nil {
+		return nil, err
+	}
+	if u.Kind == models.UnitKindServiceZone {
+		subID, ok, rerr := s.resolveSubdivisionIDForServiceZoneUnit(u)
+		if rerr != nil {
+			return nil, rerr
+		}
+		if !ok {
+			return []models.Ticket{}, nil
+		}
+		return s.repo.FindBySubdivisionAndServiceZoneID(subID, u.ID)
+	}
 	return s.repo.FindByUnitID(unitID)
 }
 
@@ -390,7 +476,7 @@ func (s *ticketService) CallNext(unitID, counterID string, serviceIDs []string, 
 			return ErrCounterUnitMismatch
 		}
 
-		t, err := s.repo.FindWaitingForUpdateTx(tx, unitID, serviceIDs)
+		t, err := s.repo.FindWaitingForUpdateTx(tx, unitID, serviceIDs, c.ServiceZoneID)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return ErrNoWaitingTickets
@@ -411,6 +497,9 @@ func (s *ticketService) CallNext(unitID, counterID string, serviceIDs []string, 
 			"from_status": fromStatus,
 			"to_status":   "called",
 			"source":      "unit_call_next",
+		}
+		if c.ServiceZoneID != nil {
+			payload["counter_service_zone_id"] = *c.ServiceZoneID
 		}
 		if len(serviceIDs) > 0 {
 			payload["service_ids"] = serviceIDs
@@ -542,6 +631,9 @@ func (s *ticketService) Pick(ticketID, counterID string, actorUserID *string) (*
 		if c.OnBreak {
 			return ErrCounterOnBreak
 		}
+		if !CounterPoolMatchesTicket(c.ServiceZoneID, t.ServiceZoneID) {
+			return ErrTicketCounterZoneMismatch
+		}
 		fromStatus := ticket.Status
 		now := time.Now()
 		ticket.Status = "called"
@@ -574,9 +666,24 @@ func (s *ticketService) Pick(ticketID, counterID string, actorUserID *string) (*
 	return ticket, nil
 }
 
-func (s *ticketService) Transfer(ticketID string, toCounterID, toUserID *string, actorUserID *string) (*models.Ticket, error) {
-	if toCounterID == nil && toUserID == nil {
-		return nil, errors.New("target counter or user required")
+func (s *ticketService) Transfer(ticketID string, in TransferTicketInput, actorUserID *string) (*models.Ticket, error) {
+	zoneIDTrim := ""
+	if in.ToServiceZoneID != nil {
+		zoneIDTrim = strings.TrimSpace(*in.ToServiceZoneID)
+	}
+	zoneTransfer := zoneIDTrim != ""
+	counterTransfer := (in.ToCounterID != nil && strings.TrimSpace(*in.ToCounterID) != "") || (in.ToUserID != nil && strings.TrimSpace(*in.ToUserID) != "")
+
+	if zoneTransfer && counterTransfer {
+		return nil, ErrTransferConflictingTargets
+	}
+	if !zoneTransfer && !counterTransfer {
+		return nil, ErrTransferTargetRequired
+	}
+	hasCounterID := in.ToCounterID != nil && strings.TrimSpace(*in.ToCounterID) != ""
+	hasUserID := in.ToUserID != nil && strings.TrimSpace(*in.ToUserID) != ""
+	if hasCounterID && hasUserID {
+		return nil, ErrTransferConflictingCounterAndUser
 	}
 
 	var ticket *models.Ticket
@@ -587,6 +694,12 @@ func (s *ticketService) Transfer(ticketID string, toCounterID, toUserID *string,
 		}
 		ticket = t
 
+		if in.OperatorCommentUpdate {
+			if err := s.patchOperatorCommentOnLockedTicketTx(tx, ticket, in.OperatorComment, actorUserID); err != nil {
+				return err
+			}
+		}
+
 		fromStatus := ticket.Status
 		var fromCounterID *string
 		if ticket.CounterID != nil {
@@ -594,32 +707,160 @@ func (s *ticketService) Transfer(ticketID string, toCounterID, toUserID *string,
 			fromCounterID = &c
 		}
 
-		var targetCounterID string
-		if toCounterID != nil {
-			targetCounterID = *toCounterID
-		} else {
-			counter, err := s.counterRepo.FindByUserIDTx(tx, *toUserID)
-			if err != nil {
-				if errors.Is(err, gorm.ErrRecordNotFound) {
-					return errCounterNotFoundForUser
-				}
+		fromServiceID := ticket.ServiceID
+		fromZoneID := ticket.ServiceZoneID
+
+		if zoneTransfer {
+			if err := ValidateChildServiceZone(s.unitRepo, ticket.UnitID, zoneIDTrim); err != nil {
 				return err
+			}
+			curSvc, err := s.serviceRepo.FindByIDTx(tx, ticket.ServiceID)
+			if err != nil {
+				return err
+			}
+			needNewService := !ServiceAllowedInZone(curSvc, zoneIDTrim)
+			var resolvedServiceID string
+			if in.ToServiceID != nil && strings.TrimSpace(*in.ToServiceID) != "" {
+				resolvedServiceID = strings.TrimSpace(*in.ToServiceID)
+			} else if needNewService {
+				return ErrTransferServiceRequiredForZone
+			} else {
+				resolvedServiceID = ticket.ServiceID
+			}
+			newSvc, err := s.serviceRepo.FindByIDTx(tx, resolvedServiceID)
+			if err != nil {
+				return err
+			}
+			if newSvc.UnitID != ticket.UnitID {
+				return ErrTicketServiceNotInUnit
+			}
+			if !newSvc.IsLeaf {
+				return ErrTransferTargetMustBeLeafService
+			}
+			if !ServiceAllowedInZone(newSvc, zoneIDTrim) {
+				return ErrTransferTargetServiceNotInZone
+			}
+
+			zCopy := zoneIDTrim
+			ticket.ServiceZoneID = &zCopy
+			ticket.ServiceID = resolvedServiceID
+			ticket.Status = "waiting"
+			ticket.CounterID = nil
+			ticket.CalledAt = nil
+			ticket.ConfirmedAt = nil
+			ticket.MaxWaitingTime = newSvc.MaxWaitingTime
+
+			payload := map[string]interface{}{
+				"transfer_kind":        "zone",
+				"unit_id":              ticket.UnitID,
+				"from_status":          fromStatus,
+				"to_status":            "waiting",
+				"from_service_id":      fromServiceID,
+				"to_service_id":        resolvedServiceID,
+				"from_service_label":   curSvc.Name,
+				"to_service_label":     newSvc.Name,
+				"queue_number":         ticket.QueueNumber,
+				"from_service_zone_id": serviceZoneIDJSON(fromZoneID),
+				"to_service_zone_id":   zoneIDTrim,
+			}
+			if curSvc.NameRu != nil && strings.TrimSpace(*curSvc.NameRu) != "" {
+				payload["from_service_name_ru"] = strings.TrimSpace(*curSvc.NameRu)
+			}
+			if curSvc.NameEn != nil && strings.TrimSpace(*curSvc.NameEn) != "" {
+				payload["from_service_name_en"] = strings.TrimSpace(*curSvc.NameEn)
+			}
+			if newSvc.NameRu != nil && strings.TrimSpace(*newSvc.NameRu) != "" {
+				payload["to_service_name_ru"] = strings.TrimSpace(*newSvc.NameRu)
+			}
+			if newSvc.NameEn != nil && strings.TrimSpace(*newSvc.NameEn) != "" {
+				payload["to_service_name_en"] = strings.TrimSpace(*newSvc.NameEn)
+			}
+			if fromCounterID != nil {
+				payload["from_counter_id"] = *fromCounterID
+			}
+			if zu, zerr := s.unitRepo.FindByIDLight(zoneIDTrim); zerr == nil && zu != nil {
+				payload["to_zone_name"] = zu.Name
+			}
+			if err := s.repo.UpdateTx(tx, ticket); err != nil {
+				return err
+			}
+			if err := s.writeTicketHistoryTx(tx, ticket.ID, actorUserID, ticketaudit.ActionTicketTransferred, payload); err != nil {
+				return err
+			}
+			if fromCounterID != nil {
+				return ensureIdleIfCounterAvailableTx(tx, s.intervalRepo, s.counterRepo, s.repo, *fromCounterID, time.Now())
+			}
+			return nil
+		}
+
+		// Counter / user transfer (existing behaviour + sync waiting pool from target counter).
+		var targetCounterID string
+		if in.ToCounterID != nil && strings.TrimSpace(*in.ToCounterID) != "" {
+			targetCounterID = strings.TrimSpace(*in.ToCounterID)
+		} else {
+			counter, uerr := s.counterRepo.FindByUserIDTx(tx, strings.TrimSpace(*in.ToUserID))
+			if uerr != nil {
+				if errors.Is(uerr, gorm.ErrRecordNotFound) {
+					return ErrCounterNotFoundForUser
+				}
+				return uerr
 			}
 			targetCounterID = counter.ID
 		}
 
+		targetCounter, err := s.counterRepo.FindByIDTx(tx, targetCounterID)
+		if err != nil {
+			return err
+		}
+		if targetCounter.UnitID != ticket.UnitID {
+			return ErrCounterUnitMismatch
+		}
+
+		curSvc, err := s.serviceRepo.FindByIDTx(tx, ticket.ServiceID)
+		if err != nil {
+			return err
+		}
+		explicitToSvc := in.ToServiceID != nil && strings.TrimSpace(*in.ToServiceID) != ""
+		if explicitToSvc {
+			resolvedServiceID := strings.TrimSpace(*in.ToServiceID)
+			newSvc, err := s.serviceRepo.FindByIDTx(tx, resolvedServiceID)
+			if err != nil {
+				return err
+			}
+			if newSvc.UnitID != ticket.UnitID {
+				return ErrTicketServiceNotInUnit
+			}
+			if !newSvc.IsLeaf {
+				return ErrTransferTargetMustBeLeafService
+			}
+			if !ServiceAllowedInTicketPool(newSvc, targetCounter.ServiceZoneID) {
+				return ErrTransferServiceNotAllowedOnTargetCounter
+			}
+			ticket.ServiceID = resolvedServiceID
+			ticket.MaxWaitingTime = newSvc.MaxWaitingTime
+		} else if !ServiceAllowedInTicketPool(curSvc, targetCounter.ServiceZoneID) {
+			return ErrTransferServiceRequiredForZone
+		}
+
 		ticket.CounterID = &targetCounterID
 		ticket.Status = "waiting"
+		ticket.ServiceZoneID = targetCounter.ServiceZoneID
+		ticket.CalledAt = nil
+		ticket.ConfirmedAt = nil
 
 		payload := map[string]interface{}{
-			"unit_id":       ticket.UnitID,
-			"service_id":    ticket.ServiceID,
-			"from_status":   fromStatus,
-			"to_status":     "waiting",
-			"to_counter_id": targetCounterID,
+			"transfer_kind":      "counter",
+			"unit_id":            ticket.UnitID,
+			"service_id":         ticket.ServiceID,
+			"from_status":        fromStatus,
+			"to_status":          "waiting",
+			"to_counter_id":      targetCounterID,
+			"to_service_zone_id": serviceZoneIDJSON(ticket.ServiceZoneID),
+			"from_service_id":    fromServiceID,
+			"to_service_id":      ticket.ServiceID,
 		}
-		if toUserID != nil {
-			payload["target_user_id"] = *toUserID
+		if in.ToUserID != nil {
+			payload["target_user_id"] = strings.TrimSpace(*in.ToUserID)
 		}
 		if fromCounterID != nil {
 			payload["from_counter_id"] = *fromCounterID
@@ -636,8 +877,8 @@ func (s *ticketService) Transfer(ticketID string, toCounterID, toUserID *string,
 		return nil
 	})
 	if err != nil {
-		if errors.Is(err, errCounterNotFoundForUser) {
-			return nil, errCounterNotFoundForUser
+		if errors.Is(err, ErrCounterNotFoundForUser) {
+			return nil, ErrCounterNotFoundForUser
 		}
 		return nil, err
 	}
@@ -646,6 +887,54 @@ func (s *ticketService) Transfer(ticketID string, toCounterID, toUserID *string,
 	return ticket, nil
 }
 
+func serviceZoneIDJSON(z *string) interface{} {
+	if z == nil {
+		return nil
+	}
+	return *z
+}
+
+func (s *ticketService) patchOperatorCommentOnLockedTicketTx(tx *gorm.DB, ticket *models.Ticket, comment *string, actorUserID *string) error {
+	var stored *string
+	if comment != nil {
+		v := strings.TrimSpace(*comment)
+		if v == "" {
+			stored = nil
+		} else {
+			if utf8.RuneCountInString(v) > maxOperatorCommentRunes {
+				return ErrOperatorCommentTooLong
+			}
+			stored = &v
+		}
+	}
+
+	var from *string
+	if ticket.OperatorComment != nil {
+		c := *ticket.OperatorComment
+		from = &c
+	}
+	if (from == nil && stored == nil) || (from != nil && stored != nil && *from == *stored) {
+		return nil
+	}
+
+	ticket.OperatorComment = stored
+	payload := map[string]interface{}{
+		"unit_id": ticket.UnitID,
+	}
+	if from != nil {
+		payload["from_comment"] = *from
+	}
+	if stored != nil {
+		payload["to_comment"] = *stored
+	}
+	if err := s.repo.UpdateTx(tx, ticket); err != nil {
+		return err
+	}
+	return s.writeTicketHistoryTx(tx, ticket.ID, actorUserID, ticketaudit.ActionTicketOperatorCommentUpdated, payload)
+}
+
+// ReturnToQueue moves the ticket back to waiting and clears counter assignment / call timestamps.
+// service_id and service_zone_id are intentionally left unchanged so the ticket stays in the same waiting pool.
 func (s *ticketService) ReturnToQueue(ticketID string, actorUserID *string) (*models.Ticket, error) {
 	var ticket *models.Ticket
 	err := s.repo.Transaction(func(tx *gorm.DB) error {
@@ -696,19 +985,6 @@ func (s *ticketService) ReturnToQueue(ticketID string, actorUserID *string) (*mo
 }
 
 func (s *ticketService) UpdateOperatorComment(ticketID string, comment *string, actorUserID *string) (*models.Ticket, error) {
-	var stored *string
-	if comment != nil {
-		v := strings.TrimSpace(*comment)
-		if v == "" {
-			stored = nil
-		} else {
-			if utf8.RuneCountInString(v) > maxOperatorCommentRunes {
-				return nil, ErrOperatorCommentTooLong
-			}
-			stored = &v
-		}
-	}
-
 	var ticket *models.Ticket
 	err := s.repo.Transaction(func(tx *gorm.DB) error {
 		t, err := s.repo.FindByIDForUpdateTx(tx, ticketID)
@@ -716,29 +992,7 @@ func (s *ticketService) UpdateOperatorComment(ticketID string, comment *string, 
 			return err
 		}
 		ticket = t
-
-		var from *string
-		if ticket.OperatorComment != nil {
-			c := *ticket.OperatorComment
-			from = &c
-		}
-
-		ticket.OperatorComment = stored
-
-		payload := map[string]interface{}{
-			"unit_id": ticket.UnitID,
-		}
-		if from != nil {
-			payload["from_comment"] = *from
-		}
-		if stored != nil {
-			payload["to_comment"] = *stored
-		}
-
-		if err := s.repo.UpdateTx(tx, ticket); err != nil {
-			return err
-		}
-		return s.writeTicketHistoryTx(tx, ticket.ID, actorUserID, ticketaudit.ActionTicketOperatorCommentUpdated, payload)
+		return s.patchOperatorCommentOnLockedTicketTx(tx, ticket, comment, actorUserID)
 	})
 	if err != nil {
 		return nil, err
@@ -817,8 +1071,25 @@ func (s *ticketService) UpdateTicketVisitor(ticketID string, in PatchTicketVisit
 				if strings.TrimSpace(newFirst) == "" && strings.TrimSpace(newLast) == "" {
 					return ErrVisitorNameRequired
 				}
+				profChanges := make(map[string]interface{})
+				if in.FirstName != nil && newFirst != c.FirstName {
+					profChanges["firstName"] = map[string]string{"from": c.FirstName, "to": newFirst}
+				}
+				if in.LastName != nil && newLast != c.LastName {
+					profChanges["lastName"] = map[string]string{"from": c.LastName, "to": newLast}
+				}
 				if err := s.clientRepo.UpdateNamesTx(tx, c.ID, newFirst, newLast); err != nil {
 					return err
+				}
+				if len(profChanges) > 0 {
+					profPl := map[string]interface{}{
+						"source":   "staff_ticket",
+						"ticketId": ticket.ID,
+						"changes":  profChanges,
+					}
+					if err := writeUnitClientHistoryTx(tx, s.unitClientHistRepo, ticket.UnitID, c.ID, actorUserID, models.UnitClientHistoryActionProfileUpdated, profPl); err != nil {
+						return err
+					}
 				}
 			}
 		} else {
@@ -968,7 +1239,24 @@ func (s *ticketService) SetVisitorTagsForTicket(ticketID string, tagDefinitionID
 			"removed_tag_labels": removedLabels,
 			"reason":             reason,
 		}
-		return s.writeTicketHistoryTx(tx, ticket.ID, actorUserID, ticketaudit.ActionTicketVisitorTagsUpdated, payload)
+		if err := s.writeTicketHistoryTx(tx, ticket.ID, actorUserID, ticketaudit.ActionTicketVisitorTagsUpdated, payload); err != nil {
+			return err
+		}
+		if len(addedIDs) == 0 && len(removedIDs) == 0 {
+			return nil
+		}
+		clientTagPayload := map[string]interface{}{
+			"source":           "staff_ticket",
+			"ticketId":         ticket.ID,
+			"reason":           reason,
+			"fromTagIds":       fromCopy,
+			"toTagIds":         toCopy,
+			"addedTagIds":      addedIDs,
+			"removedTagIds":    removedIDs,
+			"addedTagLabels":   addedLabels,
+			"removedTagLabels": removedLabels,
+		}
+		return writeUnitClientHistoryTx(tx, s.unitClientHistRepo, ticket.UnitID, client.ID, actorUserID, models.UnitClientHistoryActionTagsUpdated, clientTagPayload)
 	})
 	if err != nil {
 		return nil, err
@@ -993,6 +1281,13 @@ func (s *ticketService) ListVisitsByClient(unitID, clientID string, limit int, c
 	if c.IsAnonymous {
 		return []models.Ticket{}, nil, nil
 	}
+	if limit < 1 {
+		limit = 1
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	fetchLimit := limit + 1
 	var beforeTime *time.Time
 	var beforeID *string
 	if cursor != nil {
@@ -1010,17 +1305,37 @@ func (s *ticketService) ListVisitsByClient(unitID, clientID string, limit int, c
 			beforeID = &parts[1]
 		}
 	}
-	items, err := s.repo.ListVisitsByClientID(unitID, clientID, limit, beforeTime, beforeID)
+	items, err := s.repo.ListVisitsByClientID(unitID, clientID, fetchLimit, beforeTime, beforeID)
 	if err != nil {
 		return nil, nil, err
 	}
+	displayItems := items
+	if len(items) > limit {
+		displayItems = items[:limit]
+	}
+	if len(displayItems) > 0 {
+		ids := make([]string, 0, len(displayItems))
+		for i := range displayItems {
+			ids = append(ids, displayItems[i].ID)
+		}
+		byID, err := s.repo.ListTerminalVisitActorNamesByTicketIDs(ids)
+		if err != nil {
+			return nil, nil, err
+		}
+		for i := range displayItems {
+			if name, ok := byID[displayItems[i].ID]; ok && name != "" {
+				n := name
+				displayItems[i].ServedByName = &n
+			}
+		}
+	}
 	var next *string
-	if len(items) > 0 && len(items) == limit {
-		last := items[len(items)-1]
+	if len(items) > limit {
+		last := displayItems[len(displayItems)-1]
 		s := fmt.Sprintf("%s|%s", last.CreatedAt.Format(time.RFC3339Nano), last.ID)
 		next = &s
 	}
-	return items, next, nil
+	return displayItems, next, nil
 }
 
 func (s *ticketService) enqueueTTS(ticket *models.Ticket, counterID string) {

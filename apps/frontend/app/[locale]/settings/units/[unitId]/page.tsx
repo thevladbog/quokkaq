@@ -120,10 +120,13 @@ export default function UnitPage({ params }: UnitPageProps) {
             <p className='text-muted-foreground mb-4 text-sm'>
               {t('units.stations_on_zone_hint')}
             </p>
-            <CountersList unitId={unitId} />
+            <CountersList
+              unitId={unit.parentId ?? unitId}
+              restrictToServiceZoneId={unit.parentId ? unitId : undefined}
+            />
           </div>
           <ServiceZoneWorkplacesPanel
-            parentUnitId={unitId}
+            parentUnitId={unit.parentId ?? unitId}
             companyId={unit.companyId}
             parentTimezone={unit.timezone}
           />
@@ -140,6 +143,31 @@ export default function UnitPage({ params }: UnitPageProps) {
   );
 
   if (isServiceZone) {
+    const serviceZoneCountersContent = (
+      <PermissionGuard
+        permissions={['UNIT_SETTINGS_MANAGE']}
+        unitId={unitId}
+        fallback={<div>{t('access_denied')}</div>}
+      >
+        <div className='space-y-8'>
+          <div>
+            <p className='text-muted-foreground mb-4 text-sm'>
+              {t('units.stations_on_zone_hint')}
+            </p>
+            <CountersList
+              unitId={unit.parentId ?? unitId}
+              restrictToServiceZoneId={unit.parentId ? unitId : undefined}
+            />
+          </div>
+          <ServiceZoneWorkplacesPanel
+            parentUnitId={unit.parentId ?? unitId}
+            companyId={unit.companyId}
+            parentTimezone={unit.timezone}
+          />
+        </div>
+      </PermissionGuard>
+    );
+
     return (
       <div className='container mx-auto flex-1 p-4'>
         <div className='mb-6 flex items-center gap-4'>
@@ -149,52 +177,165 @@ export default function UnitPage({ params }: UnitPageProps) {
           <h1 className='text-3xl font-bold'>{unit.name}</h1>
         </div>
 
-        {unit.parentId ? (
-          <WorkplaceParentBanner parentId={unit.parentId} />
-        ) : null}
+        <p className='text-muted-foreground mb-6 max-w-3xl text-sm'>
+          {t('units.service_zone_folder_description')}
+        </p>
 
-        <PermissionGuard permissions={['UNIT_SETTINGS_MANAGE']} unitId={unitId}>
-          <Card className='mb-8'>
-            <CardHeader>
-              <CardTitle>{t('units.service_zone_folder_title')}</CardTitle>
-              <CardDescription>
-                {t('units.service_zone_folder_description')}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className='max-w-md space-y-4'>
-              <div className='space-y-2'>
-                <Label htmlFor='zone-name'>{t('units.unit_name')}</Label>
-                <Input
-                  id='zone-name'
-                  value={unitName}
-                  onChange={(e) => setUnitName(e.target.value)}
-                />
-              </div>
-              <div className='space-y-2'>
-                <Label htmlFor='zone-code'>{t('units.unit_code')}</Label>
-                <Input
-                  id='zone-code'
-                  value={unitCode}
-                  disabled
-                  className='bg-muted'
-                />
-                <p className='text-muted-foreground text-xs'>
-                  {t('units.unit_code_immutable')}
-                </p>
-              </div>
-              <Button
-                onClick={handleSaveServiceZoneName}
-                disabled={updateUnitMutation.isPending}
-              >
-                {updateUnitMutation.isPending
-                  ? t('units.saving')
-                  : t('units.save_changes')}
-              </Button>
-            </CardContent>
-          </Card>
-        </PermissionGuard>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className='w-full'>
+          <TabsList>
+            <PermissionGuard
+              permissions={['UNIT_SETTINGS_MANAGE']}
+              unitId={unitId}
+            >
+              <TabsTrigger value='general'>
+                {t('units.general_settings')}
+              </TabsTrigger>
+            </PermissionGuard>
+            <PermissionGuard permissions={['UNIT_GRID_MANAGE']} unitId={unitId}>
+              <TabsTrigger value='grid-configuration'>
+                {t('grid_configuration.title', {
+                  defaultValue: 'Grid Configuration'
+                })}
+              </TabsTrigger>
+            </PermissionGuard>
+            <PermissionGuard
+              permissions={['UNIT_SETTINGS_MANAGE']}
+              unitId={unitId}
+            >
+              <TabsTrigger value='counters'>
+                {t('units.tab_stations_and_structure')}
+              </TabsTrigger>
+            </PermissionGuard>
+            <PermissionGuard
+              permissions={['UNIT_SETTINGS_MANAGE']}
+              unitId={unitId}
+            >
+              <TabsTrigger value='kiosk'>
+                {t('kiosk_settings.title')}
+              </TabsTrigger>
+            </PermissionGuard>
+            <PermissionGuard
+              permissions={['UNIT_TICKET_SCREEN_MANAGE']}
+              unitId={unitId}
+            >
+              <TabsTrigger value='ad-screen'>
+                {t('ad_screen.title')}
+              </TabsTrigger>
+            </PermissionGuard>
+          </TabsList>
 
-        {stationsAndStructure}
+          <TabsContent value='general' className='mt-6'>
+            <PermissionGuard
+              permissions={['UNIT_SETTINGS_MANAGE']}
+              unitId={unitId}
+              fallback={<div>{t('access_denied')}</div>}
+            >
+              <div className='space-y-6'>
+                {unit.parentId ? (
+                  <WorkplaceParentBanner parentId={unit.parentId} />
+                ) : null}
+                <Card className='max-w-md'>
+                  <CardHeader>
+                    <CardTitle>
+                      {t('units.service_zone_folder_title')}
+                    </CardTitle>
+                    <CardDescription>
+                      {t('units.service_zone_general_hint')}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className='space-y-4'>
+                    <div className='space-y-2'>
+                      <Label htmlFor='zone-name'>{t('units.unit_name')}</Label>
+                      <Input
+                        id='zone-name'
+                        value={unitName}
+                        onChange={(e) => setUnitName(e.target.value)}
+                      />
+                    </div>
+                    <div className='space-y-2'>
+                      <Label htmlFor='zone-code'>{t('units.unit_code')}</Label>
+                      <Input
+                        id='zone-code'
+                        value={unitCode}
+                        disabled
+                        className='bg-muted'
+                      />
+                      <p className='text-muted-foreground text-xs'>
+                        {t('units.unit_code_immutable')}
+                      </p>
+                    </div>
+                    <Button
+                      onClick={handleSaveServiceZoneName}
+                      disabled={updateUnitMutation.isPending}
+                    >
+                      {updateUnitMutation.isPending
+                        ? t('units.saving')
+                        : t('units.save_changes')}
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+            </PermissionGuard>
+          </TabsContent>
+
+          <TabsContent value='grid-configuration' className='mt-6'>
+            <PermissionGuard
+              permissions={['UNIT_GRID_MANAGE']}
+              unitId={unitId}
+              fallback={<div>{t('access_denied')}</div>}
+            >
+              {unit.parentId ? (
+                <ServiceGridEditor
+                  unitId={unitId}
+                  servicesTreeUnitId={unit.parentId}
+                  lockedServiceZoneId={unitId}
+                />
+              ) : (
+                <Alert>
+                  <AlertTitle>
+                    {t('units.service_zone_grid_parent_required_title')}
+                  </AlertTitle>
+                  <AlertDescription>
+                    {t('units.service_zone_grid_parent_required_body')}
+                  </AlertDescription>
+                </Alert>
+              )}
+            </PermissionGuard>
+          </TabsContent>
+
+          <TabsContent value='counters' className='mt-6'>
+            {serviceZoneCountersContent}
+          </TabsContent>
+
+          <TabsContent value='kiosk' className='mt-6'>
+            <PermissionGuard
+              permissions={['UNIT_SETTINGS_MANAGE']}
+              unitId={unitId}
+              fallback={<div>{t('access_denied')}</div>}
+            >
+              <KioskSettings
+                key={JSON.stringify(unit.config?.kiosk)}
+                unitId={unitId}
+                unitName={unit.name}
+                currentConfig={unit.config || {}}
+              />
+            </PermissionGuard>
+          </TabsContent>
+
+          <TabsContent value='ad-screen' className='mt-6'>
+            <PermissionGuard
+              permissions={['UNIT_TICKET_SCREEN_MANAGE']}
+              unitId={unitId}
+              fallback={<div>{t('access_denied')}</div>}
+            >
+              <AdScreenSettings
+                key={JSON.stringify(unit.config?.adScreen)}
+                unitId={unitId}
+                currentConfig={unit.config || {}}
+              />
+            </PermissionGuard>
+          </TabsContent>
+        </Tabs>
       </div>
     );
   }

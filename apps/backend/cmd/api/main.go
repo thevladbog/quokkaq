@@ -80,6 +80,7 @@ func main() {
 			&models.UnitClient{},
 			&models.UnitVisitorTagDefinition{},
 			&models.UnitClientTagAssignment{},
+			&models.UnitClientHistory{},
 			&models.Ticket{},
 			&models.TicketHistory{},
 			&models.TicketNumberSequence{},
@@ -141,15 +142,16 @@ func main() {
 	authService := services.NewAuthService(userRepo, mailService, subscriptionRepo)
 	unitClientRepo := repository.NewUnitClientRepository()
 	visitorTagDefRepo := repository.NewVisitorTagDefinitionRepository()
-	unitClientService := services.NewUnitClientService(unitClientRepo, database.DB)
+	unitClientHistRepo := repository.NewUnitClientHistoryRepository()
+	unitClientService := services.NewUnitClientService(unitClientRepo, visitorTagDefRepo, unitClientHistRepo, database.DB)
 	unitService := services.NewUnitService(unitRepo, unitClientService)
 	visitorTagDefService := services.NewVisitorTagDefinitionService(visitorTagDefRepo)
-	ticketService := services.NewTicketService(ticketRepo, counterRepo, serviceRepo, operatorIntervalRepo, unitClientRepo, visitorTagDefRepo, preRegRepo, hub, jobClient)
-	serviceService := services.NewServiceService(serviceRepo)
-	counterService := services.NewCounterService(counterRepo, ticketRepo, serviceRepo, userRepo, operatorIntervalRepo, hub)
+	ticketService := services.NewTicketService(ticketRepo, counterRepo, serviceRepo, unitRepo, operatorIntervalRepo, unitClientRepo, visitorTagDefRepo, unitClientHistRepo, preRegRepo, hub, jobClient)
+	serviceService := services.NewServiceService(serviceRepo, unitRepo)
+	counterService := services.NewCounterService(counterRepo, ticketRepo, serviceRepo, userRepo, operatorIntervalRepo, unitRepo, hub)
 	bookingService := services.NewBookingService(bookingRepo)
 	auditLogRepo := repository.NewAuditLogRepository()
-	shiftService := services.NewShiftService(ticketRepo, counterRepo, auditLogRepo, operatorIntervalRepo, hub, userRepo)
+	shiftService := services.NewShiftService(ticketRepo, counterRepo, serviceRepo, auditLogRepo, operatorIntervalRepo, hub, userRepo)
 	templateService := services.NewTemplateService(templateRepo)
 	invitationService := services.NewInvitationService(invitationRepo, mailService, userRepo, templateService)
 	slotService := services.NewSlotService(slotRepo, preRegRepo)
@@ -370,7 +372,11 @@ func main() {
 			r.Get("/{unitId}/pre-registrations", preRegHandler.GetByUnit)
 			r.Put("/{unitId}/pre-registrations/{id}", preRegHandler.Update)
 			r.Get("/{unitId}/clients/search", unitClientHandler.SearchClients)
+			r.Get("/{unitId}/clients/{clientId}/history", unitClientHandler.ListClientHistory)
 			r.Get("/{unitId}/clients/{clientId}/visits", unitClientHandler.ListClientVisits)
+			r.Get("/{unitId}/clients", unitClientHandler.ListUnitClients)
+			r.Get("/{unitId}/clients/{clientId}", unitClientHandler.GetUnitClient)
+			r.Patch("/{unitId}/clients/{clientId}", unitClientHandler.PatchUnitClient)
 			r.Get("/{unitId}/visitor-tag-definitions", visitorTagHandler.ListVisitorTagDefinitions)
 			r.Post("/{unitId}/visitor-tag-definitions", visitorTagHandler.CreateVisitorTagDefinition)
 			r.Patch("/{unitId}/visitor-tag-definitions/{definitionId}", visitorTagHandler.PatchVisitorTagDefinition)

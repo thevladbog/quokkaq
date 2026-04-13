@@ -101,6 +101,8 @@ type Props = {
   onSelectedVisitorChange: (v: UnitClient | null) => void;
   onApply: () => void;
   onReset: () => void;
+  /** When true, the operator (actor) filter is hidden — server only returns own actions. */
+  hideOperatorFilter?: boolean;
 };
 
 function formatVisitorLabel(c: UnitClient): string {
@@ -160,7 +162,8 @@ export function SupervisorJournalFiltersBar({
   selectedVisitor,
   onSelectedVisitorChange,
   onApply,
-  onReset
+  onReset,
+  hideOperatorFilter = false
 }: Props) {
   const t = useTranslations('supervisor.dashboardUi');
   const locale = useLocale();
@@ -179,6 +182,17 @@ export function SupervisorJournalFiltersBar({
     );
     return () => window.clearTimeout(timerId);
   }, [visitorQuery]);
+
+  useEffect(() => {
+    if (!hideOperatorFilter) return;
+    onDraftChange((prev) => {
+      const hasOperatorSelection =
+        prev.activeKinds.includes('operator') ||
+        (prev.userId?.trim() ?? '') !== '';
+      if (!hasOperatorSelection) return prev;
+      return stripKind(prev, 'operator');
+    });
+  }, [hideOperatorFilter, onDraftChange]);
 
   const visitorSearchEnabled =
     editingKind === 'visitor' && debouncedVisitorQ.length >= 2;
@@ -303,7 +317,9 @@ export function SupervisorJournalFiltersBar({
   };
 
   const menuKinds = ALL_MENU_ORDER.filter(
-    (k) => !draft.activeKinds.includes(k)
+    (k) =>
+      !draft.activeKinds.includes(k) &&
+      !(hideOperatorFilter && k === 'operator')
   );
 
   const renderPopoverBody = (kind: JournalFilterKind) => {
