@@ -163,7 +163,8 @@ jobs:
         with:
           files: apps/frontend/test-results/vitest-junit.xml
           check_name: Vitest (frontend)
-          comment_mode: always
+          # PR comments only; merge_group/push still get the check run + job summary.
+          comment_mode: ${{ github.event_name == 'pull_request' && 'always' || 'off' }}
 
       - name: Upload coverage to Codecov (frontend)
         if: always() && hashFiles('apps/frontend/coverage/lcov.info') != ''
