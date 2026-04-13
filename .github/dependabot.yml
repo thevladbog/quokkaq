@@ -1,5 +1,8 @@
 # Also enable in the repo: Settings → Code security → Dependency graph,
 # Dependabot alerts, Dependabot security updates (not expressible in this file).
+#
+# Groups reduce PR noise: each dependency matches at most one group (first match wins).
+# Order: more specific patterns before broader ones.
 version: 2
 updates:
   - package-ecosystem: npm
@@ -12,9 +15,48 @@ updates:
         patterns:
           - '@nx/*'
           - 'nx'
+      radix:
+        patterns:
+          - '@radix-ui/*'
+      tanstack:
+        patterns:
+          - '@tanstack/*'
+      vitest:
+        patterns:
+          - 'vitest'
+          - '@vitest/*'
+      next:
+        patterns:
+          - 'next'
+          - 'eslint-config-next'
+      tailwind:
+        patterns:
+          - 'tailwindcss'
+          - '@tailwindcss/*'
+          - 'prettier-plugin-tailwindcss'
+          - 'tw-animate-css'
+      tauri:
+        patterns:
+          - '@tauri-apps/*'
 
   - package-ecosystem: gomod
     directory: /apps/backend
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    groups:
+      aws-sdk:
+        patterns:
+          - 'github.com/aws/*'
+      gorm:
+        patterns:
+          - 'gorm.io/*'
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      all-actions:
+        patterns:
+          - '*'

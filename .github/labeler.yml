@@ -1,8 +1,9 @@
 # Path-based PR labels (actions/labeler v6). Pre-create matching labels on the repo.
 # https://github.com/actions/labeler
-
-changed-files-labels-limit: 6
-max-files-changed: 1500
+#
+# Note: `changed-files-labels-limit` / `max-files-changed` are documented upstream but not
+# implemented in labeler@v6.0.x yet (they are parsed as label names → type error). Re-add when
+# a v6 release includes TOP_LEVEL_OPTIONS handling (see actions/labeler main branch).
 
 area/frontend:
   - changed-files:
