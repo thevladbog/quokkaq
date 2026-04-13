@@ -23,9 +23,32 @@ import { LogoUpload } from '@/components/ui/logo-upload';
 import { useUpdateUnit } from '@/lib/hooks';
 import type { AdScreenConfig } from '@quokkaq/shared-types';
 
+/** Unit.config JSON from API — ad block is usually partial. */
+type UnitConfigJson = {
+  adScreen?: Partial<AdScreenConfig>;
+  config?: Partial<AdScreenConfig>;
+} & Record<string, unknown>;
+
 interface AdScreenSettingsProps {
   unitId: string;
   currentConfig: Record<string, unknown>;
+}
+
+function adConfigFromUnitConfig(
+  c: Record<string, unknown>
+): Partial<AdScreenConfig> {
+  const u = c as unknown as UnitConfigJson;
+  const nested = u.adScreen ?? u.config;
+  if (nested) return nested;
+  if (
+    'width' in u ||
+    'duration' in u ||
+    'activeMaterialIds' in u ||
+    'recentCallsHistoryLimit' in u
+  ) {
+    return u as Partial<AdScreenConfig>;
+  }
+  return {};
 }
 
 export function AdScreenSettings({
@@ -36,14 +59,17 @@ export function AdScreenSettings({
   const queryClient = useQueryClient();
   const [uploading, setUploading] = useState(false);
 
-  // Determine the correct config object.
-  const typedConfig = currentConfig as {
-    adScreen?: AdScreenConfig;
-    config?: AdScreenConfig;
-  } & AdScreenConfig;
-  const adConfig = typedConfig.adScreen ||
-    typedConfig.config ||
-    typedConfig || { width: 0, duration: 5, activeMaterialIds: [] };
+  const adPartial = adConfigFromUnitConfig(currentConfig);
+  const adConfig = {
+    width: adPartial.width ?? 0,
+    duration: adPartial.duration ?? 5,
+    activeMaterialIds: adPartial.activeMaterialIds ?? [],
+    recentCallsHistoryLimit: adPartial.recentCallsHistoryLimit ?? 0,
+    logoUrl: adPartial.logoUrl ?? '',
+    isCustomColorsEnabled: adPartial.isCustomColorsEnabled ?? false,
+    headerColor: adPartial.headerColor ?? '#ffffff',
+    bodyColor: adPartial.bodyColor ?? '#ffffff'
+  };
 
   const [width, setWidth] = useState(adConfig.width || 0);
   const [duration, setDuration] = useState(adConfig.duration || 5);
@@ -107,7 +133,7 @@ export function AdScreenSettings({
     const newConfig = {
       ...(currentConfig || {}),
       adScreen: {
-        ...((currentConfig?.adScreen as AdScreenConfig) || {}),
+        ...adConfigFromUnitConfig(currentConfig),
         width,
         duration,
         recentCallsHistoryLimit,
