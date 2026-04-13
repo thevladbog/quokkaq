@@ -28,7 +28,7 @@ jobs:
 
       - name: Build changelog
         id: build
-        uses: mikepenz/release-changelog-builder-action@v5
+        uses: mikepenz/release-changelog-builder-action@v6
         with:
           fromTag: ${{ inputs.from_tag }}
           toTag: ${{ inputs.to_ref != '' && inputs.to_ref || github.sha }}

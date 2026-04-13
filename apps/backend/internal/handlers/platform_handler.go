@@ -189,6 +189,7 @@ type platformListResponse[T any] struct {
 }
 
 // ListCompanies godoc
+// @ID           platformListCompanies
 // @Summary      List companies (platform)
 // @Tags         platform
 // @Produce      json
@@ -423,6 +424,7 @@ func (h *PlatformHandler) PatchCompany(w http.ResponseWriter, r *http.Request) {
 }
 
 // ListSubscriptions godoc
+// @ID           platformListSubscriptions
 // @Summary      List all subscriptions (platform)
 // @Tags         platform
 // @Produce      json
@@ -468,6 +470,7 @@ type PlatformCreateSubscriptionBody struct {
 }
 
 // CreateSubscription godoc
+// @ID           platformCreateSubscription
 // @Summary      Create subscription for a company without one (platform)
 // @Tags         platform
 // @Accept       json
@@ -640,6 +643,7 @@ func patchSubscriptionRequestsTierChange(body PatchPlatformSubscriptionBody) boo
 }
 
 // PatchSubscription godoc
+// @ID           platformPatchSubscription
 // @Summary      Update subscription fields (platform; may diverge from Stripe)
 // @Tags         platform
 // @Accept       json

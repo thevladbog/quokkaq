@@ -15,6 +15,7 @@ Libraries today: `shared-types`, `ui-kit`, `kiosk-lib`. Builds are **`tsc` via N
 ## `shared-types`
 
 - Zod schemas are the **source of truth** for API shapes shared with the Go backend. When contracts move, coordinate with backend handlers/models and any consumers.
+- The frontend may also consume **OpenAPI-generated TypeScript** from Orval ([`apps/frontend/lib/api/generated/`](apps/frontend/lib/api/generated/)). Do **not** remove or rewrite `shared-types` fields just because Orval has overlapping types—keep Zod where forms, parsing, or non-Orval code paths need it; shrink duplication only in deliberate refactors.
 
 ## `ui-kit` and `kiosk-lib`
 

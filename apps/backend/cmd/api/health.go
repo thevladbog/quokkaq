@@ -25,6 +25,7 @@ func healthLive(w http.ResponseWriter, _ *http.Request) {
 // @Summary      Liveness probe (HEAD)
 // @Description  Same as GET /health/live without a response body.
 // @Tags         health
+// @Success      200  "OK"
 // @Router       /health/live [head]
 func healthLiveHead(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusOK)
@@ -57,6 +58,7 @@ func healthReady(w http.ResponseWriter, r *http.Request) {
 // @Summary      Readiness probe (HEAD)
 // @Description  Same checks as GET /health/ready without a response body.
 // @Tags         health
+// @Success      200  "OK"
 // @Failure      503  "Database unreachable"
 // @Router       /health/ready [head]
 func healthReadyHead(w http.ResponseWriter, r *http.Request) {

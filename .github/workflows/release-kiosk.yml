@@ -30,7 +30,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: pnpm/action-setup@v5
+      - name: Enable Corepack
+        run: corepack enable
 
       - uses: actions/setup-node@v6
         with:
@@ -171,14 +172,15 @@ jobs:
           ref: release
           fetch-depth: 0
 
-      - uses: pnpm/action-setup@v5
+      - name: Enable Corepack
+        run: corepack enable
 
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: 'pnpm'
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: apps/backend/go.mod
 
@@ -212,7 +214,7 @@ jobs:
         working-directory: apps/kiosk-desktop
         run: pnpm run tauri build
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: bundle-${{ matrix.os }}
           path: apps/kiosk-desktop/src-tauri/target/release/bundle/
@@ -238,14 +240,14 @@ jobs:
           echo "version=$V" >> "$GITHUB_OUTPUT"
           echo "tag=v$V-kiosk" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
           pattern: bundle-*
           merge-multiple: true
 
       - name: Publish release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.ver.outputs.tag }}
           name: QuokkaQ Kiosk ${{ steps.ver.outputs.version }}

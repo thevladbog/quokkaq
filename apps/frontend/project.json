@@ -54,6 +54,20 @@
         "command": "prettier --write .",
         "cwd": "apps/frontend"
       }
+    },
+    "orval": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "orval --config orval.config.ts",
+        "cwd": "apps/frontend"
+      }
+    },
+    "orval:check": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "orval --config orval.config.ts && git diff --exit-code lib/api/generated/platform.ts",
+        "cwd": "apps/frontend"
+      }
     }
   }
 }
