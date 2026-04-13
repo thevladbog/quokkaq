@@ -501,7 +501,7 @@ export const unitsApi = {
     } else {
       body = { serviceId: normalized.serviceId };
     }
-    const res = await orvalTc.postUnitsUnitIdTickets(unitId, body);
+    const res = await orvalTc.createUnitTicket(unitId, body);
     return TicketModelSchema.parse(res.data);
   },
 
@@ -692,7 +692,7 @@ export const ticketsApi = {
   },
 
   create: async (ticketData: { unitId: string; serviceId: string }) => {
-    const res = await orvalTc.postUnitsUnitIdTickets(ticketData.unitId, {
+    const res = await orvalTc.createUnitTicket(ticketData.unitId, {
       serviceId: ticketData.serviceId
     });
     return TicketModelSchema.parse(res.data);
