@@ -195,7 +195,7 @@ export default function PlatformSubscriptionsPage() {
         }
         const due = dueDate.toISOString();
 
-        await platformCreateSubscription(body).then((r) => r.data);
+        await platformCreateSubscription(body);
 
         const plan = plans.find((p) => p.id === planId);
         let inv;
@@ -239,7 +239,7 @@ export default function PlatformSubscriptionsPage() {
         return { outcome: 'subscription-and-invoice' };
       }
 
-      await platformCreateSubscription(body).then((r) => r.data);
+      await platformCreateSubscription(body);
       return { outcome: 'subscription-only' };
     },
     onSuccess: (result) => {

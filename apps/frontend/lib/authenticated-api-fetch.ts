@@ -147,23 +147,44 @@ export async function authenticatedApiFetch(
           });
 
           if (refreshResponse.ok) {
-            const refreshData = await refreshResponse.json();
-            localStorage.setItem('access_token', refreshData.accessToken);
+            const refreshData: unknown = await refreshResponse.json();
+            const data =
+              refreshData && typeof refreshData === 'object'
+                ? (refreshData as Record<string, unknown>)
+                : null;
+            const newAccessToken =
+              (typeof data?.accessToken === 'string' && data.accessToken) ||
+              (typeof data?.access_token === 'string' && data.access_token) ||
+              (typeof data?.token === 'string' && data.token) ||
+              null;
 
-            const retryAuthHeaders: Record<string, string> = {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${refreshData.accessToken}`,
-              ...(currentLocale && { 'Accept-Language': currentLocale })
-            };
-            const retryConfig: RequestInit = {
-              ...restOptions,
-              headers: mergeRequestInitHeaders(
-                headersInitWithoutAuthorization(callerHeaders),
-                retryAuthHeaders
-              )
-            };
+            if (!newAccessToken) {
+              logger.error(
+                'Token refresh: response OK but no access token field',
+                {
+                  status: refreshResponse.status,
+                  url: refreshResponse.url,
+                  body: refreshData
+                }
+              );
+            } else {
+              localStorage.setItem('access_token', newAccessToken);
 
-            response = await fetch(url, retryConfig);
+              const retryAuthHeaders: Record<string, string> = {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${newAccessToken}`,
+                ...(currentLocale && { 'Accept-Language': currentLocale })
+              };
+              const retryConfig: RequestInit = {
+                ...restOptions,
+                headers: mergeRequestInitHeaders(
+                  headersInitWithoutAuthorization(callerHeaders),
+                  retryAuthHeaders
+                )
+              };
+
+              response = await fetch(url, retryConfig);
+            }
           }
         }
       } catch (refreshError) {
