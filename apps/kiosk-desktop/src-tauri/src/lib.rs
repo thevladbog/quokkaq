@@ -325,6 +325,33 @@ fn pair_terminal(app: AppHandle, args: PairTerminalArgs) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn trim_slash_removes_trailing_slashes() {
+        assert_eq!(trim_slash("https://example.com///"), "https://example.com");
+        assert_eq!(trim_slash("path"), "path");
+    }
+
+    #[test]
+    fn profile_is_ready_checks_required_strings() {
+        let base = DesktopProfile {
+            api_base_url: "https://api".into(),
+            access_token: "t".into(),
+            unit_id: "u".into(),
+            default_locale: "en".into(),
+            app_base_url: "https://app".into(),
+            kiosk_fullscreen: false,
+        };
+        assert!(profile_is_ready(&base));
+        let mut missing_token = base.clone();
+        missing_token.access_token.clear();
+        assert!(!profile_is_ready(&missing_token));
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()

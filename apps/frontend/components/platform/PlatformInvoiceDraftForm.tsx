@@ -1,14 +1,31 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { Invoice } from '@quokkaq/shared-types';
 import type {
-  Invoice,
-  InvoiceDraftCreateBody,
-  InvoiceDraftLineInput,
-  InvoiceDraftUpsertBody,
-  InvoiceLine
-} from '@quokkaq/shared-types';
-import { platformApi } from '@/lib/api';
+  HandlersInvoiceDraftCreateBody,
+  HandlersInvoiceDraftUpsertBody,
+  HandlersPlatformListResponseModelsCatalogItem,
+  ModelsCatalogItem,
+  ModelsInvoice,
+  ModelsSubscriptionPlan
+} from '@/lib/api/generated/platform';
+import {
+  getGetPlatformCatalogItemsQueryKey,
+  getGetPlatformCompaniesIdQueryKey,
+  getGetPlatformInvoicesIdQueryKey,
+  getGetPlatformInvoicesQueryKey,
+  getGetPlatformSubscriptionPlansQueryKey,
+  getPlatformCatalogItems,
+  getPlatformCompaniesId,
+  getPlatformInvoicesId,
+  getPlatformSubscriptionPlans,
+  getPlatformListCompaniesQueryKey,
+  patchPlatformInvoicesIdDraft,
+  platformListCompanies,
+  postPlatformInvoices,
+  postPlatformInvoicesIdIssue
+} from '@/lib/api/generated/platform';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -33,286 +50,22 @@ import {
 } from '@/lib/format-datetime';
 import {
   formatPriceMinorUnits,
-  minorUnitsToAmountInputString,
-  parseAmountStringToMinorUnits,
-  validateVatRatePercentInput
+  minorUnitsToAmountInputString
 } from '@/lib/format-price';
 import {
   computeLineTotals,
-  discountMinorForLineInput,
-  type InvoiceLineCalcInput
+  discountMinorForLineInput
 } from '@/lib/invoice-line-totals';
+import {
+  buildDraftBody,
+  invoiceToDraftUpsertBody,
+  newDraftLineRow,
+  rowsFromInvoiceLines,
+  tryParseDraftRowForTotals,
+  type DraftLineRow
+} from '@/lib/platform-invoice-draft-body';
 
-export type DraftLineRow = {
-  key: string;
-  catalogItemId: string;
-  descriptionPrint: string;
-  quantity: string;
-  /** UOM for print (e.g. шт, мес.) */
-  measureUnit: string;
-  /** Major units display (comma decimal for RU), sent as minor to API */
-  unitPriceInput: string;
-  vatExempt: boolean;
-  vatRatePercent: string;
-  discountPercent: string;
-  discountAmountInput: string;
-  isLicenseLine: boolean;
-  subscriptionPlanId: string;
-  subscriptionPeriodStart: string;
-};
-
-function newLine(): DraftLineRow {
-  return {
-    key:
-      typeof crypto !== 'undefined' && crypto.randomUUID
-        ? crypto.randomUUID()
-        : String(Math.random()),
-    catalogItemId: '',
-    descriptionPrint: '',
-    quantity: '1',
-    measureUnit: '',
-    unitPriceInput: '',
-    vatExempt: false,
-    vatRatePercent: '20',
-    discountPercent: '',
-    discountAmountInput: '',
-    isLicenseLine: false,
-    subscriptionPlanId: '',
-    subscriptionPeriodStart: ''
-  };
-}
-
-function rowsFromLines(
-  lines: InvoiceLine[] | undefined,
-  invoiceCurrency: string,
-  appLocale: string
-): DraftLineRow[] {
-  const cur = invoiceCurrency.trim() || 'RUB';
-  if (!lines?.length) return [newLine()];
-  return [...lines]
-    .sort((a, b) => a.position - b.position)
-    .map((l) => ({
-      key: l.id || newLine().key,
-      catalogItemId: (l.catalogItemId ?? '').trim(),
-      descriptionPrint: l.descriptionPrint,
-      quantity: String(l.quantity),
-      measureUnit: (l.unit ?? '').trim(),
-      unitPriceInput: minorUnitsToAmountInputString(
-        l.unitPriceInclVatMinor,
-        cur,
-        appLocale
-      ),
-      vatExempt: l.vatExempt,
-      vatRatePercent:
-        typeof l.vatRatePercent === 'number' &&
-        Number.isFinite(l.vatRatePercent)
-          ? String(l.vatRatePercent)
-          : '20',
-      discountPercent:
-        l.discountPercent != null ? String(l.discountPercent) : '',
-      discountAmountInput:
-        l.discountAmountMinor != null
-          ? minorUnitsToAmountInputString(l.discountAmountMinor, cur, appLocale)
-          : '',
-      isLicenseLine: !!(l.subscriptionPlanId && l.subscriptionPlanId.trim()),
-      subscriptionPlanId: (l.subscriptionPlanId ?? '').trim(),
-      subscriptionPeriodStart: l.subscriptionPeriodStart
-        ? toDateTimeLocalString(l.subscriptionPeriodStart)
-        : ''
-    }));
-}
-
-function buildDraftBody(
-  companyId: string,
-  dueLocal: string,
-  currency: string,
-  allowYookassa: boolean,
-  allowStripe: boolean,
-  provision: boolean,
-  rows: DraftLineRow[],
-  intlLocale: string
-): InvoiceDraftCreateBody {
-  const due = new Date(dueLocal.trim());
-  if (Number.isNaN(due.getTime())) {
-    throw new Error('dueInvalid');
-  }
-
-  const cur = currency.trim() || 'RUB';
-  let licenseRows = 0;
-  const lines = rows.map((r) => {
-    const qty = Number.parseFloat(r.quantity.trim());
-    if (!Number.isFinite(qty) || qty <= 0) {
-      throw new Error('quantityInvalid');
-    }
-    const unit = parseAmountStringToMinorUnits(
-      r.unitPriceInput,
-      cur,
-      intlLocale
-    );
-    if (!Number.isFinite(unit) || unit < 0) {
-      throw new Error('unitPriceInvalid');
-    }
-    const desc = r.descriptionPrint.trim();
-    if (!desc && !r.catalogItemId.trim()) {
-      throw new Error('descriptionRequired');
-    }
-
-    let vatRatePercent = 0;
-    if (!r.vatExempt) {
-      const v = validateVatRatePercentInput(r.vatRatePercent);
-      if (v === null) {
-        throw new Error('vatRateInvalid');
-      }
-      vatRatePercent = v;
-    }
-    const line: InvoiceDraftUpsertBody['lines'][number] = {
-      descriptionPrint: desc,
-      quantity: qty,
-      unit: r.measureUnit.trim(),
-      unitPriceInclVatMinor: unit,
-      vatExempt: r.vatExempt,
-      vatRatePercent
-    };
-
-    const cat = r.catalogItemId.trim();
-    if (cat) line.catalogItemId = cat;
-
-    const dp = r.discountPercent.trim();
-    const da = r.discountAmountInput.trim();
-    if (dp && da) {
-      throw new Error('discountBoth');
-    }
-    if (dp) {
-      const p = Number.parseFloat(dp.replace(',', '.'));
-      if (!Number.isFinite(p) || p < 0 || p > 100) {
-        throw new Error('discountPercentInvalid');
-      }
-      line.discountPercent = p;
-    } else if (da) {
-      const m = parseAmountStringToMinorUnits(da, cur, intlLocale);
-      if (!Number.isFinite(m) || m < 0) {
-        throw new Error('discountAmountInvalid');
-      }
-      line.discountAmountMinor = m;
-    }
-
-    if (r.isLicenseLine) {
-      const planId = r.subscriptionPlanId.trim();
-      if (!planId) {
-        throw new Error('planRequired');
-      }
-      const st = new Date(r.subscriptionPeriodStart.trim());
-      if (Number.isNaN(st.getTime())) {
-        throw new Error('periodStartInvalid');
-      }
-      line.subscriptionPlanId = planId;
-      line.subscriptionPeriodStart = st.toISOString();
-      if (provision) {
-        licenseRows++;
-        if (licenseRows > 1) {
-          throw new Error('tooManyLicenseLines');
-        }
-      }
-    }
-
-    return line;
-  });
-
-  return {
-    companyId: companyId.trim(),
-    dueDate: due.toISOString(),
-    currency: cur,
-    allowYookassaPaymentLink: allowYookassa,
-    allowStripePaymentLink: allowStripe,
-    provisionSubscriptionsOnPayment: provision,
-    lines
-  };
-}
-
-/** Rebuild PATCH draft body from a server invoice (for rollback after a failed issue). */
-function invoiceToDraftUpsertBody(inv: Invoice): InvoiceDraftUpsertBody {
-  const companyId = inv.companyId?.trim() ?? '';
-  const lines: InvoiceDraftLineInput[] = [...(inv.lines ?? [])]
-    .sort((a, b) => a.position - b.position)
-    .map((l) => {
-      const line: InvoiceDraftLineInput = {
-        descriptionPrint: l.descriptionPrint,
-        quantity: l.quantity,
-        unit: l.unit ?? '',
-        unitPriceInclVatMinor: l.unitPriceInclVatMinor,
-        vatExempt: l.vatExempt,
-        vatRatePercent: l.vatRatePercent
-      };
-      const cat = (l.catalogItemId ?? '').trim();
-      if (cat) line.catalogItemId = cat;
-      if (l.discountPercent != null) line.discountPercent = l.discountPercent;
-      if (l.discountAmountMinor != null)
-        line.discountAmountMinor = l.discountAmountMinor;
-      const plan = (l.subscriptionPlanId ?? '').trim();
-      if (plan) {
-        line.subscriptionPlanId = plan;
-        if (l.subscriptionPeriodStart) {
-          line.subscriptionPeriodStart = l.subscriptionPeriodStart;
-        }
-      }
-      return line;
-    });
-
-  return {
-    companyId,
-    dueDate: inv.dueDate,
-    currency: (inv.currency ?? 'RUB').trim() || 'RUB',
-    allowYookassaPaymentLink: inv.allowYookassaPaymentLink ?? false,
-    allowStripePaymentLink: inv.allowStripePaymentLink ?? false,
-    provisionSubscriptionsOnPayment:
-      inv.provisionSubscriptionsOnPayment ?? false,
-    lines
-  };
-}
-
-/** Draft preview: same numeric rules as save, but omits description / license checks. */
-function tryParseDraftRowForTotals(
-  r: DraftLineRow,
-  currency: string,
-  intlLocale: string
-): InvoiceLineCalcInput | null {
-  const cur = currency.trim() || 'RUB';
-  const qty = Number.parseFloat(r.quantity.trim());
-  if (!Number.isFinite(qty) || qty <= 0) return null;
-  const unit = parseAmountStringToMinorUnits(r.unitPriceInput, cur, intlLocale);
-  if (!Number.isFinite(unit) || unit < 0) return null;
-
-  const dp = r.discountPercent.trim();
-  const da = r.discountAmountInput.trim();
-  if (dp && da) return null;
-
-  let discountPercent: number | null = null;
-  let discountAmountMinor: number | null = null;
-  if (dp) {
-    const p = Number.parseFloat(dp.replace(',', '.'));
-    if (!Number.isFinite(p) || p < 0 || p > 100) return null;
-    discountPercent = p;
-  } else if (da) {
-    const m = parseAmountStringToMinorUnits(da, cur, intlLocale);
-    if (!Number.isFinite(m) || m < 0) return null;
-    discountAmountMinor = m;
-  }
-
-  const vatExempt = r.vatExempt;
-  const vatRatePercent = vatExempt
-    ? 0
-    : validateVatRatePercentInput(r.vatRatePercent);
-  if (!vatExempt && vatRatePercent === null) return null;
-
-  return {
-    unitPriceInclVatMinor: unit,
-    quantity: qty,
-    discountPercent,
-    discountAmountMinor,
-    vatExempt,
-    vatRatePercent: vatRatePercent ?? 0
-  };
-}
+export type { DraftLineRow } from '@/lib/platform-invoice-draft-body';
 
 type PlatformInvoiceDraftFormProps = {
   /** Prefill company when creating from company page */
@@ -354,7 +107,7 @@ export function PlatformInvoiceDraftForm({
     initialInvoice?.provisionSubscriptionsOnPayment ?? false
   );
   const [rows, setRows] = useState<DraftLineRow[]>(() =>
-    rowsFromLines(
+    rowsFromInvoiceLines(
       initialInvoice?.lines,
       initialInvoice?.currency?.trim() || 'RUB',
       appLocale
@@ -384,7 +137,7 @@ export function PlatformInvoiceDraftForm({
         setAllowStripe(snapshot.allowStripePaymentLink ?? false);
         setProvision(snapshot.provisionSubscriptionsOnPayment ?? false);
         setRows(
-          rowsFromLines(
+          rowsFromInvoiceLines(
             snapshot.lines,
             snapshot.currency?.trim() || 'RUB',
             appLocale
@@ -404,7 +157,7 @@ export function PlatformInvoiceDraftForm({
         setAllowYookassa(false);
         setAllowStripe(false);
         setProvision(false);
-        setRows(rowsFromLines(undefined, 'RUB', appLocale));
+        setRows(rowsFromInvoiceLines(undefined, 'RUB', appLocale));
       });
     }
   }, [initialInvoice, appLocale, defaultCompanyId]);
@@ -420,17 +173,19 @@ export function PlatformInvoiceDraftForm({
     isError: companiesQueryError,
     error: companiesErrorObj
   } = useQuery({
-    queryKey: ['platform-companies', 'invoice-draft'],
-    queryFn: () => platformApi.listCompanies({ limit: 200 }),
+    queryKey: getPlatformListCompaniesQueryKey({ limit: 200 }),
+    queryFn: async () => (await platformListCompanies({ limit: 200 })).data,
     enabled: !isEdit
   });
 
   const companyOptions = useMemo(() => {
-    return (companiesData?.items ?? []).map((c) => ({
-      value: c.id,
-      label: `${c.name} (${c.id.slice(0, 8)}…)`,
-      keywords: [c.name, c.id]
-    }));
+    return (companiesData?.items ?? [])
+      .filter((c): c is typeof c & { id: string } => Boolean(c.id?.trim()))
+      .map((c) => ({
+        value: c.id,
+        label: `${c.name} (${c.id.slice(0, 8)}…)`,
+        keywords: [c.name ?? '', c.id]
+      }));
   }, [companiesData?.items]);
 
   const {
@@ -439,8 +194,8 @@ export function PlatformInvoiceDraftForm({
     isError: companyForEditQueryError,
     error: companyForEditErrorObj
   } = useQuery({
-    queryKey: ['platform-company', 'invoice-draft', companyId],
-    queryFn: () => platformApi.getCompany(companyId),
+    queryKey: getGetPlatformCompaniesIdQueryKey(companyId),
+    queryFn: async () => (await getPlatformCompaniesId(companyId)).data,
     enabled: isEdit && !!companyId.trim()
   });
 
@@ -449,12 +204,18 @@ export function PlatformInvoiceDraftForm({
     isError: catalogQueryError,
     error: catalogErrorObj
   } = useQuery({
-    queryKey: ['platform-catalog-items', 'invoice-draft'],
-    queryFn: () => platformApi.listCatalogItems({ limit: 500 })
+    queryKey: getGetPlatformCatalogItemsQueryKey({ limit: 500 }),
+    queryFn: async () =>
+      (await getPlatformCatalogItems({ limit: 500 }))
+        .data as HandlersPlatformListResponseModelsCatalogItem
   });
 
   const catalogItems = useMemo(
-    () => (catalogData?.items ?? []).filter((c) => c.isActive !== false),
+    () =>
+      (catalogData?.items ?? []).filter(
+        (c): c is ModelsCatalogItem & { id: string } =>
+          c.isActive !== false && Boolean(c.id?.trim())
+      ),
     [catalogData?.items]
   );
 
@@ -463,8 +224,9 @@ export function PlatformInvoiceDraftForm({
     isError: plansQueryError,
     error: plansErrorObj
   } = useQuery({
-    queryKey: ['platform-subscription-plans', 'invoice-draft'],
-    queryFn: () => platformApi.listSubscriptionPlans()
+    queryKey: getGetPlatformSubscriptionPlansQueryKey(),
+    queryFn: async () =>
+      (await getPlatformSubscriptionPlans()).data as ModelsSubscriptionPlan[]
   });
 
   const referenceDataBlocked =
@@ -475,7 +237,9 @@ export function PlatformInvoiceDraftForm({
 
   const catalogById = useMemo(() => {
     const m = new Map<string, (typeof catalogItems)[number]>();
-    for (const c of catalogItems) m.set(c.id, c);
+    for (const c of catalogItems) {
+      m.set(c.id, c);
+    }
     return m;
   }, [catalogItems]);
 
@@ -494,16 +258,16 @@ export function PlatformInvoiceDraftForm({
           return {
             ...r,
             catalogItemId: catalogId,
-            descriptionPrint: item.printName || item.name,
+            descriptionPrint: (item.printName || item.name || '').trim(),
             measureUnit: (item.unit ?? '').trim(),
             unitPriceInput: sameCurrency
               ? minorUnitsToAmountInputString(
-                  item.defaultPriceMinor,
+                  item.defaultPriceMinor ?? 0,
                   itemCur,
                   appLocale
                 )
               : '',
-            vatExempt: item.vatExempt,
+            vatExempt: item.vatExempt ?? false,
             vatRatePercent:
               typeof item.vatRatePercent === 'number' &&
               Number.isFinite(item.vatRatePercent)
@@ -620,14 +384,21 @@ export function PlatformInvoiceDraftForm({
         rows,
         intlLocale
       );
-      return platformApi.createInvoice(body);
+      return postPlatformInvoices(body as HandlersInvoiceDraftCreateBody);
     },
-    onSuccess: (inv) => {
+    onSuccess: (res) => {
+      const invId = (res.data as ModelsInvoice | undefined)?.id;
+      if (!invId) {
+        toastMutationError(new Error('missingInvoiceId'));
+        return;
+      }
       toast.success(
         t('toastDraftCreated', { defaultValue: 'Draft invoice created.' })
       );
-      void qc.invalidateQueries({ queryKey: ['platform-invoices'] });
-      router.push(`/platform/invoices/${inv.id}`);
+      void qc.invalidateQueries({
+        queryKey: getGetPlatformInvoicesQueryKey()
+      });
+      router.push(`/platform/invoices/${invId}`);
     },
     onError: toastMutationError
   });
@@ -645,14 +416,21 @@ export function PlatformInvoiceDraftForm({
         rows,
         intlLocale
       );
-      return platformApi.patchInvoiceDraft(initialInvoice.id, body);
+      return patchPlatformInvoicesIdDraft(
+        initialInvoice.id,
+        body as HandlersInvoiceDraftUpsertBody
+      );
     },
     onSuccess: () => {
       toast.success(t('toastDraftSaved', { defaultValue: 'Draft saved.' }));
-      void qc.invalidateQueries({ queryKey: ['platform-invoices'] });
       void qc.invalidateQueries({
-        queryKey: ['platform-invoice', initialInvoice?.id]
+        queryKey: getGetPlatformInvoicesQueryKey()
       });
+      if (initialInvoice?.id) {
+        void qc.invalidateQueries({
+          queryKey: getGetPlatformInvoicesIdQueryKey(initialInvoice.id)
+        });
+      }
     },
     onError: toastMutationError
   });
@@ -674,17 +452,24 @@ export function PlatformInvoiceDraftForm({
         intlLocale
       );
 
-      const snapshot = await platformApi.getPlatformInvoice(id);
+      const snapshotRes = await getPlatformInvoicesId(id);
+      const snapshot = snapshotRes.data as Invoice;
       const originalBody = invoiceToDraftUpsertBody(snapshot);
 
-      await platformApi.patchInvoiceDraft(id, body);
+      await patchPlatformInvoicesIdDraft(
+        id,
+        body as HandlersInvoiceDraftUpsertBody
+      );
       try {
-        return await platformApi.issueInvoice(id);
+        return await postPlatformInvoicesIdIssue(id);
       } catch (issueErr) {
         const detail =
           issueErr instanceof Error ? issueErr.message : String(issueErr);
         try {
-          await platformApi.patchInvoiceDraft(id, originalBody);
+          await patchPlatformInvoicesIdDraft(
+            id,
+            originalBody as HandlersInvoiceDraftUpsertBody
+          );
         } catch (rollbackErr) {
           const rollbackMsg =
             rollbackErr instanceof Error
@@ -704,17 +489,25 @@ export function PlatformInvoiceDraftForm({
     },
     onSuccess: async () => {
       toast.success(t('toastIssued', { defaultValue: 'Invoice issued.' }));
-      void qc.invalidateQueries({ queryKey: ['platform-invoices'] });
-      await qc.invalidateQueries({
-        queryKey: ['platform-invoice', initialInvoice?.id]
+      void qc.invalidateQueries({
+        queryKey: getGetPlatformInvoicesQueryKey()
       });
+      if (initialInvoice?.id) {
+        await qc.invalidateQueries({
+          queryKey: getGetPlatformInvoicesIdQueryKey(initialInvoice.id)
+        });
+      }
     },
     onError: (err) => {
       toastMutationError(err);
-      void qc.invalidateQueries({ queryKey: ['platform-invoices'] });
       void qc.invalidateQueries({
-        queryKey: ['platform-invoice', initialInvoice?.id]
+        queryKey: getGetPlatformInvoicesQueryKey()
       });
+      if (initialInvoice?.id) {
+        void qc.invalidateQueries({
+          queryKey: getGetPlatformInvoicesIdQueryKey(initialInvoice.id)
+        });
+      }
     }
   });
 
@@ -869,7 +662,7 @@ export function PlatformInvoiceDraftForm({
               className='shrink-0 lg:hidden'
               variant='secondary'
               size='sm'
-              onClick={() => setRows((r) => [...r, newLine()])}
+              onClick={() => setRows((r) => [...r, newDraftLineRow()])}
             >
               {t('addLine', { defaultValue: 'Add line' })}
             </Button>
@@ -934,7 +727,7 @@ export function PlatformInvoiceDraftForm({
                         </SelectItem>
                         {catalogItems.map((c) => (
                           <SelectItem key={c.id} value={c.id}>
-                            {c.name}
+                            {c.name ?? ''}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -1165,11 +958,15 @@ export function PlatformInvoiceDraftForm({
                             />
                           </SelectTrigger>
                           <SelectContent>
-                            {plans.map((p) => (
-                              <SelectItem key={p.id} value={p.id}>
-                                {p.name}
-                              </SelectItem>
-                            ))}
+                            {plans
+                              .filter((p): p is typeof p & { id: string } =>
+                                Boolean(p.id?.trim())
+                              )
+                              .map((p) => (
+                                <SelectItem key={p.id} value={p.id}>
+                                  {p.name}
+                                </SelectItem>
+                              ))}
                           </SelectContent>
                         </Select>
                       </div>
@@ -1208,7 +1005,7 @@ export function PlatformInvoiceDraftForm({
               type='button'
               variant='secondary'
               size='sm'
-              onClick={() => setRows((r) => [...r, newLine()])}
+              onClick={() => setRows((r) => [...r, newDraftLineRow()])}
             >
               {t('addLine', { defaultValue: 'Add line' })}
             </Button>

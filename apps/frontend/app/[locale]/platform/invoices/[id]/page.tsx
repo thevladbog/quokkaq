@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Invoice } from '@quokkaq/shared-types';
+import type { Company, Invoice } from '@quokkaq/shared-types';
 import { InvoiceDocumentLinesAndTotals } from '@/components/billing/InvoiceDocumentLinesAndTotals';
 import { PlatformInvoiceDraftForm } from '@/components/platform/PlatformInvoiceDraftForm';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,14 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
-import { platformApi } from '@/lib/api';
+import {
+  getGetPlatformCompaniesIdQueryKey,
+  getGetPlatformInvoicesIdQueryKey,
+  getGetPlatformInvoicesQueryKey,
+  getPlatformCompaniesId,
+  getPlatformInvoicesId,
+  patchPlatformInvoicesId
+} from '@/lib/api/generated/platform';
 import {
   downloadInvoicePdf,
   invoicePdfDownloadErrorToastMessage
@@ -56,22 +63,27 @@ function PlatformInvoiceReadOnly({
   const [pdfBusy, setPdfBusy] = useState(false);
 
   const { data: company, isLoading: companyLoading } = useQuery({
-    queryKey: ['platform-company', 'invoice-readonly', inv.companyId],
-    queryFn: () => platformApi.getCompany(inv.companyId!),
+    queryKey: getGetPlatformCompaniesIdQueryKey(inv.companyId!),
+    queryFn: async () =>
+      (await getPlatformCompaniesId(inv.companyId!)).data as Company,
     enabled: !!inv.companyId?.trim()
   });
 
   const patch = useMutation({
     mutationFn: ({ status }: { status: (typeof INV_STATUSES)[number] }) =>
-      platformApi.patchInvoice(inv.id, { status }),
+      patchPlatformInvoicesId(inv.id, { status }),
     onSuccess: () => {
       toast.success(
         tInv('toastStatusUpdated', {
           defaultValue: 'Invoice status updated.'
         })
       );
-      void qc.invalidateQueries({ queryKey: ['platform-invoice', inv.id] });
-      void qc.invalidateQueries({ queryKey: ['platform-invoices'] });
+      void qc.invalidateQueries({
+        queryKey: getGetPlatformInvoicesIdQueryKey(inv.id)
+      });
+      void qc.invalidateQueries({
+        queryKey: getGetPlatformInvoicesQueryKey()
+      });
     },
     onError: (err) => {
       const raw = err instanceof Error ? err.message : String(err);
@@ -258,8 +270,8 @@ export default function PlatformInvoiceDetailPage() {
     isLoading,
     isError
   } = useQuery({
-    queryKey: ['platform-invoice', id],
-    queryFn: () => platformApi.getPlatformInvoice(id),
+    queryKey: getGetPlatformInvoicesIdQueryKey(id),
+    queryFn: async () => (await getPlatformInvoicesId(id)).data as Invoice,
     enabled: !!id
   });
 

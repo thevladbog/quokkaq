@@ -1,11 +1,17 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { platformApi } from '@/lib/api';
+import type {
+  HandlersInvoiceDraftCreateBody,
+  ModelsInvoice
+} from '@/lib/api/generated/platform';
 import {
+  getGetPlatformInvoicesQueryKey,
   getPlatformListCompaniesQueryKey,
   getPlatformListSubscriptionsQueryKey,
   platformCreateSubscription,
+  postPlatformInvoices,
+  postPlatformInvoicesIdIssue,
   useGetPlatformSubscriptionPlans,
   usePlatformListCompanies,
   usePlatformListSubscriptions
@@ -198,9 +204,9 @@ export default function PlatformSubscriptionsPage() {
         await platformCreateSubscription(body);
 
         const plan = plans.find((p) => p.id === planId);
-        let inv;
+        let inv: ModelsInvoice;
         try {
-          inv = await platformApi.createInvoice({
+          const invRes = await postPlatformInvoices({
             companyId,
             dueDate: due,
             currency: (plan?.currency ?? 'RUB').trim() || 'RUB',
@@ -216,7 +222,8 @@ export default function PlatformSubscriptionsPage() {
                 vatRatePercent: 0
               }
             ]
-          });
+          } satisfies HandlersInvoiceDraftCreateBody);
+          inv = invRes.data as ModelsInvoice;
         } catch (invoiceErr) {
           logger.error(
             'createInvoice after createSubscription (with invoice flow)',
@@ -225,7 +232,8 @@ export default function PlatformSubscriptionsPage() {
           return { outcome: 'subscription-only-invoice-failed' };
         }
         try {
-          await platformApi.issueInvoice(inv.id);
+          if (!inv.id?.trim()) throw new Error('missing invoice id');
+          await postPlatformInvoicesIdIssue(inv.id);
         } catch (issueErr) {
           logger.error(
             'issueInvoice after createSubscription+createInvoice',
@@ -233,7 +241,7 @@ export default function PlatformSubscriptionsPage() {
           );
           return {
             outcome: 'subscription-draft-invoice',
-            invoiceId: inv.id
+            invoiceId: inv.id!
           };
         }
         return { outcome: 'subscription-and-invoice' };
@@ -271,8 +279,15 @@ export default function PlatformSubscriptionsPage() {
       qc.invalidateQueries({
         queryKey: getPlatformListCompaniesQueryKey()
       });
-      qc.invalidateQueries({ queryKey: ['platform-company'] });
-      qc.invalidateQueries({ queryKey: ['platform-invoices'] });
+      qc.invalidateQueries({
+        predicate: (q) =>
+          Array.isArray(q.queryKey) &&
+          typeof q.queryKey[0] === 'string' &&
+          /^\/platform\/companies\/[^/]+$/.test(q.queryKey[0])
+      });
+      qc.invalidateQueries({
+        queryKey: getGetPlatformInvoicesQueryKey()
+      });
       setCreateOpen(false);
       setCompanyId('');
       setPlanId('');

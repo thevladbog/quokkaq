@@ -20,15 +20,23 @@ function installMockWebSocket(
     addEventListener: ReturnType<typeof vi.fn>;
   }
 ) {
+  type MockWebSocketCtor = {
+    new (...args: unknown[]): unknown;
+    CONNECTING: number;
+    OPEN: number;
+    CLOSING: number;
+    CLOSED: number;
+  };
+
   const Mock = vi.fn(function MockWebSocket(this: unknown) {
     return factory();
-  }) as unknown as typeof WebSocket;
+  }) as unknown as MockWebSocketCtor;
   Mock.CONNECTING = 0;
   Mock.OPEN = 1;
   Mock.CLOSING = 2;
   Mock.CLOSED = 3;
-  vi.stubGlobal('WebSocket', Mock);
-  return Mock;
+  vi.stubGlobal('WebSocket', Mock as unknown as typeof WebSocket);
+  return Mock as unknown as typeof WebSocket;
 }
 
 describe('SocketClient.disconnect', () => {

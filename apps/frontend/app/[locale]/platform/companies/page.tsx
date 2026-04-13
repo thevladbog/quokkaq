@@ -2,7 +2,10 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { platformApi } from '@/lib/api';
+import {
+  getPlatformListCompaniesQueryKey,
+  platformListCompanies
+} from '@/lib/api/generated/platform';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
@@ -31,10 +34,14 @@ export default function PlatformCompaniesPage() {
     return () => clearTimeout(id);
   }, [search]);
 
+  const listParams = {
+    search: debounced || undefined,
+    limit: 100
+  } as const;
+
   const { data, isLoading, error } = useQuery({
-    queryKey: ['platform-companies', debounced],
-    queryFn: () =>
-      platformApi.listCompanies({ search: debounced || undefined, limit: 100 })
+    queryKey: getPlatformListCompaniesQueryKey(listParams),
+    queryFn: async () => (await platformListCompanies(listParams)).data
   });
 
   return (
@@ -64,7 +71,7 @@ export default function PlatformCompaniesPage() {
           {(error as Error).message || 'Failed to load'}
         </p>
       )}
-      {data && data.items.length > 0 && (
+      {data && (data.items ?? []).length > 0 && (
         <Table>
           <TableHeader>
             <TableRow>
@@ -75,37 +82,43 @@ export default function PlatformCompaniesPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.items.map((c) => (
-              <TableRow key={c.id}>
-                <TableCell className='font-medium'>
-                  <span className='inline-flex flex-wrap items-center gap-2'>
-                    {c.name}
-                    {c.isSaasOperator ? (
-                      <Badge variant='secondary'>
-                        {t('saasOperatorBadge', {
-                          defaultValue: 'Operator'
-                        })}
-                      </Badge>
-                    ) : null}
-                  </span>
-                </TableCell>
-                <TableCell className='text-muted-foreground font-mono text-xs'>
-                  {c.id.slice(0, 8)}…
-                </TableCell>
-                <TableCell>{formatAppDate(c.createdAt, intlLocale)}</TableCell>
-                <TableCell className='text-right'>
-                  <Button variant='outline' size='sm' asChild>
-                    <Link href={`/platform/companies/${c.id}`}>
-                      {t('open', { defaultValue: 'Open' })}
-                    </Link>
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
+            {(data.items ?? [])
+              .filter((c): c is typeof c & { id: string } =>
+                Boolean(c.id?.trim())
+              )
+              .map((c) => (
+                <TableRow key={c.id}>
+                  <TableCell className='font-medium'>
+                    <span className='inline-flex flex-wrap items-center gap-2'>
+                      {c.name}
+                      {c.isSaasOperator ? (
+                        <Badge variant='secondary'>
+                          {t('saasOperatorBadge', {
+                            defaultValue: 'Operator'
+                          })}
+                        </Badge>
+                      ) : null}
+                    </span>
+                  </TableCell>
+                  <TableCell className='text-muted-foreground font-mono text-xs'>
+                    {c.id.slice(0, 8)}…
+                  </TableCell>
+                  <TableCell>
+                    {formatAppDate(c.createdAt, intlLocale)}
+                  </TableCell>
+                  <TableCell className='text-right'>
+                    <Button variant='outline' size='sm' asChild>
+                      <Link href={`/platform/companies/${c.id}`}>
+                        {t('open', { defaultValue: 'Open' })}
+                      </Link>
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
           </TableBody>
         </Table>
       )}
-      {data && data.items.length === 0 && !isLoading && (
+      {data && (data.items ?? []).length === 0 && !isLoading && (
         <p className='text-muted-foreground py-8'>
           {t('empty', { defaultValue: 'No companies found.' })}
         </p>

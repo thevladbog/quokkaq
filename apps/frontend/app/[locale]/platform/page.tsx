@@ -1,7 +1,16 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { platformApi } from '@/lib/api';
+import {
+  getGetPlatformInvoicesQueryKey,
+  getGetPlatformSubscriptionPlansQueryKey,
+  getPlatformInvoices,
+  getPlatformListCompaniesQueryKey,
+  getPlatformListSubscriptionsQueryKey,
+  getPlatformSubscriptionPlans,
+  platformListCompanies,
+  platformListSubscriptions
+} from '@/lib/api/generated/platform';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,6 +25,8 @@ import {
   Layers
 } from 'lucide-react';
 
+const overviewListParams = { limit: 1, offset: 0 } as const;
+
 export default function PlatformOverviewPage() {
   const t = useTranslations('platform.overview');
   const {
@@ -24,8 +35,8 @@ export default function PlatformOverviewPage() {
     isError: isCompaniesError,
     refetch: refetchCompanies
   } = useQuery({
-    queryKey: ['platform-companies', 'count'],
-    queryFn: () => platformApi.listCompanies({ limit: 1, offset: 0 })
+    queryKey: getPlatformListCompaniesQueryKey(overviewListParams),
+    queryFn: async () => (await platformListCompanies(overviewListParams)).data
   });
   const {
     data: subs,
@@ -33,8 +44,9 @@ export default function PlatformOverviewPage() {
     isError: isSubsError,
     refetch: refetchSubs
   } = useQuery({
-    queryKey: ['platform-subscriptions', 'count'],
-    queryFn: () => platformApi.listSubscriptions({ limit: 1, offset: 0 })
+    queryKey: getPlatformListSubscriptionsQueryKey(overviewListParams),
+    queryFn: async () =>
+      (await platformListSubscriptions(overviewListParams)).data
   });
   const {
     data: plans,
@@ -42,8 +54,8 @@ export default function PlatformOverviewPage() {
     isError: isPlansError,
     refetch: refetchPlans
   } = useQuery({
-    queryKey: ['platform-plans'],
-    queryFn: () => platformApi.listSubscriptionPlans()
+    queryKey: getGetPlatformSubscriptionPlansQueryKey(),
+    queryFn: async () => (await getPlatformSubscriptionPlans()).data
   });
   const {
     data: inv,
@@ -51,8 +63,8 @@ export default function PlatformOverviewPage() {
     isError: isInvError,
     refetch: refetchInv
   } = useQuery({
-    queryKey: ['platform-invoices', 'count'],
-    queryFn: () => platformApi.listInvoices({ limit: 1, offset: 0 })
+    queryKey: getGetPlatformInvoicesQueryKey(overviewListParams),
+    queryFn: async () => (await getPlatformInvoices(overviewListParams)).data
   });
 
   const loading = lc || ls || lp || li;
