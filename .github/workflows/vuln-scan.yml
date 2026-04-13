@@ -32,7 +32,8 @@ jobs:
           file pnpm-lock.yaml
           wc -l pnpm-lock.yaml
 
-      - uses: pnpm/action-setup@v6
+      - name: Enable Corepack
+        run: corepack enable
 
       - uses: actions/setup-node@v6
         with:
