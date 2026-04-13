@@ -1,7 +1,15 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { platformApi } from '@/lib/api';
+import {
+  getPlatformListCompaniesQueryKey,
+  getPlatformListSubscriptionsQueryKey,
+  platformCreateSubscription,
+  useGetPlatformSubscriptionPlans,
+  usePlatformListCompanies,
+  usePlatformListSubscriptions
+} from '@/lib/api/generated/platform';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -86,35 +94,36 @@ export default function PlatformSubscriptionsPage() {
   const [invAmount, setInvAmount] = useState('');
   const [invDue, setInvDue] = useState('');
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['platform-subscriptions', 'list'],
-    queryFn: () => platformApi.listSubscriptions({ limit: 200 })
-  });
+  const { data: subscriptionsPayload, isLoading } =
+    usePlatformListSubscriptions({ limit: 200 });
+  const data = subscriptionsPayload?.data;
 
   const {
-    data: companiesData,
+    data: companiesPayload,
     isError: companiesError,
     isLoading: companiesLoading
-  } = useQuery({
-    queryKey: ['platform-companies', 'create-sub'],
-    queryFn: () => platformApi.listCompanies({ limit: 100 }),
-    enabled: createOpen
-  });
+  } = usePlatformListCompanies(
+    { limit: 100 },
+    { query: { enabled: createOpen } }
+  );
+  const companiesData = companiesPayload?.data;
 
   const companyOptions = useMemo(() => {
-    return (companiesData?.items ?? []).map((c) => {
-      const hasSub =
-        c.subscriptionId != null && String(c.subscriptionId).trim() !== '';
-      const idShort = `${c.id.slice(0, 8)}…`;
-      return {
-        value: c.id,
-        label: hasSub
-          ? `${c.name} (${idShort}) — ${t('companyHasSubscription')}`
-          : `${c.name} (${idShort})`,
-        keywords: [c.name, c.id],
-        disabled: hasSub
-      };
-    });
+    return (companiesData?.items ?? [])
+      .filter((c): c is typeof c & { id: string } => Boolean(c.id?.trim()))
+      .map((c) => {
+        const hasSub =
+          c.subscriptionId != null && String(c.subscriptionId).trim() !== '';
+        const idShort = `${c.id.slice(0, 8)}…`;
+        return {
+          value: c.id,
+          label: hasSub
+            ? `${c.name ?? ''} (${idShort}) — ${t('companyHasSubscription')}`
+            : `${c.name ?? ''} (${idShort})`,
+          keywords: [c.name ?? '', c.id],
+          disabled: hasSub
+        };
+      });
   }, [companiesData?.items, t]);
 
   const selectedCompanyHasSubscription = useMemo(() => {
@@ -122,11 +131,11 @@ export default function PlatformSubscriptionsPage() {
     return !!(c?.subscriptionId && String(c.subscriptionId).trim());
   }, [companiesData?.items, companyId]);
 
-  const { data: plans = [], isError: plansError } = useQuery({
-    queryKey: ['platform-subscription-plans', 'create-sub'],
-    queryFn: () => platformApi.listSubscriptionPlans(),
-    enabled: createOpen
-  });
+  const { data: plansPayload, isError: plansError } =
+    useGetPlatformSubscriptionPlans({
+      query: { enabled: createOpen }
+    });
+  const plans = plansPayload?.data ?? [];
 
   const createMut = useMutation({
     mutationFn: async (): Promise<CreateSubscriptionMutationResult> => {
@@ -186,7 +195,7 @@ export default function PlatformSubscriptionsPage() {
         }
         const due = dueDate.toISOString();
 
-        await platformApi.createSubscription(body);
+        await platformCreateSubscription(body).then((r) => r.data);
 
         const plan = plans.find((p) => p.id === planId);
         let inv;
@@ -230,7 +239,7 @@ export default function PlatformSubscriptionsPage() {
         return { outcome: 'subscription-and-invoice' };
       }
 
-      await platformApi.createSubscription(body);
+      await platformCreateSubscription(body).then((r) => r.data);
       return { outcome: 'subscription-only' };
     },
     onSuccess: (result) => {
@@ -256,7 +265,12 @@ export default function PlatformSubscriptionsPage() {
           t('toastCreated', { defaultValue: 'Subscription created.' })
         );
       }
-      qc.invalidateQueries({ queryKey: ['platform-subscriptions'] });
+      qc.invalidateQueries({
+        queryKey: getPlatformListSubscriptionsQueryKey({ limit: 200 })
+      });
+      qc.invalidateQueries({
+        queryKey: getPlatformListCompaniesQueryKey({ limit: 100 })
+      });
       qc.invalidateQueries({ queryKey: ['platform-company'] });
       qc.invalidateQueries({ queryKey: ['platform-invoices'] });
       setCreateOpen(false);
@@ -355,11 +369,15 @@ export default function PlatformSubscriptionsPage() {
                   />
                 </SelectTrigger>
                 <SelectContent>
-                  {plans.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name} ({p.code})
-                    </SelectItem>
-                  ))}
+                  {plans
+                    .filter((p): p is typeof p & { id: string } =>
+                      Boolean(p.id?.trim())
+                    )
+                    .map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name} ({p.code})
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
@@ -475,7 +493,7 @@ export default function PlatformSubscriptionsPage() {
           <Spinner className='h-8 w-8' />
         </div>
       )}
-      {data && data.items.length === 0 && (
+      {data && (data.items?.length ?? 0) === 0 && (
         <p className='text-muted-foreground mb-4 text-sm'>
           {t('emptyListHint', {
             defaultValue:
@@ -483,7 +501,7 @@ export default function PlatformSubscriptionsPage() {
           })}
         </p>
       )}
-      {data && data.items.length > 0 && (
+      {data && (data.items?.length ?? 0) > 0 && (
         <Table>
           <TableHeader>
             <TableRow>
@@ -497,30 +515,34 @@ export default function PlatformSubscriptionsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.items.map((s) => (
-              <TableRow key={s.id}>
-                <TableCell>
-                  <Link
-                    href={`/platform/companies/${s.companyId}`}
-                    className='text-primary font-mono text-xs underline'
-                  >
-                    {s.companyId.slice(0, 8)}…
-                  </Link>
-                </TableCell>
-                <TableCell>{s.plan?.name ?? s.planId}</TableCell>
-                <TableCell>{s.status}</TableCell>
-                <TableCell className='text-sm'>
-                  {formatAppDateTime(s.currentPeriodEnd, intlLocale)}
-                </TableCell>
-                <TableCell className='text-right'>
-                  <Button variant='outline' size='sm' asChild>
-                    <Link href={`/platform/companies/${s.companyId}`}>
-                      {t('openCompany', { defaultValue: 'Company' })}
+            {(data.items ?? [])
+              .filter((s): s is typeof s & { companyId: string } =>
+                Boolean(s.companyId?.trim())
+              )
+              .map((s) => (
+                <TableRow key={s.id}>
+                  <TableCell>
+                    <Link
+                      href={`/platform/companies/${s.companyId}`}
+                      className='text-primary font-mono text-xs underline'
+                    >
+                      {s.companyId.slice(0, 8)}…
                     </Link>
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
+                  </TableCell>
+                  <TableCell>{s.plan?.name ?? s.planId}</TableCell>
+                  <TableCell>{s.status}</TableCell>
+                  <TableCell className='text-sm'>
+                    {formatAppDateTime(s.currentPeriodEnd, intlLocale)}
+                  </TableCell>
+                  <TableCell className='text-right'>
+                    <Button variant='outline' size='sm' asChild>
+                      <Link href={`/platform/companies/${s.companyId}`}>
+                        {t('openCompany', { defaultValue: 'Company' })}
+                      </Link>
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
           </TableBody>
         </Table>
       )}

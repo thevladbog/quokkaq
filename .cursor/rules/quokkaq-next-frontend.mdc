@@ -20,7 +20,14 @@ For **ESLint, Prettier, tests, and dev-server restarts**, use `quokkaq-agent-wor
 
 ## Data and API
 
-- Prefer TanStack Query plus helpers in [`lib/api.ts`](apps/frontend/lib/api.ts). Avoid one-off `fetch` to the API base that bypasses established patterns.
+- Prefer **TanStack Query** for server state. Use either:
+  - **Orval-generated** hooks and functions under [`lib/api/generated/`](apps/frontend/lib/api/generated/) for operations that are included in the current Orval config (today: OpenAPI tag **`platform`** → [`platform.ts`](apps/frontend/lib/api/generated/platform.ts)), or
+  - Hand-written helpers in [`lib/api.ts`](apps/frontend/lib/api.ts) everywhere else (and for flows not yet in the spec).
+- Avoid one-off `fetch` to the API base that bypasses auth; the Next proxy base is **`/api`**. Orval calls go through [`lib/orval-mutator.ts`](apps/frontend/lib/orval-mutator.ts) → [`authenticated-api-fetch.ts`](apps/frontend/lib/authenticated-api-fetch.ts) (same JWT + refresh as `lib/api.ts`).
+- **Do not hand-edit** files under `lib/api/generated/` — they are overwritten by codegen.
+- **After OpenAPI changes** (backend `docs/swagger.json` / swag annotations), regenerate the client from repo root: `pnpm nx run frontend:orval` (runs Orval + [`scripts/fix-orval-query-signal.mjs`](apps/frontend/scripts/fix-orval-query-signal.mjs)). Commit the updated generated file(s). CI runs `frontend:orval:check` when frontend or backend is affected.
+- To **add more API surface** to Orval, extend [`orval.config.ts`](apps/frontend/orval.config.ts) (e.g. `input.filters.tags`) and regenerate; keep the post-process script in the pipeline if the generator still emits `queryFn` with a bare `signal` argument.
+- Generated responses are shaped as **`{ data, status, headers }`**; in components use e.g. `query.data?.data` for the JSON body. ESLint ignores `lib/api/generated/**`; Prettier ignores `lib/api/generated/` (see [`.prettierignore`](apps/frontend/.prettierignore)).
 
 ## UI
 

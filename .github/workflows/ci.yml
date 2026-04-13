@@ -38,7 +38,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@v6
 
       - uses: actions/setup-node@v6
         with:
@@ -88,14 +88,14 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@v6
 
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: 'pnpm'
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         if: needs.affected.outputs.backend == 'true'
         with:
           go-version-file: apps/backend/go.mod
@@ -145,6 +145,10 @@ jobs:
         if: needs.affected.outputs.frontend == 'true'
         run: pnpm nx run frontend:format:check
 
+      - name: Orval client in sync with OpenAPI (frontend / backend docs)
+        if: needs.affected.outputs.frontend == 'true' || needs.affected.outputs.backend == 'true'
+        run: pnpm nx run frontend:orval:check
+
       - name: Build affected
         run: pnpm nx affected -t build --base=$NX_BASE --head=$NX_HEAD
 
@@ -159,7 +163,7 @@ jobs:
 
       - name: Publish Vitest JUnit results
         if: always() && hashFiles('apps/frontend/test-results/vitest-junit.xml') != ''
-        uses: EnricoMi/publish-unit-test-result-action@v2.20.0
+        uses: EnricoMi/publish-unit-test-result-action@v2.23.0
         with:
           files: apps/frontend/test-results/vitest-junit.xml
           check_name: Vitest (frontend)
@@ -169,7 +173,7 @@ jobs:
       - name: Upload coverage to Codecov (frontend)
         if: always() && hashFiles('apps/frontend/coverage/lcov.info') != ''
         continue-on-error: true
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: apps/frontend/coverage/lcov.info
@@ -179,7 +183,7 @@ jobs:
       - name: Upload coverage to Codecov (backend)
         if: always() && hashFiles('apps/backend/coverage.out') != ''
         continue-on-error: true
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: apps/backend/coverage.out

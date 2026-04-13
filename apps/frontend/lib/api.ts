@@ -1,5 +1,14 @@
 import { z } from 'zod';
+import { ApiHttpError, throwApiHttpErrorFromBody } from './api-errors';
+import {
+  API_BASE_URL,
+  authenticatedApiFetch,
+  isRequestAbortError
+} from './authenticated-api-fetch';
 import { logger } from './logger';
+
+export { ApiHttpError } from './api-errors';
+export { isRequestAbortError } from './authenticated-api-fetch';
 
 // Re-export all types and schemas from shared package
 export * from '@quokkaq/shared-types';
@@ -152,139 +161,6 @@ function summarizeZodErrorForLog(err: unknown): Record<string, unknown> {
   return { message: String(err) };
 }
 
-/**
- * Non-OK HTTP response. `message` is a short user-facing summary (never the raw response body).
- * Full body is in `rawBody` when provided (for logging / debugging only).
- */
-export class ApiHttpError extends Error {
-  readonly status: number;
-  readonly code?: string;
-  readonly rawBody?: string;
-
-  constructor(
-    message: string,
-    status: number,
-    code?: string,
-    rawBody?: string
-  ) {
-    super(message);
-    this.name = 'ApiHttpError';
-    this.status = status;
-    this.code = code;
-    this.rawBody = rawBody;
-  }
-}
-
-function throwApiHttpErrorFromBody(status: number, errorData: string): never {
-  let parsedCode: string | undefined;
-  try {
-    const j = JSON.parse(errorData) as Record<string, unknown>;
-    parsedCode = typeof j.code === 'string' ? j.code : undefined;
-    const msg = typeof j.message === 'string' ? j.message.trim() : '';
-    if (msg) {
-      throw new ApiHttpError(msg, status, parsedCode, errorData);
-    }
-  } catch (e) {
-    if (e instanceof ApiHttpError) {
-      throw e;
-    }
-  }
-  const summary = parsedCode
-    ? `API Error: ${status} (${parsedCode})`
-    : `API Error: ${status}`;
-  throw new ApiHttpError(summary, status, parsedCode, errorData);
-}
-
-function clearClientAuthSession(): void {
-  if (typeof window === 'undefined') {
-    return;
-  }
-  localStorage.removeItem('access_token');
-  localStorage.removeItem('refresh_token');
-  try {
-    window.dispatchEvent(new CustomEvent('auth:logout'));
-  } catch (e) {
-    logger.error('Failed to dispatch auth:logout event', e);
-  }
-}
-
-/**
- * Defaults first, then caller headers on top — so explicit `Authorization` (refresh/me)
- * wins over the access token from localStorage, while `Content-Type` from callers no longer
- * wipes auth (the old `...options` after `headers` bug).
- */
-function mergeRequestInitHeaders(
-  callerHeaders: HeadersInit | undefined,
-  authHeaders: Record<string, string>
-): Record<string, string> {
-  const fromCaller: Record<string, string> = {};
-  if (callerHeaders instanceof Headers) {
-    callerHeaders.forEach((value, key) => {
-      fromCaller[key] = value;
-    });
-  } else if (Array.isArray(callerHeaders)) {
-    for (const pair of callerHeaders) {
-      if (pair.length >= 2) fromCaller[pair[0]] = String(pair[1]);
-    }
-  } else if (callerHeaders && typeof callerHeaders === 'object') {
-    Object.assign(fromCaller, callerHeaders as Record<string, string>);
-  }
-  return { ...authHeaders, ...fromCaller };
-}
-
-/** Caller headers without Authorization so retry merges keep the refreshed Bearer token. */
-function headersInitWithoutAuthorization(
-  callerHeaders: HeadersInit | undefined
-): HeadersInit | undefined {
-  if (callerHeaders === undefined) {
-    return undefined;
-  }
-  if (callerHeaders instanceof Headers) {
-    const h = new Headers();
-    callerHeaders.forEach((value, key) => {
-      if (key.toLowerCase() !== 'authorization') {
-        h.set(key, value);
-      }
-    });
-    return h;
-  }
-  if (Array.isArray(callerHeaders)) {
-    return callerHeaders.filter(
-      (pair) => pair.length >= 2 && pair[0].toLowerCase() !== 'authorization'
-    );
-  }
-  const o = { ...(callerHeaders as Record<string, string>) };
-  for (const k of Object.keys(o)) {
-    if (k.toLowerCase() === 'authorization') {
-      delete o[k];
-    }
-  }
-  return o;
-}
-
-// Base API configuration
-const API_BASE_URL = '/api';
-
-export function isRequestAbortError(error: unknown): boolean {
-  if (error instanceof DOMException && error.name === 'AbortError') {
-    return true;
-  }
-  if (error instanceof Error) {
-    if (error.name === 'AbortError') {
-      return true;
-    }
-    const msg = error.message.toLowerCase();
-    if (
-      msg.includes('signal is aborted') ||
-      msg.includes('the operation was aborted') ||
-      msg.includes('user aborted')
-    ) {
-      return true;
-    }
-  }
-  return false;
-}
-
 // Create a base fetch function with proper error handling and authentication
 type ApiRequestExtra<T> = {
   /** When the server returns 404, return this value instead of throwing (no JSON parse). */
@@ -297,139 +173,10 @@ async function apiRequest<T>(
   schema?: z.ZodType<T>,
   extra?: ApiRequestExtra<T>
 ): Promise<T> {
-  let token = null;
-  let refreshToken = null;
-  let currentLocale = null;
-
-  // Only access localStorage and navigator on the client side
-  if (typeof window !== 'undefined') {
-    token = localStorage.getItem('access_token') || null;
-    refreshToken = localStorage.getItem('refresh_token') || null;
-
-    // Determine locale from localStorage (if set) or navigator language as fallback
-    const lsLocale = localStorage.getItem('NEXT_LOCALE');
-    const navLocale = window.navigator?.language?.split('-')[0] || 'en';
-    const inferredLocale = lsLocale || navLocale;
-    currentLocale = ['en', 'ru'].includes(inferredLocale)
-      ? inferredLocale
-      : 'en';
-  }
-
   const url = `${API_BASE_URL}${endpoint}`;
-  const { headers: callerHeaders, ...restOptions } = options;
-
-  const authHeaders: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...(token && { Authorization: `Bearer ${token}` }),
-    ...(currentLocale && { 'Accept-Language': currentLocale })
-  };
-
-  const config: RequestInit = {
-    ...restOptions,
-    headers: mergeRequestInitHeaders(callerHeaders, authHeaders)
-  };
 
   try {
-    const response = await fetch(url, config);
-
-    // If we get a 401 Unauthorized error, we might need to refresh the token (only on client)
-    if (response.status === 401 && typeof window !== 'undefined') {
-      // Attempt to refresh the token
-      try {
-        if (refreshToken) {
-          const refreshResponse = await fetch(`${API_BASE_URL}/auth/refresh`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${refreshToken}`
-            }
-          });
-
-          if (refreshResponse.ok) {
-            const refreshData = await refreshResponse.json();
-            localStorage.setItem('access_token', refreshData.accessToken);
-
-            // Retry the original request with the new token
-            const retryAuthHeaders: Record<string, string> = {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${refreshData.accessToken}`,
-              ...(currentLocale && { 'Accept-Language': currentLocale })
-            };
-            const retryConfig: RequestInit = {
-              ...restOptions,
-              headers: mergeRequestInitHeaders(
-                headersInitWithoutAuthorization(callerHeaders),
-                retryAuthHeaders
-              )
-            };
-
-            const retryResponse = await fetch(url, retryConfig);
-            if (
-              retryResponse.status === 404 &&
-              extra &&
-              Object.prototype.hasOwnProperty.call(extra, 'notFoundValue')
-            ) {
-              return extra.notFoundValue as T;
-            }
-            if (!retryResponse.ok) {
-              throw new Error(
-                `API Error: ${retryResponse.status} - ${await retryResponse.text()}`
-              );
-            }
-
-            if (retryResponse.status === 204 || retryResponse.status === 205) {
-              return undefined as T;
-            }
-
-            if (retryResponse.headers.get('Content-Length') === '0') {
-              return undefined as T;
-            }
-
-            const retryText = await retryResponse.text();
-            if (!retryText.trim()) {
-              return undefined as T;
-            }
-
-            const retryData = JSON.parse(retryText);
-
-            if (schema) {
-              try {
-                return schema.parse(retryData);
-              } catch (zodError) {
-                logger.error('Zod parse error while validating API response', {
-                  url,
-                  zod: summarizeZodErrorForLog(zodError),
-                  responseSummary: summarizeApiResponseForLog(retryData)
-                });
-                throw zodError;
-              }
-            }
-
-            return retryData;
-          }
-        }
-      } catch (refreshError) {
-        if (!isRequestAbortError(refreshError)) {
-          logger.error('Token refresh failed:', refreshError);
-        }
-      }
-
-      // If refresh failed or no refresh token, clear stored tokens
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-
-      // Notify the app that auth is no longer valid so UI can react (logout/redirect)
-      try {
-        if (typeof window !== 'undefined') {
-          // Use a custom event so components can react to global unauthenticated state
-          window.dispatchEvent(new CustomEvent('auth:logout'));
-        }
-      } catch (e) {
-        logger.error('Failed to dispatch auth:logout event', e);
-      }
-
-      throw new Error(`Unauthorized: ${await response.text()}`);
-    }
+    const response = await authenticatedApiFetch(endpoint, options);
 
     if (
       response.status === 404 &&
@@ -455,7 +202,6 @@ async function apiRequest<T>(
 
     const data = JSON.parse(text);
 
-    // Validate data against schema if provided
     if (schema) {
       try {
         return schema.parse(data);
@@ -483,35 +229,7 @@ async function apiRequestBlob(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<{ blob: Blob; headers: Headers }> {
-  let token = null;
-  let refreshToken = null;
-  let currentLocale = null;
-
-  if (typeof window !== 'undefined') {
-    token = localStorage.getItem('access_token') || null;
-    refreshToken = localStorage.getItem('refresh_token') || null;
-
-    const lsLocale = localStorage.getItem('NEXT_LOCALE');
-    const navLocale = window.navigator?.language?.split('-')[0] || 'en';
-    const inferredLocale = lsLocale || navLocale;
-    currentLocale = ['en', 'ru'].includes(inferredLocale)
-      ? inferredLocale
-      : 'en';
-  }
-
   const url = `${API_BASE_URL}${endpoint}`;
-  const { headers: callerHeadersBlob, ...restOptionsBlob } = options;
-
-  const authHeadersBlob: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...(token && { Authorization: `Bearer ${token}` }),
-    ...(currentLocale && { 'Accept-Language': currentLocale })
-  };
-
-  const config: RequestInit = {
-    ...restOptionsBlob,
-    headers: mergeRequestInitHeaders(callerHeadersBlob, authHeadersBlob)
-  };
 
   const readBodyAsBlob = async (res: Response): Promise<Blob> => {
     if (res.status === 204 || res.status === 205) {
@@ -521,62 +239,7 @@ async function apiRequestBlob(
   };
 
   try {
-    const response = await fetch(url, config);
-
-    if (response.status === 401 && typeof window !== 'undefined') {
-      try {
-        if (refreshToken) {
-          const refreshResponse = await fetch(`${API_BASE_URL}/auth/refresh`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${refreshToken}`
-            }
-          });
-
-          if (refreshResponse.ok) {
-            const refreshData = await refreshResponse.json();
-            localStorage.setItem('access_token', refreshData.accessToken);
-
-            const retryAuthHeadersBlob: Record<string, string> = {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${refreshData.accessToken}`,
-              ...(currentLocale && { 'Accept-Language': currentLocale })
-            };
-            const retryConfig: RequestInit = {
-              ...restOptionsBlob,
-              headers: mergeRequestInitHeaders(
-                headersInitWithoutAuthorization(callerHeadersBlob),
-                retryAuthHeadersBlob
-              )
-            };
-
-            const retryResponse = await fetch(url, retryConfig);
-            if (!retryResponse.ok) {
-              const retryErrText = await retryResponse.text();
-              throwApiHttpErrorFromBody(retryResponse.status, retryErrText);
-            }
-            const retryBlob = await readBodyAsBlob(retryResponse);
-            return { blob: retryBlob, headers: retryResponse.headers };
-          }
-        }
-      } catch (refreshError) {
-        if (refreshError instanceof ApiHttpError) {
-          if (refreshError.status === 401) {
-            clearClientAuthSession();
-          }
-          throw refreshError;
-        }
-        if (!isRequestAbortError(refreshError)) {
-          logger.error('Token refresh failed:', refreshError);
-        }
-      }
-
-      clearClientAuthSession();
-
-      const unauthorizedBody = await response.text();
-      throwApiHttpErrorFromBody(401, unauthorizedBody);
-    }
+    const response = await authenticatedApiFetch(endpoint, options);
 
     if (!response.ok) {
       const errorData = await response.text();
@@ -586,6 +249,13 @@ async function apiRequestBlob(
     const blob = await readBodyAsBlob(response);
     return { blob, headers: response.headers };
   } catch (error) {
+    if (error instanceof ApiHttpError) {
+      throw error;
+    }
+    if (error instanceof Error && error.message.startsWith('Unauthorized:')) {
+      const raw = error.message.slice('Unauthorized:'.length).trim();
+      throwApiHttpErrorFromBody(401, raw || '{}');
+    }
     if (!isRequestAbortError(error)) {
       logger.error(`API request failed for ${url}:`, error);
     }

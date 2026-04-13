@@ -19,6 +19,7 @@ alwaysApply: true
 | **Backend (Go)** | `pnpm nx run backend:lint` — golangci-lint |
 | **Frontend** | `pnpm nx run frontend:lint` — ESLint |
 | **Frontend formatting** | `pnpm nx run frontend:format:check` (or `pnpm --dir apps/frontend exec prettier --check .` — то же дерево, без Nx); fix: `pnpm nx run frontend:format:fix` |
+| **Orval (OpenAPI → React Query)** | Regenerate: `pnpm nx run frontend:orval`. Drift check (must match committed output): `pnpm nx run frontend:orval:check` — run when changing `apps/backend/docs/swagger.json` or `apps/frontend/orval.config.ts` / mutator. |
 | **Kiosk (Rust)** | `pnpm nx run kiosk-desktop:lint` — `cargo clippy` |
 
 `shared-types` and `ui-kit` Nx `lint` targets are placeholders (echo only); real checks are `tsc` via `build` when you change those packages.

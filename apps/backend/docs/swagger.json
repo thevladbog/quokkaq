@@ -4189,7 +4189,11 @@
             },
             "head": {
                 "description": "Same as GET /health/live without a response body.",
-                "responses": {},
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                },
                 "summary": "Liveness probe (HEAD)",
                 "tags": [
                     "health"
@@ -4235,6 +4239,9 @@
             "head": {
                 "description": "Same checks as GET /health/ready without a response body.",
                 "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
                     "503": {
                         "description": "Database unreachable"
                     }
@@ -5322,6 +5329,7 @@
         },
         "/platform/companies": {
             "get": {
+                "operationId": "platformListCompanies",
                 "parameters": [
                     {
                         "description": "Filter by name",
@@ -6543,6 +6551,7 @@
         },
         "/platform/subscriptions": {
             "get": {
+                "operationId": "platformListSubscriptions",
                 "parameters": [
                     {
                         "description": "Page size (max 100)",
@@ -6584,6 +6593,7 @@
                 ]
             },
             "post": {
+                "operationId": "platformCreateSubscription",
                 "requestBody": {
                     "content": {
                         "application/json": {
@@ -6651,6 +6661,7 @@
         },
         "/platform/subscriptions/{id}": {
             "patch": {
+                "operationId": "platformPatchSubscription",
                 "parameters": [
                     {
                         "description": "Subscription ID",
@@ -6932,40 +6943,6 @@
                 ]
             }
         },
-        "/subscription-plans": {
-            "get": {
-                "description": "Returns all active subscription plans",
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "items": {
-                                        "$ref": "#/components/schemas/models.SubscriptionPlan"
-                                    },
-                                    "type": "array"
-                                }
-                            }
-                        },
-                        "description": "OK"
-                    },
-                    "500": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "string"
-                                }
-                            }
-                        },
-                        "description": "Internal Server Error"
-                    }
-                },
-                "summary": "Get Available Subscription Plans",
-                "tags": [
-                    "subscriptions"
-                ]
-            }
-        },
         "/subscriptions/checkout": {
             "post": {
                 "description": "Creates a checkout session for subscription upgrade",
@@ -7115,6 +7092,40 @@
                     }
                 ],
                 "summary": "Get Current User's Subscription",
+                "tags": [
+                    "subscriptions"
+                ]
+            }
+        },
+        "/subscriptions/plans": {
+            "get": {
+                "description": "Returns all active subscription plans",
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/models.SubscriptionPlan"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "summary": "Get Available Subscription Plans",
                 "tags": [
                     "subscriptions"
                 ]

@@ -2701,7 +2701,9 @@ paths:
       - health
     head:
       description: Same as GET /health/live without a response body.
-      responses: {}
+      responses:
+        '200':
+          description: OK
       summary: Liveness probe (HEAD)
       tags:
       - health
@@ -2731,6 +2733,8 @@ paths:
     head:
       description: Same checks as GET /health/ready without a response body.
       responses:
+        '200':
+          description: OK
         '503':
           description: Database unreachable
       summary: Readiness probe (HEAD)
@@ -3390,6 +3394,7 @@ paths:
       - platform
   /platform/companies:
     get:
+      operationId: platformListCompanies
       parameters:
       - description: Filter by name
         in: query
@@ -4121,6 +4126,7 @@ paths:
       - platform
   /platform/subscriptions:
     get:
+      operationId: platformListSubscriptions
       parameters:
       - description: Page size (max 100)
         in: query
@@ -4145,6 +4151,7 @@ paths:
       tags:
       - platform
     post:
+      operationId: platformCreateSubscription
       requestBody:
         content:
           application/json:
@@ -4185,6 +4192,7 @@ paths:
       - platform
   /platform/subscriptions/{id}:
     patch:
+      operationId: platformPatchSubscription
       parameters:
       - description: Subscription ID
         in: path
@@ -4357,27 +4365,6 @@ paths:
       summary: Update a service
       tags:
       - services
-  /subscription-plans:
-    get:
-      description: Returns all active subscription plans
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                items:
-                  $ref: '#/components/schemas/models.SubscriptionPlan'
-                type: array
-          description: OK
-        '500':
-          content:
-            application/json:
-              schema:
-                type: string
-          description: Internal Server Error
-      summary: Get Available Subscription Plans
-      tags:
-      - subscriptions
   /subscriptions/{id}/cancel:
     post:
       description: Cancels the subscription at the end of billing period
@@ -4520,6 +4507,27 @@ paths:
       security:
       - BearerAuth: []
       summary: Get Current User's Subscription
+      tags:
+      - subscriptions
+  /subscriptions/plans:
+    get:
+      description: Returns all active subscription plans
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/models.SubscriptionPlan'
+                type: array
+          description: OK
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
+      summary: Get Available Subscription Plans
       tags:
       - subscriptions
   /system/setup:

@@ -16,7 +16,8 @@ const eslintConfig = defineConfig([
     'next-env.d.ts',
     'testplane-report/**',
     'coverage/**',
-    'test-results/**'
+    'test-results/**',
+    'lib/api/generated/**'
   ])
 ]);
 

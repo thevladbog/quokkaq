@@ -1,16 +1,17 @@
- node_modules
- .next
- .husky
- coverage
- .prettierignore
- .stylelintignore
- .eslintignore
- stories
- storybook-static
- *.log
- playwright-report
- .testplane
- .nyc_output
- test-results
- junit.xml
- docs
+node_modules
+.next
+.husky
+coverage
+.prettierignore
+.stylelintignore
+.eslintignore
+stories
+storybook-static
+*.log
+playwright-report
+.testplane
+.nyc_output
+test-results
+junit.xml
+docs
+lib/api/generated

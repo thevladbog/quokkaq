@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@v6
 
       - uses: actions/setup-node@v6
         with:
@@ -43,7 +43,7 @@ jobs:
 
       # Patched stdlib (e.g. crypto/tls, crypto/x509) is only fixed in Go 1.26.2+;
       # pin explicitly so govulncheck never runs on an older 1.26.x from the runner cache.
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: '1.26.2'
           cache-dependency-path: apps/backend/go.sum

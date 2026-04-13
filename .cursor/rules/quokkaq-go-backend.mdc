@@ -24,6 +24,7 @@ Use the existing flow: **handlers → services → repository → models**. Exte
 
 1. Wire routes in `main.go`.
 2. Add Swagger annotations on handlers; regenerate docs when contracts change: `swag init -g cmd/api/main.go -o ./docs` (CI checks OpenAPI artifacts — see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
+3. If the frontend uses **Orval** for that area, after updating `docs/swagger.json` run from repo root: `pnpm nx run frontend:orval`, and adjust [`apps/frontend/orval.config.ts`](apps/frontend/orval.config.ts) if the new routes use tags not yet included in `input.filters`. Prefer stable **`operationId`** via swag `@ID` where it improves generated names.
 
 ## Configuration
 
