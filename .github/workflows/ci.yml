@@ -126,18 +126,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         if: needs.affected.outputs.kiosk == 'true'
 
-      - name: Debug lockfile integrity (job: build-and-test)
-        run: |
-          echo "=== Lockfile first 5 lines (with line numbers) ==="
-          head -5 pnpm-lock.yaml | cat -n
-          echo "=== Hex dump of first 200 bytes ==="
-          xxd -l 200 pnpm-lock.yaml || hexdump -C -n 200 pnpm-lock.yaml
-          echo "=== File info ==="
-          file pnpm-lock.yaml
-          wc -l pnpm-lock.yaml
-          echo "=== Git status ==="
-          git status pnpm-lock.yaml
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
