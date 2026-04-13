@@ -645,6 +645,17 @@
                 },
                 "type": "object"
             },
+            "handlers.UpdateCounterRequest": {
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    },
+                    "serviceZoneId": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "handlers.UpdateStatusRequest": {
                 "properties": {
                     "status": {
@@ -3752,11 +3763,11 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/models.Counter"
+                                "$ref": "#/components/schemas/handlers.UpdateCounterRequest"
                             }
                         }
                     },
-                    "description": "Counter Data",
+                    "description": "Sparse counter fields (name, serviceZoneId)",
                     "required": true,
                     "x-originalParamName": "counter"
                 },

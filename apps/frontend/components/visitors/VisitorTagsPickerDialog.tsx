@@ -66,7 +66,6 @@ export function VisitorTagsPickerDialog(props: VisitorTagsPickerDialogProps) {
 }
 
 function VisitorTagsPickerDialogInner({
-  open,
   onOpenChange,
   unitId,
   initialSelectedIds,
@@ -91,7 +90,7 @@ function VisitorTagsPickerDialogInner({
     isLoading: tagDefinitionsLoading,
     isError: tagDefinitionsError,
     error: tagDefinitionsErr
-  } = useVisitorTagDefinitions(unitId, { enabled: open && !!unitId });
+  } = useVisitorTagDefinitions(unitId, { enabled: !!unitId });
 
   const sortedTagDefinitions = useMemo(() => {
     return [...tagDefinitions].sort((a, b) => {
@@ -145,9 +144,10 @@ function VisitorTagsPickerDialogInner({
         tagDefinitionIds: selectedTagListSorted,
         operatorComment: auditReasonRequired ? reason : undefined
       });
-      if (saved !== false) {
-        toast.success(t('visitor_context.tags_saved'));
+      if (saved === false) {
+        return;
       }
+      toast.success(t('visitor_context.tags_saved'));
       onOpenChange(false);
     } catch (err) {
       if (!skipBuiltInSaveErrorToast) {

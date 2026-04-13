@@ -10,12 +10,7 @@ import {
 import { useFormatter, useLocale, useTranslations } from 'next-intl';
 import { ChevronLeft, Loader2, Tags } from 'lucide-react';
 import { toast } from 'sonner';
-import {
-  ApiHttpError,
-  unitsApi,
-  type UnitClient,
-  type UnitClientHistoryItem
-} from '@/lib/api';
+import { ApiHttpError, unitsApi, type UnitClient } from '@/lib/api';
 import { ticketServiceDisplayName } from '@/lib/ticket-display';
 import { visitorTagPillStyles } from '@/lib/visitor-tag-styles';
 import { VisitorTagsPickerDialog } from '@/components/visitors/VisitorTagsPickerDialog';
@@ -38,91 +33,13 @@ import {
   TableRow
 } from '@/components/ui/table';
 import { Link } from '@/src/i18n/navigation';
+import { ClientHistoryDetails } from './client-history-details';
 
 const VISITS_PAGE = 20;
 const HISTORY_PAGE = 20;
 
 /** Detail layout: slightly wider than default prose width for forms + wide tables. */
 const CLIENT_DETAIL_MAX_WIDTH = 'max-w-5xl';
-
-function formatHistoryScalar(v: unknown): string {
-  if (v === null || v === undefined) return '—';
-  if (typeof v === 'string') return v.trim() === '' ? '—' : v;
-  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
-  return JSON.stringify(v);
-}
-
-function ClientHistoryDetails({
-  row,
-  t
-}: {
-  row: UnitClientHistoryItem;
-  t: ReturnType<typeof useTranslations<'clients'>>;
-}) {
-  const p = row.payload;
-  if (row.action === 'profile_updated') {
-    const changes = p.changes as
-      | Record<string, { from?: unknown; to?: unknown }>
-      | undefined;
-    if (!changes || typeof changes !== 'object') {
-      return <span className='text-muted-foreground text-sm'>—</span>;
-    }
-    return (
-      <ul className='list-inside list-disc space-y-1 text-sm'>
-        {Object.entries(changes).map(([field, delta]) => {
-          const from =
-            delta && typeof delta === 'object' && 'from' in delta
-              ? (delta as { from?: unknown }).from
-              : undefined;
-          const to =
-            delta && typeof delta === 'object' && 'to' in delta
-              ? (delta as { to?: unknown }).to
-              : undefined;
-          const labelKey = `historyField_${field}`;
-          const label = t.has(labelKey) ? t(labelKey) : field;
-          return (
-            <li key={field}>
-              <span className='font-medium'>{label}</span>:{' '}
-              {formatHistoryScalar(from)} → {formatHistoryScalar(to)}
-            </li>
-          );
-        })}
-      </ul>
-    );
-  }
-  if (row.action === 'tags_updated') {
-    const added = Array.isArray(p.addedTagLabels)
-      ? (p.addedTagLabels as unknown[]).filter(
-          (x): x is string => typeof x === 'string'
-        )
-      : [];
-    const removed = Array.isArray(p.removedTagLabels)
-      ? (p.removedTagLabels as unknown[]).filter(
-          (x): x is string => typeof x === 'string'
-        )
-      : [];
-    const reason = typeof p.reason === 'string' ? p.reason.trim() : '';
-    return (
-      <div className='space-y-1 text-sm'>
-        {added.length > 0 ? (
-          <p>{t('historyTagsAdded', { list: added.join(', ') })}</p>
-        ) : null}
-        {removed.length > 0 ? (
-          <p>{t('historyTagsRemoved', { list: removed.join(', ') })}</p>
-        ) : null}
-        {reason ? (
-          <p className='text-muted-foreground'>
-            {t('historyReason', { text: reason })}
-          </p>
-        ) : null}
-        {!added.length && !removed.length && !reason ? (
-          <span className='text-muted-foreground'>—</span>
-        ) : null}
-      </div>
-    );
-  }
-  return <span className='text-muted-foreground text-sm'>{row.action}</span>;
-}
 
 function ClientDetailForm({
   unitId,
@@ -154,10 +71,12 @@ function ClientDetailForm({
     queryFn: () => unitsApi.listVisitorTagDefinitions(unitId),
     staleTime: 60_000
   });
-  const catalogTagDefs = useMemo(
-    () => tagDefsQuery.data ?? initial.definitions ?? [],
-    [tagDefsQuery.data, initial.definitions]
-  );
+  const tagCatalogForProfile = useMemo(() => {
+    if (tagDefsQuery.isError) {
+      return initial.definitions ?? [];
+    }
+    return tagDefsQuery.data ?? initial.definitions ?? [];
+  }, [tagDefsQuery.isError, tagDefsQuery.data, initial.definitions]);
   const noUnitTagDefinitions =
     tagDefsQuery.isSuccess && tagDefsQuery.data.length === 0;
 
@@ -277,14 +196,14 @@ function ClientDetailForm({
 
   const sortedProfileTags = useMemo(() => {
     const selected = new Set(selectedTagIds);
-    const list = catalogTagDefs.filter((d) => selected.has(d.id));
+    const list = tagCatalogForProfile.filter((d) => selected.has(d.id));
     return [...list].sort((a, b) => {
       const ao = a.sortOrder ?? 0;
       const bo = b.sortOrder ?? 0;
       if (ao !== bo) return ao - bo;
       return a.label.localeCompare(b.label);
     });
-  }, [catalogTagDefs, selectedTagIds]);
+  }, [tagCatalogForProfile, selectedTagIds]);
 
   return (
     <>
@@ -323,7 +242,40 @@ function ClientDetailForm({
           </div>
           <div className='space-y-2'>
             <Label>{t('fieldTags')}</Label>
-            {noUnitTagDefinitions ? (
+            {tagDefsQuery.isError ? (
+              <>
+                <p className='text-destructive text-sm'>
+                  {t('tagDefinitionsLoadError', {
+                    message:
+                      tagDefsQuery.error instanceof Error
+                        ? tagDefsQuery.error.message
+                        : String(tagDefsQuery.error ?? '')
+                  })}
+                </p>
+                <div className='border-destructive/25 bg-destructive/5 flex flex-wrap items-center gap-1.5 rounded-md border p-3'>
+                  {sortedProfileTags.map((def) => (
+                    <span
+                      key={def.id}
+                      className='inline-flex max-w-[10rem] shrink-0 truncate rounded-full border border-transparent px-2.5 py-0.5 text-[11px] font-medium shadow-sm'
+                      style={visitorTagPillStyles(def.color)}
+                      title={def.label}
+                    >
+                      {def.label}
+                    </span>
+                  ))}
+                  <Button
+                    type='button'
+                    variant='outline'
+                    size='icon'
+                    className='text-muted-foreground h-7 w-7 shrink-0 cursor-not-allowed rounded-full opacity-60'
+                    disabled
+                    aria-label={tStaff('visitor_context.tags_edit_aria')}
+                  >
+                    <Tags className='h-3.5 w-3.5' />
+                  </Button>
+                </div>
+              </>
+            ) : noUnitTagDefinitions ? (
               <p className='text-muted-foreground text-sm'>
                 {t('noTagDefinitions')}
               </p>
@@ -354,7 +306,7 @@ function ClientDetailForm({
             )}
           </div>
           <VisitorTagsPickerDialog
-            open={tagsModalOpen}
+            open={tagsModalOpen && !tagDefsQuery.isError}
             onOpenChange={setTagsModalOpen}
             unitId={unitId}
             initialSelectedIds={selectedTagIds}

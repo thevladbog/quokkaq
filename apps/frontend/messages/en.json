@@ -24,6 +24,7 @@
     "tagsFilter": "Tags",
     "tagsFilterHint": "Show clients that have any of the selected tags.",
     "noTagDefinitions": "No tags configured for this unit.",
+    "tagDefinitionsLoadError": "Could not load tag catalog: {message}. Tags shown are from the last saved profile; editing is disabled until the catalog loads.",
     "loadError": "Could not load clients: {message}",
     "empty": "No clients match your filters.",
     "colName": "Name",

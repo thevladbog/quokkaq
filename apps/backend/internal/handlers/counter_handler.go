@@ -13,6 +13,13 @@ import (
 	"gorm.io/gorm"
 )
 
+// UpdateCounterRequest is the JSON body for PUT /counters/{id} (sparse update).
+// Only name and/or serviceZoneId are applied; assignedTo and onBreak are rejected by the handler.
+type UpdateCounterRequest struct {
+	Name          *string `json:"name,omitempty"`
+	ServiceZoneID *string `json:"serviceZoneId,omitempty"`
+}
+
 type CounterHandler struct {
 	service services.CounterService
 }
@@ -110,7 +117,7 @@ func (h *CounterHandler) GetCounterByID(w http.ResponseWriter, r *http.Request) 
 // @Accept       json
 // @Produce      json
 // @Param        id      path      string          true  "Counter ID"
-// @Param        counter body      models.Counter  true  "Counter Data"
+// @Param        counter body      UpdateCounterRequest  true  "Sparse counter fields (name, serviceZoneId)"
 // @Success      200     {object}  models.Counter
 // @Failure      400     {string}  string "Bad Request"
 // @Failure      404     {string}  string "Not Found"
@@ -140,14 +147,14 @@ func (h *CounterHandler) UpdateCounter(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	updates := map[string]interface{}{}
+	var req UpdateCounterRequest
 	if v, ok := raw["name"]; ok {
-		var s string
-		if err := json.Unmarshal(v, &s); err != nil {
+		var nameStr string
+		if err := json.Unmarshal(v, &nameStr); err != nil {
 			http.Error(w, "name: invalid JSON", http.StatusBadRequest)
 			return
 		}
-		updates["name"] = s
+		req.Name = &nameStr
 	}
 	if v, ok := raw["serviceZoneId"]; ok {
 		var z *string
@@ -155,10 +162,17 @@ func (h *CounterHandler) UpdateCounter(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "serviceZoneId: invalid JSON", http.StatusBadRequest)
 			return
 		}
-		if z == nil {
+		req.ServiceZoneID = z
+	}
+	updates := map[string]interface{}{}
+	if req.Name != nil {
+		updates["name"] = *req.Name
+	}
+	if _, ok := raw["serviceZoneId"]; ok {
+		if req.ServiceZoneID == nil {
 			updates["service_zone_id"] = nil
 		} else {
-			updates["service_zone_id"] = *z
+			updates["service_zone_id"] = *req.ServiceZoneID
 		}
 	}
 	if len(updates) == 0 {

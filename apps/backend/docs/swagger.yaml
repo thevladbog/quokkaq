@@ -427,6 +427,13 @@ components:
         toUserId:
           type: string
       type: object
+    handlers.UpdateCounterRequest:
+      properties:
+        name:
+          type: string
+        serviceZoneId:
+          type: string
+      type: object
     handlers.UpdateStatusRequest:
       properties:
         status:
@@ -2434,8 +2441,8 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/models.Counter'
-        description: Counter Data
+              $ref: '#/components/schemas/handlers.UpdateCounterRequest'
+        description: Sparse counter fields (name, serviceZoneId)
         required: true
         x-originalParamName: counter
       responses:

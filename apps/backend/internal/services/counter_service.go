@@ -168,8 +168,8 @@ func (s *counterService) UpdateCounter(id string, updates map[string]interface{}
 		var zonePtr *string
 		if v, ok := updates["service_zone_id"]; !ok || v == nil {
 			zonePtr = nil
-		} else if s, ok := v.(string); ok {
-			t := strings.TrimSpace(s)
+		} else if str, ok := v.(string); ok {
+			t := strings.TrimSpace(str)
 			if t == "" {
 				zonePtr = nil
 			} else {
