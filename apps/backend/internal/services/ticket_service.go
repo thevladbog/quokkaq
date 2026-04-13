@@ -1472,6 +1472,8 @@ func (s *ticketService) hydrateClientVisitTransferTrails(tickets []models.Ticket
 	var ctrIDs []string
 	zoneSeen := make(map[string]struct{})
 	var zoneIDs []string
+	unitSeen := make(map[string]struct{})
+	var unitIDs []string
 
 	addSvc := func(id string) {
 		id = strings.TrimSpace(id)
@@ -1506,6 +1508,17 @@ func (s *ticketService) hydrateClientVisitTransferTrails(tickets []models.Ticket
 		zoneSeen[id] = struct{}{}
 		zoneIDs = append(zoneIDs, id)
 	}
+	addUnit := func(id string) {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			return
+		}
+		if _, ok := unitSeen[id]; ok {
+			return
+		}
+		unitSeen[id] = struct{}{}
+		unitIDs = append(unitIDs, id)
+	}
 
 	for _, h := range rows {
 		if len(h.Payload) == 0 {
@@ -1523,6 +1536,10 @@ func (s *ticketService) hydrateClientVisitTransferTrails(tickets []models.Ticket
 			addZone(visitHistoryPayloadString(p, "to_service_zone_id"))
 		}
 		addZone(visitHistoryPayloadString(p, "from_service_zone_id"))
+		if visitHistoryPayloadString(p, "transfer_kind") == "zone" &&
+			visitHistoryPayloadString(p, "from_service_zone_id") == "" {
+			addUnit(visitHistoryPayloadString(p, "unit_id"))
+		}
 		byTicket[h.TicketID] = append(byTicket[h.TicketID], transferHistoryParsed{h: h, p: p})
 	}
 
@@ -1543,6 +1560,17 @@ func (s *ticketService) hydrateClientVisitTransferTrails(tickets []models.Ticket
 		n := strings.TrimSpace(u.Name)
 		if n != "" {
 			zoneLabels[zid] = n
+		}
+	}
+	unitLabels := make(map[string]string, len(unitIDs))
+	for _, uid := range unitIDs {
+		u, uerr := s.unitRepo.FindByIDLight(uid)
+		if uerr != nil || u == nil {
+			continue
+		}
+		n := strings.TrimSpace(u.Name)
+		if n != "" {
+			unitLabels[uid] = n
 		}
 	}
 
@@ -1651,8 +1679,8 @@ func (s *ticketService) hydrateClientVisitTransferTrails(tickets []models.Ticket
 			if ev.FromZoneLabel == "" && visitHistoryPayloadString(p, "transfer_kind") == "zone" && fzid == "" {
 				uid := visitHistoryPayloadString(p, "unit_id")
 				if uid != "" {
-					if u, uerr := s.unitRepo.FindByIDLight(uid); uerr == nil && u != nil {
-						ev.FromZoneLabel = strings.TrimSpace(u.Name)
+					if n := unitLabels[uid]; n != "" {
+						ev.FromZoneLabel = n
 					}
 				}
 			}

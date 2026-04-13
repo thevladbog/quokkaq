@@ -8,11 +8,22 @@ import { AnimatePresence, LayoutGroup, motion } from 'framer-motion';
 interface CalledTicketsTableProps {
   tickets: Ticket[];
   backgroundColor?: string;
-  /** Max rows in "last called"; 0 or unset = show all */
+  /** Max rows in the unified list; 0 or unset = show all */
   historyLimit?: number;
 }
 
 const layoutTransition = { duration: 0.35, ease: [0.22, 1, 0.36, 1] as const };
+
+function ticketStatusKey(
+  status: string
+): 'waiting' | 'called' | 'in_service' | 'served' | 'completed' | 'skipped' {
+  if (status === 'waiting') return 'waiting';
+  if (status === 'called') return 'called';
+  if (status === 'in_service') return 'in_service';
+  if (status === 'served' || status === 'completed') return 'served';
+  if (status === 'no_show' || status === 'skipped') return 'skipped';
+  return 'waiting';
+}
 
 export function CalledTicketsTable({
   tickets,
@@ -20,132 +31,213 @@ export function CalledTicketsTable({
   historyLimit = 0
 }: CalledTicketsTableProps) {
   const t = useTranslations('screen');
-  const calledOnly = tickets.filter((ticket) => ticket.status === 'called');
-  const latest =
-    calledOnly.length === 0
-      ? undefined
-      : calledOnly.reduce((best, ticket) => {
-          const tMs = new Date(ticket.calledAt || 0).getTime();
-          const bMs = new Date(best.calledAt || 0).getTime();
-          return tMs > bMs ? ticket : best;
-        });
-  const others = tickets.filter((ticket) => ticket.id !== latest?.id);
-  const displayedOthers =
-    historyLimit > 0 ? others.slice(0, historyLimit) : others;
+  const tStatus = useTranslations('staff.statuses');
 
-  let gridCols = 'grid-cols-1';
-  if (displayedOthers.length > 12) gridCols = 'grid-cols-3';
-  else if (displayedOthers.length > 6) gridCols = 'grid-cols-2';
+  const displayed = historyLimit > 0 ? tickets.slice(0, historyLimit) : tickets;
+
+  const statusLabel = (ticket: Ticket) =>
+    tStatus(ticketStatusKey(ticket.status));
+
+  const RowDivider = ({
+    toneClass,
+    orientation
+  }: {
+    toneClass: string;
+    orientation: 'horizontal' | 'vertical';
+  }) => {
+    if (orientation === 'horizontal') {
+      return (
+        <div
+          className={`my-1 h-px w-full shrink-0 sm:hidden ${toneClass}`}
+          aria-hidden
+        />
+      );
+    }
+    return (
+      <div
+        className={`hidden w-px shrink-0 self-stretch sm:my-4 sm:block ${toneClass}`}
+        aria-hidden
+      />
+    );
+  };
 
   return (
     <div
-      className='bg-background flex h-full flex-col gap-4 p-4'
+      className='bg-background flex h-full flex-col gap-3 p-4'
       style={{ backgroundColor: backgroundColor || undefined }}
     >
-      <div className='flex-none'>
-        <div className='text-muted-foreground mb-2 text-center text-lg tracking-widest uppercase md:text-2xl'>
-          {t('nowCalling')}
-        </div>
-        {latest ? (
-          <motion.div
-            animate={{ opacity: [1, 0.88, 1] }}
-            transition={{
-              duration: 2.4,
-              repeat: Infinity,
-              ease: 'easeInOut'
-            }}
-          >
-            <Card className='bg-primary text-primary-foreground overflow-hidden border-none shadow-xl'>
-              <div className='grid grid-cols-[1fr_auto_1fr] items-center gap-2 p-4 md:gap-8 md:p-8'>
-                <div className='text-right text-[3em] leading-none font-black tracking-tighter md:text-[5em]'>
-                  {latest.queueNumber}
-                </div>
-                <div className='flex justify-center text-center text-4xl opacity-50 md:text-6xl'>
-                  →
-                </div>
-                <div className='flex w-full flex-col items-start'>
-                  <div className='w-full text-[3em] leading-tight font-bold md:text-[5em]'>
-                    {latest.counter?.name || '---'}
+      <div className='text-muted-foreground shrink-0 text-center text-lg tracking-widest uppercase md:text-2xl'>
+        {t('nowServing')}
+      </div>
+
+      <LayoutGroup>
+        <div className='flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1'>
+          <AnimatePresence initial={false} mode='popLayout'>
+            {displayed.map((ticket) => {
+              const isCalled = ticket.status === 'called';
+              const isInService = ticket.status === 'in_service';
+              const isServed =
+                ticket.status === 'served' || ticket.status === 'completed';
+
+              let rowShell =
+                'rounded-xl border bg-card/50 text-card-foreground border-border/50';
+              if (isCalled) {
+                rowShell =
+                  'rounded-xl border-none bg-primary text-primary-foreground shadow-lg';
+              } else if (isInService) {
+                rowShell =
+                  'rounded-xl border bg-green-100 text-green-950 border-green-200 dark:bg-green-900/25 dark:text-green-50 dark:border-green-800';
+              } else if (isServed) {
+                rowShell =
+                  'rounded-xl border bg-muted/60 text-muted-foreground border-border/60 opacity-90';
+              }
+
+              const labelTone = isCalled
+                ? 'text-primary-foreground/75'
+                : 'text-muted-foreground';
+              const ticketCounterSize = isCalled
+                ? 'text-4xl leading-none font-black tracking-tighter md:text-5xl lg:text-6xl'
+                : 'text-2xl font-black tracking-tight md:text-3xl lg:text-4xl';
+              const statusSize = isCalled
+                ? 'text-base font-semibold leading-snug md:text-lg'
+                : 'text-sm font-semibold md:text-base';
+
+              const dividerTone = isCalled
+                ? 'bg-primary-foreground/25'
+                : isInService
+                  ? 'bg-green-800/20 dark:bg-green-300/30'
+                  : 'bg-border/80';
+
+              const statusAnimKey = `${ticket.id}:${ticket.status}`;
+              const statusAria = `${t('row_status_label')}: ${statusLabel(ticket)}`;
+
+              const inner = (
+                <div
+                  className={`flex flex-col gap-3 sm:flex-row sm:items-stretch sm:gap-6 md:gap-10 ${isCalled ? 'px-4 py-5 md:px-6 md:py-6' : 'px-4 py-3 md:px-5 md:py-4'}`}
+                >
+                  {/* Слева: фиксированная зона талона | черта | статус (без flex-1 — иначе «центрируется» в строке) */}
+                  <div className='flex min-w-0 shrink-0 flex-col gap-2 sm:flex-row sm:items-stretch sm:gap-0'>
+                    <div className='min-w-0 sm:w-[10.5rem] md:w-[12rem] lg:w-[13rem]'>
+                      <div
+                        className={`mb-1 text-[10px] font-semibold tracking-wider uppercase md:text-xs ${labelTone}`}
+                      >
+                        {t('row_ticket_label')}
+                      </div>
+                      <div className={`truncate ${ticketCounterSize}`}>
+                        {ticket.queueNumber}
+                      </div>
+                    </div>
+
+                    <RowDivider
+                      toneClass={dividerTone}
+                      orientation='vertical'
+                    />
+
+                    <div className='flex min-w-0 shrink-0 flex-col justify-center text-left sm:max-w-[16rem] sm:pl-2 md:max-w-[18rem] md:pl-3'>
+                      <div
+                        className={`mb-1 text-[10px] font-semibold tracking-wider uppercase md:text-xs ${labelTone}`}
+                      >
+                        {t('row_status_label')}
+                      </div>
+                      {isCalled ? (
+                        <div
+                          className={`${statusSize} max-w-full`}
+                          role='status'
+                          aria-label={statusAria}
+                        >
+                          <div
+                            className='screen-called-status-reel-clip'
+                            aria-hidden
+                          >
+                            <div
+                              key={statusAnimKey}
+                              className='screen-called-status-reel-track screen-called-status-reel-track-once'
+                            >
+                              <div>{statusLabel(ticket)}</div>
+                              <div>{statusLabel(ticket)}</div>
+                              <div>{statusLabel(ticket)}</div>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div
+                          key={statusAnimKey}
+                          className={`${statusSize} screen-status-change-snap-once max-w-full`}
+                          role='status'
+                          aria-label={statusAria}
+                        >
+                          {statusLabel(ticket)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <RowDivider
+                    toneClass={dividerTone}
+                    orientation='horizontal'
+                  />
+
+                  <div className='flex min-w-0 flex-col sm:ml-auto sm:max-w-[min(52%,28rem)] sm:items-end sm:text-right'>
+                    <div
+                      className={`mb-1 text-[10px] font-semibold tracking-wider uppercase md:text-xs ${labelTone} sm:text-right`}
+                    >
+                      {t('row_counter_label')}
+                    </div>
+                    <div
+                      className={`w-full truncate sm:text-right ${ticketCounterSize}`}
+                    >
+                      {ticket.counter?.name ?? '---'}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </Card>
-          </motion.div>
-        ) : (
-          <Card className='bg-muted flex h-[150px] items-center justify-center border-none shadow-inner md:h-[250px]'>
-            <span className='text-muted-foreground text-4xl opacity-50'>
-              ---
-            </span>
-          </Card>
-        )}
-      </div>
+              );
 
-      <div className='flex flex-1 flex-col overflow-hidden'>
-        <div className='text-muted-foreground mt-8 mb-4 text-center text-xl tracking-widest uppercase'>
-          {t('lastCalled')}
-        </div>
-        <LayoutGroup>
-          <div
-            className={`grid ${gridCols} content-start gap-3 overflow-y-auto pr-2`}
-          >
-            <AnimatePresence initial={false} mode='popLayout'>
-              {displayedOthers.map((ticket) => {
-                let bgClass = 'bg-card/50 border-border/50';
-                if (ticket.status === 'called')
-                  bgClass =
-                    'bg-primary/10 border-primary border-2 shadow-md ring-2 ring-primary/25';
-                else if (ticket.status === 'in_service')
-                  bgClass =
-                    'bg-green-100 dark:bg-green-900/20 border-green-200 dark:border-green-800';
-                else if (ticket.status === 'served')
-                  bgClass =
-                    'bg-gray-100 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 opacity-75';
-
-                return (
-                  <motion.div
-                    key={ticket.id}
-                    layout
-                    initial={{ opacity: 0, y: 14 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{
-                      layout: layoutTransition,
-                      opacity: { duration: 0.22 },
-                      y: { duration: 0.22 }
-                    }}
-                  >
-                    <Card className={`p-4 ${bgClass}`}>
+              return (
+                <motion.div
+                  key={ticket.id}
+                  layout
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{
+                    layout: layoutTransition,
+                    opacity: { duration: 0.22 },
+                    y: { duration: 0.22 }
+                  }}
+                >
+                  {isCalled ? (
+                    <Card
+                      className={`relative overflow-hidden border-none p-0 ${rowShell}`}
+                    >
+                      <div
+                        className='screen-called-row-shine-underlay'
+                        aria-hidden
+                      />
+                      <div className='relative z-[1]'>{inner}</div>
+                    </Card>
+                  ) : (
+                    <Card className={`overflow-hidden p-0 ${rowShell}`}>
                       <motion.div
-                        className='grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-2xl font-semibold'
                         initial={false}
-                        animate={{
-                          opacity: ticket.status === 'served' ? 0.85 : 1
-                        }}
+                        animate={{ opacity: isServed ? 0.88 : 1 }}
                         transition={{ duration: 0.35 }}
                       >
-                        <span className='text-foreground text-right'>
-                          {ticket.queueNumber}
-                        </span>
-                        <span className='text-muted-foreground opacity-50'>
-                          →
-                        </span>
-                        <span className='text-foreground text-left'>
-                          {ticket.counter?.name ?? '---'}
-                        </span>
+                        {inner}
                       </motion.div>
                     </Card>
-                  </motion.div>
-                );
-              })}
-            </AnimatePresence>
-          </div>
-        </LayoutGroup>
-        {displayedOthers.length === 0 && (
-          <div className='text-muted-foreground py-8 text-center opacity-50'>
-            {t('noHistory')}
-          </div>
-        )}
-      </div>
+                  )}
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+        </div>
+      </LayoutGroup>
+
+      {displayed.length === 0 ? (
+        <div className='text-muted-foreground py-10 text-center text-lg opacity-60'>
+          {t('noHistory')}
+        </div>
+      ) : null}
     </div>
   );
 }

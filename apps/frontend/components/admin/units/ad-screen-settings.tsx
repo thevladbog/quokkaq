@@ -21,17 +21,7 @@ import { ImageIcon, Video, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { LogoUpload } from '@/components/ui/logo-upload';
 import { useUpdateUnit } from '@/lib/hooks';
-
-interface AdScreenConfig {
-  width?: number;
-  duration?: number;
-  activeMaterialIds?: string[];
-  logoUrl?: string;
-  isCustomColorsEnabled?: boolean;
-  headerColor?: string;
-  bodyColor?: string;
-  recentCallsHistoryLimit?: number;
-}
+import type { AdScreenConfig } from '@quokkaq/shared-types';
 
 interface AdScreenSettingsProps {
   unitId: string;

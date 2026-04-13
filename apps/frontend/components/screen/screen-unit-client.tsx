@@ -1,16 +1,18 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   formatAppDate,
   formatAppTime,
   intlLocaleFromAppLocale
 } from '@/lib/format-datetime';
-import { Ticket, ticketsApi, unitsApi, Material, UnitConfig } from '@/lib/api';
+import { getGetUnitsUnitIdTicketsQueryKey } from '@/lib/api/generated/tickets-counters';
+import { Ticket, unitsApi, Material, UnitConfig } from '@/lib/api';
 import { logger } from '@/lib/logger';
-import { useUnit } from '@/lib/hooks';
+import { useTickets, useUnit } from '@/lib/hooks';
 import { socketClient } from '@/lib/socket';
 import { AdPlayer } from '@/components/screen/ad-player';
 import { CalledTicketsTable } from '@/components/screen/called-tickets-table';
@@ -20,6 +22,8 @@ import { Spinner } from '@/components/ui/spinner';
 interface ScreenUnitClientProps {
   unitId: string;
 }
+
+const EMPTY_TICKET_LIST: Ticket[] = [];
 
 function deriveCalledTicketsForScreen(tickets: Ticket[]): Ticket[] {
   const activePool = tickets.filter(
@@ -64,44 +68,14 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
   const t = useTranslations('screen');
   const locale = useLocale();
   const intlLocale = useMemo(() => intlLocaleFromAppLocale(locale), [locale]);
+  const queryClient = useQueryClient();
 
-  const ticketsFetchSeqRef = useRef(0);
+  const { data: ticketsData, isLoading: ticketsLoading } = useTickets(unitId, {
+    enabled: !!unitId,
+    refetchInterval: 12_000
+  });
+  const tickets = ticketsData ?? EMPTY_TICKET_LIST;
 
-  const runTicketsLoad = useCallback(
-    async (
-      source: string,
-      options: {
-        affectLoading?: boolean;
-        isCancelled?: () => boolean;
-      } = {}
-    ) => {
-      const { affectLoading = false, isCancelled } = options;
-      const mySeq = ++ticketsFetchSeqRef.current;
-      if (affectLoading) {
-        setTicketsLoading(true);
-      }
-      try {
-        const data = await ticketsApi.getByUnitId(unitId);
-        if (isCancelled?.()) {
-          return;
-        }
-        if (mySeq !== ticketsFetchSeqRef.current) {
-          return;
-        }
-        setTickets(data);
-      } catch (error) {
-        logger.error('Failed to fetch tickets:', error);
-      } finally {
-        if (affectLoading && !isCancelled?.()) {
-          setTicketsLoading(false);
-        }
-      }
-    },
-    [unitId]
-  );
-
-  const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [ticketsLoading, setTicketsLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [materials, setMaterials] = useState<Material[]>([]);
 
@@ -119,20 +93,6 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
   const unitKind = unit?.kind;
   const unitParentId = unit?.parentId;
 
-  // REST: always use the unit id from the URL. Backend returns zone-scoped rows for service_zone,
-  // subdivision-wide pool for subdivision (see GetTicketsByUnit).
-  useEffect(() => {
-    if (!unitId) return;
-    let cancelled = false;
-    void runTicketsLoad('rest', {
-      affectLoading: true,
-      isCancelled: () => cancelled
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [unitId, runTicketsLoad]);
-
   // WebSocket room matches ticket.UnitID on the server (subdivision); URL may be a service_zone.
   useEffect(() => {
     if (!unitId || unitKind == null) return;
@@ -140,6 +100,7 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
     const wsRoomId =
       unitKind === 'service_zone' && unitParentId ? unitParentId : unitId;
 
+    const ticketsQueryKey = getGetUnitsUnitIdTicketsQueryKey(unitId);
     const wsDebounceRef = { t: null as ReturnType<typeof setTimeout> | null };
 
     const scheduleWsRefetch = () => {
@@ -148,7 +109,7 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
       }
       wsDebounceRef.t = setTimeout(() => {
         wsDebounceRef.t = null;
-        void runTicketsLoad('ws', {});
+        void queryClient.invalidateQueries({ queryKey: ticketsQueryKey });
       }, 80);
     };
 
@@ -179,16 +140,7 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
       socketClient.off('unit.eod', handleEOD);
       socketClient.disconnect();
     };
-  }, [unitId, unitKind, unitParentId, runTicketsLoad]);
-
-  // Safety net if a WS event is missed (e.g. reconnect gap).
-  useEffect(() => {
-    if (!unitId || !unit) return;
-    const id = setInterval(() => {
-      void runTicketsLoad('poll', {});
-    }, 12000);
-    return () => clearInterval(id);
-  }, [unitId, unit, runTicketsLoad]);
+  }, [unitId, unitKind, unitParentId, queryClient]);
 
   // Fetch materials
   useEffect(() => {
