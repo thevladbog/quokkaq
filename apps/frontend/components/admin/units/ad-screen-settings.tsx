@@ -21,20 +21,61 @@ import { ImageIcon, Video, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { LogoUpload } from '@/components/ui/logo-upload';
 import { useUpdateUnit } from '@/lib/hooks';
+import type { AdScreenConfig } from '@quokkaq/shared-types';
 
-interface AdScreenConfig {
-  width?: number;
-  duration?: number;
-  activeMaterialIds?: string[];
-  logoUrl?: string;
-  isCustomColorsEnabled?: boolean;
-  headerColor?: string;
-  bodyColor?: string;
-}
+/** Unit.config JSON from API — ad block is usually partial. */
+type UnitConfigJson = {
+  adScreen?: Partial<AdScreenConfig>;
+  config?: Partial<AdScreenConfig>;
+} & Record<string, unknown>;
 
 interface AdScreenSettingsProps {
   unitId: string;
   currentConfig: Record<string, unknown>;
+}
+
+const LEGACY_AD_SCREEN_COLOR_KEYS = [
+  'logoUrl',
+  'headerColor',
+  'bodyColor',
+  'foregroundColor',
+  'backgroundColor',
+  'primaryColor',
+  'secondaryColor',
+  'isCustomColorsEnabled'
+] as const;
+
+function recordLooksLikeLegacyFlatAdScreen(
+  u: Record<string, unknown>
+): boolean {
+  const known = LEGACY_AD_SCREEN_COLOR_KEYS as readonly string[];
+  for (const k of Object.keys(u)) {
+    if (known.includes(k)) {
+      return true;
+    }
+    if (k.toLowerCase().includes('color')) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function adConfigFromUnitConfig(
+  c: Record<string, unknown>
+): Partial<AdScreenConfig> {
+  const u = c as unknown as UnitConfigJson;
+  const nested = u.adScreen ?? u.config;
+  if (nested) return nested;
+  if (
+    'width' in u ||
+    'duration' in u ||
+    'activeMaterialIds' in u ||
+    'recentCallsHistoryLimit' in u ||
+    recordLooksLikeLegacyFlatAdScreen(u)
+  ) {
+    return u as Partial<AdScreenConfig>;
+  }
+  return {};
 }
 
 export function AdScreenSettings({
@@ -45,17 +86,23 @@ export function AdScreenSettings({
   const queryClient = useQueryClient();
   const [uploading, setUploading] = useState(false);
 
-  // Determine the correct config object.
-  const typedConfig = currentConfig as {
-    adScreen?: AdScreenConfig;
-    config?: AdScreenConfig;
-  } & AdScreenConfig;
-  const adConfig = typedConfig.adScreen ||
-    typedConfig.config ||
-    typedConfig || { width: 0, duration: 5, activeMaterialIds: [] };
+  const adPartial = adConfigFromUnitConfig(currentConfig);
+  const adConfig = {
+    width: adPartial.width ?? 0,
+    duration: adPartial.duration ?? 5,
+    activeMaterialIds: adPartial.activeMaterialIds ?? [],
+    recentCallsHistoryLimit: adPartial.recentCallsHistoryLimit ?? 0,
+    logoUrl: adPartial.logoUrl ?? '',
+    isCustomColorsEnabled: adPartial.isCustomColorsEnabled ?? false,
+    headerColor: adPartial.headerColor ?? '#ffffff',
+    bodyColor: adPartial.bodyColor ?? '#ffffff'
+  };
 
   const [width, setWidth] = useState(adConfig.width || 0);
   const [duration, setDuration] = useState(adConfig.duration || 5);
+  const [recentCallsHistoryLimit, setRecentCallsHistoryLimit] = useState(
+    adConfig.recentCallsHistoryLimit ?? 0
+  );
   const [selectedMaterials, setSelectedMaterials] = useState<string[]>(
     adConfig.activeMaterialIds || []
   );
@@ -113,9 +160,10 @@ export function AdScreenSettings({
     const newConfig = {
       ...(currentConfig || {}),
       adScreen: {
-        ...((currentConfig?.adScreen as AdScreenConfig) || {}),
+        ...adConfigFromUnitConfig(currentConfig),
         width,
         duration,
+        recentCallsHistoryLimit,
         activeMaterialIds: selectedMaterials,
         logoUrl,
         isCustomColorsEnabled,
@@ -262,6 +310,27 @@ export function AdScreenSettings({
                 {t('image_duration_help')}
               </p>
             </div>
+          </div>
+
+          <div className='max-w-md space-y-2'>
+            <Label htmlFor='recent-calls-limit'>
+              {t('recent_calls_history_limit')}
+            </Label>
+            <Input
+              id='recent-calls-limit'
+              type='number'
+              min='0'
+              max='200'
+              value={recentCallsHistoryLimit}
+              onChange={(e) =>
+                setRecentCallsHistoryLimit(
+                  Math.min(200, Math.max(0, parseInt(e.target.value, 10) || 0))
+                )
+              }
+            />
+            <p className='text-muted-foreground text-xs'>
+              {t('recent_calls_history_limit_help')}
+            </p>
           </div>
 
           <Button

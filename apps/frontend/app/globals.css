@@ -172,3 +172,108 @@
     letter-spacing: var(--tracking-normal);
   }
 }
+
+/* Ad screen «called» row: CodePen yemon-style vertical reel + shine sweep */
+@keyframes screen-called-status-reel {
+  0%,
+  8% {
+    transform: translateY(0);
+  }
+  15%,
+  35% {
+    transform: translateY(-33.333%);
+  }
+  42%,
+  58% {
+    transform: translateY(-66.666%);
+  }
+  /* Мгновенный сброс к первой копии (как в CodePen 99.99% / 100%) */
+  58.02%,
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes screen-called-row-shine {
+  0% {
+    transform: translateX(-130%) skewX(-16deg);
+  }
+  100% {
+    transform: translateX(230%) skewX(-16deg);
+  }
+}
+
+.screen-called-status-reel-clip {
+  height: 1.35em;
+  overflow: hidden;
+}
+
+.screen-called-status-reel-track {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Один полный цикл при смене key (статуса) */
+.screen-called-status-reel-track-once {
+  animation: screen-called-status-reel 5s linear 1 forwards;
+}
+
+.screen-called-status-reel-track > div {
+  display: flex;
+  min-height: 1.35em;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+@keyframes screen-status-change-snap {
+  0% {
+    opacity: 0.45;
+    transform: translateY(0.12em);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.screen-status-change-snap-once {
+  animation: screen-status-change-snap 0.42s ease-out 1 forwards;
+}
+
+.screen-called-row-shine-underlay {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.screen-called-row-shine-underlay::before {
+  content: '';
+  position: absolute;
+  top: -35%;
+  bottom: -35%;
+  left: 0;
+  width: 42%;
+  /* primary-foreground: светлая полоса на тёмном primary и тёмная на светлом */
+  background: linear-gradient(
+    95deg,
+    transparent 0%,
+    color-mix(in oklch, var(--primary-foreground) 6%, transparent) 35%,
+    color-mix(in oklch, var(--primary-foreground) 18%, transparent) 50%,
+    color-mix(in oklch, var(--primary-foreground) 6%, transparent) 65%,
+    transparent 100%
+  );
+  animation: screen-called-row-shine 4.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .screen-called-status-reel-track-once,
+  .screen-status-change-snap-once {
+    animation: none;
+  }
+
+  .screen-called-row-shine-underlay::before {
+    animation: none;
+  }
+}

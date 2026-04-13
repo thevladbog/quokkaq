@@ -214,9 +214,13 @@ export interface ModelsClientVisitTransferEvent {
   at?: string;
   fromCounterName?: string;
   fromServiceName?: string;
+  fromServiceNameEn?: string;
+  fromServiceNameRu?: string;
   fromZoneLabel?: string;
   toCounterName?: string;
   toServiceName?: string;
+  toServiceNameEn?: string;
+  toServiceNameRu?: string;
   toZoneLabel?: string;
   transferKind?: string;
 }

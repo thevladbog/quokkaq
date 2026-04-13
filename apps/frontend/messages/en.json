@@ -464,15 +464,21 @@
       "no_materials": "No materials uploaded yet.",
       "delete_confirm": "Delete this material?",
       "upload_success": "Material uploaded successfully",
+      "upload_error": "Could not upload the material",
       "upload_failed": "Upload failed: {error}",
       "delete_success": "Material deleted",
+      "delete_error": "Could not delete the material",
       "delete_failed": "Delete failed: {error}",
+      "save_success": "Ad screen settings saved",
+      "save_error": "Could not save ad screen settings",
       "update_success": "Ad settings updated",
       "update_failed": "Update failed: {error}",
       "invalid_file_type": "Invalid file type. Please upload an image or video.",
       "header_color": "Header Color",
       "body_color": "Body Color",
-      "use_custom_colors": "Use custom colors"
+      "use_custom_colors": "Use custom colors",
+      "recent_calls_history_limit": "Last called list size (rows)",
+      "recent_calls_history_limit_help": "How many rows to show in “Last called” on the ticket screen. Use 0 for no limit."
     },
     "kiosk_settings": {
       "title": "Kiosk Settings",
@@ -655,6 +661,7 @@
       "transfer_history_title": "Transfer steps",
       "transfer_service_flow": "{from} → {to}",
       "transfer_counter_flow": "Counters: {from} → {to}",
+      "transfer_counter_to_zone_queue": "Counters: {from} → zone queue",
       "transfer_zone_flow": "Zones: {from} → {to}",
       "anonymous_hint": "History is not available for anonymous walk-ins.",
       "no_client": "No linked visitor profile for this ticket.",
@@ -1009,10 +1016,14 @@
     "unitNotFound": "Unit not found",
     "nowCalling": "Now Calling",
     "lastCalled": "Last Called",
+    "row_ticket_label": "Ticket",
+    "row_status_label": "Status",
+    "row_counter_label": "Counter",
     "noHistory": "No called tickets yet",
     "waiting": "Waiting",
     "queueEmpty": "Queue is empty",
-    "ticketCalled": "Ticket Called"
+    "ticketsLoadError": "Could not load the queue for this screen. Check the connection or try again.",
+    "ticketsLoadRetry": "Try again"
   },
   "common": {
     "loading": "Loading...",
