@@ -84,6 +84,15 @@ describe('buildDraftBody', () => {
     ).toThrowError('dueInvalid');
   });
 
+  it('throws dueEmpty when due is blank', () => {
+    expect(() =>
+      buildDraftBody('c', '', 'RUB', false, false, false, [line()], enUS)
+    ).toThrowError('dueEmpty');
+    expect(() =>
+      buildDraftBody('c', '   ', 'RUB', false, false, false, [line()], enUS)
+    ).toThrowError('dueEmpty');
+  });
+
   it('throws quantityInvalid', () => {
     expect(() =>
       buildDraftBody(

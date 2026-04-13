@@ -12,7 +12,17 @@ const platformApi = vi.hoisted(() => ({
   getPlatformInvoices: vi.fn()
 }));
 
-vi.mock('@/lib/api/generated/platform', () => platformApi);
+vi.mock('@/lib/api/generated/platform', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@/lib/api/generated/platform')>();
+  return {
+    ...actual,
+    platformListCompanies: platformApi.platformListCompanies,
+    platformListSubscriptions: platformApi.platformListSubscriptions,
+    getPlatformSubscriptionPlans: platformApi.getPlatformSubscriptionPlans,
+    getPlatformInvoices: platformApi.getPlatformInvoices
+  };
+});
 
 vi.mock('@/src/i18n/navigation', () => ({
   Link: ({ children, href }: { children: ReactNode; href: string }) => (

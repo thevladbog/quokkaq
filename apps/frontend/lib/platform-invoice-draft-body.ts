@@ -101,7 +101,11 @@ export function buildDraftBody(
   rows: DraftLineRow[],
   intlLocale: string
 ): InvoiceDraftCreateBody {
-  const due = new Date(dueLocal.trim());
+  const dueTrimmed = dueLocal.trim();
+  if (dueTrimmed === '') {
+    throw new Error('dueEmpty');
+  }
+  const due = new Date(dueTrimmed);
   if (Number.isNaN(due.getTime())) {
     throw new Error('dueInvalid');
   }

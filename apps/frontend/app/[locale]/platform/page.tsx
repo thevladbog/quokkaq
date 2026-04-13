@@ -2,7 +2,11 @@
 
 import { useQuery } from '@tanstack/react-query';
 import {
+  getGetPlatformInvoicesQueryKey,
+  getGetPlatformSubscriptionPlansQueryKey,
   getPlatformInvoices,
+  getPlatformListCompaniesQueryKey,
+  getPlatformListSubscriptionsQueryKey,
   getPlatformSubscriptionPlans,
   platformListCompanies,
   platformListSubscriptions
@@ -21,6 +25,8 @@ import {
   Layers
 } from 'lucide-react';
 
+const overviewListParams = { limit: 1, offset: 0 } as const;
+
 export default function PlatformOverviewPage() {
   const t = useTranslations('platform.overview');
   const {
@@ -29,9 +35,8 @@ export default function PlatformOverviewPage() {
     isError: isCompaniesError,
     refetch: refetchCompanies
   } = useQuery({
-    queryKey: ['platform-companies', 'count'],
-    queryFn: async () =>
-      (await platformListCompanies({ limit: 1, offset: 0 })).data
+    queryKey: getPlatformListCompaniesQueryKey(overviewListParams),
+    queryFn: async () => (await platformListCompanies(overviewListParams)).data
   });
   const {
     data: subs,
@@ -39,9 +44,9 @@ export default function PlatformOverviewPage() {
     isError: isSubsError,
     refetch: refetchSubs
   } = useQuery({
-    queryKey: ['platform-subscriptions', 'count'],
+    queryKey: getPlatformListSubscriptionsQueryKey(overviewListParams),
     queryFn: async () =>
-      (await platformListSubscriptions({ limit: 1, offset: 0 })).data
+      (await platformListSubscriptions(overviewListParams)).data
   });
   const {
     data: plans,
@@ -49,7 +54,7 @@ export default function PlatformOverviewPage() {
     isError: isPlansError,
     refetch: refetchPlans
   } = useQuery({
-    queryKey: ['platform-plans'],
+    queryKey: getGetPlatformSubscriptionPlansQueryKey(),
     queryFn: async () => (await getPlatformSubscriptionPlans()).data
   });
   const {
@@ -58,9 +63,8 @@ export default function PlatformOverviewPage() {
     isError: isInvError,
     refetch: refetchInv
   } = useQuery({
-    queryKey: ['platform-invoices', 'count'],
-    queryFn: async () =>
-      (await getPlatformInvoices({ limit: 1, offset: 0 })).data
+    queryKey: getGetPlatformInvoicesQueryKey(overviewListParams),
+    queryFn: async () => (await getPlatformInvoices(overviewListParams)).data
   });
 
   const loading = lc || ls || lp || li;
