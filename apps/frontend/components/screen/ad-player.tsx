@@ -19,10 +19,14 @@ export function AdPlayer({ materials, duration }: AdPlayerProps) {
   const fadeDuration = reduceMotion ? 0 : 0.5;
   const fadeEase = [0.22, 1, 0.36, 1] as const;
 
+  const safeIndex =
+    materials.length === 0 ? 0 : Math.min(currentIndex, materials.length - 1);
+
   useEffect(() => {
     if (materials.length === 0) return;
 
-    const currentMaterial = materials[currentIndex];
+    const currentMaterial = materials[safeIndex];
+    if (!currentMaterial) return;
 
     // For images, rotate after duration
     if (currentMaterial.type === 'image') {
@@ -34,9 +38,10 @@ export function AdPlayer({ materials, duration }: AdPlayerProps) {
     }
 
     // For videos, the onEnded event will handle rotation
-  }, [currentIndex, materials, duration]);
+  }, [safeIndex, materials, duration]);
 
   const handleVideoEnded = () => {
+    if (materials.length === 0) return;
     setCurrentIndex((prev) => (prev + 1) % materials.length);
   };
 
@@ -48,7 +53,14 @@ export function AdPlayer({ materials, duration }: AdPlayerProps) {
     );
   }
 
-  const currentMaterial = materials[currentIndex];
+  const currentMaterial = materials[safeIndex];
+  if (!currentMaterial) {
+    return (
+      <div className='bg-muted/20 flex h-full w-full items-center justify-center rounded-lg'>
+        <p className='text-muted-foreground text-xl'>No ads configured</p>
+      </div>
+    );
+  }
 
   return (
     <div className='relative flex h-full w-full items-center justify-center overflow-hidden rounded-lg bg-transparent'>

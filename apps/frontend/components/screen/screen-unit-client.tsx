@@ -30,10 +30,17 @@ function deriveCalledTicketsForScreen(tickets: Ticket[]): Ticket[] {
     (t) =>
       t.status === 'called' ||
       t.status === 'in_service' ||
-      t.status === 'served'
+      t.status === 'served' ||
+      t.status === 'completed'
   );
   const statusRank = (s: string) =>
-    s === 'called' ? 3 : s === 'in_service' ? 2 : s === 'served' ? 1 : 0;
+    s === 'called'
+      ? 3
+      : s === 'in_service'
+        ? 2
+        : s === 'served' || s === 'completed'
+          ? 1
+          : 0;
   const byCounter = new Map<string, Ticket[]>();
   for (const tick of activePool) {
     const key = tick.counter?.id ?? `no-counter:${tick.id}`;
@@ -70,11 +77,16 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
   const intlLocale = useMemo(() => intlLocaleFromAppLocale(locale), [locale]);
   const queryClient = useQueryClient();
 
-  const { data: ticketsData, isLoading: ticketsLoading } = useTickets(unitId, {
+  const ticketsQuery = useTickets(unitId, {
     enabled: !!unitId,
     refetchInterval: 12_000
   });
-  const tickets = ticketsData ?? EMPTY_TICKET_LIST;
+  const {
+    data: ticketsData,
+    isLoading: ticketsLoading,
+    isPending: ticketsPending,
+    isError: ticketsError
+  } = ticketsQuery;
 
   const [currentTime, setCurrentTime] = useState(new Date());
   const [materials, setMaterials] = useState<Material[]>([]);
@@ -191,13 +203,36 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
     );
   }
 
-  if (ticketsLoading) {
+  if (ticketsLoading || ticketsPending) {
     return (
       <div className='bg-background text-foreground flex min-h-screen items-center justify-center'>
         <Spinner className='h-12 w-12' />
       </div>
     );
   }
+
+  if (ticketsError) {
+    return (
+      <div className='bg-background text-foreground flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center'>
+        <p className='text-muted-foreground max-w-md text-lg'>
+          {t('ticketsLoadError')}
+        </p>
+        <button
+          type='button'
+          className='text-primary text-sm font-medium underline underline-offset-4'
+          onClick={() =>
+            void queryClient.invalidateQueries({
+              queryKey: getGetUnitsUnitIdTicketsQueryKey(unitId)
+            })
+          }
+        >
+          {t('ticketsLoadRetry')}
+        </button>
+      </div>
+    );
+  }
+
+  const tickets = ticketsData ?? EMPTY_TICKET_LIST;
 
   const calledTickets = deriveCalledTicketsForScreen(tickets);
 

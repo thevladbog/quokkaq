@@ -14,6 +14,26 @@ interface CalledTicketsTableProps {
 
 const layoutTransition = { duration: 0.35, ease: [0.22, 1, 0.36, 1] as const };
 
+function CalledTicketLiveAnnouncer({
+  ticket,
+  rowStatusLabel,
+  rowCounterLabel,
+  statusText
+}: {
+  ticket: Ticket;
+  rowStatusLabel: string;
+  rowCounterLabel: string;
+  statusText: string;
+}) {
+  const counter = ticket.counter?.name?.trim() || '';
+  const text = `${ticket.queueNumber}. ${rowStatusLabel}: ${statusText}${counter ? `. ${rowCounterLabel}: ${counter}` : ''}`;
+  return (
+    <div className='sr-only' aria-live='polite' aria-atomic='true'>
+      {text}
+    </div>
+  );
+}
+
 function ticketStatusKey(
   status: string
 ): 'waiting' | 'called' | 'in_service' | 'served' | 'completed' | 'skipped' {
@@ -37,6 +57,8 @@ export function CalledTicketsTable({
 
   const statusLabel = (ticket: Ticket) =>
     tStatus(ticketStatusKey(ticket.status));
+
+  const calledTicket = displayed.find((x) => x.status === 'called');
 
   const RowDivider = ({
     toneClass,
@@ -69,6 +91,16 @@ export function CalledTicketsTable({
       <div className='text-muted-foreground shrink-0 text-center text-lg tracking-widest uppercase md:text-2xl'>
         {t('nowServing')}
       </div>
+
+      {calledTicket ? (
+        <CalledTicketLiveAnnouncer
+          key={calledTicket.id}
+          ticket={calledTicket}
+          rowStatusLabel={t('row_status_label')}
+          rowCounterLabel={t('row_counter_label')}
+          statusText={tStatus(ticketStatusKey(calledTicket.status))}
+        />
+      ) : null}
 
       <LayoutGroup>
         <div className='flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1'>
@@ -109,7 +141,6 @@ export function CalledTicketsTable({
                   : 'bg-border/80';
 
               const statusAnimKey = `${ticket.id}:${ticket.status}`;
-              const statusAria = `${t('row_status_label')}: ${statusLabel(ticket)}`;
 
               const inner = (
                 <div
@@ -140,11 +171,7 @@ export function CalledTicketsTable({
                         {t('row_status_label')}
                       </div>
                       {isCalled ? (
-                        <div
-                          className={`${statusSize} max-w-full`}
-                          role='status'
-                          aria-label={statusAria}
-                        >
+                        <div className={`${statusSize} max-w-full`}>
                           <div
                             className='screen-called-status-reel-clip'
                             aria-hidden
@@ -163,8 +190,6 @@ export function CalledTicketsTable({
                         <div
                           key={statusAnimKey}
                           className={`${statusSize} screen-status-change-snap-once max-w-full`}
-                          role='status'
-                          aria-label={statusAria}
                         >
                           {statusLabel(ticket)}
                         </div>

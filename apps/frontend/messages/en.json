@@ -1021,7 +1021,9 @@
     "row_counter_label": "Counter",
     "noHistory": "No called tickets yet",
     "waiting": "Waiting",
-    "queueEmpty": "Queue is empty"
+    "queueEmpty": "Queue is empty",
+    "ticketsLoadError": "Could not load the queue for this screen. Check the connection or try again.",
+    "ticketsLoadRetry": "Try again"
   },
   "common": {
     "loading": "Loading...",

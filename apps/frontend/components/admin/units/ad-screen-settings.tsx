@@ -34,6 +34,32 @@ interface AdScreenSettingsProps {
   currentConfig: Record<string, unknown>;
 }
 
+const LEGACY_AD_SCREEN_COLOR_KEYS = [
+  'logoUrl',
+  'headerColor',
+  'bodyColor',
+  'foregroundColor',
+  'backgroundColor',
+  'primaryColor',
+  'secondaryColor',
+  'isCustomColorsEnabled'
+] as const;
+
+function recordLooksLikeLegacyFlatAdScreen(
+  u: Record<string, unknown>
+): boolean {
+  const known = LEGACY_AD_SCREEN_COLOR_KEYS as readonly string[];
+  for (const k of Object.keys(u)) {
+    if (known.includes(k)) {
+      return true;
+    }
+    if (k.toLowerCase().includes('color')) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function adConfigFromUnitConfig(
   c: Record<string, unknown>
 ): Partial<AdScreenConfig> {
@@ -44,7 +70,8 @@ function adConfigFromUnitConfig(
     'width' in u ||
     'duration' in u ||
     'activeMaterialIds' in u ||
-    'recentCallsHistoryLimit' in u
+    'recentCallsHistoryLimit' in u ||
+    recordLooksLikeLegacyFlatAdScreen(u)
   ) {
     return u as Partial<AdScreenConfig>;
   }

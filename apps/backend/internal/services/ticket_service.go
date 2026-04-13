@@ -825,14 +825,8 @@ func (s *ticketService) Transfer(ticketID string, in TransferTicketInput, actorU
 			if fromCounterID != nil {
 				payload["from_counter_id"] = *fromCounterID
 			}
-			if fromZoneID != nil {
-				if zu, zerr := s.unitRepo.FindByIDLight(strings.TrimSpace(*fromZoneID)); zerr == nil && zu != nil {
-					payload["from_zone_name"] = zu.Name
-				}
-			} else {
-				if u, uerr := s.unitRepo.FindByIDLight(ticket.UnitID); uerr == nil && u != nil {
-					payload["from_zone_name"] = u.Name
-				}
+			if n, ok := s.resolveFromZoneNameForTransferPayload(fromZoneID, ticket.UnitID); ok {
+				payload["from_zone_name"] = n
 			}
 			if zu, zerr := s.unitRepo.FindByIDLight(zoneIDTrim); zerr == nil && zu != nil {
 				payload["to_zone_name"] = zu.Name
@@ -937,14 +931,8 @@ func (s *ticketService) Transfer(ticketID string, in TransferTicketInput, actorU
 		if toSvc.NameEn != nil && strings.TrimSpace(*toSvc.NameEn) != "" {
 			payload["to_service_name_en"] = strings.TrimSpace(*toSvc.NameEn)
 		}
-		if fromZoneBefore != nil {
-			if zu, zerr := s.unitRepo.FindByIDLight(strings.TrimSpace(*fromZoneBefore)); zerr == nil && zu != nil {
-				payload["from_zone_name"] = zu.Name
-			}
-		} else {
-			if u, uerr := s.unitRepo.FindByIDLight(ticket.UnitID); uerr == nil && u != nil {
-				payload["from_zone_name"] = u.Name
-			}
+		if n, ok := s.resolveFromZoneNameForTransferPayload(fromZoneBefore, ticket.UnitID); ok {
+			payload["from_zone_name"] = n
 		}
 		if targetCounter.ServiceZoneID != nil {
 			if zu, zerr := s.unitRepo.FindByIDLight(strings.TrimSpace(*targetCounter.ServiceZoneID)); zerr == nil && zu != nil {
@@ -977,6 +965,23 @@ func (s *ticketService) Transfer(ticketID string, in TransferTicketInput, actorU
 
 	s.hub.BroadcastEvent("ticket.updated", ticket, ticket.UnitID)
 	return ticket, nil
+}
+
+// resolveFromZoneNameForTransferPayload sets from_zone_name in transfer history payloads:
+// prefer the name of fromZoneID when set, otherwise the subdivision unit name.
+func (s *ticketService) resolveFromZoneNameForTransferPayload(fromZoneID *string, ticketUnitID string) (name string, ok bool) {
+	if fromZoneID != nil {
+		zu, zerr := s.unitRepo.FindByIDLight(strings.TrimSpace(*fromZoneID))
+		if zerr != nil || zu == nil {
+			return "", false
+		}
+		return zu.Name, true
+	}
+	u, uerr := s.unitRepo.FindByIDLight(ticketUnitID)
+	if uerr != nil || u == nil {
+		return "", false
+	}
+	return u.Name, true
 }
 
 func serviceZoneIDJSON(z *string) interface{} {
