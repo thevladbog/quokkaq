@@ -14,11 +14,12 @@ import {
   CardHeader,
   CardTitle
 } from '@/components/ui/card';
-import { useUpdateUnit } from '@/lib/hooks';
+import { usePatchKioskConfig } from '@/lib/hooks';
 import { toast } from 'sonner';
 import { LogoUpload } from '@/components/ui/logo-upload';
 import type { KioskConfig } from '@quokkaq/shared-types';
 import { useKioskHeaderFields } from '@/hooks/use-kiosk-header-fields';
+import { isTauriKiosk, printKioskJob, testPrintLines } from '@/lib/kiosk-print';
 
 interface KioskSettingsProps {
   unitId: string;
@@ -33,7 +34,7 @@ export function KioskSettings({
   currentConfig
 }: KioskSettingsProps) {
   const t = useTranslations('admin.kiosk_settings');
-  const updateUnitMutation = useUpdateUnit();
+  const patchKioskMutation = usePatchKioskConfig();
 
   const typedConfig = currentConfig as { kiosk?: KioskConfig };
   const kioskConfig = typedConfig.kiosk || {};
@@ -82,6 +83,9 @@ export function KioskSettings({
     kioskConfig.isPrintEnabled ?? true
   );
   const [logoUrl, setLogoUrl] = useState(kioskConfig.logoUrl || '');
+  const [printerLogoUrl, setPrinterLogoUrl] = useState(
+    kioskConfig.printerLogoUrl || ''
+  );
   const [feedbackUrl, setFeedbackUrl] = useState(kioskConfig.feedbackUrl || '');
   const [isPreRegistrationEnabled, setIsPreRegistrationEnabled] = useState(
     kioskConfig.isPreRegistrationEnabled ?? false
@@ -126,6 +130,7 @@ export function KioskSettings({
         printerType,
         isPrintEnabled,
         logoUrl,
+        printerLogoUrl: printerLogoUrl.trim() || undefined,
         ...headerKioskSaveFields(),
         feedbackUrl,
         isPreRegistrationEnabled,
@@ -136,8 +141,8 @@ export function KioskSettings({
       }
     };
 
-    updateUnitMutation.mutate(
-      { id: unitId, config: newConfig },
+    patchKioskMutation.mutate(
+      { id: unitId, config: newConfig as Record<string, unknown> },
       {
         onSuccess: () => {
           toast.success(t('save_success'));
@@ -147,6 +152,52 @@ export function KioskSettings({
         }
       }
     );
+  };
+
+  const handleTestPrint = async () => {
+    if (!isTauriKiosk()) {
+      return;
+    }
+    if (printerType === 'label') {
+      toast.info(t('test_print_label_unsupported'));
+      return;
+    }
+    try {
+      let native = false;
+      if (printerConnection === 'system') {
+        if (!systemPrinterName.trim()) {
+          toast.error(t('system_printer_required'));
+          return;
+        }
+        native = await printKioskJob(
+          'system',
+          systemPrinterName.trim(),
+          testPrintLines()
+        );
+      } else {
+        if (!printerIp.trim()) {
+          toast.error(t('printer_ip_required'));
+          return;
+        }
+        native = await printKioskJob(
+          'tcp',
+          `${printerIp.trim()}:${printerPort.trim() || '9100'}`,
+          testPrintLines()
+        );
+      }
+      if (native) {
+        toast.success(t('test_print_sent'));
+      } else {
+        toast.error(
+          t('printer_test_error', {
+            message: t('test_print_target_missing')
+          })
+        );
+      }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      toast.error(t('printer_test_error', { message }));
+    }
   };
 
   return (
@@ -159,7 +210,8 @@ export function KioskSettings({
         <CardContent className='space-y-4'>
           <div className='space-y-2'>
             <LogoUpload
-              label={t('logo_upload')}
+              label={t('logo_screen')}
+              hint={t('logo_screen_hint')}
               currentLogoUrl={logoUrl}
               onLogoUploaded={setLogoUrl}
               onLogoRemoved={() => setLogoUrl('')}
@@ -399,6 +451,19 @@ export function KioskSettings({
 
             {isPrintEnabled && (
               <>
+                <div className='space-y-2 border-b pb-4'>
+                  <LogoUpload
+                    label={t('printer_logo_upload')}
+                    hint={t('printer_logo_upload_hint')}
+                    currentLogoUrl={printerLogoUrl}
+                    onLogoUploaded={setPrinterLogoUrl}
+                    onLogoRemoved={() => setPrinterLogoUrl('')}
+                    uploadTarget='printer'
+                    allowBmpByExtension
+                    accept='image/png,image/jpeg,image/jpg,image/webp,image/svg+xml,image/bmp,.bmp,.dib'
+                  />
+                </div>
+
                 <div className='space-y-2'>
                   <Label>{t('printer_connection')}</Label>
                   <div className='flex gap-4'>
@@ -490,12 +555,24 @@ export function KioskSettings({
                     </Button>
                   </div>
                 </div>
+
+                {isTauriKiosk() ? (
+                  <Button
+                    type='button'
+                    variant='outline'
+                    className='w-full'
+                    onClick={() => void handleTestPrint()}
+                    disabled={printerType === 'label'}
+                  >
+                    {t('test_print')}
+                  </Button>
+                ) : null}
               </>
             )}
           </div>
 
-          <Button onClick={handleSave} disabled={updateUnitMutation.isPending}>
-            {updateUnitMutation.isPending ? t('saving') : t('save_changes')}
+          <Button onClick={handleSave} disabled={patchKioskMutation.isPending}>
+            {patchKioskMutation.isPending ? t('saving') : t('save_changes')}
           </Button>
         </CardContent>
       </Card>

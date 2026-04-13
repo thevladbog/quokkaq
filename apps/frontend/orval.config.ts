@@ -71,5 +71,18 @@ export default defineConfig({
       ...reactQueryOutput,
       target: './lib/api/generated/tenant-billing.ts'
     }
+  },
+  quokkaqUpload: {
+    input: {
+      target: '../backend/docs/swagger.json',
+      filters: {
+        mode: 'include',
+        tags: ['upload']
+      }
+    },
+    output: {
+      ...reactQueryOutput,
+      target: './lib/api/generated/upload.ts'
+    }
   }
 });

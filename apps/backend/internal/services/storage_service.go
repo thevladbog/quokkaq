@@ -80,9 +80,10 @@ func (s *storageService) UploadFile(ctx context.Context, fileBytes []byte, fileN
 	// Objects served anonymously (prod MinIO policy) must live under public/.
 	// Private uploads stay outside this prefix.
 	publicFolders := map[string]struct{}{
-		"logos":     {},
-		"materials": {},
-		"tts":       {},
+		"logos":         {},
+		"printer-logos": {},
+		"materials":     {},
+		"tts":           {},
 	}
 	var key string
 	if _, ok := publicFolders[folder]; ok {

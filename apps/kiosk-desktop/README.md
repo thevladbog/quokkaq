@@ -20,6 +20,8 @@ The splash shows the bundled mascot asset under `src/splash-assets/quokka-logo.s
 3. Legacy text file `kiosk-url.txt` in the app config directory (first line = URL only, no token).
 4. Otherwise the webview stays on the **splash** (`splash.html`) until pairing succeeds.
 
+**Stuck on a blank page or old kiosk URL?** The app auto-opens the last paired URL from `desktop-profile.json`, so you may never see the splash again. Use **“Clear saved pairing & start over”** on the splash (if you can open it), or from the **kiosk web UI** when the unit or services fail to load (desktop app only): **“Reset desktop pairing”** returns you to the splash. You can also call the Tauri command `reset_desktop_pairing` from allowed pages.
+
 Config directory examples:
 
 - **macOS:** `~/Library/Application Support/com.quokkaq.kiosk/`
@@ -34,6 +36,10 @@ Optional:
 ## Remote IPC (printing from your domain)
 
 Edit [`src-tauri/capabilities/remote-kiosk.json`](src-tauri/capabilities/remote-kiosk.json) and set `remote.urls` to match the origins where your Next app is served (wildcards supported, see [Tauri capabilities](https://v2.tauri.app/security/capabilities/)). Rebuild the desktop app after changing this list.
+
+## macOS: Local Network (printing)
+
+**Network (TCP) print jobs** are sent from the **main QuokkaQ Kiosk executable** (`print_receipt` → raw socket to `host:9100`), so macOS can show **Local Network** consent for the app and list it under **System Settings → Privacy & Security → Local Network**. **System printer** jobs still go through the bundled Go agent on `127.0.0.1`. **Terminal** is exempt from the same policy, so `nc` from Terminal is not a reliable comparison.
 
 ## Build
 

@@ -483,6 +483,22 @@ export const unitsApi = {
     return UnitModelSchema.parse(res.data);
   },
 
+  /**
+   * Merge `config.kiosk` only (terminal JWT, unit members, or admin).
+   * Use from kiosk settings UI instead of `update` when staff/terminal must not be tenant admin.
+   */
+  patchKioskConfig: async (unitId: string, config: Record<string, unknown>) => {
+    const res = await orvalUnits.patchUnitsUnitIdKioskConfig(unitId, {
+      config
+    });
+    if (res.status !== 200) {
+      const errData =
+        typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
+      throw new Error(`API Error: ${res.status} - ${errData}`);
+    }
+    return UnitModelSchema.parse(res.data);
+  },
+
   createTicket: async (
     unitId: string,
     ticketData: CreateTicketRequestInput

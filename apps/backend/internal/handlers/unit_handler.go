@@ -320,6 +320,94 @@ func (h *UnitHandler) UpdateAdSettings(w http.ResponseWriter, r *http.Request) {
 	RespondJSON(w, map[string]bool{"success": true})
 }
 
+// PatchUnitKioskConfig godoc
+// @Summary      Merge kiosk settings into unit config
+// @Description  Updates only config.kiosk (other config keys unchanged). Allowed for desktop terminal JWT bound to this unit, unit members, and admins.
+// @Tags         units
+// @Accept       json
+// @Produce      json
+// @Param        unitId path      string true "Unit ID"
+// @Param        body   body      object true "Payload with config.kiosk"
+// @Success      200    {object}  models.Unit
+// @Failure      400    {string}  string "Bad Request"
+// @Failure      403    {string}  string "Forbidden"
+// @Failure      404    {string}  string "Not found"
+// @Failure      413    {string}  string "Payload too large"
+// @Failure      500    {string}  string "Internal Server Error"
+// @Router       /units/{unitId}/kiosk-config [patch]
+func (h *UnitHandler) PatchUnitKioskConfig(w http.ResponseWriter, r *http.Request) {
+	unitID := chi.URLParam(r, "unitId")
+	existingUnit, err := h.service.GetUnitByID(unitID)
+	if err != nil {
+		http.Error(w, "Unit not found", http.StatusNotFound)
+		return
+	}
+
+	limited := http.MaxBytesReader(w, r.Body, maxUnitPatchBodyBytes)
+	bodyBytes, err := io.ReadAll(limited)
+	if err != nil {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	var envelope struct {
+		Config map[string]json.RawMessage `json:"config"`
+	}
+	if err := json.Unmarshal(bodyBytes, &envelope); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if envelope.Config == nil {
+		http.Error(w, "config is required", http.StatusBadRequest)
+		return
+	}
+	kioskRaw, hasKiosk := envelope.Config["kiosk"]
+	if !hasKiosk || len(kioskRaw) == 0 || string(kioskRaw) == "null" {
+		http.Error(w, "config.kiosk is required", http.StatusBadRequest)
+		return
+	}
+
+	var existingMap map[string]json.RawMessage
+	if len(existingUnit.Config) > 0 && string(existingUnit.Config) != "null" {
+		if err := json.Unmarshal(existingUnit.Config, &existingMap); err != nil {
+			http.Error(w, "existing unit config is invalid", http.StatusInternalServerError)
+			return
+		}
+	}
+	if existingMap == nil {
+		existingMap = make(map[string]json.RawMessage)
+	}
+	existingMap["kiosk"] = kioskRaw
+	merged, err := json.Marshal(existingMap)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	existingUnit.Config = merged
+
+	if err := h.service.UpdateUnit(existingUnit); err != nil {
+		switch {
+		case errors.Is(err, services.ErrInvalidUnitKind), errors.Is(err, services.ErrInvalidParentKind):
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		case errors.Is(err, services.ErrParentNotFound):
+			http.Error(w, err.Error(), http.StatusNotFound)
+		case errors.Is(err, services.ErrCrossCompanyParent), errors.Is(err, services.ErrCycleDetected):
+			http.Error(w, err.Error(), http.StatusConflict)
+		default:
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	w.Header().Set("Cache-Control", "no-store")
+	RespondJSON(w, existingUnit)
+}
+
 // UpdateUnit godoc
 // @Summary      Update a unit
 // @Description  Updates an existing unit

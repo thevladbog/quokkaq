@@ -13,6 +13,12 @@ type contextKey string
 
 const UserIDKey contextKey = "userID"
 
+// TokenTypeKey is JWT audience kind: "user" (staff) or "terminal" (desktop kiosk).
+const TokenTypeKey contextKey = "tokenType"
+
+// TerminalUnitIDKey is set when typ=terminal — unit this desktop terminal is bound to.
+const TerminalUnitIDKey contextKey = "terminalUnitID"
+
 // JWTAuth is a middleware that validates JWT tokens and extracts user ID
 func JWTAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -61,8 +67,16 @@ func JWTAuth(next http.Handler) http.Handler {
 			return
 		}
 
-		// Add user ID to request context
-		ctx := context.WithValue(r.Context(), UserIDKey, userID)
+		ctx := r.Context()
+		tokenType := "user"
+		if typ, ok := claims["typ"].(string); ok && typ == "terminal" {
+			tokenType = "terminal"
+			if uid, ok := claims["unit_id"].(string); ok && strings.TrimSpace(uid) != "" {
+				ctx = context.WithValue(ctx, TerminalUnitIDKey, strings.TrimSpace(uid))
+			}
+		}
+		ctx = context.WithValue(ctx, TokenTypeKey, tokenType)
+		ctx = context.WithValue(ctx, UserIDKey, userID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

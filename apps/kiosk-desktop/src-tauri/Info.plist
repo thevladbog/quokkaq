@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>QuokkaQ Kiosk needs local network access to send print jobs to receipt printers on your Wi‑Fi or LAN (for example TCP port 9100) and to list system print queues.</string>
+  </dict>
+</plist>

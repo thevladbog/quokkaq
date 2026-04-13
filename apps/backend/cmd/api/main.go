@@ -341,6 +341,12 @@ func main() {
 
 		r.Group(func(r chi.Router) {
 			r.Use(authmiddleware.JWTAuth)
+			r.Use(authmiddleware.RequireAdminTerminalOrUnitMemberForUnit(userRepo, "unitId"))
+			r.Patch("/{unitId}/kiosk-config", unitHandler.PatchUnitKioskConfig)
+		})
+
+		r.Group(func(r chi.Router) {
+			r.Use(authmiddleware.JWTAuth)
 			r.Use(authmiddleware.RequireAdmin(userRepo))
 			r.Post("/", unitHandler.CreateUnit)
 			r.Patch("/{id}", unitHandler.UpdateUnit)
@@ -461,6 +467,9 @@ func main() {
 	r.Group(func(r chi.Router) {
 		r.Use(authmiddleware.JWTAuth)
 		r.Use(authmiddleware.RequireAdmin(userRepo))
+		// Printer logo: flat path is canonical; nested path kept for older frontends.
+		r.Post("/upload-printer-logo", uploadHandler.UploadPrinterLogo)
+		r.Post("/upload/printer-logo", uploadHandler.UploadPrinterLogo)
 		r.Post("/upload", uploadHandler.UploadLogo)
 	})
 

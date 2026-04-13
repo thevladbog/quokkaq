@@ -7,21 +7,46 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Upload, X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import Image from 'next/image';
 import { logger } from '@/lib/logger';
+import { postUpload, postUploadPrinterLogo } from '@/lib/api/generated/upload';
 
 interface LogoUploadProps {
   currentLogoUrl?: string;
   onLogoUploaded: (url: string) => void;
   onLogoRemoved: () => void;
   label?: string;
+  /** e.g. `image/*` or `image/png,image/jpeg,image/bmp,.bmp` */
+  accept?: string;
+  /** Replaces the default hint under the button */
+  hint?: string;
+  /**
+   * `kiosk` → POST /api/upload (via Orval + authenticatedApiFetch).
+   * `printer` → POST /api/upload-printer-logo.
+   */
+  uploadTarget?: 'kiosk' | 'printer';
+  /** When true, allow `.bmp` / `.dib` even if `file.type` is empty */
+  allowBmpByExtension?: boolean;
+}
+
+function isAllowedImageFile(file: File, allowBmpByExtension: boolean): boolean {
+  if (file.type.startsWith('image/')) {
+    return true;
+  }
+  if (allowBmpByExtension && /\.(bmp|dib)$/i.test(file.name)) {
+    return true;
+  }
+  return false;
 }
 
 export function LogoUpload({
   currentLogoUrl,
   onLogoUploaded,
   onLogoRemoved,
-  label
+  label,
+  accept = 'image/*',
+  hint,
+  uploadTarget = 'kiosk',
+  allowBmpByExtension = false
 }: LogoUploadProps) {
   const t = useTranslations('components.upload');
   const displayLabel = label ?? t('defaultLogoLabel');
@@ -33,7 +58,7 @@ export function LogoUpload({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
+    if (!isAllowedImageFile(file, allowBmpByExtension)) {
       toast.error(t('invalidType'));
       return;
     }
@@ -44,29 +69,18 @@ export function LogoUpload({
     }
 
     setIsUploading(true);
-    const formData = new FormData();
-    formData.append('file', file);
 
     try {
-      const token =
-        typeof window !== 'undefined'
-          ? localStorage.getItem('access_token')
-          : null;
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/upload`,
-        {
-          method: 'POST',
-          body: formData,
-          headers: token ? { Authorization: `Bearer ${token}` } : undefined
-        }
-      );
+      const res =
+        uploadTarget === 'printer'
+          ? await postUploadPrinterLogo({ file })
+          : await postUpload({ file });
 
-      if (!response.ok) {
+      if (res.status !== 200) {
         throw new Error('Upload failed');
       }
 
-      const data = await response.json();
-      onLogoUploaded(data.url);
+      onLogoUploaded(res.data.url);
       toast.success(t('logoSuccess'));
     } catch (error) {
       logger.error('Upload error:', error);
@@ -85,12 +99,11 @@ export function LogoUpload({
       <div className='flex items-center gap-4'>
         {currentLogoUrl ? (
           <div className='bg-muted/50 relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-md border'>
-            <Image
+            {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary upload URLs; next/image blocks hosts outside remotePatterns */}
+            <img
               src={currentLogoUrl}
               alt={displayLabel}
-              fill
-              unoptimized
-              className='object-contain p-1'
+              className='max-h-full max-w-full object-contain p-1'
             />
             <Button
               variant='destructive'
@@ -111,7 +124,7 @@ export function LogoUpload({
           <Input
             ref={fileInputRef}
             type='file'
-            accept='image/*'
+            accept={accept}
             className='hidden'
             onChange={handleFileChange}
             id={fileInputId}
@@ -134,7 +147,9 @@ export function LogoUpload({
               </>
             )}
           </Button>
-          <p className='text-muted-foreground mt-1 text-xs'>{t('hint')}</p>
+          <p className='text-muted-foreground mt-1 text-xs'>
+            {hint ?? t('hint')}
+          </p>
         </div>
       </div>
     </div>

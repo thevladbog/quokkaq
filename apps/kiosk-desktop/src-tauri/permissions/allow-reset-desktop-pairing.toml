@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-reset-desktop-pairing"
+description = "Clear saved pairing files and return the main window to the local splash screen."
+commands.allow = ["reset_desktop_pairing"]

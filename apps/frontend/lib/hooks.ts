@@ -112,6 +112,26 @@ export const useUpdateUnit = () => {
   });
 };
 
+export const usePatchKioskConfig = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      config
+    }: {
+      id: string;
+      config: Record<string, unknown>;
+    }) => unitsApi.patchKioskConfig(id, config),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: getGetUnitsQueryKey() });
+      queryClient.invalidateQueries({
+        queryKey: getGetUnitsIdQueryKey(variables.id)
+      });
+    }
+  });
+};
+
 export const useUnitServices = (unitId: string) => {
   return useQuery({
     queryKey: ['units', unitId, 'services'],

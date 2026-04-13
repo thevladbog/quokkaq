@@ -32,8 +32,10 @@ import { KioskTopBar } from '@/components/kiosk/kiosk-top-bar';
 import { KioskWelcomeHero } from '@/components/kiosk/kiosk-welcome-hero';
 import { KioskServiceTile } from '@/components/kiosk/kiosk-service-tile';
 import {
-  printReceiptFromKioskConfig,
-  ticketReceiptLines
+  buildKioskTicketEscPos,
+  isTauriKiosk,
+  printReceiptBytesFromKioskConfig,
+  resetDesktopPairingViaTauri
 } from '@/lib/kiosk-print';
 import { intlLocaleFromAppLocale } from '@/lib/format-datetime';
 import {
@@ -68,11 +70,37 @@ export default function UnitKioskPage() {
     return (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '');
   });
 
-  const { data: unit } = useUnit(unitId!, {
+  const {
+    data: unit,
+    isError: unitQueryError,
+    isPending: unitPending,
+    refetch: refetchUnit
+  } = useUnit(unitId ?? '', {
+    enabled: Boolean(unitId),
     refetchInterval: 120000,
     // Desktop WebView + React Query cache: always pick up fresh kiosk PIN / config.
     refetchOnMount: 'always'
   });
+
+  const [unitSlowLoad, setUnitSlowLoad] = useState(false);
+  useEffect(() => {
+    if (!unitPending) {
+      return undefined;
+    }
+    const t = window.setTimeout(() => setUnitSlowLoad(true), 20000);
+    return () => {
+      window.clearTimeout(t);
+      setUnitSlowLoad(false);
+    };
+  }, [unitPending]);
+
+  const handleResetDesktopPairing = async () => {
+    try {
+      await resetDesktopPairingViaTauri();
+    } catch (e) {
+      console.error('resetDesktopPairingViaTauri failed:', e);
+    }
+  };
 
   /** Subdivision id for services API and ticket creation (always the branch unit). */
   const kioskApiUnitId = useMemo(() => {
@@ -112,13 +140,25 @@ export default function UnitKioskPage() {
       return;
     }
     try {
-      const printed = await printReceiptFromKioskConfig(
-        kc,
-        ticketReceiptLines(ticket, serviceLabel, unit?.name)
-      );
-      if (!printed) {
-        return;
-      }
+      const ticketPageUrl = `${baseAppUrl}/${locale}/ticket/${ticket.id}`;
+      const unitLabelOverride = kc.kioskUnitLabelText?.trim();
+      const unitDisplayTitle =
+        unitLabelOverride || unit?.name?.trim() || t('kioskTitle');
+      const logoForPrint =
+        kc.printerLogoUrl?.trim() || kc.logoUrl?.trim() || '';
+      const logoFetchUrl =
+        typeof window !== 'undefined' && logoForPrint
+          ? `${window.location.origin}/api/kiosk-print-logo?url=${encodeURIComponent(logoForPrint)}`
+          : undefined;
+      const bytes = await buildKioskTicketEscPos({
+        kiosk: kc,
+        ticket,
+        serviceLabel,
+        ticketPageUrl,
+        unitDisplayTitle,
+        logoFetchUrl
+      });
+      await printReceiptBytesFromKioskConfig(kc, bytes);
     } catch (e) {
       console.error('Kiosk native print failed:', e);
     }
@@ -410,11 +450,88 @@ export default function UnitKioskPage() {
         beforeClock={topBarBeforeClock}
       />
 
-      {!unit ? (
+      {unitQueryError && !unit ? (
         <div className='flex min-h-0 flex-1 items-center justify-center overflow-hidden'>
+          <div className='max-w-md px-4 text-center'>
+            <h2 className='mb-2 text-2xl font-bold tracking-tight sm:text-3xl'>
+              {t('unitLoadErrorTitle')}
+            </h2>
+            <p className='text-kiosk-ink-muted mb-6 text-base'>
+              {t('unitLoadErrorMessage')}
+            </p>
+            <div className='flex flex-col items-center gap-3 sm:flex-row sm:justify-center'>
+              <Button
+                className='rounded-full px-8'
+                onClick={() => void refetchUnit()}
+              >
+                {t('retryServices')}
+              </Button>
+              {isTauriKiosk() ? (
+                <Button
+                  variant='outline'
+                  className='border-kiosk-border/60 rounded-full px-8'
+                  onClick={() => void handleResetDesktopPairing()}
+                >
+                  {t('desktop_reset_pairing')}
+                </Button>
+              ) : null}
+            </div>
+            {isTauriKiosk() ? (
+              <p className='text-kiosk-ink-muted mt-4 text-sm'>
+                {t('desktop_reset_pairing_short')}
+              </p>
+            ) : null}
+          </div>
+        </div>
+      ) : unitPending && !unit ? (
+        <div className='flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden px-4'>
           <div className='text-center'>
             <div className='border-kiosk-ink/30 mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-2 border-b-transparent'></div>
             <p className='text-kiosk-ink-muted'>{t('loading')}</p>
+            {unitSlowLoad ? (
+              <>
+                <p className='text-kiosk-ink-muted mt-4 max-w-md text-sm'>
+                  {t('stillLoadingKioskHint')}
+                </p>
+                {isTauriKiosk() ? (
+                  <Button
+                    variant='outline'
+                    className='border-kiosk-border/60 mt-4 rounded-full px-8'
+                    onClick={() => void handleResetDesktopPairing()}
+                  >
+                    {t('desktop_reset_pairing')}
+                  </Button>
+                ) : null}
+              </>
+            ) : null}
+          </div>
+        </div>
+      ) : !unit ? (
+        <div className='flex min-h-0 flex-1 items-center justify-center overflow-hidden'>
+          <div className='max-w-md px-4 text-center'>
+            <h2 className='mb-2 text-2xl font-bold tracking-tight sm:text-3xl'>
+              {t('unitLoadErrorTitle')}
+            </h2>
+            <p className='text-kiosk-ink-muted mb-6 text-base'>
+              {t('unitLoadErrorMessage')}
+            </p>
+            <div className='flex flex-col items-center gap-3 sm:flex-row sm:justify-center'>
+              <Button
+                className='rounded-full px-8'
+                onClick={() => void refetchUnit()}
+              >
+                {t('retryServices')}
+              </Button>
+              {isTauriKiosk() ? (
+                <Button
+                  variant='outline'
+                  className='border-kiosk-border/60 rounded-full px-8'
+                  onClick={() => void handleResetDesktopPairing()}
+                >
+                  {t('desktop_reset_pairing')}
+                </Button>
+              ) : null}
+            </div>
           </div>
         </div>
       ) : unit.kind === 'service_zone' && !unit.parentId ? (
@@ -447,12 +564,23 @@ export default function UnitKioskPage() {
                   "We could not load this unit's services. Check the connection and try again."
               })}
             </p>
-            <Button
-              className='rounded-full px-8'
-              onClick={() => void refetchServicesTree()}
-            >
-              {t('retryServices', { defaultValue: 'Try again' })}
-            </Button>
+            <div className='flex flex-col items-center gap-3 sm:flex-row sm:justify-center'>
+              <Button
+                className='rounded-full px-8'
+                onClick={() => void refetchServicesTree()}
+              >
+                {t('retryServices', { defaultValue: 'Try again' })}
+              </Button>
+              {isTauriKiosk() ? (
+                <Button
+                  variant='outline'
+                  className='border-kiosk-border/60 rounded-full px-8'
+                  onClick={() => void handleResetDesktopPairing()}
+                >
+                  {t('desktop_reset_pairing')}
+                </Button>
+              ) : null}
+            </div>
           </div>
         </div>
       ) : visibleServices.length === 0 ? (

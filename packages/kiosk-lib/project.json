@@ -20,6 +20,13 @@
         "command": "echo 'Linting kiosk-lib'",
         "cwd": "packages/kiosk-lib"
       }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "vitest run",
+        "cwd": "packages/kiosk-lib"
+      }
     }
   }
 }

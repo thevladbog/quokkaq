@@ -554,6 +554,10 @@ export interface HandlersUpdateStatusRequest {
   status?: string;
 }
 
+export interface HandlersUploadLogoResponse {
+  url: string;
+}
+
 export interface HandlersUsageMetricInfoResponse {
   current?: number;
   limit?: number;
@@ -1083,6 +1087,8 @@ export interface ServicesUnitClientListResponse {
   items?: ModelsUnitClient[];
   nextCursor?: string;
 }
+
+export type PatchUnitsUnitIdKioskConfigBody = { [key: string]: unknown };
 
 export type PatchUnitsUnitIdAdSettingsBody = { [key: string]: unknown };
 
@@ -1630,6 +1636,118 @@ export const usePatchUnitsId = <TError = string,
         TContext
       > => {
       return useMutation(getPatchUnitsIdMutationOptions(options), queryClient);
+    }
+
+/**
+ * Updates only config.kiosk (other config keys unchanged). Allowed for desktop terminal JWT bound to this unit, unit members, and admins.
+ * @summary Merge kiosk settings into unit config
+ */
+export type patchUnitsUnitIdKioskConfigResponse200 = {
+  data: ModelsUnit
+  status: 200
+}
+
+export type patchUnitsUnitIdKioskConfigResponse400 = {
+  data: string
+  status: 400
+}
+
+export type patchUnitsUnitIdKioskConfigResponse403 = {
+  data: string
+  status: 403
+}
+
+export type patchUnitsUnitIdKioskConfigResponse404 = {
+  data: string
+  status: 404
+}
+
+export type patchUnitsUnitIdKioskConfigResponse413 = {
+  data: string
+  status: 413
+}
+
+export type patchUnitsUnitIdKioskConfigResponse500 = {
+  data: string
+  status: 500
+}
+
+export type patchUnitsUnitIdKioskConfigResponseSuccess = (patchUnitsUnitIdKioskConfigResponse200) & {
+  headers: Headers;
+};
+export type patchUnitsUnitIdKioskConfigResponseError = (patchUnitsUnitIdKioskConfigResponse400 | patchUnitsUnitIdKioskConfigResponse403 | patchUnitsUnitIdKioskConfigResponse404 | patchUnitsUnitIdKioskConfigResponse413 | patchUnitsUnitIdKioskConfigResponse500) & {
+  headers: Headers;
+};
+
+export type patchUnitsUnitIdKioskConfigResponse = (patchUnitsUnitIdKioskConfigResponseSuccess | patchUnitsUnitIdKioskConfigResponseError)
+
+export const getPatchUnitsUnitIdKioskConfigUrl = (unitId: string,) => {
+
+
+
+
+  return `/units/${unitId}/kiosk-config`
+}
+
+export const patchUnitsUnitIdKioskConfig = async (unitId: string,
+    patchUnitsUnitIdKioskConfigBody: PatchUnitsUnitIdKioskConfigBody, options?: RequestInit): Promise<patchUnitsUnitIdKioskConfigResponse> => {
+
+  return orvalMutator<patchUnitsUnitIdKioskConfigResponse>(getPatchUnitsUnitIdKioskConfigUrl(unitId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      patchUnitsUnitIdKioskConfigBody,)
+  }
+);}
+
+
+
+
+export const getPatchUnitsUnitIdKioskConfigMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchUnitsUnitIdKioskConfig>>, TError,{unitId: string;data: PatchUnitsUnitIdKioskConfigBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof patchUnitsUnitIdKioskConfig>>, TError,{unitId: string;data: PatchUnitsUnitIdKioskConfigBody}, TContext> => {
+
+const mutationKey = ['patchUnitsUnitIdKioskConfig'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchUnitsUnitIdKioskConfig>>, {unitId: string;data: PatchUnitsUnitIdKioskConfigBody}> = (props) => {
+          const {unitId,data} = props ?? {};
+
+          return  patchUnitsUnitIdKioskConfig(unitId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PatchUnitsUnitIdKioskConfigMutationResult = NonNullable<Awaited<ReturnType<typeof patchUnitsUnitIdKioskConfig>>>
+    export type PatchUnitsUnitIdKioskConfigMutationBody = PatchUnitsUnitIdKioskConfigBody
+    export type PatchUnitsUnitIdKioskConfigMutationError = string
+
+    /**
+ * @summary Merge kiosk settings into unit config
+ */
+export const usePatchUnitsUnitIdKioskConfig = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchUnitsUnitIdKioskConfig>>, TError,{unitId: string;data: PatchUnitsUnitIdKioskConfigBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof patchUnitsUnitIdKioskConfig>>,
+        TError,
+        {unitId: string;data: PatchUnitsUnitIdKioskConfigBody},
+        TContext
+      > => {
+      return useMutation(getPatchUnitsUnitIdKioskConfigMutationOptions(options), queryClient);
     }
 
 /**

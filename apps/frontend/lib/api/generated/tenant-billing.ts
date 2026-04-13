@@ -554,6 +554,10 @@ export interface HandlersUpdateStatusRequest {
   status?: string;
 }
 
+export interface HandlersUploadLogoResponse {
+  url: string;
+}
+
 export interface HandlersUsageMetricInfoResponse {
   current?: number;
   limit?: number;

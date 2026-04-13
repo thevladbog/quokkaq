@@ -314,7 +314,13 @@ export interface KioskConfig {
   headerColor?: string;
   bodyColor?: string;
   serviceGridColor?: string;
+  /** Logo in the kiosk UI (color is fine). */
   logoUrl?: string;
+  /**
+   * Optional logo raster for thermal receipts only. Prefer high-contrast black-and-white (PNG, JPEG, BMP, SVG, WebP).
+   * When empty, `logoUrl` is used for printing as well.
+   */
+  printerLogoUrl?: string;
   printerType?: string;
   isPrintEnabled?: boolean;
   feedbackUrl?: string;
