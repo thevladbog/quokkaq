@@ -79,6 +79,7 @@ jobs:
     permissions:
       contents: read
       checks: write
+      pull-requests: write
     env:
       NX_BASE: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha || github.event.before || 'origin/main' }}
       NX_HEAD: ${{ github.event.merge_group.head_sha || github.sha }}
@@ -162,7 +163,8 @@ jobs:
         with:
           files: apps/frontend/test-results/vitest-junit.xml
           check_name: Vitest (frontend)
-          comment_mode: off
+          # PR comments only; merge_group/push still get the check run + job summary.
+          comment_mode: ${{ github.event_name == 'pull_request' && 'always' || 'off' }}
 
       - name: Upload coverage to Codecov (frontend)
         if: always() && hashFiles('apps/frontend/coverage/lcov.info') != ''
