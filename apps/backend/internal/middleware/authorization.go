@@ -48,10 +48,10 @@ func RequireAdmin(userRepo repository.UserRepository) func(http.Handler) http.Ha
 }
 
 // platformAllowTenantAdmin is true when tenant "admin" may call /platform APIs (never when APP_ENV=production).
-// - PLATFORM_ALLOW_TENANT_ADMIN=true|1|yes: allow (non-production only).
-// - PLATFORM_ALLOW_TENANT_ADMIN=false|0|no: never allow.
-// - unset: allow only for typical local dev (APP_ENV empty, development, dev, local) so `go run` without .env works.
-//   Staging should set APP_ENV=staging and either assign platform_admin or set PLATFORM_ALLOW_TENANT_ADMIN=true.
+//   - PLATFORM_ALLOW_TENANT_ADMIN=true|1|yes: allow (non-production only).
+//   - PLATFORM_ALLOW_TENANT_ADMIN=false|0|no: never allow.
+//   - unset: allow only for typical local dev (APP_ENV empty, development, dev, local) so `go run` without .env works.
+//     Staging should set APP_ENV=staging and either assign platform_admin or set PLATFORM_ALLOW_TENANT_ADMIN=true.
 func platformAllowTenantAdmin() bool {
 	app := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV")))
 	if app == "production" {
@@ -88,6 +88,49 @@ func RequirePlatformAdmin(userRepo repository.UserRepository) func(http.Handler)
 					http.Error(w, "Internal server error", http.StatusInternalServerError)
 					return
 				}
+			}
+			if !allowed {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// RequireAdminTerminalOrUnitMemberForUnit allows:
+//   - desktop terminal JWT when claim unit_id matches the URL unit id (kiosk shell);
+//   - tenant admin; or
+//   - any user with access to that unit (same as RequireUnitMember).
+//
+// Use for narrow config updates (e.g. kiosk settings) where full PATCH /units/{id} is admin-only.
+func RequireAdminTerminalOrUnitMemberForUnit(userRepo repository.UserRepository, urlUnitIDParam string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			unitID := chi.URLParam(r, urlUnitIDParam)
+			if strings.TrimSpace(unitID) == "" {
+				http.Error(w, "Unit ID required", http.StatusBadRequest)
+				return
+			}
+			tokenType, _ := r.Context().Value(TokenTypeKey).(string)
+			if tokenType == "terminal" {
+				tu, ok := r.Context().Value(TerminalUnitIDKey).(string)
+				if !ok || tu != unitID {
+					http.Error(w, "Forbidden", http.StatusForbidden)
+					return
+				}
+				next.ServeHTTP(w, r)
+				return
+			}
+			userID, ok := GetUserIDFromContext(r.Context())
+			if !ok {
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				return
+			}
+			allowed, err := userRepo.IsAdminOrHasUnitAccess(userID, unitID)
+			if err != nil {
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
 			}
 			if !allowed {
 				http.Error(w, "Forbidden", http.StatusForbidden)

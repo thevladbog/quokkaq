@@ -15,7 +15,7 @@ import {
   SheetTitle,
   SheetFooter
 } from '@/components/ui/sheet';
-import { useUpdateUnit } from '@/lib/hooks';
+import { usePatchKioskConfig } from '@/lib/hooks';
 import { toast } from 'sonner';
 import { Lock } from 'lucide-react';
 import { LogoUpload } from '@/components/ui/logo-upload';
@@ -98,7 +98,7 @@ function KioskSettingsForm({
   onUnlock: () => void;
 }) {
   const t = useTranslations('kiosk.settings');
-  const updateUnitMutation = useUpdateUnit();
+  const patchKioskMutation = usePatchKioskConfig();
 
   const [showHeader, setShowHeader] = useState(
     currentConfig?.kiosk?.showHeader !== false
@@ -140,6 +140,9 @@ function KioskSettingsForm({
   const [printers, setPrinters] = useState<PrinterInfo[]>([]);
   const [loadingPrinters, setLoadingPrinters] = useState(false);
   const [logoUrl, setLogoUrl] = useState(currentConfig?.kiosk?.logoUrl || '');
+  const [printerLogoUrl, setPrinterLogoUrl] = useState(
+    currentConfig?.kiosk?.printerLogoUrl || ''
+  );
   const {
     showUnitInHeader,
     setShowUnitInHeader,
@@ -165,12 +168,13 @@ function KioskSettingsForm({
         printerPort,
         printerType,
         isPrintEnabled,
-        logoUrl
+        logoUrl,
+        printerLogoUrl: printerLogoUrl.trim() || undefined
       }
     };
 
-    updateUnitMutation.mutate(
-      { id: unitId, config: newConfig },
+    patchKioskMutation.mutate(
+      { id: unitId, config: newConfig as Record<string, unknown> },
       {
         onSuccess: () => {
           toast.success(t('save_success'));
@@ -216,6 +220,15 @@ function KioskSettingsForm({
   };
 
   const handleTestPrint = async () => {
+    if (!isTauriKiosk()) {
+      toast.info(
+        t('test_print_desktop_only', {
+          defaultValue:
+            'Hardware print runs only in the QuokkaQ Kiosk desktop application.'
+        })
+      );
+      return;
+    }
     if (!isPrintEnabled) {
       return;
     }
@@ -242,7 +255,7 @@ function KioskSettingsForm({
         );
       } else {
         if (!printerIp.trim()) {
-          toast.error(t('printer_ip'));
+          toast.error(t('printer_ip_required'));
           return;
         }
         native = await printKioskJob(
@@ -253,11 +266,12 @@ function KioskSettingsForm({
       }
       if (native) {
         toast.success(t('test_print_sent'));
-      } else if (!isTauriKiosk()) {
-        toast.info(
-          t('test_print_desktop_only', {
-            defaultValue:
-              'Hardware print runs only in the QuokkaQ Kiosk desktop application.'
+      } else {
+        toast.error(
+          t('printerTestError', {
+            message: t('test_print_target_missing', {
+              defaultValue: 'Check printer IP or queue name'
+            })
           })
         );
       }
@@ -272,7 +286,8 @@ function KioskSettingsForm({
       <div className='space-y-6 py-6'>
         <div className='space-y-2'>
           <LogoUpload
-            label={t('logo_upload')}
+            label={t('logo_screen')}
+            hint={t('logo_screen_hint')}
             currentLogoUrl={logoUrl}
             onLogoUploaded={setLogoUrl}
             onLogoRemoved={() => setLogoUrl('')}
@@ -350,6 +365,19 @@ function KioskSettingsForm({
 
         {isPrintEnabled && (
           <>
+            <div className='space-y-2 border-b pb-4'>
+              <LogoUpload
+                label={t('printer_logo_upload')}
+                hint={t('printer_logo_upload_hint')}
+                currentLogoUrl={printerLogoUrl}
+                onLogoUploaded={setPrinterLogoUrl}
+                onLogoRemoved={() => setPrinterLogoUrl('')}
+                uploadTarget='printer'
+                allowBmpByExtension
+                accept='image/png,image/jpeg,image/jpg,image/webp,image/svg+xml,image/bmp,.bmp,.dib'
+              />
+            </div>
+
             <div className='space-y-2'>
               <Label>{t('printer_connection')}</Label>
               <div className='flex gap-4'>
@@ -458,10 +486,13 @@ function KioskSettingsForm({
         )}
 
         <Button
+          type='button'
           variant='outline'
           className='w-full'
-          onClick={handleTestPrint}
-          disabled={!isPrintEnabled}
+          onClick={() => void handleTestPrint()}
+          disabled={
+            printerType === 'label' || (!isTauriKiosk() && !isPrintEnabled)
+          }
         >
           {t('test_print')}
         </Button>
@@ -490,8 +521,8 @@ function KioskSettingsForm({
       </div>
 
       <SheetFooter>
-        <Button onClick={handleSave} disabled={updateUnitMutation.isPending}>
-          {updateUnitMutation.isPending ? t('saving') : t('save_changes')}
+        <Button onClick={handleSave} disabled={patchKioskMutation.isPending}>
+          {patchKioskMutation.isPending ? t('saving') : t('save_changes')}
         </Button>
       </SheetFooter>
     </>

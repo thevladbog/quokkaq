@@ -110,6 +110,58 @@ export const ServiceModelSchema: z.ZodType<ServiceModel> = z.object({
 
 export const UnitKindSchema = z.enum(['subdivision', 'service_zone']);
 
+/** Runtime shape for `UnitConfig.adScreen` (matches {@link AdScreenConfig}). */
+export const AdScreenConfigSchema = z
+  .object({
+    width: z.number(),
+    duration: z.number(),
+    activeMaterialIds: z.array(z.string()),
+    logoUrl: z.string().optional(),
+    isCustomColorsEnabled: z.boolean().optional(),
+    headerColor: z.string().optional(),
+    bodyColor: z.string().optional(),
+    recentCallsHistoryLimit: z.number().optional()
+  })
+  .passthrough();
+
+/** Runtime shape for `UnitConfig.kiosk` (matches {@link KioskConfig}). */
+export const KioskConfigSchema = z
+  .object({
+    pin: z.string().optional(),
+    welcomeTitle: z.string().optional(),
+    welcomeSubtitle: z.string().optional(),
+    headerText: z.string().optional(),
+    footerText: z.string().optional(),
+    printerConnection: z.enum(['network', 'system']).optional(),
+    systemPrinterName: z.string().optional(),
+    printerIp: z.string().optional(),
+    printerPort: z.string().optional(),
+    showHeader: z.boolean().optional(),
+    showFooter: z.boolean().optional(),
+    isCustomColorsEnabled: z.boolean().optional(),
+    headerColor: z.string().optional(),
+    bodyColor: z.string().optional(),
+    serviceGridColor: z.string().optional(),
+    logoUrl: z.string().optional(),
+    printerLogoUrl: z.string().optional(),
+    printerType: z.string().optional(),
+    isPrintEnabled: z.boolean().optional(),
+    feedbackUrl: z.string().optional(),
+    isPreRegistrationEnabled: z.boolean().optional(),
+    showUnitInHeader: z.boolean().optional(),
+    kioskUnitLabelText: z.string().optional()
+  })
+  .passthrough();
+
+/** Runtime shape for unit `config` JSON (matches {@link UnitConfig}). */
+export const UnitConfigSchema = z
+  .object({
+    adScreen: AdScreenConfigSchema.optional(),
+    kiosk: KioskConfigSchema.optional(),
+    logoUrl: z.string().optional()
+  })
+  .passthrough();
+
 export const UnitModelSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -119,7 +171,7 @@ export const UnitModelSchema = z.object({
   kind: UnitKindSchema.optional().default('subdivision'),
   sortOrder: z.number().int().optional().default(0),
   timezone: z.string(),
-  config: z.custom<UnitConfig>().nullable().optional(),
+  config: UnitConfigSchema.nullable().optional(),
   services: z.array(ServiceModelSchema).optional()
 });
 
@@ -314,7 +366,13 @@ export interface KioskConfig {
   headerColor?: string;
   bodyColor?: string;
   serviceGridColor?: string;
+  /** Logo in the kiosk UI (color is fine). */
   logoUrl?: string;
+  /**
+   * Optional logo raster for thermal receipts only. Prefer high-contrast black-and-white (PNG, JPEG, BMP, SVG, WebP).
+   * When empty, `logoUrl` is used for printing as well.
+   */
+  printerLogoUrl?: string;
   printerType?: string;
   isPrintEnabled?: boolean;
   feedbackUrl?: string;

@@ -431,7 +431,7 @@ export default function DesktopTerminalsPage() {
           <div className='bg-muted rounded-md px-4 py-3 font-mono text-lg font-semibold tracking-wider'>
             {newPairingCode}
           </div>
-          <DialogFooter className='gap-2 sm:gap-0'>
+          <DialogFooter>
             <Button variant='outline' onClick={copyCode}>
               <Copy className='mr-2 h-4 w-4' />
               {t('copy_code')}

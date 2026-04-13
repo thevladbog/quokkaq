@@ -67,12 +67,15 @@ export const useUnit = (
   options: {
     refetchInterval?: number;
     refetchOnMount?: boolean | 'always';
+    enabled?: boolean;
   } = {}
 ) => {
+  const enabled =
+    options.enabled !== undefined ? options.enabled && !!id : !!id;
   return useQuery({
     queryKey: getGetUnitsIdQueryKey(id),
     queryFn: () => unitsApi.getById(id),
-    enabled: !!id,
+    enabled,
     refetchInterval: options.refetchInterval,
     refetchOnMount: options.refetchOnMount
   });
@@ -104,6 +107,26 @@ export const useUpdateUnit = () => {
     mutationFn: ({ id, ...data }: { id: string } & Partial<Unit>) =>
       unitsApi.update(id, data),
     onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: getGetUnitsQueryKey() });
+      queryClient.invalidateQueries({
+        queryKey: getGetUnitsIdQueryKey(variables.id)
+      });
+    }
+  });
+};
+
+export const usePatchKioskConfig = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      config
+    }: {
+      id: string;
+      config: Record<string, unknown>;
+    }) => unitsApi.patchKioskConfig(id, config),
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: getGetUnitsQueryKey() });
       queryClient.invalidateQueries({
         queryKey: getGetUnitsIdQueryKey(variables.id)

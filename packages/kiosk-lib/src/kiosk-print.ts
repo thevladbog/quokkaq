@@ -66,14 +66,50 @@ export async function listPrintersViaTauri(): Promise<{
   };
 }
 
+type KioskPrinterConfig = {
+  printerConnection?: 'network' | 'system';
+  systemPrinterName?: string;
+  printerIp?: string;
+  printerPort?: string;
+  printerType?: string;
+  isPrintEnabled?: boolean;
+};
+
+function resolvePrintTarget(kiosk: KioskPrinterConfig): {
+  mode: 'tcp' | 'system';
+  target: string;
+} | null {
+  if (kiosk.isPrintEnabled === false || kiosk.printerType === 'label') {
+    return null;
+  }
+  const connection =
+    kiosk.printerConnection ??
+    (kiosk.systemPrinterName?.trim() ? 'system' : 'network');
+
+  if (connection === 'system') {
+    const name = kiosk.systemPrinterName?.trim();
+    if (!name) {
+      return null;
+    }
+    return { mode: 'system', target: name };
+  }
+
+  const host = kiosk.printerIp?.trim();
+  if (!host) {
+    return null;
+  }
+  const port = (kiosk.printerPort || '9100').trim();
+  return { mode: 'tcp', target: `${host}:${port}` };
+}
+
 /**
- * Send ESC/POS via Tauri → agent (`tcp` to host:port or `system` queue).
+ * Send raw ESC/POS bytes via Tauri → agent (`tcp` or `system` queue).
  * Returns false if not in Tauri or missing target.
  */
-export async function printKioskJob(
+export async function printKioskJobBytes(
   mode: 'tcp' | 'system',
   target: string,
-  lines: string[]
+  bytes: Uint8Array
 ): Promise<boolean> {
   if (!isTauriKiosk()) {
     return false;
@@ -82,7 +118,7 @@ export async function printKioskJob(
   if (!t) {
     return false;
   }
-  const payload = bytesToBase64(buildEscPosReceipt(lines));
+  const payload = bytesToBase64(bytes);
   await invoke('print_receipt', {
     mode,
     target: t,
@@ -92,45 +128,41 @@ export async function printKioskJob(
 }
 
 /**
+ * Send ESC/POS via Tauri → agent (`tcp` to host:port or `system` queue).
+ * Returns false if not in Tauri or missing target.
+ */
+export async function printKioskJob(
+  mode: 'tcp' | 'system',
+  target: string,
+  lines: string[]
+): Promise<boolean> {
+  return printKioskJobBytes(mode, target, buildEscPosReceipt(lines));
+}
+
+/**
+ * Print raw bytes using unit kiosk config (network or system queue).
+ * Returns false if not applicable or not in Tauri.
+ */
+export async function printReceiptBytesFromKioskConfig(
+  kiosk: KioskPrinterConfig,
+  bytes: Uint8Array
+): Promise<boolean> {
+  const resolved = resolvePrintTarget(kiosk);
+  if (!resolved) {
+    return false;
+  }
+  return printKioskJobBytes(resolved.mode, resolved.target, bytes);
+}
+
+/**
  * Print using unit kiosk config (network or system queue).
  * Returns false if not applicable or not in Tauri.
  */
 export async function printReceiptFromKioskConfig(
-  kiosk: {
-    printerConnection?: 'network' | 'system';
-    systemPrinterName?: string;
-    printerIp?: string;
-    printerPort?: string;
-    printerType?: string;
-    isPrintEnabled?: boolean;
-  },
+  kiosk: KioskPrinterConfig,
   lines: string[]
 ): Promise<boolean> {
-  if (kiosk.isPrintEnabled === false) {
-    return false;
-  }
-  if (kiosk.printerType === 'label') {
-    return false;
-  }
-
-  const connection =
-    kiosk.printerConnection ??
-    (kiosk.systemPrinterName?.trim() ? 'system' : 'network');
-
-  if (connection === 'system') {
-    const name = kiosk.systemPrinterName?.trim();
-    if (!name) {
-      return false;
-    }
-    return printKioskJob('system', name, lines);
-  }
-
-  const host = kiosk.printerIp?.trim();
-  if (!host) {
-    return false;
-  }
-  const port = (kiosk.printerPort || '9100').trim();
-  return printKioskJob('tcp', `${host}:${port}`, lines);
+  return printReceiptBytesFromKioskConfig(kiosk, buildEscPosReceipt(lines));
 }
 
 /** @deprecated Use printReceiptFromKioskConfig or printKioskJob */
@@ -142,11 +174,7 @@ export async function printReceiptViaTauri(
   if (!host) {
     return false;
   }
-  return printKioskJob(
-    'tcp',
-    `${host}:${target.port.trim() || '9100'}`,
-    lines
-  );
+  return printKioskJob('tcp', `${host}:${target.port.trim() || '9100'}`, lines);
 }
 
 /** Lines for a ticket after creation / pre-reg redemption. */
@@ -170,4 +198,16 @@ export function ticketReceiptLines(
 /** Short test pattern for printer settings. */
 export function testPrintLines(): string[] {
   return ['QuokkaQ', 'Test print', '', new Date().toISOString()];
+}
+
+/**
+ * Desktop only: delete `desktop-profile.json` / legacy URL file and open the pairing splash.
+ * No-op when not running inside Tauri.
+ */
+export async function resetDesktopPairingViaTauri(): Promise<boolean> {
+  if (!isTauriKiosk()) {
+    return false;
+  }
+  await invoke('reset_desktop_pairing');
+  return true;
 }

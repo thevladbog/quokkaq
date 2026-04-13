@@ -20,6 +20,41 @@
       * {
         box-sizing: border-box;
       }
+      .lang-switch {
+        position: fixed;
+        top: 14px;
+        right: 14px;
+        z-index: 100;
+        display: flex;
+        gap: 2px;
+        padding: 3px;
+        border-radius: 999px;
+        background: rgba(26, 35, 50, 0.92);
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        backdrop-filter: blur(8px);
+      }
+      .lang-switch button {
+        width: auto;
+        min-width: 2.5rem;
+        margin: 0;
+        padding: 6px 10px;
+        font-size: 0.8125rem;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        border-radius: 999px;
+        background: transparent;
+        color: var(--muted);
+        border: none;
+        box-shadow: none;
+      }
+      .lang-switch button:hover:not(:disabled) {
+        color: var(--text);
+        background: rgba(148, 163, 184, 0.1);
+      }
+      .lang-switch button.active {
+        color: var(--accent);
+        background: var(--accent-dim);
+      }
       body {
         margin: 0;
         min-height: 100vh;
@@ -115,6 +150,24 @@
         opacity: 0.55;
         cursor: not-allowed;
       }
+      button.secondary {
+        margin-top: 10px;
+        background: transparent;
+        color: var(--muted);
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        box-shadow: none;
+      }
+      button.secondary:hover:not(:disabled) {
+        color: var(--text);
+        border-color: rgba(148, 163, 184, 0.55);
+        background: rgba(148, 163, 184, 0.08);
+      }
+      .reset-hint {
+        font-size: 0.8125rem;
+        color: var(--muted);
+        margin-top: 18px;
+        line-height: 1.45;
+      }
       .error {
         color: #f87171;
         font-size: 0.8125rem;
@@ -159,6 +212,16 @@
     </style>
   </head>
   <body>
+    <div
+      class="lang-switch"
+      role="group"
+      aria-label="Language"
+      id="lang-switch"
+    >
+      <button type="button" id="lang-en" data-locale="en">EN</button>
+      <button type="button" id="lang-ru" data-locale="ru">RU</button>
+    </div>
+
     <div class="brand">
       <img
         class="mascot"
@@ -170,13 +233,13 @@
     </div>
 
     <div class="card">
-      <h1>Connect this kiosk</h1>
-      <p class="sub">
+      <h1 id="i18n-title">Connect this kiosk</h1>
+      <p class="sub" id="i18n-sub">
         Enter your API base URL (same host the backend uses) and the pairing
         code from Admin → Desktop terminals.
       </p>
       <form id="form">
-        <label for="api">API base URL</label>
+        <label for="api" id="i18n-label-api">API base URL</label>
         <input
           id="api"
           name="api"
@@ -185,7 +248,7 @@
           autocomplete="off"
           required
         />
-        <label for="code">Terminal pairing code</label>
+        <label for="code" id="i18n-label-code">Terminal pairing code</label>
         <input
           id="code"
           name="code"
@@ -197,6 +260,13 @@
         <button type="submit" id="submit">Connect</button>
         <div class="error" id="err" hidden></div>
       </form>
+      <p class="reset-hint" id="i18n-reset-hint">
+        If this device was paired before but the kiosk no longer loads (wrong API, expired
+        terminal, or a blank screen), clear saved data and set it up again.
+      </p>
+      <button type="button" class="secondary" id="reset-pairing">
+        Clear saved pairing &amp; start over
+      </button>
     </div>
 
     <div class="progress-wrap">
@@ -208,19 +278,153 @@
 
     <script>
       (function () {
+        var LOCALE_KEY = 'quokkaq_splash_locale';
+
+        var STR = {
+          en: {
+            pageTitle: 'QuokkaQ Kiosk',
+            title: 'Connect this kiosk',
+            sub:
+              'Enter your API base URL (same host the backend uses) and the pairing code from Admin → Desktop terminals.',
+            labelApi: 'API base URL',
+            labelCode: 'Terminal pairing code',
+            phApi: 'https://api.example.com',
+            phCode: '10-character code',
+            submit: 'Connect',
+            resetHint:
+              'If this device was paired before but the kiosk no longer loads (wrong API, expired terminal, or a blank screen), clear saved data and set it up again.',
+            resetBtn: 'Clear saved pairing & start over',
+            errNoTauri:
+              'Tauri API not available. Open this app from the QuokkaQ Kiosk desktop build.',
+            progStart: 'Starting…',
+            progAgent: 'Starting print agent…',
+            progConfig: 'Loading configuration…',
+            progAlmost: 'Almost ready…',
+            progDone: 'Done',
+            connecting: 'Connecting to API…',
+            opening: 'Opening kiosk…',
+            connFailed: 'Connection failed',
+            couldNotConnect: 'Could not connect',
+            clearing: 'Clearing saved pairing…',
+            readyAgain: 'Ready — enter API URL and pairing code above',
+            couldNotReset: 'Could not reset',
+            resetFailed: 'Reset failed',
+            langAria: 'Language'
+          },
+          ru: {
+            pageTitle: 'QuokkaQ — киоск',
+            title: 'Подключите киоск',
+            sub:
+              'Укажите базовый URL API (тот же хост, что у бэкенда) и код сопряжения из Админка → Настольные терминалы.',
+            labelApi: 'Базовый URL API',
+            labelCode: 'Код сопряжения терминала',
+            phApi: 'https://api.example.com',
+            phCode: 'Код из 10 символов',
+            submit: 'Подключить',
+            resetHint:
+              'Если киоск уже сопряжён, но не открывается (неверный API, истёк терминал или пустой экран), очистите сохранённые данные и настройте заново.',
+            resetBtn: 'Сбросить сопряжение и начать сначала',
+            errNoTauri:
+              'API Tauri недоступен. Откройте приложение из сборки QuokkaQ Kiosk для десктопа.',
+            progStart: 'Запуск…',
+            progAgent: 'Запуск агента печати…',
+            progConfig: 'Загрузка настроек…',
+            progAlmost: 'Почти готово…',
+            progDone: 'Готово',
+            connecting: 'Подключение к API…',
+            opening: 'Открываем киоск…',
+            connFailed: 'Ошибка подключения',
+            couldNotConnect: 'Не удалось подключиться',
+            clearing: 'Очистка сохранённого сопряжения…',
+            readyAgain: 'Готово — введите URL API и код выше',
+            couldNotReset: 'Не удалось сбросить',
+            resetFailed: 'Сброс не удался',
+            langAria: 'Язык'
+          }
+        };
+
+        function getLocale() {
+          try {
+            var s = localStorage.getItem(LOCALE_KEY);
+            if (s === 'ru' || s === 'en') return s;
+          } catch (e) {}
+          if (
+            navigator.language &&
+            navigator.language.toLowerCase().indexOf('ru') === 0
+          ) {
+            return 'ru';
+          }
+          return 'en';
+        }
+
+        var locale = getLocale();
+
+        function t(key) {
+          var pack = STR[locale] || STR.en;
+          return pack[key] != null ? pack[key] : STR.en[key] || key;
+        }
+
+        function applyLocale(lang) {
+          locale = lang === 'ru' ? 'ru' : 'en';
+          try {
+            localStorage.setItem(LOCALE_KEY, locale);
+          } catch (e) {}
+          document.documentElement.lang = locale;
+          document.title = t('pageTitle');
+          document.getElementById('i18n-title').textContent = t('title');
+          document.getElementById('i18n-sub').textContent = t('sub');
+          document.getElementById('i18n-label-api').textContent = t('labelApi');
+          document.getElementById('i18n-label-code').textContent =
+            t('labelCode');
+          document.getElementById('api').placeholder = t('phApi');
+          document.getElementById('code').placeholder = t('phCode');
+          document.getElementById('submit').textContent = t('submit');
+          document.getElementById('i18n-reset-hint').textContent =
+            t('resetHint');
+          document.getElementById('reset-pairing').textContent = t('resetBtn');
+          document.getElementById('lang-switch').setAttribute(
+            'aria-label',
+            t('langAria')
+          );
+          document.getElementById('lang-en').classList.toggle(
+            'active',
+            locale === 'en'
+          );
+          document.getElementById('lang-ru').classList.toggle(
+            'active',
+            locale === 'ru'
+          );
+          var progLabelEl = document.getElementById('prog-label');
+          if (progLabelEl && !window.__splashProgressDone) {
+            progLabelEl.textContent = t('progStart');
+          }
+        }
+
         var bar = document.getElementById('prog-bar');
         var label = document.getElementById('prog-label');
+
+        document.getElementById('lang-en').addEventListener('click', function () {
+          applyLocale('en');
+        });
+        document.getElementById('lang-ru').addEventListener('click', function () {
+          applyLocale('ru');
+        });
+
+        applyLocale(locale);
         var steps = [
-          { pct: 22, text: 'Starting print agent…' },
-          { pct: 48, text: 'Loading configuration…' },
-          { pct: 72, text: 'Almost ready…' },
-          { pct: 100, text: 'Done' }
+          { pct: 22, key: 'progAgent' },
+          { pct: 48, key: 'progConfig' },
+          { pct: 72, key: 'progAlmost' },
+          { pct: 100, key: 'progDone' }
         ];
         var i = 0;
         function tick() {
-          if (i >= steps.length) return;
+          if (i >= steps.length) {
+            window.__splashProgressDone = true;
+            return;
+          }
           bar.style.width = steps[i].pct + '%';
-          label.textContent = steps[i].text;
+          label.textContent = t(steps[i].key);
           i++;
           setTimeout(tick, i < steps.length ? 450 : 0);
         }
@@ -239,33 +443,59 @@
 
           var tauri = window.__TAURI__;
           if (!tauri || !tauri.core || !tauri.core.invoke) {
-            err.textContent =
-              'Tauri API not available. Open this app from the QuokkaQ Kiosk desktop build.';
+            err.textContent = t('errNoTauri');
             err.hidden = false;
             return;
           }
 
           submit.disabled = true;
           bar.classList.add('indeterminate');
-          label.textContent = 'Connecting to API…';
+          label.textContent = t('connecting');
 
           try {
             await tauri.core.invoke('pair_terminal', {
-              args: {
-                apiBaseUrl: api,
-                pairingCode: code
-              }
+              apiBaseUrl: api,
+              pairingCode: code
             });
-            label.textContent = 'Opening kiosk…';
+            label.textContent = t('opening');
           } catch (ex) {
             bar.classList.remove('indeterminate');
             err.textContent =
-              (ex && (ex.message || String(ex))) || 'Connection failed';
+              (ex && (ex.message || String(ex))) || t('connFailed');
             err.hidden = false;
             submit.disabled = false;
-            label.textContent = 'Could not connect';
+            label.textContent = t('couldNotConnect');
           }
         });
+
+        document
+          .getElementById('reset-pairing')
+          .addEventListener('click', async function () {
+            err.hidden = true;
+            var tauri = window.__TAURI__;
+            if (!tauri || !tauri.core || !tauri.core.invoke) {
+              err.textContent = t('errNoTauri');
+              err.hidden = false;
+              return;
+            }
+            var btn = document.getElementById('reset-pairing');
+            btn.disabled = true;
+            label.textContent = t('clearing');
+            bar.classList.add('indeterminate');
+            try {
+              await tauri.core.invoke('reset_desktop_pairing');
+              label.textContent = t('readyAgain');
+            } catch (ex) {
+              err.textContent =
+                (ex && (ex.message || String(ex))) || t('couldNotReset');
+              err.hidden = false;
+              label.textContent = t('resetFailed');
+            } finally {
+              bar.classList.remove('indeterminate');
+              bar.style.width = '0%';
+              btn.disabled = false;
+            }
+          });
       })();
     </script>
   </body>

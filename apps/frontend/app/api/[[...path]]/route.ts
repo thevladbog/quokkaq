@@ -5,7 +5,10 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
 
-/** Server-side only (not inlined at build). Prefer in Docker so proxy always reaches the API container. */
+/**
+ * Go API base URL for this Next server (browser calls use `/api/...` only).
+ * Priority: API_UPSTREAM_URL → NEXT_PUBLIC_API_URL → http://127.0.0.1:3001 (backend default PORT).
+ */
 function upstreamBase(): string {
   const raw =
     process.env.API_UPSTREAM_URL?.trim() ||
