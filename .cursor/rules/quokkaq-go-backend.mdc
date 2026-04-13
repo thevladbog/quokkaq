@@ -10,7 +10,7 @@ For **lint, tests, and local restart**, follow the always-on workflow rule (`quo
 
 ## Stack
 
-- Module: `quokkaq-go-backend` · Go 1.26+
+- Module: `quokkaq-go-backend` · Go 1.26.2+
 - HTTP: Chi v5 · Auth: JWT · DB: PostgreSQL + GORM · Jobs: Asynq · Real-time: Gorilla WebSocket · Storage: AWS SDK v2 (S3/MinIO)
 
 ## Layering

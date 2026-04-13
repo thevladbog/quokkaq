@@ -21,14 +21,14 @@ Install the following tools:
    npm install -g pnpm@10
    ```
 
-3. **Go 1.26+** (for backend development)
+3. **Go 1.26.2+** (for backend development)
    ```bash
    # macOS
    brew install go
    
    # Ubuntu
-   wget https://go.dev/dl/go1.26.linux-amd64.tar.gz
-   sudo tar -C /usr/local -xzf go1.26.linux-amd64.tar.gz
+   wget https://go.dev/dl/go1.26.2.linux-amd64.tar.gz
+   sudo tar -C /usr/local -xzf go1.26.2.linux-amd64.tar.gz
    export PATH=$PATH:/usr/local/go/bin
    ```
 

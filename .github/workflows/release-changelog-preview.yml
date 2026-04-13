@@ -1,0 +1,40 @@
+# Builds categorized release notes between two refs (mikepenz/release-changelog-builder).
+# Run manually: Actions → "Release changelog preview" → Run workflow.
+name: Release changelog preview
+
+on:
+  workflow_dispatch:
+    inputs:
+      from_tag:
+        description: 'Start tag or commit (e.g. v1.0.0)'
+        required: true
+        type: string
+      to_ref:
+        description: 'End ref (branch, tag, or SHA). Leave empty to use the workflow commit.'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  changelog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Build changelog
+        id: build
+        uses: mikepenz/release-changelog-builder-action@v5
+        with:
+          fromTag: ${{ inputs.from_tag }}
+          toTag: ${{ inputs.to_ref != '' && inputs.to_ref || github.sha }}
+
+      - name: Add to job summary
+        run: |
+          echo "## Changelog (preview)" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "${{ steps.build.outputs.changelog }}" >> "$GITHUB_STEP_SUMMARY"

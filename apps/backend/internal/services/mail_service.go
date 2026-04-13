@@ -44,8 +44,14 @@ func NewMailService() MailService {
 		d.SSL = true
 	case "false":
 		d.SSL = false
-		// For development/testing with self-signed certs or if specifically requested
-		d.TLSConfig = &tls.Config{InsecureSkipVerify: true}
+	}
+
+	// Only for dev/self-signed SMTP; never enable in production without understanding the risk.
+	if os.Getenv("SMTP_TLS_INSECURE_SKIP_VERIFY") == "true" {
+		if d.TLSConfig == nil {
+			d.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+		}
+		d.TLSConfig.InsecureSkipVerify = true
 	}
 
 	log.Printf("SMTP Configured: Host=%s, Port=%d, User=%s, SSL=%v", host, port, user, d.SSL)

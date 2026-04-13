@@ -1,0 +1,44 @@
+{
+  "exclude-rules": [
+    {
+      "path": ".*/docs/.*",
+      "rules": ["*"]
+    },
+    {
+      "path": ".*/cmd/swagger-to-openapi3/.*",
+      "rules": ["*"]
+    },
+    {
+      "path": ".*/cmd/debug_email/.*",
+      "rules": ["*"]
+    },
+    {
+      "path": ".*/cmd/test_email/.*",
+      "rules": ["*"]
+    },
+    {
+      "path": ".*",
+      "rules": ["G706"]
+    },
+    {
+      "path": ".*/internal/services/email_templates\\.go",
+      "rules": ["G101"]
+    },
+    {
+      "path": ".*/internal/handlers/helpers\\.go",
+      "rules": ["G705"]
+    },
+    {
+      "path": ".*/internal/handlers/invoice_handler\\.go",
+      "rules": ["G705"]
+    },
+    {
+      "path": ".*/internal/handlers/upload_handler\\.go",
+      "rules": ["G120"]
+    },
+    {
+      "path": ".*/internal/handlers/unit_handler\\.go",
+      "rules": ["G120"]
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+# Path-based PR labels (actions/labeler v6). Pre-create matching labels on the repo.
+# https://github.com/actions/labeler
+
+changed-files-labels-limit: 6
+max-files-changed: 1500
+
+area/frontend:
+  - changed-files:
+      - any-glob-to-any-file: 'apps/frontend/**'
+
+area/backend:
+  - changed-files:
+      - any-glob-to-any-file: 'apps/backend/**'
+
+area/kiosk:
+  - changed-files:
+      - any-glob-to-any-file: 'apps/kiosk-desktop/**'
+
+area/shared:
+  - changed-files:
+      - any-glob-to-any-file: 'packages/**'
+
+area/ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/**'
+          - 'nx.json'
+          - 'pnpm-workspace.yaml'
+          - 'pnpm-lock.yaml'
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file: 'docs/**'
+
+release-pr:
+  - base-branch: '^release$'

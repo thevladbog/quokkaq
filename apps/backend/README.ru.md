@@ -80,7 +80,7 @@
 
 | Компонент | Технология |
 |-----------|-----------|
-| **Язык** | Go 1.26.0 |
+| **Язык** | Go 1.26.2 |
 | **Web Framework** | Chi Router v5 |
 | **База данных** | PostgreSQL (через GORM) |
 | **Real-time** | Gorilla WebSocket |
@@ -96,7 +96,7 @@
 
 Перед запуском QuokkaQ Backend убедитесь, что у вас установлены:
 
-- **Go** 1.26.0 или выше
+- **Go** 1.26.2 или выше
 - **PostgreSQL** 16+ (нужен для индекса `units_company_parent_code_uq` с `NULLS NOT DISTINCT`; в Docker Compose — `postgres:16-alpine`)
 - **Redis** 6+ - для фоновых задач
 - **MinIO** или AWS S3

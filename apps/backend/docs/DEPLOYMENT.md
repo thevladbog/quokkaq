@@ -38,6 +38,7 @@ The following environment variables need to be configured in the CI/CD environme
 - `SMTP_PASS` - SMTP password
 - `SMTP_FROM` - SMTP from address
 - `SMTP_SECURE` - SMTP secure setting
+- `SMTP_TLS_INSECURE_SKIP_VERIFY` - optional; set to `true` only for dev or self-signed SMTP (STARTTLS otherwise uses normal certificate verification)
 - `JWT_SECRET` - JWT secret for authentication
 - `APP_BASE_URL` - Application base URL
 
@@ -58,7 +59,7 @@ The system automatically determines the next version by:
 ### 2. Docker Image Build
 
 A Docker image is built using the multi-stage Dockerfile:
-- Base image: golang:1.26.0-alpine for building
+- Base image: golang:1.26.2-alpine for building
 - Runtime image: alpine:latest for minimal size
 - The final image contains only the compiled binary and necessary assets
 

@@ -3,7 +3,7 @@
   <h1>QuokkaQ Go Backend</h1>
   <p><strong>High-performance queue management system backend built with Go</strong></p>
   
-  [![Go Version](https://img.shields.io/badge/Go-1.26.0-00ADD8?style=flat&logo=go)](https://golang.org/)
+  [![Go Version](https://img.shields.io/badge/Go-1.26.2-00ADD8?style=flat&logo=go)](https://golang.org/)
   [![License](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
   [![API Documentation](https://img.shields.io/badge/API-Scalar-6366f1)](http://localhost:3001/swagger/)
 </div>
@@ -97,7 +97,7 @@
 
 | Component | Technology |
 |-----------|-----------|
-| **Language** | Go 1.26.0 |
+| **Language** | Go 1.26.2 |
 | **Web Framework** | Chi Router v5 |
 | **Database** | PostgreSQL (via GORM) |
 | **Real-time** | Gorilla WebSocket |
@@ -113,7 +113,7 @@
 
 Before running QuokkaQ Backend, ensure you have:
 
-- **Go** 1.26.0 or higher ([Download](https://golang.org/dl/))
+- **Go** 1.26.2 or higher ([Download](https://golang.org/dl/))
 - **PostgreSQL** 16+ ([Download](https://www.postgresql.org/download/)) — required for `units_company_parent_code_uq` (`NULLS NOT DISTINCT`); local stack uses `postgres:16-alpine` in Docker Compose
 - **Redis** 6+ ([Download](https://redis.io/download)) - for background jobs
 - **MinIO** or AWS S3 ([MinIO Setup](https://min.io/docs/minio/linux/operations/installation.html))

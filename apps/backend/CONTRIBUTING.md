@@ -69,7 +69,7 @@ We actively welcome pull requests:
 
 ### Prerequisites
 
-- Go 1.26.0 or higher
+- Go 1.26.2 or higher
 - PostgreSQL 16+ (migrations use `NULLS NOT DISTINCT` on `units_company_parent_code_uq`)
 - Redis 6+
 - MinIO or S3-compatible storage

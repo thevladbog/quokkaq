@@ -17,6 +17,7 @@ import (
 	"quokkaq-go-backend/pkg/database"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/MarceloPetrucio/go-scalar-api-reference"
 	"github.com/go-chi/chi/v5"
@@ -558,7 +559,14 @@ func main() {
 	}
 
 	fmt.Printf("Server starting on port %s\n", port)
-	if err := http.ListenAndServe(":"+port, r); err != nil {
+	srv := &http.Server{
+		Addr:              ":" + port,
+		Handler:           r,
+		ReadHeaderTimeout: 15 * time.Second,
+		ReadTimeout:       60 * time.Second,
+		WriteTimeout:      60 * time.Second,
+	}
+	if err := srv.ListenAndServe(); err != nil {
 		log.Fatalf("ListenAndServe: %v", err)
 	}
 }

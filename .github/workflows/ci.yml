@@ -2,6 +2,7 @@ name: CI
 
 on:
   pull_request:
+  merge_group:
   push:
     branches:
       - main
@@ -17,7 +18,8 @@ env:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Merge queue builds must not be cancelled by newer queue entries on the same ref pattern.
+  cancel-in-progress: ${{ github.event_name != 'merge_group' }}
 
 jobs:
   affected:
@@ -25,8 +27,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       # Same base/head as build-and-test so "kiosk affected" matches nx affected -t build
-      NX_BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}
-      NX_HEAD: ${{ github.sha }}
+      NX_BASE: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha || github.event.before || 'origin/main' }}
+      NX_HEAD: ${{ github.event.merge_group.head_sha || github.sha }}
     outputs:
       frontend: ${{ steps.check.outputs.frontend }}
       backend: ${{ steps.check.outputs.backend }}
@@ -37,8 +39,6 @@ jobs:
           fetch-depth: 0
 
       - uses: pnpm/action-setup@v5
-        with:
-          version: 10
 
       - uses: actions/setup-node@v6
         with:
@@ -76,17 +76,18 @@ jobs:
     runs-on: ubuntu-latest
     needs: affected
     if: ${{ needs.affected.outputs.frontend == 'true' || needs.affected.outputs.backend == 'true' || needs.affected.outputs.kiosk == 'true' }}
+    permissions:
+      contents: read
+      checks: write
     env:
-      NX_BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}
-      NX_HEAD: ${{ github.sha }}
+      NX_BASE: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha || github.event.before || 'origin/main' }}
+      NX_HEAD: ${{ github.event.merge_group.head_sha || github.sha }}
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - uses: pnpm/action-setup@v5
-        with:
-          version: 10
 
       - uses: actions/setup-node@v6
         with:
@@ -96,7 +97,7 @@ jobs:
       - uses: actions/setup-go@v5
         if: needs.affected.outputs.backend == 'true'
         with:
-          go-version: '1.26'
+          go-version-file: apps/backend/go.mod
 
       # Always on this runner: nx affected can include kiosk-desktop even if the detect job
       # previously disagreed (e.g. base/head drift). GTK/WebKit are required for tauri build on Linux.
@@ -125,6 +126,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Check pnpm workspace (sherif)
+        # apps/backend is Go-only (no package.json); allow that workspace quirk.
+        run: pnpm exec sherif -r packages-without-package-json
+
       - name: Verify OpenAPI 3 artifacts match doc pipeline (backend)
         if: needs.affected.outputs.backend == 'true'
         working-directory: apps/backend
@@ -142,8 +147,39 @@ jobs:
       - name: Build affected
         run: pnpm nx affected -t build --base=$NX_BASE --head=$NX_HEAD
 
-      - name: Test affected
-        run: pnpm nx affected -t test --base=$NX_BASE --head=$NX_HEAD --skip-nx-cache || true
+      - name: Test affected (non-backend)
+        run: pnpm nx affected -t test --base=$NX_BASE --head=$NX_HEAD --skip-nx-cache --exclude=backend
+
+      - name: Test affected backend (coverage)
+        run: pnpm nx affected -t test:ci --base=$NX_BASE --head=$NX_HEAD --skip-nx-cache
 
       - name: Lint affected
-        run: pnpm nx affected -t lint --base=$NX_BASE --head=$NX_HEAD --skip-nx-cache || true
+        run: pnpm nx affected -t lint --base=$NX_BASE --head=$NX_HEAD --skip-nx-cache
+
+      - name: Publish Vitest JUnit results
+        if: always() && hashFiles('apps/frontend/test-results/vitest-junit.xml') != ''
+        uses: EnricoMi/publish-unit-test-result-action@v2.20.0
+        with:
+          files: apps/frontend/test-results/vitest-junit.xml
+          check_name: Vitest (frontend)
+          comment_mode: off
+
+      - name: Upload coverage to Codecov (frontend)
+        if: always() && hashFiles('apps/frontend/coverage/lcov.info') != ''
+        continue-on-error: true
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: apps/frontend/coverage/lcov.info
+          flags: frontend
+          fail_ci_if_error: false
+
+      - name: Upload coverage to Codecov (backend)
+        if: always() && hashFiles('apps/backend/coverage.out') != ''
+        continue-on-error: true
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: apps/backend/coverage.out
+          flags: backend
+          fail_ci_if_error: false

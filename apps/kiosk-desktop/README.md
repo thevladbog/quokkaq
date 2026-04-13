@@ -37,7 +37,7 @@ Edit [`src-tauri/capabilities/remote-kiosk.json`](src-tauri/capabilities/remote-
 
 ## Build
 
-Requirements: **Rust (stable)**, **Go 1.26+**, **Node** (for the Tauri CLI).
+Requirements: **Rust (stable)**, **Go 1.26.2+**, **Node** (for the Tauri CLI).
 
 ```bash
 cd quokkaq-kiosk-desktop
