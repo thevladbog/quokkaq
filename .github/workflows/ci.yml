@@ -38,16 +38,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Debug lockfile after checkout (before pnpm setup)
-        run: |
-          echo "=== Lockfile first 5 lines (with line numbers) ==="
-          head -5 pnpm-lock.yaml | cat -n
-          echo "=== Hex dump of first 200 bytes ==="
-          xxd -l 200 pnpm-lock.yaml || hexdump -C -n 200 pnpm-lock.yaml
-          echo "=== File info ==="
-          file pnpm-lock.yaml
-          wc -l pnpm-lock.yaml
-
       - name: Enable Corepack
         run: corepack enable
 
@@ -55,30 +45,6 @@ jobs:
         with:
           node-version: '22'
           cache: 'pnpm'
-
-      - name: Debug lockfile after setup-node (before install)
-        run: |
-          echo "=== Lockfile first 5 lines ==="
-          head -5 pnpm-lock.yaml | cat -n
-          echo "=== Hex dump first 200 bytes ==="
-          xxd -l 200 pnpm-lock.yaml || hexdump -C -n 200 pnpm-lock.yaml
-          echo "=== File info ==="
-          file pnpm-lock.yaml
-          wc -l pnpm-lock.yaml
-          echo "=== Git diff ==="
-          git diff --stat pnpm-lock.yaml
-
-      - name: Debug lockfile integrity (job: affected)
-        run: |
-          echo "=== Lockfile first 5 lines (with line numbers) ==="
-          head -5 pnpm-lock.yaml | cat -n
-          echo "=== Hex dump of first 200 bytes ==="
-          xxd -l 200 pnpm-lock.yaml || hexdump -C -n 200 pnpm-lock.yaml
-          echo "=== File info ==="
-          file pnpm-lock.yaml
-          wc -l pnpm-lock.yaml
-          echo "=== Git status ==="
-          git status pnpm-lock.yaml
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -123,16 +89,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Debug lockfile after checkout (before pnpm setup)
-        run: |
-          echo "=== Lockfile first 5 lines (with line numbers) ==="
-          head -5 pnpm-lock.yaml | cat -n
-          echo "=== Hex dump of first 200 bytes ==="
-          xxd -l 200 pnpm-lock.yaml || hexdump -C -n 200 pnpm-lock.yaml
-          echo "=== File info ==="
-          file pnpm-lock.yaml
-          wc -l pnpm-lock.yaml
-
       - name: Enable Corepack
         run: corepack enable
 
@@ -140,18 +96,6 @@ jobs:
         with:
           node-version: '22'
           cache: 'pnpm'
-
-      - name: Debug lockfile after setup-node (before setup-go)
-        run: |
-          echo "=== Lockfile first 5 lines ==="
-          head -5 pnpm-lock.yaml | cat -n
-          echo "=== Hex dump first 200 bytes ==="
-          xxd -l 200 pnpm-lock.yaml || hexdump -C -n 200 pnpm-lock.yaml
-          echo "=== File info ==="
-          file pnpm-lock.yaml
-          wc -l pnpm-lock.yaml
-          echo "=== Git diff ==="
-          git diff --stat pnpm-lock.yaml
 
       - uses: actions/setup-go@v6
         if: needs.affected.outputs.backend == 'true'

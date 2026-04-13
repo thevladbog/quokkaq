@@ -22,16 +22,6 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Debug lockfile after checkout
-        run: |
-          echo "=== Lockfile first 5 lines ==="
-          head -5 pnpm-lock.yaml | cat -n
-          echo "=== Hex dump first 200 bytes ==="
-          xxd -l 200 pnpm-lock.yaml || hexdump -C -n 200 pnpm-lock.yaml
-          echo "=== File info ==="
-          file pnpm-lock.yaml
-          wc -l pnpm-lock.yaml
-
       - name: Enable Corepack
         run: corepack enable
 
