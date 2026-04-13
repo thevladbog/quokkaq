@@ -20,8 +20,6 @@ jobs:
 
       - uses: pnpm/action-setup@v6
         if: env.SNYK_TOKEN != ''
-        with:
-          version: 10.22.0
 
       - uses: actions/setup-node@v6
         if: env.SNYK_TOKEN != ''
