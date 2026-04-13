@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useMemo } from 'react';
 import {
@@ -15,11 +15,49 @@ import { socketClient } from '@/lib/socket';
 import { AdPlayer } from '@/components/screen/ad-player';
 import { CalledTicketsTable } from '@/components/screen/called-tickets-table';
 import { QueueTicker } from '@/components/screen/queue-ticker';
-import { CallNotification } from '@/components/screen/call-notification';
 import { Spinner } from '@/components/ui/spinner';
 
 interface ScreenUnitClientProps {
   unitId: string;
+}
+
+function deriveCalledTicketsForScreen(tickets: Ticket[]): Ticket[] {
+  const activePool = tickets.filter(
+    (t) =>
+      t.status === 'called' ||
+      t.status === 'in_service' ||
+      t.status === 'served'
+  );
+  const statusRank = (s: string) =>
+    s === 'called' ? 3 : s === 'in_service' ? 2 : s === 'served' ? 1 : 0;
+  const byCounter = new Map<string, Ticket[]>();
+  for (const tick of activePool) {
+    const key = tick.counter?.id ?? `no-counter:${tick.id}`;
+    const list = byCounter.get(key);
+    if (list) list.push(tick);
+    else byCounter.set(key, [tick]);
+  }
+  const out: Ticket[] = [];
+  for (const group of byCounter.values()) {
+    group.sort((a, b) => {
+      const dr = statusRank(b.status) - statusRank(a.status);
+      if (dr !== 0) return dr;
+      return (
+        new Date(b.calledAt || 0).getTime() -
+        new Date(a.calledAt || 0).getTime()
+      );
+    });
+    const winner = group[0];
+    if (winner) out.push(winner);
+  }
+  out.sort((a, b) => {
+    const dr = statusRank(b.status) - statusRank(a.status);
+    if (dr !== 0) return dr;
+    return (
+      new Date(b.calledAt || 0).getTime() - new Date(a.calledAt || 0).getTime()
+    );
+  });
+  return out;
 }
 
 export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
@@ -27,15 +65,45 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
   const locale = useLocale();
   const intlLocale = useMemo(() => intlLocaleFromAppLocale(locale), [locale]);
 
+  const ticketsFetchSeqRef = useRef(0);
+
+  const runTicketsLoad = useCallback(
+    async (
+      source: string,
+      options: {
+        affectLoading?: boolean;
+        isCancelled?: () => boolean;
+      } = {}
+    ) => {
+      const { affectLoading = false, isCancelled } = options;
+      const mySeq = ++ticketsFetchSeqRef.current;
+      if (affectLoading) {
+        setTicketsLoading(true);
+      }
+      try {
+        const data = await ticketsApi.getByUnitId(unitId);
+        if (isCancelled?.()) {
+          return;
+        }
+        if (mySeq !== ticketsFetchSeqRef.current) {
+          return;
+        }
+        setTickets(data);
+      } catch (error) {
+        logger.error('Failed to fetch tickets:', error);
+      } finally {
+        if (affectLoading && !isCancelled?.()) {
+          setTicketsLoading(false);
+        }
+      }
+    },
+    [unitId]
+  );
+
   const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [ticketsLoading, setTicketsLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [materials, setMaterials] = useState<Material[]>([]);
-
-  // State for call notification
-  const [showingNotification, setShowingNotification] = useState<Ticket | null>(
-    null
-  );
 
   // Use useUnit hook with polling
   const { data: unit, isLoading: isUnitLoading } = useUnit(unitId, {
@@ -51,39 +119,48 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
   const unitKind = unit?.kind;
   const unitParentId = unit?.parentId;
 
-  // WebSocket + tickets: WS room is always the subdivision (ticket.UnitID); screen URL may be a service_zone.
+  // REST: always use the unit id from the URL. Backend returns zone-scoped rows for service_zone,
+  // subdivision-wide pool for subdivision (see GetTicketsByUnit).
+  useEffect(() => {
+    if (!unitId) return;
+    let cancelled = false;
+    void runTicketsLoad('rest', {
+      affectLoading: true,
+      isCancelled: () => cancelled
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [unitId, runTicketsLoad]);
+
+  // WebSocket room matches ticket.UnitID on the server (subdivision); URL may be a service_zone.
   useEffect(() => {
     if (!unitId || unitKind == null) return;
 
-    let cancelled = false;
     const wsRoomId =
       unitKind === 'service_zone' && unitParentId ? unitParentId : unitId;
 
-    const fetchTickets = async () => {
-      try {
-        const data = await ticketsApi.getByUnitId(wsRoomId);
-        if (!cancelled) {
-          setTickets(data);
-          setIsLoading(false);
-        }
-      } catch (error) {
-        logger.error('Failed to fetch tickets:', error);
-        if (!cancelled) {
-          setIsLoading(false);
-        }
+    const wsDebounceRef = { t: null as ReturnType<typeof setTimeout> | null };
+
+    const scheduleWsRefetch = () => {
+      if (wsDebounceRef.t) {
+        clearTimeout(wsDebounceRef.t);
       }
+      wsDebounceRef.t = setTimeout(() => {
+        wsDebounceRef.t = null;
+        void runTicketsLoad('ws', {});
+      }, 80);
     };
-    void fetchTickets();
 
     socketClient.connect(wsRoomId);
 
     const handleTicketUpdate = () => {
-      void fetchTickets();
+      scheduleWsRefetch();
     };
 
     const handleEOD = () => {
       logger.log('EOD event received, refreshing tickets');
-      void fetchTickets();
+      scheduleWsRefetch();
     };
 
     socketClient.onTicketCreated(handleTicketUpdate);
@@ -92,14 +169,26 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
     socketClient.onUnitEOD(handleEOD);
 
     return () => {
-      cancelled = true;
+      if (wsDebounceRef.t) {
+        clearTimeout(wsDebounceRef.t);
+        wsDebounceRef.t = null;
+      }
       socketClient.off('ticket.created', handleTicketUpdate);
       socketClient.off('ticket.updated', handleTicketUpdate);
       socketClient.off('ticket.called', handleTicketUpdate);
       socketClient.off('unit.eod', handleEOD);
       socketClient.disconnect();
     };
-  }, [unitId, unitKind, unitParentId]);
+  }, [unitId, unitKind, unitParentId, runTicketsLoad]);
+
+  // Safety net if a WS event is missed (e.g. reconnect gap).
+  useEffect(() => {
+    if (!unitId || !unit) return;
+    const id = setInterval(() => {
+      void runTicketsLoad('poll', {});
+    }, 12000);
+    return () => clearInterval(id);
+  }, [unitId, unit, runTicketsLoad]);
 
   // Fetch materials
   useEffect(() => {
@@ -134,12 +223,7 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
     };
   }, [unitId, unit]);
 
-  // Callback for notification completion
-  const handleNotificationComplete = useCallback(() => {
-    setShowingNotification(null);
-  }, []);
-
-  if (isLoading) {
+  if (isUnitLoading) {
     return (
       <div className='bg-background text-foreground flex min-h-screen items-center justify-center'>
         <Spinner className='h-12 w-12' />
@@ -147,39 +231,23 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
     );
   }
 
-  if (isUnitLoading || !unit) {
+  if (!unit) {
     return (
       <div className='bg-background text-foreground flex min-h-screen items-center justify-center'>
-        {isUnitLoading ? (
-          <Spinner className='h-12 w-12' />
-        ) : (
-          <h1 className='text-2xl'>{t('unitNotFound')}</h1>
-        )}
+        <h1 className='text-2xl'>{t('unitNotFound')}</h1>
       </div>
     );
   }
 
-  const calledTicketsRaw = tickets
-    .filter(
-      (t) =>
-        t.status === 'called' ||
-        t.status === 'in_service' ||
-        t.status === 'served'
-    )
-    .sort(
-      (a, b) =>
-        new Date(b.calledAt || 0).getTime() -
-        new Date(a.calledAt || 0).getTime()
+  if (ticketsLoading) {
+    return (
+      <div className='bg-background text-foreground flex min-h-screen items-center justify-center'>
+        <Spinner className='h-12 w-12' />
+      </div>
     );
+  }
 
-  // Filter to keep only the latest ticket per counter
-  const uniqueCounterTickets = new Map<string, string>(); // counterId -> ticketId
-  const calledTickets = calledTicketsRaw.filter((t) => {
-    if (!t.counter?.id) return false;
-    if (uniqueCounterTickets.has(t.counter.id)) return false;
-    uniqueCounterTickets.set(t.counter.id, t.id);
-    return true;
-  });
+  const calledTickets = deriveCalledTicketsForScreen(tickets);
 
   const waitingTickets = tickets
     .filter((t) => t.status === 'waiting')
@@ -260,6 +328,7 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
           <CalledTicketsTable
             tickets={calledTickets}
             backgroundColor={bodyColor}
+            historyLimit={adConfig?.recentCallsHistoryLimit ?? 0}
           />
         </div>
       </div>
@@ -268,12 +337,6 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
       <div className='z-20 flex-none'>
         <QueueTicker tickets={waitingTickets} />
       </div>
-
-      {/* Notification Overlay */}
-      <CallNotification
-        ticket={showingNotification}
-        onComplete={handleNotificationComplete}
-      />
     </div>
   );
 }

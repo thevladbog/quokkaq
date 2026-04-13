@@ -25,6 +25,24 @@ export class SocketClient {
   connect(unitId: string) {
     this.unitId = unitId;
     this.isExplicitDisconnect = false;
+
+    // If the socket is already open, we must send a new subscribe. Otherwise initSocket()
+    // bails out early, the hub keeps the client in the old room only, but this.unitId is
+    // already updated — ticket events then get filtered out (data.unitId !== this.unitId).
+    if (this.socket?.readyState === WebSocket.OPEN) {
+      try {
+        this.socket.send(
+          JSON.stringify({
+            action: 'subscribe',
+            unitId
+          })
+        );
+      } catch (e) {
+        logger.error('WebSocket subscribe send failed:', e);
+      }
+      return;
+    }
+
     this.initSocket();
   }
 
@@ -66,8 +84,14 @@ export class SocketClient {
 
         // Filter by unitId if applicable
         // Backend now handles room-based broadcasting, but we can keep this as a safety check
-        if (this.unitId && data?.unitId && data.unitId !== this.unitId) {
-          // console.warn('Received message for different unit:', data.unitId);
+        const dataUnitId =
+          data && typeof data === 'object' && 'unitId' in data
+            ? (data as { unitId?: string }).unitId
+            : undefined;
+        const filteredOut = Boolean(
+          this.unitId && dataUnitId && dataUnitId !== this.unitId
+        );
+        if (filteredOut) {
           return;
         }
 

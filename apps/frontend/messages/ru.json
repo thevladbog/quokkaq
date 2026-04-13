@@ -472,7 +472,9 @@
       "invalid_file_type": "Неверный тип файла. Пожалуйста, загрузите изображение или видео.",
       "header_color": "Цвет заголовка",
       "body_color": "Цвет фона",
-      "use_custom_colors": "Использовать кастомные цвета"
+      "use_custom_colors": "Использовать кастомные цвета",
+      "recent_calls_history_limit": "Размер списка «Последние вызовы» (строк)",
+      "recent_calls_history_limit_help": "Сколько последних вызовов показывать на экране талонов. 0 — без ограничения."
     },
     "kiosk_settings": {
       "title": "Киоск",
@@ -655,6 +657,7 @@
       "transfer_history_title": "Передачи по талону",
       "transfer_service_flow": "{from} → {to}",
       "transfer_counter_flow": "Стойки: {from} → {to}",
+      "transfer_counter_to_zone_queue": "Стойки: {from} → в очередь зоны",
       "transfer_zone_flow": "Зоны: {from} → {to}",
       "anonymous_hint": "Для анонимных гостей история недоступна.",
       "no_client": "К этому талону не привязан профиль посетителя.",
@@ -1011,8 +1014,7 @@
     "lastCalled": "Последние вызванные",
     "noHistory": "Нет вызванных талонов",
     "waiting": "Ожидание",
-    "queueEmpty": "Очередь пуста",
-    "ticketCalled": "Вызов талона"
+    "queueEmpty": "Очередь пуста"
   },
   "common": {
     "loading": "Загрузка...",

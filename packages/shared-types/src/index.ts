@@ -127,7 +127,11 @@ export const ClientVisitTransferEventSchema = z.object({
   at: z.string(),
   transferKind: z.string().optional(),
   fromServiceName: z.string().optional(),
+  fromServiceNameRu: z.string().optional(),
+  fromServiceNameEn: z.string().optional(),
   toServiceName: z.string().optional(),
+  toServiceNameRu: z.string().optional(),
+  toServiceNameEn: z.string().optional(),
   fromCounterName: z.string().optional(),
   toCounterName: z.string().optional(),
   fromZoneLabel: z.string().optional(),
@@ -288,6 +292,8 @@ export interface AdScreenConfig {
   isCustomColorsEnabled?: boolean;
   headerColor?: string;
   bodyColor?: string;
+  /** Max rows in the "last called" list on the ticket screen; 0 or unset = unlimited. */
+  recentCallsHistoryLimit?: number;
 }
 
 export interface KioskConfig {

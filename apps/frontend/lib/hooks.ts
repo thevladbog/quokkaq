@@ -211,13 +211,17 @@ export const useRemoveUserFromUnit = () => {
 // Ticket-related hooks
 export const useTickets = (
   unitId?: string,
-  options: { enabled?: boolean } = {}
+  options: {
+    enabled?: boolean;
+    refetchInterval?: number | false;
+  } = {}
 ) => {
   return useQuery({
     queryKey: unitId ? getGetUnitsUnitIdTicketsQueryKey(unitId) : ['tickets'],
     queryFn: () =>
       unitId ? ticketsApi.getByUnitId(unitId) : ticketsApi.getAll(),
-    enabled: options.enabled ?? (!!unitId || options.enabled === undefined)
+    enabled: options.enabled ?? (!!unitId || options.enabled === undefined),
+    refetchInterval: options.refetchInterval
   });
 };
 

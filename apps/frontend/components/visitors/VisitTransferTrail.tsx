@@ -9,6 +9,25 @@ function dash(v: string | undefined) {
   return s || '—';
 }
 
+/** Matches `ticketServiceDisplayName` in `lib/ticket-display.ts` (ru → nameRu, en → nameEn, else name). */
+function localizedTransferServiceName(
+  ev: ClientVisitTransferEvent,
+  side: 'from' | 'to',
+  locale: string
+): string {
+  const lang = locale.split('-')[0]?.toLowerCase() ?? 'en';
+  const name = side === 'from' ? ev.fromServiceName : ev.toServiceName;
+  const nameRu = side === 'from' ? ev.fromServiceNameRu : ev.toServiceNameRu;
+  const nameEn = side === 'from' ? ev.fromServiceNameEn : ev.toServiceNameEn;
+  if (lang === 'ru' && nameRu?.trim()) {
+    return nameRu.trim();
+  }
+  if (lang === 'en' && nameEn?.trim()) {
+    return nameEn.trim();
+  }
+  return name?.trim() || nameRu?.trim() || nameEn?.trim() || '—';
+}
+
 export function VisitTransferTrail({
   trail,
   locale,
@@ -52,7 +71,14 @@ export function VisitTransferTrail({
       </p>
       <ul className='space-y-1.5'>
         {trail.map((ev, idx) => {
-          const hasCounter = !!(ev.fromCounterName || ev.toCounterName);
+          const fromSvc = localizedTransferServiceName(ev, 'from', locale);
+          const toSvc = localizedTransferServiceName(ev, 'to', locale);
+          const zoneTransferToQueue =
+            ev.transferKind === 'zone' &&
+            !!ev.fromCounterName?.trim() &&
+            !ev.toCounterName?.trim();
+          const hasCounter =
+            !!ev.fromCounterName?.trim() || !!ev.toCounterName?.trim();
           const hasZone = !!(ev.fromZoneLabel || ev.toZoneLabel);
           return (
             <li
@@ -64,16 +90,20 @@ export function VisitTransferTrail({
               </div>
               <div>
                 {t('visitor_context.transfer_service_flow', {
-                  from: dash(ev.fromServiceName),
-                  to: dash(ev.toServiceName)
+                  from: dash(fromSvc),
+                  to: dash(toSvc)
                 })}
               </div>
               {hasCounter ? (
                 <div>
-                  {t('visitor_context.transfer_counter_flow', {
-                    from: dash(ev.fromCounterName),
-                    to: dash(ev.toCounterName)
-                  })}
+                  {zoneTransferToQueue && ev.fromCounterName?.trim()
+                    ? t('visitor_context.transfer_counter_to_zone_queue', {
+                        from: ev.fromCounterName.trim()
+                      })
+                    : t('visitor_context.transfer_counter_flow', {
+                        from: dash(ev.fromCounterName),
+                        to: dash(ev.toCounterName)
+                      })}
                 </div>
               ) : null}
               {hasZone ? (

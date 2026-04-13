@@ -129,7 +129,8 @@ export default function StaffWorkspacePage({
     error,
     refetch
   } = useTickets(unitId, {
-    enabled: !!unitId
+    enabled: !!unitId,
+    refetchInterval: 12_000
   });
   const tickets = ticketsData ?? EMPTY_TICKET_LIST;
   const completeMutation = useCompleteTicket();
@@ -327,6 +328,9 @@ export default function StaffWorkspacePage({
     [showAllQueueTickets, poolFilteredWaiting, scopedWaitingTickets]
   );
 
+  const refetchTicketsRef = useRef(refetch);
+  refetchTicketsRef.current = refetch;
+
   // WebSocket Connection
   useEffect(() => {
     if (!unitId) return;
@@ -334,7 +338,7 @@ export default function StaffWorkspacePage({
     socketClient.connect(unitId);
 
     const handleTicketUpdate = () => {
-      refetch();
+      void refetchTicketsRef.current();
     };
 
     socketClient.onTicketCreated(handleTicketUpdate);
@@ -347,7 +351,7 @@ export default function StaffWorkspacePage({
       socketClient.off('ticket.called', handleTicketUpdate);
       socketClient.disconnect();
     };
-  }, [unitId, refetch]);
+  }, [unitId]);
 
   const leafServicesForScope = useMemo(() => {
     return leafServiceIds

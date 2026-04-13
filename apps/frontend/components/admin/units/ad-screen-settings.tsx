@@ -30,6 +30,7 @@ interface AdScreenConfig {
   isCustomColorsEnabled?: boolean;
   headerColor?: string;
   bodyColor?: string;
+  recentCallsHistoryLimit?: number;
 }
 
 interface AdScreenSettingsProps {
@@ -56,6 +57,9 @@ export function AdScreenSettings({
 
   const [width, setWidth] = useState(adConfig.width || 0);
   const [duration, setDuration] = useState(adConfig.duration || 5);
+  const [recentCallsHistoryLimit, setRecentCallsHistoryLimit] = useState(
+    adConfig.recentCallsHistoryLimit ?? 0
+  );
   const [selectedMaterials, setSelectedMaterials] = useState<string[]>(
     adConfig.activeMaterialIds || []
   );
@@ -116,6 +120,7 @@ export function AdScreenSettings({
         ...((currentConfig?.adScreen as AdScreenConfig) || {}),
         width,
         duration,
+        recentCallsHistoryLimit,
         activeMaterialIds: selectedMaterials,
         logoUrl,
         isCustomColorsEnabled,
@@ -262,6 +267,27 @@ export function AdScreenSettings({
                 {t('image_duration_help')}
               </p>
             </div>
+          </div>
+
+          <div className='max-w-md space-y-2'>
+            <Label htmlFor='recent-calls-limit'>
+              {t('recent_calls_history_limit')}
+            </Label>
+            <Input
+              id='recent-calls-limit'
+              type='number'
+              min='0'
+              max='200'
+              value={recentCallsHistoryLimit}
+              onChange={(e) =>
+                setRecentCallsHistoryLimit(
+                  Math.min(200, Math.max(0, parseInt(e.target.value, 10) || 0))
+                )
+              }
+            />
+            <p className='text-muted-foreground text-xs'>
+              {t('recent_calls_history_limit_help')}
+            </p>
           </div>
 
           <Button

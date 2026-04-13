@@ -472,7 +472,9 @@
       "invalid_file_type": "Invalid file type. Please upload an image or video.",
       "header_color": "Header Color",
       "body_color": "Body Color",
-      "use_custom_colors": "Use custom colors"
+      "use_custom_colors": "Use custom colors",
+      "recent_calls_history_limit": "Last called list size (rows)",
+      "recent_calls_history_limit_help": "How many rows to show in “Last called” on the ticket screen. Use 0 for no limit."
     },
     "kiosk_settings": {
       "title": "Kiosk Settings",
@@ -655,6 +657,7 @@
       "transfer_history_title": "Transfer steps",
       "transfer_service_flow": "{from} → {to}",
       "transfer_counter_flow": "Counters: {from} → {to}",
+      "transfer_counter_to_zone_queue": "Counters: {from} → zone queue",
       "transfer_zone_flow": "Zones: {from} → {to}",
       "anonymous_hint": "History is not available for anonymous walk-ins.",
       "no_client": "No linked visitor profile for this ticket.",
@@ -1011,8 +1014,7 @@
     "lastCalled": "Last Called",
     "noHistory": "No called tickets yet",
     "waiting": "Waiting",
-    "queueEmpty": "Queue is empty",
-    "ticketCalled": "Ticket Called"
+    "queueEmpty": "Queue is empty"
   },
   "common": {
     "loading": "Loading...",

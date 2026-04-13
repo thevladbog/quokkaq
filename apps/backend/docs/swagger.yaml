@@ -674,11 +674,19 @@ components:
           type: string
         fromServiceName:
           type: string
+        fromServiceNameEn:
+          type: string
+        fromServiceNameRu:
+          type: string
         fromZoneLabel:
           type: string
         toCounterName:
           type: string
         toServiceName:
+          type: string
+        toServiceNameEn:
+          type: string
+        toServiceNameRu:
           type: string
         toZoneLabel:
           type: string

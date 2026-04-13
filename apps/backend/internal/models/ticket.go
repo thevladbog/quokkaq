@@ -6,14 +6,18 @@ import (
 
 // ClientVisitTransferEvent is one transfer step in a visit timeline (hydrated from ticket_histories, not stored on tickets).
 type ClientVisitTransferEvent struct {
-	At              time.Time `json:"at"`
-	TransferKind    string    `json:"transferKind,omitempty"`
-	FromServiceName string    `json:"fromServiceName,omitempty"`
-	ToServiceName   string    `json:"toServiceName,omitempty"`
-	FromCounterName string    `json:"fromCounterName,omitempty"`
-	ToCounterName   string    `json:"toCounterName,omitempty"`
-	FromZoneLabel   string    `json:"fromZoneLabel,omitempty"`
-	ToZoneLabel     string    `json:"toZoneLabel,omitempty"`
+	At                time.Time `json:"at"`
+	TransferKind      string    `json:"transferKind,omitempty"`
+	FromServiceName   string    `json:"fromServiceName,omitempty"`
+	FromServiceNameRu string    `json:"fromServiceNameRu,omitempty"`
+	FromServiceNameEn string    `json:"fromServiceNameEn,omitempty"`
+	ToServiceName     string    `json:"toServiceName,omitempty"`
+	ToServiceNameRu   string    `json:"toServiceNameRu,omitempty"`
+	ToServiceNameEn   string    `json:"toServiceNameEn,omitempty"`
+	FromCounterName   string    `json:"fromCounterName,omitempty"`
+	ToCounterName     string    `json:"toCounterName,omitempty"`
+	FromZoneLabel     string    `json:"fromZoneLabel,omitempty"`
+	ToZoneLabel       string    `json:"toZoneLabel,omitempty"`
 }
 
 type Ticket struct {

@@ -825,6 +825,15 @@ func (s *ticketService) Transfer(ticketID string, in TransferTicketInput, actorU
 			if fromCounterID != nil {
 				payload["from_counter_id"] = *fromCounterID
 			}
+			if fromZoneID != nil {
+				if zu, zerr := s.unitRepo.FindByIDLight(strings.TrimSpace(*fromZoneID)); zerr == nil && zu != nil {
+					payload["from_zone_name"] = zu.Name
+				}
+			} else {
+				if u, uerr := s.unitRepo.FindByIDLight(ticket.UnitID); uerr == nil && u != nil {
+					payload["from_zone_name"] = u.Name
+				}
+			}
 			if zu, zerr := s.unitRepo.FindByIDLight(zoneIDTrim); zerr == nil && zu != nil {
 				payload["to_zone_name"] = zu.Name
 			}
@@ -889,6 +898,13 @@ func (s *ticketService) Transfer(ticketID string, in TransferTicketInput, actorU
 			return ErrTransferServiceRequiredForZone
 		}
 
+		toSvc, svcErr := s.serviceRepo.FindByIDTx(tx, ticket.ServiceID)
+		if svcErr != nil {
+			return svcErr
+		}
+
+		fromZoneBefore := ticket.ServiceZoneID
+
 		ticket.CounterID = &targetCounterID
 		ticket.Status = "waiting"
 		ticket.ServiceZoneID = targetCounter.ServiceZoneID
@@ -896,15 +912,44 @@ func (s *ticketService) Transfer(ticketID string, in TransferTicketInput, actorU
 		ticket.ConfirmedAt = nil
 
 		payload := map[string]interface{}{
-			"transfer_kind":      "counter",
-			"unit_id":            ticket.UnitID,
-			"service_id":         ticket.ServiceID,
-			"from_status":        fromStatus,
-			"to_status":          "waiting",
-			"to_counter_id":      targetCounterID,
-			"to_service_zone_id": serviceZoneIDJSON(ticket.ServiceZoneID),
-			"from_service_id":    fromServiceID,
-			"to_service_id":      ticket.ServiceID,
+			"transfer_kind":        "counter",
+			"unit_id":              ticket.UnitID,
+			"service_id":           ticket.ServiceID,
+			"from_status":          fromStatus,
+			"to_status":            "waiting",
+			"to_counter_id":        targetCounterID,
+			"to_service_zone_id":   serviceZoneIDJSON(ticket.ServiceZoneID),
+			"from_service_id":      fromServiceID,
+			"to_service_id":        ticket.ServiceID,
+			"from_service_label":   curSvc.Name,
+			"to_service_label":     toSvc.Name,
+			"from_service_zone_id": serviceZoneIDJSON(fromZoneBefore),
+		}
+		if curSvc.NameRu != nil && strings.TrimSpace(*curSvc.NameRu) != "" {
+			payload["from_service_name_ru"] = strings.TrimSpace(*curSvc.NameRu)
+		}
+		if curSvc.NameEn != nil && strings.TrimSpace(*curSvc.NameEn) != "" {
+			payload["from_service_name_en"] = strings.TrimSpace(*curSvc.NameEn)
+		}
+		if toSvc.NameRu != nil && strings.TrimSpace(*toSvc.NameRu) != "" {
+			payload["to_service_name_ru"] = strings.TrimSpace(*toSvc.NameRu)
+		}
+		if toSvc.NameEn != nil && strings.TrimSpace(*toSvc.NameEn) != "" {
+			payload["to_service_name_en"] = strings.TrimSpace(*toSvc.NameEn)
+		}
+		if fromZoneBefore != nil {
+			if zu, zerr := s.unitRepo.FindByIDLight(strings.TrimSpace(*fromZoneBefore)); zerr == nil && zu != nil {
+				payload["from_zone_name"] = zu.Name
+			}
+		} else {
+			if u, uerr := s.unitRepo.FindByIDLight(ticket.UnitID); uerr == nil && u != nil {
+				payload["from_zone_name"] = u.Name
+			}
+		}
+		if targetCounter.ServiceZoneID != nil {
+			if zu, zerr := s.unitRepo.FindByIDLight(strings.TrimSpace(*targetCounter.ServiceZoneID)); zerr == nil && zu != nil {
+				payload["to_zone_name"] = zu.Name
+			}
 		}
 		if in.ToUserID != nil {
 			payload["target_user_id"] = strings.TrimSpace(*in.ToUserID)
@@ -1519,17 +1564,65 @@ func (s *ticketService) hydrateClientVisitTransferTrails(tickets []models.Ticket
 			}
 			fromSID := visitHistoryPayloadString(p, "from_service_id")
 			toSID := visitHistoryPayloadString(p, "to_service_id")
-			ev.FromServiceName = visitHistoryPayloadString(p, "from_service_label")
-			if ev.FromServiceName == "" && fromSID != "" {
+			payloadFromLabel := visitHistoryPayloadString(p, "from_service_label")
+			payloadFromRu := visitHistoryPayloadString(p, "from_service_name_ru")
+			payloadFromEn := visitHistoryPayloadString(p, "from_service_name_en")
+			payloadToLabel := visitHistoryPayloadString(p, "to_service_label")
+			payloadToRu := visitHistoryPayloadString(p, "to_service_name_ru")
+			payloadToEn := visitHistoryPayloadString(p, "to_service_name_en")
+
+			// Prefer current service rows over payload labels so UI matches ticket.service
+			// (payload often stores English internal names; Name / NameRu in DB are authoritative).
+			ev.FromServiceName = payloadFromLabel
+			ev.FromServiceNameRu = payloadFromRu
+			ev.FromServiceNameEn = payloadFromEn
+			if fromSID != "" {
 				if svc := svcMap[fromSID]; svc != nil {
 					ev.FromServiceName = strings.TrimSpace(svc.Name)
+					ev.FromServiceNameRu = ""
+					ev.FromServiceNameEn = ""
+					if svc.NameRu != nil {
+						ev.FromServiceNameRu = strings.TrimSpace(*svc.NameRu)
+					}
+					if svc.NameEn != nil {
+						ev.FromServiceNameEn = strings.TrimSpace(*svc.NameEn)
+					}
 				}
 			}
-			ev.ToServiceName = visitHistoryPayloadString(p, "to_service_label")
-			if ev.ToServiceName == "" && toSID != "" {
+			if ev.FromServiceName == "" {
+				ev.FromServiceName = payloadFromLabel
+			}
+			if ev.FromServiceNameRu == "" {
+				ev.FromServiceNameRu = payloadFromRu
+			}
+			if ev.FromServiceNameEn == "" {
+				ev.FromServiceNameEn = payloadFromEn
+			}
+
+			ev.ToServiceName = payloadToLabel
+			ev.ToServiceNameRu = payloadToRu
+			ev.ToServiceNameEn = payloadToEn
+			if toSID != "" {
 				if svc := svcMap[toSID]; svc != nil {
 					ev.ToServiceName = strings.TrimSpace(svc.Name)
+					ev.ToServiceNameRu = ""
+					ev.ToServiceNameEn = ""
+					if svc.NameRu != nil {
+						ev.ToServiceNameRu = strings.TrimSpace(*svc.NameRu)
+					}
+					if svc.NameEn != nil {
+						ev.ToServiceNameEn = strings.TrimSpace(*svc.NameEn)
+					}
 				}
+			}
+			if ev.ToServiceName == "" {
+				ev.ToServiceName = payloadToLabel
+			}
+			if ev.ToServiceNameRu == "" {
+				ev.ToServiceNameRu = payloadToRu
+			}
+			if ev.ToServiceNameEn == "" {
+				ev.ToServiceNameEn = payloadToEn
 			}
 			fromCID := visitHistoryPayloadString(p, "from_counter_id")
 			toCID := visitHistoryPayloadString(p, "to_counter_id")
@@ -1550,9 +1643,18 @@ func (s *ticketService) hydrateClientVisitTransferTrails(tickets []models.Ticket
 					ev.ToZoneLabel = zoneLabels[tzid]
 				}
 			}
+			ev.FromZoneLabel = visitHistoryPayloadString(p, "from_zone_name")
 			fzid := visitHistoryPayloadString(p, "from_service_zone_id")
-			if fzid != "" {
+			if ev.FromZoneLabel == "" && fzid != "" {
 				ev.FromZoneLabel = zoneLabels[fzid]
+			}
+			if ev.FromZoneLabel == "" && visitHistoryPayloadString(p, "transfer_kind") == "zone" && fzid == "" {
+				uid := visitHistoryPayloadString(p, "unit_id")
+				if uid != "" {
+					if u, uerr := s.unitRepo.FindByIDLight(uid); uerr == nil && u != nil {
+						ev.FromZoneLabel = strings.TrimSpace(u.Name)
+					}
+				}
 			}
 			trail = append(trail, ev)
 		}

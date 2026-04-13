@@ -441,7 +441,9 @@ export const unitsApi = {
     ),
 
   getTickets: async (unitId: string) => {
-    const res = await orvalTc.getUnitsUnitIdTickets(unitId);
+    const res = await orvalTc.getUnitsUnitIdTickets(unitId, {
+      cache: 'no-store'
+    });
     return z.array(TicketModelSchema).parse(res.data ?? []);
   },
 
