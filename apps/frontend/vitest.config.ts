@@ -1,11 +1,18 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 
 const isCi = Boolean(process.env.CI);
+const appRoot = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@': appRoot
+    }
+  },
   test: {
-    environment: 'node',
-    include: ['lib/**/*.test.ts'],
+    setupFiles: ['./vitest.setup.ts'],
     reporters: isCi
       ? [
           'default',
@@ -25,6 +32,24 @@ export default defineConfig({
           reporter: ['text', 'json-summary', 'lcov'],
           reportsDirectory: './coverage'
         }
-      : { enabled: false }
+      : { enabled: false },
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'unit-node',
+          environment: 'node',
+          include: ['lib/**/*.test.ts']
+        }
+      },
+      {
+        extends: true,
+        test: {
+          name: 'component-jsdom',
+          environment: 'jsdom',
+          include: ['**/*.test.tsx']
+        }
+      }
+    ]
   }
 });

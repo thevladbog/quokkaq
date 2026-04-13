@@ -1,7 +1,16 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { platformApi } from '@/lib/api';
+import type {
+  HandlersPlatformCreateSubscriptionPlanBody,
+  HandlersPlatformUpdateSubscriptionPlanBody
+} from '@/lib/api/generated/platform';
+import {
+  getGetPlatformSubscriptionPlansQueryKey,
+  getPlatformSubscriptionPlans,
+  postPlatformSubscriptionPlans,
+  putPlatformSubscriptionPlansId
+} from '@/lib/api/generated/platform';
 import type { SubscriptionPlan } from '@quokkaq/shared-types';
 import { Button } from '@/components/ui/button';
 import {
@@ -46,8 +55,8 @@ export default function PlatformPlansPage() {
   const intlLocale = useMemo(() => intlLocaleFromAppLocale(locale), [locale]);
   const qc = useQueryClient();
   const { data: plans, isLoading } = useQuery({
-    queryKey: ['platform-plans'],
-    queryFn: () => platformApi.listSubscriptionPlans()
+    queryKey: getGetPlatformSubscriptionPlansQueryKey(),
+    queryFn: async () => (await getPlatformSubscriptionPlans()).data
   });
 
   const [openCreate, setOpenCreate] = useState(false);
@@ -56,7 +65,7 @@ export default function PlatformPlansPage() {
 
   const createMut = useMutation({
     mutationFn: () =>
-      platformApi.createSubscriptionPlan({
+      postPlatformSubscriptionPlans({
         name: form.name.trim(),
         code: form.code.trim().toLowerCase(),
         price: parseInt(form.price, 10) || 0,
@@ -65,9 +74,11 @@ export default function PlatformPlansPage() {
         features: {},
         limits: {},
         isActive: form.isActive
-      }),
+      } satisfies HandlersPlatformCreateSubscriptionPlanBody),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['platform-plans'] });
+      qc.invalidateQueries({
+        queryKey: getGetPlatformSubscriptionPlansQueryKey()
+      });
       setOpenCreate(false);
       setForm(emptyForm());
       toast.success(t('toastCreated'));
@@ -80,7 +91,7 @@ export default function PlatformPlansPage() {
   const updateMut = useMutation({
     mutationFn: () => {
       if (!editPlan) throw new Error('no plan');
-      return platformApi.updateSubscriptionPlan(editPlan.id, {
+      return putPlatformSubscriptionPlansId(editPlan.id, {
         name: form.name.trim(),
         code: form.code.trim().toLowerCase(),
         price: parseInt(form.price, 10) || 0,
@@ -89,10 +100,12 @@ export default function PlatformPlansPage() {
         features: editPlan.features ?? {},
         limits: editPlan.limits ?? {},
         isActive: form.isActive
-      });
+      } satisfies HandlersPlatformUpdateSubscriptionPlanBody);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['platform-plans'] });
+      qc.invalidateQueries({
+        queryKey: getGetPlatformSubscriptionPlansQueryKey()
+      });
       setEditPlan(null);
       setForm(emptyForm());
       toast.success(t('toastUpdated'));
@@ -235,26 +248,34 @@ export default function PlatformPlansPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {plans.map((p) => (
-              <TableRow key={p.id}>
-                <TableCell>{p.name}</TableCell>
-                <TableCell className='font-mono text-sm'>{p.code}</TableCell>
-                <TableCell className='font-medium'>
-                  {formatPriceMinorUnits(p.price, p.currency, intlLocale)}
-                </TableCell>
-                <TableCell>{p.interval}</TableCell>
-                <TableCell>{p.isActive ? '✓' : '—'}</TableCell>
-                <TableCell className='text-right'>
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    onClick={() => openEdit(p)}
-                  >
-                    {t('edit', { defaultValue: 'Edit' })}
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
+            {plans
+              .filter((p): p is typeof p & { id: string } =>
+                Boolean(p.id?.trim())
+              )
+              .map((p) => (
+                <TableRow key={p.id}>
+                  <TableCell>{p.name}</TableCell>
+                  <TableCell className='font-mono text-sm'>{p.code}</TableCell>
+                  <TableCell className='font-medium'>
+                    {formatPriceMinorUnits(
+                      p.price ?? 0,
+                      p.currency ?? 'RUB',
+                      intlLocale
+                    )}
+                  </TableCell>
+                  <TableCell>{p.interval}</TableCell>
+                  <TableCell>{p.isActive ? '✓' : '—'}</TableCell>
+                  <TableCell className='text-right'>
+                    <Button
+                      variant='outline'
+                      size='sm'
+                      onClick={() => openEdit(p as SubscriptionPlan)}
+                    >
+                      {t('edit', { defaultValue: 'Edit' })}
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
           </TableBody>
         </Table>
       )}

@@ -2,7 +2,20 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { CatalogItem } from '@quokkaq/shared-types';
-import { platformApi } from '@/lib/api';
+import type {
+  HandlersPlatformListResponseModelsCatalogItem,
+  ModelsCatalogItemCreateRequest,
+  ModelsCatalogItemPatchRequest
+} from '@/lib/api/generated/platform';
+import {
+  deletePlatformCatalogItemsId,
+  getGetPlatformCatalogItemsQueryKey,
+  getGetPlatformSubscriptionPlansQueryKey,
+  getPlatformCatalogItems,
+  getPlatformSubscriptionPlans,
+  patchPlatformCatalogItemsId,
+  postPlatformCatalogItems
+} from '@/lib/api/generated/platform';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -75,8 +88,10 @@ export default function PlatformCatalogItemsPage() {
     isError: catalogIsError,
     error: catalogError
   } = useQuery({
-    queryKey: ['platform-catalog-items'],
-    queryFn: () => platformApi.listCatalogItems({ limit: 500 })
+    queryKey: getGetPlatformCatalogItemsQueryKey({ limit: 500 }),
+    queryFn: async () =>
+      (await getPlatformCatalogItems({ limit: 500 }))
+        .data as HandlersPlatformListResponseModelsCatalogItem
   });
 
   const {
@@ -85,11 +100,11 @@ export default function PlatformCatalogItemsPage() {
     error: plansError,
     isLoading: plansLoading
   } = useQuery({
-    queryKey: ['platform-subscription-plans', 'catalog'],
-    queryFn: () => platformApi.listSubscriptionPlans()
+    queryKey: getGetPlatformSubscriptionPlansQueryKey(),
+    queryFn: async () => (await getPlatformSubscriptionPlans()).data
   });
 
-  const items = data?.items ?? [];
+  const items = (data?.items ?? []) as CatalogItem[];
 
   const openCreate = () => {
     saveMut.reset();
@@ -155,30 +170,34 @@ export default function PlatformCatalogItemsPage() {
         currency: cur,
         vatExempt: form.vatExempt,
         vatRatePercent: vatRate,
-        isActive: form.isActive
+        isActive: form.isActive,
+        ...(planPart ? { subscriptionPlanId: planPart } : {})
       };
       if (editing) {
-        return platformApi.patchCatalogItem(editing.id, {
-          ...base,
-          subscriptionPlanId: planPart ? planPart : null
-        });
+        return patchPlatformCatalogItemsId(
+          editing.id,
+          base satisfies ModelsCatalogItemPatchRequest
+        );
       }
-      return platformApi.createCatalogItem({
-        ...base,
-        subscriptionPlanId: planPart ? planPart : null
-      });
+      return postPlatformCatalogItems(
+        base satisfies ModelsCatalogItemCreateRequest
+      );
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['platform-catalog-items'] });
+      void qc.invalidateQueries({
+        queryKey: getGetPlatformCatalogItemsQueryKey({ limit: 500 })
+      });
       setDialogOpen(false);
       toast.success(t('toastItemSaved'));
     }
   });
 
   const deleteMut = useMutation({
-    mutationFn: (id: string) => platformApi.deleteCatalogItem(id),
+    mutationFn: (id: string) => deletePlatformCatalogItemsId(id),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['platform-catalog-items'] });
+      void qc.invalidateQueries({
+        queryKey: getGetPlatformCatalogItemsQueryKey({ limit: 500 })
+      });
     },
     onError: (err: Error) => {
       toast.error(
@@ -191,7 +210,9 @@ export default function PlatformCatalogItemsPage() {
 
   const planById = useMemo(() => {
     const m = new Map<string, string>();
-    for (const p of plans) m.set(p.id, p.name);
+    for (const p of plans) {
+      if (p.id?.trim()) m.set(p.id, p.name ?? '');
+    }
     return m;
   }, [plans]);
 
@@ -241,12 +262,12 @@ export default function PlatformCatalogItemsPage() {
           </TableHeader>
           <TableBody>
             {items.map((item) => (
-              <TableRow key={item.id}>
+              <TableRow key={item.id ?? item.name}>
                 <TableCell className='font-medium'>{item.name}</TableCell>
                 <TableCell>{item.unit}</TableCell>
                 <TableCell className='text-sm'>
                   {formatPriceMinorUnits(
-                    item.defaultPriceMinor,
+                    item.defaultPriceMinor ?? 0,
                     item.currency || 'RUB',
                     intlLocale
                   )}
@@ -443,11 +464,15 @@ export default function PlatformCatalogItemsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value='__none__'>{t('planNone')}</SelectItem>
-                  {plans.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
+                  {plans
+                    .filter((p): p is typeof p & { id: string } =>
+                      Boolean(p.id?.trim())
+                    )
+                    .map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>

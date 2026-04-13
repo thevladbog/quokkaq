@@ -1,7 +1,12 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { platformApi } from '@/lib/api';
+import {
+  getPlatformInvoices,
+  getPlatformSubscriptionPlans,
+  platformListCompanies,
+  platformListSubscriptions
+} from '@/lib/api/generated/platform';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,7 +30,8 @@ export default function PlatformOverviewPage() {
     refetch: refetchCompanies
   } = useQuery({
     queryKey: ['platform-companies', 'count'],
-    queryFn: () => platformApi.listCompanies({ limit: 1, offset: 0 })
+    queryFn: async () =>
+      (await platformListCompanies({ limit: 1, offset: 0 })).data
   });
   const {
     data: subs,
@@ -34,7 +40,8 @@ export default function PlatformOverviewPage() {
     refetch: refetchSubs
   } = useQuery({
     queryKey: ['platform-subscriptions', 'count'],
-    queryFn: () => platformApi.listSubscriptions({ limit: 1, offset: 0 })
+    queryFn: async () =>
+      (await platformListSubscriptions({ limit: 1, offset: 0 })).data
   });
   const {
     data: plans,
@@ -43,7 +50,7 @@ export default function PlatformOverviewPage() {
     refetch: refetchPlans
   } = useQuery({
     queryKey: ['platform-plans'],
-    queryFn: () => platformApi.listSubscriptionPlans()
+    queryFn: async () => (await getPlatformSubscriptionPlans()).data
   });
   const {
     data: inv,
@@ -52,7 +59,8 @@ export default function PlatformOverviewPage() {
     refetch: refetchInv
   } = useQuery({
     queryKey: ['platform-invoices', 'count'],
-    queryFn: () => platformApi.listInvoices({ limit: 1, offset: 0 })
+    queryFn: async () =>
+      (await getPlatformInvoices({ limit: 1, offset: 0 })).data
   });
 
   const loading = lc || ls || lp || li;

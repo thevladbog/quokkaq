@@ -19,6 +19,13 @@
         "command": "echo 'Linting shared-types'",
         "cwd": "packages/shared-types"
       }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "vitest run",
+        "cwd": "packages/shared-types"
+      }
     }
   }
 }

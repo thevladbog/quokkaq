@@ -147,6 +147,10 @@ jobs:
         if: needs.affected.outputs.frontend == 'true'
         run: pnpm nx run frontend:format:check
 
+      - name: Typecheck frontend (tsc --noEmit)
+        if: needs.affected.outputs.frontend == 'true'
+        run: pnpm --dir apps/frontend exec tsc --noEmit
+
       - name: Orval client in sync with OpenAPI (frontend / backend docs)
         if: needs.affected.outputs.frontend == 'true' || needs.affected.outputs.backend == 'true'
         run: pnpm nx run frontend:orval:check

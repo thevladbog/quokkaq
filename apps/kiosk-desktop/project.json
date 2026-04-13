@@ -36,6 +36,13 @@
         "command": "cargo clippy",
         "cwd": "apps/kiosk-desktop/src-tauri"
       }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "cargo test",
+        "cwd": "apps/kiosk-desktop/src-tauri"
+      }
     }
   }
 }
