@@ -186,14 +186,16 @@ function ClientDetailForm({
   });
 
   const isPristine = useMemo(() => {
+    const trimmedInitialFirst = (initial.firstName ?? '').trim();
+    const trimmedInitialLast = (initial.lastName ?? '').trim();
     const tagIdsSorted = [...selectedTagIds].sort();
     const origTagIds = (initial.definitions ?? []).map((d) => d.id).sort();
     const tagsEqual =
       tagIdsSorted.length === origTagIds.length &&
       tagIdsSorted.every((id, i) => id === origTagIds[i]);
     return (
-      firstName.trim() === initial.firstName &&
-      lastName.trim() === initial.lastName &&
+      firstName.trim() === trimmedInitialFirst &&
+      lastName.trim() === trimmedInitialLast &&
       phone.trim() === (initial.phoneE164 ?? '').trim() &&
       tagsEqual
     );
@@ -210,6 +212,8 @@ function ClientDetailForm({
 
   const saveMutation = useMutation({
     mutationFn: () => {
+      const trimmedInitialFirst = (initial.firstName ?? '').trim();
+      const trimmedInitialLast = (initial.lastName ?? '').trim();
       const tagIdsSorted = [...selectedTagIds].sort();
       const origTagIds = (initial.definitions ?? []).map((d) => d.id).sort();
       const tagsChanged =
@@ -224,8 +228,8 @@ function ClientDetailForm({
       } = {};
 
       if (
-        firstName.trim() !== initial.firstName ||
-        lastName.trim() !== initial.lastName
+        firstName.trim() !== trimmedInitialFirst ||
+        lastName.trim() !== trimmedInitialLast
       ) {
         body.firstName = firstName.trim();
         body.lastName = lastName.trim();
@@ -361,6 +365,14 @@ function ClientDetailForm({
             t={tStaff}
             skipBuiltInSaveErrorToast
             onSave={async ({ tagDefinitionIds }) => {
+              const currentSorted = [...selectedTagIds].sort();
+              const incomingSorted = [...tagDefinitionIds].sort();
+              const tagsUnchanged =
+                currentSorted.length === incomingSorted.length &&
+                currentSorted.every((id, i) => id === incomingSorted[i]);
+              if (tagsUnchanged) {
+                return false;
+              }
               setTagsSavePending(true);
               try {
                 const updated = await unitsApi.patchUnitClient(

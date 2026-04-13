@@ -29,6 +29,12 @@ var ErrCounterAlreadyOnBreak = errors.New("counter is already on break")
 // ErrCounterNotOnBreak is returned when break/end is requested but the counter is not on break.
 var ErrCounterNotOnBreak = errors.New("counter is not on break")
 
+// ErrCounterOccupancyOrBreakViaUpdate is returned when PUT tries to change assignedTo or onBreak; use occupy, release, break/start, and break/end instead.
+var ErrCounterOccupancyOrBreakViaUpdate = errors.New("assignedTo and onBreak cannot be updated via this endpoint; use occupy, release, break/start, and break/end")
+
+// ErrCounterInvalidServiceZoneIDType is returned when service_zone_id in updates is not a string or null.
+var ErrCounterInvalidServiceZoneIDType = errors.New("invalid service_zone_id type")
+
 type CounterService interface {
 	CreateCounter(counter *models.Counter) error
 	GetCountersByUnit(unitID string) ([]models.Counter, error)
@@ -148,6 +154,12 @@ func (s *counterService) GetCounterByID(id string) (*models.Counter, error) {
 }
 
 func (s *counterService) UpdateCounter(id string, updates map[string]interface{}) error {
+	if _, ok := updates["assigned_to"]; ok {
+		return ErrCounterOccupancyOrBreakViaUpdate
+	}
+	if _, ok := updates["on_break"]; ok {
+		return ErrCounterOccupancyOrBreakViaUpdate
+	}
 	existing, err := s.repo.FindByID(id)
 	if err != nil {
 		return err
@@ -164,7 +176,7 @@ func (s *counterService) UpdateCounter(id string, updates map[string]interface{}
 				zonePtr = &t
 			}
 		} else {
-			return errors.New("invalid service_zone_id type")
+			return ErrCounterInvalidServiceZoneIDType
 		}
 		if err := ValidateOptionalChildServiceZone(s.unitRepo, existing.UnitID, &zonePtr); err != nil {
 			return err

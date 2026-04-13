@@ -21,6 +21,19 @@ func NewCounterHandler(service services.CounterService) *CounterHandler {
 	return &CounterHandler{service: service}
 }
 
+func writeCounterServiceError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, gorm.ErrRecordNotFound):
+		http.Error(w, err.Error(), http.StatusNotFound)
+	case errors.Is(err, services.ErrCounterOccupancyOrBreakViaUpdate),
+		errors.Is(err, services.ErrCounterInvalidServiceZoneIDType),
+		errors.Is(err, services.ErrInvalidServiceZone):
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	default:
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
 // CreateCounter godoc
 // @Summary      Create a new counter
 // @Description  Creates a new counter for a unit
@@ -84,7 +97,7 @@ func (h *CounterHandler) GetCounterByID(w http.ResponseWriter, r *http.Request) 
 	id := chi.URLParam(r, "id")
 	counter, err := h.service.GetCounterByID(id)
 	if err != nil {
-		http.Error(w, "Counter not found", http.StatusNotFound)
+		writeCounterServiceError(w, err)
 		return
 	}
 	RespondJSON(w, counter)
@@ -100,6 +113,7 @@ func (h *CounterHandler) GetCounterByID(w http.ResponseWriter, r *http.Request) 
 // @Param        counter body      models.Counter  true  "Counter Data"
 // @Success      200     {object}  models.Counter
 // @Failure      400     {string}  string "Bad Request"
+// @Failure      404     {string}  string "Not Found"
 // @Failure      500     {string}  string "Internal Server Error"
 // @Router       /counters/{id} [put]
 func (h *CounterHandler) UpdateCounter(w http.ResponseWriter, r *http.Request) {
@@ -109,6 +123,23 @@ func (h *CounterHandler) UpdateCounter(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	for k := range raw {
+		switch k {
+		case "name", "serviceZoneId", "assignedTo", "onBreak":
+		default:
+			http.Error(w, "unknown field: "+k, http.StatusBadRequest)
+			return
+		}
+	}
+	if _, ok := raw["assignedTo"]; ok {
+		http.Error(w, services.ErrCounterOccupancyOrBreakViaUpdate.Error(), http.StatusBadRequest)
+		return
+	}
+	if _, ok := raw["onBreak"]; ok {
+		http.Error(w, services.ErrCounterOccupancyOrBreakViaUpdate.Error(), http.StatusBadRequest)
+		return
+	}
+
 	updates := map[string]interface{}{}
 	if v, ok := raw["name"]; ok {
 		var s string
@@ -130,30 +161,18 @@ func (h *CounterHandler) UpdateCounter(w http.ResponseWriter, r *http.Request) {
 			updates["service_zone_id"] = *z
 		}
 	}
-	if v, ok := raw["assignedTo"]; ok {
-		var z *string
-		if err := json.Unmarshal(v, &z); err != nil {
-			http.Error(w, "assignedTo: invalid JSON", http.StatusBadRequest)
-			return
-		}
-		updates["assigned_to"] = z
-	}
-	if v, ok := raw["onBreak"]; ok {
-		var b bool
-		if err := json.Unmarshal(v, &b); err != nil {
-			http.Error(w, "onBreak: invalid JSON", http.StatusBadRequest)
-			return
-		}
-		updates["on_break"] = b
+	if len(updates) == 0 {
+		http.Error(w, "no fields to update", http.StatusBadRequest)
+		return
 	}
 
 	if err := h.service.UpdateCounter(id, updates); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeCounterServiceError(w, err)
 		return
 	}
 	counter, err := h.service.GetCounterByID(id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeCounterServiceError(w, err)
 		return
 	}
 	RespondJSON(w, counter)

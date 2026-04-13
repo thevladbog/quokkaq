@@ -32,10 +32,14 @@ export type VisitorTagsPickerDialogProps = {
   /** Ticket flow: reason is required and sent to the API. Profile flow: section hidden. */
   auditReasonRequired: boolean;
   isPending?: boolean;
+  /**
+   * Return `false` to skip success feedback (e.g. no-op save). Return `true` or
+   * resolve with no value after a successful persist.
+   */
   onSave: (args: {
     tagDefinitionIds: string[];
     operatorComment?: string;
-  }) => Promise<void>;
+  }) => Promise<boolean | void>;
   t: TFn;
   /** Overrides `staff.visitor_context.tags_title` when set */
   title?: string;
@@ -137,11 +141,13 @@ function VisitorTagsPickerDialogInner({
 
     const reason = reasonDraft.trim();
     try {
-      await onSave({
+      const saved = await onSave({
         tagDefinitionIds: selectedTagListSorted,
         operatorComment: auditReasonRequired ? reason : undefined
       });
-      toast.success(t('visitor_context.tags_saved'));
+      if (saved !== false) {
+        toast.success(t('visitor_context.tags_saved'));
+      }
       onOpenChange(false);
     } catch (err) {
       if (!skipBuiltInSaveErrorToast) {
