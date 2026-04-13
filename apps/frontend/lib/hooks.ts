@@ -505,10 +505,14 @@ export const useCreateTicketInUnit = () => {
       unitId: string;
       serviceId: string;
       clientId?: string;
+      visitorPhone?: string;
+      visitorLocale?: string;
     }) =>
       unitsApi.createTicket(createData.unitId, {
         serviceId: createData.serviceId,
-        clientId: createData.clientId
+        clientId: createData.clientId,
+        visitorPhone: createData.visitorPhone,
+        visitorLocale: createData.visitorLocale
       }),
     onSuccess: () => {
       invalidateTicketListQueries(queryClient);

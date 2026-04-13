@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	"quokkaq-go-backend/internal/localeutil"
 	"quokkaq-go-backend/internal/phoneutil"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
@@ -26,13 +27,15 @@ func NewTicketHandler(service services.TicketService) *TicketHandler {
 
 // CreateTicketRequest is the JSON body for POST /units/{unitId}/tickets (unit comes from the path).
 type CreateTicketRequest struct {
-	ServiceID string  `json:"serviceId" binding:"required"`
-	ClientID  *string `json:"clientId,omitempty"`
+	ServiceID     string  `json:"serviceId" binding:"required"`
+	ClientID      *string `json:"clientId,omitempty"`
+	VisitorPhone  *string `json:"visitorPhone,omitempty"`
+	VisitorLocale *string `json:"visitorLocale,omitempty"`
 }
 
 // CreateTicket godoc
 // @Summary      Create a new ticket
-// @Description  Creates a new ticket for a service in a unit. Unit is taken from the path; body requires serviceId (optional clientId).
+// @Description  Creates a new ticket for a service in a unit. Unit is taken from the path; body requires serviceId. Optional clientId (staff) or visitorPhone+visitorLocale (kiosk identification, en|ru); clientId and visitorPhone are mutually exclusive.
 // @Tags         tickets
 // @Accept       json
 // @Produce      json
@@ -60,14 +63,32 @@ func (h *TicketHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 		s := strings.TrimSpace(*req.ClientID)
 		staffClientID = &s
 	}
+	var visitorPhone *string
+	if req.VisitorPhone != nil && strings.TrimSpace(*req.VisitorPhone) != "" {
+		vp := strings.TrimSpace(*req.VisitorPhone)
+		visitorPhone = &vp
+	}
+	var visitorLocale *string
+	if req.VisitorLocale != nil && strings.TrimSpace(*req.VisitorLocale) != "" {
+		vl := strings.TrimSpace(*req.VisitorLocale)
+		visitorLocale = &vl
+	}
+	if staffClientID != nil && visitorPhone != nil {
+		http.Error(w, services.ErrTicketCreateVisitorConflict.Error(), http.StatusBadRequest)
+		return
+	}
+
 	actor := getActorFromRequest(r)
-	ticket, err := h.service.CreateTicket(unitID, req.ServiceID, staffClientID, actor)
+	ticket, err := h.service.CreateTicket(unitID, req.ServiceID, staffClientID, visitorPhone, visitorLocale, actor)
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrTicketServiceNotInUnit),
 			errors.Is(err, services.ErrVisitorAnonymousNotAllowed),
 			errors.Is(err, services.ErrTicketCreateClientNotInUnit),
-			errors.Is(err, services.ErrDuplicateClientPhone):
+			errors.Is(err, services.ErrDuplicateClientPhone),
+			errors.Is(err, services.ErrTicketCreateVisitorConflict),
+			errors.Is(err, localeutil.ErrKioskVisitorLocaleInvalid),
+			errors.Is(err, services.ErrVisitorPhoneInvalid):
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		default:

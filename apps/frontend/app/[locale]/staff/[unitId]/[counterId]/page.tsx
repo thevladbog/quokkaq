@@ -164,6 +164,8 @@ export default function StaffWorkspacePage({
       queryClient.invalidateQueries({
         queryKey: ['shift-counters', unitId]
       });
+      // Otherwise /staff still has cached { kind: 'redirect' } and sends the user back here.
+      queryClient.removeQueries({ queryKey: ['staff-workstation-bootstrap'] });
       router.push('/staff');
     },
     onError: (error: Error) => {

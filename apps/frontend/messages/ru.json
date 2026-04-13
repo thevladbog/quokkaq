@@ -56,6 +56,7 @@
     "visitQueue": "№ в очереди",
     "visitStatus": "Статус",
     "visitService": "Услуга",
+    "visitTransfers": "Передачи",
     "visitCreated": "Создан",
     "visitComment": "Комментарий",
     "visitOperator": "Обслуживал",
@@ -651,6 +652,10 @@
       "history_operator_note": "Заметка к визиту",
       "history_loading": "Загрузка истории…",
       "no_history": "Ранее зафиксированных визитов нет.",
+      "transfer_history_title": "Передачи по талону",
+      "transfer_service_flow": "{from} → {to}",
+      "transfer_counter_flow": "Стойки: {from} → {to}",
+      "transfer_zone_flow": "Зоны: {from} → {to}",
       "anonymous_hint": "Для анонимных гостей история недоступна.",
       "no_client": "К этому талону не привязан профиль посетителя.",
       "link_modal_title": "Привязка посетителя",
@@ -916,6 +921,15 @@
       "checkInSuccess": "Регистрация успешна! Ваш номер талона: {number}",
       "invalidBookingCode": "Неверный код бронирования или ошибка регистрации."
     },
+    "phone_identification": {
+      "title": "Номер телефона",
+      "subtitle": "Необязательно. Введите номер для идентификации или нажмите «Пропустить».",
+      "skip": "Пропустить",
+      "confirm": "Продолжить",
+      "backspace": "Удалить последнюю цифру",
+      "phone_aria": "Номер телефона",
+      "submit_failed": "Не удалось выдать талон с этим номером. Проверьте номер и попробуйте снова."
+    },
     "pin_modal": {
       "enter_pin": "Введите Пин-код",
       "invalid_pin": "Неверный Пин-код",
@@ -1056,6 +1070,7 @@
       "parent_service": "Родительская услуга",
       "no_parent": "Нет родителя (корневая услуга)",
       "allow_prebooking": "Разрешить предварительное бронирование",
+      "offer_identification": "Предлагать идентификацию (телефон в киоске)",
       "is_leaf": "Конечная услуга (генерирует талоны)",
       "image_url": "Фон услуги",
       "bg_color": "Цвет фона",

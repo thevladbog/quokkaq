@@ -8,7 +8,7 @@ alwaysApply: true
 ## Before finishing a task that changes code
 
 1. **Run linters** and fix all reported issues. Do not leave the workspace in a failing lint state.
-2. **Restart local dev servers** when your edits affect runtime and the user (or session) is using locally running instances—so running processes pick up changes without asking the user to restart manually.
+2. **Restart local dev stands yourself** after changes that affect runtime (backend and/or frontend): kill listeners on `localhost:3000` and `localhost:3001`, then start `pnpm nx run backend:serve` and `pnpm nx run frontend:dev` again in the background from the repo root. Do this **without asking** the user to restart—treat it as part of handing off the task. Skip only if the user has explicitly asked not to touch running processes in this session.
 
 ## Lint & format commands (repository root: `pnpm nx …`)
 
@@ -31,7 +31,7 @@ alwaysApply: true
 
 ## Restart API + Next.js (default local ports)
 
-After backend and/or frontend code changes when dev servers are in use (`localhost:3001`, `localhost:3000`):
+After backend and/or frontend code changes that require a running process to pick up new code or config (including migrations, env, routes), **run the restart yourself**—even if you are unsure whether the user still has dev servers open:
 
 ```bash
 lsof -tiTCP:3000 -sTCP:LISTEN | xargs kill -9 2>/dev/null
@@ -44,5 +44,6 @@ Then start again in the background from repo root: `pnpm nx run backend:serve`, 
 ## Principles
 
 - Run commands yourself; do not only suggest that the user run lint or restart servers.
+- **Dev stands:** proactively restart API + Next.js after relevant edits; do not end the turn with “please restart” unless the user opted out of restarts.
 - Prefer `nx run-many -t lint --all` before handing off a multi-area change.
 - If you only touched one app, you may scope lint to that project to save time, but run the full matrix before merge-ready work.

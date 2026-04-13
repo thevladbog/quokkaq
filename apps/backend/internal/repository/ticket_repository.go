@@ -187,6 +187,8 @@ type TicketRepository interface {
 	ListVisitsByClientID(unitID, clientID string, limit int, beforeTime *time.Time, beforeID *string) ([]models.Ticket, error)
 	// ListTerminalVisitActorNamesByTicketIDs returns display names of users who last moved each ticket to a terminal status (PostgreSQL).
 	ListTerminalVisitActorNamesByTicketIDs(ticketIDs []string) (map[string]string, error)
+	// ListTransferHistoriesByTicketIDs returns ticket.transferred rows for the given tickets (oldest first).
+	ListTransferHistoriesByTicketIDs(ticketIDs []string) ([]models.TicketHistory, error)
 }
 
 type ticketRepository struct {
@@ -540,6 +542,17 @@ func (r *ticketRepository) ListVisitsByClientID(unitID, clientID string, limit i
 		return nil, err
 	}
 	return tickets, nil
+}
+
+func (r *ticketRepository) ListTransferHistoriesByTicketIDs(ticketIDs []string) ([]models.TicketHistory, error) {
+	var rows []models.TicketHistory
+	if len(ticketIDs) == 0 {
+		return rows, nil
+	}
+	err := r.db.Where("ticket_id IN ? AND action = ?", ticketIDs, ticketaudit.ActionTicketTransferred).
+		Order("created_at ASC, id ASC").
+		Find(&rows).Error
+	return rows, err
 }
 
 func (r *ticketRepository) ListTerminalVisitActorNamesByTicketIDs(ticketIDs []string) (map[string]string, error) {

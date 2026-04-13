@@ -34,6 +34,7 @@ import {
   TableRow
 } from '@/components/ui/table';
 import { Link } from '@/src/i18n/navigation';
+import { VisitTransferTrail } from '@/components/visitors/VisitTransferTrail';
 import { ClientHistoryDetails } from './client-history-details';
 
 const VISITS_PAGE = 20;
@@ -494,6 +495,7 @@ function ClientDetailForm({
                       <TableHead>{t('visitQueue')}</TableHead>
                       <TableHead>{t('visitStatus')}</TableHead>
                       <TableHead>{t('visitService')}</TableHead>
+                      <TableHead>{t('visitTransfers')}</TableHead>
                       <TableHead>{t('visitOperator')}</TableHead>
                       <TableHead>{t('visitCreated')}</TableHead>
                       <TableHead>{t('visitComment')}</TableHead>
@@ -524,6 +526,17 @@ function ClientDetailForm({
                           </TableCell>
                           <TableCell className='align-top'>
                             {serviceName}
+                          </TableCell>
+                          <TableCell className='max-w-[16rem] align-top text-sm'>
+                            {tk.transferTrail?.length ? (
+                              <VisitTransferTrail
+                                trail={tk.transferTrail}
+                                locale={locale}
+                                embedded
+                              />
+                            ) : (
+                              '—'
+                            )}
                           </TableCell>
                           <TableCell className='max-w-[14rem] align-top text-sm'>
                             {operatorName ? operatorName : '—'}

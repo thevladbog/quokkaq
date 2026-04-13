@@ -4,6 +4,18 @@ import (
 	"time"
 )
 
+// ClientVisitTransferEvent is one transfer step in a visit timeline (hydrated from ticket_histories, not stored on tickets).
+type ClientVisitTransferEvent struct {
+	At              time.Time `json:"at"`
+	TransferKind    string    `json:"transferKind,omitempty"`
+	FromServiceName string    `json:"fromServiceName,omitempty"`
+	ToServiceName   string    `json:"toServiceName,omitempty"`
+	FromCounterName string    `json:"fromCounterName,omitempty"`
+	ToCounterName   string    `json:"toCounterName,omitempty"`
+	FromZoneLabel   string    `json:"fromZoneLabel,omitempty"`
+	ToZoneLabel     string    `json:"toZoneLabel,omitempty"`
+}
+
 type Ticket struct {
 	ID          string `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
 	QueueNumber string `gorm:"not null" json:"queueNumber"`
@@ -28,6 +40,8 @@ type Ticket struct {
 	OperatorComment   *string    `gorm:"type:text" json:"operatorComment,omitempty"`
 	// ServedByName is hydrated for client visit lists from ticket_histories (not stored on tickets).
 	ServedByName *string `json:"servedByName,omitempty" gorm:"-"`
+	// TransferTrail lists ticket.transferred events in chronological order (client visit APIs only).
+	TransferTrail []ClientVisitTransferEvent `json:"transferTrail,omitempty" gorm:"-"`
 
 	// Relations
 	Unit    Unit     `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-" swaggerignore:"true"`

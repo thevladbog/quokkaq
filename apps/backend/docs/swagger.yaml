@@ -69,6 +69,10 @@ components:
           type: string
         serviceId:
           type: string
+        visitorLocale:
+          type: string
+        visitorPhone:
+          type: string
       required:
       - serviceId
       type: object
@@ -670,6 +674,25 @@ components:
         vatRatePercent:
           type: number
       type: object
+    models.ClientVisitTransferEvent:
+      properties:
+        at:
+          type: string
+        fromCounterName:
+          type: string
+        fromServiceName:
+          type: string
+        fromZoneLabel:
+          type: string
+        toCounterName:
+          type: string
+        toServiceName:
+          type: string
+        toZoneLabel:
+          type: string
+        transferKind:
+          type: string
+      type: object
     models.Company:
       properties:
         billingAddress:
@@ -1087,6 +1110,8 @@ components:
           type: string
         numberSequence:
           type: string
+        offerIdentification:
+          type: boolean
         parentId:
           type: string
         prebook:
@@ -1298,6 +1323,11 @@ components:
           type: string
         status:
           type: string
+        transferTrail:
+          description: TransferTrail lists ticket.transferred events in chronological order (client visit APIs only).
+          items:
+            $ref: '#/components/schemas/models.ClientVisitTransferEvent'
+          type: array
         ttsUrl:
           description: URL to the generated TTS audio file
           type: string
@@ -6941,7 +6971,7 @@ paths:
       tags:
       - tickets
     post:
-      description: Creates a new ticket for a service in a unit. Unit is taken from the path; body requires serviceId (optional clientId).
+      description: Creates a new ticket for a service in a unit. Unit is taken from the path; body requires serviceId. Optional clientId (staff) or visitorPhone+visitorLocale (kiosk identification, en|ru); clientId and visitorPhone are mutually exclusive.
       parameters:
       - description: Unit ID
         in: path

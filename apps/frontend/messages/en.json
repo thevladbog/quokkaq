@@ -56,6 +56,7 @@
     "visitQueue": "Queue #",
     "visitStatus": "Status",
     "visitService": "Service",
+    "visitTransfers": "Transfers",
     "visitCreated": "Created",
     "visitComment": "Comment",
     "visitOperator": "Served by",
@@ -651,6 +652,10 @@
       "history_operator_note": "Visit note",
       "history_loading": "Loading history…",
       "no_history": "No earlier visits on file.",
+      "transfer_history_title": "Transfer steps",
+      "transfer_service_flow": "{from} → {to}",
+      "transfer_counter_flow": "Counters: {from} → {to}",
+      "transfer_zone_flow": "Zones: {from} → {to}",
       "anonymous_hint": "History is not available for anonymous walk-ins.",
       "no_client": "No linked visitor profile for this ticket.",
       "link_modal_title": "Link visitor",
@@ -916,6 +921,15 @@
       "checkInSuccess": "Check-in successful! Your ticket number is: {number}",
       "invalidBookingCode": "Invalid booking code or check-in failed."
     },
+    "phone_identification": {
+      "title": "Your phone number",
+      "subtitle": "Optional. Enter your number to identify yourself, or skip.",
+      "skip": "Skip",
+      "confirm": "Continue",
+      "backspace": "Delete last digit",
+      "phone_aria": "Phone number",
+      "submit_failed": "Could not create the ticket with this number. Check the number and try again."
+    },
     "pin_modal": {
       "enter_pin": "Enter PIN",
       "invalid_pin": "Invalid PIN",
@@ -1056,6 +1070,7 @@
       "parent_service": "Parent Service",
       "no_parent": "No parent (root service)",
       "allow_prebooking": "Allow Prebooking",
+      "offer_identification": "Offer identification (kiosk phone)",
       "is_leaf": "Is Leaf Service (Generates Tickets)",
       "image_url": "Image URL",
       "bg_color": "Background Color",

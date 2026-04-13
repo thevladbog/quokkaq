@@ -67,6 +67,7 @@ export type ServiceModel = {
   duration?: number | null;
   maxWaitingTime?: number | null;
   prebook?: boolean;
+  offerIdentification?: boolean;
   isLeaf?: boolean;
   gridRow?: number | null;
   gridCol?: number | null;
@@ -98,6 +99,7 @@ export const ServiceModelSchema: z.ZodType<ServiceModel> = z.object({
   duration: z.number().nullable().optional(),
   maxWaitingTime: z.number().nullable().optional(),
   prebook: z.boolean().optional(),
+  offerIdentification: z.boolean().optional(),
   isLeaf: z.boolean().optional(),
   gridRow: z.number().nullable().optional(),
   gridCol: z.number().nullable().optional(),
@@ -121,6 +123,17 @@ export const UnitModelSchema = z.object({
   services: z.array(ServiceModelSchema).optional()
 });
 
+export const ClientVisitTransferEventSchema = z.object({
+  at: z.string(),
+  transferKind: z.string().optional(),
+  fromServiceName: z.string().optional(),
+  toServiceName: z.string().optional(),
+  fromCounterName: z.string().optional(),
+  toCounterName: z.string().optional(),
+  fromZoneLabel: z.string().optional(),
+  toZoneLabel: z.string().optional()
+});
+
 export const TicketModelSchema = z.object({
   id: z.string(),
   queueNumber: z.string(),
@@ -135,6 +148,7 @@ export const TicketModelSchema = z.object({
   maxWaitingTime: z.number().nullable().optional(),
   operatorComment: z.string().nullable().optional(),
   servedByName: z.string().nullable().optional(),
+  transferTrail: z.array(ClientVisitTransferEventSchema).optional(),
   service: z
     .object({
       id: z.string().optional(),

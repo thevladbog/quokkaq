@@ -481,13 +481,22 @@ export const unitsApi = {
 
   createTicket: async (
     unitId: string,
-    ticketData: { serviceId: string; clientId?: string }
+    ticketData: {
+      serviceId: string;
+      clientId?: string;
+      visitorPhone?: string;
+      visitorLocale?: string;
+    }
   ) => {
     const body: orvalTc.HandlersCreateTicketRequest = {
       serviceId: ticketData.serviceId
     };
     const cid = ticketData.clientId?.trim();
     if (cid) body.clientId = cid;
+    const vph = ticketData.visitorPhone?.trim();
+    if (vph) body.visitorPhone = vph;
+    const vloc = ticketData.visitorLocale?.trim();
+    if (vloc) body.visitorLocale = vloc;
     const res = await orvalTc.postUnitsUnitIdTickets(unitId, body);
     return TicketModelSchema.parse(res.data);
   },
