@@ -1,6 +1,6 @@
 'use client';
 
-import { useGetUnitsUnitIdClientsClientIdSurveyResponses } from '@/lib/api/generated/surveys';
+import { useListResponsesForClient } from '@/lib/api/generated/surveys';
 import { useLocale, useTranslations } from 'next-intl';
 
 export function StaffVisitorSurveyResponses({
@@ -13,12 +13,15 @@ export function StaffVisitorSurveyResponses({
   const t = useTranslations('admin.guest_survey');
   const locale = useLocale();
 
-  const { data: responses = [], isLoading } =
-    useGetUnitsUnitIdClientsClientIdSurveyResponses(unitId, clientId, {
+  const { data: responses = [], isLoading } = useListResponsesForClient(
+    unitId,
+    clientId,
+    {
       query: {
         select: (r) => r.data ?? []
       }
-    });
+    }
+  );
 
   const formatWhen = (iso: string) => {
     try {

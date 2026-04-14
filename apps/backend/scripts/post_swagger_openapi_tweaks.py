@@ -30,6 +30,20 @@ def _components(doc: dict[str, Any]) -> dict[str, Any]:
     return comp
 
 
+def _merge_schema_required(schema: dict[str, Any], extra: list[str]) -> None:
+    """Union swagger/kin `required` with extra keys without dropping existing entries."""
+    cur = schema.get("required")
+    seen: dict[str, None] = {}
+    if isinstance(cur, list):
+        for x in cur:
+            if isinstance(x, str) and x not in seen:
+                seen[x] = None
+    for x in extra:
+        if x not in seen:
+            seen[x] = None
+    schema["required"] = list(seen.keys())
+
+
 def _schema(components: dict[str, Any], name: str) -> dict[str, Any]:
     schemas = components.get("schemas")
     if not isinstance(schemas, dict):
@@ -79,16 +93,16 @@ def apply_openapi_tweaks(doc: dict[str, Any]) -> None:
     upload_logo["required"] = ["url"]
 
     upload_completion = _schema(comp, "handlers.UploadSurveyCompletionImageResponse")
-    upload_completion["required"] = ["url"]
+    _merge_schema_required(upload_completion, ["url"])
 
     upload_idle = _schema(comp, "handlers.UploadSurveyIdleMediaResponse")
-    upload_idle["required"] = ["url"]
+    _merge_schema_required(upload_idle, ["url"])
 
     create_survey = _schema(comp, "handlers.createSurveyRequest")
-    create_survey["required"] = ["title", "questions"]
+    _merge_schema_required(create_survey, ["title", "questions"])
 
     guest_submit = _schema(comp, "handlers.guestSurveySubmitRequest")
-    guest_submit["required"] = ["ticketId", "surveyId", "answers"]
+    _merge_schema_required(guest_submit, ["ticketId", "surveyId", "answers"])
 
     patch_survey = _schema(comp, "handlers.patchSurveyRequest")
     patch_survey["minProperties"] = 1

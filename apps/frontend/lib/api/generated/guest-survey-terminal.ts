@@ -1239,41 +1239,41 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
  * Streams image bytes. Requires Authorization: Bearer (staff user JWT or counter terminal JWT). This URL is not embeddable from unauthenticated contexts: plain <img src>, Markdown image syntax, or server-side markdown renderers without the token will fail. Clients should fetch with the Bearer token (e.g. browser fetch) and create an object/blob URL, or proxy the bytes with auth.
  * @summary Get guest survey completion markdown image (staff or terminal JWT)
  */
-export type getUnitsUnitIdGuestSurveyCompletionImagesFileNameResponse200 = {
+export type getSurveyCompletionImageResponse200 = {
   data: Blob
   status: 200
 }
 
-export type getUnitsUnitIdGuestSurveyCompletionImagesFileNameResponse400 = {
+export type getSurveyCompletionImageResponse400 = {
   data: Blob
   status: 400
 }
 
-export type getUnitsUnitIdGuestSurveyCompletionImagesFileNameResponse401 = {
+export type getSurveyCompletionImageResponse401 = {
   data: Blob
   status: 401
 }
 
-export type getUnitsUnitIdGuestSurveyCompletionImagesFileNameResponse403 = {
+export type getSurveyCompletionImageResponse403 = {
   data: Blob
   status: 403
 }
 
-export type getUnitsUnitIdGuestSurveyCompletionImagesFileNameResponse404 = {
+export type getSurveyCompletionImageResponse404 = {
   data: Blob
   status: 404
 }
 
-export type getUnitsUnitIdGuestSurveyCompletionImagesFileNameResponseSuccess = (getUnitsUnitIdGuestSurveyCompletionImagesFileNameResponse200) & {
+export type getSurveyCompletionImageResponseSuccess = (getSurveyCompletionImageResponse200) & {
   headers: Headers;
 };
-export type getUnitsUnitIdGuestSurveyCompletionImagesFileNameResponseError = (getUnitsUnitIdGuestSurveyCompletionImagesFileNameResponse400 | getUnitsUnitIdGuestSurveyCompletionImagesFileNameResponse401 | getUnitsUnitIdGuestSurveyCompletionImagesFileNameResponse403 | getUnitsUnitIdGuestSurveyCompletionImagesFileNameResponse404) & {
+export type getSurveyCompletionImageResponseError = (getSurveyCompletionImageResponse400 | getSurveyCompletionImageResponse401 | getSurveyCompletionImageResponse403 | getSurveyCompletionImageResponse404) & {
   headers: Headers;
 };
 
-export type getUnitsUnitIdGuestSurveyCompletionImagesFileNameResponse = (getUnitsUnitIdGuestSurveyCompletionImagesFileNameResponseSuccess | getUnitsUnitIdGuestSurveyCompletionImagesFileNameResponseError)
+export type getSurveyCompletionImageResponse = (getSurveyCompletionImageResponseSuccess | getSurveyCompletionImageResponseError)
 
-export const getGetUnitsUnitIdGuestSurveyCompletionImagesFileNameUrl = (unitId: string,
+export const getGetSurveyCompletionImageUrl = (unitId: string,
     fileName: string,) => {
 
 
@@ -1282,10 +1282,10 @@ export const getGetUnitsUnitIdGuestSurveyCompletionImagesFileNameUrl = (unitId: 
   return `/units/${unitId}/guest-survey/completion-images/${fileName}`
 }
 
-export const getUnitsUnitIdGuestSurveyCompletionImagesFileName = async (unitId: string,
-    fileName: string, options?: RequestInit): Promise<getUnitsUnitIdGuestSurveyCompletionImagesFileNameResponse> => {
+export const getSurveyCompletionImage = async (unitId: string,
+    fileName: string, options?: RequestInit): Promise<getSurveyCompletionImageResponse> => {
 
-  return terminalOrvalMutator<getUnitsUnitIdGuestSurveyCompletionImagesFileNameResponse>(getGetUnitsUnitIdGuestSurveyCompletionImagesFileNameUrl(unitId,fileName),
+  return terminalOrvalMutator<getSurveyCompletionImageResponse>(getGetSurveyCompletionImageUrl(unitId,fileName),
   {
     ...options,
     method: 'GET'
@@ -1298,7 +1298,7 @@ export const getUnitsUnitIdGuestSurveyCompletionImagesFileName = async (unitId: 
 
 
 
-export const getGetUnitsUnitIdGuestSurveyCompletionImagesFileNameQueryKey = (unitId: string,
+export const getGetSurveyCompletionImageQueryKey = (unitId: string,
     fileName: string,) => {
     return [
     `/units/${unitId}/guest-survey/completion-images/${fileName}`
@@ -1306,67 +1306,67 @@ export const getGetUnitsUnitIdGuestSurveyCompletionImagesFileNameQueryKey = (uni
     }
 
 
-export const getGetUnitsUnitIdGuestSurveyCompletionImagesFileNameQueryOptions = <TData = Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveyCompletionImagesFileName>>, TError = Blob>(unitId: string,
-    fileName: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveyCompletionImagesFileName>>, TError, TData>>, request?: SecondParameter<typeof terminalOrvalMutator>}
+export const getGetSurveyCompletionImageQueryOptions = <TData = Awaited<ReturnType<typeof getSurveyCompletionImage>>, TError = Blob>(unitId: string,
+    fileName: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSurveyCompletionImage>>, TError, TData>>, request?: SecondParameter<typeof terminalOrvalMutator>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetUnitsUnitIdGuestSurveyCompletionImagesFileNameQueryKey(unitId,fileName);
+  const queryKey =  queryOptions?.queryKey ?? getGetSurveyCompletionImageQueryKey(unitId,fileName);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveyCompletionImagesFileName>>> = ({ signal }) => getUnitsUnitIdGuestSurveyCompletionImagesFileName(unitId,fileName, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSurveyCompletionImage>>> = ({ signal }) => getSurveyCompletionImage(unitId,fileName, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: !!(unitId && fileName), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveyCompletionImagesFileName>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, enabled: !!(unitId && fileName), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSurveyCompletionImage>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type GetUnitsUnitIdGuestSurveyCompletionImagesFileNameQueryResult = NonNullable<Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveyCompletionImagesFileName>>>
-export type GetUnitsUnitIdGuestSurveyCompletionImagesFileNameQueryError = Blob
+export type GetSurveyCompletionImageQueryResult = NonNullable<Awaited<ReturnType<typeof getSurveyCompletionImage>>>
+export type GetSurveyCompletionImageQueryError = Blob
 
 
-export function useGetUnitsUnitIdGuestSurveyCompletionImagesFileName<TData = Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveyCompletionImagesFileName>>, TError = Blob>(
+export function useGetSurveyCompletionImage<TData = Awaited<ReturnType<typeof getSurveyCompletionImage>>, TError = Blob>(
  unitId: string,
-    fileName: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveyCompletionImagesFileName>>, TError, TData>> & Pick<
+    fileName: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSurveyCompletionImage>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveyCompletionImagesFileName>>,
+          Awaited<ReturnType<typeof getSurveyCompletionImage>>,
           TError,
-          Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveyCompletionImagesFileName>>
+          Awaited<ReturnType<typeof getSurveyCompletionImage>>
         > , 'initialData'
       >, request?: SecondParameter<typeof terminalOrvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitsUnitIdGuestSurveyCompletionImagesFileName<TData = Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveyCompletionImagesFileName>>, TError = Blob>(
+export function useGetSurveyCompletionImage<TData = Awaited<ReturnType<typeof getSurveyCompletionImage>>, TError = Blob>(
  unitId: string,
-    fileName: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveyCompletionImagesFileName>>, TError, TData>> & Pick<
+    fileName: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSurveyCompletionImage>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveyCompletionImagesFileName>>,
+          Awaited<ReturnType<typeof getSurveyCompletionImage>>,
           TError,
-          Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveyCompletionImagesFileName>>
+          Awaited<ReturnType<typeof getSurveyCompletionImage>>
         > , 'initialData'
       >, request?: SecondParameter<typeof terminalOrvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitsUnitIdGuestSurveyCompletionImagesFileName<TData = Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveyCompletionImagesFileName>>, TError = Blob>(
+export function useGetSurveyCompletionImage<TData = Awaited<ReturnType<typeof getSurveyCompletionImage>>, TError = Blob>(
  unitId: string,
-    fileName: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveyCompletionImagesFileName>>, TError, TData>>, request?: SecondParameter<typeof terminalOrvalMutator>}
+    fileName: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSurveyCompletionImage>>, TError, TData>>, request?: SecondParameter<typeof terminalOrvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get guest survey completion markdown image (staff or terminal JWT)
  */
 
-export function useGetUnitsUnitIdGuestSurveyCompletionImagesFileName<TData = Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveyCompletionImagesFileName>>, TError = Blob>(
+export function useGetSurveyCompletionImage<TData = Awaited<ReturnType<typeof getSurveyCompletionImage>>, TError = Blob>(
  unitId: string,
-    fileName: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveyCompletionImagesFileName>>, TError, TData>>, request?: SecondParameter<typeof terminalOrvalMutator>}
+    fileName: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSurveyCompletionImage>>, TError, TData>>, request?: SecondParameter<typeof terminalOrvalMutator>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetUnitsUnitIdGuestSurveyCompletionImagesFileNameQueryOptions(unitId,fileName,options)
+  const queryOptions = getGetSurveyCompletionImageQueryOptions(unitId,fileName,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -1383,41 +1383,41 @@ export function useGetUnitsUnitIdGuestSurveyCompletionImagesFileName<TData = Awa
  * Streams image/video bytes. Requires Authorization: Bearer. Not a public URL for <img>/<video> src or static markdown—use authenticated fetch and blob/object URLs (or a signed public URL if the product adds one).
  * @summary Get guest survey idle slide media (staff or terminal JWT)
  */
-export type getUnitsUnitIdGuestSurveyIdleMediaFileNameResponse200 = {
+export type getSurveyIdleMediaResponse200 = {
   data: Blob
   status: 200
 }
 
-export type getUnitsUnitIdGuestSurveyIdleMediaFileNameResponse400 = {
+export type getSurveyIdleMediaResponse400 = {
   data: Blob
   status: 400
 }
 
-export type getUnitsUnitIdGuestSurveyIdleMediaFileNameResponse401 = {
+export type getSurveyIdleMediaResponse401 = {
   data: Blob
   status: 401
 }
 
-export type getUnitsUnitIdGuestSurveyIdleMediaFileNameResponse403 = {
+export type getSurveyIdleMediaResponse403 = {
   data: Blob
   status: 403
 }
 
-export type getUnitsUnitIdGuestSurveyIdleMediaFileNameResponse404 = {
+export type getSurveyIdleMediaResponse404 = {
   data: Blob
   status: 404
 }
 
-export type getUnitsUnitIdGuestSurveyIdleMediaFileNameResponseSuccess = (getUnitsUnitIdGuestSurveyIdleMediaFileNameResponse200) & {
+export type getSurveyIdleMediaResponseSuccess = (getSurveyIdleMediaResponse200) & {
   headers: Headers;
 };
-export type getUnitsUnitIdGuestSurveyIdleMediaFileNameResponseError = (getUnitsUnitIdGuestSurveyIdleMediaFileNameResponse400 | getUnitsUnitIdGuestSurveyIdleMediaFileNameResponse401 | getUnitsUnitIdGuestSurveyIdleMediaFileNameResponse403 | getUnitsUnitIdGuestSurveyIdleMediaFileNameResponse404) & {
+export type getSurveyIdleMediaResponseError = (getSurveyIdleMediaResponse400 | getSurveyIdleMediaResponse401 | getSurveyIdleMediaResponse403 | getSurveyIdleMediaResponse404) & {
   headers: Headers;
 };
 
-export type getUnitsUnitIdGuestSurveyIdleMediaFileNameResponse = (getUnitsUnitIdGuestSurveyIdleMediaFileNameResponseSuccess | getUnitsUnitIdGuestSurveyIdleMediaFileNameResponseError)
+export type getSurveyIdleMediaResponse = (getSurveyIdleMediaResponseSuccess | getSurveyIdleMediaResponseError)
 
-export const getGetUnitsUnitIdGuestSurveyIdleMediaFileNameUrl = (unitId: string,
+export const getGetSurveyIdleMediaUrl = (unitId: string,
     fileName: string,) => {
 
 
@@ -1426,10 +1426,10 @@ export const getGetUnitsUnitIdGuestSurveyIdleMediaFileNameUrl = (unitId: string,
   return `/units/${unitId}/guest-survey/idle-media/${fileName}`
 }
 
-export const getUnitsUnitIdGuestSurveyIdleMediaFileName = async (unitId: string,
-    fileName: string, options?: RequestInit): Promise<getUnitsUnitIdGuestSurveyIdleMediaFileNameResponse> => {
+export const getSurveyIdleMedia = async (unitId: string,
+    fileName: string, options?: RequestInit): Promise<getSurveyIdleMediaResponse> => {
 
-  return terminalOrvalMutator<getUnitsUnitIdGuestSurveyIdleMediaFileNameResponse>(getGetUnitsUnitIdGuestSurveyIdleMediaFileNameUrl(unitId,fileName),
+  return terminalOrvalMutator<getSurveyIdleMediaResponse>(getGetSurveyIdleMediaUrl(unitId,fileName),
   {
     ...options,
     method: 'GET'
@@ -1442,7 +1442,7 @@ export const getUnitsUnitIdGuestSurveyIdleMediaFileName = async (unitId: string,
 
 
 
-export const getGetUnitsUnitIdGuestSurveyIdleMediaFileNameQueryKey = (unitId: string,
+export const getGetSurveyIdleMediaQueryKey = (unitId: string,
     fileName: string,) => {
     return [
     `/units/${unitId}/guest-survey/idle-media/${fileName}`
@@ -1450,67 +1450,67 @@ export const getGetUnitsUnitIdGuestSurveyIdleMediaFileNameQueryKey = (unitId: st
     }
 
 
-export const getGetUnitsUnitIdGuestSurveyIdleMediaFileNameQueryOptions = <TData = Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveyIdleMediaFileName>>, TError = Blob>(unitId: string,
-    fileName: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveyIdleMediaFileName>>, TError, TData>>, request?: SecondParameter<typeof terminalOrvalMutator>}
+export const getGetSurveyIdleMediaQueryOptions = <TData = Awaited<ReturnType<typeof getSurveyIdleMedia>>, TError = Blob>(unitId: string,
+    fileName: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSurveyIdleMedia>>, TError, TData>>, request?: SecondParameter<typeof terminalOrvalMutator>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetUnitsUnitIdGuestSurveyIdleMediaFileNameQueryKey(unitId,fileName);
+  const queryKey =  queryOptions?.queryKey ?? getGetSurveyIdleMediaQueryKey(unitId,fileName);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveyIdleMediaFileName>>> = ({ signal }) => getUnitsUnitIdGuestSurveyIdleMediaFileName(unitId,fileName, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSurveyIdleMedia>>> = ({ signal }) => getSurveyIdleMedia(unitId,fileName, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: !!(unitId && fileName), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveyIdleMediaFileName>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, enabled: !!(unitId && fileName), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSurveyIdleMedia>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type GetUnitsUnitIdGuestSurveyIdleMediaFileNameQueryResult = NonNullable<Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveyIdleMediaFileName>>>
-export type GetUnitsUnitIdGuestSurveyIdleMediaFileNameQueryError = Blob
+export type GetSurveyIdleMediaQueryResult = NonNullable<Awaited<ReturnType<typeof getSurveyIdleMedia>>>
+export type GetSurveyIdleMediaQueryError = Blob
 
 
-export function useGetUnitsUnitIdGuestSurveyIdleMediaFileName<TData = Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveyIdleMediaFileName>>, TError = Blob>(
+export function useGetSurveyIdleMedia<TData = Awaited<ReturnType<typeof getSurveyIdleMedia>>, TError = Blob>(
  unitId: string,
-    fileName: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveyIdleMediaFileName>>, TError, TData>> & Pick<
+    fileName: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSurveyIdleMedia>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveyIdleMediaFileName>>,
+          Awaited<ReturnType<typeof getSurveyIdleMedia>>,
           TError,
-          Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveyIdleMediaFileName>>
+          Awaited<ReturnType<typeof getSurveyIdleMedia>>
         > , 'initialData'
       >, request?: SecondParameter<typeof terminalOrvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitsUnitIdGuestSurveyIdleMediaFileName<TData = Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveyIdleMediaFileName>>, TError = Blob>(
+export function useGetSurveyIdleMedia<TData = Awaited<ReturnType<typeof getSurveyIdleMedia>>, TError = Blob>(
  unitId: string,
-    fileName: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveyIdleMediaFileName>>, TError, TData>> & Pick<
+    fileName: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSurveyIdleMedia>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveyIdleMediaFileName>>,
+          Awaited<ReturnType<typeof getSurveyIdleMedia>>,
           TError,
-          Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveyIdleMediaFileName>>
+          Awaited<ReturnType<typeof getSurveyIdleMedia>>
         > , 'initialData'
       >, request?: SecondParameter<typeof terminalOrvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitsUnitIdGuestSurveyIdleMediaFileName<TData = Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveyIdleMediaFileName>>, TError = Blob>(
+export function useGetSurveyIdleMedia<TData = Awaited<ReturnType<typeof getSurveyIdleMedia>>, TError = Blob>(
  unitId: string,
-    fileName: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveyIdleMediaFileName>>, TError, TData>>, request?: SecondParameter<typeof terminalOrvalMutator>}
+    fileName: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSurveyIdleMedia>>, TError, TData>>, request?: SecondParameter<typeof terminalOrvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get guest survey idle slide media (staff or terminal JWT)
  */
 
-export function useGetUnitsUnitIdGuestSurveyIdleMediaFileName<TData = Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveyIdleMediaFileName>>, TError = Blob>(
+export function useGetSurveyIdleMedia<TData = Awaited<ReturnType<typeof getSurveyIdleMedia>>, TError = Blob>(
  unitId: string,
-    fileName: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveyIdleMediaFileName>>, TError, TData>>, request?: SecondParameter<typeof terminalOrvalMutator>}
+    fileName: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSurveyIdleMedia>>, TError, TData>>, request?: SecondParameter<typeof terminalOrvalMutator>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetUnitsUnitIdGuestSurveyIdleMediaFileNameQueryOptions(unitId,fileName,options)
+  const queryOptions = getGetSurveyIdleMediaQueryOptions(unitId,fileName,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

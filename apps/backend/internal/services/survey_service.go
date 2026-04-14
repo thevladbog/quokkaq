@@ -341,16 +341,16 @@ func ExtractIdleMediaFileNames(raw json.RawMessage) []string {
 }
 
 type SurveyService interface {
-	ListDefinitions(actorUserID, scopeUnitID string) ([]models.SurveyDefinition, error)
-	CreateDefinition(actorUserID, scopeUnitID, title string, questions json.RawMessage, completionMessage *json.RawMessage, displayTheme *json.RawMessage, idleScreen *json.RawMessage) (*models.SurveyDefinition, error)
+	ListDefinitions(ctx context.Context, actorUserID, scopeUnitID string) ([]models.SurveyDefinition, error)
+	CreateDefinition(ctx context.Context, actorUserID, scopeUnitID, title string, questions json.RawMessage, completionMessage *json.RawMessage, displayTheme *json.RawMessage, idleScreen *json.RawMessage) (*models.SurveyDefinition, error)
 	UpdateDefinition(ctx context.Context, actorUserID, scopeUnitID, surveyID string, title *string, questions *json.RawMessage, completionMessage *json.RawMessage, displayTheme *json.RawMessage, idleScreen *json.RawMessage) error
-	SetActiveDefinition(actorUserID, scopeUnitID, surveyID string) error
+	SetActiveDefinition(ctx context.Context, actorUserID, scopeUnitID, surveyID string) error
 
-	ListResponses(actorUserID, unitID string, limit, offset int) ([]models.SurveyResponse, error)
-	ListResponsesForClient(actorUserID, unitID, clientID string) ([]models.SurveyResponse, error)
+	ListResponses(ctx context.Context, actorUserID, unitID string, limit, offset int) ([]models.SurveyResponse, error)
+	ListResponsesForClient(ctx context.Context, actorUserID, unitID, clientID string) ([]models.SurveyResponse, error)
 
-	GuestSession(unitID, terminalID string) (*GuestSurveySession, error)
-	SubmitGuestResponse(unitID, terminalID, ticketID, surveyID string, answers json.RawMessage) error
+	GuestSession(ctx context.Context, unitID, terminalID string) (*GuestSurveySession, error)
+	SubmitGuestResponse(ctx context.Context, unitID, terminalID, ticketID, surveyID string, answers json.RawMessage) error
 
 	CompanyIDForUnit(unitID string) (string, error)
 	EnsureGuestSurveyUploadAccess(actorUserID, unitID string) error
@@ -403,7 +403,7 @@ func (s *surveyService) deleteOrphanIdleMedia(ctx context.Context, companyID str
 		if _, ok := newSet[n]; ok {
 			continue
 		}
-		cnt, err := s.surveyRepo.CountDefinitionsReferencingIdleMediaFile(companyID, n)
+		cnt, err := s.surveyRepo.CountDefinitionsReferencingIdleMediaFile(ctx, companyID, n)
 		if err != nil {
 			log.Printf("idle_screen orphan count %s: %v", n, err)
 			continue
@@ -419,7 +419,7 @@ func (s *surveyService) deleteOrphanIdleMedia(ctx context.Context, companyID str
 }
 
 func (s *surveyService) EnsureIdleMediaFileDeletable(companyID, fileName string) error {
-	n, err := s.surveyRepo.CountDefinitionsReferencingIdleMediaFile(companyID, fileName)
+	n, err := s.surveyRepo.CountDefinitionsReferencingIdleMediaFile(context.Background(), companyID, fileName)
 	if err != nil {
 		return err
 	}
@@ -506,17 +506,17 @@ func (s *surveyService) EnsureCompletionImageRead(unitID, tokenType, userID, ter
 	return s.ensureFeatureForUnit(unitID)
 }
 
-func (s *surveyService) ListDefinitions(actorUserID, scopeUnitID string) ([]models.SurveyDefinition, error) {
+func (s *surveyService) ListDefinitions(ctx context.Context, actorUserID, scopeUnitID string) ([]models.SurveyDefinition, error) {
 	if err := s.ensureUnitAccess(actorUserID, scopeUnitID); err != nil {
 		return nil, err
 	}
 	if err := s.ensureFeatureForUnit(scopeUnitID); err != nil {
 		return nil, err
 	}
-	return s.surveyRepo.ListDefinitionsByScopeUnit(scopeUnitID)
+	return s.surveyRepo.ListDefinitionsByScopeUnit(ctx, scopeUnitID)
 }
 
-func (s *surveyService) CreateDefinition(actorUserID, scopeUnitID, title string, questions json.RawMessage, completionMessage *json.RawMessage, displayTheme *json.RawMessage, idleScreen *json.RawMessage) (*models.SurveyDefinition, error) {
+func (s *surveyService) CreateDefinition(ctx context.Context, actorUserID, scopeUnitID, title string, questions json.RawMessage, completionMessage *json.RawMessage, displayTheme *json.RawMessage, idleScreen *json.RawMessage) (*models.SurveyDefinition, error) {
 	if err := s.ensureUnitAccess(actorUserID, scopeUnitID); err != nil {
 		return nil, err
 	}
@@ -565,7 +565,7 @@ func (s *surveyService) CreateDefinition(actorUserID, scopeUnitID, title string,
 		IdleScreen:        is,
 		IsActive:          false,
 	}
-	if err := s.surveyRepo.CreateDefinition(d); err != nil {
+	if err := s.surveyRepo.CreateDefinition(ctx, d); err != nil {
 		return nil, err
 	}
 	return d, nil
@@ -578,7 +578,7 @@ func (s *surveyService) UpdateDefinition(ctx context.Context, actorUserID, scope
 	if err := s.ensureFeatureForUnit(scopeUnitID); err != nil {
 		return err
 	}
-	d, err := s.surveyRepo.FindDefinitionByID(surveyID)
+	d, err := s.surveyRepo.FindDefinitionByID(ctx, surveyID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrSurveyNotFound
@@ -632,7 +632,7 @@ func (s *surveyService) UpdateDefinition(ctx context.Context, actorUserID, scope
 			d.IdleScreen = *idleScreen
 		}
 	}
-	if err := s.surveyRepo.UpdateDefinition(d); err != nil {
+	if err := s.surveyRepo.UpdateDefinition(ctx, d); err != nil {
 		return err
 	}
 	if idleScreen != nil {
@@ -641,14 +641,14 @@ func (s *surveyService) UpdateDefinition(ctx context.Context, actorUserID, scope
 	return nil
 }
 
-func (s *surveyService) SetActiveDefinition(actorUserID, scopeUnitID, surveyID string) error {
+func (s *surveyService) SetActiveDefinition(ctx context.Context, actorUserID, scopeUnitID, surveyID string) error {
 	if err := s.ensureUnitAccess(actorUserID, scopeUnitID); err != nil {
 		return err
 	}
 	if err := s.ensureFeatureForUnit(scopeUnitID); err != nil {
 		return err
 	}
-	d, err := s.surveyRepo.FindDefinitionByID(surveyID)
+	d, err := s.surveyRepo.FindDefinitionByID(ctx, surveyID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrSurveyNotFound
@@ -658,10 +658,10 @@ func (s *surveyService) SetActiveDefinition(actorUserID, scopeUnitID, surveyID s
 	if d.ScopeUnitID != scopeUnitID {
 		return ErrSurveyForbidden
 	}
-	return s.surveyRepo.SetActiveDefinition(scopeUnitID, surveyID)
+	return s.surveyRepo.SetActiveDefinition(ctx, scopeUnitID, surveyID)
 }
 
-func (s *surveyService) ListResponses(actorUserID, unitID string, limit, offset int) ([]models.SurveyResponse, error) {
+func (s *surveyService) ListResponses(ctx context.Context, actorUserID, unitID string, limit, offset int) ([]models.SurveyResponse, error) {
 	if err := s.ensureUnitAccess(actorUserID, unitID); err != nil {
 		return nil, err
 	}
@@ -672,10 +672,10 @@ func (s *surveyService) ListResponses(actorUserID, unitID string, limit, offset 
 	if !repository.UserCanViewSurveyResponses(u, unitID) {
 		return nil, ErrSurveyForbidden
 	}
-	return s.surveyRepo.ListResponsesByUnit(unitID, limit, offset)
+	return s.surveyRepo.ListResponsesByUnit(ctx, unitID, limit, offset)
 }
 
-func (s *surveyService) ListResponsesForClient(actorUserID, unitID, clientID string) ([]models.SurveyResponse, error) {
+func (s *surveyService) ListResponsesForClient(ctx context.Context, actorUserID, unitID, clientID string) ([]models.SurveyResponse, error) {
 	if err := s.ensureUnitAccess(actorUserID, unitID); err != nil {
 		return nil, err
 	}
@@ -686,20 +686,23 @@ func (s *surveyService) ListResponsesForClient(actorUserID, unitID, clientID str
 	if !repository.UserCanViewSurveyResponses(u, unitID) {
 		return nil, ErrSurveyForbidden
 	}
-	return s.surveyRepo.ListResponsesByClient(unitID, clientID)
+	return s.surveyRepo.ListResponsesByClient(ctx, unitID, clientID)
 }
 
-func (s *surveyService) resolveActiveSurveyForTicket(ticket *models.Ticket) (*models.SurveyDefinition, error) {
-	if ticket.ServiceZoneID != nil && *ticket.ServiceZoneID != "" {
-		def, err := s.surveyRepo.FindActiveDefinitionByScopeUnit(*ticket.ServiceZoneID)
-		if err == nil {
-			return def, nil
-		}
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, err
+func (s *surveyService) resolveActiveSurveyByZoneOrUnit(ctx context.Context, serviceZoneID *string, unitID string) (*models.SurveyDefinition, error) {
+	if serviceZoneID != nil {
+		z := strings.TrimSpace(*serviceZoneID)
+		if z != "" {
+			def, err := s.surveyRepo.FindActiveDefinitionByScopeUnit(ctx, z)
+			if err == nil {
+				return def, nil
+			}
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, err
+			}
 		}
 	}
-	def, err := s.surveyRepo.FindActiveDefinitionByScopeUnit(ticket.UnitID)
+	def, err := s.surveyRepo.FindActiveDefinitionByScopeUnit(ctx, unitID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
@@ -709,27 +712,15 @@ func (s *surveyService) resolveActiveSurveyForTicket(ticket *models.Ticket) (*mo
 	return def, nil
 }
 
-func (s *surveyService) resolveActiveSurveyForCounter(counter *models.Counter) (*models.SurveyDefinition, error) {
-	if counter.ServiceZoneID != nil && *counter.ServiceZoneID != "" {
-		def, err := s.surveyRepo.FindActiveDefinitionByScopeUnit(*counter.ServiceZoneID)
-		if err == nil {
-			return def, nil
-		}
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, err
-		}
-	}
-	def, err := s.surveyRepo.FindActiveDefinitionByScopeUnit(counter.UnitID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	return def, nil
+func (s *surveyService) resolveActiveSurveyForTicket(ctx context.Context, ticket *models.Ticket) (*models.SurveyDefinition, error) {
+	return s.resolveActiveSurveyByZoneOrUnit(ctx, ticket.ServiceZoneID, ticket.UnitID)
 }
 
-func (s *surveyService) GuestSession(unitID, terminalID string) (*GuestSurveySession, error) {
+func (s *surveyService) resolveActiveSurveyForCounter(ctx context.Context, counter *models.Counter) (*models.SurveyDefinition, error) {
+	return s.resolveActiveSurveyByZoneOrUnit(ctx, counter.ServiceZoneID, counter.UnitID)
+}
+
+func (s *surveyService) GuestSession(ctx context.Context, unitID, terminalID string) (*GuestSurveySession, error) {
 	tm, err := s.terminalRepo.FindByID(terminalID)
 	if err != nil {
 		if repository.IsNotFound(err) {
@@ -768,7 +759,7 @@ func (s *surveyService) GuestSession(unitID, terminalID string) (*GuestSurveySes
 		out.UnitConfig = u.Config
 	}
 
-	idleDef, err := s.resolveActiveSurveyForCounter(counter)
+	idleDef, err := s.resolveActiveSurveyForCounter(ctx, counter)
 	if err != nil {
 		return nil, err
 	}
@@ -786,7 +777,7 @@ func (s *surveyService) GuestSession(unitID, terminalID string) (*GuestSurveySes
 			QueueNumber: ticket.QueueNumber,
 			Status:      ticket.Status,
 		}
-		def, err := s.resolveActiveSurveyForTicket(ticket)
+		def, err := s.resolveActiveSurveyForTicket(ctx, ticket)
 		if err != nil {
 			return nil, err
 		}
@@ -798,7 +789,7 @@ func (s *surveyService) GuestSession(unitID, terminalID string) (*GuestSurveySes
 				CompletionMessage: def.CompletionMessage,
 				DisplayTheme:      def.DisplayTheme,
 			}
-			submitted, err := s.surveyRepo.ResponseExistsForTicketAndSurvey(ticket.ID, def.ID)
+			submitted, err := s.surveyRepo.ResponseExistsForTicketAndSurvey(ctx, ticket.ID, def.ID)
 			if err != nil {
 				return nil, err
 			}
@@ -809,7 +800,7 @@ func (s *surveyService) GuestSession(unitID, terminalID string) (*GuestSurveySes
 	return out, nil
 }
 
-func (s *surveyService) SubmitGuestResponse(unitID, terminalID, ticketID, surveyID string, answers json.RawMessage) error {
+func (s *surveyService) SubmitGuestResponse(ctx context.Context, unitID, terminalID, ticketID, surveyID string, answers json.RawMessage) error {
 	if len(answers) == 0 || !json.Valid(answers) {
 		return ErrSurveyBadRequest
 	}
@@ -844,14 +835,14 @@ func (s *surveyService) SubmitGuestResponse(unitID, terminalID, ticketID, survey
 		return ErrSurveyForbidden
 	}
 
-	def, err := s.surveyRepo.FindDefinitionByID(surveyID)
+	def, err := s.surveyRepo.FindDefinitionByID(ctx, surveyID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrSurveyNotFound
 		}
 		return err
 	}
-	resolved, err := s.resolveActiveSurveyForTicket(ticket)
+	resolved, err := s.resolveActiveSurveyForTicket(ctx, ticket)
 	if err != nil {
 		return err
 	}
@@ -871,5 +862,5 @@ func (s *surveyService) SubmitGuestResponse(unitID, terminalID, ticketID, survey
 	if ticket.ClientID != nil && *ticket.ClientID != "" {
 		row.ClientID = ticket.ClientID
 	}
-	return s.surveyRepo.UpsertResponse(row)
+	return s.surveyRepo.UpsertResponse(ctx, row)
 }

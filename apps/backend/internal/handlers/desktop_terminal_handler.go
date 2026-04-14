@@ -126,11 +126,11 @@ func (h *DesktopTerminalHandler) Create(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	full, err := h.service.GetByID(row.ID)
-	if err != nil {
+	full := row
+	if enriched, err := h.service.GetByID(row.ID); err != nil {
 		log.Printf("desktop terminal get after create: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
+	} else {
+		full = enriched
 	}
 
 	w.WriteHeader(http.StatusCreated)

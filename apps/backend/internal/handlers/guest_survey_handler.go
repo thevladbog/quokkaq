@@ -40,7 +40,7 @@ func (h *GuestSurveyHandler) Session(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	sess, err := h.survey.GuestSession(unitID, termID)
+	sess, err := h.survey.GuestSession(r.Context(), unitID, termID)
 	if err != nil {
 		if errors.Is(err, services.ErrSurveyForbidden) {
 			http.Error(w, "Forbidden", http.StatusForbidden)
@@ -104,7 +104,7 @@ func (h *GuestSurveyHandler) SubmitResponse(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "answers are required", http.StatusBadRequest)
 		return
 	}
-	err := h.survey.SubmitGuestResponse(unitID, termID, req.TicketID, req.SurveyID, req.Answers)
+	err := h.survey.SubmitGuestResponse(r.Context(), unitID, termID, req.TicketID, req.SurveyID, req.Answers)
 	if err != nil {
 		if errors.Is(err, services.ErrSurveyForbidden) {
 			http.Error(w, "Forbidden", http.StatusForbidden)

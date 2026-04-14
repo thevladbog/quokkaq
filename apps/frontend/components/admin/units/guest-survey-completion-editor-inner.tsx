@@ -31,7 +31,7 @@ import { GuestSurveyCompletionBlockTypeButtons } from '@/components/admin/units/
 import { GuestSurveyCompletionImageDialog } from '@/components/admin/units/guest-survey-completion-image-dialog';
 import { createGuestSurveyCompletionImagePreviewHandler } from '@/components/guest-survey/guest-survey-completion-markdown';
 import { ApiHttpError } from '@/lib/api';
-import { postUnitsUnitIdSurveyCompletionImages } from '@/lib/api/generated/surveys';
+import { uploadCompletionImage as uploadCompletionImageRequest } from '@/lib/api/generated/surveys';
 
 type Props = {
   unitId: string;
@@ -45,7 +45,7 @@ async function uploadCompletionImage(
   unitId: string,
   file: File
 ): Promise<string> {
-  const res = await postUnitsUnitIdSurveyCompletionImages(unitId, {
+  const res = await uploadCompletionImageRequest(unitId, {
     file
   });
   if (res.status !== 200 || !res.data?.url) {

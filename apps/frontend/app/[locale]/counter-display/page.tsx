@@ -11,7 +11,10 @@ import {
   type CSSProperties,
   type FormEvent
 } from 'react';
-import type { AdScreenConfig } from '@quokkaq/shared-types';
+import {
+  AdScreenConfigSchema,
+  type AdScreenConfig
+} from '@quokkaq/shared-types';
 import { parseGuestSurveyIdleScreenForDisplay } from '@quokkaq/shared-types';
 import {
   ApiHttpError,
@@ -149,10 +152,11 @@ function GuestSurveyIconScaleRow({
 function parseAdScreen(
   unitConfig: Record<string, unknown> | undefined
 ): Partial<AdScreenConfig> | undefined {
-  if (!unitConfig) return undefined;
-  const raw = unitConfig.adScreen;
-  if (!raw || typeof raw !== 'object') return undefined;
-  return raw as Partial<AdScreenConfig>;
+  if (!unitConfig?.adScreen || typeof unitConfig.adScreen !== 'object') {
+    return undefined;
+  }
+  const parsed = AdScreenConfigSchema.partial().safeParse(unitConfig.adScreen);
+  return parsed.success ? parsed.data : undefined;
 }
 
 function CounterDisplayPageInner() {

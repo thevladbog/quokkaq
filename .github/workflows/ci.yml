@@ -151,6 +151,7 @@ jobs:
     env:
       NX_BASE: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha || github.event.before || 'origin/main' }}
       NX_HEAD: ${{ github.event.merge_group.head_sha || github.sha }}
+      # Nx exclude: `*` = all, `!tag:…` negates — keep only platform:web plus shared/ui libs (double-negative style).
       NX_EXCLUDE_WEB: '*,!tag:platform:web,!tag:scope:shared,!tag:scope:ui'
     steps:
       - uses: actions/checkout@v6

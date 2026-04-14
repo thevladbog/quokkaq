@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import {
   formatAppDateTime,
@@ -106,6 +106,9 @@ export default function DesktopTerminalsPage() {
   const [formName, setFormName] = useState('');
   const [formKioskFullscreen, setFormKioskFullscreen] = useState(false);
 
+  /** Bumps when the edit dialog closes or a new edit preload starts; ignore stale async counter loads. */
+  const editPreloadSeq = useRef(0);
+
   const contextUnits = useMemo(
     () =>
       units.filter(
@@ -173,6 +176,12 @@ export default function DesktopTerminalsPage() {
     };
   }, [createOpen, editOpen, formDeviceKind, formContextUnitId, units, t]);
 
+  useEffect(() => {
+    if (!editOpen) {
+      editPreloadSeq.current += 1;
+    }
+  }, [editOpen]);
+
   const resetForm = () => {
     setFormDeviceKind('kiosk');
     setFormUnitId('');
@@ -199,19 +208,24 @@ export default function DesktopTerminalsPage() {
       setFormDeviceKind('counter_display');
       setFormUnitId(row.unitId);
       setFormCounterId(row.counterId);
+      const seq = ++editPreloadSeq.current;
+      const counterId = row.counterId;
       void (async () => {
         try {
-          const counter = await countersApi.getById(row.counterId!);
+          const counter = await countersApi.getById(counterId);
+          if (seq !== editPreloadSeq.current) return;
           const ctxId = counter.serviceZoneId?.trim()
             ? counter.serviceZoneId
             : row.unitId;
           setFormContextUnitId(ctxId);
           const all = await countersApi.getByUnitId(counter.unitId);
+          if (seq !== editPreloadSeq.current) return;
           const ctxUnit = units.find((u) => u.id === ctxId);
           setAvailableCounters(
             ctxUnit ? filterCountersForContext(ctxUnit, all) : all
           );
         } catch {
+          if (seq !== editPreloadSeq.current) return;
           setFormContextUnitId(row.unitId);
           setAvailableCounters([]);
           toast.error(t('load_counters_error'));

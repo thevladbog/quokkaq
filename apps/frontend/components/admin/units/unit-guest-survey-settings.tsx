@@ -6,10 +6,10 @@ import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { ApiHttpError } from '@/lib/api';
 import {
-  createSurveyDefinition,
-  getUnitsUnitIdSurveys,
-  patchUnitsUnitIdSurveysSurveyId,
-  postUnitsUnitIdSurveysSurveyIdActivate,
+  activateDefinition,
+  createDefinition,
+  listDefinitions,
+  patchDefinition,
   type HandlersCreateSurveyRequestDisplayTheme,
   type HandlersCreateSurveyRequestIdleScreen,
   type HandlersCreateSurveyRequestQuestions,
@@ -78,6 +78,18 @@ import {
   type IdleScreenDraftValidationError
 } from '@/lib/guest-survey-idle-draft';
 
+const GUEST_SURVEY_BLOCK_VALIDATION_CODES: readonly ValidateDraftsErrorCode[] =
+  [
+    'empty_blocks',
+    'block_id_required',
+    'duplicate_id',
+    'scale_label_required',
+    'info_label_required',
+    'scale_range',
+    'scale_icon_preset_required',
+    'scale_presentation_invalid'
+  ];
+
 function isFeatureLockedError(e: unknown): boolean {
   return (
     e instanceof ApiHttpError &&
@@ -127,7 +139,7 @@ export function UnitGuestSurveySettings({ unitId }: { unitId: string }) {
   } = useQuery({
     queryKey: listKey,
     queryFn: async () => {
-      const res = await getUnitsUnitIdSurveys(unitId);
+      const res = await listDefinitions(unitId);
       return res.data ?? [];
     }
   });
@@ -154,15 +166,14 @@ export function UnitGuestSurveySettings({ unitId }: { unitId: string }) {
         createIdleDraft.slides.length > 0
           ? idleScreenDraftToApiPayload(createIdleDraft)
           : undefined;
-      return createSurveyDefinition(unitId, {
+      return createDefinition(unitId, {
         title: title.trim(),
         questions: questions as HandlersCreateSurveyRequestQuestions,
         displayTheme: themePayload as HandlersCreateSurveyRequestDisplayTheme,
         ...(cm ? { completionMessage: cm } : {}),
         ...(idlePayload
           ? {
-              idleScreen:
-                idlePayload as unknown as HandlersCreateSurveyRequestIdleScreen
+              idleScreen: idlePayload as HandlersCreateSurveyRequestIdleScreen
             }
           : {})
       });
@@ -181,18 +192,7 @@ export function UnitGuestSurveySettings({ unitId }: { unitId: string }) {
     onError: (e: unknown) => {
       if (e instanceof Error && e.message !== 'save_error') {
         const code = e.message as ValidateDraftsErrorCode;
-        if (
-          [
-            'empty_blocks',
-            'block_id_required',
-            'duplicate_id',
-            'scale_label_required',
-            'info_label_required',
-            'scale_range',
-            'scale_icon_preset_required',
-            'scale_presentation_invalid'
-          ].includes(code)
-        ) {
+        if (GUEST_SURVEY_BLOCK_VALIDATION_CODES.includes(code)) {
           toast.error(t(`validation_${code}` as Parameters<typeof t>[0]));
           return;
         }
@@ -231,13 +231,12 @@ export function UnitGuestSurveySettings({ unitId }: { unitId: string }) {
       const cm =
         buildCompletionMessagePayload(editCompletionEn, editCompletionRu) ?? {};
       const idlePayload = idleScreenDraftToApiPayload(editIdleDraft);
-      await patchUnitsUnitIdSurveysSurveyId(unitId, editingRow.id, {
+      await patchDefinition(unitId, editingRow.id, {
         title: editTitle.trim(),
         questions: questions as HandlersPatchSurveyRequestQuestions,
         completionMessage: cm,
         displayTheme: themePayload as HandlersPatchSurveyRequestDisplayTheme,
-        idleScreen:
-          idlePayload as unknown as HandlersPatchSurveyRequestIdleScreen
+        idleScreen: idlePayload as HandlersPatchSurveyRequestIdleScreen
       });
     },
     onSuccess: () => {
@@ -249,18 +248,7 @@ export function UnitGuestSurveySettings({ unitId }: { unitId: string }) {
     onError: (e: unknown) => {
       if (e instanceof Error && e.message !== 'save_error') {
         const code = e.message as ValidateDraftsErrorCode;
-        if (
-          [
-            'empty_blocks',
-            'block_id_required',
-            'duplicate_id',
-            'scale_label_required',
-            'info_label_required',
-            'scale_range',
-            'scale_icon_preset_required',
-            'scale_presentation_invalid'
-          ].includes(code)
-        ) {
+        if (GUEST_SURVEY_BLOCK_VALIDATION_CODES.includes(code)) {
           toast.error(t(`validation_${code}` as Parameters<typeof t>[0]));
           return;
         }
@@ -287,8 +275,7 @@ export function UnitGuestSurveySettings({ unitId }: { unitId: string }) {
   });
 
   const activateMut = useMutation({
-    mutationFn: (surveyId: string) =>
-      postUnitsUnitIdSurveysSurveyIdActivate(unitId, surveyId),
+    mutationFn: (surveyId: string) => activateDefinition(unitId, surveyId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: listKey });
     },
@@ -508,39 +495,44 @@ export function UnitGuestSurveySettings({ unitId }: { unitId: string }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(rows ?? []).map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell className='font-medium'>{r.title}</TableCell>
-                    <TableCell>
-                      {r.isActive ? (
-                        <Badge>{t('active_badge')}</Badge>
-                      ) : (
-                        <span className='text-muted-foreground text-sm'>—</span>
-                      )}
-                    </TableCell>
-                    <TableCell className='text-right'>
-                      <div className='flex flex-wrap justify-end gap-2'>
-                        <Button
-                          variant='outline'
-                          size='sm'
-                          onClick={() => openEdit(r)}
-                        >
-                          {t('edit_survey')}
-                        </Button>
-                        {!r.isActive && r.id && (
+                {(rows ?? []).map((r) => {
+                  const id = r.id;
+                  return (
+                    <TableRow key={id ?? r.title}>
+                      <TableCell className='font-medium'>{r.title}</TableCell>
+                      <TableCell>
+                        {r.isActive ? (
+                          <Badge>{t('active_badge')}</Badge>
+                        ) : (
+                          <span className='text-muted-foreground text-sm'>
+                            —
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className='text-right'>
+                        <div className='flex flex-wrap justify-end gap-2'>
                           <Button
                             variant='outline'
                             size='sm'
-                            disabled={activateMut.isPending}
-                            onClick={() => activateMut.mutate(r.id!)}
+                            onClick={() => openEdit(r)}
                           >
-                            {t('activate')}
+                            {t('edit_survey')}
                           </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                          {!r.isActive && id && (
+                            <Button
+                              variant='outline'
+                              size='sm'
+                              disabled={activateMut.isPending}
+                              onClick={() => activateMut.mutate(id)}
+                            >
+                              {t('activate')}
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}

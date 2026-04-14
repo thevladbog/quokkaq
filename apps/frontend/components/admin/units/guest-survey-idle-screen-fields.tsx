@@ -8,8 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { GuestSurveyCompletionEditor } from '@/components/admin/units/guest-survey-completion-editor';
 import {
-  deleteUnitsUnitIdGuestSurveyIdleMediaFileName,
-  postUnitsUnitIdGuestSurveyIdleMedia
+  deleteSurveyIdleMedia,
+  uploadIdleMedia
 } from '@/lib/api/generated/surveys';
 import { authenticatedApiFetch } from '@/lib/authenticated-api-fetch';
 import type {
@@ -90,7 +90,7 @@ type TIdle = (key: string) => string;
 async function deleteIdleMediaIfPresent(unitId: string, apiUrl: string) {
   const fn = idleMediaFileNameFromApiUrl(apiUrl);
   if (!fn) return;
-  await deleteUnitsUnitIdGuestSurveyIdleMediaFileName(unitId, fn);
+  await deleteSurveyIdleMedia(unitId, fn);
 }
 
 export function GuestSurveyIdleScreenFields({
@@ -225,7 +225,7 @@ export function GuestSurveyIdleScreenFields({
     }
 
     const prevUrl = slide.url.trim();
-    const res = await postUnitsUnitIdGuestSurveyIdleMedia(unitId, { file });
+    const res = await uploadIdleMedia(unitId, { file });
     if (res.status !== 200 || !res.data?.url) {
       onUploadError('idle_upload_error');
       return;

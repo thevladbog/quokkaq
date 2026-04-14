@@ -286,15 +286,6 @@ export function parseGuestSurveyIdleScreen(
     } catch {
       return null;
     }
-  } else if (raw !== null && typeof raw === 'object') {
-    try {
-      const encoded = new TextEncoder().encode(JSON.stringify(raw));
-      if (encoded.length > guestSurveyIdleScreenMaxJsonBytes) {
-        return null;
-      }
-    } catch {
-      return null;
-    }
   }
 
   const r = GuestSurveyIdleScreenSchema.safeParse(raw);
@@ -373,8 +364,9 @@ export function parseGuestSurveyIdleScreenForDisplay(
       const fn = u
         .slice(i + marker.length)
         .split('/')[0]
-        ?.split('?')[0];
-      if (!fn || fn.includes('/')) {
+        ?.split('?')[0]
+        ?.trim();
+      if (!fn) {
         return null;
       }
       if (slide.type === 'image') {

@@ -55,6 +55,7 @@ func NewSurveyHandler(survey services.SurveyService, storage services.StorageSer
 // @Security     BearerAuth
 // @Param        unitId path string true "Scope unit id (subdivision or service_zone)"
 // @Success      200  {array}   models.SurveyDefinition
+// @ID           ListDefinitions
 // @Router       /units/{unitId}/surveys [get]
 func (h *SurveyHandler) ListDefinitions(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
@@ -63,7 +64,7 @@ func (h *SurveyHandler) ListDefinitions(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	rows, err := h.survey.ListDefinitions(userID, unitID)
+	rows, err := h.survey.ListDefinitions(r.Context(), userID, unitID)
 	if err != nil {
 		h.writeSurveyErr(w, err)
 		return
@@ -89,7 +90,7 @@ type createSurveyRequest struct {
 // @Param        unitId path string true "Scope unit id"
 // @Param        body body createSurveyRequest true "Payload"
 // @Success      201  {object}  models.SurveyDefinition
-// @ID           CreateSurveyDefinition
+// @ID           CreateDefinition
 // @Router       /units/{unitId}/surveys [post]
 func (h *SurveyHandler) CreateDefinition(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
@@ -123,7 +124,7 @@ func (h *SurveyHandler) CreateDefinition(w http.ResponseWriter, r *http.Request)
 	if len(req.IdleScreen) > 0 {
 		is = &req.IdleScreen
 	}
-	d, err := h.survey.CreateDefinition(userID, unitID, req.Title, req.Questions, cm, dt, is)
+	d, err := h.survey.CreateDefinition(r.Context(), userID, unitID, req.Title, req.Questions, cm, dt, is)
 	if err != nil {
 		h.writeSurveyErr(w, err)
 		return
@@ -150,6 +151,7 @@ type patchSurveyRequest struct {
 // @Param        surveyId path string true "Survey id"
 // @Param        body body patchSurveyRequest true "Payload"
 // @Success      204
+// @ID           PatchDefinition
 // @Router       /units/{unitId}/surveys/{surveyId} [patch]
 func (h *SurveyHandler) PatchDefinition(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
@@ -183,6 +185,7 @@ func (h *SurveyHandler) PatchDefinition(w http.ResponseWriter, r *http.Request) 
 // @Param        unitId path string true "Scope unit id"
 // @Param        surveyId path string true "Survey id"
 // @Success      204
+// @ID           ActivateDefinition
 // @Router       /units/{unitId}/surveys/{surveyId}/activate [post]
 func (h *SurveyHandler) ActivateDefinition(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
@@ -192,7 +195,7 @@ func (h *SurveyHandler) ActivateDefinition(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	err := h.survey.SetActiveDefinition(userID, unitID, surveyID)
+	err := h.survey.SetActiveDefinition(r.Context(), userID, unitID, surveyID)
 	if err != nil {
 		h.writeSurveyErr(w, err)
 		return
@@ -209,6 +212,7 @@ func (h *SurveyHandler) ActivateDefinition(w http.ResponseWriter, r *http.Reques
 // @Param        limit query int false "Limit"
 // @Param        offset query int false "Offset"
 // @Success      200  {array}   models.SurveyResponse
+// @ID           ListResponses
 // @Router       /units/{unitId}/survey-responses [get]
 func (h *SurveyHandler) ListResponses(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
@@ -222,7 +226,7 @@ func (h *SurveyHandler) ListResponses(w http.ResponseWriter, r *http.Request) {
 	if limit <= 0 || limit > 500 {
 		limit = 100
 	}
-	rows, err := h.survey.ListResponses(userID, unitID, limit, offset)
+	rows, err := h.survey.ListResponses(r.Context(), userID, unitID, limit, offset)
 	if err != nil {
 		h.writeSurveyErr(w, err)
 		return
@@ -239,6 +243,7 @@ func (h *SurveyHandler) ListResponses(w http.ResponseWriter, r *http.Request) {
 // @Param        unitId path string true "Subdivision unit id"
 // @Param        clientId path string true "Client id"
 // @Success      200  {array}   models.SurveyResponse
+// @ID           ListResponsesForClient
 // @Router       /units/{unitId}/clients/{clientId}/survey-responses [get]
 func (h *SurveyHandler) ListResponsesForClient(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
@@ -248,7 +253,7 @@ func (h *SurveyHandler) ListResponsesForClient(w http.ResponseWriter, r *http.Re
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	rows, err := h.survey.ListResponsesForClient(userID, unitID, clientID)
+	rows, err := h.survey.ListResponsesForClient(r.Context(), userID, unitID, clientID)
 	if err != nil {
 		h.writeSurveyErr(w, err)
 		return
@@ -277,6 +282,7 @@ type UploadSurveyCompletionImageResponse struct {
 // @Failure      403  {string}  string "Forbidden"
 // @Failure      413  {string}  string "Request body too large"
 // @Failure      500  {string}  string "Internal Server Error"
+// @ID           UploadCompletionImage
 // @Router       /units/{unitId}/survey-completion-images [post]
 func (h *SurveyHandler) UploadCompletionImage(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
@@ -387,6 +393,7 @@ func (h *SurveyHandler) UploadCompletionImage(w http.ResponseWriter, r *http.Req
 // @Failure      401  {string}  string "Unauthorized"
 // @Failure      403  {string}  string "Forbidden"
 // @Failure      404  {string}  string "Not Found"
+// @ID           GetSurveyCompletionImage
 // @Router       /units/{unitId}/guest-survey/completion-images/{fileName} [get]
 func (h *SurveyHandler) GetSurveyCompletionImage(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
@@ -449,6 +456,7 @@ type UploadSurveyIdleMediaResponse struct {
 // @Failure      403  {string}  string "Forbidden"
 // @Failure      413  {string}  string "Request body too large"
 // @Failure      500  {string}  string "Internal Server Error"
+// @ID           UploadIdleMedia
 // @Router       /units/{unitId}/guest-survey/idle-media [post]
 func (h *SurveyHandler) UploadIdleMedia(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
@@ -568,6 +576,7 @@ func (h *SurveyHandler) UploadIdleMedia(w http.ResponseWriter, r *http.Request) 
 // @Failure      401  {string}  string "Unauthorized"
 // @Failure      403  {string}  string "Forbidden"
 // @Failure      404  {string}  string "Not Found"
+// @ID           GetSurveyIdleMedia
 // @Router       /units/{unitId}/guest-survey/idle-media/{fileName} [get]
 func (h *SurveyHandler) GetSurveyIdleMedia(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
@@ -622,6 +631,7 @@ func (h *SurveyHandler) GetSurveyIdleMedia(w http.ResponseWriter, r *http.Reques
 // @Failure      403  {string}  string "Forbidden"
 // @Failure      409  {string}  string "Conflict — file still referenced by a survey"
 // @Failure      500  {string}  string "Internal Server Error"
+// @ID           DeleteSurveyIdleMedia
 // @Router       /units/{unitId}/guest-survey/idle-media/{fileName} [delete]
 func (h *SurveyHandler) DeleteSurveyIdleMedia(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
