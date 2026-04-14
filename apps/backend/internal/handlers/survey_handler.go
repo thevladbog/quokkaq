@@ -25,6 +25,9 @@ const surveyCompletionImageCategory = "guest-survey-completion"
 const maxSurveyCompletionImageMultipartBytes = 5 << 20 // 5 MiB
 const maxSurveyIdleMediaMultipartBytes = 50 << 20      // 50 MiB
 
+// In-memory budget for ParseMultipartForm only; overflow spills to temp files. Total body size is still capped by MaxBytesReader above.
+const multipartFormParseMemoryBytes = 1 << 20 // 1 MiB
+
 // UUID + allowed image extension (must match upload validation).
 var surveyCompletionImageFileRe = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpeg|jpg|png|webp|svg)$`)
 
@@ -288,7 +291,7 @@ func (h *SurveyHandler) UploadCompletionImage(w http.ResponseWriter, r *http.Req
 	}
 
 	r.Body = http.MaxBytesReader(w, r.Body, maxSurveyCompletionImageMultipartBytes)
-	if err := r.ParseMultipartForm(maxSurveyCompletionImageMultipartBytes); err != nil {
+	if err := r.ParseMultipartForm(multipartFormParseMemoryBytes); err != nil {
 		if maxBytesReaderExceeded(err) {
 			http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
 			return
@@ -460,7 +463,7 @@ func (h *SurveyHandler) UploadIdleMedia(w http.ResponseWriter, r *http.Request) 
 	}
 
 	r.Body = http.MaxBytesReader(w, r.Body, maxSurveyIdleMediaMultipartBytes)
-	if err := r.ParseMultipartForm(maxSurveyIdleMediaMultipartBytes); err != nil {
+	if err := r.ParseMultipartForm(multipartFormParseMemoryBytes); err != nil {
 		if maxBytesReaderExceeded(err) {
 			http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
 			return

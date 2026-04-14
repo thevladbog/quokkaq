@@ -14,7 +14,7 @@
       "unrs-resolver"
     ],
     "overrides": {
-      "es5-ext": "0.10.53"
+      "es5-ext": "0.10.63"
     }
   },
   "scripts": {
