@@ -17,13 +17,13 @@ interface ConditionalLayoutProps {
 const ConditionalLayout = ({ children }: ConditionalLayoutProps) => {
   const pathname = usePathname();
 
+  const pathWithoutLocale = useMemo(
+    () => pathname.replace(/^\/[a-z]{2}\//, '/').replace(/^\/[a-z]{2}$/, '/'),
+    [pathname]
+  );
+
   // Define which paths should use the sidebar layout
   const layoutConfig = useMemo(() => {
-    // Remove locale from pathname for comparison
-    const pathWithoutLocale = pathname
-      .replace(/^\/[a-z]{2}\//, '/')
-      .replace(/^\/[a-z]{2}$/, '/');
-
     if (pathWithoutLocale.startsWith('/platform')) {
       const allowTenantAdmin = platformRouteAllowsTenantAdmin();
       return {
@@ -137,11 +137,8 @@ const ConditionalLayout = ({ children }: ConditionalLayoutProps) => {
     }
 
     return { useSidebar: false, protected: false };
-  }, [pathname]);
+  }, [pathWithoutLocale]);
 
-  const pathWithoutLocale = pathname
-    .replace(/^\/[a-z]{2}\//, '/')
-    .replace(/^\/[a-z]{2}$/, '/');
   const showBackground =
     !pathWithoutLocale.startsWith('/kiosk') &&
     !pathWithoutLocale.startsWith('/counter-display') &&

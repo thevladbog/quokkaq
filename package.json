@@ -12,7 +12,10 @@
       "nx",
       "sharp",
       "unrs-resolver"
-    ]
+    ],
+    "overrides": {
+      "es5-ext": "0.10.53"
+    }
   },
   "scripts": {
     "prepare": "husky",

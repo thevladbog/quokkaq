@@ -9,6 +9,8 @@ interface PermissionGuardProps {
   unitId?: string;
   requireAll?: boolean;
   fallback?: React.ReactNode;
+  /** When false, tenant `admin` does not bypass — they need the listed unit permission(s). */
+  adminBypass?: boolean;
 }
 
 export default function PermissionGuard({
@@ -16,7 +18,8 @@ export default function PermissionGuard({
   permissions,
   unitId,
   requireAll = false,
-  fallback = null
+  fallback = null,
+  adminBypass = true
 }: PermissionGuardProps) {
   const { user, isAuthenticated, isLoading } = useAuthContext();
 
@@ -29,7 +32,10 @@ export default function PermissionGuard({
     if (isLoading) return null as boolean | null;
     if (!isAuthenticated || !user) return false;
 
-    if (user.roles?.includes('admin')) {
+    if (user.roles?.includes('platform_admin')) {
+      return true;
+    }
+    if (adminBypass && user.roles?.includes('admin')) {
       return true;
     }
 
@@ -43,7 +49,15 @@ export default function PermissionGuard({
       return sortedPermissions.every((p) => userPermissions.includes(p));
     }
     return sortedPermissions.some((p) => userPermissions.includes(p));
-  }, [isLoading, isAuthenticated, user, unitId, requireAll, sortedPermissions]);
+  }, [
+    isLoading,
+    isAuthenticated,
+    user,
+    unitId,
+    requireAll,
+    sortedPermissions,
+    adminBypass
+  ]);
 
   if (hasAccess === null) {
     return null;

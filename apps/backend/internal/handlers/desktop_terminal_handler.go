@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -114,17 +115,21 @@ func (h *DesktopTerminalHandler) Create(w http.ResponseWriter, r *http.Request) 
 			http.Error(w, "Counter guest survey is not enabled for your subscription", http.StatusForbidden)
 			return
 		}
-		if err.Error() == "unit not found" || err.Error() == "counter not found" || err.Error() == "context unit not found" {
+		if errors.Is(err, services.ErrUnitNotFound) ||
+			errors.Is(err, services.ErrCounterNotFound) ||
+			errors.Is(err, services.ErrContextUnitNotFound) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("desktop terminal create: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	full, err := h.service.GetByID(row.ID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("desktop terminal get after create: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -138,7 +143,8 @@ func (h *DesktopTerminalHandler) Create(w http.ResponseWriter, r *http.Request) 
 func (h *DesktopTerminalHandler) List(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.service.List()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("desktop terminal list: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 	out := make([]desktopTerminalJSON, 0, len(rows))
@@ -180,7 +186,9 @@ func (h *DesktopTerminalHandler) Update(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Counter guest survey is not enabled for your subscription", http.StatusForbidden)
 		return
 	}
-	if err != nil && (err.Error() == "unit not found" || err.Error() == "counter not found" || err.Error() == "context unit not found") {
+	if err != nil && (errors.Is(err, services.ErrUnitNotFound) ||
+		errors.Is(err, services.ErrCounterNotFound) ||
+		errors.Is(err, services.ErrContextUnitNotFound)) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -188,7 +196,8 @@ func (h *DesktopTerminalHandler) Update(w http.ResponseWriter, r *http.Request) 
 		if middleware.RespondRepoFindError(w, err, "UpdateDesktopTerminal") {
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("desktop terminal update: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -232,7 +241,8 @@ func (h *DesktopTerminalHandler) Bootstrap(w http.ResponseWriter, r *http.Reques
 			http.Error(w, "Invalid or revoked terminal code", http.StatusUnauthorized)
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("desktop terminal bootstrap: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 

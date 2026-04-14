@@ -341,7 +341,7 @@
         "ACCESS_KIOSK": "Доступ к киоску",
         "ACCESS_TICKET_SCREEN": "Доступ к экрану талонов",
         "ACCESS_SUPERVISOR_PANEL": "Доступ к панели супервайзера",
-        "ACCESS_SURVEY_RESPONSES": "Просмотр ответов гостевых опросов"
+        "ACCESS_SURVEY_RESPONSES": "Видеть оценки гостевого опроса"
       },
       "system_admin": "Системный администратор",
       "system_admin_desc": "Полный доступ к системе"
@@ -1416,7 +1416,7 @@
       "noActiveTicket": "Нет активного талона на этом месте",
       "activityTitle": "События подразделения",
       "activityDescription": "Ожидание выбора рабочего места…",
-      "activityDescriptionLive": "Последние события по талонам этого юнита",
+      "activityDescriptionLive": "6 последних событий по талонам; остальное — в журнале",
       "activityPendingScope": "Выберите рабочее место выше или дождитесь загрузки списка.",
       "activityEmpty": "Пока нет событий по талонам в этом юните.",
       "activityError": "Не удалось загрузить события: {message}",

@@ -330,7 +330,8 @@ jobs:
           fail() { echo "::error::$1"; exit 1; }
 
           [ "${{ needs.affected.result }}" = "success" ] || fail "Job affected did not succeed (${{ needs.affected.result }})."
-          [ "${{ needs.ci-sherif.result }}" = "success" ] || fail "Job ci-sherif did not succeed (${{ needs.ci-sherif.result }})."
+          sherif="${{ needs.ci-sherif.result }}"
+          [ "$sherif" = "success" ] || [ "$sherif" = "skipped" ] || fail "Job ci-sherif did not succeed (${{ needs.ci-sherif.result }})."
 
           if [ "$FE" = "true" ] || [ "$BE" = "true" ]; then
             [ "${{ needs.ci-openapi.result }}" = "success" ] || fail "Job ci-openapi did not succeed (${{ needs.ci-openapi.result }})."

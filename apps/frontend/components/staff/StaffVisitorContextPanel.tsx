@@ -476,6 +476,7 @@ export function StaffVisitorContextPanel({
           <PermissionGuard
             unitId={unitId}
             permissions={['ACCESS_SURVEY_RESPONSES']}
+            adminBypass={false}
           >
             <StaffVisitorSurveyResponses unitId={unitId} clientId={clientId} />
           </PermissionGuard>

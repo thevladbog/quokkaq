@@ -433,6 +433,7 @@ func (r *ticketRepository) GetActiveTicketByCounterTx(tx *gorm.DB, counterID str
 func (r *ticketRepository) FindInServiceTicketByCounter(counterID string) (*models.Ticket, error) {
 	var t models.Ticket
 	err := r.db.Where("counter_id = ? AND status = ? AND is_eod = ?", counterID, "in_service", false).
+		Order("created_at ASC").
 		First(&t).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

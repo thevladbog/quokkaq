@@ -30,6 +30,7 @@ function IdleSlideContent({
   locale,
   reduceMotion,
   onVideoEnded,
+  onMediaFailed,
   videoLoop
 }: {
   slide: GuestSurveyIdleScreen['slides'][number];
@@ -37,6 +38,7 @@ function IdleSlideContent({
   locale: string;
   reduceMotion: boolean;
   onVideoEnded: () => void;
+  onMediaFailed: () => void;
   /** Единственный слайд — видео крутится по кругу без остановки. */
   videoLoop: boolean;
 }) {
@@ -63,7 +65,15 @@ function IdleSlideContent({
         const res = await fetch(`/api${path}`, {
           headers: { Authorization: `Bearer ${bearerToken}` }
         });
-        if (!res.ok || cancelled) return;
+        if (cancelled) return;
+        if (!res.ok) {
+          if (objectUrl) {
+            URL.revokeObjectURL(objectUrl);
+            objectUrl = null;
+          }
+          onMediaFailed();
+          return;
+        }
         const ct = res.headers.get('content-type') ?? '';
         const blob = await res.blob();
         if (cancelled) return;
@@ -71,14 +81,20 @@ function IdleSlideContent({
         setIsVideo(ct.startsWith('video/'));
         setBlobUrl(objectUrl);
       } catch {
-        if (!cancelled) setBlobUrl(null);
+        if (cancelled) return;
+        if (objectUrl) {
+          URL.revokeObjectURL(objectUrl);
+          objectUrl = null;
+        }
+        setBlobUrl(null);
+        onMediaFailed();
       }
     })();
     return () => {
       cancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [slide, bearerToken]);
+  }, [slide, bearerToken, onMediaFailed]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const transitionMs = reduceMotion ? 0 : 280;
@@ -148,7 +164,14 @@ function IdleSlideContent({
         loop={videoLoop}
         onEnded={videoLoop ? undefined : onVideoEnded}
         onLoadedData={() => setMediaReady(true)}
-        onError={() => setMediaReady(true)}
+        onError={() => {
+          if (blobUrl) {
+            URL.revokeObjectURL(blobUrl);
+            setBlobUrl(null);
+          }
+          setMediaReady(true);
+          onMediaFailed();
+        }}
       />
     );
   }
@@ -161,7 +184,14 @@ function IdleSlideContent({
       className={mediaClassName}
       style={{ ...wrapStyle, ...mediaReveal }}
       onLoad={() => setMediaReady(true)}
-      onError={() => setMediaReady(true)}
+      onError={() => {
+        if (blobUrl) {
+          URL.revokeObjectURL(blobUrl);
+          setBlobUrl(null);
+        }
+        setMediaReady(true);
+        onMediaFailed();
+      }}
     />
   );
 }
@@ -239,6 +269,7 @@ export function CounterDisplayIdleSlideshow({
             locale={locale}
             reduceMotion={reduceMotion}
             onVideoEnded={goNext}
+            onMediaFailed={goNext}
             videoLoop={singleVideoLoop}
           />
         </motion.div>

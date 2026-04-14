@@ -341,7 +341,7 @@
         "ACCESS_KIOSK": "Access Kiosk",
         "ACCESS_TICKET_SCREEN": "Access Ticket Screen",
         "ACCESS_SUPERVISOR_PANEL": "Access Supervisor Panel",
-        "ACCESS_SURVEY_RESPONSES": "View guest survey responses"
+        "ACCESS_SURVEY_RESPONSES": "View guest survey ratings"
       },
       "system_admin": "System Administrator",
       "system_admin_desc": "Grant full access to the system"
@@ -1416,7 +1416,7 @@
       "noActiveTicket": "No active ticket on this station",
       "activityTitle": "Branch activity",
       "activityDescription": "Waiting for workplace selection…",
-      "activityDescriptionLive": "Latest ticket events for this unit",
+      "activityDescriptionLive": "Six most recent ticket events; full history in the log",
       "activityPendingScope": "Select a workplace above or wait for the list to load.",
       "activityEmpty": "No ticket events for this unit yet.",
       "activityError": "Could not load events: {message}",

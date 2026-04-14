@@ -95,14 +95,7 @@ export default defineConfig({
     },
     output: {
       ...reactQueryOutput,
-      target: './lib/api/generated/surveys.ts',
-      override: {
-        ...reactQueryOutput.override,
-        mutator: {
-          path: './lib/orval-mutator.ts',
-          name: 'orvalMutator'
-        }
-      }
+      target: './lib/api/generated/surveys.ts'
     }
   },
   quokkaqGuestSurveyTerminal: {

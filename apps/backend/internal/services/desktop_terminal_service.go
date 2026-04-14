@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -26,6 +27,9 @@ var (
 	ErrInvalidLocale           = errors.New("locale must be en or ru")
 	ErrTerminalCounterContext  = errors.New("contextUnitId is required when counterId is set")
 	ErrTerminalCounterMismatch = errors.New("counter does not match selected organizational unit")
+	ErrUnitNotFound            = errors.New("unit not found")
+	ErrCounterNotFound         = errors.New("counter not found")
+	ErrContextUnitNotFound     = errors.New("context unit not found")
 )
 
 type DesktopTerminalService interface {
@@ -101,7 +105,7 @@ func (s *desktopTerminalService) resolveCounterBinding(unitID string, contextUni
 	if cid == "" {
 		if _, e := s.unitRepo.FindByIDLight(unitID); e != nil {
 			if repository.IsNotFound(e) {
-				return "", nil, errors.New("unit not found")
+				return "", nil, fmt.Errorf("%w", ErrUnitNotFound)
 			}
 			return "", nil, e
 		}
@@ -116,14 +120,14 @@ func (s *desktopTerminalService) resolveCounterBinding(unitID string, contextUni
 	counter, e := s.counterRepo.FindByID(cid)
 	if e != nil {
 		if repository.IsNotFound(e) {
-			return "", nil, errors.New("counter not found")
+			return "", nil, fmt.Errorf("%w", ErrCounterNotFound)
 		}
 		return "", nil, e
 	}
 	ctxUnit, e := s.unitRepo.FindByIDLight(ctxID)
 	if e != nil {
 		if repository.IsNotFound(e) {
-			return "", nil, errors.New("context unit not found")
+			return "", nil, fmt.Errorf("%w", ErrContextUnitNotFound)
 		}
 		return "", nil, e
 	}

@@ -17,6 +17,9 @@ import { enUS, ru } from 'date-fns/locale';
 import { useLocale } from 'next-intl';
 import { SupervisorActivityRow } from '@/components/supervisor/SupervisorActivityRow';
 
+/** Max rows on the supervisor dashboard; full history is on the journal page. */
+const DASHBOARD_ACTIVITY_LIMIT = 6;
+
 export function SupervisorRecentActivity({
   dashboardUnitId,
   activityUnitId,
@@ -36,8 +39,16 @@ export function SupervisorRecentActivity({
       : `/journal/${dashboardUnitId}`;
 
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['shift-activity', activityUnitId, 'short'],
-    queryFn: () => shiftApi.getActivity(activityUnitId!, { limit: 12 }),
+    queryKey: [
+      'shift-activity',
+      activityUnitId,
+      'short',
+      DASHBOARD_ACTIVITY_LIMIT
+    ],
+    queryFn: () =>
+      shiftApi.getActivity(activityUnitId!, {
+        limit: DASHBOARD_ACTIVITY_LIMIT
+      }),
     enabled: Boolean(activityUnitId && queryEnabled),
     refetchInterval: 10_000
   });

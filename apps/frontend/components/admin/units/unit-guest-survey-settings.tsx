@@ -6,9 +6,9 @@ import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { ApiHttpError } from '@/lib/api';
 import {
+  createSurveyDefinition,
   getUnitsUnitIdSurveys,
   patchUnitsUnitIdSurveysSurveyId,
-  postUnitsUnitIdSurveys,
   postUnitsUnitIdSurveysSurveyIdActivate,
   type HandlersCreateSurveyRequestDisplayTheme,
   type HandlersCreateSurveyRequestIdleScreen,
@@ -81,7 +81,7 @@ import {
 function isFeatureLockedError(e: unknown): boolean {
   return (
     e instanceof ApiHttpError &&
-    (e.status === 403 || e.message.toLowerCase().includes('feature'))
+    (e.status === 403 || e.code === 'FEATURE_LOCKED')
   );
 }
 
@@ -121,7 +121,7 @@ export function UnitGuestSurveySettings({ unitId }: { unitId: string }) {
   const listKey = useMemo(() => ['surveys', unitId] as const, [unitId]);
 
   const {
-    data: rows = [],
+    data: rows,
     isLoading,
     error
   } = useQuery({
@@ -154,7 +154,7 @@ export function UnitGuestSurveySettings({ unitId }: { unitId: string }) {
         createIdleDraft.slides.length > 0
           ? idleScreenDraftToApiPayload(createIdleDraft)
           : undefined;
-      return postUnitsUnitIdSurveys(unitId, {
+      return createSurveyDefinition(unitId, {
         title: title.trim(),
         questions: questions as HandlersCreateSurveyRequestQuestions,
         displayTheme: themePayload as HandlersCreateSurveyRequestDisplayTheme,
@@ -490,9 +490,11 @@ export function UnitGuestSurveySettings({ unitId }: { unitId: string }) {
           <CardTitle>{t('list_title')}</CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {error ? (
+            <p className='text-destructive text-sm'>{t('load_error')}</p>
+          ) : isLoading ? (
             <p className='text-muted-foreground text-sm'>…</p>
-          ) : rows.length === 0 ? (
+          ) : (rows?.length ?? 0) === 0 ? (
             <p className='text-muted-foreground text-sm'>{t('empty')}</p>
           ) : (
             <Table>
@@ -506,7 +508,7 @@ export function UnitGuestSurveySettings({ unitId }: { unitId: string }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((r) => (
+                {(rows ?? []).map((r) => (
                   <TableRow key={r.id}>
                     <TableCell className='font-medium'>{r.title}</TableCell>
                     <TableCell>

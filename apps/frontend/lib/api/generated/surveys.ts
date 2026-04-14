@@ -569,11 +569,11 @@ export interface HandlersUploadLogoResponse {
 }
 
 export interface HandlersUploadSurveyCompletionImageResponse {
-  url?: string;
+  url: string;
 }
 
 export interface HandlersUploadSurveyIdleMediaResponse {
-  url?: string;
+  url: string;
 }
 
 export interface HandlersUsageMetricInfoResponse {
@@ -804,8 +804,8 @@ export interface HandlersCreateSurveyRequest {
   completionMessage?: HandlersCreateSurveyRequestCompletionMessage;
   displayTheme?: HandlersCreateSurveyRequestDisplayTheme;
   idleScreen?: HandlersCreateSurveyRequestIdleScreen;
-  questions?: HandlersCreateSurveyRequestQuestions;
-  title?: string;
+  questions: HandlersCreateSurveyRequestQuestions;
+  title: string;
 }
 
 export interface HandlersCreateVisitorTagDefinitionRequest {
@@ -818,9 +818,9 @@ export interface HandlersCreateVisitorTagDefinitionRequest {
 export type HandlersGuestSurveySubmitRequestAnswers = { [key: string]: unknown };
 
 export interface HandlersGuestSurveySubmitRequest {
-  answers?: HandlersGuestSurveySubmitRequestAnswers;
-  surveyId?: string;
-  ticketId?: string;
+  answers: HandlersGuestSurveySubmitRequestAnswers;
+  surveyId: string;
+  ticketId: string;
 }
 
 export type HandlersPatchSurveyRequestCompletionMessage = { [key: string]: unknown };
@@ -1378,7 +1378,7 @@ export function useGetUnitsUnitIdClientsClientIdSurveyResponses<TData = Awaited<
 
 
 /**
- * Multipart file field "file". Returns an API-relative URL for idle_screen JSON.
+ * Multipart file field "file". Returns an API-relative URL for idle_screen JSON. The GET for that media path requires BearerAuth and is not a public embed URL—counter UIs must fetch with the terminal JWT and use blob URLs (see Get guest survey idle slide media).
  * @summary Upload guest survey idle slide image or video
  */
 export type postUnitsUnitIdGuestSurveyIdleMediaResponse200 = {
@@ -1401,6 +1401,11 @@ export type postUnitsUnitIdGuestSurveyIdleMediaResponse403 = {
   status: 403
 }
 
+export type postUnitsUnitIdGuestSurveyIdleMediaResponse413 = {
+  data: string
+  status: 413
+}
+
 export type postUnitsUnitIdGuestSurveyIdleMediaResponse500 = {
   data: string
   status: 500
@@ -1409,7 +1414,7 @@ export type postUnitsUnitIdGuestSurveyIdleMediaResponse500 = {
 export type postUnitsUnitIdGuestSurveyIdleMediaResponseSuccess = (postUnitsUnitIdGuestSurveyIdleMediaResponse200) & {
   headers: Headers;
 };
-export type postUnitsUnitIdGuestSurveyIdleMediaResponseError = (postUnitsUnitIdGuestSurveyIdleMediaResponse400 | postUnitsUnitIdGuestSurveyIdleMediaResponse401 | postUnitsUnitIdGuestSurveyIdleMediaResponse403 | postUnitsUnitIdGuestSurveyIdleMediaResponse500) & {
+export type postUnitsUnitIdGuestSurveyIdleMediaResponseError = (postUnitsUnitIdGuestSurveyIdleMediaResponse400 | postUnitsUnitIdGuestSurveyIdleMediaResponse401 | postUnitsUnitIdGuestSurveyIdleMediaResponse403 | postUnitsUnitIdGuestSurveyIdleMediaResponse413 | postUnitsUnitIdGuestSurveyIdleMediaResponse500) & {
   headers: Headers;
 };
 
@@ -1509,10 +1514,20 @@ export type deleteUnitsUnitIdGuestSurveyIdleMediaFileNameResponse403 = {
   status: 403
 }
 
+export type deleteUnitsUnitIdGuestSurveyIdleMediaFileNameResponse409 = {
+  data: string
+  status: 409
+}
+
+export type deleteUnitsUnitIdGuestSurveyIdleMediaFileNameResponse500 = {
+  data: string
+  status: 500
+}
+
 export type deleteUnitsUnitIdGuestSurveyIdleMediaFileNameResponseSuccess = (deleteUnitsUnitIdGuestSurveyIdleMediaFileNameResponse204) & {
   headers: Headers;
 };
-export type deleteUnitsUnitIdGuestSurveyIdleMediaFileNameResponseError = (deleteUnitsUnitIdGuestSurveyIdleMediaFileNameResponse400 | deleteUnitsUnitIdGuestSurveyIdleMediaFileNameResponse401 | deleteUnitsUnitIdGuestSurveyIdleMediaFileNameResponse403) & {
+export type deleteUnitsUnitIdGuestSurveyIdleMediaFileNameResponseError = (deleteUnitsUnitIdGuestSurveyIdleMediaFileNameResponse400 | deleteUnitsUnitIdGuestSurveyIdleMediaFileNameResponse401 | deleteUnitsUnitIdGuestSurveyIdleMediaFileNameResponse403 | deleteUnitsUnitIdGuestSurveyIdleMediaFileNameResponse409 | deleteUnitsUnitIdGuestSurveyIdleMediaFileNameResponse500) & {
   headers: Headers;
 };
 
@@ -1588,7 +1603,7 @@ export const useDeleteUnitsUnitIdGuestSurveyIdleMediaFileName = <TError = string
     }
 
 /**
- * Multipart file field "file". Returns an API-relative URL for use in markdown (authorized GET, not direct S3).
+ * Multipart file field "file". Returns an API-relative URL string. The GET for that path requires BearerAuth; it is not usable as a bare <img src> or static markdown image URL—clients must fetch with Authorization and use a blob/object URL (or proxy) to display.
  * @summary Upload guest survey completion markdown image
  */
 export type postUnitsUnitIdSurveyCompletionImagesResponse200 = {
@@ -1611,6 +1626,11 @@ export type postUnitsUnitIdSurveyCompletionImagesResponse403 = {
   status: 403
 }
 
+export type postUnitsUnitIdSurveyCompletionImagesResponse413 = {
+  data: string
+  status: 413
+}
+
 export type postUnitsUnitIdSurveyCompletionImagesResponse500 = {
   data: string
   status: 500
@@ -1619,7 +1639,7 @@ export type postUnitsUnitIdSurveyCompletionImagesResponse500 = {
 export type postUnitsUnitIdSurveyCompletionImagesResponseSuccess = (postUnitsUnitIdSurveyCompletionImagesResponse200) & {
   headers: Headers;
 };
-export type postUnitsUnitIdSurveyCompletionImagesResponseError = (postUnitsUnitIdSurveyCompletionImagesResponse400 | postUnitsUnitIdSurveyCompletionImagesResponse401 | postUnitsUnitIdSurveyCompletionImagesResponse403 | postUnitsUnitIdSurveyCompletionImagesResponse500) & {
+export type postUnitsUnitIdSurveyCompletionImagesResponseError = (postUnitsUnitIdSurveyCompletionImagesResponse400 | postUnitsUnitIdSurveyCompletionImagesResponse401 | postUnitsUnitIdSurveyCompletionImagesResponse403 | postUnitsUnitIdSurveyCompletionImagesResponse413 | postUnitsUnitIdSurveyCompletionImagesResponse500) & {
   headers: Headers;
 };
 
@@ -1940,19 +1960,19 @@ export function useGetUnitsUnitIdSurveys<TData = Awaited<ReturnType<typeof getUn
 /**
  * @summary Create survey definition
  */
-export type postUnitsUnitIdSurveysResponse201 = {
+export type createSurveyDefinitionResponse201 = {
   data: ModelsSurveyDefinition
   status: 201
 }
 
-export type postUnitsUnitIdSurveysResponseSuccess = (postUnitsUnitIdSurveysResponse201) & {
+export type createSurveyDefinitionResponseSuccess = (createSurveyDefinitionResponse201) & {
   headers: Headers;
 };
 ;
 
-export type postUnitsUnitIdSurveysResponse = (postUnitsUnitIdSurveysResponseSuccess)
+export type createSurveyDefinitionResponse = (createSurveyDefinitionResponseSuccess)
 
-export const getPostUnitsUnitIdSurveysUrl = (unitId: string,) => {
+export const getCreateSurveyDefinitionUrl = (unitId: string,) => {
 
 
 
@@ -1960,10 +1980,10 @@ export const getPostUnitsUnitIdSurveysUrl = (unitId: string,) => {
   return `/units/${unitId}/surveys`
 }
 
-export const postUnitsUnitIdSurveys = async (unitId: string,
-    handlersCreateSurveyRequest: HandlersCreateSurveyRequest, options?: RequestInit): Promise<postUnitsUnitIdSurveysResponse> => {
+export const createSurveyDefinition = async (unitId: string,
+    handlersCreateSurveyRequest: HandlersCreateSurveyRequest, options?: RequestInit): Promise<createSurveyDefinitionResponse> => {
 
-  return orvalMutator<postUnitsUnitIdSurveysResponse>(getPostUnitsUnitIdSurveysUrl(unitId),
+  return orvalMutator<createSurveyDefinitionResponse>(getCreateSurveyDefinitionUrl(unitId),
   {
     ...options,
     method: 'POST',
@@ -1976,11 +1996,11 @@ export const postUnitsUnitIdSurveys = async (unitId: string,
 
 
 
-export const getPostUnitsUnitIdSurveysMutationOptions = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdSurveys>>, TError,{unitId: string;data: HandlersCreateSurveyRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdSurveys>>, TError,{unitId: string;data: HandlersCreateSurveyRequest}, TContext> => {
+export const getCreateSurveyDefinitionMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSurveyDefinition>>, TError,{unitId: string;data: HandlersCreateSurveyRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof createSurveyDefinition>>, TError,{unitId: string;data: HandlersCreateSurveyRequest}, TContext> => {
 
-const mutationKey = ['postUnitsUnitIdSurveys'];
+const mutationKey = ['createSurveyDefinition'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -1990,10 +2010,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postUnitsUnitIdSurveys>>, {unitId: string;data: HandlersCreateSurveyRequest}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createSurveyDefinition>>, {unitId: string;data: HandlersCreateSurveyRequest}> = (props) => {
           const {unitId,data} = props ?? {};
 
-          return  postUnitsUnitIdSurveys(unitId,data,requestOptions)
+          return  createSurveyDefinition(unitId,data,requestOptions)
         }
 
 
@@ -2003,22 +2023,22 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PostUnitsUnitIdSurveysMutationResult = NonNullable<Awaited<ReturnType<typeof postUnitsUnitIdSurveys>>>
-    export type PostUnitsUnitIdSurveysMutationBody = HandlersCreateSurveyRequest
-    export type PostUnitsUnitIdSurveysMutationError = unknown
+    export type CreateSurveyDefinitionMutationResult = NonNullable<Awaited<ReturnType<typeof createSurveyDefinition>>>
+    export type CreateSurveyDefinitionMutationBody = HandlersCreateSurveyRequest
+    export type CreateSurveyDefinitionMutationError = unknown
 
     /**
  * @summary Create survey definition
  */
-export const usePostUnitsUnitIdSurveys = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdSurveys>>, TError,{unitId: string;data: HandlersCreateSurveyRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const useCreateSurveyDefinition = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSurveyDefinition>>, TError,{unitId: string;data: HandlersCreateSurveyRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof postUnitsUnitIdSurveys>>,
+        Awaited<ReturnType<typeof createSurveyDefinition>>,
         TError,
         {unitId: string;data: HandlersCreateSurveyRequest},
         TContext
       > => {
-      return useMutation(getPostUnitsUnitIdSurveysMutationOptions(options), queryClient);
+      return useMutation(getCreateSurveyDefinitionMutationOptions(options), queryClient);
     }
 
 /**

@@ -156,7 +156,7 @@ export function GuestSurveyBlocksEditor({
       <div className='space-y-4'>
         {blocks.map((block, index) => (
           <div
-            key={`${block.id}-${index}`}
+            key={index}
             className='border-border space-y-3 rounded-lg border p-4'
           >
             <div className='flex flex-wrap items-center justify-between gap-2'>

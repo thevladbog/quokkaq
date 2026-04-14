@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"mime"
 	"net/http"
 	"path/filepath"
@@ -19,6 +20,10 @@ import (
 )
 
 const surveyCompletionImageCategory = "guest-survey-completion"
+
+// Hard caps for multipart bodies (gosec G120 / defense in depth vs ParseMultipartForm memory staging).
+const maxSurveyCompletionImageMultipartBytes = 5 << 20 // 5 MiB
+const maxSurveyIdleMediaMultipartBytes = 50 << 20      // 50 MiB
 
 // UUID + allowed image extension (must match upload validation).
 var surveyCompletionImageFileRe = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpeg|jpg|png|webp|svg)$`)
@@ -81,6 +86,7 @@ type createSurveyRequest struct {
 // @Param        unitId path string true "Scope unit id"
 // @Param        body body createSurveyRequest true "Payload"
 // @Success      201  {object}  models.SurveyDefinition
+// @ID           CreateSurveyDefinition
 // @Router       /units/{unitId}/surveys [post]
 func (h *SurveyHandler) CreateDefinition(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
@@ -92,6 +98,14 @@ func (h *SurveyHandler) CreateDefinition(w http.ResponseWriter, r *http.Request)
 	var req createSurveyRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if strings.TrimSpace(req.Title) == "" {
+		http.Error(w, "title is required", http.StatusBadRequest)
+		return
+	}
+	if len(req.Questions) == 0 || string(req.Questions) == "null" {
+		http.Error(w, "questions are required", http.StatusBadRequest)
 		return
 	}
 	var cm *json.RawMessage
@@ -145,6 +159,10 @@ func (h *SurveyHandler) PatchDefinition(w http.ResponseWriter, r *http.Request) 
 	var req patchSurveyRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.Title == nil && req.Questions == nil && req.CompletionMessage == nil && req.DisplayTheme == nil && req.IdleScreen == nil {
+		http.Error(w, "at least one field is required", http.StatusBadRequest)
 		return
 	}
 	err := h.survey.UpdateDefinition(r.Context(), userID, unitID, surveyID, req.Title, req.Questions, req.CompletionMessage, req.DisplayTheme, req.IdleScreen)
@@ -243,7 +261,7 @@ type UploadSurveyCompletionImageResponse struct {
 
 // UploadCompletionImage godoc
 // @Summary      Upload guest survey completion markdown image
-// @Description  Multipart file field "file". Returns an API-relative URL for use in markdown (authorized GET, not direct S3).
+// @Description  Multipart file field "file". Returns an API-relative URL string. The GET for that path requires BearerAuth; it is not usable as a bare <img src> or static markdown image URL—clients must fetch with Authorization and use a blob/object URL (or proxy) to display.
 // @Tags         surveys
 // @Accept       multipart/form-data
 // @Produce      json
@@ -254,6 +272,7 @@ type UploadSurveyCompletionImageResponse struct {
 // @Failure      400  {string}  string "Bad Request"
 // @Failure      401  {string}  string "Unauthorized"
 // @Failure      403  {string}  string "Forbidden"
+// @Failure      413  {string}  string "Request body too large"
 // @Failure      500  {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/survey-completion-images [post]
 func (h *SurveyHandler) UploadCompletionImage(w http.ResponseWriter, r *http.Request) {
@@ -268,10 +287,20 @@ func (h *SurveyHandler) UploadCompletionImage(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if err := r.ParseMultipartForm(5 << 20); err != nil {
+	r.Body = http.MaxBytesReader(w, r.Body, maxSurveyCompletionImageMultipartBytes)
+	if err := r.ParseMultipartForm(maxSurveyCompletionImageMultipartBytes); err != nil {
+		if maxBytesReaderExceeded(err) {
+			http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
+			return
+		}
 		http.Error(w, "Failed to parse form", http.StatusBadRequest)
 		return
 	}
+	defer func() {
+		if r.MultipartForm != nil {
+			_ = r.MultipartForm.RemoveAll()
+		}
+	}()
 	file, header, err := r.FormFile("file")
 	if err != nil {
 		http.Error(w, "Invalid file", http.StatusBadRequest)
@@ -344,6 +373,7 @@ func (h *SurveyHandler) UploadCompletionImage(w http.ResponseWriter, r *http.Req
 
 // GetSurveyCompletionImage godoc
 // @Summary      Get guest survey completion markdown image (staff or terminal JWT)
+// @Description  Streams image bytes. Requires Authorization: Bearer (staff user JWT or counter terminal JWT). This URL is not embeddable from unauthenticated contexts: plain <img src>, Markdown image syntax, or server-side markdown renderers without the token will fail. Clients should fetch with the Bearer token (e.g. browser fetch) and create an object/blob URL, or proxy the bytes with auth.
 // @Tags         guest-survey
 // @Produce      octet-stream
 // @Security     BearerAuth
@@ -403,7 +433,7 @@ type UploadSurveyIdleMediaResponse struct {
 
 // UploadIdleMedia godoc
 // @Summary      Upload guest survey idle slide image or video
-// @Description  Multipart file field "file". Returns an API-relative URL for idle_screen JSON.
+// @Description  Multipart file field "file". Returns an API-relative URL for idle_screen JSON. The GET for that media path requires BearerAuth and is not a public embed URL—counter UIs must fetch with the terminal JWT and use blob URLs (see Get guest survey idle slide media).
 // @Tags         surveys
 // @Accept       multipart/form-data
 // @Produce      json
@@ -414,6 +444,7 @@ type UploadSurveyIdleMediaResponse struct {
 // @Failure      400  {string}  string "Bad Request"
 // @Failure      401  {string}  string "Unauthorized"
 // @Failure      403  {string}  string "Forbidden"
+// @Failure      413  {string}  string "Request body too large"
 // @Failure      500  {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/guest-survey/idle-media [post]
 func (h *SurveyHandler) UploadIdleMedia(w http.ResponseWriter, r *http.Request) {
@@ -428,10 +459,20 @@ func (h *SurveyHandler) UploadIdleMedia(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := r.ParseMultipartForm(50 << 20); err != nil {
+	r.Body = http.MaxBytesReader(w, r.Body, maxSurveyIdleMediaMultipartBytes)
+	if err := r.ParseMultipartForm(maxSurveyIdleMediaMultipartBytes); err != nil {
+		if maxBytesReaderExceeded(err) {
+			http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
+			return
+		}
 		http.Error(w, "Failed to parse form", http.StatusBadRequest)
 		return
 	}
+	defer func() {
+		if r.MultipartForm != nil {
+			_ = r.MultipartForm.RemoveAll()
+		}
+	}()
 	file, header, err := r.FormFile("file")
 	if err != nil {
 		http.Error(w, "Invalid file", http.StatusBadRequest)
@@ -513,6 +554,7 @@ func (h *SurveyHandler) UploadIdleMedia(w http.ResponseWriter, r *http.Request) 
 
 // GetSurveyIdleMedia godoc
 // @Summary      Get guest survey idle slide media (staff or terminal JWT)
+// @Description  Streams image/video bytes. Requires Authorization: Bearer. Not a public URL for <img>/<video> src or static markdown—use authenticated fetch and blob/object URLs (or a signed public URL if the product adds one).
 // @Tags         guest-survey
 // @Produce      octet-stream
 // @Security     BearerAuth
@@ -575,6 +617,8 @@ func (h *SurveyHandler) GetSurveyIdleMedia(w http.ResponseWriter, r *http.Reques
 // @Failure      400  {string}  string "Bad Request"
 // @Failure      401  {string}  string "Unauthorized"
 // @Failure      403  {string}  string "Forbidden"
+// @Failure      409  {string}  string "Conflict — file still referenced by a survey"
+// @Failure      500  {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/guest-survey/idle-media/{fileName} [delete]
 func (h *SurveyHandler) DeleteSurveyIdleMedia(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
@@ -604,8 +648,17 @@ func (h *SurveyHandler) DeleteSurveyIdleMedia(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	if err := h.survey.EnsureIdleMediaFileDeletable(companyID, fileName); err != nil {
+		h.writeSurveyErr(w, err)
+		return
+	}
+
 	key := fmt.Sprintf("tenants/%s/%s/%s", companyID, services.GuestSurveyIdleMediaCategory, fileName)
-	_ = h.storage.DeleteFile(r.Context(), key)
+	if err := h.storage.DeleteFile(r.Context(), key); err != nil {
+		log.Printf("delete idle media %s: %v", key, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -619,7 +672,10 @@ func (h *SurveyHandler) writeSurveyErr(w http.ResponseWriter, err error) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	case errors.Is(err, services.ErrSurveyFeatureLocked):
 		http.Error(w, "Feature not enabled for subscription", http.StatusForbidden)
+	case errors.Is(err, services.ErrSurveyIdleMediaInUse):
+		http.Error(w, "Idle media is still referenced by a survey definition", http.StatusConflict)
 	default:
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("survey handler: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
 }

@@ -19,10 +19,10 @@ import {
   COUNTER_DISPLAY_UNIT_KEY,
   terminalAuthBootstrap
 } from '@/lib/api';
-import { throwApiHttpErrorFromBody } from '@/lib/api-errors';
 import {
-  getUnitsUnitIdGuestSurveySession,
-  postUnitsUnitIdGuestSurveyResponses
+  guestSurveySession,
+  guestSurveySubmitResponse,
+  type ServicesGuestSurveySession
 } from '@/lib/api/generated/guest-survey-terminal';
 import { GuestSurveyCompletionMarkdown } from '@/components/guest-survey/guest-survey-completion-markdown';
 import { pickCompletionMarkdown } from '@/lib/guest-survey-completion';
@@ -196,15 +196,12 @@ function CounterDisplayPageInner() {
   const sessionQuery = useQuery({
     queryKey: ['guest-survey-session', unitId, token],
     queryFn: async ({ signal }) => {
-      const res = await getUnitsUnitIdGuestSurveySession(unitId!, {
+      const res = await guestSurveySession(unitId!, {
         signal,
         headers: { Authorization: `Bearer ${token}` }
       });
-      if (res.status !== 200) {
-        const errBody = typeof res.data === 'string' ? res.data : '{}';
-        throwApiHttpErrorFromBody(res.status, errBody);
-      }
-      return res.data;
+      // terminalOrvalMutator throws on non-OK; narrowed type for OpenAPI union.
+      return res.data as ServicesGuestSurveySession;
     },
     enabled: Boolean(hydrated && token && unitId),
     refetchInterval: 5000,
@@ -298,7 +295,9 @@ function CounterDisplayPageInner() {
 
   const submitMut = useMutation({
     mutationFn: async () => {
-      if (!token || !unitId || !session?.activeTicket || !session.survey) {
+      const ticketId = session?.activeTicket?.id;
+      const surveyId = session?.survey?.id;
+      if (!token || !unitId || !ticketId || !surveyId) {
         throw new Error('session');
       }
       const answers: Record<string, number> = {};
@@ -313,11 +312,11 @@ function CounterDisplayPageInner() {
           answers[q.id] = scaleValues[q.id] ?? q.min;
         }
       }
-      await postUnitsUnitIdGuestSurveyResponses(
+      await guestSurveySubmitResponse(
         unitId,
         {
-          ticketId: session.activeTicket.id,
-          surveyId: session.survey.id,
+          ticketId,
+          surveyId,
           answers
         },
         { headers: { Authorization: `Bearer ${token}` } }
@@ -458,9 +457,7 @@ function CounterDisplayPageInner() {
     const err = sessionQuery.error;
     const locked =
       err instanceof ApiHttpError &&
-      (err.status === 403 ||
-        err.message.toLowerCase().includes('feature') ||
-        err.message.toLowerCase().includes('forbidden'));
+      (err.status === 403 || err.code === 'FEATURE_LOCKED');
     return (
       <div className='relative flex flex-1 flex-col items-center justify-center gap-4 p-6 text-center'>
         <div className='absolute top-4 right-4 z-10'>

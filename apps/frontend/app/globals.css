@@ -1,6 +1,15 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
+@layer utilities {
+  .z-layer-backdrop {
+    z-index: 100;
+  }
+  .z-layer-dialog {
+    z-index: 110;
+  }
+}
+
 @custom-variant dark (&:is(.dark *));
 
 :root {

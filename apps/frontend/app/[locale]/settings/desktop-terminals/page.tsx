@@ -216,7 +216,7 @@ export default function DesktopTerminalsPage() {
           setAvailableCounters([]);
           toast.error(t('load_counters_error'));
         }
-      });
+      })();
     } else {
       setFormDeviceKind('kiosk');
       setFormUnitId(row.unitId);

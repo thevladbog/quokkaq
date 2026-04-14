@@ -159,9 +159,26 @@ func (s *storageService) UploadTenantAsset(ctx context.Context, tenantID, catego
 	return key, nil
 }
 
+func validatePrivateObjectKey(key string) error {
+	k := strings.TrimSpace(key)
+	if k == "" {
+		return fmt.Errorf("empty object key")
+	}
+	if strings.Contains(k, "..") {
+		return fmt.Errorf("invalid object key")
+	}
+	if !strings.HasPrefix(k, "tenants/") && !strings.HasPrefix(k, "public/") {
+		return fmt.Errorf("object key has disallowed prefix")
+	}
+	return nil
+}
+
 func (s *storageService) GetObject(ctx context.Context, key string) (io.ReadCloser, string, error) {
 	if s.client == nil {
 		return nil, "", fmt.Errorf("storage client not initialized")
+	}
+	if err := validatePrivateObjectKey(key); err != nil {
+		return nil, "", err
 	}
 	out, err := s.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(s.bucketName),

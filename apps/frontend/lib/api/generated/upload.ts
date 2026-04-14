@@ -560,11 +560,11 @@ export interface HandlersUploadLogoResponse {
 }
 
 export interface HandlersUploadSurveyCompletionImageResponse {
-  url?: string;
+  url: string;
 }
 
 export interface HandlersUploadSurveyIdleMediaResponse {
-  url?: string;
+  url: string;
 }
 
 export interface HandlersUsageMetricInfoResponse {
@@ -795,8 +795,8 @@ export interface HandlersCreateSurveyRequest {
   completionMessage?: HandlersCreateSurveyRequestCompletionMessage;
   displayTheme?: HandlersCreateSurveyRequestDisplayTheme;
   idleScreen?: HandlersCreateSurveyRequestIdleScreen;
-  questions?: HandlersCreateSurveyRequestQuestions;
-  title?: string;
+  questions: HandlersCreateSurveyRequestQuestions;
+  title: string;
 }
 
 export interface HandlersCreateVisitorTagDefinitionRequest {
@@ -809,9 +809,9 @@ export interface HandlersCreateVisitorTagDefinitionRequest {
 export type HandlersGuestSurveySubmitRequestAnswers = { [key: string]: unknown };
 
 export interface HandlersGuestSurveySubmitRequest {
-  answers?: HandlersGuestSurveySubmitRequestAnswers;
-  surveyId?: string;
-  ticketId?: string;
+  answers: HandlersGuestSurveySubmitRequestAnswers;
+  surveyId: string;
+  ticketId: string;
 }
 
 export type HandlersPatchSurveyRequestCompletionMessage = { [key: string]: unknown };

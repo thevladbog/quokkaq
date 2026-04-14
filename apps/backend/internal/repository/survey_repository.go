@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"strings"
+
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/pkg/database"
 
@@ -15,6 +17,8 @@ type SurveyRepository interface {
 	ListDefinitionsByScopeUnit(scopeUnitID string) ([]models.SurveyDefinition, error)
 	FindActiveDefinitionByScopeUnit(scopeUnitID string) (*models.SurveyDefinition, error)
 	SetActiveDefinition(scopeUnitID, surveyID string) error
+	// CountDefinitionsReferencingIdleMediaFile counts survey definitions in company whose idle_screen JSON references fileName (substring match).
+	CountDefinitionsReferencingIdleMediaFile(companyID, fileName string) (int64, error)
 
 	UpsertResponse(r *models.SurveyResponse) error
 	ResponseExistsForTicketAndSurvey(ticketID, surveyDefinitionID string) (bool, error)
@@ -64,15 +68,39 @@ func (r *surveyRepository) FindActiveDefinitionByScopeUnit(scopeUnitID string) (
 
 func (r *surveyRepository) SetActiveDefinition(scopeUnitID, surveyID string) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
+		var verify models.SurveyDefinition
+		if err := tx.Where("id = ? AND scope_unit_id = ?", surveyID, scopeUnitID).First(&verify).Error; err != nil {
+			return err
+		}
 		if err := tx.Model(&models.SurveyDefinition{}).
 			Where("scope_unit_id = ?", scopeUnitID).
 			Update("is_active", false).Error; err != nil {
 			return err
 		}
-		return tx.Model(&models.SurveyDefinition{}).
+		res := tx.Model(&models.SurveyDefinition{}).
 			Where("id = ? AND scope_unit_id = ?", surveyID, scopeUnitID).
-			Update("is_active", true).Error
+			Update("is_active", true)
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return gorm.ErrRecordNotFound
+		}
+		return nil
 	})
+}
+
+func (r *surveyRepository) CountDefinitionsReferencingIdleMediaFile(companyID, fileName string) (int64, error) {
+	fn := strings.TrimSpace(fileName)
+	if fn == "" {
+		return 0, nil
+	}
+	pattern := "%" + fn + "%"
+	var count int64
+	err := r.db.Model(&models.SurveyDefinition{}).
+		Where("company_id = ? AND idle_screen::text LIKE ?", companyID, pattern).
+		Count(&count).Error
+	return count, err
 }
 
 func (r *surveyRepository) UpsertResponse(row *models.SurveyResponse) error {

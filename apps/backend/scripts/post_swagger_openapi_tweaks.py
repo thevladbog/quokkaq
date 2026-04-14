@@ -78,6 +78,21 @@ def apply_openapi_tweaks(doc: dict[str, Any]) -> None:
     upload_logo = _schema(comp, "handlers.UploadLogoResponse")
     upload_logo["required"] = ["url"]
 
+    upload_completion = _schema(comp, "handlers.UploadSurveyCompletionImageResponse")
+    upload_completion["required"] = ["url"]
+
+    upload_idle = _schema(comp, "handlers.UploadSurveyIdleMediaResponse")
+    upload_idle["required"] = ["url"]
+
+    create_survey = _schema(comp, "handlers.createSurveyRequest")
+    create_survey["required"] = ["title", "questions"]
+
+    guest_submit = _schema(comp, "handlers.guestSurveySubmitRequest")
+    guest_submit["required"] = ["ticketId", "surveyId", "answers"]
+
+    patch_survey = _schema(comp, "handlers.patchSurveyRequest")
+    patch_survey["minProperties"] = 1
+
     kiosk_patch = _schema(comp, "handlers.PatchUnitKioskConfigRequest")
     kiosk_patch["required"] = ["config"]
     cfg = kiosk_patch.get("properties", {}).get("config")

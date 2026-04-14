@@ -460,11 +460,15 @@ components:
         url:
           type: string
       type: object
+      required:
+      - url
     handlers.UploadSurveyIdleMediaResponse:
       properties:
         url:
           type: string
       type: object
+      required:
+      - url
     handlers.UsageMetricInfoResponse:
       properties:
         current:
@@ -509,6 +513,9 @@ components:
         title:
           type: string
       type: object
+      required:
+      - title
+      - questions
     handlers.createVisitorTagDefinitionRequest:
       properties:
         color:
@@ -531,6 +538,10 @@ components:
         ticketId:
           type: string
       type: object
+      required:
+      - ticketId
+      - surveyId
+      - answers
     handlers.patchSurveyRequest:
       properties:
         completionMessage:
@@ -544,6 +555,7 @@ components:
         title:
           type: string
       type: object
+      minProperties: 1
     handlers.patchVisitorTagDefinitionRequest:
       properties:
         color:
@@ -6121,6 +6133,7 @@ paths:
       - counters
   /units/{unitId}/guest-survey/completion-images/{fileName}:
     get:
+      description: 'Streams image bytes. Requires Authorization: Bearer (staff user JWT or counter terminal JWT). This URL is not embeddable from unauthenticated contexts: plain <img src>, Markdown image syntax, or server-side markdown renderers without the token will fail. Clients should fetch with the Bearer token (e.g. browser fetch) and create an object/blob URL, or proxy the bytes with auth.'
       parameters:
       - description: Unit id
         in: path
@@ -6173,7 +6186,7 @@ paths:
       - guest-survey
   /units/{unitId}/guest-survey/idle-media:
     post:
-      description: Multipart file field "file". Returns an API-relative URL for idle_screen JSON.
+      description: Multipart file field "file". Returns an API-relative URL for idle_screen JSON. The GET for that media path requires BearerAuth and is not a public embed URL—counter UIs must fetch with the terminal JWT and use blob URLs (see Get guest survey idle slide media).
       parameters:
       - description: Scope unit id
         in: path
@@ -6219,6 +6232,12 @@ paths:
               schema:
                 type: string
           description: Forbidden
+        '413':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Request body too large
         '500':
           content:
             application/json:
@@ -6266,12 +6285,25 @@ paths:
               schema:
                 type: string
           description: Forbidden
+        '409':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Conflict — file still referenced by a survey
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
       security:
       - BearerAuth: []
       summary: Delete guest survey idle slide media object (S3)
       tags:
       - surveys
     get:
+      description: 'Streams image/video bytes. Requires Authorization: Bearer. Not a public URL for <img>/<video> src or static markdown—use authenticated fetch and blob/object URLs (or a signed public URL if the product adds one).'
       parameters:
       - description: Unit id
         in: path
@@ -6324,6 +6356,7 @@ paths:
       - guest-survey
   /units/{unitId}/guest-survey/responses:
     post:
+      operationId: guestSurveySubmitResponse
       parameters:
       - description: Subdivision unit id
         in: path
@@ -6360,6 +6393,18 @@ paths:
               schema:
                 type: string
           description: Forbidden
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Not found
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
       security:
       - BearerAuth: []
       summary: Submit guest survey (terminal)
@@ -6367,6 +6412,7 @@ paths:
       - guest-survey
   /units/{unitId}/guest-survey/session:
     get:
+      operationId: guestSurveySession
       parameters:
       - description: Subdivision unit id (queue scope)
         in: path
@@ -6381,6 +6427,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/services.GuestSurveySession'
           description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad request
         '401':
           content:
             application/json:
@@ -6393,6 +6445,12 @@ paths:
               schema:
                 type: string
           description: Forbidden
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
       security:
       - BearerAuth: []
       summary: Guest survey session (terminal)
@@ -7498,7 +7556,7 @@ paths:
       - slots
   /units/{unitId}/survey-completion-images:
     post:
-      description: Multipart file field "file". Returns an API-relative URL for use in markdown (authorized GET, not direct S3).
+      description: Multipart file field "file". Returns an API-relative URL string. The GET for that path requires BearerAuth; it is not usable as a bare <img src> or static markdown image URL—clients must fetch with Authorization and use a blob/object URL (or proxy) to display.
       parameters:
       - description: Scope unit id
         in: path
@@ -7544,6 +7602,12 @@ paths:
               schema:
                 type: string
           description: Forbidden
+        '413':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Request body too large
         '500':
           content:
             application/json:
@@ -7612,6 +7676,7 @@ paths:
       tags:
       - surveys
     post:
+      operationId: CreateSurveyDefinition
       parameters:
       - description: Scope unit id
         in: path

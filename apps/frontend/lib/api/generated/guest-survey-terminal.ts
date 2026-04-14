@@ -569,11 +569,11 @@ export interface HandlersUploadLogoResponse {
 }
 
 export interface HandlersUploadSurveyCompletionImageResponse {
-  url?: string;
+  url: string;
 }
 
 export interface HandlersUploadSurveyIdleMediaResponse {
-  url?: string;
+  url: string;
 }
 
 export interface HandlersUsageMetricInfoResponse {
@@ -804,8 +804,8 @@ export interface HandlersCreateSurveyRequest {
   completionMessage?: HandlersCreateSurveyRequestCompletionMessage;
   displayTheme?: HandlersCreateSurveyRequestDisplayTheme;
   idleScreen?: HandlersCreateSurveyRequestIdleScreen;
-  questions?: HandlersCreateSurveyRequestQuestions;
-  title?: string;
+  questions: HandlersCreateSurveyRequestQuestions;
+  title: string;
 }
 
 export interface HandlersCreateVisitorTagDefinitionRequest {
@@ -818,9 +818,9 @@ export interface HandlersCreateVisitorTagDefinitionRequest {
 export type HandlersGuestSurveySubmitRequestAnswers = { [key: string]: unknown };
 
 export interface HandlersGuestSurveySubmitRequest {
-  answers?: HandlersGuestSurveySubmitRequestAnswers;
-  surveyId?: string;
-  ticketId?: string;
+  answers: HandlersGuestSurveySubmitRequestAnswers;
+  surveyId: string;
+  ticketId: string;
 }
 
 export type HandlersPatchSurveyRequestCompletionMessage = { [key: string]: unknown };
@@ -1236,6 +1236,7 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
 /**
+ * Streams image bytes. Requires Authorization: Bearer (staff user JWT or counter terminal JWT). This URL is not embeddable from unauthenticated contexts: plain <img src>, Markdown image syntax, or server-side markdown renderers without the token will fail. Clients should fetch with the Bearer token (e.g. browser fetch) and create an object/blob URL, or proxy the bytes with auth.
  * @summary Get guest survey completion markdown image (staff or terminal JWT)
  */
 export type getUnitsUnitIdGuestSurveyCompletionImagesFileNameResponse200 = {
@@ -1379,6 +1380,7 @@ export function useGetUnitsUnitIdGuestSurveyCompletionImagesFileName<TData = Awa
 
 
 /**
+ * Streams image/video bytes. Requires Authorization: Bearer. Not a public URL for <img>/<video> src or static markdown—use authenticated fetch and blob/object URLs (or a signed public URL if the product adds one).
  * @summary Get guest survey idle slide media (staff or terminal JWT)
  */
 export type getUnitsUnitIdGuestSurveyIdleMediaFileNameResponse200 = {
@@ -1524,36 +1526,46 @@ export function useGetUnitsUnitIdGuestSurveyIdleMediaFileName<TData = Awaited<Re
 /**
  * @summary Submit guest survey (terminal)
  */
-export type postUnitsUnitIdGuestSurveyResponsesResponse204 = {
+export type guestSurveySubmitResponseResponse204 = {
   data: void
   status: 204
 }
 
-export type postUnitsUnitIdGuestSurveyResponsesResponse400 = {
+export type guestSurveySubmitResponseResponse400 = {
   data: string
   status: 400
 }
 
-export type postUnitsUnitIdGuestSurveyResponsesResponse401 = {
+export type guestSurveySubmitResponseResponse401 = {
   data: string
   status: 401
 }
 
-export type postUnitsUnitIdGuestSurveyResponsesResponse403 = {
+export type guestSurveySubmitResponseResponse403 = {
   data: string
   status: 403
 }
 
-export type postUnitsUnitIdGuestSurveyResponsesResponseSuccess = (postUnitsUnitIdGuestSurveyResponsesResponse204) & {
+export type guestSurveySubmitResponseResponse404 = {
+  data: string
+  status: 404
+}
+
+export type guestSurveySubmitResponseResponse500 = {
+  data: string
+  status: 500
+}
+
+export type guestSurveySubmitResponseResponseSuccess = (guestSurveySubmitResponseResponse204) & {
   headers: Headers;
 };
-export type postUnitsUnitIdGuestSurveyResponsesResponseError = (postUnitsUnitIdGuestSurveyResponsesResponse400 | postUnitsUnitIdGuestSurveyResponsesResponse401 | postUnitsUnitIdGuestSurveyResponsesResponse403) & {
+export type guestSurveySubmitResponseResponseError = (guestSurveySubmitResponseResponse400 | guestSurveySubmitResponseResponse401 | guestSurveySubmitResponseResponse403 | guestSurveySubmitResponseResponse404 | guestSurveySubmitResponseResponse500) & {
   headers: Headers;
 };
 
-export type postUnitsUnitIdGuestSurveyResponsesResponse = (postUnitsUnitIdGuestSurveyResponsesResponseSuccess | postUnitsUnitIdGuestSurveyResponsesResponseError)
+export type guestSurveySubmitResponseResponse = (guestSurveySubmitResponseResponseSuccess | guestSurveySubmitResponseResponseError)
 
-export const getPostUnitsUnitIdGuestSurveyResponsesUrl = (unitId: string,) => {
+export const getGuestSurveySubmitResponseUrl = (unitId: string,) => {
 
 
 
@@ -1561,10 +1573,10 @@ export const getPostUnitsUnitIdGuestSurveyResponsesUrl = (unitId: string,) => {
   return `/units/${unitId}/guest-survey/responses`
 }
 
-export const postUnitsUnitIdGuestSurveyResponses = async (unitId: string,
-    handlersGuestSurveySubmitRequest: HandlersGuestSurveySubmitRequest, options?: RequestInit): Promise<postUnitsUnitIdGuestSurveyResponsesResponse> => {
+export const guestSurveySubmitResponse = async (unitId: string,
+    handlersGuestSurveySubmitRequest: HandlersGuestSurveySubmitRequest, options?: RequestInit): Promise<guestSurveySubmitResponseResponse> => {
 
-  return terminalOrvalMutator<postUnitsUnitIdGuestSurveyResponsesResponse>(getPostUnitsUnitIdGuestSurveyResponsesUrl(unitId),
+  return terminalOrvalMutator<guestSurveySubmitResponseResponse>(getGuestSurveySubmitResponseUrl(unitId),
   {
     ...options,
     method: 'POST',
@@ -1577,11 +1589,11 @@ export const postUnitsUnitIdGuestSurveyResponses = async (unitId: string,
 
 
 
-export const getPostUnitsUnitIdGuestSurveyResponsesMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdGuestSurveyResponses>>, TError,{unitId: string;data: HandlersGuestSurveySubmitRequest}, TContext>, request?: SecondParameter<typeof terminalOrvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdGuestSurveyResponses>>, TError,{unitId: string;data: HandlersGuestSurveySubmitRequest}, TContext> => {
+export const getGuestSurveySubmitResponseMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof guestSurveySubmitResponse>>, TError,{unitId: string;data: HandlersGuestSurveySubmitRequest}, TContext>, request?: SecondParameter<typeof terminalOrvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof guestSurveySubmitResponse>>, TError,{unitId: string;data: HandlersGuestSurveySubmitRequest}, TContext> => {
 
-const mutationKey = ['postUnitsUnitIdGuestSurveyResponses'];
+const mutationKey = ['guestSurveySubmitResponse'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -1591,10 +1603,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postUnitsUnitIdGuestSurveyResponses>>, {unitId: string;data: HandlersGuestSurveySubmitRequest}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof guestSurveySubmitResponse>>, {unitId: string;data: HandlersGuestSurveySubmitRequest}> = (props) => {
           const {unitId,data} = props ?? {};
 
-          return  postUnitsUnitIdGuestSurveyResponses(unitId,data,requestOptions)
+          return  guestSurveySubmitResponse(unitId,data,requestOptions)
         }
 
 
@@ -1604,52 +1616,62 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PostUnitsUnitIdGuestSurveyResponsesMutationResult = NonNullable<Awaited<ReturnType<typeof postUnitsUnitIdGuestSurveyResponses>>>
-    export type PostUnitsUnitIdGuestSurveyResponsesMutationBody = HandlersGuestSurveySubmitRequest
-    export type PostUnitsUnitIdGuestSurveyResponsesMutationError = string
+    export type GuestSurveySubmitResponseMutationResult = NonNullable<Awaited<ReturnType<typeof guestSurveySubmitResponse>>>
+    export type GuestSurveySubmitResponseMutationBody = HandlersGuestSurveySubmitRequest
+    export type GuestSurveySubmitResponseMutationError = string
 
     /**
  * @summary Submit guest survey (terminal)
  */
-export const usePostUnitsUnitIdGuestSurveyResponses = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdGuestSurveyResponses>>, TError,{unitId: string;data: HandlersGuestSurveySubmitRequest}, TContext>, request?: SecondParameter<typeof terminalOrvalMutator>}
+export const useGuestSurveySubmitResponse = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof guestSurveySubmitResponse>>, TError,{unitId: string;data: HandlersGuestSurveySubmitRequest}, TContext>, request?: SecondParameter<typeof terminalOrvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof postUnitsUnitIdGuestSurveyResponses>>,
+        Awaited<ReturnType<typeof guestSurveySubmitResponse>>,
         TError,
         {unitId: string;data: HandlersGuestSurveySubmitRequest},
         TContext
       > => {
-      return useMutation(getPostUnitsUnitIdGuestSurveyResponsesMutationOptions(options), queryClient);
+      return useMutation(getGuestSurveySubmitResponseMutationOptions(options), queryClient);
     }
 
 /**
  * @summary Guest survey session (terminal)
  */
-export type getUnitsUnitIdGuestSurveySessionResponse200 = {
+export type guestSurveySessionResponse200 = {
   data: ServicesGuestSurveySession
   status: 200
 }
 
-export type getUnitsUnitIdGuestSurveySessionResponse401 = {
+export type guestSurveySessionResponse400 = {
+  data: string
+  status: 400
+}
+
+export type guestSurveySessionResponse401 = {
   data: string
   status: 401
 }
 
-export type getUnitsUnitIdGuestSurveySessionResponse403 = {
+export type guestSurveySessionResponse403 = {
   data: string
   status: 403
 }
 
-export type getUnitsUnitIdGuestSurveySessionResponseSuccess = (getUnitsUnitIdGuestSurveySessionResponse200) & {
+export type guestSurveySessionResponse500 = {
+  data: string
+  status: 500
+}
+
+export type guestSurveySessionResponseSuccess = (guestSurveySessionResponse200) & {
   headers: Headers;
 };
-export type getUnitsUnitIdGuestSurveySessionResponseError = (getUnitsUnitIdGuestSurveySessionResponse401 | getUnitsUnitIdGuestSurveySessionResponse403) & {
+export type guestSurveySessionResponseError = (guestSurveySessionResponse400 | guestSurveySessionResponse401 | guestSurveySessionResponse403 | guestSurveySessionResponse500) & {
   headers: Headers;
 };
 
-export type getUnitsUnitIdGuestSurveySessionResponse = (getUnitsUnitIdGuestSurveySessionResponseSuccess | getUnitsUnitIdGuestSurveySessionResponseError)
+export type guestSurveySessionResponse = (guestSurveySessionResponseSuccess | guestSurveySessionResponseError)
 
-export const getGetUnitsUnitIdGuestSurveySessionUrl = (unitId: string,) => {
+export const getGuestSurveySessionUrl = (unitId: string,) => {
 
 
 
@@ -1657,9 +1679,9 @@ export const getGetUnitsUnitIdGuestSurveySessionUrl = (unitId: string,) => {
   return `/units/${unitId}/guest-survey/session`
 }
 
-export const getUnitsUnitIdGuestSurveySession = async (unitId: string, options?: RequestInit): Promise<getUnitsUnitIdGuestSurveySessionResponse> => {
+export const guestSurveySession = async (unitId: string, options?: RequestInit): Promise<guestSurveySessionResponse> => {
 
-  return terminalOrvalMutator<getUnitsUnitIdGuestSurveySessionResponse>(getGetUnitsUnitIdGuestSurveySessionUrl(unitId),
+  return terminalOrvalMutator<guestSurveySessionResponse>(getGuestSurveySessionUrl(unitId),
   {
     ...options,
     method: 'GET'
@@ -1672,69 +1694,69 @@ export const getUnitsUnitIdGuestSurveySession = async (unitId: string, options?:
 
 
 
-export const getGetUnitsUnitIdGuestSurveySessionQueryKey = (unitId: string,) => {
+export const getGuestSurveySessionQueryKey = (unitId: string,) => {
     return [
     `/units/${unitId}/guest-survey/session`
     ] as const;
     }
 
 
-export const getGetUnitsUnitIdGuestSurveySessionQueryOptions = <TData = Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveySession>>, TError = string>(unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveySession>>, TError, TData>>, request?: SecondParameter<typeof terminalOrvalMutator>}
+export const getGuestSurveySessionQueryOptions = <TData = Awaited<ReturnType<typeof guestSurveySession>>, TError = string>(unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof guestSurveySession>>, TError, TData>>, request?: SecondParameter<typeof terminalOrvalMutator>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetUnitsUnitIdGuestSurveySessionQueryKey(unitId);
+  const queryKey =  queryOptions?.queryKey ?? getGuestSurveySessionQueryKey(unitId);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveySession>>> = ({ signal }) => getUnitsUnitIdGuestSurveySession(unitId, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof guestSurveySession>>> = ({ signal }) => guestSurveySession(unitId, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveySession>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof guestSurveySession>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type GetUnitsUnitIdGuestSurveySessionQueryResult = NonNullable<Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveySession>>>
-export type GetUnitsUnitIdGuestSurveySessionQueryError = string
+export type GuestSurveySessionQueryResult = NonNullable<Awaited<ReturnType<typeof guestSurveySession>>>
+export type GuestSurveySessionQueryError = string
 
 
-export function useGetUnitsUnitIdGuestSurveySession<TData = Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveySession>>, TError = string>(
- unitId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveySession>>, TError, TData>> & Pick<
+export function useGuestSurveySession<TData = Awaited<ReturnType<typeof guestSurveySession>>, TError = string>(
+ unitId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof guestSurveySession>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveySession>>,
+          Awaited<ReturnType<typeof guestSurveySession>>,
           TError,
-          Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveySession>>
+          Awaited<ReturnType<typeof guestSurveySession>>
         > , 'initialData'
       >, request?: SecondParameter<typeof terminalOrvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitsUnitIdGuestSurveySession<TData = Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveySession>>, TError = string>(
- unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveySession>>, TError, TData>> & Pick<
+export function useGuestSurveySession<TData = Awaited<ReturnType<typeof guestSurveySession>>, TError = string>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof guestSurveySession>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveySession>>,
+          Awaited<ReturnType<typeof guestSurveySession>>,
           TError,
-          Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveySession>>
+          Awaited<ReturnType<typeof guestSurveySession>>
         > , 'initialData'
       >, request?: SecondParameter<typeof terminalOrvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitsUnitIdGuestSurveySession<TData = Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveySession>>, TError = string>(
- unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveySession>>, TError, TData>>, request?: SecondParameter<typeof terminalOrvalMutator>}
+export function useGuestSurveySession<TData = Awaited<ReturnType<typeof guestSurveySession>>, TError = string>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof guestSurveySession>>, TError, TData>>, request?: SecondParameter<typeof terminalOrvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Guest survey session (terminal)
  */
 
-export function useGetUnitsUnitIdGuestSurveySession<TData = Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveySession>>, TError = string>(
- unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdGuestSurveySession>>, TError, TData>>, request?: SecondParameter<typeof terminalOrvalMutator>}
+export function useGuestSurveySession<TData = Awaited<ReturnType<typeof guestSurveySession>>, TError = string>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof guestSurveySession>>, TError, TData>>, request?: SecondParameter<typeof terminalOrvalMutator>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetUnitsUnitIdGuestSurveySessionQueryOptions(unitId,options)
+  const queryOptions = getGuestSurveySessionQueryOptions(unitId,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

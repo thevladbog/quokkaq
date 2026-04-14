@@ -248,25 +248,17 @@ export const GuestSurveyIdleScreenSchema = z
   })
   .strict()
   .superRefine((data, ctx) => {
-    const n = data.slides.length;
-    if (n > 0) {
-      if (data.slideIntervalSec < 1 || data.slideIntervalSec > 300) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['slideIntervalSec'],
-          message:
-            'slideIntervalSec must be between 1 and 300 when slides are non-empty'
-        });
-      }
-    } else if (
-      data.slideIntervalSec !== 0 &&
-      (data.slideIntervalSec < 1 || data.slideIntervalSec > 300)
-    ) {
+    const hasSlides = data.slides.length > 0;
+    if (!hasSlides && data.slideIntervalSec === 0) {
+      return;
+    }
+    if (data.slideIntervalSec < 1 || data.slideIntervalSec > 300) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['slideIntervalSec'],
-        message:
-          'slideIntervalSec must be 0 or between 1 and 300 when slides are empty'
+        message: hasSlides
+          ? 'slideIntervalSec must be between 1 and 300 when slides are non-empty'
+          : 'slideIntervalSec must be 0 or between 1 and 300 when slides are empty'
       });
     }
   });

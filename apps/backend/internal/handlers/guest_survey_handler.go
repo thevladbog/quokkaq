@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 
 	authmiddleware "quokkaq-go-backend/internal/middleware"
@@ -26,8 +27,11 @@ func NewGuestSurveyHandler(survey services.SurveyService) *GuestSurveyHandler {
 // @Security     BearerAuth
 // @Param        unitId path string true "Subdivision unit id (queue scope)"
 // @Success      200  {object}  services.GuestSurveySession
+// @Failure      400  {string}  string "Bad request"
 // @Failure      401  {string}  string "Unauthorized"
 // @Failure      403  {string}  string "Forbidden"
+// @Failure      500  {string}  string "Internal Server Error"
+// @ID           guestSurveySession
 // @Router       /units/{unitId}/guest-survey/session [get]
 func (h *GuestSurveyHandler) Session(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
@@ -50,7 +54,8 @@ func (h *GuestSurveyHandler) Session(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Feature not enabled", http.StatusForbidden)
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("guest survey session: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -75,6 +80,9 @@ type guestSurveySubmitRequest struct {
 // @Failure      400  {string}  string "Bad request"
 // @Failure      401  {string}  string "Unauthorized"
 // @Failure      403  {string}  string "Forbidden"
+// @Failure      404  {string}  string "Not found"
+// @Failure      500  {string}  string "Internal Server Error"
+// @ID           guestSurveySubmitResponse
 // @Router       /units/{unitId}/guest-survey/responses [post]
 func (h *GuestSurveyHandler) SubmitResponse(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
@@ -90,6 +98,10 @@ func (h *GuestSurveyHandler) SubmitResponse(w http.ResponseWriter, r *http.Reque
 	}
 	if req.TicketID == "" || req.SurveyID == "" {
 		http.Error(w, "ticketId and surveyId are required", http.StatusBadRequest)
+		return
+	}
+	if len(req.Answers) == 0 || string(req.Answers) == "null" {
+		http.Error(w, "answers are required", http.StatusBadRequest)
 		return
 	}
 	err := h.survey.SubmitGuestResponse(unitID, termID, req.TicketID, req.SurveyID, req.Answers)
@@ -110,7 +122,8 @@ func (h *GuestSurveyHandler) SubmitResponse(w http.ResponseWriter, r *http.Reque
 			http.Error(w, "Feature not enabled", http.StatusForbidden)
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("guest survey submit: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

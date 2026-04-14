@@ -167,6 +167,17 @@ export function GuestSurveyIdleScreenFields({
     setSlides(next);
   };
 
+  const patchSlideByKey = (
+    slideKey: string,
+    patch: Partial<IdleSlideDraft>
+  ) => {
+    setSlides(
+      draft.slides.map((s) =>
+        s.key === slideKey ? ({ ...s, ...patch } as IdleSlideDraft) : s
+      )
+    );
+  };
+
   const clearMediaAt = async (index: number) => {
     const s = draft.slides[index];
     if (!s || (s.type !== 'image' && s.type !== 'video')) return;
@@ -186,11 +197,11 @@ export function GuestSurveyIdleScreenFields({
   };
 
   const uploadMedia = async (
-    index: number,
+    slideKey: string,
     file: File,
     kind: 'image' | 'video'
   ) => {
-    const slide = draft.slides[index];
+    const slide = draft.slides.find((s) => s.key === slideKey);
     if (!slide || (slide.type !== 'image' && slide.type !== 'video')) return;
 
     const allowedImage = [
@@ -213,20 +224,20 @@ export function GuestSurveyIdleScreenFields({
       return;
     }
 
-    if (slide.url.trim()) {
-      try {
-        await deleteIdleMediaIfPresent(unitId, slide.url);
-      } catch {
-        /* best-effort */
-      }
-    }
-
+    const prevUrl = slide.url.trim();
     const res = await postUnitsUnitIdGuestSurveyIdleMedia(unitId, { file });
     if (res.status !== 200 || !res.data?.url) {
       onUploadError('idle_upload_error');
       return;
     }
-    patchSlide(index, { url: res.data.url });
+    patchSlideByKey(slideKey, { url: res.data.url });
+    if (prevUrl) {
+      try {
+        await deleteIdleMediaIfPresent(unitId, prevUrl);
+      } catch {
+        /* best-effort */
+      }
+    }
   };
 
   return (
@@ -369,7 +380,7 @@ export function GuestSurveyIdleScreenFields({
                         const f = e.target.files?.[0];
                         e.target.value = '';
                         if (!f) return;
-                        void uploadMedia(index, f, 'image');
+                        void uploadMedia(slide.key, f, 'image');
                       }}
                     />
                     {slide.url ? (
@@ -398,7 +409,7 @@ export function GuestSurveyIdleScreenFields({
                         const f = e.target.files?.[0];
                         e.target.value = '';
                         if (!f) return;
-                        void uploadMedia(index, f, 'video');
+                        void uploadMedia(slide.key, f, 'video');
                       }}
                     />
                     {slide.url ? (

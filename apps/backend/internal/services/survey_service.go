@@ -18,10 +18,11 @@ import (
 )
 
 var (
-	ErrSurveyForbidden     = errors.New("forbidden")
-	ErrSurveyNotFound      = errors.New("not found")
-	ErrSurveyBadRequest    = errors.New("bad request")
-	ErrSurveyFeatureLocked = errors.New("feature not enabled for subscription")
+	ErrSurveyForbidden      = errors.New("forbidden")
+	ErrSurveyNotFound       = errors.New("not found")
+	ErrSurveyBadRequest     = errors.New("bad request")
+	ErrSurveyFeatureLocked  = errors.New("feature not enabled for subscription")
+	ErrSurveyIdleMediaInUse = errors.New("idle media still referenced by a survey")
 )
 
 type GuestSurveySession struct {
@@ -353,6 +354,8 @@ type SurveyService interface {
 
 	CompanyIDForUnit(unitID string) (string, error)
 	EnsureGuestSurveyUploadAccess(actorUserID, unitID string) error
+	// EnsureIdleMediaFileDeletable returns ErrSurveyIdleMediaInUse if any survey definition still references the file.
+	EnsureIdleMediaFileDeletable(companyID, fileName string) error
 	// EnsureCompletionImageRead: staff (user JWT) or counter terminal JWT may read completion images for unit.
 	EnsureCompletionImageRead(unitID, tokenType, userID, terminalUnitID, terminalCounterID string) error
 }
@@ -400,11 +403,30 @@ func (s *surveyService) deleteOrphanIdleMedia(ctx context.Context, companyID str
 		if _, ok := newSet[n]; ok {
 			continue
 		}
+		cnt, err := s.surveyRepo.CountDefinitionsReferencingIdleMediaFile(companyID, n)
+		if err != nil {
+			log.Printf("idle_screen orphan count %s: %v", n, err)
+			continue
+		}
+		if cnt > 0 {
+			continue
+		}
 		key := fmt.Sprintf("tenants/%s/%s/%s", companyID, GuestSurveyIdleMediaCategory, n)
 		if err := s.storage.DeleteFile(ctx, key); err != nil {
 			log.Printf("idle_screen orphan delete %s: %v", key, err)
 		}
 	}
+}
+
+func (s *surveyService) EnsureIdleMediaFileDeletable(companyID, fileName string) error {
+	n, err := s.surveyRepo.CountDefinitionsReferencingIdleMediaFile(companyID, fileName)
+	if err != nil {
+		return err
+	}
+	if n > 0 {
+		return ErrSurveyIdleMediaInUse
+	}
+	return nil
 }
 
 func (s *surveyService) ensureUnitAccess(userID, unitID string) error {
