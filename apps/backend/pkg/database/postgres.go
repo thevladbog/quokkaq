@@ -845,6 +845,73 @@ func RunVersionedMigrations(models ...interface{}) error {
 		return fmt.Errorf("failed to run services offer_identification migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.1.12_counter_guest_survey", func(db *gorm.DB) error {
+		if err := db.Exec(`
+			ALTER TABLE desktop_terminals
+			ADD COLUMN IF NOT EXISTS counter_id text REFERENCES counters(id) ON DELETE SET NULL;
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.AutoMigrate(&dbmodels.SurveyDefinition{}, &dbmodels.SurveyResponse{}); err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			CREATE UNIQUE INDEX IF NOT EXISTS idx_survey_definitions_one_active_per_scope
+			ON survey_definitions (scope_unit_id) WHERE is_active = true;
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			CREATE UNIQUE INDEX IF NOT EXISTS idx_survey_responses_ticket_survey
+			ON survey_responses (ticket_id, survey_definition_id);
+		`).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run counter guest survey migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.1.13_survey_completion_message", func(db *gorm.DB) error {
+		if err := db.Exec(`
+			ALTER TABLE survey_definitions
+			ADD COLUMN IF NOT EXISTS completion_message jsonb;
+		`).Error; err != nil {
+			return err
+		}
+		return db.AutoMigrate(&dbmodels.SurveyDefinition{})
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run survey completion message migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.1.14_survey_display_theme", func(db *gorm.DB) error {
+		if err := db.Exec(`
+			ALTER TABLE survey_definitions
+			ADD COLUMN IF NOT EXISTS display_theme jsonb;
+		`).Error; err != nil {
+			return err
+		}
+		return db.AutoMigrate(&dbmodels.SurveyDefinition{})
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run survey display theme migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.1.15_survey_idle_screen", func(db *gorm.DB) error {
+		if err := db.Exec(`
+			ALTER TABLE survey_definitions
+			ADD COLUMN IF NOT EXISTS idle_screen jsonb;
+		`).Error; err != nil {
+			return err
+		}
+		return db.AutoMigrate(&dbmodels.SurveyDefinition{})
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run survey idle screen migration: %w", err)
+	}
+
 	fmt.Println("All migrations completed successfully")
 	return nil
 }

@@ -172,6 +172,8 @@ type TicketRepository interface {
 	UpdateStatusByUnit(unitID string, oldStatuses []string, newStatus string) (int64, error)
 	GetActiveTicketByCounter(counterID string) (*models.Ticket, error)
 	GetActiveTicketByCounterTx(tx *gorm.DB, counterID string) (*models.Ticket, error)
+	// FindInServiceTicketByCounter returns the ticket at the counter with status in_service, if any.
+	FindInServiceTicketByCounter(counterID string) (*models.Ticket, error)
 	MarkAsEODTicketIDsTx(tx *gorm.DB, ticketIDs []string) (int64, error)
 	// CountEODTicketSplitTx counts tickets already marked end-of-day (is_eod=true), split into waiting vs non-waiting status, for EOD messaging.
 	CountEODTicketSplitTx(tx *gorm.DB, unitID string) (waiting int64, nonWaiting int64, err error)
@@ -426,6 +428,20 @@ func (r *ticketRepository) GetActiveTicketByCounterTx(tx *gorm.DB, counterID str
 		return nil, nil
 	}
 	return &tickets[0], nil
+}
+
+func (r *ticketRepository) FindInServiceTicketByCounter(counterID string) (*models.Ticket, error) {
+	var t models.Ticket
+	err := r.db.Where("counter_id = ? AND status = ? AND is_eod = ?", counterID, "in_service", false).
+		Order("created_at ASC").
+		First(&t).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &t, nil
 }
 
 func (r *ticketRepository) MarkAsEODTicketIDsTx(tx *gorm.DB, ticketIDs []string) (int64, error) {

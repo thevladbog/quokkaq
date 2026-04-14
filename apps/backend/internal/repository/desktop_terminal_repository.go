@@ -31,6 +31,8 @@ func (r *desktopTerminalRepository) FindAll() ([]models.DesktopTerminal, error) 
 	var rows []models.DesktopTerminal
 	err := r.db.Preload("Unit", func(db *gorm.DB) *gorm.DB {
 		return db.Select("id", "name", "company_id", "code", "timezone", "created_at", "updated_at")
+	}).Preload("Counter", func(db *gorm.DB) *gorm.DB {
+		return db.Select("id", "unit_id", "name", "service_zone_id")
 	}).Order("created_at DESC").Find(&rows).Error
 	return rows, err
 }
@@ -39,6 +41,8 @@ func (r *desktopTerminalRepository) FindByID(id string) (*models.DesktopTerminal
 	var t models.DesktopTerminal
 	err := r.db.Preload("Unit", func(db *gorm.DB) *gorm.DB {
 		return db.Select("id", "name", "company_id", "code", "timezone", "created_at", "updated_at")
+	}).Preload("Counter", func(db *gorm.DB) *gorm.DB {
+		return db.Select("id", "unit_id", "name", "service_zone_id")
 	}).First(&t, "id = ?", id).Error
 	if err != nil {
 		return nil, err

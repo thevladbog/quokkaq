@@ -25,14 +25,7 @@ export default defineConfig({
           ]
         ]
       : ['default'],
-    coverage: isCi
-      ? {
-          enabled: true,
-          provider: 'v8',
-          reporter: ['text', 'json-summary', 'lcov'],
-          reportsDirectory: './coverage'
-        }
-      : { enabled: false },
+    coverage: { enabled: false },
     projects: [
       {
         extends: true,

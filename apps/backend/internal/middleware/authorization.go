@@ -299,3 +299,88 @@ func RequireCounterUnit(userRepo repository.UserRepository, counterRepo reposito
 		})
 	}
 }
+
+// RequireGuestSurveyCompletionImageRead allows reading guest-survey completion markdown images:
+//   - terminal JWT with unit_id and counter_id matching the URL unit (counter tablet);
+//   - staff user with unit access (same as RequireUnitMember) or platform_admin.
+//
+// Use after JWTAuth on GET /units/{unitId}/guest-survey/completion-images/{fileName}.
+func RequireGuestSurveyCompletionImageRead(userRepo repository.UserRepository, urlUnitIDParam string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			unitID := chi.URLParam(r, urlUnitIDParam)
+			if strings.TrimSpace(unitID) == "" {
+				http.Error(w, "Unit ID required", http.StatusBadRequest)
+				return
+			}
+			tokenType, _ := r.Context().Value(TokenTypeKey).(string)
+			if tokenType == "terminal" {
+				got, ok := r.Context().Value(TerminalUnitIDKey).(string)
+				if !ok || got != unitID {
+					http.Error(w, "Forbidden", http.StatusForbidden)
+					return
+				}
+				cid, ok := r.Context().Value(TerminalCounterIDKey).(string)
+				if !ok || strings.TrimSpace(cid) == "" {
+					http.Error(w, "Forbidden", http.StatusForbidden)
+					return
+				}
+				next.ServeHTTP(w, r)
+				return
+			}
+			userID, ok := GetUserIDFromContext(r.Context())
+			if !ok {
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				return
+			}
+			platform, err := userRepo.IsPlatformAdmin(userID)
+			if err != nil {
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+			if platform {
+				next.ServeHTTP(w, r)
+				return
+			}
+			allowed, err := userRepo.IsAdminOrHasUnitAccess(userID, unitID)
+			if err != nil {
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+			if !allowed {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// RequireTerminalGuestSurvey allows only a terminal JWT bound to a counter, with unit_id matching the URL unit.
+// Use after JWTAuth on /units/{unitId}/guest-survey/* routes.
+func RequireTerminalGuestSurvey(urlUnitIDParam string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if typ, _ := r.Context().Value(TokenTypeKey).(string); typ != "terminal" {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+			want := chi.URLParam(r, urlUnitIDParam)
+			if strings.TrimSpace(want) == "" {
+				http.Error(w, "Unit ID required", http.StatusBadRequest)
+				return
+			}
+			got, ok := r.Context().Value(TerminalUnitIDKey).(string)
+			if !ok || got != want {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+			cid, ok := r.Context().Value(TerminalCounterIDKey).(string)
+			if !ok || strings.TrimSpace(cid) == "" {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}

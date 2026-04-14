@@ -23,14 +23,7 @@
     "test": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "go test ./...",
-        "cwd": "apps/backend"
-      }
-    },
-    "test:ci": {
-      "executor": "nx:run-commands",
-      "options": {
-        "command": "go test ./... -coverprofile=coverage.out -covermode=atomic",
+        "command": "bash -lc 'set -euo pipefail; mkdir -p test-results; if [ \"${CI:-}\" = \"true\" ]; then go run gotest.tools/gotestsum@v1.12.3 --junitfile test-results/go-junit.xml -- ./...; else go test ./...; fi'",
         "cwd": "apps/backend"
       }
     },

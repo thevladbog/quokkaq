@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import {
   formatAppDateTime,
@@ -54,11 +54,29 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import {
+  ApiHttpError,
+  countersApi,
   desktopTerminalsApi,
   unitsApi,
+  type Counter,
   type DesktopTerminal,
   type Unit
 } from '@/lib/api';
+
+function filterCountersForContext(unit: Unit, counters: Counter[]): Counter[] {
+  if (unit.kind === 'subdivision') {
+    return counters.filter((c) => c.unitId === unit.id);
+  }
+  if (unit.kind === 'service_zone') {
+    return counters.filter(
+      (c) =>
+        !c.serviceZoneId ||
+        String(c.serviceZoneId).trim() === '' ||
+        c.serviceZoneId === unit.id
+    );
+  }
+  return [];
+}
 
 export default function DesktopTerminalsPage() {
   const t = useTranslations('admin.desktop_terminals');
@@ -76,10 +94,28 @@ export default function DesktopTerminalsPage() {
   );
   const [editing, setEditing] = useState<DesktopTerminal | null>(null);
 
+  const [formDeviceKind, setFormDeviceKind] = useState<
+    'kiosk' | 'counter_display'
+  >('kiosk');
   const [formUnitId, setFormUnitId] = useState('');
+  const [formContextUnitId, setFormContextUnitId] = useState('');
+  const [formCounterId, setFormCounterId] = useState('');
+  const [availableCounters, setAvailableCounters] = useState<Counter[]>([]);
+  const [countersLoading, setCountersLoading] = useState(false);
   const [formLocale, setFormLocale] = useState('en');
   const [formName, setFormName] = useState('');
   const [formKioskFullscreen, setFormKioskFullscreen] = useState(false);
+
+  /** Bumps when the edit dialog closes or a new edit preload starts; ignore stale async counter loads. */
+  const editPreloadSeq = useRef(0);
+
+  const contextUnits = useMemo(
+    () =>
+      units.filter(
+        (u) => u.kind === 'subdivision' || u.kind === 'service_zone'
+      ),
+    [units]
+  );
 
   const load = useCallback(async () => {
     try {
@@ -100,8 +136,58 @@ export default function DesktopTerminalsPage() {
     load();
   }, [load]);
 
+  useEffect(() => {
+    if (!(createOpen || editOpen)) return;
+    if (formDeviceKind !== 'counter_display' || !formContextUnitId) {
+      setAvailableCounters([]);
+      setCountersLoading(false);
+      return;
+    }
+    const ctx = units.find((u) => u.id === formContextUnitId);
+    const queueId =
+      ctx?.kind === 'subdivision'
+        ? ctx.id
+        : ctx?.kind === 'service_zone' && ctx.parentId
+          ? ctx.parentId
+          : null;
+    if (!queueId || !ctx) {
+      setAvailableCounters([]);
+      return;
+    }
+    let cancelled = false;
+    setCountersLoading(true);
+    countersApi
+      .getByUnitId(queueId)
+      .then((all) => {
+        if (cancelled) return;
+        setAvailableCounters(filterCountersForContext(ctx, all));
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAvailableCounters([]);
+          toast.error(t('load_counters_error'));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setCountersLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [createOpen, editOpen, formDeviceKind, formContextUnitId, units, t]);
+
+  useEffect(() => {
+    if (!editOpen) {
+      editPreloadSeq.current += 1;
+    }
+  }, [editOpen]);
+
   const resetForm = () => {
+    setFormDeviceKind('kiosk');
     setFormUnitId('');
+    setFormContextUnitId('');
+    setFormCounterId('');
+    setAvailableCounters([]);
     setFormLocale('en');
     setFormName('');
     setFormKioskFullscreen(false);
@@ -114,20 +200,81 @@ export default function DesktopTerminalsPage() {
 
   const openEdit = (row: DesktopTerminal) => {
     setEditing(row);
-    setFormUnitId(row.unitId);
     setFormLocale(row.defaultLocale);
     setFormName(row.name ?? '');
     setFormKioskFullscreen(row.kioskFullscreen === true);
+
+    if (row.counterId) {
+      setFormDeviceKind('counter_display');
+      setFormUnitId(row.unitId);
+      setFormCounterId(row.counterId);
+      const seq = ++editPreloadSeq.current;
+      const counterId = row.counterId;
+      void (async () => {
+        try {
+          const counter = await countersApi.getById(counterId);
+          if (seq !== editPreloadSeq.current) return;
+          const ctxId = counter.serviceZoneId?.trim()
+            ? counter.serviceZoneId
+            : row.unitId;
+          setFormContextUnitId(ctxId);
+          const all = await countersApi.getByUnitId(counter.unitId);
+          if (seq !== editPreloadSeq.current) return;
+          const ctxUnit = units.find((u) => u.id === ctxId);
+          setAvailableCounters(
+            ctxUnit ? filterCountersForContext(ctxUnit, all) : all
+          );
+        } catch {
+          if (seq !== editPreloadSeq.current) return;
+          setFormContextUnitId(row.unitId);
+          setAvailableCounters([]);
+          toast.error(t('load_counters_error'));
+        }
+      })();
+    } else {
+      setFormDeviceKind('kiosk');
+      setFormUnitId(row.unitId);
+      setFormContextUnitId('');
+      setFormCounterId('');
+      setAvailableCounters([]);
+    }
     setEditOpen(true);
   };
 
   const submitCreate = async () => {
-    if (!formUnitId) {
-      toast.error(t('select_unit'));
-      return;
-    }
+    const nameTrim = formName.trim();
     try {
-      const nameTrim = formName.trim();
+      if (formDeviceKind === 'counter_display') {
+        if (!formContextUnitId || !formCounterId) {
+          toast.error(t('select_counter_error'));
+          return;
+        }
+        const counter = availableCounters.find((c) => c.id === formCounterId);
+        if (!counter) {
+          toast.error(t('select_counter_error'));
+          return;
+        }
+        const res = await desktopTerminalsApi.create({
+          unitId: counter.unitId,
+          defaultLocale: formLocale,
+          kioskFullscreen: formKioskFullscreen,
+          contextUnitId: formContextUnitId,
+          counterId: formCounterId,
+          ...(nameTrim ? { name: nameTrim } : {})
+        });
+        setCreateOpen(false);
+        resetForm();
+        setNewPairingCode(res.pairingCode);
+        setCodeOpen(true);
+        toast.success(t('created'));
+        load();
+        return;
+      }
+
+      if (!formUnitId) {
+        toast.error(t('select_unit'));
+        return;
+      }
       const res = await desktopTerminalsApi.create({
         unitId: formUnitId,
         defaultLocale: formLocale,
@@ -140,26 +287,59 @@ export default function DesktopTerminalsPage() {
       setCodeOpen(true);
       toast.success(t('created'));
       load();
-    } catch {
+    } catch (e) {
+      if (e instanceof ApiHttpError && e.status === 403) {
+        toast.error(t('feature_locked_create'));
+        return;
+      }
       toast.error(t('error_save'));
     }
   };
 
   const submitEdit = async () => {
-    if (!editing || !formUnitId) return;
+    if (!editing) return;
+    const nameTrim = formName.trim();
     try {
-      const nameTrim = formName.trim();
-      await desktopTerminalsApi.update(editing.id, {
-        unitId: formUnitId,
-        defaultLocale: formLocale,
-        kioskFullscreen: formKioskFullscreen,
-        ...(nameTrim ? { name: nameTrim } : {})
-      });
+      if (formDeviceKind === 'counter_display') {
+        if (!formContextUnitId || !formCounterId) {
+          toast.error(t('select_counter_error'));
+          return;
+        }
+        const counter = availableCounters.find((c) => c.id === formCounterId);
+        if (!counter) {
+          toast.error(t('select_counter_error'));
+          return;
+        }
+        await desktopTerminalsApi.update(editing.id, {
+          unitId: counter.unitId,
+          defaultLocale: formLocale,
+          kioskFullscreen: formKioskFullscreen,
+          contextUnitId: formContextUnitId,
+          counterId: formCounterId,
+          ...(nameTrim ? { name: nameTrim } : {})
+        });
+      } else {
+        if (!formUnitId) {
+          toast.error(t('select_unit'));
+          return;
+        }
+        await desktopTerminalsApi.update(editing.id, {
+          unitId: formUnitId,
+          defaultLocale: formLocale,
+          kioskFullscreen: formKioskFullscreen,
+          counterId: '',
+          ...(nameTrim ? { name: nameTrim } : {})
+        });
+      }
       setEditOpen(false);
       setEditing(null);
       toast.success(t('updated'));
       load();
-    } catch {
+    } catch (e) {
+      if (e instanceof ApiHttpError && e.status === 403) {
+        toast.error(t('feature_locked_create'));
+        return;
+      }
       toast.error(t('error_save'));
     }
   };
@@ -184,6 +364,137 @@ export default function DesktopTerminalsPage() {
       toast.error(t('copy_code'));
     }
   };
+
+  const terminalFormFields = (idPrefix: string) => (
+    <>
+      <div className='grid gap-2'>
+        <Label htmlFor={`${idPrefix}-kind`}>{t('device_kind')}</Label>
+        <Select
+          value={formDeviceKind}
+          onValueChange={(v) => {
+            setFormDeviceKind(v as 'kiosk' | 'counter_display');
+            setFormContextUnitId('');
+            setFormCounterId('');
+            if (v === 'kiosk') setAvailableCounters([]);
+          }}
+        >
+          <SelectTrigger id={`${idPrefix}-kind`}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value='kiosk'>{t('device_kiosk')}</SelectItem>
+            <SelectItem value='counter_display'>
+              {t('device_counter_display')}
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className='grid gap-2'>
+        <Label htmlFor={`${idPrefix}-name`}>{t('name_optional')}</Label>
+        <Input
+          id={`${idPrefix}-name`}
+          value={formName}
+          onChange={(e) => setFormName(e.target.value)}
+          placeholder={t('name_placeholder')}
+        />
+      </div>
+      {formDeviceKind === 'kiosk' ? (
+        <div className='grid gap-2'>
+          <Label>{t('unit')}</Label>
+          <Select value={formUnitId} onValueChange={setFormUnitId}>
+            <SelectTrigger>
+              <SelectValue placeholder={t('select_unit')} />
+            </SelectTrigger>
+            <SelectContent>
+              {units.map((u) => (
+                <SelectItem key={u.id} value={u.id}>
+                  {u.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ) : (
+        <>
+          <div className='grid gap-2'>
+            <Label>{t('context_unit')}</Label>
+            <Select
+              value={formContextUnitId}
+              onValueChange={(v) => {
+                setFormContextUnitId(v);
+                setFormCounterId('');
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={t('select_context')} />
+              </SelectTrigger>
+              <SelectContent>
+                {contextUnits.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>
+                    {u.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className='grid gap-2'>
+            <Label>{t('select_counter')}</Label>
+            <Select
+              value={formCounterId}
+              onValueChange={setFormCounterId}
+              disabled={
+                !formContextUnitId ||
+                countersLoading ||
+                availableCounters.length === 0
+              }
+            >
+              <SelectTrigger>
+                <SelectValue
+                  placeholder={
+                    countersLoading ? t('loading') : t('select_counter')
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {availableCounters.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </>
+      )}
+      <div className='grid gap-2'>
+        <Label>{t('locale')}</Label>
+        <Select value={formLocale} onValueChange={setFormLocale}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value='en'>English</SelectItem>
+            <SelectItem value='ru'>Русский</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className='flex items-center justify-between gap-4 rounded-lg border p-3'>
+        <div className='space-y-0.5'>
+          <Label htmlFor={`${idPrefix}-kiosk-fs`}>
+            {t('kiosk_fullscreen')}
+          </Label>
+          <p className='text-muted-foreground text-xs'>
+            {t('kiosk_fullscreen_hint')}
+          </p>
+        </div>
+        <Switch
+          id={`${idPrefix}-kiosk-fs`}
+          checked={formKioskFullscreen}
+          onCheckedChange={setFormKioskFullscreen}
+        />
+      </div>
+    </>
+  );
 
   return (
     <div className='container mx-auto max-w-6xl space-y-6 p-4 md:p-8'>
@@ -223,6 +534,7 @@ export default function DesktopTerminalsPage() {
                 <TableRow>
                   <TableHead>{t('table.name')}</TableHead>
                   <TableHead>{t('table.unit')}</TableHead>
+                  <TableHead>{t('table.counter')}</TableHead>
                   <TableHead>{t('table.locale')}</TableHead>
                   <TableHead>{t('table.kiosk_fullscreen')}</TableHead>
                   <TableHead>{t('table.status')}</TableHead>
@@ -239,6 +551,11 @@ export default function DesktopTerminalsPage() {
                       {row.name?.trim() || '—'}
                     </TableCell>
                     <TableCell>{row.unitName ?? row.unitId}</TableCell>
+                    <TableCell>
+                      {row.counterId
+                        ? row.counterName?.trim() || row.counterId
+                        : '—'}
+                    </TableCell>
                     <TableCell>{row.defaultLocale}</TableCell>
                     <TableCell>
                       {row.kioskFullscreen ? (
@@ -295,57 +612,7 @@ export default function DesktopTerminalsPage() {
             <DialogTitle>{t('create_title')}</DialogTitle>
             <DialogDescription>{t('create_desc')}</DialogDescription>
           </DialogHeader>
-          <div className='grid gap-4 py-2'>
-            <div className='grid gap-2'>
-              <Label htmlFor='dt-name'>{t('name_optional')}</Label>
-              <Input
-                id='dt-name'
-                value={formName}
-                onChange={(e) => setFormName(e.target.value)}
-                placeholder={t('name_placeholder')}
-              />
-            </div>
-            <div className='grid gap-2'>
-              <Label>{t('unit')}</Label>
-              <Select value={formUnitId} onValueChange={setFormUnitId}>
-                <SelectTrigger>
-                  <SelectValue placeholder={t('select_unit')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {units.map((u) => (
-                    <SelectItem key={u.id} value={u.id}>
-                      {u.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className='grid gap-2'>
-              <Label>{t('locale')}</Label>
-              <Select value={formLocale} onValueChange={setFormLocale}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value='en'>English</SelectItem>
-                  <SelectItem value='ru'>Русский</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className='flex items-center justify-between gap-4 rounded-lg border p-3'>
-              <div className='space-y-0.5'>
-                <Label htmlFor='dt-kiosk-fs'>{t('kiosk_fullscreen')}</Label>
-                <p className='text-muted-foreground text-xs'>
-                  {t('kiosk_fullscreen_hint')}
-                </p>
-              </div>
-              <Switch
-                id='dt-kiosk-fs'
-                checked={formKioskFullscreen}
-                onCheckedChange={setFormKioskFullscreen}
-              />
-            </div>
-          </div>
+          <div className='grid gap-4 py-2'>{terminalFormFields('dt')}</div>
           <DialogFooter>
             <Button variant='outline' onClick={() => setCreateOpen(false)}>
               {t('cancel')}
@@ -360,59 +627,7 @@ export default function DesktopTerminalsPage() {
           <DialogHeader>
             <DialogTitle>{t('edit_title')}</DialogTitle>
           </DialogHeader>
-          <div className='grid gap-4 py-2'>
-            <div className='grid gap-2'>
-              <Label htmlFor='dt-edit-name'>{t('name_optional')}</Label>
-              <Input
-                id='dt-edit-name'
-                value={formName}
-                onChange={(e) => setFormName(e.target.value)}
-                placeholder={t('name_placeholder')}
-              />
-            </div>
-            <div className='grid gap-2'>
-              <Label>{t('unit')}</Label>
-              <Select value={formUnitId} onValueChange={setFormUnitId}>
-                <SelectTrigger>
-                  <SelectValue placeholder={t('select_unit')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {units.map((u) => (
-                    <SelectItem key={u.id} value={u.id}>
-                      {u.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className='grid gap-2'>
-              <Label>{t('locale')}</Label>
-              <Select value={formLocale} onValueChange={setFormLocale}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value='en'>English</SelectItem>
-                  <SelectItem value='ru'>Русский</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className='flex items-center justify-between gap-4 rounded-lg border p-3'>
-              <div className='space-y-0.5'>
-                <Label htmlFor='dt-edit-kiosk-fs'>
-                  {t('kiosk_fullscreen')}
-                </Label>
-                <p className='text-muted-foreground text-xs'>
-                  {t('kiosk_fullscreen_hint')}
-                </p>
-              </div>
-              <Switch
-                id='dt-edit-kiosk-fs'
-                checked={formKioskFullscreen}
-                onCheckedChange={setFormKioskFullscreen}
-              />
-            </div>
-          </div>
+          <div className='grid gap-4 py-2'>{terminalFormFields('dt-edit')}</div>
           <DialogFooter>
             <Button variant='outline' onClick={() => setEditOpen(false)}>
               {t('cancel')}

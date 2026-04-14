@@ -118,7 +118,7 @@ export function SidebarActiveUnitSelect({ className }: { className?: string }) {
           className='truncate'
         />
       </SelectTrigger>
-      <SelectContent position='popper' align='start' className='z-50'>
+      <SelectContent position='popper' align='start' className='z-[110]'>
         {assignableUnitIds.map((id) => (
           <SelectItem key={id} value={id}>
             <span className='truncate' title={labelById.get(id) ?? id}>
@@ -157,7 +157,7 @@ export function SidebarActiveUnitSelect({ className }: { className?: string }) {
               <Building2 className='size-4' />
             </SidebarMenuButton>
           </PopoverTrigger>
-          <PopoverContent side='right' align='start' className='z-50 w-72'>
+          <PopoverContent side='right' align='start' className='z-[110] w-72'>
             <div className='space-y-2'>
               <Label htmlFor='sidebar-active-unit-popover'>
                 {tNav('active_unit')}

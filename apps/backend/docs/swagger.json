@@ -694,6 +694,28 @@
                     "url"
                 ]
             },
+            "handlers.UploadSurveyCompletionImageResponse": {
+                "properties": {
+                    "url": {
+                        "type": "string"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "url"
+                ]
+            },
+            "handlers.UploadSurveyIdleMediaResponse": {
+                "properties": {
+                    "url": {
+                        "type": "string"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "url"
+                ]
+            },
             "handlers.UsageMetricInfoResponse": {
                 "properties": {
                     "current": {
@@ -742,6 +764,30 @@
                 },
                 "type": "object"
             },
+            "handlers.createSurveyRequest": {
+                "properties": {
+                    "completionMessage": {
+                        "type": "object"
+                    },
+                    "displayTheme": {
+                        "type": "object"
+                    },
+                    "idleScreen": {
+                        "type": "object"
+                    },
+                    "questions": {
+                        "type": "object"
+                    },
+                    "title": {
+                        "type": "string"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "title",
+                    "questions"
+                ]
+            },
             "handlers.createVisitorTagDefinitionRequest": {
                 "properties": {
                     "color": {
@@ -760,6 +806,46 @@
                     "label"
                 ],
                 "type": "object"
+            },
+            "handlers.guestSurveySubmitRequest": {
+                "properties": {
+                    "answers": {
+                        "type": "object"
+                    },
+                    "surveyId": {
+                        "type": "string"
+                    },
+                    "ticketId": {
+                        "type": "string"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "ticketId",
+                    "surveyId",
+                    "answers"
+                ]
+            },
+            "handlers.patchSurveyRequest": {
+                "properties": {
+                    "completionMessage": {
+                        "type": "object"
+                    },
+                    "displayTheme": {
+                        "type": "object"
+                    },
+                    "idleScreen": {
+                        "type": "object"
+                    },
+                    "questions": {
+                        "type": "object"
+                    },
+                    "title": {
+                        "type": "string"
+                    }
+                },
+                "type": "object",
+                "minProperties": 1
             },
             "handlers.patchVisitorTagDefinitionRequest": {
                 "properties": {
@@ -1935,6 +2021,76 @@
                 },
                 "type": "object"
             },
+            "models.SurveyDefinition": {
+                "properties": {
+                    "companyId": {
+                        "type": "string"
+                    },
+                    "completionMessage": {
+                        "description": "CompletionMessage optional per-locale Markdown shown after survey submit (e.g. {\"en\":\"...\",\"ru\":\"...\"}).",
+                        "type": "object"
+                    },
+                    "createdAt": {
+                        "type": "string"
+                    },
+                    "displayTheme": {
+                        "description": "DisplayTheme optional JSON for counter-display terminal colors (see validateDisplayTheme).",
+                        "type": "object"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "idleScreen": {
+                        "description": "IdleScreen optional JSON for counter idle carousel (text/image/video slides); see validateIdleScreen.",
+                        "type": "object"
+                    },
+                    "isActive": {
+                        "type": "boolean"
+                    },
+                    "questions": {
+                        "type": "object"
+                    },
+                    "scopeUnitId": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "updatedAt": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "models.SurveyResponse": {
+                "properties": {
+                    "answers": {
+                        "type": "object"
+                    },
+                    "clientId": {
+                        "type": "string"
+                    },
+                    "counterId": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "submittedAt": {
+                        "type": "string"
+                    },
+                    "surveyDefinitionId": {
+                        "type": "string"
+                    },
+                    "ticketId": {
+                        "type": "string"
+                    },
+                    "unitId": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "models.Ticket": {
                 "properties": {
                     "booking": {
@@ -2343,6 +2499,67 @@
                         "type": "string"
                     },
                     "updatedAt": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "services.GuestSurveySession": {
+                "properties": {
+                    "activeSurveySubmitted": {
+                        "type": "boolean"
+                    },
+                    "activeTicket": {
+                        "$ref": "#/components/schemas/services.GuestSurveySessionTicket"
+                    },
+                    "counterId": {
+                        "type": "string"
+                    },
+                    "counterName": {
+                        "type": "string"
+                    },
+                    "idleScreen": {
+                        "description": "IdleScreen from the active survey for this counter (service zone scope first), regardless of ticket.",
+                        "type": "object"
+                    },
+                    "survey": {
+                        "$ref": "#/components/schemas/services.GuestSurveySessionSurvey"
+                    },
+                    "unitConfig": {
+                        "type": "object"
+                    }
+                },
+                "type": "object"
+            },
+            "services.GuestSurveySessionSurvey": {
+                "properties": {
+                    "completionMessage": {
+                        "type": "object"
+                    },
+                    "displayTheme": {
+                        "type": "object"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "questions": {
+                        "type": "object"
+                    },
+                    "title": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "services.GuestSurveySessionTicket": {
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "queueNumber": {
+                        "type": "string"
+                    },
+                    "status": {
                         "type": "string"
                     }
                 },
@@ -9382,6 +9599,55 @@
                 ]
             }
         },
+        "/units/{unitId}/clients/{clientId}/survey-responses": {
+            "get": {
+                "operationId": "ListResponsesForClient",
+                "parameters": [
+                    {
+                        "description": "Subdivision unit id",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Client id",
+                        "in": "path",
+                        "name": "clientId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/models.SurveyResponse"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List survey responses for a client (requires ACCESS_SURVEY_RESPONSES)",
+                "tags": [
+                    "surveys"
+                ]
+            }
+        },
         "/units/{unitId}/clients/{clientId}/visits": {
             "get": {
                 "description": "Tickets linked to the client in this unit; empty for anonymous client.",
@@ -9526,6 +9792,546 @@
                 "summary": "Get counters by unit",
                 "tags": [
                     "counters"
+                ]
+            }
+        },
+        "/units/{unitId}/guest-survey/completion-images/{fileName}": {
+            "get": {
+                "description": "Streams image bytes. Requires Authorization: Bearer (staff user JWT or counter terminal JWT). This URL is not embeddable from unauthenticated contexts: plain <img src>, Markdown image syntax, or server-side markdown renderers without the token will fail. Clients should fetch with the Bearer token (e.g. browser fetch) and create an object/blob URL, or proxy the bytes with auth.",
+                "operationId": "GetSurveyCompletionImage",
+                "parameters": [
+                    {
+                        "description": "Unit id",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Object file name (uuid.ext)",
+                        "in": "path",
+                        "name": "fileName",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/octet-stream": {
+                                "schema": {
+                                    "format": "binary",
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/octet-stream": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/octet-stream": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/octet-stream": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/octet-stream": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Not Found"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get guest survey completion markdown image (staff or terminal JWT)",
+                "tags": [
+                    "guest-survey"
+                ]
+            }
+        },
+        "/units/{unitId}/guest-survey/idle-media": {
+            "post": {
+                "description": "Multipart file field \"file\". Returns an API-relative URL for idle_screen JSON. The GET for that media path requires BearerAuth and is not a public embed URL—counter UIs must fetch with the terminal JWT and use blob URLs (see Get guest survey idle slide media).",
+                "operationId": "UploadIdleMedia",
+                "parameters": [
+                    {
+                        "description": "Scope unit id",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "properties": {
+                                    "file": {
+                                        "description": "Image or video file",
+                                        "format": "binary",
+                                        "type": "string",
+                                        "x-formData-name": "file"
+                                    }
+                                },
+                                "required": [
+                                    "file"
+                                ],
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.UploadSurveyIdleMediaResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "413": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Request body too large"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Upload guest survey idle slide image or video",
+                "tags": [
+                    "surveys"
+                ]
+            }
+        },
+        "/units/{unitId}/guest-survey/idle-media/{fileName}": {
+            "delete": {
+                "operationId": "DeleteSurveyIdleMedia",
+                "parameters": [
+                    {
+                        "description": "Scope unit id",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Object file name (uuid.ext)",
+                        "in": "path",
+                        "name": "fileName",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Conflict — file still referenced by a survey"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Delete guest survey idle slide media object (S3)",
+                "tags": [
+                    "surveys"
+                ]
+            },
+            "get": {
+                "description": "Streams image/video bytes. Requires Authorization: Bearer. Not a public URL for <img>/<video> src or static markdown—use authenticated fetch and blob/object URLs (or a signed public URL if the product adds one).",
+                "operationId": "GetSurveyIdleMedia",
+                "parameters": [
+                    {
+                        "description": "Unit id",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Object file name (uuid.ext)",
+                        "in": "path",
+                        "name": "fileName",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/octet-stream": {
+                                "schema": {
+                                    "format": "binary",
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/octet-stream": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/octet-stream": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/octet-stream": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/octet-stream": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Not Found"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get guest survey idle slide media (staff or terminal JWT)",
+                "tags": [
+                    "guest-survey"
+                ]
+            }
+        },
+        "/units/{unitId}/guest-survey/responses": {
+            "post": {
+                "operationId": "guestSurveySubmitResponse",
+                "parameters": [
+                    {
+                        "description": "Subdivision unit id",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.guestSurveySubmitRequest"
+                            }
+                        }
+                    },
+                    "description": "Payload",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Submit guest survey (terminal)",
+                "tags": [
+                    "guest-survey"
+                ]
+            }
+        },
+        "/units/{unitId}/guest-survey/session": {
+            "get": {
+                "operationId": "guestSurveySession",
+                "parameters": [
+                    {
+                        "description": "Subdivision unit id (queue scope)",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/services.GuestSurveySession"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Guest survey session (terminal)",
+                "tags": [
+                    "guest-survey"
                 ]
             }
         },
@@ -11316,6 +12122,347 @@
                 "summary": "Generate service slots for a date range",
                 "tags": [
                     "slots"
+                ]
+            }
+        },
+        "/units/{unitId}/survey-completion-images": {
+            "post": {
+                "description": "Multipart file field \"file\". Returns an API-relative URL string. The GET for that path requires BearerAuth; it is not usable as a bare <img src> or static markdown image URL—clients must fetch with Authorization and use a blob/object URL (or proxy) to display.",
+                "operationId": "UploadCompletionImage",
+                "parameters": [
+                    {
+                        "description": "Scope unit id",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "properties": {
+                                    "file": {
+                                        "description": "Image file",
+                                        "format": "binary",
+                                        "type": "string",
+                                        "x-formData-name": "file"
+                                    }
+                                },
+                                "required": [
+                                    "file"
+                                ],
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.UploadSurveyCompletionImageResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "413": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Request body too large"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Upload guest survey completion markdown image",
+                "tags": [
+                    "surveys"
+                ]
+            }
+        },
+        "/units/{unitId}/survey-responses": {
+            "get": {
+                "operationId": "ListResponses",
+                "parameters": [
+                    {
+                        "description": "Subdivision unit id",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Limit",
+                        "in": "query",
+                        "name": "limit",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Offset",
+                        "in": "query",
+                        "name": "offset",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/models.SurveyResponse"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List survey responses for a subdivision (requires ACCESS_SURVEY_RESPONSES)",
+                "tags": [
+                    "surveys"
+                ]
+            }
+        },
+        "/units/{unitId}/surveys": {
+            "get": {
+                "operationId": "ListDefinitions",
+                "parameters": [
+                    {
+                        "description": "Scope unit id (subdivision or service_zone)",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/models.SurveyDefinition"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List survey definitions for a scope unit",
+                "tags": [
+                    "surveys"
+                ]
+            },
+            "post": {
+                "operationId": "CreateDefinition",
+                "parameters": [
+                    {
+                        "description": "Scope unit id",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.createSurveyRequest"
+                            }
+                        }
+                    },
+                    "description": "Payload",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/models.SurveyDefinition"
+                                }
+                            }
+                        },
+                        "description": "Created"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Create survey definition",
+                "tags": [
+                    "surveys"
+                ]
+            }
+        },
+        "/units/{unitId}/surveys/{surveyId}": {
+            "patch": {
+                "operationId": "PatchDefinition",
+                "parameters": [
+                    {
+                        "description": "Scope unit id",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Survey id",
+                        "in": "path",
+                        "name": "surveyId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.patchSurveyRequest"
+                            }
+                        }
+                    },
+                    "description": "Payload",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Patch survey definition",
+                "tags": [
+                    "surveys"
+                ]
+            }
+        },
+        "/units/{unitId}/surveys/{surveyId}/activate": {
+            "post": {
+                "operationId": "ActivateDefinition",
+                "parameters": [
+                    {
+                        "description": "Scope unit id",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Survey id",
+                        "in": "path",
+                        "name": "surveyId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Set survey as the active one for its scope",
+                "tags": [
+                    "surveys"
                 ]
             }
         },

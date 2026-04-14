@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -17,6 +19,10 @@ import (
 
 type StorageService interface {
 	UploadFile(ctx context.Context, fileBytes []byte, fileName string, folder string, contentType string) (string, string, error)
+	// UploadTenantAsset stores a private object at tenants/{tenantID}/{category}/{uuid}{ext}. Returns S3 object key only (no public URL).
+	UploadTenantAsset(ctx context.Context, tenantID, category string, fileBytes []byte, fileName string, contentType string) (key string, err error)
+	// GetObject streams a private object; caller must close the body.
+	GetObject(ctx context.Context, key string) (body io.ReadCloser, contentType string, err error)
 	DeleteFile(ctx context.Context, key string) error
 }
 
@@ -122,6 +128,73 @@ func (s *storageService) UploadFile(ctx context.Context, fileBytes []byte, fileN
 	}
 
 	return url, key, nil
+}
+
+func (s *storageService) UploadTenantAsset(ctx context.Context, tenantID, category string, fileBytes []byte, fileName string, contentType string) (string, error) {
+	if s.client == nil {
+		return "", fmt.Errorf("storage client not initialized")
+	}
+	tid := strings.TrimSpace(tenantID)
+	cat := strings.TrimSpace(category)
+	if tid == "" || cat == "" {
+		return "", fmt.Errorf("tenantID and category are required")
+	}
+	if strings.Contains(tid, "/") || strings.Contains(cat, "/") {
+		return "", fmt.Errorf("invalid tenantID or category")
+	}
+	ext := filepath.Ext(fileName)
+	id := uuid.New().String()
+	key := fmt.Sprintf("tenants/%s/%s/%s%s", tid, cat, id, ext)
+
+	_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket:      aws.String(s.bucketName),
+		Key:         aws.String(key),
+		Body:        bytes.NewReader(fileBytes),
+		ContentType: aws.String(contentType),
+	})
+	if err != nil {
+		log.Printf("Failed to upload tenant asset to S3: %v", err)
+		return "", err
+	}
+	return key, nil
+}
+
+func validatePrivateObjectKey(key string) error {
+	k := strings.TrimSpace(key)
+	if k == "" {
+		return fmt.Errorf("empty object key")
+	}
+	if strings.Contains(k, "..") {
+		return fmt.Errorf("invalid object key")
+	}
+	if !strings.HasPrefix(k, "tenants/") && !strings.HasPrefix(k, "public/") {
+		return fmt.Errorf("object key has disallowed prefix")
+	}
+	return nil
+}
+
+func (s *storageService) GetObject(ctx context.Context, key string) (io.ReadCloser, string, error) {
+	if s.client == nil {
+		return nil, "", fmt.Errorf("storage client not initialized")
+	}
+	if err := validatePrivateObjectKey(key); err != nil {
+		return nil, "", err
+	}
+	out, err := s.client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(s.bucketName),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return nil, "", err
+	}
+	ct := ""
+	if out.ContentType != nil {
+		ct = *out.ContentType
+	}
+	if ct == "" {
+		ct = "application/octet-stream"
+	}
+	return out.Body, ct, nil
 }
 
 func (s *storageService) DeleteFile(ctx context.Context, key string) error {
