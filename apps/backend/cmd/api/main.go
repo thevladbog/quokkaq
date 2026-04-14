@@ -157,7 +157,9 @@ func main() {
 	invitationService := services.NewInvitationService(invitationRepo, mailService, userRepo, templateService)
 	slotService := services.NewSlotService(slotRepo, preRegRepo)
 	preRegService := services.NewPreRegistrationService(preRegRepo, slotRepo, ticketRepo, serviceRepo)
-	desktopTerminalService := services.NewDesktopTerminalService(desktopTerminalRepo, unitRepo)
+	desktopTerminalService := services.NewDesktopTerminalService(desktopTerminalRepo, unitRepo, counterRepo)
+	surveyRepo := repository.NewSurveyRepository()
+	surveyService := services.NewSurveyService(surveyRepo, unitRepo, userRepo, ticketRepo, desktopTerminalRepo, counterRepo, storageService)
 	quotaService := services.NewQuotaService()
 
 	userHandler := handlers.NewUserHandler(userService)
@@ -176,6 +178,8 @@ func main() {
 	visitorTagHandler := handlers.NewVisitorTagHandler(visitorTagDefService)
 	uploadHandler := handlers.NewUploadHandler(storageService)
 	desktopTerminalHandler := handlers.NewDesktopTerminalHandler(desktopTerminalService)
+	surveyHandler := handlers.NewSurveyHandler(surveyService, storageService)
+	guestSurveyHandler := handlers.NewGuestSurveyHandler(surveyService)
 	usageHandler := handlers.NewUsageHandler(quotaService, userRepo)
 
 	var paymentProvider services.PaymentProvider
@@ -347,6 +351,20 @@ func main() {
 
 		r.Group(func(r chi.Router) {
 			r.Use(authmiddleware.JWTAuth)
+			r.Use(authmiddleware.RequireTerminalGuestSurvey("unitId"))
+			r.Get("/{unitId}/guest-survey/session", guestSurveyHandler.Session)
+			r.Post("/{unitId}/guest-survey/responses", guestSurveyHandler.SubmitResponse)
+		})
+
+		r.Group(func(r chi.Router) {
+			r.Use(authmiddleware.JWTAuth)
+			r.Use(authmiddleware.RequireGuestSurveyCompletionImageRead(userRepo, "unitId"))
+			r.Get("/{unitId}/guest-survey/completion-images/{fileName}", surveyHandler.GetSurveyCompletionImage)
+			r.Get("/{unitId}/guest-survey/idle-media/{fileName}", surveyHandler.GetSurveyIdleMedia)
+		})
+
+		r.Group(func(r chi.Router) {
+			r.Use(authmiddleware.JWTAuth)
 			r.Use(authmiddleware.RequireAdmin(userRepo))
 			r.Post("/", unitHandler.CreateUnit)
 			r.Patch("/{id}", unitHandler.UpdateUnit)
@@ -381,6 +399,7 @@ func main() {
 			r.Get("/{unitId}/clients/search", unitClientHandler.SearchClients)
 			r.Get("/{unitId}/clients/{clientId}/history", unitClientHandler.ListClientHistory)
 			r.Get("/{unitId}/clients/{clientId}/visits", unitClientHandler.ListClientVisits)
+			r.Get("/{unitId}/clients/{clientId}/survey-responses", surveyHandler.ListResponsesForClient)
 			r.Get("/{unitId}/clients", unitClientHandler.ListUnitClients)
 			r.Get("/{unitId}/clients/{clientId}", unitClientHandler.GetUnitClient)
 			r.Patch("/{unitId}/clients/{clientId}", unitClientHandler.PatchUnitClient)
@@ -389,6 +408,16 @@ func main() {
 			r.Patch("/{unitId}/visitor-tag-definitions/{definitionId}", visitorTagHandler.PatchVisitorTagDefinition)
 			r.Delete("/{unitId}/visitor-tag-definitions/{definitionId}", visitorTagHandler.DeleteVisitorTagDefinition)
 			r.Post("/{unitId}/counters", counterHandler.CreateCounter)
+			r.Get("/{unitId}/surveys", surveyHandler.ListDefinitions)
+			r.Post("/{unitId}/surveys", surveyHandler.CreateDefinition)
+			// Not under .../surveys/{surveyId}: chi would match "upload-completion-image" as surveyId → POST → 405.
+			r.Post("/{unitId}/survey-completion-images", surveyHandler.UploadCompletionImage)
+			// POST collection URL (same prefix as GET/DELETE idle-media) — avoids proxies missing /survey-idle-media.
+			r.Post("/{unitId}/guest-survey/idle-media", surveyHandler.UploadIdleMedia)
+			r.Delete("/{unitId}/guest-survey/idle-media/{fileName}", surveyHandler.DeleteSurveyIdleMedia)
+			r.Patch("/{unitId}/surveys/{surveyId}", surveyHandler.PatchDefinition)
+			r.Post("/{unitId}/surveys/{surveyId}/activate", surveyHandler.ActivateDefinition)
+			r.Get("/{unitId}/survey-responses", surveyHandler.ListResponses)
 		})
 	})
 

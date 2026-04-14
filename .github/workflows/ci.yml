@@ -18,7 +18,6 @@ env:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  # Merge queue builds must not be cancelled by newer queue entries on the same ref pattern.
   cancel-in-progress: ${{ github.event_name != 'merge_group' }}
 
 jobs:
@@ -26,7 +25,6 @@ jobs:
     name: Detect affected apps
     runs-on: ubuntu-latest
     env:
-      # Same base/head as build-and-test so "kiosk affected" matches nx affected -t build
       NX_BASE: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha || github.event.before || 'origin/main' }}
       NX_HEAD: ${{ github.event.merge_group.head_sha || github.sha }}
     outputs:
@@ -54,7 +52,7 @@ jobs:
         run: |
           AFFECTED="$(pnpm nx show projects --affected --base=$NX_BASE --head=$NX_HEAD)"
 
-          if echo "$AFFECTED" | grep -q "frontend"; then
+          if echo "$AFFECTED" | grep -qE 'frontend|shared-types|ui-kit'; then
             echo "frontend=true" >> $GITHUB_OUTPUT
           else
             echo "frontend=false" >> $GITHUB_OUTPUT
@@ -66,21 +64,44 @@ jobs:
             echo "backend=false" >> $GITHUB_OUTPUT
           fi
 
-          if echo "$AFFECTED" | grep -q "kiosk-desktop"; then
+          if echo "$AFFECTED" | grep -qE 'kiosk-desktop|kiosk-lib'; then
             echo "kiosk=true" >> $GITHUB_OUTPUT
           else
             echo "kiosk=false" >> $GITHUB_OUTPUT
           fi
 
-  build-and-test:
-    name: Build and test affected
+  ci-sherif:
+    name: Workspace (sherif)
     runs-on: ubuntu-latest
     needs: affected
     if: ${{ needs.affected.outputs.frontend == 'true' || needs.affected.outputs.backend == 'true' || needs.affected.outputs.kiosk == 'true' }}
-    permissions:
-      contents: read
-      checks: write
-      pull-requests: write
+    env:
+      NX_BASE: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha || github.event.before || 'origin/main' }}
+      NX_HEAD: ${{ github.event.merge_group.head_sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check pnpm workspace (sherif)
+        run: pnpm exec sherif -r packages-without-package-json
+
+  ci-openapi:
+    name: OpenAPI / Orval
+    runs-on: ubuntu-latest
+    needs: affected
+    if: ${{ needs.affected.outputs.frontend == 'true' || needs.affected.outputs.backend == 'true' }}
     env:
       NX_BASE: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha || github.event.before || 'origin/main' }}
       NX_HEAD: ${{ github.event.merge_group.head_sha || github.sha }}
@@ -102,8 +123,146 @@ jobs:
         with:
           go-version-file: apps/backend/go.mod
 
-      # Always on this runner: nx affected can include kiosk-desktop even if the detect job
-      # previously disagreed (e.g. base/head drift). GTK/WebKit are required for tauri build on Linux.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify OpenAPI 3 artifacts match doc pipeline (backend)
+        if: needs.affected.outputs.backend == 'true'
+        working-directory: apps/backend
+        run: |
+          python3 -m pip install --user 'PyYAML>=6.0,<7'
+          go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g cmd/api/main.go -o ./docs
+          go run ./cmd/swagger-to-openapi3
+          python3 scripts/post_swagger_openapi_tweaks.py
+          git diff --exit-code docs/docs.go docs/swagger.json docs/swagger.yaml
+
+      - name: Orval client in sync with OpenAPI
+        run: pnpm nx run frontend:orval:check
+
+  ci-frontend:
+    name: Frontend (build, test, lint)
+    runs-on: ubuntu-latest
+    needs: affected
+    if: ${{ needs.affected.outputs.frontend == 'true' }}
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+    env:
+      NX_BASE: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha || github.event.before || 'origin/main' }}
+      NX_HEAD: ${{ github.event.merge_group.head_sha || github.sha }}
+      NX_EXCLUDE_WEB: '*,!tag:platform:web,!tag:scope:shared,!tag:scope:ui'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prettier (frontend)
+        run: pnpm nx run frontend:format:check
+
+      - name: Typecheck frontend (tsc --noEmit)
+        run: pnpm --dir apps/frontend exec tsc --noEmit
+
+      - name: Build, test, lint (affected web stack)
+        run: pnpm nx affected -t build,test,lint --base=$NX_BASE --head=$NX_HEAD --outputStyle=static --parallel=3 --exclude="$NX_EXCLUDE_WEB"
+
+      - name: Publish Vitest JUnit
+        if: always() && hashFiles('apps/frontend/test-results/vitest-junit.xml') != ''
+        uses: EnricoMi/publish-unit-test-result-action@v2.23.0
+        with:
+          files: apps/frontend/test-results/vitest-junit.xml
+          check_name: Vitest (frontend)
+          comment_mode: ${{ github.event_name == 'pull_request' && 'always' || 'off' }}
+
+  ci-backend:
+    name: Backend (build, test, lint)
+    runs-on: ubuntu-latest
+    needs: affected
+    if: ${{ needs.affected.outputs.backend == 'true' }}
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+    env:
+      NX_BASE: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha || github.event.before || 'origin/main' }}
+      NX_HEAD: ${{ github.event.merge_group.head_sha || github.sha }}
+      NX_EXCLUDE_BACKEND: '*,!tag:platform:backend'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: apps/backend/go.mod
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build, test, lint (affected backend)
+        env:
+          CI: true
+        run: pnpm nx affected -t build,test,lint --base=$NX_BASE --head=$NX_HEAD --outputStyle=static --parallel=3 --exclude="$NX_EXCLUDE_BACKEND"
+
+      - name: Publish Go JUnit
+        if: always() && hashFiles('apps/backend/test-results/go-junit.xml') != ''
+        uses: EnricoMi/publish-unit-test-result-action@v2.23.0
+        with:
+          files: apps/backend/test-results/go-junit.xml
+          check_name: Go (backend)
+          comment_mode: ${{ github.event_name == 'pull_request' && 'always' || 'off' }}
+
+  ci-kiosk:
+    name: Kiosk desktop (build, test, lint)
+    runs-on: ubuntu-latest
+    needs: affected
+    if: ${{ needs.affected.outputs.kiosk == 'true' }}
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+    env:
+      NX_BASE: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha || github.event.before || 'origin/main' }}
+      NX_HEAD: ${{ github.event.merge_group.head_sha || github.sha }}
+      NX_EXCLUDE_KIOSK: '*,!tag:platform:desktop,!tag:scope:kiosk'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+
       - name: Install Tauri / GTK system dependencies (Linux)
         run: |
           sudo apt-get update
@@ -123,75 +282,70 @@ jobs:
             libudev-dev \
             patchelf
 
-      - uses: dtolnay/rust-toolchain@stable
-        if: needs.affected.outputs.kiosk == 'true'
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Check pnpm workspace (sherif)
-        # apps/backend is Go-only (no package.json); allow that workspace quirk.
-        run: pnpm exec sherif -r packages-without-package-json
+      - name: Build, test, lint (affected kiosk)
+        env:
+          CI: true
+        run: pnpm nx affected -t build,test,lint --base=$NX_BASE --head=$NX_HEAD --outputStyle=static --parallel=3 --exclude="$NX_EXCLUDE_KIOSK"
 
-      - name: Verify OpenAPI 3 artifacts match doc pipeline (backend)
-        if: needs.affected.outputs.backend == 'true'
-        working-directory: apps/backend
-        run: |
-          python3 -m pip install --user 'PyYAML>=6.0,<7'
-          go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g cmd/api/main.go -o ./docs
-          go run ./cmd/swagger-to-openapi3
-          python3 scripts/post_swagger_openapi_tweaks.py
-          git diff --exit-code docs/docs.go docs/swagger.json docs/swagger.yaml
-
-      - name: Prettier (frontend)
-        if: needs.affected.outputs.frontend == 'true'
-        run: pnpm nx run frontend:format:check
-
-      - name: Typecheck frontend (tsc --noEmit)
-        if: needs.affected.outputs.frontend == 'true'
-        run: pnpm --dir apps/frontend exec tsc --noEmit
-
-      - name: Orval client in sync with OpenAPI (frontend / backend docs)
-        if: needs.affected.outputs.frontend == 'true' || needs.affected.outputs.backend == 'true'
-        run: pnpm nx run frontend:orval:check
-
-      - name: Build affected
-        run: pnpm nx affected -t build --base=$NX_BASE --head=$NX_HEAD
-
-      - name: Test affected (non-backend)
-        run: pnpm nx affected -t test --base=$NX_BASE --head=$NX_HEAD --skip-nx-cache --exclude=backend
-
-      - name: Test affected backend (coverage)
-        run: pnpm nx affected -t test:ci --base=$NX_BASE --head=$NX_HEAD --skip-nx-cache
-
-      - name: Lint affected
-        run: pnpm nx affected -t lint --base=$NX_BASE --head=$NX_HEAD --skip-nx-cache
-
-      - name: Publish Vitest JUnit results
-        if: always() && hashFiles('apps/frontend/test-results/vitest-junit.xml') != ''
+      - name: Publish Nextest JUnit
+        if: always() && hashFiles('apps/kiosk-desktop/src-tauri/target/nextest/ci/junit.xml') != ''
         uses: EnricoMi/publish-unit-test-result-action@v2.23.0
         with:
-          files: apps/frontend/test-results/vitest-junit.xml
-          check_name: Vitest (frontend)
-          # PR comments only; merge_group/push still get the check run + job summary.
+          files: apps/kiosk-desktop/src-tauri/target/nextest/ci/junit.xml
+          check_name: Nextest (kiosk-desktop)
           comment_mode: ${{ github.event_name == 'pull_request' && 'always' || 'off' }}
 
-      - name: Upload coverage to Codecov (frontend)
-        if: always() && hashFiles('apps/frontend/coverage/lcov.info') != ''
-        continue-on-error: true
-        uses: codecov/codecov-action@v6
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: apps/frontend/coverage/lcov.info
-          flags: frontend
-          fail_ci_if_error: false
+  ci-gate:
+    name: CI status
+    runs-on: ubuntu-latest
+    needs:
+      - affected
+      - ci-sherif
+      - ci-openapi
+      - ci-frontend
+      - ci-backend
+      - ci-kiosk
+    if: always()
+    steps:
+      - name: Verify required jobs
+        env:
+          FE: ${{ needs.affected.outputs.frontend }}
+          BE: ${{ needs.affected.outputs.backend }}
+          KIOSK: ${{ needs.affected.outputs.kiosk }}
+        run: |
+          set -euo pipefail
+          any=false
+          [ "$FE" = "true" ] && any=true
+          [ "$BE" = "true" ] && any=true
+          [ "$KIOSK" = "true" ] && any=true
 
-      - name: Upload coverage to Codecov (backend)
-        if: always() && hashFiles('apps/backend/coverage.out') != ''
-        continue-on-error: true
-        uses: codecov/codecov-action@v6
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: apps/backend/coverage.out
-          flags: backend
-          fail_ci_if_error: false
+          if [ "$any" != "true" ]; then
+            echo "No app projects in affected set; nothing to gate."
+            exit 0
+          fi
+
+          fail() { echo "::error::$1"; exit 1; }
+
+          [ "${{ needs.affected.result }}" = "success" ] || fail "Job affected did not succeed (${{ needs.affected.result }})."
+          [ "${{ needs.ci-sherif.result }}" = "success" ] || fail "Job ci-sherif did not succeed (${{ needs.ci-sherif.result }})."
+
+          if [ "$FE" = "true" ] || [ "$BE" = "true" ]; then
+            [ "${{ needs.ci-openapi.result }}" = "success" ] || fail "Job ci-openapi did not succeed (${{ needs.ci-openapi.result }})."
+          fi
+
+          if [ "$FE" = "true" ]; then
+            [ "${{ needs.ci-frontend.result }}" = "success" ] || fail "Job ci-frontend did not succeed (${{ needs.ci-frontend.result }})."
+          fi
+
+          if [ "$BE" = "true" ]; then
+            [ "${{ needs.ci-backend.result }}" = "success" ] || fail "Job ci-backend did not succeed (${{ needs.ci-backend.result }})."
+          fi
+
+          if [ "$KIOSK" = "true" ]; then
+            [ "${{ needs.ci-kiosk.result }}" = "success" ] || fail "Job ci-kiosk did not succeed (${{ needs.ci-kiosk.result }})."
+          fi
+
+          echo "All required CI jobs succeeded."

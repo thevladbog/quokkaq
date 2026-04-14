@@ -22,29 +22,33 @@ const (
 )
 
 var (
-	ErrInvalidTerminalCode = errors.New("invalid terminal code")
-	ErrInvalidLocale       = errors.New("locale must be en or ru")
+	ErrInvalidTerminalCode     = errors.New("invalid terminal code")
+	ErrInvalidLocale           = errors.New("locale must be en or ru")
+	ErrTerminalCounterContext  = errors.New("contextUnitId is required when counterId is set")
+	ErrTerminalCounterMismatch = errors.New("counter does not match selected organizational unit")
 )
 
 type DesktopTerminalService interface {
-	Create(name *string, unitID, defaultLocale string, kioskFullscreen bool) (*models.DesktopTerminal, string, error)
+	Create(name *string, unitID, defaultLocale string, kioskFullscreen bool, contextUnitID, counterID *string) (*models.DesktopTerminal, string, error)
 	List() ([]models.DesktopTerminal, error)
 	GetByID(id string) (*models.DesktopTerminal, error)
-	Update(id string, name *string, unitID, defaultLocale string, kioskFullscreen bool) error
+	Update(id string, name *string, unitID, defaultLocale string, kioskFullscreen bool, contextUnitID, counterID *string) error
 	Revoke(id string) error
-	Bootstrap(pairingCode string) (token, unitID, defaultLocale, appBaseURL string, kioskFullscreen bool, err error)
+	Bootstrap(pairingCode string) (token, unitID, defaultLocale, appBaseURL string, kioskFullscreen bool, counterID *string, err error)
 }
 
 type desktopTerminalService struct {
-	repo     repository.DesktopTerminalRepository
-	unitRepo repository.UnitRepository
+	repo        repository.DesktopTerminalRepository
+	unitRepo    repository.UnitRepository
+	counterRepo repository.CounterRepository
 }
 
 func NewDesktopTerminalService(
 	repo repository.DesktopTerminalRepository,
 	unitRepo repository.UnitRepository,
+	counterRepo repository.CounterRepository,
 ) DesktopTerminalService {
-	return &desktopTerminalService{repo: repo, unitRepo: unitRepo}
+	return &desktopTerminalService{repo: repo, unitRepo: unitRepo, counterRepo: counterRepo}
 }
 
 func (s *desktopTerminalService) codePepper() string {
@@ -89,14 +93,67 @@ func validateLocale(loc string) error {
 	}
 }
 
-func (s *desktopTerminalService) Create(name *string, unitID, defaultLocale string, kioskFullscreen bool) (*models.DesktopTerminal, string, error) {
+func (s *desktopTerminalService) resolveCounterBinding(unitID string, contextUnitID, counterID *string) (effectiveUnitID string, counterPtr *string, err error) {
+	cid := ""
+	if counterID != nil {
+		cid = strings.TrimSpace(*counterID)
+	}
+	if cid == "" {
+		if _, e := s.unitRepo.FindByIDLight(unitID); e != nil {
+			if repository.IsNotFound(e) {
+				return "", nil, errors.New("unit not found")
+			}
+			return "", nil, e
+		}
+		return unitID, nil, nil
+	}
+
+	if contextUnitID == nil || strings.TrimSpace(*contextUnitID) == "" {
+		return "", nil, ErrTerminalCounterContext
+	}
+	ctxID := strings.TrimSpace(*contextUnitID)
+
+	counter, e := s.counterRepo.FindByID(cid)
+	if e != nil {
+		if repository.IsNotFound(e) {
+			return "", nil, errors.New("counter not found")
+		}
+		return "", nil, e
+	}
+	ctxUnit, e := s.unitRepo.FindByIDLight(ctxID)
+	if e != nil {
+		if repository.IsNotFound(e) {
+			return "", nil, errors.New("context unit not found")
+		}
+		return "", nil, e
+	}
+	if !CounterMatchesOrgUnit(counter, ctxUnit) {
+		return "", nil, ErrTerminalCounterMismatch
+	}
+
+	u, e := s.unitRepo.FindByIDLight(counter.UnitID)
+	if e != nil {
+		return "", nil, e
+	}
+	ok, e := CompanyHasPlanFeature(u.CompanyID, PlanFeatureCounterGuestSurvey)
+	if e != nil {
+		return "", nil, e
+	}
+	if !ok {
+		return "", nil, ErrSurveyFeatureLocked
+	}
+
+	c := cid
+	return counter.UnitID, &c, nil
+}
+
+func (s *desktopTerminalService) Create(name *string, unitID, defaultLocale string, kioskFullscreen bool, contextUnitID, counterID *string) (*models.DesktopTerminal, string, error) {
 	if err := validateLocale(defaultLocale); err != nil {
 		return nil, "", err
 	}
-	if _, err := s.unitRepo.FindByIDLight(unitID); err != nil {
-		if repository.IsNotFound(err) {
-			return nil, "", errors.New("unit not found")
-		}
+
+	effectiveUnit, cPtr, err := s.resolveCounterBinding(unitID, contextUnitID, counterID)
+	if err != nil {
 		return nil, "", err
 	}
 
@@ -114,7 +171,8 @@ func (s *desktopTerminalService) Create(name *string, unitID, defaultLocale stri
 		}
 		loc := strings.ToLower(strings.TrimSpace(defaultLocale))
 		row = &models.DesktopTerminal{
-			UnitID:            unitID,
+			UnitID:            effectiveUnit,
+			CounterID:         cPtr,
 			Name:              name,
 			DefaultLocale:     loc,
 			KioskFullscreen:   kioskFullscreen,
@@ -144,22 +202,31 @@ func (s *desktopTerminalService) GetByID(id string) (*models.DesktopTerminal, er
 	return s.repo.FindByID(id)
 }
 
-func (s *desktopTerminalService) Update(id string, name *string, unitID, defaultLocale string, kioskFullscreen bool) error {
+func (s *desktopTerminalService) Update(id string, name *string, unitID, defaultLocale string, kioskFullscreen bool, contextUnitID, counterID *string) error {
 	if err := validateLocale(defaultLocale); err != nil {
-		return err
-	}
-	if _, err := s.unitRepo.FindByIDLight(unitID); err != nil {
-		if repository.IsNotFound(err) {
-			return errors.New("unit not found")
-		}
 		return err
 	}
 	t, err := s.repo.FindByID(id)
 	if err != nil {
 		return err
 	}
+
+	// Omitting counterId/contextUnitId in JSON leaves both nil: keep existing guest counter binding, only refresh metadata.
+	if contextUnitID == nil && counterID == nil && t.CounterID != nil && *t.CounterID != "" {
+		t.Name = name
+		t.DefaultLocale = strings.ToLower(strings.TrimSpace(defaultLocale))
+		t.KioskFullscreen = kioskFullscreen
+		return s.repo.Update(t)
+	}
+
+	effectiveUnit, cPtr, err := s.resolveCounterBinding(unitID, contextUnitID, counterID)
+	if err != nil {
+		return err
+	}
+
 	t.Name = name
-	t.UnitID = unitID
+	t.UnitID = effectiveUnit
+	t.CounterID = cPtr
 	t.DefaultLocale = strings.ToLower(strings.TrimSpace(defaultLocale))
 	t.KioskFullscreen = kioskFullscreen
 	return s.repo.Update(t)
@@ -175,14 +242,14 @@ func (s *desktopTerminalService) Revoke(id string) error {
 	return s.repo.Update(t)
 }
 
-func (s *desktopTerminalService) Bootstrap(pairingCode string) (token, unitID, defaultLocale, appBaseURL string, kioskFullscreen bool, err error) {
+func (s *desktopTerminalService) Bootstrap(pairingCode string) (token, unitID, defaultLocale, appBaseURL string, kioskFullscreen bool, counterID *string, err error) {
 	digest := pairingCodeDigest(s.codePepper(), pairingCode)
 	t, e := s.repo.FindByPairingCodeDigest(digest)
 	if e != nil || t.RevokedAt != nil {
-		return "", "", "", "", false, ErrInvalidTerminalCode
+		return "", "", "", "", false, nil, ErrInvalidTerminalCode
 	}
 	if bcrypt.CompareHashAndPassword([]byte(t.SecretHash), []byte(strings.TrimSpace(pairingCode))) != nil {
-		return "", "", "", "", false, ErrInvalidTerminalCode
+		return "", "", "", "", false, nil, ErrInvalidTerminalCode
 	}
 
 	secret := os.Getenv("JWT_SECRET")
@@ -197,10 +264,13 @@ func (s *desktopTerminalService) Bootstrap(pairingCode string) (token, unitID, d
 		"locale":  t.DefaultLocale,
 		"exp":     exp.Unix(),
 	}
+	if t.CounterID != nil && *t.CounterID != "" {
+		claims["counter_id"] = *t.CounterID
+	}
 	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	signed, e := tok.SignedString([]byte(secret))
 	if e != nil {
-		return "", "", "", "", false, e
+		return "", "", "", "", false, nil, e
 	}
 
 	now := time.Now()
@@ -211,5 +281,9 @@ func (s *desktopTerminalService) Bootstrap(pairingCode string) (token, unitID, d
 	if base == "" {
 		base = "http://localhost:3000"
 	}
-	return signed, t.UnitID, t.DefaultLocale, strings.TrimRight(base, "/"), t.KioskFullscreen, nil
+	var outCounter *string
+	if t.CounterID != nil && *t.CounterID != "" {
+		outCounter = t.CounterID
+	}
+	return signed, t.UnitID, t.DefaultLocale, strings.TrimRight(base, "/"), t.KioskFullscreen, outCounter, nil
 }

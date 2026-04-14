@@ -19,6 +19,9 @@ const TokenTypeKey contextKey = "tokenType"
 // TerminalUnitIDKey is set when typ=terminal — unit this desktop terminal is bound to.
 const TerminalUnitIDKey contextKey = "terminalUnitID"
 
+// TerminalCounterIDKey is set when typ=terminal and the device is bound to a counter (guest survey screen).
+const TerminalCounterIDKey contextKey = "terminalCounterID"
+
 // JWTAuth is a middleware that validates JWT tokens and extracts user ID
 func JWTAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -73,6 +76,9 @@ func JWTAuth(next http.Handler) http.Handler {
 			tokenType = "terminal"
 			if uid, ok := claims["unit_id"].(string); ok && strings.TrimSpace(uid) != "" {
 				ctx = context.WithValue(ctx, TerminalUnitIDKey, strings.TrimSpace(uid))
+			}
+			if cid, ok := claims["counter_id"].(string); ok && strings.TrimSpace(cid) != "" {
+				ctx = context.WithValue(ctx, TerminalCounterIDKey, strings.TrimSpace(cid))
 			}
 		}
 		ctx = context.WithValue(ctx, TokenTypeKey, tokenType)

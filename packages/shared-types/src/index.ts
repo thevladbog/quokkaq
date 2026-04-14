@@ -124,6 +124,300 @@ export const AdScreenConfigSchema = z
   })
   .passthrough();
 
+const guestSurveyCounterDisplayThemeHex = z
+  .string()
+  .regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/);
+
+/** Counter-display terminal colors stored on `SurveyDefinition.displayTheme` (JSON). */
+export const GuestSurveyCounterDisplayThemeSchema = z
+  .object({
+    isCustomColorsEnabled: z.boolean().optional(),
+    headerColor: guestSurveyCounterDisplayThemeHex.optional(),
+    bodyColor: guestSurveyCounterDisplayThemeHex.optional(),
+    foregroundColor: guestSurveyCounterDisplayThemeHex.optional(),
+    mutedForegroundColor: guestSurveyCounterDisplayThemeHex.optional(),
+    primaryColor: guestSurveyCounterDisplayThemeHex.optional(),
+    primaryForegroundColor: guestSurveyCounterDisplayThemeHex.optional(),
+    borderColor: guestSurveyCounterDisplayThemeHex.optional()
+  })
+  .strict();
+
+export type GuestSurveyCounterDisplayTheme = z.infer<
+  typeof GuestSurveyCounterDisplayThemeSchema
+>;
+
+export function parseGuestSurveyCounterDisplayTheme(
+  raw: unknown
+): GuestSurveyCounterDisplayTheme | null {
+  const r = GuestSurveyCounterDisplayThemeSchema.safeParse(raw);
+  return r.success ? r.data : null;
+}
+
+/** Pictorial 1–5 scale on counter display (`presentation: icons`). */
+export const guestSurveyScaleIconPresetSchema = z.enum([
+  'stars_gold',
+  'hearts_red'
+]);
+
+export const guestSurveyScalePresentationSchema = z.enum(['numeric', 'icons']);
+
+/**
+ * One `scale` object inside `SurveyDefinition.questions` blocks (contract slice).
+ * Full `questions` payload may be a bare array or `{ displayMode, blocks }`; this schema validates a single block.
+ */
+export const GuestSurveyQuestionScaleBlockSchema = z
+  .object({
+    id: z.string().min(1),
+    type: z.literal('scale'),
+    min: z.number().int(),
+    max: z.number().int(),
+    label: z.record(z.string(), z.string()).optional(),
+    presentation: guestSurveyScalePresentationSchema.optional(),
+    iconPreset: guestSurveyScaleIconPresetSchema.optional()
+  })
+  .passthrough()
+  .superRefine((data, ctx) => {
+    if (data.presentation === 'icons') {
+      if (data.min !== 1 || data.max !== 5) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['min'],
+          message: 'icon scale must use min 1 and max 5'
+        });
+      }
+      if (data.iconPreset === undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['iconPreset'],
+          message: 'iconPreset is required when presentation is icons'
+        });
+      }
+    }
+  });
+
+export type GuestSurveyQuestionScaleBlock = z.infer<
+  typeof GuestSurveyQuestionScaleBlockSchema
+>;
+
+const guestSurveyIdleMarkdownLocaleMax = 64 * 1024;
+
+const guestSurveyIdleImageFileRe =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpeg|jpg|png|webp|svg)$/i;
+
+const guestSurveyIdleVideoFileRe =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(mp4|webm|mov|m4v)$/i;
+
+/** One slide on the counter idle carousel (`SurveyDefinition.idleScreen`). */
+export const GuestSurveyIdleSlideSchema = z.discriminatedUnion('type', [
+  z
+    .object({
+      type: z.literal('text'),
+      id: z.string().uuid().optional(),
+      markdown: z.record(
+        z.string().min(1),
+        z.string().max(guestSurveyIdleMarkdownLocaleMax)
+      )
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('image'),
+      id: z.string().uuid().optional(),
+      url: z.string().min(1)
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('video'),
+      id: z.string().uuid().optional(),
+      url: z.string().min(1)
+    })
+    .strict()
+]);
+
+export type GuestSurveyIdleSlide = z.infer<typeof GuestSurveyIdleSlideSchema>;
+
+/**
+ * Counter idle screen JSON (`SurveyDefinition.idleScreen`).
+ * Use {@link parseGuestSurveyIdleScreen} with `scopeUnitId` to validate media URLs match the survey scope unit.
+ */
+export const GuestSurveyIdleScreenSchema = z
+  .object({
+    slideIntervalSec: z.number().int(),
+    slides: z.array(GuestSurveyIdleSlideSchema).max(30)
+  })
+  .strict()
+  .superRefine((data, ctx) => {
+    const n = data.slides.length;
+    if (n > 0) {
+      if (data.slideIntervalSec < 1 || data.slideIntervalSec > 300) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['slideIntervalSec'],
+          message:
+            'slideIntervalSec must be between 1 and 300 when slides are non-empty'
+        });
+      }
+    } else if (
+      data.slideIntervalSec !== 0 &&
+      (data.slideIntervalSec < 1 || data.slideIntervalSec > 300)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['slideIntervalSec'],
+        message:
+          'slideIntervalSec must be 0 or between 1 and 300 when slides are empty'
+      });
+    }
+  });
+
+export type GuestSurveyIdleScreen = z.infer<typeof GuestSurveyIdleScreenSchema>;
+
+/** Max JSON size for idle screen (matches backend). */
+export const guestSurveyIdleScreenMaxJsonBytes = 512 * 1024;
+
+/**
+ * Parse and validate idle screen; `scopeUnitId` must match URLs in image/video slides.
+ */
+export function parseGuestSurveyIdleScreen(
+  raw: unknown,
+  scopeUnitId: string
+): GuestSurveyIdleScreen | null {
+  if (typeof raw === 'string') {
+    if (
+      new TextEncoder().encode(raw).length > guestSurveyIdleScreenMaxJsonBytes
+    ) {
+      return null;
+    }
+    try {
+      raw = JSON.parse(raw) as unknown;
+    } catch {
+      return null;
+    }
+  } else if (raw !== null && typeof raw === 'object') {
+    try {
+      const encoded = new TextEncoder().encode(JSON.stringify(raw));
+      if (encoded.length > guestSurveyIdleScreenMaxJsonBytes) {
+        return null;
+      }
+    } catch {
+      return null;
+    }
+  }
+
+  const r = GuestSurveyIdleScreenSchema.safeParse(raw);
+  if (!r.success) {
+    return null;
+  }
+  const prefix = `/api/units/${scopeUnitId}/guest-survey/idle-media/`;
+  for (let i = 0; i < r.data.slides.length; i++) {
+    const slide = r.data.slides[i];
+    if (slide.type === 'image' || slide.type === 'video') {
+      const u = slide.url.trim();
+      if (!u.startsWith(prefix)) {
+        return null;
+      }
+      const fn = u.slice(prefix.length);
+      if (fn.includes('/')) {
+        return null;
+      }
+      if (slide.type === 'image') {
+        if (!guestSurveyIdleImageFileRe.test(fn)) {
+          return null;
+        }
+      } else if (!guestSurveyIdleVideoFileRe.test(fn)) {
+        return null;
+      }
+    }
+  }
+  return r.data;
+}
+
+export type GuestSurveyIdleScreenSafeParseResult =
+  | { success: true; data: GuestSurveyIdleScreen }
+  | { success: false; error: z.ZodError };
+
+/**
+ * Parse idle screen for counter display: same as {@link parseGuestSurveyIdleScreen} but allows any
+ * `/api/units/{id}/guest-survey/idle-media/...` path (survey scope unit may differ from terminal unit).
+ */
+export function parseGuestSurveyIdleScreenForDisplay(
+  raw: unknown
+): GuestSurveyIdleScreen | null {
+  if (typeof raw === 'string') {
+    if (
+      new TextEncoder().encode(raw).length > guestSurveyIdleScreenMaxJsonBytes
+    ) {
+      return null;
+    }
+    try {
+      raw = JSON.parse(raw) as unknown;
+    } catch {
+      return null;
+    }
+  } else if (raw !== null && typeof raw === 'object') {
+    try {
+      const encoded = new TextEncoder().encode(JSON.stringify(raw));
+      if (encoded.length > guestSurveyIdleScreenMaxJsonBytes) {
+        return null;
+      }
+    } catch {
+      return null;
+    }
+  }
+
+  const r = GuestSurveyIdleScreenSchema.safeParse(raw);
+  if (!r.success) {
+    return null;
+  }
+  const marker = '/guest-survey/idle-media/';
+  for (const slide of r.data.slides) {
+    if (slide.type === 'image' || slide.type === 'video') {
+      const u = slide.url.trim();
+      if (!u.startsWith('/api/units/') || !u.includes(marker)) {
+        return null;
+      }
+      const i = u.indexOf(marker);
+      const fn = u
+        .slice(i + marker.length)
+        .split('/')[0]
+        ?.split('?')[0];
+      if (!fn || fn.includes('/')) {
+        return null;
+      }
+      if (slide.type === 'image') {
+        if (!guestSurveyIdleImageFileRe.test(fn)) {
+          return null;
+        }
+      } else if (!guestSurveyIdleVideoFileRe.test(fn)) {
+        return null;
+      }
+    }
+  }
+  return r.data;
+}
+
+/** Runtime parse for guest session `idleScreen` (pass active survey `scopeUnitId` for URL checks). */
+export function safeParseGuestSurveyIdleScreen(
+  raw: unknown,
+  scopeUnitId: string
+): GuestSurveyIdleScreenSafeParseResult {
+  const parsed = parseGuestSurveyIdleScreen(raw, scopeUnitId);
+  if (parsed) {
+    return { success: true, data: parsed };
+  }
+  return {
+    success: false,
+    error: new z.ZodError([
+      {
+        code: 'custom',
+        message: 'Invalid idle screen',
+        path: []
+      }
+    ])
+  };
+}
+
 /** Runtime shape for `UnitConfig.kiosk` (matches {@link KioskConfig}). */
 export const KioskConfigSchema = z
   .object({
@@ -291,6 +585,8 @@ export const CounterModelSchema = z.object({
 export const DesktopTerminalSchema = z.object({
   id: z.string(),
   unitId: z.string(),
+  counterId: z.string().nullable().optional(),
+  counterName: z.string().optional(),
   name: z.string().nullable().optional(),
   defaultLocale: z.string(),
   kioskFullscreen: z.boolean().optional().default(false),

@@ -84,5 +84,45 @@ export default defineConfig({
       ...reactQueryOutput,
       target: './lib/api/generated/upload.ts'
     }
+  },
+  quokkaqSurveys: {
+    input: {
+      target: '../backend/docs/swagger.json',
+      filters: {
+        mode: 'include',
+        tags: ['surveys']
+      }
+    },
+    output: {
+      ...reactQueryOutput,
+      target: './lib/api/generated/surveys.ts',
+      override: {
+        ...reactQueryOutput.override,
+        mutator: {
+          path: './lib/orval-mutator.ts',
+          name: 'orvalMutator'
+        }
+      }
+    }
+  },
+  quokkaqGuestSurveyTerminal: {
+    input: {
+      target: '../backend/docs/swagger.json',
+      filters: {
+        mode: 'include',
+        tags: ['guest-survey']
+      }
+    },
+    output: {
+      ...reactQueryOutput,
+      target: './lib/api/generated/guest-survey-terminal.ts',
+      override: {
+        ...reactQueryOutput.override,
+        mutator: {
+          path: './lib/terminal-orval-mutator.ts',
+          name: 'terminalOrvalMutator'
+        }
+      }
+    }
   }
 });

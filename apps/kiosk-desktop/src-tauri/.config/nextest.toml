@@ -1,0 +1,3 @@
+# JUnit for CI (cargo nextest run --profile ci)
+[profile.ci.junit]
+path = "junit.xml"

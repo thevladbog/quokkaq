@@ -18,7 +18,7 @@ Steps you ran or reviewers should follow:
 
 **Backend (copy-paste when applicable)**
 
-- Changes matching `**/{apps,packages}/backend/**/*.go` → `pnpm nx run backend:test` (or `pnpm nx run backend:test:ci` with coverage, as in CI)
+- Changes matching `**/{apps,packages}/backend/**/*.go` → `pnpm nx run backend:test`
 
 **Frontend (copy-paste when applicable)**
 

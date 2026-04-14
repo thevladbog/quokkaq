@@ -277,3 +277,18 @@
     animation: none;
   }
 }
+
+/* MDXEditor: image/link dialogs portal into this node on document.body (see @mdxeditor/editor).
+   Stack above Radix Dialog/Sheet (z-[100]); the package sets z-index: 2 on the same element. */
+.mdxeditor-popup-container {
+  z-index: 120;
+}
+
+/* MDXEditor toolbar Select: may portal to editor root or body; must beat Dialog overlay (z-[100–200]). */
+[data-radix-popper-content-wrapper]:has(.mdxeditor-select-content) {
+  z-index: 300 !important;
+}
+
+.mdxeditor-select-content {
+  z-index: 300 !important;
+}

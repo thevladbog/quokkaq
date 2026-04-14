@@ -28,6 +28,7 @@ import { UnitServicesManager } from '@/components/admin/units/unit-services-mana
 import { KioskSettings } from '@/components/admin/units/kiosk-settings';
 import { SlotConfiguration } from '@/components/admin/units/slot-configuration';
 import { UnitVisitorTagsSettings } from '@/components/admin/units/unit-visitor-tags-settings';
+import { UnitGuestSurveySettings } from '@/components/admin/units/unit-guest-survey-settings';
 
 import ServiceGridEditor from '@/components/ServiceGridEditor';
 
@@ -216,6 +217,14 @@ export default function UnitPage({ params }: UnitPageProps) {
               </TabsTrigger>
             </PermissionGuard>
             <PermissionGuard
+              permissions={['UNIT_SETTINGS_MANAGE']}
+              unitId={unitId}
+            >
+              <TabsTrigger value='guest-survey'>
+                {t('guest_survey.tab')}
+              </TabsTrigger>
+            </PermissionGuard>
+            <PermissionGuard
               permissions={['UNIT_TICKET_SCREEN_MANAGE']}
               unitId={unitId}
             >
@@ -323,6 +332,16 @@ export default function UnitPage({ params }: UnitPageProps) {
             </PermissionGuard>
           </TabsContent>
 
+          <TabsContent value='guest-survey' className='mt-6'>
+            <PermissionGuard
+              permissions={['UNIT_SETTINGS_MANAGE']}
+              unitId={unitId}
+              fallback={<div>{t('access_denied')}</div>}
+            >
+              <UnitGuestSurveySettings unitId={unitId} />
+            </PermissionGuard>
+          </TabsContent>
+
           <TabsContent value='ad-screen' className='mt-6'>
             <PermissionGuard
               permissions={['UNIT_TICKET_SCREEN_MANAGE']}
@@ -421,6 +440,14 @@ export default function UnitPage({ params }: UnitPageProps) {
             unitId={unitId}
           >
             <TabsTrigger value='kiosk'>{t('kiosk_settings.title')}</TabsTrigger>
+          </PermissionGuard>
+          <PermissionGuard
+            permissions={['UNIT_SETTINGS_MANAGE']}
+            unitId={unitId}
+          >
+            <TabsTrigger value='guest-survey'>
+              {t('guest_survey.tab')}
+            </TabsTrigger>
           </PermissionGuard>
           <PermissionGuard
             permissions={['UNIT_SETTINGS_MANAGE']}
@@ -560,6 +587,15 @@ export default function UnitPage({ params }: UnitPageProps) {
               unitName={unit.name}
               currentConfig={unit.config || {}}
             />
+          </PermissionGuard>
+        </TabsContent>
+        <TabsContent value='guest-survey' className='mt-6'>
+          <PermissionGuard
+            permissions={['UNIT_SETTINGS_MANAGE']}
+            unitId={unitId}
+            fallback={<div>{t('access_denied')}</div>}
+          >
+            <UnitGuestSurveySettings unitId={unitId} />
           </PermissionGuard>
         </TabsContent>
         <TabsContent value='visitor-tags' className='mt-6'>

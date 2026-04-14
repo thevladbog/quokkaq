@@ -375,6 +375,8 @@ export const desktopTerminalsApi = {
     unitId: string;
     defaultLocale: string;
     kioskFullscreen?: boolean;
+    contextUnitId?: string;
+    counterId?: string;
   }) =>
     apiRequest<{ terminal: DesktopTerminal; pairingCode: string }>(
       '/desktop-terminals',
@@ -392,6 +394,8 @@ export const desktopTerminalsApi = {
       unitId: string;
       defaultLocale: string;
       kioskFullscreen?: boolean;
+      contextUnitId?: string;
+      counterId?: string;
     }
   ) =>
     apiRequest<void>(`/desktop-terminals/${id}`, {
@@ -404,6 +408,38 @@ export const desktopTerminalsApi = {
       method: 'POST'
     })
 };
+
+export const COUNTER_DISPLAY_TOKEN_KEY = 'quokkaq_counter_display_token';
+export const COUNTER_DISPLAY_UNIT_KEY = 'quokkaq_counter_display_unitId';
+
+const TerminalBootstrapResponseSchema = z.object({
+  token: z.string(),
+  unitId: z.string(),
+  counterId: z.string().nullable().optional(),
+  defaultLocale: z.string(),
+  appBaseUrl: z.string(),
+  kioskFullscreen: z.boolean()
+});
+
+export type TerminalBootstrapResponse = z.infer<
+  typeof TerminalBootstrapResponseSchema
+>;
+
+/** Public: pair a desktop / counter-display device (no staff JWT). */
+export async function terminalAuthBootstrap(
+  code: string
+): Promise<TerminalBootstrapResponse> {
+  const res = await fetch(`${API_BASE_URL}/auth/terminal/bootstrap`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code: code.trim() })
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    throwApiHttpErrorFromBody(res.status, text || '{}');
+  }
+  return TerminalBootstrapResponseSchema.parse(JSON.parse(text));
+}
 
 // Unit API functions
 export const unitsApi = {
@@ -899,6 +935,11 @@ export const countersApi = {
   getByUnitId: async (unitId: string) => {
     const res = await orvalTc.getUnitsUnitIdCounters(unitId);
     return z.array(CounterModelSchema).parse(res.data ?? []);
+  },
+
+  getById: async (id: string) => {
+    const res = await orvalTc.getCountersId(id);
+    return CounterModelSchema.parse(res.data);
   },
 
   create: async (

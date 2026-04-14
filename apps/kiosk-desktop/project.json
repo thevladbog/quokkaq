@@ -40,7 +40,7 @@
     "test": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "cargo test",
+        "command": "bash -lc 'set -euo pipefail; if command -v cargo-nextest >/dev/null 2>&1; then cargo nextest run --profile ci; else cargo test; fi'",
         "cwd": "apps/kiosk-desktop/src-tauri"
       }
     }

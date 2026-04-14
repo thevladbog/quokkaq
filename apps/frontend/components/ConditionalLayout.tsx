@@ -44,6 +44,10 @@ const ConditionalLayout = ({ children }: ConditionalLayoutProps) => {
       return { useSidebar: false, protected: false };
     }
 
+    if (pathWithoutLocale.startsWith('/counter-display')) {
+      return { useSidebar: false, protected: false };
+    }
+
     if (pathWithoutLocale === '/login') {
       return { useSidebar: false, protected: false };
     }
@@ -140,6 +144,7 @@ const ConditionalLayout = ({ children }: ConditionalLayoutProps) => {
     .replace(/^\/[a-z]{2}$/, '/');
   const showBackground =
     !pathWithoutLocale.startsWith('/kiosk') &&
+    !pathWithoutLocale.startsWith('/counter-display') &&
     !pathWithoutLocale.startsWith('/screen') &&
     !pathWithoutLocale.startsWith('/ticket');
 

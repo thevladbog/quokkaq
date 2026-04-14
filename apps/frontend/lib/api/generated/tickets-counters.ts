@@ -568,6 +568,14 @@ export interface HandlersUploadLogoResponse {
   url: string;
 }
 
+export interface HandlersUploadSurveyCompletionImageResponse {
+  url?: string;
+}
+
+export interface HandlersUploadSurveyIdleMediaResponse {
+  url?: string;
+}
+
 export interface HandlersUsageMetricInfoResponse {
   current?: number;
   limit?: number;
@@ -784,11 +792,51 @@ export interface HandlersCompanyMeResponse {
   features?: HandlersFeaturesFlags;
 }
 
+export type HandlersCreateSurveyRequestCompletionMessage = { [key: string]: unknown };
+
+export type HandlersCreateSurveyRequestDisplayTheme = { [key: string]: unknown };
+
+export type HandlersCreateSurveyRequestIdleScreen = { [key: string]: unknown };
+
+export type HandlersCreateSurveyRequestQuestions = { [key: string]: unknown };
+
+export interface HandlersCreateSurveyRequest {
+  completionMessage?: HandlersCreateSurveyRequestCompletionMessage;
+  displayTheme?: HandlersCreateSurveyRequestDisplayTheme;
+  idleScreen?: HandlersCreateSurveyRequestIdleScreen;
+  questions?: HandlersCreateSurveyRequestQuestions;
+  title?: string;
+}
+
 export interface HandlersCreateVisitorTagDefinitionRequest {
   /** @pattern ^#[0-9A-Fa-f]{6}$ */
   color: string;
   label: string;
   sortOrder?: number;
+}
+
+export type HandlersGuestSurveySubmitRequestAnswers = { [key: string]: unknown };
+
+export interface HandlersGuestSurveySubmitRequest {
+  answers?: HandlersGuestSurveySubmitRequestAnswers;
+  surveyId?: string;
+  ticketId?: string;
+}
+
+export type HandlersPatchSurveyRequestCompletionMessage = { [key: string]: unknown };
+
+export type HandlersPatchSurveyRequestDisplayTheme = { [key: string]: unknown };
+
+export type HandlersPatchSurveyRequestIdleScreen = { [key: string]: unknown };
+
+export type HandlersPatchSurveyRequestQuestions = { [key: string]: unknown };
+
+export interface HandlersPatchSurveyRequest {
+  completionMessage?: HandlersPatchSurveyRequestCompletionMessage;
+  displayTheme?: HandlersPatchSurveyRequestDisplayTheme;
+  idleScreen?: HandlersPatchSurveyRequestIdleScreen;
+  questions?: HandlersPatchSurveyRequestQuestions;
+  title?: string;
 }
 
 export interface HandlersPatchVisitorTagDefinitionRequest {
@@ -1006,6 +1054,53 @@ export interface ModelsSlotSuccessResponse {
   success?: boolean;
 }
 
+/**
+ * CompletionMessage optional per-locale Markdown shown after survey submit (e.g. {"en":"...","ru":"..."}).
+ */
+export type ModelsSurveyDefinitionCompletionMessage = { [key: string]: unknown };
+
+/**
+ * DisplayTheme optional JSON for counter-display terminal colors (see validateDisplayTheme).
+ */
+export type ModelsSurveyDefinitionDisplayTheme = { [key: string]: unknown };
+
+/**
+ * IdleScreen optional JSON for counter idle carousel (text/image/video slides); see validateIdleScreen.
+ */
+export type ModelsSurveyDefinitionIdleScreen = { [key: string]: unknown };
+
+export type ModelsSurveyDefinitionQuestions = { [key: string]: unknown };
+
+export interface ModelsSurveyDefinition {
+  companyId?: string;
+  /** CompletionMessage optional per-locale Markdown shown after survey submit (e.g. {"en":"...","ru":"..."}). */
+  completionMessage?: ModelsSurveyDefinitionCompletionMessage;
+  createdAt?: string;
+  /** DisplayTheme optional JSON for counter-display terminal colors (see validateDisplayTheme). */
+  displayTheme?: ModelsSurveyDefinitionDisplayTheme;
+  id?: string;
+  /** IdleScreen optional JSON for counter idle carousel (text/image/video slides); see validateIdleScreen. */
+  idleScreen?: ModelsSurveyDefinitionIdleScreen;
+  isActive?: boolean;
+  questions?: ModelsSurveyDefinitionQuestions;
+  scopeUnitId?: string;
+  title?: string;
+  updatedAt?: string;
+}
+
+export type ModelsSurveyResponseAnswers = { [key: string]: unknown };
+
+export interface ModelsSurveyResponse {
+  answers?: ModelsSurveyResponseAnswers;
+  clientId?: string;
+  counterId?: string;
+  id?: string;
+  submittedAt?: string;
+  surveyDefinitionId?: string;
+  ticketId?: string;
+  unitId?: string;
+}
+
 export interface ModelsUnitMaterial {
   createdAt?: string;
   filename?: string;
@@ -1031,6 +1126,44 @@ export interface ModelsWeeklySlotCapacity {
   startTime?: string;
   unitId?: string;
   updatedAt?: string;
+}
+
+/**
+ * IdleScreen from the active survey for this counter (service zone scope first), regardless of ticket.
+ */
+export type ServicesGuestSurveySessionIdleScreen = { [key: string]: unknown };
+
+export type ServicesGuestSurveySessionUnitConfig = { [key: string]: unknown };
+
+export interface ServicesGuestSurveySessionTicket {
+  id?: string;
+  queueNumber?: string;
+  status?: string;
+}
+
+export type ServicesGuestSurveySessionSurveyCompletionMessage = { [key: string]: unknown };
+
+export type ServicesGuestSurveySessionSurveyDisplayTheme = { [key: string]: unknown };
+
+export type ServicesGuestSurveySessionSurveyQuestions = { [key: string]: unknown };
+
+export interface ServicesGuestSurveySessionSurvey {
+  completionMessage?: ServicesGuestSurveySessionSurveyCompletionMessage;
+  displayTheme?: ServicesGuestSurveySessionSurveyDisplayTheme;
+  id?: string;
+  questions?: ServicesGuestSurveySessionSurveyQuestions;
+  title?: string;
+}
+
+export interface ServicesGuestSurveySession {
+  activeSurveySubmitted?: boolean;
+  activeTicket?: ServicesGuestSurveySessionTicket;
+  counterId?: string;
+  counterName?: string;
+  /** IdleScreen from the active survey for this counter (service zone scope first), regardless of ticket. */
+  idleScreen?: ServicesGuestSurveySessionIdleScreen;
+  survey?: ServicesGuestSurveySessionSurvey;
+  unitConfig?: ServicesGuestSurveySessionUnitConfig;
 }
 
 export interface ServicesShiftActivityActorOption {

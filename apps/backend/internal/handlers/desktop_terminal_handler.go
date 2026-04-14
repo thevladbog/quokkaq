@@ -23,17 +23,22 @@ func NewDesktopTerminalHandler(service services.DesktopTerminalService) *Desktop
 }
 
 type createDesktopTerminalRequest struct {
-	Name              *string `json:"name"`
-	UnitID            string  `json:"unitId"`
-	DefaultLocale     string  `json:"defaultLocale"`
-	KioskFullscreen   bool    `json:"kioskFullscreen"`
+	Name            *string `json:"name"`
+	UnitID          string  `json:"unitId"`
+	DefaultLocale   string  `json:"defaultLocale"`
+	KioskFullscreen bool    `json:"kioskFullscreen"`
+	// ContextUnitID: subdivision or service_zone selected in the pairing wizard (required with counterId).
+	ContextUnitID *string `json:"contextUnitId"`
+	CounterID     *string `json:"counterId"`
 }
 
 type updateDesktopTerminalRequest struct {
-	Name              *string `json:"name"`
-	UnitID            string  `json:"unitId"`
-	DefaultLocale     string  `json:"defaultLocale"`
-	KioskFullscreen   bool    `json:"kioskFullscreen"`
+	Name            *string `json:"name"`
+	UnitID          string  `json:"unitId"`
+	DefaultLocale   string  `json:"defaultLocale"`
+	KioskFullscreen bool    `json:"kioskFullscreen"`
+	ContextUnitID   *string `json:"contextUnitId"`
+	CounterID       *string `json:"counterId"`
 }
 
 type createDesktopTerminalResponse struct {
@@ -42,27 +47,29 @@ type createDesktopTerminalResponse struct {
 }
 
 type desktopTerminalJSON struct {
-	ID                string  `json:"id"`
-	UnitID            string  `json:"unitId"`
-	Name              *string `json:"name,omitempty"`
-	DefaultLocale     string  `json:"defaultLocale"`
-	KioskFullscreen   bool    `json:"kioskFullscreen"`
-	RevokedAt         *string `json:"revokedAt,omitempty"`
-	LastSeenAt        *string `json:"lastSeenAt,omitempty"`
-	CreatedAt         string  `json:"createdAt"`
-	UpdatedAt         string  `json:"updatedAt"`
-	UnitName          string  `json:"unitName,omitempty"`
+	ID              string  `json:"id"`
+	UnitID          string  `json:"unitId"`
+	CounterID       *string `json:"counterId,omitempty"`
+	CounterName     string  `json:"counterName,omitempty"`
+	Name            *string `json:"name,omitempty"`
+	DefaultLocale   string  `json:"defaultLocale"`
+	KioskFullscreen bool    `json:"kioskFullscreen"`
+	RevokedAt       *string `json:"revokedAt,omitempty"`
+	LastSeenAt      *string `json:"lastSeenAt,omitempty"`
+	CreatedAt       string  `json:"createdAt"`
+	UpdatedAt       string  `json:"updatedAt"`
+	UnitName        string  `json:"unitName,omitempty"`
 }
 
 func mapTerminalToJSON(t *models.DesktopTerminal) desktopTerminalJSON {
 	out := desktopTerminalJSON{
-		ID:                t.ID,
-		UnitID:            t.UnitID,
-		Name:              t.Name,
-		DefaultLocale:     t.DefaultLocale,
-		KioskFullscreen:   t.KioskFullscreen,
-		CreatedAt:         t.CreatedAt.UTC().Format(time.RFC3339Nano),
-		UpdatedAt:         t.UpdatedAt.UTC().Format(time.RFC3339Nano),
+		ID:              t.ID,
+		UnitID:          t.UnitID,
+		Name:            t.Name,
+		DefaultLocale:   t.DefaultLocale,
+		KioskFullscreen: t.KioskFullscreen,
+		CreatedAt:       t.CreatedAt.UTC().Format(time.RFC3339Nano),
+		UpdatedAt:       t.UpdatedAt.UTC().Format(time.RFC3339Nano),
 	}
 	if t.RevokedAt != nil {
 		s := t.RevokedAt.UTC().Format(time.RFC3339Nano)
@@ -74,6 +81,12 @@ func mapTerminalToJSON(t *models.DesktopTerminal) desktopTerminalJSON {
 	}
 	if t.Unit.ID != "" {
 		out.UnitName = t.Unit.Name
+	}
+	if t.CounterID != nil && *t.CounterID != "" {
+		out.CounterID = t.CounterID
+		if t.Counter != nil {
+			out.CounterName = t.Counter.Name
+		}
 	}
 	return out
 }
@@ -89,13 +102,19 @@ func (h *DesktopTerminalHandler) Create(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	row, code, err := h.service.Create(req.Name, req.UnitID, req.DefaultLocale, req.KioskFullscreen)
+	row, code, err := h.service.Create(req.Name, req.UnitID, req.DefaultLocale, req.KioskFullscreen, req.ContextUnitID, req.CounterID)
 	if err != nil {
-		if errors.Is(err, services.ErrInvalidLocale) {
+		if errors.Is(err, services.ErrInvalidLocale) ||
+			errors.Is(err, services.ErrTerminalCounterContext) ||
+			errors.Is(err, services.ErrTerminalCounterMismatch) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if err.Error() == "unit not found" {
+		if errors.Is(err, services.ErrSurveyFeatureLocked) {
+			http.Error(w, "Counter guest survey is not enabled for your subscription", http.StatusForbidden)
+			return
+		}
+		if err.Error() == "unit not found" || err.Error() == "counter not found" || err.Error() == "context unit not found" {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -150,12 +169,18 @@ func (h *DesktopTerminalHandler) Update(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	err := h.service.Update(id, req.Name, req.UnitID, req.DefaultLocale, req.KioskFullscreen)
-	if errors.Is(err, services.ErrInvalidLocale) {
+	err := h.service.Update(id, req.Name, req.UnitID, req.DefaultLocale, req.KioskFullscreen, req.ContextUnitID, req.CounterID)
+	if errors.Is(err, services.ErrInvalidLocale) ||
+		errors.Is(err, services.ErrTerminalCounterContext) ||
+		errors.Is(err, services.ErrTerminalCounterMismatch) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if err != nil && err.Error() == "unit not found" {
+	if errors.Is(err, services.ErrSurveyFeatureLocked) {
+		http.Error(w, "Counter guest survey is not enabled for your subscription", http.StatusForbidden)
+		return
+	}
+	if err != nil && (err.Error() == "unit not found" || err.Error() == "counter not found" || err.Error() == "context unit not found") {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -182,11 +207,12 @@ type terminalBootstrapRequest struct {
 }
 
 type terminalBootstrapResponse struct {
-	Token             string `json:"token"`
-	UnitID            string `json:"unitId"`
-	DefaultLocale     string `json:"defaultLocale"`
-	AppBaseURL        string `json:"appBaseUrl"`
-	KioskFullscreen   bool   `json:"kioskFullscreen"`
+	Token           string  `json:"token"`
+	UnitID          string  `json:"unitId"`
+	CounterID       *string `json:"counterId,omitempty"`
+	DefaultLocale   string  `json:"defaultLocale"`
+	AppBaseURL      string  `json:"appBaseUrl"`
+	KioskFullscreen bool    `json:"kioskFullscreen"`
 }
 
 func (h *DesktopTerminalHandler) Bootstrap(w http.ResponseWriter, r *http.Request) {
@@ -200,7 +226,7 @@ func (h *DesktopTerminalHandler) Bootstrap(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	token, unitID, loc, appBase, kioskFs, err := h.service.Bootstrap(req.Code)
+	token, unitID, loc, appBase, kioskFs, counterID, err := h.service.Bootstrap(req.Code)
 	if err != nil {
 		if errors.Is(err, services.ErrInvalidTerminalCode) {
 			http.Error(w, "Invalid or revoked terminal code", http.StatusUnauthorized)
@@ -211,10 +237,11 @@ func (h *DesktopTerminalHandler) Bootstrap(w http.ResponseWriter, r *http.Reques
 	}
 
 	_ = json.NewEncoder(w).Encode(terminalBootstrapResponse{
-		Token:             token,
-		UnitID:            unitID,
-		DefaultLocale:     loc,
-		AppBaseURL:        appBase,
-		KioskFullscreen:   kioskFs,
+		Token:           token,
+		UnitID:          unitID,
+		CounterID:       counterID,
+		DefaultLocale:   loc,
+		AppBaseURL:      appBase,
+		KioskFullscreen: kioskFs,
 	})
 }
