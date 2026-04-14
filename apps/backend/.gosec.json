@@ -39,6 +39,10 @@
     {
       "path": ".*/internal/handlers/unit_handler\\.go",
       "rules": ["G120"]
+    },
+    {
+      "path": ".*/internal/handlers/survey_handler\\.go",
+      "rules": ["G120"]
     }
   ]
 }
