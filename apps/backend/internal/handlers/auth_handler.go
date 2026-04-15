@@ -6,15 +6,18 @@ import (
 	"log"
 	"net/http"
 	"quokkaq-go-backend/internal/middleware"
+	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
+	"strings"
 )
 
 type AuthHandler struct {
-	service services.AuthService
+	service  services.AuthService
+	userRepo repository.UserRepository
 }
 
-func NewAuthHandler(service services.AuthService) *AuthHandler {
-	return &AuthHandler{service: service}
+func NewAuthHandler(service services.AuthService, userRepo repository.UserRepository) *AuthHandler {
+	return &AuthHandler{service: service, userRepo: userRepo}
 }
 
 type LoginRequest struct {
@@ -23,7 +26,15 @@ type LoginRequest struct {
 }
 
 type LoginResponse struct {
-	Token string `json:"token"`
+	Token        string `json:"token"` // same as accessToken (legacy clients)
+	AccessToken  string `json:"accessToken"`
+	RefreshToken string `json:"refreshToken"`
+}
+
+// RefreshResponse is the body of POST /auth/refresh.
+type RefreshResponse struct {
+	AccessToken  string `json:"accessToken"`
+	RefreshToken string `json:"refreshToken"`
 }
 
 type ForgotPasswordRequest struct {
@@ -45,7 +56,7 @@ type SignupRequest struct {
 
 // Login godoc
 // @Summary      User Login
-// @Description  Authenticates a user and returns a JWT token
+// @Description  Authenticates a user and returns access and refresh JWTs (`token` duplicates access for legacy clients)
 // @Tags         auth
 // @Accept       json
 // @Produce      json
@@ -61,13 +72,54 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := h.service.Login(req.Email, req.Password)
+	pair, err := h.service.Login(req.Email, req.Password)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(LoginResponse{Token: token}); err != nil {
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(LoginResponse{
+		Token:        pair.AccessToken,
+		AccessToken:  pair.AccessToken,
+		RefreshToken: pair.RefreshToken,
+	}); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
+}
+
+// Refresh godoc
+// @Summary      Refresh tokens
+// @Description  Exchanges a valid refresh JWT for new access and refresh tokens. Send the refresh token as `Authorization: Bearer <refresh>`.
+// @Tags         auth
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {object}  RefreshResponse
+// @Failure      401  {string}  string "Unauthorized"
+// @Router       /auth/refresh [post]
+func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		http.Error(w, "Authorization header required", http.StatusUnauthorized)
+		return
+	}
+	parts := strings.Split(authHeader, " ")
+	if len(parts) != 2 || parts[0] != "Bearer" {
+		http.Error(w, "Invalid authorization header format", http.StatusUnauthorized)
+		return
+	}
+
+	pair, err := h.service.Refresh(parts[1])
+	if err != nil {
+		http.Error(w, "Invalid or expired refresh token", http.StatusUnauthorized)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(RefreshResponse{
+		AccessToken:  pair.AccessToken,
+		RefreshToken: pair.RefreshToken,
+	}); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 	}
 }
@@ -98,6 +150,60 @@ func (h *AuthHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 	// Map to DTO for proper frontend format
 	response := MapUserToResponse(user)
 	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
+}
+
+// AccessibleCompanyItem is one row in GET /auth/accessible-companies.
+type AccessibleCompanyItem struct {
+	ID        string  `json:"id"`
+	Name      string  `json:"name"`
+	LegalName *string `json:"legalName,omitempty"`
+	Inn       *string `json:"inn,omitempty"`
+}
+
+// AccessibleCompaniesResponse is the body of GET /auth/accessible-companies.
+type AccessibleCompaniesResponse struct {
+	Companies []AccessibleCompanyItem `json:"companies"`
+}
+
+// ListAccessibleCompanies godoc
+// @Summary      List companies the current user may access
+// @Description  Distinct tenants from unit assignments and company ownership. Optional query q searches name, legal name, INN, counterparty JSON.
+// @Tags         auth
+// @Produce      json
+// @Param        q query string false "Search substring (case-insensitive)"
+// @Security     BearerAuth
+// @Success      200  {object}  AccessibleCompaniesResponse
+// @Failure      401  {string}  string "Unauthorized"
+// @Router       /auth/accessible-companies [get]
+func (h *AuthHandler) ListAccessibleCompanies(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	q := r.URL.Query().Get("q")
+	rows, err := h.userRepo.ListAccessibleCompanies(userID, q)
+	if err != nil {
+		log.Printf("ListAccessibleCompanies: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	items := make([]AccessibleCompanyItem, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, AccessibleCompanyItem{
+			ID:        row.ID,
+			Name:      row.Name,
+			LegalName: row.LegalName,
+			Inn:       row.Inn,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(AccessibleCompaniesResponse{Companies: items}); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 	}
 }
@@ -194,7 +300,7 @@ func (h *AuthHandler) Signup(w http.ResponseWriter, r *http.Request) {
 		req.PlanCode = "starter"
 	}
 
-	token, err := h.service.Signup(req.Name, req.Email, req.Password, req.CompanyName, req.PlanCode)
+	pair, err := h.service.Signup(req.Name, req.Email, req.Password, req.CompanyName, req.PlanCode)
 	if err != nil {
 		if errors.Is(err, services.ErrEmailAlreadyExists) {
 			http.Error(w, "An account with this email already exists", http.StatusConflict)
@@ -205,8 +311,13 @@ func (h *AuthHandler) Signup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	if err := json.NewEncoder(w).Encode(LoginResponse{Token: token}); err != nil {
+	if err := json.NewEncoder(w).Encode(LoginResponse{
+		Token:        pair.AccessToken,
+		AccessToken:  pair.AccessToken,
+		RefreshToken: pair.RefreshToken,
+	}); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 	}
 }

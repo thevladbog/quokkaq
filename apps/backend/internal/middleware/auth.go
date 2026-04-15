@@ -64,6 +64,12 @@ func JWTAuth(next http.Handler) http.Handler {
 			return
 		}
 
+		// Refresh JWTs must only be used with POST /auth/refresh, not as API access tokens.
+		if typ, ok := claims["typ"].(string); ok && typ == "refresh" {
+			http.Error(w, "Invalid token type", http.StatusUnauthorized)
+			return
+		}
+
 		userID, ok := claims["sub"].(string)
 		if !ok {
 			http.Error(w, "Invalid user ID in token", http.StatusUnauthorized)

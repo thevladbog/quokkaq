@@ -82,7 +82,7 @@ export default function SetupPage() {
         });
 
         if (response && response.accessToken) {
-          login(response.accessToken);
+          await login(response.accessToken);
           router.push('/settings');
         }
       } catch (loginError) {

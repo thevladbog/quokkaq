@@ -10,6 +10,7 @@ import {
   type ReactNode
 } from 'react';
 import { useAuthContext } from '@/contexts/AuthContext';
+import { useActiveCompany } from '@/contexts/ActiveCompanyContext';
 
 const STORAGE_PREFIX = 'quokkaq.activeUnit.';
 
@@ -25,12 +26,23 @@ const ActiveUnitContext = createContext<ActiveUnitContextValue | undefined>(
 
 export function ActiveUnitProvider({ children }: { children: ReactNode }) {
   const { user, isAuthenticated } = useAuthContext();
+  const { activeCompanyId } = useActiveCompany();
   const [preference, setPreference] = useState<string | null>(null);
 
-  const assignableUnitIds = useMemo(
-    () => user?.units?.map((u: { unitId: string }) => u.unitId) ?? [],
-    [user?.units]
-  );
+  const assignableUnitIds = useMemo(() => {
+    const units = user?.units;
+    if (!units?.length) return [];
+    const cid = activeCompanyId?.trim();
+    if (!cid) {
+      return units.map((u: { unitId: string }) => u.unitId);
+    }
+    return units
+      .filter((u: { unitId: string; companyId?: string }) => {
+        if (!u.companyId) return true;
+        return u.companyId === cid;
+      })
+      .map((u: { unitId: string }) => u.unitId);
+  }, [user?.units, activeCompanyId]);
 
   const userId = user?.id;
 
@@ -52,14 +64,13 @@ export function ActiveUnitProvider({ children }: { children: ReactNode }) {
   const setActiveUnitId = useCallback(
     (id: string) => {
       if (!user?.id) return;
-      const ids = user?.units?.map((u: { unitId: string }) => u.unitId) ?? [];
-      if (!ids.includes(id)) return;
+      if (!assignableUnitIds.includes(id)) return;
       setPreference(id);
       if (typeof window !== 'undefined') {
         localStorage.setItem(STORAGE_PREFIX + user.id, id);
       }
     },
-    [user]
+    [user, assignableUnitIds]
   );
 
   const value = useMemo(

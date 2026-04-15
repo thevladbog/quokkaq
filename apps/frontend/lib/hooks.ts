@@ -21,12 +21,12 @@ import {
   ticketsApi,
   bookingsApi,
   countersApi,
-  authApi,
   servicesApi,
   Unit,
   Service,
   type CreateTicketInUnitMutationVariables
 } from '../lib/api';
+import { fetchCurrentUser, loginWithPassword } from '../lib/auth-orval';
 import { invalidateTicketListQueries } from '../lib/ticket-query-invalidation';
 
 // User-related hooks
@@ -214,7 +214,7 @@ export function useCurrentUser() {
   const { token, isAuthenticated } = useAuth();
   return useQuery({
     queryKey: ['me', token],
-    queryFn: () => authApi.me(token!),
+    queryFn: () => fetchCurrentUser(),
     enabled: isAuthenticated && !!token
   });
 }
@@ -589,11 +589,13 @@ export const useCallNextTicket = () => {
 export const useLogin = () => {
   return useMutation({
     mutationFn: ({ email, password }: { email: string; password: string }) =>
-      authApi.login({ email, password }),
+      loginWithPassword({ email, password }),
     onSuccess: (data) => {
-      // Store the access token in localStorage
       if (typeof window !== 'undefined') {
         localStorage.setItem('access_token', data.accessToken);
+        if (data.refreshToken) {
+          localStorage.setItem('refresh_token', data.refreshToken);
+        }
       }
     }
   });

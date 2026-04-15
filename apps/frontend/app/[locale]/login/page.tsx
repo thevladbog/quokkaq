@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter, Link } from '@/src/i18n/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
@@ -14,16 +14,59 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useLogin } from '@/lib/hooks';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useAuthContext } from '@/contexts/AuthContext';
+import { useActiveCompany } from '@/contexts/ActiveCompanyContext';
+import LanguageSwitcher from '@/components/LanguageSwitcher';
+import ThemeToggle from '@/components/ThemeToggle';
+import {
+  getAuthAccessibleCompanies,
+  useGetAuthAccessibleCompanies,
+  type HandlersAccessibleCompanyItem
+} from '@/lib/api/generated/auth';
+import { Loader2 } from 'lucide-react';
+
+type Step = 'form' | 'company';
 
 export default function LoginPage() {
   const t = useTranslations('login');
+  const locale = useLocale();
+  const wordmarkSrc = locale === 'ru' ? '/logo-text-ru.svg' : '/logo-text.svg';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [step, setStep] = useState<Step>('form');
+  const [companySearch, setCompanySearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const router = useRouter();
   const loginMutation = useLogin();
-  const { login } = useAuthContext(); // Get the login function from auth context
+  const { login } = useAuthContext();
+  const { setActiveCompanyId } = useActiveCompany();
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(companySearch), 300);
+    return () => clearTimeout(timer);
+  }, [companySearch]);
+
+  const accessibleCompaniesParams = useMemo(() => {
+    const q = debouncedSearch.trim();
+    return q !== '' ? { q } : undefined;
+  }, [debouncedSearch]);
+
+  const {
+    data: companyRows = [],
+    isLoading: companiesLoading,
+    isError: companiesError
+  } = useGetAuthAccessibleCompanies(accessibleCompaniesParams, {
+    query: {
+      enabled: step === 'company',
+      select: (r) => {
+        if (r.status !== 200) {
+          throw new Error('accessible_companies_failed');
+        }
+        return r.data.companies ?? [];
+      }
+    }
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,89 +74,219 @@ export default function LoginPage() {
     try {
       const response = await loginMutation.mutateAsync({ email, password });
 
-      // Use the login function from context to update auth state
       if (response && response.accessToken) {
-        login(response.accessToken);
+        await login(response.accessToken);
+        const acRes = await getAuthAccessibleCompanies();
+        if (acRes.status !== 200) {
+          throw new Error('accessible_companies_failed');
+        }
+        const companies = acRes.data.companies ?? [];
+        if (companies.length > 1) {
+          setStep('company');
+          return;
+        }
+        if (companies.length === 1 && companies[0].id) {
+          setActiveCompanyId(companies[0].id);
+        }
+        router.push('/');
       }
-
-      // Redirect to home page (locale is handled by router)
-      router.push('/');
     } catch (error) {
       console.error('Login failed:', error);
-      // Handle login error (show message to user)
     }
   };
 
+  const pickCompany = (c: HandlersAccessibleCompanyItem) => {
+    if (!c.id) return;
+    setActiveCompanyId(c.id);
+    router.push('/');
+  };
+
   return (
-    <div className='bg-background relative flex min-h-screen items-center justify-center overflow-hidden p-4'>
-      <Card
-        className='relative z-10 w-full max-w-md'
-        data-testid='e2e-login-card'
-      >
-        <div className='mb-6 flex justify-center'>
-          <div className='relative h-48 w-48'>
+    <div className='bg-background relative grid min-h-dvh lg:grid-cols-2'>
+      <div className='absolute top-6 right-4 z-30 flex items-center gap-1 sm:right-8 lg:right-12 xl:right-16'>
+        <LanguageSwitcher />
+        <ThemeToggle />
+      </div>
+      <div className='relative flex flex-col justify-center px-4 pt-16 pb-8 sm:px-8 sm:pt-20 lg:px-12 xl:px-16'>
+        <Link
+          href='/'
+          className='absolute top-6 left-4 z-20 sm:left-8 lg:left-12 xl:left-16'
+        >
+          <div className='relative h-9 w-40'>
             <Image
-              src='/quokka-logo.svg'
-              alt='QuokkaQ Mascot'
+              src={wordmarkSrc}
+              alt={t('brandName')}
               fill
-              className='object-contain'
+              className='object-contain object-left'
               priority
             />
           </div>
+        </Link>
+        <Card
+          className='relative z-10 mx-auto w-full max-w-md'
+          data-testid='e2e-login-card'
+        >
+          {step === 'form' ? (
+            <>
+              <CardHeader className='text-center'>
+                <CardTitle className='text-2xl'>{t('title')}</CardTitle>
+                <CardDescription>{t('description')}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleSubmit} className='space-y-4'>
+                  <div className='grid gap-2'>
+                    <Label htmlFor='email'>{t('email')}</Label>
+                    <Input
+                      id='email'
+                      type='email'
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      placeholder={t('emailPlaceholder')}
+                    />
+                  </div>
+
+                  <div className='grid gap-2'>
+                    <Label htmlFor='password'>{t('password')}</Label>
+                    <Input
+                      id='password'
+                      type='password'
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      placeholder={t('passwordPlaceholder')}
+                    />
+                  </div>
+
+                  <div className='flex justify-end'>
+                    <Link
+                      href='/forgot-password'
+                      className='text-muted-foreground hover:text-primary text-sm underline-offset-4 hover:underline'
+                    >
+                      {t('forgotPassword')}
+                    </Link>
+                  </div>
+
+                  {loginMutation.isError && (
+                    <div className='text-sm text-red-600'>{t('error')}</div>
+                  )}
+
+                  <Button
+                    type='submit'
+                    className='w-full'
+                    disabled={loginMutation.isPending}
+                  >
+                    {loginMutation.isPending ? t('signingIn') : t('signIn')}
+                  </Button>
+                </form>
+              </CardContent>
+            </>
+          ) : (
+            <>
+              <CardHeader className='text-center'>
+                <CardTitle className='text-2xl'>
+                  {t('chooseOrganization')}
+                </CardTitle>
+                <CardDescription>
+                  {t('chooseOrganizationDescription')}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className='space-y-4'>
+                <div className='grid gap-2'>
+                  <Label htmlFor='org-search'>{t('searchOrganizations')}</Label>
+                  <Input
+                    id='org-search'
+                    value={companySearch}
+                    onChange={(e) => setCompanySearch(e.target.value)}
+                    placeholder={t('searchOrganizations')}
+                    autoComplete='off'
+                  />
+                </div>
+                <div className='max-h-[min(50vh,22rem)] space-y-2 overflow-y-auto pr-1'>
+                  {companiesLoading ? (
+                    <div className='text-muted-foreground flex items-center gap-2 text-sm'>
+                      <Loader2 className='size-4 animate-spin' />…
+                    </div>
+                  ) : companiesError ? (
+                    <div className='text-sm text-red-600'>{t('error')}</div>
+                  ) : (
+                    companyRows.map((c) => (
+                      <button
+                        key={c.id}
+                        type='button'
+                        onClick={() => pickCompany(c)}
+                        className='border-border hover:bg-muted/60 flex w-full flex-col gap-1 rounded-lg border px-3 py-3 text-left transition-colors'
+                      >
+                        <span className='font-medium'>{c.name}</span>
+                        {(c.legalName || c.inn) && (
+                          <span className='text-muted-foreground text-xs'>
+                            {c.legalName ? (
+                              <>
+                                {t('legalEntity')}: {c.legalName}
+                                {c.inn ? ' · ' : ''}
+                              </>
+                            ) : null}
+                            {c.inn ? (
+                              <>
+                                {t('inn')}: {c.inn}
+                              </>
+                            ) : null}
+                          </span>
+                        )}
+                      </button>
+                    ))
+                  )}
+                </div>
+              </CardContent>
+            </>
+          )}
+        </Card>
+      </div>
+
+      <div className='relative hidden min-h-dvh flex-col items-center justify-center overflow-hidden lg:flex'>
+        <div
+          aria-hidden
+          className='from-primary/10 via-chart-1/15 to-chart-2/20 dark:from-primary/12 dark:via-chart-2/12 dark:to-chart-1/8 absolute inset-0 bg-gradient-to-br'
+        />
+        <div
+          aria-hidden
+          className='bg-chart-1/25 dark:bg-chart-2/15 absolute top-[-10%] -left-[20%] h-[min(55vh,28rem)] w-[min(55vh,28rem)] rounded-full blur-3xl'
+        />
+        <div
+          aria-hidden
+          className='bg-chart-2/20 dark:bg-chart-1/10 absolute -right-[15%] bottom-[-15%] h-[min(45vh,24rem)] w-[min(45vh,24rem)] rounded-full blur-3xl'
+        />
+        <div
+          aria-hidden
+          className='pointer-events-none absolute inset-0 opacity-[0.35] dark:opacity-[0.28]'
+          style={{
+            backgroundImage:
+              'radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0)',
+            backgroundSize: '36px 36px',
+            color: 'var(--foreground)'
+          }}
+        />
+        <div className='relative z-10 flex max-w-lg flex-col items-center gap-6 px-8 text-center'>
+          <div className='bg-card/50 border-border/60 dark:bg-card/25 relative h-[min(52vw,20rem)] w-[min(52vw,20rem)] max-w-full shrink-0 overflow-hidden rounded-3xl border shadow-sm'>
+            <Image
+              src='/quokka-logo.svg'
+              alt=''
+              fill
+              className='object-contain p-4'
+              sizes='(min-width: 1024px) 320px, 0px'
+              priority
+            />
+          </div>
+          <div className='space-y-2'>
+            <h2 className='text-foreground text-2xl font-semibold tracking-tight'>
+              {t('brandName')}
+            </h2>
+            <p className='text-muted-foreground max-w-md text-sm leading-relaxed text-pretty'>
+              {t('brandTagline')}
+            </p>
+          </div>
         </div>
-        <CardHeader className='text-center'>
-          <CardTitle className='text-2xl'>{t('title')}</CardTitle>
-          <CardDescription>{t('description')}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className='space-y-4'>
-            <div className='grid gap-2'>
-              <Label htmlFor='email'>{t('email')}</Label>
-              <Input
-                id='email'
-                type='email'
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                placeholder={t('emailPlaceholder')}
-              />
-            </div>
-
-            <div className='grid gap-2'>
-              <Label htmlFor='password'>{t('password')}</Label>
-              <Input
-                id='password'
-                type='password'
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                placeholder={t('passwordPlaceholder')}
-              />
-            </div>
-
-            <div className='flex justify-end'>
-              <Link
-                href='/forgot-password'
-                className='text-muted-foreground hover:text-primary text-sm underline-offset-4 hover:underline'
-              >
-                {t('forgotPassword')}
-              </Link>
-            </div>
-
-            {loginMutation.isError && (
-              <div className='text-sm text-red-600'>{t('error')}</div>
-            )}
-
-            <Button
-              type='submit'
-              className='w-full'
-              disabled={loginMutation.isPending}
-            >
-              {loginMutation.isPending ? t('signingIn') : t('signIn')}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+      </div>
     </div>
   );
 }

@@ -15,6 +15,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import { postAuthForgotPassword } from '@/lib/api/generated/auth';
 
 export default function ForgotPasswordPage() {
   const t = useTranslations('forgotPassword');
@@ -27,24 +28,9 @@ export default function ForgotPasswordPage() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/auth/forgot-password`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ email })
-        }
-      );
-
-      if (response.ok) {
-        setIsSuccess(true);
-        toast.success(t('success'));
-      } else {
-        setIsSuccess(true);
-        toast.success(t('success'));
-      }
+      await postAuthForgotPassword({ email }).catch(() => undefined);
+      setIsSuccess(true);
+      toast.success(t('success'));
     } catch (error) {
       console.error('Forgot password error:', error);
       toast.error(t('requestError'));

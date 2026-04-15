@@ -8,6 +8,7 @@
     "kiosk": "Kiosk",
     "screen": "Public Screen",
     "active_unit": "Active unit",
+    "organization": "Organization",
     "active_unit_placeholder": "Select unit",
     "sidebar_collapse": "Collapse menu",
     "sidebar_expand": "Expand menu",
@@ -1389,6 +1390,8 @@
     }
   },
   "login": {
+    "brandName": "QuokkaQ",
+    "brandTagline": "Queue management system",
     "title": "Login",
     "description": "Sign in to your account",
     "email": "Email",
@@ -1398,7 +1401,12 @@
     "signIn": "Sign in",
     "signingIn": "Signing in...",
     "error": "Login failed. Please check your credentials.",
-    "forgotPassword": "Forgot Password?"
+    "forgotPassword": "Forgot Password?",
+    "chooseOrganization": "Choose organization",
+    "chooseOrganizationDescription": "You have access to more than one organization. Pick one to continue.",
+    "searchOrganizations": "Search organizations",
+    "legalEntity": "Legal entity",
+    "inn": "Tax ID (INN)"
   },
   "forgotPassword": {
     "title": "Forgot Password",

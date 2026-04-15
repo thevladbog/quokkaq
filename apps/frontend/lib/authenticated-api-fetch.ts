@@ -8,6 +8,28 @@ import { logger } from './logger';
 
 export const API_BASE_URL = '/api';
 
+function isAuthRefreshPath(endpoint: string): boolean {
+  const e = endpoint.split('?')[0] ?? '';
+  return e === '/auth/refresh' || e.endsWith('/auth/refresh');
+}
+
+/** Persisted active tenant (company) for X-Company-Id; must match ActiveCompanyContext. */
+export const ACTIVE_COMPANY_ID_STORAGE_KEY = 'quokkaq_active_company_id';
+
+/** Dispatched when the stored active company id changes (including logout cleanup). */
+export const ACTIVE_COMPANY_CHANGED_EVENT = 'quokkaq:active-company-changed';
+
+function activeCompanyIdHeader(): Record<string, string> {
+  if (typeof window === 'undefined') {
+    return {};
+  }
+  const id = localStorage.getItem(ACTIVE_COMPANY_ID_STORAGE_KEY)?.trim();
+  if (!id) {
+    return {};
+  }
+  return { 'X-Company-Id': id };
+}
+
 export function isRequestAbortError(error: unknown): boolean {
   if (error instanceof DOMException && error.name === 'AbortError') {
     return true;
@@ -125,6 +147,12 @@ function clearClientAuthSession(): void {
   }
   localStorage.removeItem('access_token');
   localStorage.removeItem('refresh_token');
+  localStorage.removeItem(ACTIVE_COMPANY_ID_STORAGE_KEY);
+  try {
+    window.dispatchEvent(new CustomEvent(ACTIVE_COMPANY_CHANGED_EVENT));
+  } catch (e) {
+    logger.error('Failed to dispatch active company change event', e);
+  }
   try {
     window.dispatchEvent(new CustomEvent('auth:logout'));
   } catch (e) {
@@ -164,7 +192,8 @@ export async function authenticatedApiFetch(
   const authHeaders: Record<string, string> = {
     ...(shouldSetContentType && { 'Content-Type': 'application/json' }),
     ...(token && { Authorization: `Bearer ${token}` }),
-    ...(currentLocale && { 'Accept-Language': currentLocale })
+    ...(currentLocale && { 'Accept-Language': currentLocale }),
+    ...activeCompanyIdHeader()
   };
 
   const config: RequestInit = {
@@ -176,39 +205,54 @@ export async function authenticatedApiFetch(
   try {
     let response = await fetch(url, config);
 
-    if (response.status === 401 && typeof window !== 'undefined') {
+    if (
+      response.status === 401 &&
+      typeof window !== 'undefined' &&
+      !isAuthRefreshPath(endpoint)
+    ) {
       try {
         if (refreshToken) {
-          const refreshResponse = await fetch(`${API_BASE_URL}/auth/refresh`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${refreshToken}`
-            }
-          });
+          const { postAuthRefresh } = await import('@/lib/api/generated/auth');
 
-          if (refreshResponse.ok) {
-            const refreshData: unknown = await refreshResponse.json();
-            const data =
-              refreshData && typeof refreshData === 'object'
-                ? (refreshData as Record<string, unknown>)
-                : null;
+          let refreshPayload: Record<string, unknown> | null = null;
+          try {
+            const refreshRes = await postAuthRefresh({
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${refreshToken}`
+              }
+            });
+            if (refreshRes.status === 200 && refreshRes.data) {
+              refreshPayload = refreshRes.data as Record<string, unknown>;
+            }
+          } catch (refreshErr) {
+            if (!isRequestAbortError(refreshErr)) {
+              logger.error('Token refresh failed:', refreshErr);
+            }
+          }
+
+          if (refreshPayload) {
+            const data = refreshPayload;
             const newAccessToken =
-              (typeof data?.accessToken === 'string' && data.accessToken) ||
-              (typeof data?.access_token === 'string' && data.access_token) ||
-              (typeof data?.token === 'string' && data.token) ||
+              (typeof data.accessToken === 'string' && data.accessToken) ||
+              (typeof data.access_token === 'string' && data.access_token) ||
+              (typeof data.token === 'string' && data.token) ||
+              null;
+            const newRefresh =
+              (typeof data.refreshToken === 'string' && data.refreshToken) ||
+              (typeof data.refresh_token === 'string' && data.refresh_token) ||
               null;
 
             if (!newAccessToken) {
               logger.error(
                 'Token refresh: response OK but no access token field',
-                {
-                  status: refreshResponse.status,
-                  url: refreshResponse.url
-                }
+                {}
               );
             } else {
               localStorage.setItem('access_token', newAccessToken);
+              if (newRefresh) {
+                localStorage.setItem('refresh_token', newRefresh);
+              }
 
               const retryShouldSetContentType =
                 !hasContentTypeHeader(
@@ -220,7 +264,8 @@ export async function authenticatedApiFetch(
                   'Content-Type': 'application/json'
                 }),
                 Authorization: `Bearer ${newAccessToken}`,
-                ...(currentLocale && { 'Accept-Language': currentLocale })
+                ...(currentLocale && { 'Accept-Language': currentLocale }),
+                ...activeCompanyIdHeader()
               };
               const retryConfig: RequestInit = {
                 ...restOptions,

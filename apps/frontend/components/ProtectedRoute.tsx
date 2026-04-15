@@ -21,16 +21,15 @@ export default function ProtectedRoute({
   fallbackComponent,
   loadingComponent
 }: ProtectedRouteProps) {
-  const { isAuthenticated, isLoading, user } = useAuthContext();
+  const { isAuthenticated, isLoading, user, token } = useAuthContext();
   const router = useRouter();
   const locale = useLocale();
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      // Redirect to the login page with the current locale
+    if (!isLoading && !isAuthenticated && token == null) {
       router.push('/login');
     }
-  }, [isAuthenticated, isLoading, router, locale]);
+  }, [isAuthenticated, isLoading, router, locale, token]);
 
   // Check access if user is loaded
   if (user) {
@@ -74,8 +73,10 @@ export default function ProtectedRoute({
     }
   }
 
-  // Show loading state while checking auth status
-  if (isLoading) {
+  const sessionResolving = Boolean(token && !user);
+
+  // Show loading while auth is resolving (including token present but /auth/me not yet applied)
+  if (isLoading || sessionResolving) {
     return (
       loadingComponent || (
         <div className='flex min-h-screen items-center justify-center p-4'>
@@ -88,6 +89,9 @@ export default function ProtectedRoute({
     );
   }
 
-  // If authenticated, render children
+  if (!isAuthenticated) {
+    return null;
+  }
+
   return <>{children}</>;
 }

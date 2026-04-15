@@ -1,5 +1,23 @@
 components:
   schemas:
+    handlers.AccessibleCompaniesResponse:
+      properties:
+        companies:
+          items:
+            $ref: '#/components/schemas/handlers.AccessibleCompanyItem'
+          type: array
+      type: object
+    handlers.AccessibleCompanyItem:
+      properties:
+        id:
+          type: string
+        inn:
+          type: string
+        legalName:
+          type: string
+        name:
+          type: string
+      type: object
     handlers.AssignUnitRequest:
       properties:
         permissions:
@@ -196,7 +214,12 @@ components:
       type: object
     handlers.LoginResponse:
       properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
         token:
+          description: same as accessToken (legacy clients)
           type: string
       type: object
     handlers.OperatorCommentPatchDTO:
@@ -366,6 +389,13 @@ components:
           type: string
         price:
           type: integer
+      type: object
+    handlers.RefreshResponse:
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
       type: object
     handlers.RegisterUserRequest:
       properties:
@@ -2100,6 +2130,33 @@ info:
   version: '1.0'
 openapi: 3.0.3
 paths:
+  /auth/accessible-companies:
+    get:
+      description: Distinct tenants from unit assignments and company ownership. Optional query q searches name, legal name, INN, counterparty JSON.
+      parameters:
+      - description: Search substring (case-insensitive)
+        in: query
+        name: q
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/handlers.AccessibleCompaniesResponse'
+          description: OK
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+      security:
+      - BearerAuth: []
+      summary: List companies the current user may access
+      tags:
+      - auth
   /auth/forgot-password:
     post:
       description: Sends a password reset link to the user's email
@@ -2129,7 +2186,7 @@ paths:
       - auth
   /auth/login:
     post:
-      description: Authenticates a user and returns a JWT token
+      description: Authenticates a user and returns access and refresh JWTs (`token` duplicates access for legacy clients)
       requestBody:
         content:
           application/json:
@@ -2185,6 +2242,27 @@ paths:
       security:
       - BearerAuth: []
       summary: Get current user
+      tags:
+      - auth
+  /auth/refresh:
+    post:
+      description: 'Exchanges a valid refresh JWT for new access and refresh tokens. Send the refresh token as `Authorization: Bearer <refresh>`.'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/handlers.RefreshResponse'
+          description: OK
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+      security:
+      - BearerAuth: []
+      summary: Refresh tokens
       tags:
       - auth
   /auth/reset-password:

@@ -16,6 +16,17 @@ import type {
 } from '@tanstack/react-query';
 
 import { orvalMutator } from '../../orval-mutator';
+export interface HandlersAccessibleCompanyItem {
+  id?: string;
+  inn?: string;
+  legalName?: string;
+  name?: string;
+}
+
+export interface HandlersAccessibleCompaniesResponse {
+  companies?: HandlersAccessibleCompanyItem[];
+}
+
 export interface HandlersAssignUnitRequest {
   permissions?: string[];
   unitId?: string;
@@ -391,6 +402,9 @@ export interface HandlersLoginRequest {
 }
 
 export interface HandlersLoginResponse {
+  accessToken?: string;
+  refreshToken?: string;
+  /** same as accessToken (legacy clients) */
   token?: string;
 }
 
@@ -505,6 +519,11 @@ export interface HandlersPlatformUpdateSubscriptionPlanBody {
   limits?: HandlersPlatformUpdateSubscriptionPlanBodyLimits;
   name?: string;
   price?: number;
+}
+
+export interface HandlersRefreshResponse {
+  accessToken?: string;
+  refreshToken?: string;
 }
 
 export interface HandlersRegisterUserRequest {

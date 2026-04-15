@@ -156,5 +156,18 @@ export default defineConfig({
       ...reactQueryOutput,
       target: './lib/api/generated/shift.ts'
     }
+  },
+  quokkaqAuth: {
+    input: {
+      target: '../backend/docs/swagger.json',
+      filters: {
+        mode: 'include',
+        tags: ['auth']
+      }
+    },
+    output: {
+      ...reactQueryOutput,
+      target: './lib/api/generated/auth.ts'
+    }
   }
 });

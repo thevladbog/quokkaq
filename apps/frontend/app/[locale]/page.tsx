@@ -18,7 +18,7 @@ import { useEffect, useState } from 'react';
 
 export default function Home() {
   const t = useTranslations('home');
-  const { isAuthenticated, isLoading, user } = useAuthContext();
+  const { isAuthenticated, isLoading, user, token } = useAuthContext();
   const router = useRouter();
   const [systemChecked, setSystemChecked] = useState(false);
 
@@ -44,10 +44,11 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (systemChecked && !isLoading && !isAuthenticated) {
+    // Do not send to login while a token exists but /auth/me is still resolving (avoids flash after sign-in).
+    if (systemChecked && !isLoading && !isAuthenticated && token == null) {
       router.push('/login');
     }
-  }, [isLoading, isAuthenticated, router, systemChecked]);
+  }, [isLoading, isAuthenticated, router, systemChecked, token]);
 
   // Operators without admin/staff/supervisor: land on staff panel.
   useEffect(() => {
@@ -65,7 +66,9 @@ export default function Home() {
     router.replace('/staff');
   }, [systemChecked, isLoading, user, router]);
 
-  if (isLoading) {
+  const sessionResolving = Boolean(token && !user);
+
+  if (isLoading || sessionResolving) {
     return (
       <div className='flex h-screen w-full items-center justify-center'>
         <Loader2 className='text-primary h-8 w-8 animate-spin' />
@@ -74,7 +77,7 @@ export default function Home() {
   }
 
   if (!isAuthenticated) {
-    return null; // Don't render anything while redirecting
+    return null; // Redirecting to login (guest with no token)
   }
 
   // Helper to check if user has specific permission in ANY unit
