@@ -807,6 +807,21 @@
                 ],
                 "type": "object"
             },
+            "handlers.emergencyUnlockBody": {
+                "properties": {
+                    "confirm": {
+                        "enum": [
+                            "UNLOCK"
+                        ],
+                        "example": "UNLOCK",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "confirm"
+                ],
+                "type": "object"
+            },
             "handlers.guestSurveySubmitRequest": {
                 "properties": {
                     "answers": {
@@ -2225,6 +2240,15 @@
                     "name": {
                         "type": "string"
                     },
+                    "operations": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/models.UnitOperationsPublic"
+                            }
+                        ],
+                        "description": "Operations is hydrated for GET /units/{id} (kiosk freeze / EOD phase); not stored on units row.",
+                        "readOnly": true
+                    },
                     "parentId": {
                         "type": "string"
                     },
@@ -2318,6 +2342,20 @@
                         "type": "string"
                     },
                     "url": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "models.UnitOperationsPublic": {
+                "properties": {
+                    "counterLoginBlocked": {
+                        "type": "boolean"
+                    },
+                    "kioskFrozen": {
+                        "type": "boolean"
+                    },
+                    "phase": {
                         "type": "string"
                     }
                 },
@@ -2504,6 +2542,29 @@
                 },
                 "type": "object"
             },
+            "services.EmployeeRadarResponse": {
+                "properties": {
+                    "computedAt": {
+                        "type": "string"
+                    },
+                    "rating": {
+                        "type": "number"
+                    },
+                    "slaService": {
+                        "type": "number"
+                    },
+                    "slaWait": {
+                        "type": "number"
+                    },
+                    "ticketsPerHour": {
+                        "type": "number"
+                    },
+                    "userId": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "services.GuestSurveySession": {
                 "properties": {
                     "activeSurveySubmitted": {
@@ -2561,6 +2622,115 @@
                     },
                     "status": {
                         "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "services.LoadPoint": {
+                "properties": {
+                    "date": {
+                        "type": "string"
+                    },
+                    "noShowCount": {
+                        "type": "integer"
+                    },
+                    "ticketsCompleted": {
+                        "type": "integer"
+                    },
+                    "ticketsCreated": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "services.LoadResponse": {
+                "properties": {
+                    "computedAt": {
+                        "type": "string"
+                    },
+                    "granularity": {
+                        "type": "string"
+                    },
+                    "points": {
+                        "items": {
+                            "$ref": "#/components/schemas/services.LoadPoint"
+                        },
+                        "type": "array"
+                    }
+                },
+                "type": "object"
+            },
+            "services.OperationsStatusDTO": {
+                "properties": {
+                    "counterLoginBlocked": {
+                        "type": "boolean"
+                    },
+                    "kioskFrozen": {
+                        "type": "boolean"
+                    },
+                    "lastEodAt": {
+                        "type": "string"
+                    },
+                    "lastReconcileAt": {
+                        "type": "string"
+                    },
+                    "lastReconcileError": {
+                        "type": "string"
+                    },
+                    "phase": {
+                        "type": "string"
+                    },
+                    "reconcileInProgress": {
+                        "type": "boolean"
+                    },
+                    "reconcileProgressNote": {
+                        "type": "string"
+                    },
+                    "statisticsAsOf": {
+                        "type": "string"
+                    },
+                    "statisticsQuiet": {
+                        "type": "boolean"
+                    },
+                    "unitId": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "services.SLADeviationsPoint": {
+                "properties": {
+                    "breachPct": {
+                        "type": "number"
+                    },
+                    "date": {
+                        "type": "string"
+                    },
+                    "slaWaitMet": {
+                        "type": "integer"
+                    },
+                    "slaWaitTotal": {
+                        "type": "integer"
+                    },
+                    "withinPct": {
+                        "type": "number"
+                    }
+                },
+                "type": "object"
+            },
+            "services.SLADeviationsResponse": {
+                "properties": {
+                    "computedAt": {
+                        "type": "string"
+                    },
+                    "granularity": {
+                        "type": "string"
+                    },
+                    "points": {
+                        "items": {
+                            "$ref": "#/components/schemas/services.SLADeviationsPoint"
+                        },
+                        "type": "array"
                     }
                 },
                 "type": "object"
@@ -2667,6 +2837,150 @@
                 },
                 "type": "object"
             },
+            "services.SlaSummaryResponse": {
+                "properties": {
+                    "breachPct": {
+                        "type": "number"
+                    },
+                    "computedAt": {
+                        "type": "string"
+                    },
+                    "serviceId": {
+                        "type": "string"
+                    },
+                    "slaWaitMet": {
+                        "type": "integer"
+                    },
+                    "slaWaitTotal": {
+                        "type": "integer"
+                    },
+                    "withinPct": {
+                        "type": "number"
+                    }
+                },
+                "type": "object"
+            },
+            "services.SurveyScorePoint": {
+                "properties": {
+                    "avgScoreNative": {
+                        "type": "number"
+                    },
+                    "avgScoreNorm5": {
+                        "type": "number"
+                    },
+                    "date": {
+                        "type": "string"
+                    },
+                    "questionId": {
+                        "type": "string"
+                    },
+                    "scaleMax": {
+                        "type": "number"
+                    },
+                    "scaleMin": {
+                        "type": "number"
+                    }
+                },
+                "type": "object"
+            },
+            "services.SurveyScoresResponse": {
+                "properties": {
+                    "computedAt": {
+                        "type": "string"
+                    },
+                    "granularity": {
+                        "type": "string"
+                    },
+                    "mode": {
+                        "type": "string"
+                    },
+                    "points": {
+                        "items": {
+                            "$ref": "#/components/schemas/services.SurveyScorePoint"
+                        },
+                        "type": "array"
+                    }
+                },
+                "type": "object"
+            },
+            "services.TicketsByServiceItem": {
+                "properties": {
+                    "count": {
+                        "type": "integer"
+                    },
+                    "serviceId": {
+                        "type": "string"
+                    },
+                    "serviceName": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "services.TicketsByServiceResponse": {
+                "properties": {
+                    "computedAt": {
+                        "type": "string"
+                    },
+                    "items": {
+                        "items": {
+                            "$ref": "#/components/schemas/services.TicketsByServiceItem"
+                        },
+                        "type": "array"
+                    },
+                    "total": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "services.TimeseriesPoint": {
+                "properties": {
+                    "avgServiceMinutes": {
+                        "type": "number"
+                    },
+                    "avgWaitMinutes": {
+                        "type": "number"
+                    },
+                    "date": {
+                        "type": "string"
+                    },
+                    "noShowCount": {
+                        "type": "integer"
+                    },
+                    "slaWaitMetPct": {
+                        "type": "number"
+                    },
+                    "ticketsCompleted": {
+                        "type": "integer"
+                    },
+                    "ticketsCreated": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "services.TimeseriesResponse": {
+                "properties": {
+                    "computedAt": {
+                        "type": "string"
+                    },
+                    "granularity": {
+                        "description": "\"day\" | \"hour\"",
+                        "type": "string"
+                    },
+                    "metric": {
+                        "type": "string"
+                    },
+                    "points": {
+                        "items": {
+                            "$ref": "#/components/schemas/services.TimeseriesPoint"
+                        },
+                        "type": "array"
+                    }
+                },
+                "type": "object"
+            },
             "services.UnitClientHistoryItem": {
                 "properties": {
                     "action": {
@@ -2721,6 +3035,40 @@
                     },
                     "nextCursor": {
                         "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "services.UtilizationPoint": {
+                "properties": {
+                    "date": {
+                        "type": "string"
+                    },
+                    "idleMinutes": {
+                        "type": "number"
+                    },
+                    "servingMinutes": {
+                        "type": "number"
+                    },
+                    "utilizationPct": {
+                        "type": "number"
+                    }
+                },
+                "type": "object"
+            },
+            "services.UtilizationResponse": {
+                "properties": {
+                    "computedAt": {
+                        "type": "string"
+                    },
+                    "granularity": {
+                        "type": "string"
+                    },
+                    "points": {
+                        "items": {
+                            "$ref": "#/components/schemas/services.UtilizationPoint"
+                        },
+                        "type": "array"
                     }
                 },
                 "type": "object"
@@ -10581,6 +10929,247 @@
                 ]
             }
         },
+        "/units/{unitId}/operations/clear-statistics-quiet": {
+            "post": {
+                "description": "Admin-only: clears the statistics quiet flag so incremental statistics processing resumes for the subdivision. No request body.",
+                "operationId": "postUnitOperationsClearStatisticsQuiet",
+                "parameters": [
+                    {
+                        "description": "Subdivision unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden (not tenant admin)"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unit not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal server error (clear failed or audit log failed)"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Resume incremental statistics processing",
+                "tags": [
+                    "operations"
+                ]
+            }
+        },
+        "/units/{unitId}/operations/emergency-unlock": {
+            "post": {
+                "description": "Destructive admin operation: clears kiosk admission freeze and counter-login blocks for the subdivision. JSON body required; confirm must equal UNLOCK exactly.",
+                "operationId": "postUnitOperationsEmergencyUnlock",
+                "parameters": [
+                    {
+                        "description": "Subdivision unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.emergencyUnlockBody"
+                            }
+                        }
+                    },
+                    "description": "Required. Send confirm equal to UNLOCK.",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad Request (confirm not UNLOCK or invalid JSON)"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden (not tenant admin)"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unit not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal server error (unlock failed or audit log failed)"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Emergency unlock kiosk and counter login",
+                "tags": [
+                    "operations"
+                ]
+            }
+        },
+        "/units/{unitId}/operations/status": {
+            "get": {
+                "operationId": "getUnitOperationsStatus",
+                "parameters": [
+                    {
+                        "description": "Subdivision unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/services.OperationsStatusDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden (not tenant admin)"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unit not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Unit operations / EOD pipeline status",
+                "tags": [
+                    "operations"
+                ]
+            }
+        },
         "/units/{unitId}/pre-registrations": {
             "get": {
                 "description": "Returns all pre-registrations associated with the unit (authenticated unit member).",
@@ -12122,6 +12711,967 @@
                 "summary": "Generate service slots for a date range",
                 "tags": [
                     "slots"
+                ]
+            }
+        },
+        "/units/{unitId}/statistics/employee-radar": {
+            "get": {
+                "operationId": "getUnitStatisticsEmployeeRadar",
+                "parameters": [
+                    {
+                        "description": "Subdivision unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Target user id",
+                        "in": "query",
+                        "name": "userId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/services.EmployeeRadarResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad Request (missing or invalid query params)"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden (missing statistics access or plan)"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unit not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Employee radar chart metrics",
+                "tags": [
+                    "statistics"
+                ]
+            }
+        },
+        "/units/{unitId}/statistics/load": {
+            "get": {
+                "description": "Same daily bucket source as timeseries volume; wait/service semantics match timeseries when those metrics are derived from the same warehouse rows.",
+                "operationId": "getUnitStatisticsLoad",
+                "parameters": [
+                    {
+                        "description": "Subdivision unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "YYYY-MM-DD",
+                        "in": "query",
+                        "name": "dateFrom",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "YYYY-MM-DD",
+                        "in": "query",
+                        "name": "dateTo",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Filter by operator (expanded scope only)",
+                        "in": "query",
+                        "name": "userId",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Service zone unit id",
+                        "in": "query",
+                        "name": "serviceZoneId",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/services.LoadResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad Request (missing or invalid query params)"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden (missing statistics access or plan)"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unit not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Daily ticket load (created / completed / no-show)",
+                "tags": [
+                    "statistics"
+                ]
+            }
+        },
+        "/units/{unitId}/statistics/sla-deviations": {
+            "get": {
+                "description": "Waiting SLA shares use the same queue segment definition as timeseries (post-transfer wait before call).",
+                "operationId": "getUnitStatisticsSlaDeviations",
+                "parameters": [
+                    {
+                        "description": "Subdivision unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "YYYY-MM-DD",
+                        "in": "query",
+                        "name": "dateFrom",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "YYYY-MM-DD",
+                        "in": "query",
+                        "name": "dateTo",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Filter by operator (expanded scope only)",
+                        "in": "query",
+                        "name": "userId",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Service zone unit id (child of subdivision)",
+                        "in": "query",
+                        "name": "serviceZoneId",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/services.SLADeviationsResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad Request (missing or invalid query params)"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden (missing statistics access or plan)"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unit not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "SLA waiting compliance vs breach per day",
+                "tags": [
+                    "statistics"
+                ]
+            }
+        },
+        "/units/{unitId}/statistics/sla-summary": {
+            "get": {
+                "operationId": "getUnitStatisticsSlaSummary",
+                "parameters": [
+                    {
+                        "description": "Subdivision unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "YYYY-MM-DD",
+                        "in": "query",
+                        "name": "dateFrom",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "YYYY-MM-DD",
+                        "in": "query",
+                        "name": "dateTo",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Filter by operator (expanded scope only)",
+                        "in": "query",
+                        "name": "userId",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Service zone unit id",
+                        "in": "query",
+                        "name": "serviceZoneId",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Business service id; omit for all services in scope",
+                        "in": "query",
+                        "name": "serviceId",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/services.SlaSummaryResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad Request (missing or invalid query params)"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden (missing statistics access or plan)"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unit not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Aggregate waiting SLA percent for date range (optional service filter)",
+                "tags": [
+                    "statistics"
+                ]
+            }
+        },
+        "/units/{unitId}/statistics/survey-scores": {
+            "get": {
+                "operationId": "getUnitStatisticsSurveyScores",
+                "parameters": [
+                    {
+                        "description": "Subdivision unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "YYYY-MM-DD",
+                        "in": "query",
+                        "name": "dateFrom",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "YYYY-MM-DD",
+                        "in": "query",
+                        "name": "dateTo",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Single survey definition id (required with questionIds)",
+                        "in": "query",
+                        "name": "surveyId",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Question ids (repeat query param or comma-separated); native scale",
+                        "in": "query",
+                        "name": "questionIds",
+                        "schema": {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        "style": "form",
+                        "explode": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/services.SurveyScoresResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad Request (missing or invalid query params)"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden (missing survey score statistics access or plan)"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unit not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Guest survey score timeseries (live from responses; hourly for a single day, daily for longer ranges)",
+                "tags": [
+                    "statistics"
+                ]
+            }
+        },
+        "/units/{unitId}/statistics/tickets-by-service": {
+            "get": {
+                "operationId": "getUnitStatisticsTicketsByService",
+                "parameters": [
+                    {
+                        "description": "Subdivision unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "YYYY-MM-DD",
+                        "in": "query",
+                        "name": "dateFrom",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "YYYY-MM-DD",
+                        "in": "query",
+                        "name": "dateTo",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Filter by operator (expanded scope only)",
+                        "in": "query",
+                        "name": "userId",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Service zone unit id",
+                        "in": "query",
+                        "name": "serviceZoneId",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/services.TicketsByServiceResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad Request (missing or invalid query params)"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden (missing statistics access or plan)"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unit not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Tickets created in range grouped by business service (donut chart)",
+                "tags": [
+                    "statistics"
+                ]
+            }
+        },
+        "/units/{unitId}/statistics/timeseries": {
+            "get": {
+                "description": "Daily metrics from statistics warehouse; single calendar day without operator filter yields hourly points with per-hour recomputed wait/service/SLA (same rules as daily rollup). Requires unit branch access and statistics scope (self or ACCESS_STATISTICS_* / supervisor / admin).\nWait averages use queue time after the last ticket.transferred before the call. Service averages sum in_service episodes from ticket_histories (split by transfer / return-to-queue / recall / terminal status); warehouse service_count is the number of those segments with positive duration.",
+                "operationId": "getUnitStatisticsTimeseries",
+                "parameters": [
+                    {
+                        "description": "Subdivision unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "YYYY-MM-DD",
+                        "in": "query",
+                        "name": "dateFrom",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "YYYY-MM-DD",
+                        "in": "query",
+                        "name": "dateTo",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "wait_time|service_time|volume|sla_wait",
+                        "in": "query",
+                        "name": "metric",
+                        "schema": {
+                            "default": "wait_time",
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Filter by operator (expanded scope only)",
+                        "in": "query",
+                        "name": "userId",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Service zone unit id (child of subdivision); omit for allowed scope default",
+                        "in": "query",
+                        "name": "serviceZoneId",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/services.TimeseriesResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad Request (dates, service zone, or conflicting filters)"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden (scope, plan, or zone access)"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unit not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Statistics timeseries (daily or hourly for a single day)",
+                "tags": [
+                    "statistics"
+                ]
+            }
+        },
+        "/units/{unitId}/statistics/utilization": {
+            "get": {
+                "operationId": "getUnitStatisticsUtilization",
+                "parameters": [
+                    {
+                        "description": "Subdivision unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "YYYY-MM-DD",
+                        "in": "query",
+                        "name": "dateFrom",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "YYYY-MM-DD",
+                        "in": "query",
+                        "name": "dateTo",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Target operator user id",
+                        "in": "query",
+                        "name": "userId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/services.UtilizationResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad Request (missing or invalid query params)"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden (missing statistics access or plan)"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unit not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Per-operator utilization (serving vs idle/break), calendar days in subdivision TZ",
+                "tags": [
+                    "statistics"
                 ]
             }
         },

@@ -141,6 +141,37 @@ func RequireAdminTerminalOrUnitMemberForUnit(userRepo repository.UserRepository,
 	}
 }
 
+// RequireUnitBranchMember allows tenant admin or any user assigned to the subdivision or a descendant unit (service zones).
+func RequireUnitBranchMember(userRepo repository.UserRepository) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			userID, ok := GetUserIDFromContext(r.Context())
+			if !ok {
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				return
+			}
+			unitID := strings.TrimSpace(chi.URLParam(r, "unitId"))
+			if unitID == "" {
+				unitID = strings.TrimSpace(chi.URLParam(r, "id"))
+			}
+			if unitID == "" {
+				http.Error(w, "Unit ID required", http.StatusBadRequest)
+				return
+			}
+			allowed, err := userRepo.HasUnitBranchAccess(userID, unitID)
+			if err != nil {
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+			if !allowed {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 // RequireUnitMember allows admins or users assigned to the unit (URL param unitId or id on /units routes).
 func RequireUnitMember(userRepo repository.UserRepository) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -150,12 +181,12 @@ func RequireUnitMember(userRepo repository.UserRepository) func(http.Handler) ht
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 				return
 			}
-			unitID := chi.URLParam(r, "unitId")
+			unitID := strings.TrimSpace(chi.URLParam(r, "unitId"))
 			if unitID == "" {
-				unitID = chi.URLParam(r, "id")
+				unitID = strings.TrimSpace(chi.URLParam(r, "id"))
 			}
 			if unitID == "" {
-				next.ServeHTTP(w, r)
+				http.Error(w, "Unit ID required", http.StatusBadRequest)
 				return
 			}
 			allowed, err := userRepo.IsAdminOrHasUnitAccess(userID, unitID)

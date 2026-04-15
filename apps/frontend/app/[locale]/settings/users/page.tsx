@@ -32,6 +32,7 @@ import {
   useCurrentUser
 } from '@/lib/hooks';
 import { useTranslations } from 'next-intl';
+import { UNIT_PERMISSIONS } from '@/lib/unit-permissions';
 
 interface UserUnit {
   id: string;
@@ -50,19 +51,6 @@ interface Unit {
   name: string;
   code: string;
 }
-
-const AVAILABLE_PERMISSIONS = [
-  { id: 'UNIT_SETTINGS_MANAGE', label: 'Manage Unit Settings' },
-  { id: 'UNIT_GRID_MANAGE', label: 'Manage Grid' },
-  { id: 'UNIT_SERVICES_MANAGE', label: 'Manage Services' },
-  { id: 'UNIT_TICKET_SCREEN_MANAGE', label: 'Manage Ticket Screen' },
-  { id: 'UNIT_USERS_MANAGE', label: 'Manage Unit Users' },
-  { id: 'ACCESS_STAFF_PANEL', label: 'Access Staff Panel' },
-  { id: 'ACCESS_KIOSK', label: 'Access Kiosk' },
-  { id: 'ACCESS_TICKET_SCREEN', label: 'Access Ticket Screen' },
-  { id: 'ACCESS_SUPERVISOR_PANEL', label: 'Access Supervisor Panel' },
-  { id: 'ACCESS_SURVEY_RESPONSES', label: 'View guest survey responses' }
-];
 
 export default function UsersPage() {
   const { data: currentUser } = useCurrentUser();
@@ -452,7 +440,7 @@ export default function UsersPage() {
           </DialogHeader>
           <div className='grid gap-4 py-4'>
             <div className='space-y-4'>
-              {AVAILABLE_PERMISSIONS.map((permission) => (
+              {UNIT_PERMISSIONS.map((permission) => (
                 <div
                   key={permission.id}
                   className='flex items-center space-x-2'

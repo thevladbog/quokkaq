@@ -25,6 +25,33 @@ import type {
 } from '@tanstack/react-query';
 
 import { orvalMutator } from '../../orval-mutator';
+
+// https://stackoverflow.com/questions/49579094/typescript-conditional-types-filter-out-readonly-properties-pick-only-requir/49579497#49579497
+type IfEquals<X, Y, A = X, B = never> = (<T>() => T extends X ? 1 : 2) extends <
+T,
+>() => T extends Y ? 1 : 2
+? A
+: B;
+
+type WritableKeys<T> = {
+[P in keyof T]-?: IfEquals<
+  { [Q in P]: T[P] },
+  { -readonly [Q in P]: T[P] },
+  P
+>;
+}[keyof T];
+
+type UnionToIntersection<U> =
+  (U extends any ? (k: U)=>void : never) extends ((k: infer I)=>void) ? I : never;
+type DistributeReadOnlyOverUnions<T> = T extends any ? NonReadonly<T> : never;
+
+type Writable<T> = Pick<T, WritableKeys<T>>;
+type NonReadonly<T> = [T] extends [UnionToIntersection<T>] ? {
+  [P in keyof Writable<T>]: T[P] extends object
+    ? NonReadonly<NonNullable<T[P]>>
+    : T[P];
+} : DistributeReadOnlyOverUnions<T>;
+
 export interface HandlersAssignUnitRequest {
   permissions?: string[];
   unitId?: string;
@@ -84,6 +111,12 @@ export interface ModelsUserRole {
   role?: ModelsRole;
   roleId?: string;
   userId?: string;
+}
+
+export interface ModelsUnitOperationsPublic {
+  counterLoginBlocked?: boolean;
+  kioskFrozen?: boolean;
+  phase?: string;
 }
 
 export interface ModelsService {
@@ -168,6 +201,8 @@ export interface ModelsUnit {
   id?: string;
   kind?: string;
   name?: string;
+  /** Operations is hydrated for GET /units/{id} (kiosk freeze / EOD phase); not stored on units row. */
+  readonly operations?: ModelsUnitOperationsPublic;
   parentId?: string;
   preRegistrations?: ModelsPreRegistration[];
   services?: ModelsService[];
@@ -815,6 +850,17 @@ export interface HandlersCreateVisitorTagDefinitionRequest {
   sortOrder?: number;
 }
 
+export type HandlersEmergencyUnlockBodyConfirm = typeof HandlersEmergencyUnlockBodyConfirm[keyof typeof HandlersEmergencyUnlockBodyConfirm];
+
+
+export const HandlersEmergencyUnlockBodyConfirm = {
+  UNLOCK: 'UNLOCK',
+} as const;
+
+export interface HandlersEmergencyUnlockBody {
+  confirm: HandlersEmergencyUnlockBodyConfirm;
+}
+
 export type HandlersGuestSurveySubmitRequestAnswers = { [key: string]: unknown };
 
 export interface HandlersGuestSurveySubmitRequest {
@@ -1128,6 +1174,15 @@ export interface ModelsWeeklySlotCapacity {
   updatedAt?: string;
 }
 
+export interface ServicesEmployeeRadarResponse {
+  computedAt?: string;
+  rating?: number;
+  slaService?: number;
+  slaWait?: number;
+  ticketsPerHour?: number;
+  userId?: string;
+}
+
 /**
  * IdleScreen from the active survey for this counter (service zone scope first), regardless of ticket.
  */
@@ -1164,6 +1219,47 @@ export interface ServicesGuestSurveySession {
   idleScreen?: ServicesGuestSurveySessionIdleScreen;
   survey?: ServicesGuestSurveySessionSurvey;
   unitConfig?: ServicesGuestSurveySessionUnitConfig;
+}
+
+export interface ServicesLoadPoint {
+  date?: string;
+  noShowCount?: number;
+  ticketsCompleted?: number;
+  ticketsCreated?: number;
+}
+
+export interface ServicesLoadResponse {
+  computedAt?: string;
+  granularity?: string;
+  points?: ServicesLoadPoint[];
+}
+
+export interface ServicesOperationsStatusDTO {
+  counterLoginBlocked?: boolean;
+  kioskFrozen?: boolean;
+  lastEodAt?: string;
+  lastReconcileAt?: string;
+  lastReconcileError?: string;
+  phase?: string;
+  reconcileInProgress?: boolean;
+  reconcileProgressNote?: string;
+  statisticsAsOf?: string;
+  statisticsQuiet?: boolean;
+  unitId?: string;
+}
+
+export interface ServicesSLADeviationsPoint {
+  breachPct?: number;
+  date?: string;
+  slaWaitMet?: number;
+  slaWaitTotal?: number;
+  withinPct?: number;
+}
+
+export interface ServicesSLADeviationsResponse {
+  computedAt?: string;
+  granularity?: string;
+  points?: ServicesSLADeviationsPoint[];
 }
 
 export interface ServicesShiftActivityActorOption {
@@ -1208,6 +1304,61 @@ export interface ServicesShiftCounterDTO {
   unitId?: string;
 }
 
+export interface ServicesSlaSummaryResponse {
+  breachPct?: number;
+  computedAt?: string;
+  serviceId?: string;
+  slaWaitMet?: number;
+  slaWaitTotal?: number;
+  withinPct?: number;
+}
+
+export interface ServicesSurveyScorePoint {
+  avgScoreNative?: number;
+  avgScoreNorm5?: number;
+  date?: string;
+  questionId?: string;
+  scaleMax?: number;
+  scaleMin?: number;
+}
+
+export interface ServicesSurveyScoresResponse {
+  computedAt?: string;
+  granularity?: string;
+  mode?: string;
+  points?: ServicesSurveyScorePoint[];
+}
+
+export interface ServicesTicketsByServiceItem {
+  count?: number;
+  serviceId?: string;
+  serviceName?: string;
+}
+
+export interface ServicesTicketsByServiceResponse {
+  computedAt?: string;
+  items?: ServicesTicketsByServiceItem[];
+  total?: number;
+}
+
+export interface ServicesTimeseriesPoint {
+  avgServiceMinutes?: number;
+  avgWaitMinutes?: number;
+  date?: string;
+  noShowCount?: number;
+  slaWaitMetPct?: number;
+  ticketsCompleted?: number;
+  ticketsCreated?: number;
+}
+
+export interface ServicesTimeseriesResponse {
+  computedAt?: string;
+  /** "day" | "hour" */
+  granularity?: string;
+  metric?: string;
+  points?: ServicesTimeseriesPoint[];
+}
+
 export type ServicesUnitClientHistoryItemPayload = { [key: string]: unknown };
 
 export interface ServicesUnitClientHistoryItem {
@@ -1229,6 +1380,19 @@ export interface ServicesUnitClientHistoryListResponse {
 export interface ServicesUnitClientListResponse {
   items?: ModelsUnitClient[];
   nextCursor?: string;
+}
+
+export interface ServicesUtilizationPoint {
+  date?: string;
+  idleMinutes?: number;
+  servingMinutes?: number;
+  utilizationPct?: number;
+}
+
+export interface ServicesUtilizationResponse {
+  computedAt?: string;
+  granularity?: string;
+  points?: ServicesUtilizationPoint[];
 }
 
 export type PatchUnitsUnitIdAdSettingsBody = { [key: string]: unknown };
@@ -1396,7 +1560,7 @@ export const getPostUnitsUrl = () => {
   return `/units`
 }
 
-export const postUnits = async (modelsUnit: ModelsUnit, options?: RequestInit): Promise<postUnitsResponse> => {
+export const postUnits = async (modelsUnit: NonReadonly<ModelsUnit>, options?: RequestInit): Promise<postUnitsResponse> => {
 
   return orvalMutator<postUnitsResponse>(getPostUnitsUrl(),
   {
@@ -1412,8 +1576,8 @@ export const postUnits = async (modelsUnit: ModelsUnit, options?: RequestInit): 
 
 
 export const getPostUnitsMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnits>>, TError,{data: ModelsUnit}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof postUnits>>, TError,{data: ModelsUnit}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnits>>, TError,{data: NonReadonly<ModelsUnit>}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof postUnits>>, TError,{data: NonReadonly<ModelsUnit>}, TContext> => {
 
 const mutationKey = ['postUnits'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -1425,7 +1589,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postUnits>>, {data: ModelsUnit}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postUnits>>, {data: NonReadonly<ModelsUnit>}> = (props) => {
           const {data} = props ?? {};
 
           return  postUnits(data,requestOptions)
@@ -1439,18 +1603,18 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type PostUnitsMutationResult = NonNullable<Awaited<ReturnType<typeof postUnits>>>
-    export type PostUnitsMutationBody = ModelsUnit
+    export type PostUnitsMutationBody = NonReadonly<ModelsUnit>
     export type PostUnitsMutationError = string
 
     /**
  * @summary Create a new unit
  */
 export const usePostUnits = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnits>>, TError,{data: ModelsUnit}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnits>>, TError,{data: NonReadonly<ModelsUnit>}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postUnits>>,
         TError,
-        {data: ModelsUnit},
+        {data: NonReadonly<ModelsUnit>},
         TContext
       > => {
       return useMutation(getPostUnitsMutationOptions(options), queryClient);
@@ -1719,7 +1883,7 @@ export const getPatchUnitsIdUrl = (id: string,) => {
 }
 
 export const patchUnitsId = async (id: string,
-    modelsUnit: ModelsUnit, options?: RequestInit): Promise<patchUnitsIdResponse> => {
+    modelsUnit: NonReadonly<ModelsUnit>, options?: RequestInit): Promise<patchUnitsIdResponse> => {
 
   return orvalMutator<patchUnitsIdResponse>(getPatchUnitsIdUrl(id),
   {
@@ -1735,8 +1899,8 @@ export const patchUnitsId = async (id: string,
 
 
 export const getPatchUnitsIdMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchUnitsId>>, TError,{id: string;data: ModelsUnit}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof patchUnitsId>>, TError,{id: string;data: ModelsUnit}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchUnitsId>>, TError,{id: string;data: NonReadonly<ModelsUnit>}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof patchUnitsId>>, TError,{id: string;data: NonReadonly<ModelsUnit>}, TContext> => {
 
 const mutationKey = ['patchUnitsId'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -1748,7 +1912,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchUnitsId>>, {id: string;data: ModelsUnit}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchUnitsId>>, {id: string;data: NonReadonly<ModelsUnit>}> = (props) => {
           const {id,data} = props ?? {};
 
           return  patchUnitsId(id,data,requestOptions)
@@ -1762,18 +1926,18 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type PatchUnitsIdMutationResult = NonNullable<Awaited<ReturnType<typeof patchUnitsId>>>
-    export type PatchUnitsIdMutationBody = ModelsUnit
+    export type PatchUnitsIdMutationBody = NonReadonly<ModelsUnit>
     export type PatchUnitsIdMutationError = string
 
     /**
  * @summary Update a unit
  */
 export const usePatchUnitsId = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchUnitsId>>, TError,{id: string;data: ModelsUnit}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchUnitsId>>, TError,{id: string;data: NonReadonly<ModelsUnit>}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof patchUnitsId>>,
         TError,
-        {id: string;data: ModelsUnit},
+        {id: string;data: NonReadonly<ModelsUnit>},
         TContext
       > => {
       return useMutation(getPatchUnitsIdMutationOptions(options), queryClient);

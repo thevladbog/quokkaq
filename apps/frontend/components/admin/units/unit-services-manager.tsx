@@ -34,6 +34,7 @@ import {
   useUpdateService,
   useDeleteService
 } from '@/lib/hooks';
+import { normalizeChildUnitsQueryData } from '@/lib/child-units-query';
 import { getGetUnitsUnitIdChildUnitsQueryKey } from '@/lib/api/generated/units';
 import { unitsApi } from '@/lib/api';
 import { useTranslations, useLocale } from 'next-intl';
@@ -376,15 +377,18 @@ function ServiceForm({
   const createServiceMutation = useCreateService();
   const updateServiceMutation = useUpdateService();
 
-  const { data: childUnits = [] } = useQuery({
+  const { data: childUnitsRaw } = useQuery({
     queryKey: getGetUnitsUnitIdChildUnitsQueryKey(selectedUnitId),
     queryFn: () => unitsApi.getChildUnits(selectedUnitId),
     enabled: !!selectedUnitId && (!!editingService || isCreating)
   });
 
   const serviceZones = useMemo(
-    () => childUnits.filter((u) => u.kind === 'service_zone'),
-    [childUnits]
+    () =>
+      normalizeChildUnitsQueryData(childUnitsRaw).filter(
+        (u) => u.kind === 'service_zone'
+      ),
+    [childUnitsRaw]
   );
 
   const [baselineValues] = useState<Partial<Service>>(() =>
@@ -615,11 +619,16 @@ function ServiceForm({
               <SelectItem value='__none__'>
                 {t('services.restricted_zone_none')}
               </SelectItem>
-              {serviceZones.map((zone) => (
-                <SelectItem key={zone.id} value={zone.id}>
-                  {zone.name}
-                </SelectItem>
-              ))}
+              {serviceZones
+                .filter(
+                  (zone): zone is typeof zone & { id: string } =>
+                    typeof zone.id === 'string' && zone.id.trim().length > 0
+                )
+                .map((zone) => (
+                  <SelectItem key={zone.id} value={zone.id}>
+                    {zone.name}
+                  </SelectItem>
+                ))}
             </SelectContent>
           </Select>
           <p className='text-muted-foreground text-xs'>

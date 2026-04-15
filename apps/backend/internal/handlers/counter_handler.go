@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log"
 	"net/http"
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/models"
+	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
 
 	"github.com/go-chi/chi/v5"
@@ -21,11 +23,13 @@ type UpdateCounterRequest struct {
 }
 
 type CounterHandler struct {
-	service services.CounterService
+	service     services.CounterService
+	counterRepo repository.CounterRepository
+	operational *services.OperationalService
 }
 
-func NewCounterHandler(service services.CounterService) *CounterHandler {
-	return &CounterHandler{service: service}
+func NewCounterHandler(service services.CounterService, counterRepo repository.CounterRepository, operational *services.OperationalService) *CounterHandler {
+	return &CounterHandler{service: service, counterRepo: counterRepo, operational: operational}
 }
 
 func writeCounterServiceError(w http.ResponseWriter, err error) {
@@ -225,6 +229,28 @@ func (h *CounterHandler) Occupy(w http.ResponseWriter, r *http.Request) {
 	if !ok || userID == "" {
 		http.Error(w, "User ID not found in context", http.StatusUnauthorized)
 		return
+	}
+
+	if h.operational != nil && h.counterRepo != nil {
+		c, err := h.counterRepo.FindByID(id)
+		if err != nil {
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				log.Printf("counter Occupy: operational pre-check FindByID(counterId=%q) err=%v", id, err)
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+		}
+		if err == nil && c != nil {
+			blocked, opErr := h.operational.IsCounterLoginBlocked(c.UnitID)
+			if opErr != nil {
+				http.Error(w, opErr.Error(), http.StatusInternalServerError)
+				return
+			}
+			if blocked {
+				http.Error(w, "counter login is blocked for end-of-day operations", http.StatusForbidden)
+				return
+			}
+		}
 	}
 
 	counter, err := h.service.Occupy(id, userID)

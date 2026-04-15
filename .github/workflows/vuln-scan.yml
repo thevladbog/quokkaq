@@ -33,8 +33,46 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: pnpm audit
-        run: pnpm audit --audit-level=high
+      # npm retired POST /-/npm/v1/security/audits (410). pnpm ≤10.33 still uses it (pnpm/pnpm#11265).
+      # OSV-Scanner reads pnpm-lock.yaml and queries OSV.dev; we fail only on CVSS ≥ 7 to match --audit-level=high.
+      - name: Lockfile audit (OSV, high+ only)
+        run: |
+          set -euo pipefail
+          docker run --rm -v "${GITHUB_WORKSPACE}:/src:ro" ghcr.io/google/osv-scanner:v2.3.5 \
+            scan source -L /src/pnpm-lock.yaml --format json --verbosity error \
+            > osv-results.json || true
+          node <<'NODE'
+          const fs = require('fs');
+          const raw = fs.readFileSync('osv-results.json', 'utf8').trim();
+          if (!raw) {
+            console.error('OSV-Scanner produced no output (registry or image failure).');
+            process.exit(1);
+          }
+          const data = JSON.parse(raw);
+          let worst = 0;
+          for (const r of data.results ?? []) {
+            for (const pkg of r.packages ?? []) {
+              for (const g of pkg.groups ?? []) {
+                const n = parseFloat(g.max_severity);
+                if (!Number.isNaN(n)) worst = Math.max(worst, n);
+              }
+            }
+          }
+          const HIGH = 7.0;
+          if (worst >= HIGH) {
+            console.error(
+              `Failing: highest CVSS in pnpm-lock.yaml is ${worst} (threshold ${HIGH}, same band as npm audit --audit-level=high).`
+            );
+            process.exit(1);
+          }
+          console.log(
+            worst > 0
+              ? `OSV: max CVSS ${worst} is below high threshold (${HIGH}); not failing the job.`
+              : 'OSV: no known vulnerabilities in pnpm-lock.yaml.'
+          );
+          process.exit(0);
+          NODE
+          rm -f osv-results.json
 
   govulncheck:
     name: govulncheck (Go)

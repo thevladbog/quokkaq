@@ -23,7 +23,8 @@ import {
   LogIn,
   Globe,
   Layers,
-  Settings
+  Settings,
+  BarChart3
 } from 'lucide-react';
 import Image from 'next/image';
 import { useAuthContext } from '@/contexts/AuthContext';
@@ -58,6 +59,8 @@ const AppSidebar = () => {
   const isActive = (path: string) => pathname === path;
   const isActiveSub = (path: string) =>
     pathname.startsWith(path) && pathname !== path;
+  const isActiveStatistics =
+    pathname === '/statistics' || pathname.startsWith('/statistics/');
 
   const hasPermissionInAnyUnit = (permission: string) => {
     if (!user?.permissions) return false;
@@ -75,6 +78,9 @@ const AppSidebar = () => {
     activeUnitId != null && activeUnitId !== ''
       ? `/clients/${activeUnitId}`
       : null;
+
+  const statisticsHref =
+    activeUnitId != null && activeUnitId !== '' ? `/statistics` : null;
 
   const navItems = [
     {
@@ -127,6 +133,17 @@ const AppSidebar = () => {
             label: tNav('clients', { defaultValue: 'Clients' }),
             href: clientsHref,
             active: pathname.startsWith(`/clients/${activeUnitId}`),
+            roles: ['admin', 'staff', 'supervisor', 'operator'] as const
+          }
+        ]
+      : []),
+    ...(statisticsHref
+      ? [
+          {
+            icon: BarChart3,
+            label: tNav('statistics', { defaultValue: 'Statistics' }),
+            href: statisticsHref,
+            active: isActiveStatistics,
             roles: ['admin', 'staff', 'supervisor', 'operator'] as const
           }
         ]

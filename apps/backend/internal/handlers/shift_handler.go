@@ -114,11 +114,12 @@ func parseShiftActivityFilters(r *http.Request) (*repository.TicketHistoryListFi
 }
 
 type ShiftHandler struct {
-	service services.ShiftService
+	service     services.ShiftService
+	operational *services.OperationalService
 }
 
-func NewShiftHandler(service services.ShiftService) *ShiftHandler {
-	return &ShiftHandler{service: service}
+func NewShiftHandler(service services.ShiftService, operational *services.OperationalService) *ShiftHandler {
+	return &ShiftHandler{service: service, operational: operational}
 }
 
 // GetDashboardStats godoc
@@ -276,10 +277,22 @@ func (h *ShiftHandler) ExecuteEndOfDay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	actorID := uid
+	if h.operational != nil {
+		if err := h.operational.BeginEODFreeze(unitID); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
 	result, err := h.service.ExecuteEndOfDay(r.Context(), unitID, &actorID)
 	if err != nil {
+		if h.operational != nil {
+			h.operational.AbortEODFreeze(unitID)
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+	if h.operational != nil {
+		h.operational.CompleteEODPipeline(unitID)
 	}
 	RespondJSON(w, result)
 }

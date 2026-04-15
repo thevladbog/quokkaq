@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { normalizeChildUnitsQueryData } from '@/lib/child-units-query';
 import { useTranslations } from 'next-intl';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { FolderOpen, Plus, ExternalLink } from 'lucide-react';
@@ -32,7 +33,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { unitsApi, type Unit } from '@/lib/api';
+import { unitsApi } from '@/lib/api';
 import { useCreateUnit } from '@/lib/hooks';
 import { Link, useRouter } from '@/src/i18n/navigation';
 import PermissionGuard from '@/components/auth/permission-guard';
@@ -79,14 +80,19 @@ export function SubdivisionStationsAndZonesPanel({
     queryFn: () => unitsApi.getChildUnits(subdivisionId)
   });
 
-  const serviceZones = useMemo(
-    () => (children ?? []).filter((u) => u.kind === 'service_zone'),
+  const childrenList = useMemo(
+    () => normalizeChildUnitsQueryData(children),
     [children]
   );
 
+  const serviceZones = useMemo(
+    () => childrenList.filter((u) => u.kind === 'service_zone'),
+    [childrenList]
+  );
+
   const nestedSubdivisions = useMemo(
-    () => (children ?? []).filter((u) => u.kind === 'subdivision'),
-    [children]
+    () => childrenList.filter((u) => u.kind === 'subdivision'),
+    [childrenList]
   );
 
   const resetForm = () => {
@@ -165,7 +171,7 @@ export function SubdivisionStationsAndZonesPanel({
     }
   };
 
-  const kindLabel = (u: Unit) =>
+  const kindLabel = (u: { kind?: string }) =>
     u.kind === 'service_zone' ? t('kind_service_zone') : t('kind_subdivision');
 
   return (

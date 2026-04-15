@@ -22,6 +22,7 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { getGetUnitsUnitIdCountersQueryKey } from '@/lib/api/generated/tickets-counters';
+import { normalizeChildUnitsQueryData } from '@/lib/child-units-query';
 import { getGetUnitsUnitIdChildUnitsQueryKey } from '@/lib/api/generated/units';
 import { countersApi, Counter, unitsApi } from '@/lib/api';
 import type { CounterServiceZoneFilter } from '@/components/admin/units/counter-zone-filter';
@@ -103,15 +104,18 @@ function CounterForm({
     (serviceZoneFilter === null ||
       (typeof serviceZoneFilter === 'string' && Boolean(serviceZoneFilter)));
 
-  const { data: childUnits = [] } = useQuery({
+  const { data: childUnitsRaw } = useQuery({
     queryKey: getGetUnitsUnitIdChildUnitsQueryKey(countersUnitId),
     queryFn: () => unitsApi.getChildUnits(countersUnitId),
     enabled: !!countersUnitId
   });
 
   const serviceZones = useMemo(
-    () => childUnits.filter((u) => u.kind === 'service_zone'),
-    [childUnits]
+    () =>
+      normalizeChildUnitsQueryData(childUnitsRaw).filter(
+        (u) => u.kind === 'service_zone'
+      ),
+    [childUnitsRaw]
   );
 
   const createMutation = useMutation({
@@ -206,11 +210,16 @@ function CounterForm({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value='__none__'>{t('service_zone_none')}</SelectItem>
-              {serviceZones.map((zone) => (
-                <SelectItem key={zone.id} value={zone.id}>
-                  {zone.name}
-                </SelectItem>
-              ))}
+              {serviceZones
+                .filter(
+                  (zone): zone is typeof zone & { id: string } =>
+                    typeof zone.id === 'string' && zone.id.trim().length > 0
+                )
+                .map((zone) => (
+                  <SelectItem key={zone.id} value={zone.id}>
+                    {zone.name}
+                  </SelectItem>
+                ))}
             </SelectContent>
           </Select>
         )}

@@ -160,7 +160,12 @@ export default function AdminPage() {
             <CardDescription>{t('reports.description')}</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button className='w-full'>{t('reports.view')}</Button>
+            <Button
+              className='w-full'
+              onClick={() => router.push('/statistics')}
+            >
+              {t('reports.view')}
+            </Button>
           </CardContent>
         </Card>
 

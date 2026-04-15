@@ -80,10 +80,15 @@ export default function UnitKioskPage() {
     isPending: unitPending
   } = useUnit(unitId ?? '', {
     enabled: Boolean(unitId),
-    refetchInterval: 120000,
+    refetchInterval: (query) => {
+      const u = query.state.data;
+      return u?.operations?.kioskFrozen ? 10_000 : 120_000;
+    },
     // Desktop WebView + React Query cache: always pick up fresh kiosk PIN / config.
     refetchOnMount: 'always'
   });
+
+  const serverKioskFrozen = Boolean(unit?.operations?.kioskFrozen);
 
   const invalidateUnitQuery = useCallback(() => {
     if (!unitId) {
@@ -868,6 +873,18 @@ export default function UnitKioskPage() {
           setIsSettingsOpen(false);
         }}
       />
+
+      {serverKioskFrozen ? (
+        <div
+          className='bg-background/95 fixed inset-0 z-[60] flex flex-col items-center justify-center gap-3 p-6 text-center backdrop-blur-sm'
+          role='alert'
+        >
+          <h1 className='text-2xl font-semibold'>{t('server_frozen_title')}</h1>
+          <p className='text-muted-foreground max-w-md text-sm'>
+            {t('server_frozen_message')}
+          </p>
+        </div>
+      ) : null}
 
       <LockScreen
         isLocked={isLocked}

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -179,6 +180,11 @@ type TicketRepository interface {
 	CountEODTicketSplitTx(tx *gorm.DB, unitID string) (waiting int64, nonWaiting int64, err error)
 	// CountEODTicketSplitByIDsTx counts by status among the given ticket IDs (e.g. the batch marked EOD in this transaction).
 	CountEODTicketSplitByIDsTx(tx *gorm.DB, ticketIDs []string) (waiting int64, nonWaiting int64, err error)
+	// FinalizeEODTicketStatusesTx sets terminal status and completed_at on EOD-flagged tickets so warehouse/hourly stats
+	// bucket them by EOD time. Call after CountEODTicketSplitByIDsTx (toast counts use pre-finalize status).
+	FinalizeEODTicketStatusesTx(tx *gorm.DB, ticketIDs []string, eodCloseAt time.Time, actorUserID *string) error
+	// ListOrphanEODTicketIDsTx returns EOD-flagged tickets that still lack completed_at (legacy runs before finalize existed).
+	ListOrphanEODTicketIDsTx(tx *gorm.DB, unitID string) ([]string, error)
 	ResetSequencesTx(tx *gorm.DB, unitID, date string) error
 
 	// ListTicketHistoryByUnitID returns recent history for tickets belonging to the unit (keyset pagination).
@@ -483,6 +489,73 @@ func (r *ticketRepository) CountEODTicketSplitByIDsTx(tx *gorm.DB, ticketIDs []s
 		return 0, 0, err
 	}
 	return waiting, nonWaiting, nil
+}
+
+func (r *ticketRepository) FinalizeEODTicketStatusesTx(tx *gorm.DB, ticketIDs []string, eodCloseAt time.Time, actorUserID *string) error {
+	if len(ticketIDs) == 0 {
+		return nil
+	}
+	if eodCloseAt.IsZero() {
+		return fmt.Errorf("invalid eodCloseAt: zero value")
+	}
+	var tickets []models.Ticket
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id IN ? AND is_eod = ? AND completed_at IS NULL AND status IN ?", ticketIDs, true, []string{"waiting", "called", "in_service"}).
+		Find(&tickets).Error; err != nil {
+		return err
+	}
+	for i := range tickets {
+		t := &tickets[i]
+		from := t.Status
+		var to string
+		switch from {
+		case "waiting":
+			to = "no_show"
+		case "called", "in_service":
+			to = "cancelled"
+		default:
+			continue
+		}
+		res := tx.Model(&models.Ticket{}).
+			Where("id = ? AND is_eod = ? AND completed_at IS NULL", t.ID, true).
+			Updates(map[string]interface{}{
+				"status":       to,
+				"completed_at": eodCloseAt,
+			})
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected != 1 {
+			return fmt.Errorf("finalize eod ticket %s: expected 1 row updated, got %d", t.ID, res.RowsAffected)
+		}
+		payload, err := json.Marshal(map[string]interface{}{
+			"unit_id":     t.UnitID,
+			"from_status": from,
+			"to_status":   to,
+			"reason":      "end_of_day",
+		})
+		if err != nil {
+			return err
+		}
+		h := models.TicketHistory{
+			TicketID: t.ID,
+			Action:   ticketaudit.ActionTicketStatusChanged,
+			UserID:   actorUserID,
+			Payload:  payload,
+		}
+		if err := tx.Create(&h).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *ticketRepository) ListOrphanEODTicketIDsTx(tx *gorm.DB, unitID string) ([]string, error) {
+	var ids []string
+	err := tx.Model(&models.Ticket{}).
+		Where("unit_id = ? AND is_eod = ? AND completed_at IS NULL AND status IN ?", unitID, true, []string{"waiting", "called", "in_service"}).
+		Pluck("id", &ids).Error
+	return ids, err
 }
 
 func (r *ticketRepository) ListTicketHistoryByUnitID(unitID string, limit int, beforeTime *time.Time, beforeID *string, filters *TicketHistoryListFilters) ([]TicketHistoryListRow, error) {

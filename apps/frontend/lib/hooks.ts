@@ -1,4 +1,9 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  type Query
+} from '@tanstack/react-query';
 import { useRouter } from '@/src/i18n/navigation';
 import {
   getGetTicketsIdQueryKey,
@@ -65,7 +70,11 @@ export const useUnits = () => {
 export const useUnit = (
   id: string,
   options: {
-    refetchInterval?: number;
+    refetchInterval?:
+      | number
+      | ((
+          query: Query<Awaited<ReturnType<typeof unitsApi.getById>>, Error>
+        ) => number | false | undefined);
     refetchOnMount?: boolean | 'always';
     enabled?: boolean;
   } = {}

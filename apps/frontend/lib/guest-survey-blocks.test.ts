@@ -6,10 +6,35 @@ import {
   isGuestSurveyIconScale,
   parseDraftsFromQuestionsJson,
   parseGuestSurveyForDisplay,
+  pickGuestSurveyLabelForLocale,
   unwrapGuestSurveyQuestionsJson,
   validateDrafts,
   type GuestSurveyBlockDraft
 } from './guest-survey-blocks';
+
+describe('pickGuestSurveyLabelForLocale', () => {
+  it('prefers ru when locale is ru', () => {
+    expect(
+      pickGuestSurveyLabelForLocale({ en: 'Hello', ru: 'Привет' }, 'ru')
+    ).toBe('Привет');
+  });
+
+  it('prefers en when locale is en', () => {
+    expect(
+      pickGuestSurveyLabelForLocale({ en: 'Hello', ru: 'Привет' }, 'en')
+    ).toBe('Hello');
+  });
+
+  it('falls back to other locale when preferred key is missing', () => {
+    expect(pickGuestSurveyLabelForLocale({ en: 'Only' }, 'ru')).toBe('Only');
+  });
+
+  it('falls back to other locale when preferred value is an empty string', () => {
+    expect(pickGuestSurveyLabelForLocale({ en: 'Only', ru: '' }, 'ru')).toBe(
+      'Only'
+    );
+  });
+});
 
 describe('unwrapGuestSurveyQuestionsJson', () => {
   it('treats array as single_page', () => {

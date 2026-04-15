@@ -23,7 +23,8 @@ import {
   Mail,
   MessageSquare,
   Monitor,
-  UserRound
+  UserRound,
+  Activity
 } from 'lucide-react';
 import Image from 'next/image';
 import { Link, usePathname, useRouter } from '@/src/i18n/navigation';
@@ -64,6 +65,12 @@ export default function SettingsSidebar() {
       label: tAdmin('navigation.users'),
       href: '/settings/users',
       active: isActive('/settings/users')
+    },
+    {
+      icon: Activity,
+      label: tAdmin('navigation.operations'),
+      href: '/settings/operations',
+      active: isActive('/settings/operations')
     },
     {
       icon: Grid3X3,

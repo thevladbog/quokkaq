@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -29,12 +30,14 @@ type PatchUnitKioskConfigRequest struct {
 type UnitHandler struct {
 	service        services.UnitService
 	storageService services.StorageService
+	operational    *services.OperationalService
 }
 
-func NewUnitHandler(service services.UnitService, storageService services.StorageService) *UnitHandler {
+func NewUnitHandler(service services.UnitService, storageService services.StorageService, operational *services.OperationalService) *UnitHandler {
 	return &UnitHandler{
 		service:        service,
 		storageService: storageService,
+		operational:    operational,
 	}
 }
 
@@ -97,6 +100,14 @@ func (h *UnitHandler) GetUnitByID(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, "Unit not found", http.StatusNotFound)
 		return
+	}
+	if h.operational != nil {
+		snap, snapErr := h.operational.GetPublicSnapshot(unit.ID)
+		if snapErr != nil {
+			log.Printf("GetUnitByID: GetPublicSnapshot unitID=%q err=%v", unit.ID, snapErr)
+		} else if snap != nil {
+			unit.Operations = snap
+		}
 	}
 	// Kiosk config (e.g. PIN) must not be served from stale HTTP caches (desktop WebViews cache aggressively).
 	w.Header().Set("Cache-Control", "no-store")

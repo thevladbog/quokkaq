@@ -26,6 +26,7 @@ import {
   getGetUnitsUnitIdChildUnitsQueryKey
 } from '@/lib/api/generated/units';
 import { countersApi, unitsApi, Ticket, type Service } from '@/lib/api';
+import { normalizeChildUnitsQueryData } from '@/lib/child-units-query';
 
 /** Stable empty refs so React Query “no data yet” does not allocate a new [] every render (avoids effect loops on [data]). */
 const EMPTY_TICKET_LIST: Ticket[] = [];
@@ -517,15 +518,18 @@ export default function StaffWorkspacePage({
 
   const countersForTransfer = counters ?? [];
 
-  const { data: childUnits = [] } = useQuery({
+  const { data: childUnitsRaw } = useQuery({
     queryKey: getGetUnitsUnitIdChildUnitsQueryKey(unitId),
     queryFn: () => unitsApi.getChildUnits(unitId),
     enabled: !!unitId && isTransferOpen
   });
 
   const serviceZones = useMemo(
-    () => childUnits.filter((u) => u.kind === 'service_zone'),
-    [childUnits]
+    () =>
+      normalizeChildUnitsQueryData(childUnitsRaw).filter(
+        (u) => u.kind === 'service_zone'
+      ),
+    [childUnitsRaw]
   );
 
   const ticketServiceRow = useMemo(
@@ -763,11 +767,16 @@ export default function StaffWorkspacePage({
                         />
                       </SelectTrigger>
                       <SelectContent>
-                        {serviceZones.map((z) => (
-                          <SelectItem key={z.id} value={z.id}>
-                            {z.name}
-                          </SelectItem>
-                        ))}
+                        {serviceZones
+                          .filter(
+                            (z): z is typeof z & { id: string } =>
+                              typeof z.id === 'string' && z.id.trim().length > 0
+                          )
+                          .map((z) => (
+                            <SelectItem key={z.id} value={z.id}>
+                              {z.name}
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
                     {serviceZones.length === 0 && (
