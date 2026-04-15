@@ -18,11 +18,12 @@ import (
 )
 
 type TicketHandler struct {
-	service services.TicketService
+	service     services.TicketService
+	operational *services.OperationalService
 }
 
-func NewTicketHandler(service services.TicketService) *TicketHandler {
-	return &TicketHandler{service: service}
+func NewTicketHandler(service services.TicketService, operational *services.OperationalService) *TicketHandler {
+	return &TicketHandler{service: service, operational: operational}
 }
 
 // CreateTicketRequest is the JSON body for POST /units/{unitId}/tickets (unit comes from the path).
@@ -80,6 +81,11 @@ func (h *TicketHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if h.operational != nil && visitorPhone != nil && h.operational.IsKioskFrozen(unitID) {
+		http.Error(w, "kiosk admission is frozen for end-of-day operations", http.StatusServiceUnavailable)
+		return
+	}
+
 	actor := getActorFromRequest(r)
 	ticket, err := h.service.CreateTicket(unitID, serviceID, staffClientID, visitorPhone, visitorLocale, actor)
 	if err != nil {
@@ -97,6 +103,10 @@ func (h *TicketHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+	}
+
+	if h.operational != nil {
+		h.operational.WakeStatisticsIfQuiet(unitID)
 	}
 
 	w.WriteHeader(http.StatusCreated)

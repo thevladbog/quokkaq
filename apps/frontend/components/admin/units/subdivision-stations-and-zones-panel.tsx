@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { normalizeChildUnitsQueryData } from '@/lib/child-units-query';
 import { useTranslations } from 'next-intl';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { FolderOpen, Plus, ExternalLink } from 'lucide-react';
@@ -79,14 +80,19 @@ export function SubdivisionStationsAndZonesPanel({
     queryFn: () => unitsApi.getChildUnits(subdivisionId)
   });
 
-  const serviceZones = useMemo(
-    () => (children ?? []).filter((u) => u.kind === 'service_zone'),
+  const childrenList = useMemo(
+    () => normalizeChildUnitsQueryData(children),
     [children]
   );
 
+  const serviceZones = useMemo(
+    () => childrenList.filter((u) => u.kind === 'service_zone'),
+    [childrenList]
+  );
+
   const nestedSubdivisions = useMemo(
-    () => (children ?? []).filter((u) => u.kind === 'subdivision'),
-    [children]
+    () => childrenList.filter((u) => u.kind === 'subdivision'),
+    [childrenList]
   );
 
   const resetForm = () => {

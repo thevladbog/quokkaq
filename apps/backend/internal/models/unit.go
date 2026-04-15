@@ -84,4 +84,7 @@ type Unit struct {
 	Tickets          []Ticket          `gorm:"foreignKey:UnitID" json:"tickets,omitempty"`
 	PreRegistrations []PreRegistration `gorm:"foreignKey:UnitID" json:"preRegistrations,omitempty"`
 	SlotConfig       *SlotConfig       `gorm:"foreignKey:UnitID" json:"slotConfig,omitempty"`
+
+	// Operations is hydrated for GET /units/{id} (kiosk freeze / EOD phase); not stored on units row.
+	Operations *UnitOperationsPublic `json:"operations,omitempty" gorm:"-"`
 }

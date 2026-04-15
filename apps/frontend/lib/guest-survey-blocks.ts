@@ -119,6 +119,35 @@ function readLabel(obj: Record<string, unknown>): { en: string; ru: string } {
   };
 }
 
+/**
+ * Resolved label for UI from a survey block's `label` field: plain string or `{ en, ru, ... }`
+ * (same shape as stored guest-survey JSON). Falls back across locales, then any string value.
+ */
+export function pickGuestSurveyLabelForLocale(
+  label: unknown,
+  locale: string
+): string {
+  if (typeof label === 'string') {
+    const s = label.trim();
+    return s;
+  }
+  if (!label || typeof label !== 'object') {
+    return '';
+  }
+  const l = label as Record<string, unknown>;
+  const prefer = locale.toLowerCase().startsWith('ru') ? 'ru' : 'en';
+  const secondary = prefer === 'ru' ? 'en' : 'ru';
+  const a = typeof l[prefer] === 'string' ? (l[prefer] as string).trim() : '';
+  if (a) return a;
+  const b =
+    typeof l[secondary] === 'string' ? (l[secondary] as string).trim() : '';
+  if (b) return b;
+  for (const v of Object.values(l)) {
+    if (typeof v === 'string' && v.trim()) return v.trim();
+  }
+  return '';
+}
+
 function readPresentation(
   o: Record<string, unknown>
 ): GuestSurveyScalePresentation {

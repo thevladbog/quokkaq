@@ -61,7 +61,9 @@ const AVAILABLE_PERMISSIONS = [
   { id: 'ACCESS_KIOSK', label: 'Access Kiosk' },
   { id: 'ACCESS_TICKET_SCREEN', label: 'Access Ticket Screen' },
   { id: 'ACCESS_SUPERVISOR_PANEL', label: 'Access Supervisor Panel' },
-  { id: 'ACCESS_SURVEY_RESPONSES', label: 'View guest survey responses' }
+  { id: 'ACCESS_SURVEY_RESPONSES', label: 'View guest survey responses' },
+  { id: 'ACCESS_STATISTICS_SUBDIVISION', label: 'Statistics: subdivision' },
+  { id: 'ACCESS_STATISTICS_ZONE', label: 'Statistics: zones' }
 ];
 
 export default function UsersPage() {

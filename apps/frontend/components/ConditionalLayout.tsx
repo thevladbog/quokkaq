@@ -125,6 +125,17 @@ const ConditionalLayout = ({ children }: ConditionalLayoutProps) => {
     }
 
     if (
+      pathWithoutLocale === '/statistics' ||
+      pathWithoutLocale.startsWith('/statistics/')
+    ) {
+      return {
+        useSidebar: true,
+        protected: true,
+        roles: ['admin', 'staff', 'supervisor', 'operator']
+      };
+    }
+
+    if (
       pathWithoutLocale === '/supervisor' ||
       pathWithoutLocale.startsWith('/supervisor/')
     ) {

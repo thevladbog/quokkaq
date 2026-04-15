@@ -912,6 +912,56 @@ func RunVersionedMigrations(models ...interface{}) error {
 		return fmt.Errorf("failed to run survey idle screen migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.1.16_statistics_daily_buckets_service_zone", func(db *gorm.DB) error {
+		// v1.0.0_core_tables already ran before StatisticsDailyBucket existed, so some DBs never got this table.
+		var tableExists bool
+		if err := db.Raw(`
+			SELECT EXISTS (
+				SELECT 1 FROM information_schema.tables
+				WHERE table_schema = 'public' AND table_name = 'statistics_daily_buckets'
+			)
+		`).Scan(&tableExists).Error; err != nil {
+			return err
+		}
+		if !tableExists {
+			return db.AutoMigrate(&dbmodels.StatisticsDailyBucket{})
+		}
+		if err := db.Exec(`
+			ALTER TABLE statistics_daily_buckets
+			ADD COLUMN IF NOT EXISTS service_zone_id uuid NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000';
+		`).Error; err != nil {
+			return err
+		}
+		// Replace legacy 3-column unique index with 4-column uniqueness (incl. service zone slice).
+		_ = db.Exec(`DROP INDEX IF EXISTS uniq_stat_daily`).Error
+		_ = db.Exec(`DROP INDEX IF EXISTS idx_statistics_daily_buckets_uniq_stat_daily`).Error
+		if err := db.Exec(`
+			CREATE UNIQUE INDEX IF NOT EXISTS uniq_stat_daily_service_zone
+			ON statistics_daily_buckets (unit_id, bucket_date, actor_user_id, service_zone_id);
+		`).Error; err != nil {
+			return err
+		}
+		return db.AutoMigrate(&dbmodels.StatisticsDailyBucket{})
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run statistics service_zone migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.1.17_statistics_survey_daily", func(db *gorm.DB) error {
+		return db.AutoMigrate(&dbmodels.StatisticsSurveyDaily{})
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run statistics_survey_daily migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.1.18_unit_operational_states_ensure", func(db *gorm.DB) error {
+		// DBs where v1.0.0 ran before UnitOperationalState existed never got this table from core AutoMigrate.
+		return db.AutoMigrate(&dbmodels.UnitOperationalState{})
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run unit_operational_states migration: %w", err)
+	}
+
 	fmt.Println("All migrations completed successfully")
 	return nil
 }

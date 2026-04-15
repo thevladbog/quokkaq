@@ -86,6 +86,12 @@ export interface ModelsUserRole {
   userId?: string;
 }
 
+export interface ModelsUnitOperationsPublic {
+  counterLoginBlocked?: boolean;
+  kioskFrozen?: boolean;
+  phase?: string;
+}
+
 export interface ModelsService {
   backgroundColor?: string;
   children?: ModelsService[];
@@ -168,6 +174,8 @@ export interface ModelsUnit {
   id?: string;
   kind?: string;
   name?: string;
+  /** Operations is hydrated for GET /units/{id} (kiosk freeze / EOD phase); not stored on units row. */
+  operations?: ModelsUnitOperationsPublic;
   parentId?: string;
   preRegistrations?: ModelsPreRegistration[];
   services?: ModelsService[];
@@ -815,6 +823,10 @@ export interface HandlersCreateVisitorTagDefinitionRequest {
   sortOrder?: number;
 }
 
+export interface HandlersEmergencyUnlockBody {
+  confirm?: string;
+}
+
 export type HandlersGuestSurveySubmitRequestAnswers = { [key: string]: unknown };
 
 export interface HandlersGuestSurveySubmitRequest {
@@ -1128,6 +1140,15 @@ export interface ModelsWeeklySlotCapacity {
   updatedAt?: string;
 }
 
+export interface ServicesEmployeeRadarResponse {
+  computedAt?: string;
+  rating?: number;
+  slaService?: number;
+  slaWait?: number;
+  ticketsPerHour?: number;
+  userId?: string;
+}
+
 /**
  * IdleScreen from the active survey for this counter (service zone scope first), regardless of ticket.
  */
@@ -1164,6 +1185,72 @@ export interface ServicesGuestSurveySession {
   idleScreen?: ServicesGuestSurveySessionIdleScreen;
   survey?: ServicesGuestSurveySessionSurvey;
   unitConfig?: ServicesGuestSurveySessionUnitConfig;
+}
+
+export interface ServicesLoadPoint {
+  date?: string;
+  noShowCount?: number;
+  ticketsCompleted?: number;
+  ticketsCreated?: number;
+}
+
+export interface ServicesLoadResponse {
+  computedAt?: string;
+  /** day | hour — hour when date range is a single calendar day without operator filter */
+  granularity?: string;
+  points?: ServicesLoadPoint[];
+}
+
+export interface ServicesSlaSummaryResponse {
+  breachPct?: number;
+  computedAt?: string;
+  serviceId?: string;
+  slaWaitMet?: number;
+  slaWaitTotal?: number;
+  withinPct?: number;
+}
+
+export interface ServicesTicketsByServiceItem {
+  count?: number;
+  serviceId?: string;
+  serviceName?: string;
+}
+
+export interface ServicesTicketsByServiceResponse {
+  computedAt?: string;
+  items?: ServicesTicketsByServiceItem[];
+  total?: number;
+}
+
+export interface ServicesOperationsStatusDTO {
+  counterLoginBlocked?: boolean;
+  kioskFrozen?: boolean;
+  lastEodAt?: string;
+  lastReconcileAt?: string;
+  lastReconcileError?: string;
+  phase?: string;
+  reconcileInProgress?: boolean;
+  reconcileProgressNote?: string;
+  statisticsAsOf?: string;
+  statisticsQuiet?: boolean;
+  unitId?: string;
+}
+
+export interface ServicesSLADeviationsPoint {
+  breachPct?: number;
+  date?: string;
+  /** waiting SLA segments within threshold for this bucket */
+  slaWaitMet?: number;
+  /** waiting SLA segments counted for this bucket */
+  slaWaitTotal?: number;
+  withinPct?: number;
+}
+
+export interface ServicesSLADeviationsResponse {
+  computedAt?: string;
+  /** day | hour — hour when date range is a single calendar day without operator filter */
+  granularity?: string;
+  points?: ServicesSLADeviationsPoint[];
 }
 
 export interface ServicesShiftActivityActorOption {
@@ -1208,6 +1295,41 @@ export interface ServicesShiftCounterDTO {
   unitId?: string;
 }
 
+export interface ServicesSurveyScorePoint {
+  avgScoreNative?: number;
+  avgScoreNorm5?: number;
+  date?: string;
+  questionId?: string;
+  scaleMax?: number;
+  scaleMin?: number;
+}
+
+export interface ServicesSurveyScoresResponse {
+  computedAt?: string;
+  /** day | hour — hour when date range is a single calendar day */
+  granularity?: string;
+  mode?: string;
+  points?: ServicesSurveyScorePoint[];
+}
+
+export interface ServicesTimeseriesPoint {
+  avgServiceMinutes?: number;
+  avgWaitMinutes?: number;
+  date?: string;
+  noShowCount?: number;
+  slaWaitMetPct?: number;
+  ticketsCompleted?: number;
+  ticketsCreated?: number;
+}
+
+export interface ServicesTimeseriesResponse {
+  computedAt?: string;
+  /** day | hour — hour when date range is a single calendar day without operator filter; per-hour ticket volume and wait/service/SLA averages from the same rollup rules as daily buckets */
+  granularity?: string;
+  metric?: string;
+  points?: ServicesTimeseriesPoint[];
+}
+
 export type ServicesUnitClientHistoryItemPayload = { [key: string]: unknown };
 
 export interface ServicesUnitClientHistoryItem {
@@ -1229,6 +1351,24 @@ export interface ServicesUnitClientHistoryListResponse {
 export interface ServicesUnitClientListResponse {
   items?: ModelsUnitClient[];
   nextCursor?: string;
+}
+
+export interface ServicesUtilizationPoint {
+  date?: string;
+  idleMinutes?: number;
+  servingMinutes?: number;
+  /**
+     * Omitted when this hour has no serving and no idle/break (excluded from aggregates)
+     * @nullable
+     */
+  utilizationPct?: number | null;
+}
+
+export interface ServicesUtilizationResponse {
+  computedAt?: string;
+  /** hour when dateFrom equals dateTo (one point per clock hour); day when range spans multiple calendar days. Percentages ignore hours where serving+idle+break are all zero. */
+  granularity?: string;
+  points?: ServicesUtilizationPoint[];
 }
 
 export type UploadIdleMediaBody = {

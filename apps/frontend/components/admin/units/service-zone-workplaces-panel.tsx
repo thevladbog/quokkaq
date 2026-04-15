@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { normalizeChildUnitsQueryData } from '@/lib/child-units-query';
 import { useTranslations } from 'next-intl';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, ExternalLink } from 'lucide-react';
@@ -76,6 +77,11 @@ export function ServiceZoneWorkplacesPanel({
     queryKey: childUnitsQueryKey(parentUnitId),
     queryFn: () => unitsApi.getChildUnits(parentUnitId)
   });
+
+  const childrenList = useMemo(
+    () => normalizeChildUnitsQueryData(children),
+    [children]
+  );
 
   const resetForm = () => {
     setName('');
@@ -175,7 +181,7 @@ export function ServiceZoneWorkplacesPanel({
                 message: formatApiToastErrorMessage(error, tCommon('error'))
               })}
             </p>
-          ) : !children?.length ? (
+          ) : childrenList.length === 0 ? (
             <p className='text-muted-foreground text-sm'>
               {t('no_children_under_zone')}
             </p>
@@ -192,7 +198,7 @@ export function ServiceZoneWorkplacesPanel({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {children.map((u) => (
+                {childrenList.map((u) => (
                   <TableRow key={u.id}>
                     <TableCell className='font-medium'>{u.name}</TableCell>
                     <TableCell className='text-muted-foreground'>

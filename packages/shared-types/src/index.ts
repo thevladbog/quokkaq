@@ -440,6 +440,13 @@ export const UnitConfigSchema = z
   })
   .passthrough();
 
+/** Hydrated on GET unit for kiosk/EOD pipeline; not a DB column. */
+export const UnitOperationsPublicSchema = z.object({
+  kioskFrozen: z.boolean().optional(),
+  counterLoginBlocked: z.boolean().optional(),
+  phase: z.string().optional()
+});
+
 export const UnitModelSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -450,7 +457,8 @@ export const UnitModelSchema = z.object({
   sortOrder: z.number().int().optional().default(0),
   timezone: z.string(),
   config: UnitConfigSchema.nullable().optional(),
-  services: z.array(ServiceModelSchema).optional()
+  services: z.array(ServiceModelSchema).optional(),
+  operations: UnitOperationsPublicSchema.optional()
 });
 
 export const ClientVisitTransferEventSchema = z.object({

@@ -98,6 +98,19 @@ export default defineConfig({
       target: './lib/api/generated/surveys.ts'
     }
   },
+  quokkaqStatistics: {
+    input: {
+      target: '../backend/docs/swagger.json',
+      filters: {
+        mode: 'include',
+        tags: ['statistics', 'operations']
+      }
+    },
+    output: {
+      ...reactQueryOutput,
+      target: './lib/api/generated/statistics.ts'
+    }
+  },
   quokkaqGuestSurveyTerminal: {
     input: {
       target: '../backend/docs/swagger.json',
@@ -116,6 +129,32 @@ export default defineConfig({
           name: 'terminalOrvalMutator'
         }
       }
+    }
+  },
+  quokkaqServices: {
+    input: {
+      target: '../backend/docs/swagger.json',
+      filters: {
+        mode: 'include',
+        tags: ['services']
+      }
+    },
+    output: {
+      ...reactQueryOutput,
+      target: './lib/api/generated/services.ts'
+    }
+  },
+  quokkaqShift: {
+    input: {
+      target: '../backend/docs/swagger.json',
+      filters: {
+        mode: 'include',
+        tags: ['shift']
+      }
+    },
+    output: {
+      ...reactQueryOutput,
+      target: './lib/api/generated/shift.ts'
     }
   }
 });

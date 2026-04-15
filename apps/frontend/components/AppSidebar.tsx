@@ -23,7 +23,8 @@ import {
   LogIn,
   Globe,
   Layers,
-  Settings
+  Settings,
+  BarChart3
 } from 'lucide-react';
 import Image from 'next/image';
 import { useAuthContext } from '@/contexts/AuthContext';
@@ -76,6 +77,9 @@ const AppSidebar = () => {
       ? `/clients/${activeUnitId}`
       : null;
 
+  const statisticsHref =
+    activeUnitId != null && activeUnitId !== '' ? `/statistics` : null;
+
   const navItems = [
     {
       icon: Home,
@@ -127,6 +131,17 @@ const AppSidebar = () => {
             label: tNav('clients', { defaultValue: 'Clients' }),
             href: clientsHref,
             active: pathname.startsWith(`/clients/${activeUnitId}`),
+            roles: ['admin', 'staff', 'supervisor', 'operator'] as const
+          }
+        ]
+      : []),
+    ...(statisticsHref
+      ? [
+          {
+            icon: BarChart3,
+            label: tNav('statistics', { defaultValue: 'Statistics' }),
+            href: statisticsHref,
+            active: pathname.startsWith('/statistics'),
             roles: ['admin', 'staff', 'supervisor', 'operator'] as const
           }
         ]

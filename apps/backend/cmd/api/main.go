@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"quokkaq-go-backend/internal/config"
 	"quokkaq-go-backend/internal/handlers"
 	"quokkaq-go-backend/internal/jobs"
@@ -15,8 +17,10 @@ import (
 	"quokkaq-go-backend/internal/services/billing"
 	"quokkaq-go-backend/internal/ws"
 	"quokkaq-go-backend/pkg/database"
+	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/MarceloPetrucio/go-scalar-api-reference"
@@ -98,6 +102,9 @@ func main() {
 			&models.DaySchedule{},
 			&models.ServiceSlot{},
 			&models.DesktopTerminal{},
+			&models.UnitOperationalState{},
+			&models.StatisticsDailyBucket{},
+			&models.StatisticsSurveyDaily{},
 		)
 		if err != nil {
 			log.Fatalf("Failed to run migrations: %v", err)
@@ -152,6 +159,12 @@ func main() {
 	counterService := services.NewCounterService(counterRepo, ticketRepo, serviceRepo, userRepo, operatorIntervalRepo, unitRepo, hub)
 	bookingService := services.NewBookingService(bookingRepo)
 	auditLogRepo := repository.NewAuditLogRepository()
+	opStateRepo := repository.NewOperationalStateRepository()
+	statsRepo := repository.NewStatisticsRepository()
+	statsRefresh := services.NewStatisticsRefreshService(statsRepo, unitRepo, opStateRepo)
+	operationalService := services.NewOperationalService(opStateRepo, unitRepo, statsRefresh)
+	statsService := services.NewStatisticsService(statsRepo, opStateRepo)
+	statsRefresh.StartPeriodicRefresh()
 	shiftService := services.NewShiftService(ticketRepo, counterRepo, serviceRepo, auditLogRepo, operatorIntervalRepo, hub, userRepo)
 	templateService := services.NewTemplateService(templateRepo)
 	invitationService := services.NewInvitationService(invitationRepo, mailService, userRepo, templateService)
@@ -164,12 +177,14 @@ func main() {
 
 	userHandler := handlers.NewUserHandler(userService)
 	authHandler := handlers.NewAuthHandler(authService)
-	unitHandler := handlers.NewUnitHandler(unitService, storageService)
-	ticketHandler := handlers.NewTicketHandler(ticketService)
+	unitHandler := handlers.NewUnitHandler(unitService, storageService, operationalService)
+	ticketHandler := handlers.NewTicketHandler(ticketService, operationalService)
 	serviceHandler := handlers.NewServiceHandler(serviceService, userRepo)
-	counterHandler := handlers.NewCounterHandler(counterService)
+	counterHandler := handlers.NewCounterHandler(counterService, counterRepo, operationalService)
 	bookingHandler := handlers.NewBookingHandler(bookingService, userRepo)
-	shiftHandler := handlers.NewShiftHandler(shiftService)
+	shiftHandler := handlers.NewShiftHandler(shiftService, operationalService)
+	statisticsHandler := handlers.NewStatisticsHandler(statsService, userRepo, unitRepo)
+	operationsHandler := handlers.NewOperationsHandler(operationalService, userRepo, auditLogRepo)
 	templateHandler := handlers.NewTemplateHandler(templateService)
 	invitationHandler := handlers.NewInvitationHandler(invitationService)
 	slotHandler := handlers.NewSlotHandler(slotService)
@@ -419,6 +434,28 @@ func main() {
 			r.Post("/{unitId}/surveys/{surveyId}/activate", surveyHandler.ActivateDefinition)
 			r.Get("/{unitId}/survey-responses", surveyHandler.ListResponses)
 		})
+
+		r.Group(func(r chi.Router) {
+			r.Use(authmiddleware.JWTAuth)
+			r.Use(authmiddleware.RequireUnitBranchMember(userRepo))
+			r.Get("/{unitId}/statistics/timeseries", statisticsHandler.GetTimeseries)
+			r.Get("/{unitId}/statistics/sla-deviations", statisticsHandler.GetSLADeviations)
+			r.Get("/{unitId}/statistics/load", statisticsHandler.GetLoad)
+			r.Get("/{unitId}/statistics/tickets-by-service", statisticsHandler.GetTicketsByService)
+			r.Get("/{unitId}/statistics/sla-summary", statisticsHandler.GetSlaSummary)
+			r.Get("/{unitId}/statistics/utilization", statisticsHandler.GetUtilization)
+			r.Get("/{unitId}/statistics/survey-scores", statisticsHandler.GetSurveyScores)
+			r.Get("/{unitId}/statistics/employee-radar", statisticsHandler.GetEmployeeRadar)
+		})
+
+		r.Group(func(r chi.Router) {
+			r.Use(authmiddleware.JWTAuth)
+			r.Use(authmiddleware.RequireUnitMember(userRepo))
+			r.Use(authmiddleware.RequireAdmin(userRepo))
+			r.Get("/{unitId}/operations/status", operationsHandler.GetOperationsStatus)
+			r.Post("/{unitId}/operations/emergency-unlock", operationsHandler.PostEmergencyUnlock)
+			r.Post("/{unitId}/operations/clear-statistics-quiet", operationsHandler.PostClearStatisticsQuiet)
+		})
 	})
 
 	r.Route("/services", func(r chi.Router) {
@@ -604,7 +641,29 @@ func main() {
 		ReadTimeout:       60 * time.Second,
 		WriteTimeout:      60 * time.Second,
 	}
-	if err := srv.ListenAndServe(); err != nil {
-		log.Fatalf("ListenAndServe: %v", err)
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- srv.ListenAndServe()
+	}()
+
+	quit := make(chan os.Signal, 1)
+	if runtime.GOOS == "windows" {
+		signal.Notify(quit, os.Interrupt)
+	} else {
+		signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	}
+
+	select {
+	case err := <-errCh:
+		if err != nil && err != http.ErrServerClosed {
+			log.Fatalf("ListenAndServe: %v", err)
+		}
+	case <-quit:
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := srv.Shutdown(ctx); err != nil {
+			log.Printf("Server shutdown: %v", err)
+		}
 	}
 }

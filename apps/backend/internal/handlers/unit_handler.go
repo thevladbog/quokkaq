@@ -29,12 +29,14 @@ type PatchUnitKioskConfigRequest struct {
 type UnitHandler struct {
 	service        services.UnitService
 	storageService services.StorageService
+	operational    *services.OperationalService
 }
 
-func NewUnitHandler(service services.UnitService, storageService services.StorageService) *UnitHandler {
+func NewUnitHandler(service services.UnitService, storageService services.StorageService, operational *services.OperationalService) *UnitHandler {
 	return &UnitHandler{
 		service:        service,
 		storageService: storageService,
+		operational:    operational,
 	}
 }
 
@@ -97,6 +99,11 @@ func (h *UnitHandler) GetUnitByID(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, "Unit not found", http.StatusNotFound)
 		return
+	}
+	if h.operational != nil {
+		if snap, err := h.operational.GetPublicSnapshot(unit.ID); err == nil && snap != nil {
+			unit.Operations = snap
+		}
 	}
 	// Kiosk config (e.g. PIN) must not be served from stale HTTP caches (desktop WebViews cache aggressively).
 	w.Header().Set("Cache-Control", "no-store")

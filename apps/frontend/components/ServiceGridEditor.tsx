@@ -15,6 +15,7 @@ import {
   getGetUnitsIdQueryKey,
   getGetUnitsUnitIdChildUnitsQueryKey
 } from '@/lib/api/generated/units';
+import { normalizeChildUnitsQueryData } from '@/lib/child-units-query';
 import { Service, Unit, unitsApi, isRequestAbortError } from '@/lib/api';
 import { logger } from '@/lib/logger';
 import { useTranslations } from 'next-intl';
@@ -1489,13 +1490,18 @@ const ServiceGridEditor: React.FC<ServiceGridEditorProps> = ({
     return null;
   }, [gridContextUnit]);
 
-  const { data: zoneLabelChildUnits = [] } = useQuery({
+  const { data: zoneLabelChildUnitsRaw } = useQuery({
     queryKey: zoneLabelsParentId
       ? getGetUnitsUnitIdChildUnitsQueryKey(zoneLabelsParentId)
       : (['getUnitsUnitIdChildUnits', 'disabled'] as const),
     queryFn: () => unitsApi.getChildUnits(zoneLabelsParentId!),
     enabled: !!zoneLabelsParentId
   });
+
+  const zoneLabelChildUnits = useMemo(
+    () => normalizeChildUnitsQueryData(zoneLabelChildUnitsRaw),
+    [zoneLabelChildUnitsRaw]
+  );
 
   const zoneNameById = useMemo(() => {
     const m = new Map<string, string>();

@@ -529,6 +529,11 @@ components:
       - color
       - label
       type: object
+    handlers.emergencyUnlockBody:
+      properties:
+        confirm:
+          type: string
+      type: object
     handlers.guestSurveySubmitRequest:
       properties:
         answers:
@@ -1482,6 +1487,10 @@ components:
           type: string
         name:
           type: string
+        operations:
+          allOf:
+          - $ref: '#/components/schemas/models.UnitOperationsPublic'
+          description: Operations is hydrated for GET /units/{id} (kiosk freeze / EOD phase); not stored on units row.
         parentId:
           type: string
         preRegistrations:
@@ -1546,6 +1555,15 @@ components:
         unitId:
           type: string
         url:
+          type: string
+      type: object
+    models.UnitOperationsPublic:
+      properties:
+        counterLoginBlocked:
+          type: boolean
+        kioskFrozen:
+          type: boolean
+        phase:
           type: string
       type: object
     models.UnitVisitorTagDefinition:
@@ -1669,6 +1687,21 @@ components:
         updatedAt:
           type: string
       type: object
+    services.EmployeeRadarResponse:
+      properties:
+        computedAt:
+          type: string
+        rating:
+          type: number
+        slaService:
+          type: number
+        slaWait:
+          type: number
+        ticketsPerHour:
+          type: number
+        userId:
+          type: string
+      type: object
     services.GuestSurveySession:
       properties:
         activeSurveySubmitted:
@@ -1708,6 +1741,81 @@ components:
           type: string
         status:
           type: string
+      type: object
+    services.LoadPoint:
+      properties:
+        date:
+          type: string
+        noShowCount:
+          type: integer
+        ticketsCompleted:
+          type: integer
+        ticketsCreated:
+          type: integer
+      type: object
+    services.LoadResponse:
+      properties:
+        computedAt:
+          type: string
+        granularity:
+          description: day | hour — hour when date range is a single calendar day without operator filter
+          type: string
+        points:
+          items:
+            $ref: '#/components/schemas/services.LoadPoint'
+          type: array
+      type: object
+    services.OperationsStatusDTO:
+      properties:
+        counterLoginBlocked:
+          type: boolean
+        kioskFrozen:
+          type: boolean
+        lastEodAt:
+          type: string
+        lastReconcileAt:
+          type: string
+        lastReconcileError:
+          type: string
+        phase:
+          type: string
+        reconcileInProgress:
+          type: boolean
+        reconcileProgressNote:
+          type: string
+        statisticsAsOf:
+          type: string
+        statisticsQuiet:
+          type: boolean
+        unitId:
+          type: string
+      type: object
+    services.SLADeviationsPoint:
+      properties:
+        breachPct:
+          type: number
+        date:
+          type: string
+        slaWaitMet:
+          description: waiting SLA segments within threshold for this bucket
+          type: integer
+        slaWaitTotal:
+          description: waiting SLA segments counted for this bucket
+          type: integer
+        withinPct:
+          type: number
+      type: object
+    services.SLADeviationsResponse:
+      properties:
+        computedAt:
+          type: string
+        granularity:
+          description: day | hour — hour when date range is a single calendar day without operator filter
+          type: string
+        points:
+          items:
+            $ref: '#/components/schemas/services.SLADeviationsPoint'
+          type: array
       type: object
     services.ShiftActivityActorOption:
       properties:
@@ -1776,6 +1884,66 @@ components:
         unitId:
           type: string
       type: object
+    services.SurveyScorePoint:
+      properties:
+        avgScoreNative:
+          type: number
+        avgScoreNorm5:
+          type: number
+        date:
+          type: string
+        questionId:
+          type: string
+        scaleMax:
+          type: number
+        scaleMin:
+          type: number
+      type: object
+    services.SurveyScoresResponse:
+      properties:
+        computedAt:
+          type: string
+        granularity:
+          description: day | hour — hour when date range is a single calendar day
+          type: string
+        mode:
+          type: string
+        points:
+          items:
+            $ref: '#/components/schemas/services.SurveyScorePoint'
+          type: array
+      type: object
+    services.TimeseriesPoint:
+      properties:
+        avgServiceMinutes:
+          type: number
+        avgWaitMinutes:
+          type: number
+        date:
+          type: string
+        noShowCount:
+          type: integer
+        slaWaitMetPct:
+          type: number
+        ticketsCompleted:
+          type: integer
+        ticketsCreated:
+          type: integer
+      type: object
+    services.TimeseriesResponse:
+      properties:
+        computedAt:
+          type: string
+        granularity:
+          description: day | hour — hour when date range is a single calendar day without operator filter; per-hour volume and wait/service/SLA from the same rollup rules as daily buckets
+          type: string
+        metric:
+          type: string
+        points:
+          items:
+            $ref: '#/components/schemas/services.TimeseriesPoint'
+          type: array
+      type: object
     services.UnitClientHistoryItem:
       properties:
         action:
@@ -1813,6 +1981,31 @@ components:
           type: array
         nextCursor:
           type: string
+      type: object
+    services.UtilizationPoint:
+      properties:
+        date:
+          type: string
+        idleMinutes:
+          type: number
+        servingMinutes:
+          type: number
+        utilizationPct:
+          description: Omitted when this hour has no serving and no idle/break (excluded from aggregates)
+          nullable: true
+          type: number
+      type: object
+    services.UtilizationResponse:
+      properties:
+        computedAt:
+          type: string
+        granularity:
+          description: hour when dateFrom equals dateTo (one point per clock hour); day when range spans multiple calendar days. Percentages ignore hours where serving+idle+break are all zero.
+          type: string
+        points:
+          items:
+            $ref: '#/components/schemas/services.UtilizationPoint'
+          type: array
       type: object
     handlers.CreateTicketRequestAnonymous:
       type: object
@@ -6615,6 +6808,71 @@ paths:
       summary: Delete material
       tags:
       - units
+  /units/{unitId}/operations/clear-statistics-quiet:
+    post:
+      operationId: postUnitOperationsClearStatisticsQuiet
+      parameters:
+      - description: Subdivision unit ID
+        in: path
+        name: unitId
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: No Content
+      security:
+      - BearerAuth: []
+      summary: Resume incremental statistics processing
+      tags:
+      - operations
+  /units/{unitId}/operations/emergency-unlock:
+    post:
+      operationId: postUnitOperationsEmergencyUnlock
+      parameters:
+      - description: Subdivision unit ID
+        in: path
+        name: unitId
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          '*/*':
+            schema:
+              $ref: '#/components/schemas/handlers.emergencyUnlockBody'
+        description: Send {\
+        x-originalParamName: body
+      responses:
+        '204':
+          description: No Content
+      security:
+      - BearerAuth: []
+      summary: Emergency unlock kiosk and counter login
+      tags:
+      - operations
+  /units/{unitId}/operations/status:
+    get:
+      operationId: getUnitOperationsStatus
+      parameters:
+      - description: Subdivision unit ID
+        in: path
+        name: unitId
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/services.OperationsStatusDTO'
+          description: OK
+      security:
+      - BearerAuth: []
+      summary: Unit operations / EOD pipeline status
+      tags:
+      - operations
   /units/{unitId}/pre-registrations:
     get:
       description: Returns all pre-registrations associated with the unit (authenticated unit member).
@@ -7559,6 +7817,271 @@ paths:
       summary: Generate service slots for a date range
       tags:
       - slots
+  /units/{unitId}/statistics/employee-radar:
+    get:
+      operationId: getUnitStatisticsEmployeeRadar
+      parameters:
+      - description: Subdivision unit ID
+        in: path
+        name: unitId
+        required: true
+        schema:
+          type: string
+      - description: Target user id
+        in: query
+        name: userId
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/services.EmployeeRadarResponse'
+          description: OK
+      security:
+      - BearerAuth: []
+      summary: Employee radar chart metrics
+      tags:
+      - statistics
+  /units/{unitId}/statistics/load:
+    get:
+      operationId: getUnitStatisticsLoad
+      parameters:
+      - description: Subdivision unit ID
+        in: path
+        name: unitId
+        required: true
+        schema:
+          type: string
+      - description: YYYY-MM-DD
+        in: query
+        name: dateFrom
+        required: true
+        schema:
+          type: string
+      - description: YYYY-MM-DD
+        in: query
+        name: dateTo
+        required: true
+        schema:
+          type: string
+      - description: Filter by operator (expanded scope only)
+        in: query
+        name: userId
+        schema:
+          type: string
+      - description: Service zone unit id
+        in: query
+        name: serviceZoneId
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/services.LoadResponse'
+          description: OK
+      security:
+      - BearerAuth: []
+      summary: Daily ticket load (created / completed / no-show)
+      tags:
+      - statistics
+  /units/{unitId}/statistics/sla-deviations:
+    get:
+      operationId: getUnitStatisticsSlaDeviations
+      parameters:
+      - description: Subdivision unit ID
+        in: path
+        name: unitId
+        required: true
+        schema:
+          type: string
+      - description: YYYY-MM-DD
+        in: query
+        name: dateFrom
+        required: true
+        schema:
+          type: string
+      - description: YYYY-MM-DD
+        in: query
+        name: dateTo
+        required: true
+        schema:
+          type: string
+      - description: Filter by operator (expanded scope only)
+        in: query
+        name: userId
+        schema:
+          type: string
+      - description: Service zone unit id (child of subdivision)
+        in: query
+        name: serviceZoneId
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/services.SLADeviationsResponse'
+          description: OK
+      security:
+      - BearerAuth: []
+      summary: SLA waiting compliance vs breach per day
+      tags:
+      - statistics
+  /units/{unitId}/statistics/survey-scores:
+    get:
+      operationId: getUnitStatisticsSurveyScores
+      parameters:
+      - description: Subdivision unit ID
+        in: path
+        name: unitId
+        required: true
+        schema:
+          type: string
+      - description: YYYY-MM-DD
+        in: query
+        name: dateFrom
+        required: true
+        schema:
+          type: string
+      - description: YYYY-MM-DD
+        in: query
+        name: dateTo
+        required: true
+        schema:
+          type: string
+      - description: Single survey definition id (required with questionIds)
+        in: query
+        name: surveyId
+        schema:
+          type: string
+      - description: Question ids (repeat param or comma-separated); native scale
+        in: query
+        name: questionIds
+        schema:
+          items:
+            type: string
+          type: array
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/services.SurveyScoresResponse'
+          description: OK
+      security:
+      - BearerAuth: []
+      summary: Guest survey score timeseries (live from responses; hourly for a single day, daily for longer ranges)
+      tags:
+      - statistics
+  /units/{unitId}/statistics/timeseries:
+    get:
+      description: Daily metrics from statistics warehouse; when dateFrom equals dateTo (single calendar day) and no operator filter, returns hourly granularity (24 points) with ticket volume by hour and wait/service/SLA averages recomputed per hour (same rules as daily rollup). Requires unit branch access and statistics scope (self or ACCESS_STATISTICS_* / supervisor / admin).
+      operationId: getUnitStatisticsTimeseries
+      parameters:
+      - description: Subdivision unit ID
+        in: path
+        name: unitId
+        required: true
+        schema:
+          type: string
+      - description: YYYY-MM-DD
+        in: query
+        name: dateFrom
+        required: true
+        schema:
+          type: string
+      - description: YYYY-MM-DD
+        in: query
+        name: dateTo
+        required: true
+        schema:
+          type: string
+      - description: wait_time|service_time|volume|sla_wait
+        in: query
+        name: metric
+        schema:
+          default: wait_time
+          type: string
+      - description: Filter by operator (expanded scope only)
+        in: query
+        name: userId
+        schema:
+          type: string
+      - description: Service zone unit id (child of subdivision); omit for allowed scope default
+        in: query
+        name: serviceZoneId
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/services.TimeseriesResponse'
+          description: OK
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
+      security:
+      - BearerAuth: []
+      summary: Statistics timeseries (daily or hourly for a single day)
+      tags:
+      - statistics
+  /units/{unitId}/statistics/utilization:
+    get:
+      operationId: getUnitStatisticsUtilization
+      parameters:
+      - description: Subdivision unit ID
+        in: path
+        name: unitId
+        required: true
+        schema:
+          type: string
+      - description: YYYY-MM-DD
+        in: query
+        name: dateFrom
+        required: true
+        schema:
+          type: string
+      - description: YYYY-MM-DD
+        in: query
+        name: dateTo
+        required: true
+        schema:
+          type: string
+      - description: Target operator user id
+        in: query
+        name: userId
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/services.UtilizationResponse'
+          description: OK
+      security:
+      - BearerAuth: []
+      summary: Per-operator utilization (serving vs idle/break), calendar days in subdivision TZ
+      tags:
+      - statistics
   /units/{unitId}/survey-completion-images:
     post:
       description: Multipart file field "file". Returns an API-relative URL string. The GET for that path requires BearerAuth; it is not usable as a bare <img src> or static markdown image URL—clients must fetch with Authorization and use a blob/object URL (or proxy) to display.

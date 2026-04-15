@@ -25,9 +25,6 @@ import { ticketServiceDisplayName } from '@/lib/ticket-display';
 import { cn } from '@/lib/utils';
 import { Loader2, UserRoundSearch } from 'lucide-react';
 import { toast } from 'sonner';
-import PermissionGuard from '@/components/auth/permission-guard';
-import { StaffVisitorSurveyResponses } from '@/components/staff/staff-visitor-survey-responses';
-
 type TFn = (
   key: string,
   values?: Record<string, string | number | Date>
@@ -471,16 +468,6 @@ export function StaffVisitorContextPanel({
             </div>
           </div>
         )}
-
-        {clientId ? (
-          <PermissionGuard
-            unitId={unitId}
-            permissions={['ACCESS_SURVEY_RESPONSES']}
-            adminBypass={false}
-          >
-            <StaffVisitorSurveyResponses unitId={unitId} clientId={clientId} />
-          </PermissionGuard>
-        ) : null}
 
         <div>
           <label

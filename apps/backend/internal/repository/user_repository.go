@@ -48,6 +48,8 @@ type UserRepository interface {
 	ResolveJournalActorDisplayNames(userIDs []string) (map[string]string, error)
 	// ShiftJournalSeesAllActivity is true when the user may list all ticket history in the unit (not restricted to own actions).
 	ShiftJournalSeesAllActivity(userID, unitID string) (bool, error)
+	// HasUnitBranchAccess is true for tenant admin, or if the user has any user_units row for the subdivision or a descendant unit in the org tree.
+	HasUnitBranchAccess(userID, subdivisionID string) (bool, error)
 }
 
 type userRepository struct {
@@ -382,4 +384,28 @@ func (r *userRepository) ShiftJournalSeesAllActivity(userID, unitID string) (boo
 		return false, err
 	}
 	return shiftJournalSeesAllActivityFromLoadedUser(user, unitID), nil
+}
+
+func (r *userRepository) HasUnitBranchAccess(userID, subdivisionID string) (bool, error) {
+	if userID == "" || subdivisionID == "" {
+		return false, nil
+	}
+	ok, err := r.IsAdminOrHasUnitAccess(userID, subdivisionID)
+	if err != nil || ok {
+		return ok, err
+	}
+	var n int64
+	err = r.db.Raw(`
+WITH RECURSIVE branch AS (
+  SELECT id FROM units WHERE id = ?
+  UNION ALL
+  SELECT u.id FROM units u INNER JOIN branch b ON u.parent_id = b.id
+)
+SELECT COUNT(*) FROM user_units uu
+WHERE uu.user_id = ? AND uu.unit_id IN (SELECT id FROM branch)
+`, subdivisionID, userID).Scan(&n).Error
+	if err != nil {
+		return false, err
+	}
+	return n > 0, nil
 }

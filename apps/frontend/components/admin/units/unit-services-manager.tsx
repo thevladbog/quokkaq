@@ -34,6 +34,7 @@ import {
   useUpdateService,
   useDeleteService
 } from '@/lib/hooks';
+import { normalizeChildUnitsQueryData } from '@/lib/child-units-query';
 import { getGetUnitsUnitIdChildUnitsQueryKey } from '@/lib/api/generated/units';
 import { unitsApi } from '@/lib/api';
 import { useTranslations, useLocale } from 'next-intl';
@@ -376,15 +377,18 @@ function ServiceForm({
   const createServiceMutation = useCreateService();
   const updateServiceMutation = useUpdateService();
 
-  const { data: childUnits = [] } = useQuery({
+  const { data: childUnitsRaw } = useQuery({
     queryKey: getGetUnitsUnitIdChildUnitsQueryKey(selectedUnitId),
     queryFn: () => unitsApi.getChildUnits(selectedUnitId),
     enabled: !!selectedUnitId && (!!editingService || isCreating)
   });
 
   const serviceZones = useMemo(
-    () => childUnits.filter((u) => u.kind === 'service_zone'),
-    [childUnits]
+    () =>
+      normalizeChildUnitsQueryData(childUnitsRaw).filter(
+        (u) => u.kind === 'service_zone'
+      ),
+    [childUnitsRaw]
   );
 
   const [baselineValues] = useState<Partial<Service>>(() =>

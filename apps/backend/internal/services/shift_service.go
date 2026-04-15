@@ -461,6 +461,17 @@ func (s *shiftService) ExecuteEndOfDay(ctx context.Context, unitID string, userI
 		if err != nil {
 			return err
 		}
+		if err := s.ticketRepo.FinalizeEODTicketStatusesTx(tx, eodIDs, eodCloseAt, userID); err != nil {
+			return fmt.Errorf("end of day: finalize ticket statuses: %w", err)
+		}
+		// EOD runs before Finalize existed left is_eod=true but completed_at NULL; a later EOD has no new ids to finalize.
+		orphanIDs, err := s.ticketRepo.ListOrphanEODTicketIDsTx(tx, unitID)
+		if err != nil {
+			return fmt.Errorf("end of day: list orphan eod tickets: %w", err)
+		}
+		if err := s.ticketRepo.FinalizeEODTicketStatusesTx(tx, orphanIDs, eodCloseAt, userID); err != nil {
+			return fmt.Errorf("end of day: finalize orphan eod tickets: %w", err)
+		}
 		countersReleased, err = s.counterRepo.ReleaseAllTx(tx, unitID)
 		if err != nil {
 			return err

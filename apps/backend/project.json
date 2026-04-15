@@ -16,8 +16,12 @@
     "serve": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "go run ./cmd/api",
-        "cwd": "apps/backend"
+        "commands": [
+          "go build -o bin/server ./cmd/api",
+          "./bin/server"
+        ],
+        "cwd": "apps/backend",
+        "parallel": false
       }
     },
     "test": {
