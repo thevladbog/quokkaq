@@ -814,9 +814,6 @@ export interface HandlersCreateVisitorTagDefinitionRequest {
   sortOrder?: number;
 }
 
-/**
- * Must equal UNLOCK exactly to acknowledge the operation.
- */
 export type HandlersEmergencyUnlockBodyConfirm = typeof HandlersEmergencyUnlockBodyConfirm[keyof typeof HandlersEmergencyUnlockBodyConfirm];
 
 
@@ -824,11 +821,7 @@ export const HandlersEmergencyUnlockBodyConfirm = {
   UNLOCK: 'UNLOCK',
 } as const;
 
-/**
- * Request body for emergency unlock. Destructive admin action: clears kiosk admission freeze and counter-login blocks for the subdivision (EOD recovery). confirm must be exactly UNLOCK.
- */
 export interface HandlersEmergencyUnlockBody {
-  /** Must equal UNLOCK exactly to acknowledge the operation. */
   confirm: HandlersEmergencyUnlockBodyConfirm;
 }
 

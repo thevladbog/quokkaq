@@ -14,6 +14,15 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
@@ -42,6 +51,9 @@ export default function SettingsOperationsPage() {
   const [selectedUnitId, setSelectedUnitId] = useState('');
   const unitId = selectedUnitId || subdivisions[0]?.id || '';
 
+  const [unlockOpen, setUnlockOpen] = useState(false);
+  const [unlockTyped, setUnlockTyped] = useState('');
+
   const statusQuery = useGetUnitOperationsStatus(unitId, {
     query: {
       enabled: Boolean(unitId),
@@ -64,10 +76,10 @@ export default function SettingsOperationsPage() {
 
   const unlockMutation = usePostUnitOperationsEmergencyUnlock({
     mutation: {
-      onSuccess: async () => {
+      onSuccess: async (_data, variables) => {
         toast.success(t('toast_unlock_ok'));
         await queryClient.invalidateQueries({
-          queryKey: getGetUnitOperationsStatusQueryKey(unitId)
+          queryKey: getGetUnitOperationsStatusQueryKey(variables.unitId)
         });
       },
       onError: (e) => {
@@ -79,10 +91,10 @@ export default function SettingsOperationsPage() {
 
   const clearQuietMutation = usePostUnitOperationsClearStatisticsQuiet({
     mutation: {
-      onSuccess: async () => {
+      onSuccess: async (_data, variables) => {
         toast.success(t('toast_clear_quiet_ok'));
         await queryClient.invalidateQueries({
-          queryKey: getGetUnitOperationsStatusQueryKey(unitId)
+          queryKey: getGetUnitOperationsStatusQueryKey(variables.unitId)
         });
       },
       onError: (e) => {
@@ -219,12 +231,10 @@ export default function SettingsOperationsPage() {
             type='button'
             variant='destructive'
             disabled={!unitId || unlockMutation.isPending}
-            onClick={() =>
-              unlockMutation.mutate({
-                unitId,
-                data: { confirm: 'UNLOCK' }
-              })
-            }
+            onClick={() => {
+              setUnlockTyped('');
+              setUnlockOpen(true);
+            }}
           >
             {t('action_emergency_unlock')}
           </Button>
@@ -238,6 +248,59 @@ export default function SettingsOperationsPage() {
           </Button>
         </CardContent>
       </Card>
+
+      <Dialog
+        open={unlockOpen}
+        onOpenChange={(open) => {
+          setUnlockOpen(open);
+          if (!open) setUnlockTyped('');
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('unlock_confirm_title')}</DialogTitle>
+            <DialogDescription>
+              {t('unlock_confirm_description')}
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            autoComplete='off'
+            placeholder={t('unlock_confirm_placeholder')}
+            value={unlockTyped}
+            onChange={(e) => setUnlockTyped(e.target.value)}
+          />
+          <DialogFooter className='gap-2 sm:gap-0'>
+            <Button
+              type='button'
+              variant='outline'
+              onClick={() => setUnlockOpen(false)}
+            >
+              {t('unlock_confirm_cancel')}
+            </Button>
+            <Button
+              type='button'
+              variant='destructive'
+              disabled={
+                !unitId || unlockTyped !== 'UNLOCK' || unlockMutation.isPending
+              }
+              onClick={() => {
+                if (!unitId || unlockTyped !== 'UNLOCK') return;
+                unlockMutation.mutate(
+                  { unitId, data: { confirm: 'UNLOCK' } },
+                  {
+                    onSettled: () => {
+                      setUnlockOpen(false);
+                      setUnlockTyped('');
+                    }
+                  }
+                );
+              }}
+            >
+              {t('unlock_confirm_submit')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

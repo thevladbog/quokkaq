@@ -61,15 +61,42 @@ func isMissingDBRelation(err error, relation string) bool {
 	return strings.Contains(msg, rel) && strings.Contains(msg, "does not exist")
 }
 
+// statisticsBranchUnitIDs returns subdivisionID plus every descendant unit id in the branch (for statistics scope filtering).
+func (s *StatisticsService) statisticsBranchUnitIDs(ctx context.Context, subdivisionID string) (map[string]struct{}, error) {
+	if strings.TrimSpace(subdivisionID) == "" {
+		return map[string]struct{}{}, nil
+	}
+	var ids []string
+	err := s.db.WithContext(ctx).Raw(`
+WITH RECURSIVE branch AS (
+  SELECT id::text AS id FROM units WHERE id::text = ?
+  UNION ALL
+  SELECT u.id::text FROM units u INNER JOIN branch b ON u.parent_id::text = b.id
+)
+SELECT id FROM branch
+`, subdivisionID).Scan(&ids).Error
+	if err != nil {
+		return nil, err
+	}
+	m := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id != "" {
+			m[id] = struct{}{}
+		}
+	}
+	return m, nil
+}
+
 // companyPlanFeatureBool resolves subscription_plans.features[featureKey] for a company.
 // Returns (true, nil) only when the JSON object is present, unmarshals cleanly, and the key is explicitly boolean true.
 // Missing company row, NULL features, absent key, null value, or non-boolean value → (false, nil) or (false, err) on DB/unmarshal errors.
-func companyPlanFeatureBool(ctx context.Context, companyID string, featureKey string) (bool, error) {
+func companyPlanFeatureBool(ctx context.Context, db *gorm.DB, companyID string, featureKey string) (bool, error) {
 	if strings.TrimSpace(companyID) == "" {
 		return false, nil
 	}
 	var raw []byte
-	if err := database.DB.WithContext(ctx).Raw(`
+	if err := db.WithContext(ctx).Raw(`
 SELECT sp.features FROM companies c
 LEFT JOIN subscriptions s ON s.id = c.subscription_id
 LEFT JOIN subscription_plans sp ON sp.id = s.plan_id
@@ -99,13 +126,13 @@ WHERE c.id = ? LIMIT 1
 }
 
 // CompanyAllowsBasicReports is true only when plan.features.basic_reports is explicitly true.
-func CompanyAllowsBasicReports(ctx context.Context, companyID string) (bool, error) {
-	return companyPlanFeatureBool(ctx, companyID, "basic_reports")
+func CompanyAllowsBasicReports(ctx context.Context, db *gorm.DB, companyID string) (bool, error) {
+	return companyPlanFeatureBool(ctx, db, companyID, "basic_reports")
 }
 
 // CompanyAllowsAdvancedReports is true only when plan.features.advanced_reports is explicitly true.
-func CompanyAllowsAdvancedReports(ctx context.Context, companyID string) (bool, error) {
-	return companyPlanFeatureBool(ctx, companyID, "advanced_reports")
+func CompanyAllowsAdvancedReports(ctx context.Context, db *gorm.DB, companyID string) (bool, error) {
+	return companyPlanFeatureBool(ctx, db, companyID, "advanced_reports")
 }
 
 // TimeseriesPoint is one day in a chart.
@@ -137,14 +164,18 @@ func (s *StatisticsService) GetTimeseries(
 	requestedUserID *string,
 	requestedServiceZoneID string,
 ) (*TimeseriesResponse, error) {
-	ok, err := CompanyAllowsBasicReports(ctx, companyID)
+	ok, err := CompanyAllowsBasicReports(ctx, s.db, companyID)
 	if err != nil {
 		return nil, err
 	}
 	if !ok {
 		return nil, errors.New("plan does not include basic reports")
 	}
-	sc := statistics.ResolveScope(user, subdivisionID, viewerID)
+	branchIDs, err := s.statisticsBranchUnitIDs(ctx, subdivisionID)
+	if err != nil {
+		return nil, err
+	}
+	sc := statistics.ResolveScope(user, subdivisionID, viewerID, branchIDs)
 	if sc.Denied {
 		return nil, errors.New("forbidden")
 	}
@@ -231,14 +262,18 @@ func (s *StatisticsService) GetSLADeviations(
 	requestedUserID *string,
 	requestedServiceZoneID string,
 ) (*SLADeviationsResponse, error) {
-	ok, err := CompanyAllowsBasicReports(ctx, companyID)
+	ok, err := CompanyAllowsBasicReports(ctx, s.db, companyID)
 	if err != nil {
 		return nil, err
 	}
 	if !ok {
 		return nil, errors.New("plan does not include basic reports")
 	}
-	sc := statistics.ResolveScope(user, subdivisionID, viewerID)
+	branchIDs, err := s.statisticsBranchUnitIDs(ctx, subdivisionID)
+	if err != nil {
+		return nil, err
+	}
+	sc := statistics.ResolveScope(user, subdivisionID, viewerID, branchIDs)
 	if sc.Denied {
 		return nil, errors.New("forbidden")
 	}
@@ -381,14 +416,18 @@ func (s *StatisticsService) GetUtilization(
 	targetUserID string,
 	dateFrom, dateTo string,
 ) (*UtilizationResponse, error) {
-	ok, err := CompanyAllowsAdvancedReports(ctx, companyID)
+	ok, err := CompanyAllowsAdvancedReports(ctx, s.db, companyID)
 	if err != nil {
 		return nil, err
 	}
 	if !ok {
 		return nil, errors.New("plan does not include advanced reports")
 	}
-	sc := statistics.ResolveScope(user, subdivisionID, viewerID)
+	branchIDs, err := s.statisticsBranchUnitIDs(ctx, subdivisionID)
+	if err != nil {
+		return nil, err
+	}
+	sc := statistics.ResolveScope(user, subdivisionID, viewerID, branchIDs)
 	if sc.Denied {
 		return nil, errors.New("forbidden")
 	}
@@ -423,12 +462,12 @@ func (s *StatisticsService) GetUtilization(
 SELECT started_at, ended_at
 FROM counter_operator_intervals
 WHERE user_id = ?
-  AND unit_id IN (SELECT id FROM units WHERE id = ? OR parent_id = ?)
+  AND unit_id = ?
   AND kind IN ('idle', 'break')
   AND started_at < ?::timestamptz
   AND COALESCE(ended_at, NOW()) > ?::timestamptz
 `
-	if err := s.db.WithContext(ctx).Raw(q, targetUserID, subdivisionID, subdivisionID, endUTC, startUTC).Scan(&intervalRows).Error; err != nil {
+	if err := s.db.WithContext(ctx).Raw(q, targetUserID, subdivisionID, endUTC, startUTC).Scan(&intervalRows).Error; err != nil {
 		return nil, err
 	}
 
@@ -617,14 +656,18 @@ func (s *StatisticsService) GetSurveyScores(
 	surveyID *string,
 	questionIDs []string,
 ) (*SurveyScoresResponse, error) {
-	ok, err := CompanyAllowsBasicReports(ctx, companyID)
+	ok, err := CompanyAllowsBasicReports(ctx, s.db, companyID)
 	if err != nil {
 		return nil, err
 	}
 	if !ok {
 		return nil, errors.New("plan does not include basic reports")
 	}
-	sc := statistics.ResolveScope(user, subdivisionID, viewerID)
+	branchIDs, err := s.statisticsBranchUnitIDs(ctx, subdivisionID)
+	if err != nil {
+		return nil, err
+	}
+	sc := statistics.ResolveScope(user, subdivisionID, viewerID, branchIDs)
 	if sc.Denied {
 		return nil, errors.New("forbidden")
 	}
@@ -671,22 +714,32 @@ func (s *StatisticsService) GetEmployeeRadar(
 	viewerID string,
 	targetUserID string,
 ) (*EmployeeRadarResponse, error) {
-	ok, err := CompanyAllowsAdvancedReports(ctx, companyID)
+	ok, err := CompanyAllowsAdvancedReports(ctx, s.db, companyID)
 	if err != nil {
 		return nil, err
 	}
 	if !ok {
 		return nil, errors.New("plan does not include advanced reports")
 	}
-	sc := statistics.ResolveScope(user, subdivisionID, viewerID)
+	branchIDs, err := s.statisticsBranchUnitIDs(ctx, subdivisionID)
+	if err != nil {
+		return nil, err
+	}
+	sc := statistics.ResolveScope(user, subdivisionID, viewerID, branchIDs)
 	if sc.Denied {
 		return nil, errors.New("forbidden")
 	}
 	if !sc.Expanded && strings.TrimSpace(sc.ForceUserID) != strings.TrimSpace(targetUserID) {
 		return nil, errors.New("forbidden")
 	}
-	// Last 30 calendar days inclusive (today and the prior 29 days).
-	now := time.Now().UTC()
+	// Last 30 calendar days inclusive in subdivision local time (today and the prior 29 days).
+	locRadar := time.UTC
+	if tzName, tzErr := s.loadSubdivisionTimezoneName(ctx, subdivisionID); tzErr == nil {
+		if l, le := time.LoadLocation(tzName); le == nil && l != nil {
+			locRadar = l
+		}
+	}
+	now := time.Now().In(locRadar)
 	from := now.AddDate(0, 0, -29).Format("2006-01-02")
 	to := now.Format("2006-01-02")
 	zq := repository.StatisticsZoneQuery{WholeSubdivision: true}

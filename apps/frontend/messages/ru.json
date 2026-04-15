@@ -94,6 +94,7 @@
     "date_from": "С",
     "date_to": "По",
     "open_calendar": "Выберите дату или период",
+    "date_range_awaiting_end": "выберите конечную дату",
     "filter_subdivision": "Подразделение",
     "subdivision_placeholder": "Выберите подразделение",
     "filter_user": "Оператор (необязательно)",
@@ -192,7 +193,12 @@
     "action_clear_quiet": "Возобновить инкрементальную статистику",
     "toast_unlock_ok": "Экстренная разблокировка применена.",
     "toast_clear_quiet_ok": "Режим тишины статистики снят.",
-    "toast_error": "Ошибка запроса: {message}"
+    "toast_error": "Ошибка запроса: {message}",
+    "unlock_confirm_title": "Аварийная разблокировка",
+    "unlock_confirm_description": "Снимает блокировку киоска, входа на стойках и зависшие флаги сверки для этого подразделения. Введите UNLOCK для подтверждения.",
+    "unlock_confirm_placeholder": "Введите UNLOCK",
+    "unlock_confirm_submit": "Подтвердить",
+    "unlock_confirm_cancel": "Отмена"
   },
   "home": {
     "title": "QuokkaQ",

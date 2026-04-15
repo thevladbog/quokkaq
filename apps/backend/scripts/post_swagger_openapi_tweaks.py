@@ -68,6 +68,31 @@ def _patch_color_pattern(schema_obj: dict[str, Any], schema_label: str) -> None:
     color["pattern"] = COLOR_PATTERN
 
 
+def _patch_statistics_survey_scores_question_ids_param(doc: dict[str, Any]) -> None:
+    """Ensure survey-scores questionIds is documented as form-style array (repeat + CSV)."""
+    paths = doc.get("paths")
+    if not isinstance(paths, dict):
+        return
+    item = paths.get("/units/{unitId}/statistics/survey-scores")
+    if not isinstance(item, dict):
+        return
+    get_op = item.get("get")
+    if not isinstance(get_op, dict):
+        return
+    params = get_op.get("parameters")
+    if not isinstance(params, list):
+        return
+    for p in params:
+        if (
+            isinstance(p, dict)
+            and p.get("name") == "questionIds"
+            and p.get("in") == "query"
+        ):
+            p["style"] = "form"
+            p["explode"] = True
+            return
+
+
 def apply_openapi_tweaks(doc: dict[str, Any]) -> None:
     """Apply extra schema constraints by path under components.schemas.
 
@@ -76,6 +101,8 @@ def apply_openapi_tweaks(doc: dict[str, Any]) -> None:
     fails fast with a clear message — adjust the schema names or fields above.
     """
     comp = _components(doc)
+
+    _patch_statistics_survey_scores_question_ids_param(doc)
 
     patch_visitor = _schema(comp, "handlers.PatchTicketVisitorRequest")
     patch_visitor["minProperties"] = 1

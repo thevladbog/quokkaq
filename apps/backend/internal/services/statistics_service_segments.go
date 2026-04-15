@@ -3,6 +3,7 @@ package services
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -29,6 +30,9 @@ func buildServiceTimeSegments(histories []models.TicketHistory, ticket models.Ti
 	if len(histories) == 0 {
 		return nil
 	}
+	sort.Slice(histories, func(i, j int) bool {
+		return histories[i].CreatedAt.Before(histories[j].CreatedAt)
+	})
 	type openSeg struct {
 		start          time.Time
 		serviceID      string

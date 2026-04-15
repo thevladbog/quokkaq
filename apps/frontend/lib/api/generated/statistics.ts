@@ -823,9 +823,6 @@ export interface HandlersCreateVisitorTagDefinitionRequest {
   sortOrder?: number;
 }
 
-/**
- * Must equal UNLOCK exactly to acknowledge the operation.
- */
 export type HandlersEmergencyUnlockBodyConfirm = typeof HandlersEmergencyUnlockBodyConfirm[keyof typeof HandlersEmergencyUnlockBodyConfirm];
 
 
@@ -833,11 +830,7 @@ export const HandlersEmergencyUnlockBodyConfirm = {
   UNLOCK: 'UNLOCK',
 } as const;
 
-/**
- * Request body for emergency unlock. Destructive admin action: clears kiosk admission freeze and counter-login blocks for the subdivision (EOD recovery). confirm must be exactly UNLOCK.
- */
 export interface HandlersEmergencyUnlockBody {
-  /** Must equal UNLOCK exactly to acknowledge the operation. */
   confirm: HandlersEmergencyUnlockBodyConfirm;
 }
 
@@ -1457,7 +1450,7 @@ dateTo: string;
  */
 surveyId?: string;
 /**
- * Question ids (repeat param or comma-separated); native scale
+ * Question ids (repeat query param or comma-separated); native scale
  */
 questionIds?: string[];
 };
@@ -1532,12 +1525,34 @@ export type postUnitOperationsClearStatisticsQuietResponse204 = {
   status: 204
 }
 
+export type postUnitOperationsClearStatisticsQuietResponse401 = {
+  data: string
+  status: 401
+}
+
+export type postUnitOperationsClearStatisticsQuietResponse403 = {
+  data: string
+  status: 403
+}
+
+export type postUnitOperationsClearStatisticsQuietResponse404 = {
+  data: string
+  status: 404
+}
+
+export type postUnitOperationsClearStatisticsQuietResponse500 = {
+  data: string
+  status: 500
+}
+
 export type postUnitOperationsClearStatisticsQuietResponseSuccess = (postUnitOperationsClearStatisticsQuietResponse204) & {
   headers: Headers;
 };
-;
+export type postUnitOperationsClearStatisticsQuietResponseError = (postUnitOperationsClearStatisticsQuietResponse401 | postUnitOperationsClearStatisticsQuietResponse403 | postUnitOperationsClearStatisticsQuietResponse404 | postUnitOperationsClearStatisticsQuietResponse500) & {
+  headers: Headers;
+};
 
-export type postUnitOperationsClearStatisticsQuietResponse = (postUnitOperationsClearStatisticsQuietResponseSuccess)
+export type postUnitOperationsClearStatisticsQuietResponse = (postUnitOperationsClearStatisticsQuietResponseSuccess | postUnitOperationsClearStatisticsQuietResponseError)
 
 export const getPostUnitOperationsClearStatisticsQuietUrl = (unitId: string,) => {
 
@@ -1561,7 +1576,7 @@ export const postUnitOperationsClearStatisticsQuiet = async (unitId: string, opt
 
 
 
-export const getPostUnitOperationsClearStatisticsQuietMutationOptions = <TError = unknown,
+export const getPostUnitOperationsClearStatisticsQuietMutationOptions = <TError = string,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitOperationsClearStatisticsQuiet>>, TError,{unitId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postUnitOperationsClearStatisticsQuiet>>, TError,{unitId: string}, TContext> => {
 
@@ -1590,12 +1605,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostUnitOperationsClearStatisticsQuietMutationResult = NonNullable<Awaited<ReturnType<typeof postUnitOperationsClearStatisticsQuiet>>>
 
-    export type PostUnitOperationsClearStatisticsQuietMutationError = unknown
+    export type PostUnitOperationsClearStatisticsQuietMutationError = string
 
     /**
  * @summary Resume incremental statistics processing
  */
-export const usePostUnitOperationsClearStatisticsQuiet = <TError = unknown,
+export const usePostUnitOperationsClearStatisticsQuiet = <TError = string,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitOperationsClearStatisticsQuiet>>, TError,{unitId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postUnitOperationsClearStatisticsQuiet>>,
@@ -1615,12 +1630,39 @@ export type postUnitOperationsEmergencyUnlockResponse204 = {
   status: 204
 }
 
+export type postUnitOperationsEmergencyUnlockResponse400 = {
+  data: string
+  status: 400
+}
+
+export type postUnitOperationsEmergencyUnlockResponse401 = {
+  data: string
+  status: 401
+}
+
+export type postUnitOperationsEmergencyUnlockResponse403 = {
+  data: string
+  status: 403
+}
+
+export type postUnitOperationsEmergencyUnlockResponse404 = {
+  data: string
+  status: 404
+}
+
+export type postUnitOperationsEmergencyUnlockResponse500 = {
+  data: string
+  status: 500
+}
+
 export type postUnitOperationsEmergencyUnlockResponseSuccess = (postUnitOperationsEmergencyUnlockResponse204) & {
   headers: Headers;
 };
-;
+export type postUnitOperationsEmergencyUnlockResponseError = (postUnitOperationsEmergencyUnlockResponse400 | postUnitOperationsEmergencyUnlockResponse401 | postUnitOperationsEmergencyUnlockResponse403 | postUnitOperationsEmergencyUnlockResponse404 | postUnitOperationsEmergencyUnlockResponse500) & {
+  headers: Headers;
+};
 
-export type postUnitOperationsEmergencyUnlockResponse = (postUnitOperationsEmergencyUnlockResponseSuccess)
+export type postUnitOperationsEmergencyUnlockResponse = (postUnitOperationsEmergencyUnlockResponseSuccess | postUnitOperationsEmergencyUnlockResponseError)
 
 export const getPostUnitOperationsEmergencyUnlockUrl = (unitId: string,) => {
 
@@ -1646,7 +1688,7 @@ export const postUnitOperationsEmergencyUnlock = async (unitId: string,
 
 
 
-export const getPostUnitOperationsEmergencyUnlockMutationOptions = <TError = unknown,
+export const getPostUnitOperationsEmergencyUnlockMutationOptions = <TError = string,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitOperationsEmergencyUnlock>>, TError,{unitId: string;data: HandlersEmergencyUnlockBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postUnitOperationsEmergencyUnlock>>, TError,{unitId: string;data: HandlersEmergencyUnlockBody}, TContext> => {
 
@@ -1675,12 +1717,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostUnitOperationsEmergencyUnlockMutationResult = NonNullable<Awaited<ReturnType<typeof postUnitOperationsEmergencyUnlock>>>
     export type PostUnitOperationsEmergencyUnlockMutationBody = HandlersEmergencyUnlockBody
-    export type PostUnitOperationsEmergencyUnlockMutationError = unknown
+    export type PostUnitOperationsEmergencyUnlockMutationError = string
 
     /**
  * @summary Emergency unlock kiosk and counter login
  */
-export const usePostUnitOperationsEmergencyUnlock = <TError = unknown,
+export const usePostUnitOperationsEmergencyUnlock = <TError = string,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitOperationsEmergencyUnlock>>, TError,{unitId: string;data: HandlersEmergencyUnlockBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postUnitOperationsEmergencyUnlock>>,
@@ -1699,12 +1741,34 @@ export type getUnitOperationsStatusResponse200 = {
   status: 200
 }
 
+export type getUnitOperationsStatusResponse401 = {
+  data: string
+  status: 401
+}
+
+export type getUnitOperationsStatusResponse403 = {
+  data: string
+  status: 403
+}
+
+export type getUnitOperationsStatusResponse404 = {
+  data: string
+  status: 404
+}
+
+export type getUnitOperationsStatusResponse500 = {
+  data: string
+  status: 500
+}
+
 export type getUnitOperationsStatusResponseSuccess = (getUnitOperationsStatusResponse200) & {
   headers: Headers;
 };
-;
+export type getUnitOperationsStatusResponseError = (getUnitOperationsStatusResponse401 | getUnitOperationsStatusResponse403 | getUnitOperationsStatusResponse404 | getUnitOperationsStatusResponse500) & {
+  headers: Headers;
+};
 
-export type getUnitOperationsStatusResponse = (getUnitOperationsStatusResponseSuccess)
+export type getUnitOperationsStatusResponse = (getUnitOperationsStatusResponseSuccess | getUnitOperationsStatusResponseError)
 
 export const getGetUnitOperationsStatusUrl = (unitId: string,) => {
 
@@ -1736,7 +1800,7 @@ export const getGetUnitOperationsStatusQueryKey = (unitId: string,) => {
     }
 
 
-export const getGetUnitOperationsStatusQueryOptions = <TData = Awaited<ReturnType<typeof getUnitOperationsStatus>>, TError = unknown>(unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitOperationsStatus>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export const getGetUnitOperationsStatusQueryOptions = <TData = Awaited<ReturnType<typeof getUnitOperationsStatus>>, TError = string>(unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitOperationsStatus>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -1755,10 +1819,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetUnitOperationsStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getUnitOperationsStatus>>>
-export type GetUnitOperationsStatusQueryError = unknown
+export type GetUnitOperationsStatusQueryError = string
 
 
-export function useGetUnitOperationsStatus<TData = Awaited<ReturnType<typeof getUnitOperationsStatus>>, TError = unknown>(
+export function useGetUnitOperationsStatus<TData = Awaited<ReturnType<typeof getUnitOperationsStatus>>, TError = string>(
  unitId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitOperationsStatus>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getUnitOperationsStatus>>,
@@ -1768,7 +1832,7 @@ export function useGetUnitOperationsStatus<TData = Awaited<ReturnType<typeof get
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitOperationsStatus<TData = Awaited<ReturnType<typeof getUnitOperationsStatus>>, TError = unknown>(
+export function useGetUnitOperationsStatus<TData = Awaited<ReturnType<typeof getUnitOperationsStatus>>, TError = string>(
  unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitOperationsStatus>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getUnitOperationsStatus>>,
@@ -1778,7 +1842,7 @@ export function useGetUnitOperationsStatus<TData = Awaited<ReturnType<typeof get
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitOperationsStatus<TData = Awaited<ReturnType<typeof getUnitOperationsStatus>>, TError = unknown>(
+export function useGetUnitOperationsStatus<TData = Awaited<ReturnType<typeof getUnitOperationsStatus>>, TError = string>(
  unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitOperationsStatus>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
@@ -1786,7 +1850,7 @@ export function useGetUnitOperationsStatus<TData = Awaited<ReturnType<typeof get
  * @summary Unit operations / EOD pipeline status
  */
 
-export function useGetUnitOperationsStatus<TData = Awaited<ReturnType<typeof getUnitOperationsStatus>>, TError = unknown>(
+export function useGetUnitOperationsStatus<TData = Awaited<ReturnType<typeof getUnitOperationsStatus>>, TError = string>(
  unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitOperationsStatus>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -1812,12 +1876,39 @@ export type getUnitStatisticsEmployeeRadarResponse200 = {
   status: 200
 }
 
+export type getUnitStatisticsEmployeeRadarResponse400 = {
+  data: string
+  status: 400
+}
+
+export type getUnitStatisticsEmployeeRadarResponse401 = {
+  data: string
+  status: 401
+}
+
+export type getUnitStatisticsEmployeeRadarResponse403 = {
+  data: string
+  status: 403
+}
+
+export type getUnitStatisticsEmployeeRadarResponse404 = {
+  data: string
+  status: 404
+}
+
+export type getUnitStatisticsEmployeeRadarResponse500 = {
+  data: string
+  status: 500
+}
+
 export type getUnitStatisticsEmployeeRadarResponseSuccess = (getUnitStatisticsEmployeeRadarResponse200) & {
   headers: Headers;
 };
-;
+export type getUnitStatisticsEmployeeRadarResponseError = (getUnitStatisticsEmployeeRadarResponse400 | getUnitStatisticsEmployeeRadarResponse401 | getUnitStatisticsEmployeeRadarResponse403 | getUnitStatisticsEmployeeRadarResponse404 | getUnitStatisticsEmployeeRadarResponse500) & {
+  headers: Headers;
+};
 
-export type getUnitStatisticsEmployeeRadarResponse = (getUnitStatisticsEmployeeRadarResponseSuccess)
+export type getUnitStatisticsEmployeeRadarResponse = (getUnitStatisticsEmployeeRadarResponseSuccess | getUnitStatisticsEmployeeRadarResponseError)
 
 export const getGetUnitStatisticsEmployeeRadarUrl = (unitId: string,
     params: GetUnitStatisticsEmployeeRadarParams,) => {
@@ -1859,7 +1950,7 @@ export const getGetUnitStatisticsEmployeeRadarQueryKey = (unitId: string,
     }
 
 
-export const getGetUnitStatisticsEmployeeRadarQueryOptions = <TData = Awaited<ReturnType<typeof getUnitStatisticsEmployeeRadar>>, TError = unknown>(unitId: string,
+export const getGetUnitStatisticsEmployeeRadarQueryOptions = <TData = Awaited<ReturnType<typeof getUnitStatisticsEmployeeRadar>>, TError = string>(unitId: string,
     params: GetUnitStatisticsEmployeeRadarParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsEmployeeRadar>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
 ) => {
 
@@ -1879,10 +1970,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetUnitStatisticsEmployeeRadarQueryResult = NonNullable<Awaited<ReturnType<typeof getUnitStatisticsEmployeeRadar>>>
-export type GetUnitStatisticsEmployeeRadarQueryError = unknown
+export type GetUnitStatisticsEmployeeRadarQueryError = string
 
 
-export function useGetUnitStatisticsEmployeeRadar<TData = Awaited<ReturnType<typeof getUnitStatisticsEmployeeRadar>>, TError = unknown>(
+export function useGetUnitStatisticsEmployeeRadar<TData = Awaited<ReturnType<typeof getUnitStatisticsEmployeeRadar>>, TError = string>(
  unitId: string,
     params: GetUnitStatisticsEmployeeRadarParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsEmployeeRadar>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -1893,7 +1984,7 @@ export function useGetUnitStatisticsEmployeeRadar<TData = Awaited<ReturnType<typ
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitStatisticsEmployeeRadar<TData = Awaited<ReturnType<typeof getUnitStatisticsEmployeeRadar>>, TError = unknown>(
+export function useGetUnitStatisticsEmployeeRadar<TData = Awaited<ReturnType<typeof getUnitStatisticsEmployeeRadar>>, TError = string>(
  unitId: string,
     params: GetUnitStatisticsEmployeeRadarParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsEmployeeRadar>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -1904,7 +1995,7 @@ export function useGetUnitStatisticsEmployeeRadar<TData = Awaited<ReturnType<typ
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitStatisticsEmployeeRadar<TData = Awaited<ReturnType<typeof getUnitStatisticsEmployeeRadar>>, TError = unknown>(
+export function useGetUnitStatisticsEmployeeRadar<TData = Awaited<ReturnType<typeof getUnitStatisticsEmployeeRadar>>, TError = string>(
  unitId: string,
     params: GetUnitStatisticsEmployeeRadarParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsEmployeeRadar>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
@@ -1913,7 +2004,7 @@ export function useGetUnitStatisticsEmployeeRadar<TData = Awaited<ReturnType<typ
  * @summary Employee radar chart metrics
  */
 
-export function useGetUnitStatisticsEmployeeRadar<TData = Awaited<ReturnType<typeof getUnitStatisticsEmployeeRadar>>, TError = unknown>(
+export function useGetUnitStatisticsEmployeeRadar<TData = Awaited<ReturnType<typeof getUnitStatisticsEmployeeRadar>>, TError = string>(
  unitId: string,
     params: GetUnitStatisticsEmployeeRadarParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsEmployeeRadar>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
@@ -1941,12 +2032,39 @@ export type getUnitStatisticsLoadResponse200 = {
   status: 200
 }
 
+export type getUnitStatisticsLoadResponse400 = {
+  data: string
+  status: 400
+}
+
+export type getUnitStatisticsLoadResponse401 = {
+  data: string
+  status: 401
+}
+
+export type getUnitStatisticsLoadResponse403 = {
+  data: string
+  status: 403
+}
+
+export type getUnitStatisticsLoadResponse404 = {
+  data: string
+  status: 404
+}
+
+export type getUnitStatisticsLoadResponse500 = {
+  data: string
+  status: 500
+}
+
 export type getUnitStatisticsLoadResponseSuccess = (getUnitStatisticsLoadResponse200) & {
   headers: Headers;
 };
-;
+export type getUnitStatisticsLoadResponseError = (getUnitStatisticsLoadResponse400 | getUnitStatisticsLoadResponse401 | getUnitStatisticsLoadResponse403 | getUnitStatisticsLoadResponse404 | getUnitStatisticsLoadResponse500) & {
+  headers: Headers;
+};
 
-export type getUnitStatisticsLoadResponse = (getUnitStatisticsLoadResponseSuccess)
+export type getUnitStatisticsLoadResponse = (getUnitStatisticsLoadResponseSuccess | getUnitStatisticsLoadResponseError)
 
 export const getGetUnitStatisticsLoadUrl = (unitId: string,
     params: GetUnitStatisticsLoadParams,) => {
@@ -1988,7 +2106,7 @@ export const getGetUnitStatisticsLoadQueryKey = (unitId: string,
     }
 
 
-export const getGetUnitStatisticsLoadQueryOptions = <TData = Awaited<ReturnType<typeof getUnitStatisticsLoad>>, TError = unknown>(unitId: string,
+export const getGetUnitStatisticsLoadQueryOptions = <TData = Awaited<ReturnType<typeof getUnitStatisticsLoad>>, TError = string>(unitId: string,
     params: GetUnitStatisticsLoadParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsLoad>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
 ) => {
 
@@ -2008,10 +2126,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetUnitStatisticsLoadQueryResult = NonNullable<Awaited<ReturnType<typeof getUnitStatisticsLoad>>>
-export type GetUnitStatisticsLoadQueryError = unknown
+export type GetUnitStatisticsLoadQueryError = string
 
 
-export function useGetUnitStatisticsLoad<TData = Awaited<ReturnType<typeof getUnitStatisticsLoad>>, TError = unknown>(
+export function useGetUnitStatisticsLoad<TData = Awaited<ReturnType<typeof getUnitStatisticsLoad>>, TError = string>(
  unitId: string,
     params: GetUnitStatisticsLoadParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsLoad>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -2022,7 +2140,7 @@ export function useGetUnitStatisticsLoad<TData = Awaited<ReturnType<typeof getUn
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitStatisticsLoad<TData = Awaited<ReturnType<typeof getUnitStatisticsLoad>>, TError = unknown>(
+export function useGetUnitStatisticsLoad<TData = Awaited<ReturnType<typeof getUnitStatisticsLoad>>, TError = string>(
  unitId: string,
     params: GetUnitStatisticsLoadParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsLoad>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -2033,7 +2151,7 @@ export function useGetUnitStatisticsLoad<TData = Awaited<ReturnType<typeof getUn
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitStatisticsLoad<TData = Awaited<ReturnType<typeof getUnitStatisticsLoad>>, TError = unknown>(
+export function useGetUnitStatisticsLoad<TData = Awaited<ReturnType<typeof getUnitStatisticsLoad>>, TError = string>(
  unitId: string,
     params: GetUnitStatisticsLoadParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsLoad>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
@@ -2042,7 +2160,7 @@ export function useGetUnitStatisticsLoad<TData = Awaited<ReturnType<typeof getUn
  * @summary Daily ticket load (created / completed / no-show)
  */
 
-export function useGetUnitStatisticsLoad<TData = Awaited<ReturnType<typeof getUnitStatisticsLoad>>, TError = unknown>(
+export function useGetUnitStatisticsLoad<TData = Awaited<ReturnType<typeof getUnitStatisticsLoad>>, TError = string>(
  unitId: string,
     params: GetUnitStatisticsLoadParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsLoad>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
@@ -2070,12 +2188,39 @@ export type getUnitStatisticsSlaDeviationsResponse200 = {
   status: 200
 }
 
+export type getUnitStatisticsSlaDeviationsResponse400 = {
+  data: string
+  status: 400
+}
+
+export type getUnitStatisticsSlaDeviationsResponse401 = {
+  data: string
+  status: 401
+}
+
+export type getUnitStatisticsSlaDeviationsResponse403 = {
+  data: string
+  status: 403
+}
+
+export type getUnitStatisticsSlaDeviationsResponse404 = {
+  data: string
+  status: 404
+}
+
+export type getUnitStatisticsSlaDeviationsResponse500 = {
+  data: string
+  status: 500
+}
+
 export type getUnitStatisticsSlaDeviationsResponseSuccess = (getUnitStatisticsSlaDeviationsResponse200) & {
   headers: Headers;
 };
-;
+export type getUnitStatisticsSlaDeviationsResponseError = (getUnitStatisticsSlaDeviationsResponse400 | getUnitStatisticsSlaDeviationsResponse401 | getUnitStatisticsSlaDeviationsResponse403 | getUnitStatisticsSlaDeviationsResponse404 | getUnitStatisticsSlaDeviationsResponse500) & {
+  headers: Headers;
+};
 
-export type getUnitStatisticsSlaDeviationsResponse = (getUnitStatisticsSlaDeviationsResponseSuccess)
+export type getUnitStatisticsSlaDeviationsResponse = (getUnitStatisticsSlaDeviationsResponseSuccess | getUnitStatisticsSlaDeviationsResponseError)
 
 export const getGetUnitStatisticsSlaDeviationsUrl = (unitId: string,
     params: GetUnitStatisticsSlaDeviationsParams,) => {
@@ -2117,7 +2262,7 @@ export const getGetUnitStatisticsSlaDeviationsQueryKey = (unitId: string,
     }
 
 
-export const getGetUnitStatisticsSlaDeviationsQueryOptions = <TData = Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>, TError = unknown>(unitId: string,
+export const getGetUnitStatisticsSlaDeviationsQueryOptions = <TData = Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>, TError = string>(unitId: string,
     params: GetUnitStatisticsSlaDeviationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
 ) => {
 
@@ -2137,10 +2282,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetUnitStatisticsSlaDeviationsQueryResult = NonNullable<Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>>
-export type GetUnitStatisticsSlaDeviationsQueryError = unknown
+export type GetUnitStatisticsSlaDeviationsQueryError = string
 
 
-export function useGetUnitStatisticsSlaDeviations<TData = Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>, TError = unknown>(
+export function useGetUnitStatisticsSlaDeviations<TData = Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>, TError = string>(
  unitId: string,
     params: GetUnitStatisticsSlaDeviationsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -2151,7 +2296,7 @@ export function useGetUnitStatisticsSlaDeviations<TData = Awaited<ReturnType<typ
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitStatisticsSlaDeviations<TData = Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>, TError = unknown>(
+export function useGetUnitStatisticsSlaDeviations<TData = Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>, TError = string>(
  unitId: string,
     params: GetUnitStatisticsSlaDeviationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -2162,7 +2307,7 @@ export function useGetUnitStatisticsSlaDeviations<TData = Awaited<ReturnType<typ
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitStatisticsSlaDeviations<TData = Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>, TError = unknown>(
+export function useGetUnitStatisticsSlaDeviations<TData = Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>, TError = string>(
  unitId: string,
     params: GetUnitStatisticsSlaDeviationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
@@ -2171,7 +2316,7 @@ export function useGetUnitStatisticsSlaDeviations<TData = Awaited<ReturnType<typ
  * @summary SLA waiting compliance vs breach per day
  */
 
-export function useGetUnitStatisticsSlaDeviations<TData = Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>, TError = unknown>(
+export function useGetUnitStatisticsSlaDeviations<TData = Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>, TError = string>(
  unitId: string,
     params: GetUnitStatisticsSlaDeviationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
@@ -2198,12 +2343,39 @@ export type getUnitStatisticsSlaSummaryResponse200 = {
   status: 200
 }
 
+export type getUnitStatisticsSlaSummaryResponse400 = {
+  data: string
+  status: 400
+}
+
+export type getUnitStatisticsSlaSummaryResponse401 = {
+  data: string
+  status: 401
+}
+
+export type getUnitStatisticsSlaSummaryResponse403 = {
+  data: string
+  status: 403
+}
+
+export type getUnitStatisticsSlaSummaryResponse404 = {
+  data: string
+  status: 404
+}
+
+export type getUnitStatisticsSlaSummaryResponse500 = {
+  data: string
+  status: 500
+}
+
 export type getUnitStatisticsSlaSummaryResponseSuccess = (getUnitStatisticsSlaSummaryResponse200) & {
   headers: Headers;
 };
-;
+export type getUnitStatisticsSlaSummaryResponseError = (getUnitStatisticsSlaSummaryResponse400 | getUnitStatisticsSlaSummaryResponse401 | getUnitStatisticsSlaSummaryResponse403 | getUnitStatisticsSlaSummaryResponse404 | getUnitStatisticsSlaSummaryResponse500) & {
+  headers: Headers;
+};
 
-export type getUnitStatisticsSlaSummaryResponse = (getUnitStatisticsSlaSummaryResponseSuccess)
+export type getUnitStatisticsSlaSummaryResponse = (getUnitStatisticsSlaSummaryResponseSuccess | getUnitStatisticsSlaSummaryResponseError)
 
 export const getGetUnitStatisticsSlaSummaryUrl = (unitId: string,
     params: GetUnitStatisticsSlaSummaryParams,) => {
@@ -2245,7 +2417,7 @@ export const getGetUnitStatisticsSlaSummaryQueryKey = (unitId: string,
     }
 
 
-export const getGetUnitStatisticsSlaSummaryQueryOptions = <TData = Awaited<ReturnType<typeof getUnitStatisticsSlaSummary>>, TError = unknown>(unitId: string,
+export const getGetUnitStatisticsSlaSummaryQueryOptions = <TData = Awaited<ReturnType<typeof getUnitStatisticsSlaSummary>>, TError = string>(unitId: string,
     params: GetUnitStatisticsSlaSummaryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSlaSummary>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
 ) => {
 
@@ -2265,10 +2437,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetUnitStatisticsSlaSummaryQueryResult = NonNullable<Awaited<ReturnType<typeof getUnitStatisticsSlaSummary>>>
-export type GetUnitStatisticsSlaSummaryQueryError = unknown
+export type GetUnitStatisticsSlaSummaryQueryError = string
 
 
-export function useGetUnitStatisticsSlaSummary<TData = Awaited<ReturnType<typeof getUnitStatisticsSlaSummary>>, TError = unknown>(
+export function useGetUnitStatisticsSlaSummary<TData = Awaited<ReturnType<typeof getUnitStatisticsSlaSummary>>, TError = string>(
  unitId: string,
     params: GetUnitStatisticsSlaSummaryParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSlaSummary>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -2279,7 +2451,7 @@ export function useGetUnitStatisticsSlaSummary<TData = Awaited<ReturnType<typeof
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitStatisticsSlaSummary<TData = Awaited<ReturnType<typeof getUnitStatisticsSlaSummary>>, TError = unknown>(
+export function useGetUnitStatisticsSlaSummary<TData = Awaited<ReturnType<typeof getUnitStatisticsSlaSummary>>, TError = string>(
  unitId: string,
     params: GetUnitStatisticsSlaSummaryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSlaSummary>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -2290,7 +2462,7 @@ export function useGetUnitStatisticsSlaSummary<TData = Awaited<ReturnType<typeof
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitStatisticsSlaSummary<TData = Awaited<ReturnType<typeof getUnitStatisticsSlaSummary>>, TError = unknown>(
+export function useGetUnitStatisticsSlaSummary<TData = Awaited<ReturnType<typeof getUnitStatisticsSlaSummary>>, TError = string>(
  unitId: string,
     params: GetUnitStatisticsSlaSummaryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSlaSummary>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
@@ -2299,7 +2471,7 @@ export function useGetUnitStatisticsSlaSummary<TData = Awaited<ReturnType<typeof
  * @summary Aggregate waiting SLA percent for date range (optional service filter)
  */
 
-export function useGetUnitStatisticsSlaSummary<TData = Awaited<ReturnType<typeof getUnitStatisticsSlaSummary>>, TError = unknown>(
+export function useGetUnitStatisticsSlaSummary<TData = Awaited<ReturnType<typeof getUnitStatisticsSlaSummary>>, TError = string>(
  unitId: string,
     params: GetUnitStatisticsSlaSummaryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSlaSummary>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
@@ -2326,18 +2498,53 @@ export type getUnitStatisticsSurveyScoresResponse200 = {
   status: 200
 }
 
+export type getUnitStatisticsSurveyScoresResponse400 = {
+  data: string
+  status: 400
+}
+
+export type getUnitStatisticsSurveyScoresResponse401 = {
+  data: string
+  status: 401
+}
+
+export type getUnitStatisticsSurveyScoresResponse403 = {
+  data: string
+  status: 403
+}
+
+export type getUnitStatisticsSurveyScoresResponse404 = {
+  data: string
+  status: 404
+}
+
+export type getUnitStatisticsSurveyScoresResponse500 = {
+  data: string
+  status: 500
+}
+
 export type getUnitStatisticsSurveyScoresResponseSuccess = (getUnitStatisticsSurveyScoresResponse200) & {
   headers: Headers;
 };
-;
+export type getUnitStatisticsSurveyScoresResponseError = (getUnitStatisticsSurveyScoresResponse400 | getUnitStatisticsSurveyScoresResponse401 | getUnitStatisticsSurveyScoresResponse403 | getUnitStatisticsSurveyScoresResponse404 | getUnitStatisticsSurveyScoresResponse500) & {
+  headers: Headers;
+};
 
-export type getUnitStatisticsSurveyScoresResponse = (getUnitStatisticsSurveyScoresResponseSuccess)
+export type getUnitStatisticsSurveyScoresResponse = (getUnitStatisticsSurveyScoresResponseSuccess | getUnitStatisticsSurveyScoresResponseError)
 
 export const getGetUnitStatisticsSurveyScoresUrl = (unitId: string,
     params: GetUnitStatisticsSurveyScoresParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
+    const explodeParameters = ["questionIds"];
+
+    if (Array.isArray(value) && explodeParameters.includes(key)) {
+      value.forEach((v) => {
+        normalizedParams.append(key, v === null ? 'null' : v.toString());
+      });
+      return;
+    }
 
     if (value !== undefined) {
       normalizedParams.append(key, value === null ? 'null' : value.toString())
@@ -2373,7 +2580,7 @@ export const getGetUnitStatisticsSurveyScoresQueryKey = (unitId: string,
     }
 
 
-export const getGetUnitStatisticsSurveyScoresQueryOptions = <TData = Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>, TError = unknown>(unitId: string,
+export const getGetUnitStatisticsSurveyScoresQueryOptions = <TData = Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>, TError = string>(unitId: string,
     params: GetUnitStatisticsSurveyScoresParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
 ) => {
 
@@ -2393,10 +2600,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetUnitStatisticsSurveyScoresQueryResult = NonNullable<Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>>
-export type GetUnitStatisticsSurveyScoresQueryError = unknown
+export type GetUnitStatisticsSurveyScoresQueryError = string
 
 
-export function useGetUnitStatisticsSurveyScores<TData = Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>, TError = unknown>(
+export function useGetUnitStatisticsSurveyScores<TData = Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>, TError = string>(
  unitId: string,
     params: GetUnitStatisticsSurveyScoresParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -2407,7 +2614,7 @@ export function useGetUnitStatisticsSurveyScores<TData = Awaited<ReturnType<type
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitStatisticsSurveyScores<TData = Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>, TError = unknown>(
+export function useGetUnitStatisticsSurveyScores<TData = Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>, TError = string>(
  unitId: string,
     params: GetUnitStatisticsSurveyScoresParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -2418,7 +2625,7 @@ export function useGetUnitStatisticsSurveyScores<TData = Awaited<ReturnType<type
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitStatisticsSurveyScores<TData = Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>, TError = unknown>(
+export function useGetUnitStatisticsSurveyScores<TData = Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>, TError = string>(
  unitId: string,
     params: GetUnitStatisticsSurveyScoresParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
@@ -2427,7 +2634,7 @@ export function useGetUnitStatisticsSurveyScores<TData = Awaited<ReturnType<type
  * @summary Guest survey score timeseries (live from responses; hourly for a single day, daily for longer ranges)
  */
 
-export function useGetUnitStatisticsSurveyScores<TData = Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>, TError = unknown>(
+export function useGetUnitStatisticsSurveyScores<TData = Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>, TError = string>(
  unitId: string,
     params: GetUnitStatisticsSurveyScoresParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
@@ -2454,12 +2661,39 @@ export type getUnitStatisticsTicketsByServiceResponse200 = {
   status: 200
 }
 
+export type getUnitStatisticsTicketsByServiceResponse400 = {
+  data: string
+  status: 400
+}
+
+export type getUnitStatisticsTicketsByServiceResponse401 = {
+  data: string
+  status: 401
+}
+
+export type getUnitStatisticsTicketsByServiceResponse403 = {
+  data: string
+  status: 403
+}
+
+export type getUnitStatisticsTicketsByServiceResponse404 = {
+  data: string
+  status: 404
+}
+
+export type getUnitStatisticsTicketsByServiceResponse500 = {
+  data: string
+  status: 500
+}
+
 export type getUnitStatisticsTicketsByServiceResponseSuccess = (getUnitStatisticsTicketsByServiceResponse200) & {
   headers: Headers;
 };
-;
+export type getUnitStatisticsTicketsByServiceResponseError = (getUnitStatisticsTicketsByServiceResponse400 | getUnitStatisticsTicketsByServiceResponse401 | getUnitStatisticsTicketsByServiceResponse403 | getUnitStatisticsTicketsByServiceResponse404 | getUnitStatisticsTicketsByServiceResponse500) & {
+  headers: Headers;
+};
 
-export type getUnitStatisticsTicketsByServiceResponse = (getUnitStatisticsTicketsByServiceResponseSuccess)
+export type getUnitStatisticsTicketsByServiceResponse = (getUnitStatisticsTicketsByServiceResponseSuccess | getUnitStatisticsTicketsByServiceResponseError)
 
 export const getGetUnitStatisticsTicketsByServiceUrl = (unitId: string,
     params: GetUnitStatisticsTicketsByServiceParams,) => {
@@ -2501,7 +2735,7 @@ export const getGetUnitStatisticsTicketsByServiceQueryKey = (unitId: string,
     }
 
 
-export const getGetUnitStatisticsTicketsByServiceQueryOptions = <TData = Awaited<ReturnType<typeof getUnitStatisticsTicketsByService>>, TError = unknown>(unitId: string,
+export const getGetUnitStatisticsTicketsByServiceQueryOptions = <TData = Awaited<ReturnType<typeof getUnitStatisticsTicketsByService>>, TError = string>(unitId: string,
     params: GetUnitStatisticsTicketsByServiceParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsTicketsByService>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
 ) => {
 
@@ -2521,10 +2755,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetUnitStatisticsTicketsByServiceQueryResult = NonNullable<Awaited<ReturnType<typeof getUnitStatisticsTicketsByService>>>
-export type GetUnitStatisticsTicketsByServiceQueryError = unknown
+export type GetUnitStatisticsTicketsByServiceQueryError = string
 
 
-export function useGetUnitStatisticsTicketsByService<TData = Awaited<ReturnType<typeof getUnitStatisticsTicketsByService>>, TError = unknown>(
+export function useGetUnitStatisticsTicketsByService<TData = Awaited<ReturnType<typeof getUnitStatisticsTicketsByService>>, TError = string>(
  unitId: string,
     params: GetUnitStatisticsTicketsByServiceParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsTicketsByService>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -2535,7 +2769,7 @@ export function useGetUnitStatisticsTicketsByService<TData = Awaited<ReturnType<
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitStatisticsTicketsByService<TData = Awaited<ReturnType<typeof getUnitStatisticsTicketsByService>>, TError = unknown>(
+export function useGetUnitStatisticsTicketsByService<TData = Awaited<ReturnType<typeof getUnitStatisticsTicketsByService>>, TError = string>(
  unitId: string,
     params: GetUnitStatisticsTicketsByServiceParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsTicketsByService>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -2546,7 +2780,7 @@ export function useGetUnitStatisticsTicketsByService<TData = Awaited<ReturnType<
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitStatisticsTicketsByService<TData = Awaited<ReturnType<typeof getUnitStatisticsTicketsByService>>, TError = unknown>(
+export function useGetUnitStatisticsTicketsByService<TData = Awaited<ReturnType<typeof getUnitStatisticsTicketsByService>>, TError = string>(
  unitId: string,
     params: GetUnitStatisticsTicketsByServiceParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsTicketsByService>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
@@ -2555,7 +2789,7 @@ export function useGetUnitStatisticsTicketsByService<TData = Awaited<ReturnType<
  * @summary Tickets created in range grouped by business service (donut chart)
  */
 
-export function useGetUnitStatisticsTicketsByService<TData = Awaited<ReturnType<typeof getUnitStatisticsTicketsByService>>, TError = unknown>(
+export function useGetUnitStatisticsTicketsByService<TData = Awaited<ReturnType<typeof getUnitStatisticsTicketsByService>>, TError = string>(
  unitId: string,
     params: GetUnitStatisticsTicketsByServiceParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsTicketsByService>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
@@ -2584,6 +2818,11 @@ export type getUnitStatisticsTimeseriesResponse200 = {
   status: 200
 }
 
+export type getUnitStatisticsTimeseriesResponse400 = {
+  data: string
+  status: 400
+}
+
 export type getUnitStatisticsTimeseriesResponse401 = {
   data: string
   status: 401
@@ -2594,10 +2833,20 @@ export type getUnitStatisticsTimeseriesResponse403 = {
   status: 403
 }
 
+export type getUnitStatisticsTimeseriesResponse404 = {
+  data: string
+  status: 404
+}
+
+export type getUnitStatisticsTimeseriesResponse500 = {
+  data: string
+  status: 500
+}
+
 export type getUnitStatisticsTimeseriesResponseSuccess = (getUnitStatisticsTimeseriesResponse200) & {
   headers: Headers;
 };
-export type getUnitStatisticsTimeseriesResponseError = (getUnitStatisticsTimeseriesResponse401 | getUnitStatisticsTimeseriesResponse403) & {
+export type getUnitStatisticsTimeseriesResponseError = (getUnitStatisticsTimeseriesResponse400 | getUnitStatisticsTimeseriesResponse401 | getUnitStatisticsTimeseriesResponse403 | getUnitStatisticsTimeseriesResponse404 | getUnitStatisticsTimeseriesResponse500) & {
   headers: Headers;
 };
 
@@ -2724,12 +2973,39 @@ export type getUnitStatisticsUtilizationResponse200 = {
   status: 200
 }
 
+export type getUnitStatisticsUtilizationResponse400 = {
+  data: string
+  status: 400
+}
+
+export type getUnitStatisticsUtilizationResponse401 = {
+  data: string
+  status: 401
+}
+
+export type getUnitStatisticsUtilizationResponse403 = {
+  data: string
+  status: 403
+}
+
+export type getUnitStatisticsUtilizationResponse404 = {
+  data: string
+  status: 404
+}
+
+export type getUnitStatisticsUtilizationResponse500 = {
+  data: string
+  status: 500
+}
+
 export type getUnitStatisticsUtilizationResponseSuccess = (getUnitStatisticsUtilizationResponse200) & {
   headers: Headers;
 };
-;
+export type getUnitStatisticsUtilizationResponseError = (getUnitStatisticsUtilizationResponse400 | getUnitStatisticsUtilizationResponse401 | getUnitStatisticsUtilizationResponse403 | getUnitStatisticsUtilizationResponse404 | getUnitStatisticsUtilizationResponse500) & {
+  headers: Headers;
+};
 
-export type getUnitStatisticsUtilizationResponse = (getUnitStatisticsUtilizationResponseSuccess)
+export type getUnitStatisticsUtilizationResponse = (getUnitStatisticsUtilizationResponseSuccess | getUnitStatisticsUtilizationResponseError)
 
 export const getGetUnitStatisticsUtilizationUrl = (unitId: string,
     params: GetUnitStatisticsUtilizationParams,) => {
@@ -2771,7 +3047,7 @@ export const getGetUnitStatisticsUtilizationQueryKey = (unitId: string,
     }
 
 
-export const getGetUnitStatisticsUtilizationQueryOptions = <TData = Awaited<ReturnType<typeof getUnitStatisticsUtilization>>, TError = unknown>(unitId: string,
+export const getGetUnitStatisticsUtilizationQueryOptions = <TData = Awaited<ReturnType<typeof getUnitStatisticsUtilization>>, TError = string>(unitId: string,
     params: GetUnitStatisticsUtilizationParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsUtilization>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
 ) => {
 
@@ -2791,10 +3067,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetUnitStatisticsUtilizationQueryResult = NonNullable<Awaited<ReturnType<typeof getUnitStatisticsUtilization>>>
-export type GetUnitStatisticsUtilizationQueryError = unknown
+export type GetUnitStatisticsUtilizationQueryError = string
 
 
-export function useGetUnitStatisticsUtilization<TData = Awaited<ReturnType<typeof getUnitStatisticsUtilization>>, TError = unknown>(
+export function useGetUnitStatisticsUtilization<TData = Awaited<ReturnType<typeof getUnitStatisticsUtilization>>, TError = string>(
  unitId: string,
     params: GetUnitStatisticsUtilizationParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsUtilization>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -2805,7 +3081,7 @@ export function useGetUnitStatisticsUtilization<TData = Awaited<ReturnType<typeo
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitStatisticsUtilization<TData = Awaited<ReturnType<typeof getUnitStatisticsUtilization>>, TError = unknown>(
+export function useGetUnitStatisticsUtilization<TData = Awaited<ReturnType<typeof getUnitStatisticsUtilization>>, TError = string>(
  unitId: string,
     params: GetUnitStatisticsUtilizationParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsUtilization>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -2816,7 +3092,7 @@ export function useGetUnitStatisticsUtilization<TData = Awaited<ReturnType<typeo
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitStatisticsUtilization<TData = Awaited<ReturnType<typeof getUnitStatisticsUtilization>>, TError = unknown>(
+export function useGetUnitStatisticsUtilization<TData = Awaited<ReturnType<typeof getUnitStatisticsUtilization>>, TError = string>(
  unitId: string,
     params: GetUnitStatisticsUtilizationParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsUtilization>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
@@ -2825,7 +3101,7 @@ export function useGetUnitStatisticsUtilization<TData = Awaited<ReturnType<typeo
  * @summary Per-operator utilization (serving vs idle/break), calendar days in subdivision TZ
  */
 
-export function useGetUnitStatisticsUtilization<TData = Awaited<ReturnType<typeof getUnitStatisticsUtilization>>, TError = unknown>(
+export function useGetUnitStatisticsUtilization<TData = Awaited<ReturnType<typeof getUnitStatisticsUtilization>>, TError = string>(
  unitId: string,
     params: GetUnitStatisticsUtilizationParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsUtilization>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient

@@ -234,7 +234,11 @@ func (h *CounterHandler) Occupy(w http.ResponseWriter, r *http.Request) {
 	if h.operational != nil && h.counterRepo != nil {
 		c, err := h.counterRepo.FindByID(id)
 		if err != nil {
-			log.Printf("counter Occupy: operational pre-check FindByID(counterId=%q) err=%v", id, err)
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				log.Printf("counter Occupy: operational pre-check FindByID(counterId=%q) err=%v", id, err)
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
 		}
 		if err == nil && c != nil {
 			blocked, opErr := h.operational.IsCounterLoginBlocked(c.UnitID)

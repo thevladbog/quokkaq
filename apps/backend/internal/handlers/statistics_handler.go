@@ -74,8 +74,11 @@ func (h *StatisticsHandler) subdivisionCompanyID(ctx context.Context, subdivisio
 // @Param        userId query string false "Filter by operator (expanded scope only)"
 // @Param        serviceZoneId query string false "Service zone unit id (child of subdivision); omit for allowed scope default"
 // @Success      200 {object} services.TimeseriesResponse
+// @Failure      400 {string} string "Bad Request (dates, service zone, or conflicting filters)"
 // @Failure      401 {string} string "Unauthorized"
-// @Failure      403 {string} string "Forbidden"
+// @Failure      403 {string} string "Forbidden (scope, plan, or zone access)"
+// @Failure      404 {string} string "Unit not found"
+// @Failure      500 {string} string "Internal server error"
 // @Router       /units/{unitId}/statistics/timeseries [get]
 func (h *StatisticsHandler) GetTimeseries(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
@@ -111,23 +114,29 @@ func (h *StatisticsHandler) GetTimeseries(w http.ResponseWriter, r *http.Request
 	svcZone := strings.TrimSpace(r.URL.Query().Get("serviceZoneId"))
 	resp, err := h.service.GetTimeseries(r.Context(), unitID, companyID, user, viewerID, dateFrom, dateTo, metric, reqUser, svcZone)
 	if err != nil {
-		if strings.Contains(err.Error(), "plan does not include") {
-			http.Error(w, err.Error(), http.StatusForbidden)
+		msg := err.Error()
+		low := strings.ToLower(msg)
+		if strings.Contains(msg, "plan does not include") {
+			http.Error(w, msg, http.StatusForbidden)
 			return
 		}
-		if strings.Contains(err.Error(), "forbidden service zone") {
-			http.Error(w, err.Error(), http.StatusForbidden)
+		if strings.Contains(low, "servicezoneid cannot be used with userid filter") {
+			http.Error(w, msg, http.StatusBadRequest)
 			return
 		}
-		if strings.Contains(err.Error(), "service zone not under subdivision") {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+		if strings.Contains(low, "forbidden") {
+			http.Error(w, msg, http.StatusForbidden)
 			return
 		}
-		if strings.Contains(err.Error(), "invalid date") || strings.Contains(err.Error(), "dateTo before") {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+		if strings.Contains(msg, "service zone not under subdivision") {
+			http.Error(w, msg, http.StatusBadRequest)
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		if strings.Contains(msg, "invalid date") || strings.Contains(msg, "dateTo before") {
+			http.Error(w, msg, http.StatusBadRequest)
+			return
+		}
+		http.Error(w, msg, http.StatusInternalServerError)
 		return
 	}
 	RespondJSON(w, resp)
@@ -145,6 +154,11 @@ func (h *StatisticsHandler) GetTimeseries(w http.ResponseWriter, r *http.Request
 // @Param        userId query string false "Filter by operator (expanded scope only)"
 // @Param        serviceZoneId query string false "Service zone unit id (child of subdivision)"
 // @Success      200 {object} services.SLADeviationsResponse
+// @Failure      400 {string} string "Bad Request (missing or invalid query params)"
+// @Failure      401 {string} string "Unauthorized"
+// @Failure      403 {string} string "Forbidden (missing statistics access or plan)"
+// @Failure      404 {string} string "Unit not found"
+// @Failure      500 {string} string "Internal server error"
 // @Router       /units/{unitId}/statistics/sla-deviations [get]
 func (h *StatisticsHandler) GetSLADeviations(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
@@ -207,8 +221,13 @@ func (h *StatisticsHandler) GetSLADeviations(w http.ResponseWriter, r *http.Requ
 // @Param        dateFrom query string true "YYYY-MM-DD"
 // @Param        dateTo query string true "YYYY-MM-DD"
 // @Param        surveyId query string false "Single survey definition id (required with questionIds)"
-// @Param        questionIds query []string false "Question ids (repeat param or comma-separated); native scale"
+// @Param        questionIds query []string false "Question ids (repeat query param or comma-separated); native scale" collectionFormat(multi)
 // @Success      200 {object} services.SurveyScoresResponse
+// @Failure      400 {string} string "Bad Request (missing or invalid query params)"
+// @Failure      401 {string} string "Unauthorized"
+// @Failure      403 {string} string "Forbidden (missing survey score statistics access or plan)"
+// @Failure      404 {string} string "Unit not found"
+// @Failure      500 {string} string "Internal server error"
 // @Router       /units/{unitId}/statistics/survey-scores [get]
 func (h *StatisticsHandler) GetSurveyScores(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
@@ -274,6 +293,11 @@ func (h *StatisticsHandler) GetSurveyScores(w http.ResponseWriter, r *http.Reque
 // @Param        userId query string false "Filter by operator (expanded scope only)"
 // @Param        serviceZoneId query string false "Service zone unit id"
 // @Success      200 {object} services.LoadResponse
+// @Failure      400 {string} string "Bad Request (missing or invalid query params)"
+// @Failure      401 {string} string "Unauthorized"
+// @Failure      403 {string} string "Forbidden (missing statistics access or plan)"
+// @Failure      404 {string} string "Unit not found"
+// @Failure      500 {string} string "Internal server error"
 // @Router       /units/{unitId}/statistics/load [get]
 func (h *StatisticsHandler) GetLoad(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
@@ -337,6 +361,11 @@ func (h *StatisticsHandler) GetLoad(w http.ResponseWriter, r *http.Request) {
 // @Param        dateTo query string true "YYYY-MM-DD"
 // @Param        userId query string true "Target operator user id"
 // @Success      200 {object} services.UtilizationResponse
+// @Failure      400 {string} string "Bad Request (missing or invalid query params)"
+// @Failure      401 {string} string "Unauthorized"
+// @Failure      403 {string} string "Forbidden (missing statistics access or plan)"
+// @Failure      404 {string} string "Unit not found"
+// @Failure      500 {string} string "Internal server error"
 // @Router       /units/{unitId}/statistics/utilization [get]
 func (h *StatisticsHandler) GetUtilization(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
@@ -397,6 +426,11 @@ func (h *StatisticsHandler) GetUtilization(w http.ResponseWriter, r *http.Reques
 // @Param        userId query string false "Filter by operator (expanded scope only)"
 // @Param        serviceZoneId query string false "Service zone unit id"
 // @Success      200 {object} services.TicketsByServiceResponse
+// @Failure      400 {string} string "Bad Request (missing or invalid query params)"
+// @Failure      401 {string} string "Unauthorized"
+// @Failure      403 {string} string "Forbidden (missing statistics access or plan)"
+// @Failure      404 {string} string "Unit not found"
+// @Failure      500 {string} string "Internal server error"
 // @Router       /units/{unitId}/statistics/tickets-by-service [get]
 func (h *StatisticsHandler) GetTicketsByService(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
@@ -462,6 +496,11 @@ func (h *StatisticsHandler) GetTicketsByService(w http.ResponseWriter, r *http.R
 // @Param        serviceZoneId query string false "Service zone unit id"
 // @Param        serviceId query string false "Business service id; omit for all services in scope"
 // @Success      200 {object} services.SlaSummaryResponse
+// @Failure      400 {string} string "Bad Request (missing or invalid query params)"
+// @Failure      401 {string} string "Unauthorized"
+// @Failure      403 {string} string "Forbidden (missing statistics access or plan)"
+// @Failure      404 {string} string "Unit not found"
+// @Failure      500 {string} string "Internal server error"
 // @Router       /units/{unitId}/statistics/sla-summary [get]
 func (h *StatisticsHandler) GetSlaSummary(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
@@ -528,6 +567,11 @@ func (h *StatisticsHandler) GetSlaSummary(w http.ResponseWriter, r *http.Request
 // @Param        unitId path string true "Subdivision unit ID"
 // @Param        userId query string true "Target user id"
 // @Success      200 {object} services.EmployeeRadarResponse
+// @Failure      400 {string} string "Bad Request (missing or invalid query params)"
+// @Failure      401 {string} string "Unauthorized"
+// @Failure      403 {string} string "Forbidden (missing statistics access or plan)"
+// @Failure      404 {string} string "Unit not found"
+// @Failure      500 {string} string "Internal server error"
 // @Router       /units/{unitId}/statistics/employee-radar [get]
 func (h *StatisticsHandler) GetEmployeeRadar(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")

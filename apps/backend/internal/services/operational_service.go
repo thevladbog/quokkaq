@@ -143,7 +143,11 @@ func (s *OperationalService) WakeStatisticsIfQuiet(unitID string) {
 
 // BeginEODFreeze sets admission locks before EOD transaction.
 func (s *OperationalService) BeginEODFreeze(subdivisionID string) error {
-	st, err := s.getOperationalStateForRead(subdivisionID)
+	subID, err := s.ResolveSubdivisionForOperationalState(subdivisionID)
+	if err != nil {
+		return err
+	}
+	st, err := s.getOperationalStateForRead(subID)
 	if err != nil {
 		return err
 	}
@@ -155,7 +159,11 @@ func (s *OperationalService) BeginEODFreeze(subdivisionID string) error {
 
 // AbortEODFreeze clears locks after failed EOD.
 func (s *OperationalService) AbortEODFreeze(subdivisionID string) {
-	st, err := s.getOperationalStateForRead(subdivisionID)
+	subID, err := s.ResolveSubdivisionForOperationalState(subdivisionID)
+	if err != nil {
+		return
+	}
+	st, err := s.getOperationalStateForRead(subID)
 	if err != nil {
 		return
 	}
@@ -170,13 +178,18 @@ func (s *OperationalService) AbortEODFreeze(subdivisionID string) {
 // It rolls up yesterday and today in local time: EOD finalization sets completed_at to "now", which falls on
 // today's bucket; yesterday covers late updates to the previous calendar day (same as RefreshRecentDays).
 func (s *OperationalService) CompleteEODPipeline(subdivisionID string) {
-	claimMu := s.eodClaimMutex(subdivisionID)
+	subID, resErr := s.ResolveSubdivisionForOperationalState(subdivisionID)
+	if resErr != nil {
+		log.Printf("eod pipeline: resolve subdivision %s: %v", subdivisionID, resErr)
+		return
+	}
+	claimMu := s.eodClaimMutex(subID)
 	claimMu.Lock()
-	st, err := s.getOperationalStateForRead(subdivisionID)
+	st, err := s.getOperationalStateForRead(subID)
 	if err != nil {
 		claimMu.Unlock()
-		log.Printf("eod pipeline: get state %s: %v", subdivisionID, err)
-		s.AbortEODFreeze(subdivisionID)
+		log.Printf("eod pipeline: get state %s: %v", subID, err)
+		s.AbortEODFreeze(subID)
 		return
 	}
 	if st.ReconcileInProgress {
@@ -191,23 +204,17 @@ func (s *OperationalService) CompleteEODPipeline(subdivisionID string) {
 	if err := s.opRepo.Upsert(st); err != nil {
 		claimMu.Unlock()
 		log.Printf("eod pipeline: begin reconcile %s: %v", subdivisionID, err)
-		s.AbortEODFreeze(subdivisionID)
+		s.AbortEODFreeze(subID)
 		return
 	}
 	claimMu.Unlock()
 
 	go func() {
 		var rollupErr error
-		u, err := s.unitRepo.FindByIDLight(subdivisionID)
+		u, err := s.unitRepo.FindByIDLight(subID)
 		if err != nil {
-			log.Printf("eod pipeline: unit %s: %v", subdivisionID, err)
-			s.AbortEODFreeze(subdivisionID)
-			return
-		}
-		subID, err := s.ResolveSubdivisionForOperationalState(subdivisionID)
-		if err != nil {
-			log.Printf("eod pipeline: resolve subdivision %s: %v", subdivisionID, err)
-			s.AbortEODFreeze(subdivisionID)
+			log.Printf("eod pipeline: unit %s: %v", subID, err)
+			s.AbortEODFreeze(subID)
 			return
 		}
 		loc, lerr := time.LoadLocation(strings.TrimSpace(u.Timezone))
@@ -218,7 +225,7 @@ func (s *OperationalService) CompleteEODPipeline(subdivisionID string) {
 		yesterday := nowLocal.AddDate(0, 0, -1).Format("2006-01-02")
 		today := nowLocal.Format("2006-01-02")
 
-		if stNote, gerr := s.getOperationalStateForRead(subdivisionID); gerr == nil {
+		if stNote, gerr := s.getOperationalStateForRead(subID); gerr == nil && stNote != nil {
 			stNote.ReconcileProgressNote = "rollup " + yesterday + "+" + today
 			_ = s.opRepo.Upsert(stNote)
 		}
@@ -228,7 +235,17 @@ func (s *OperationalService) CompleteEODPipeline(subdivisionID string) {
 				rollupErr = e
 			}
 		}
-		st2, _ := s.getOperationalStateForRead(subdivisionID)
+		st2, rerr := s.getOperationalStateForRead(subID)
+		if rerr != nil {
+			log.Printf("eod pipeline: finalize read state %s: %v", subID, rerr)
+			s.AbortEODFreeze(subID)
+			return
+		}
+		if st2 == nil {
+			log.Printf("eod pipeline: finalize missing state row %s", subID)
+			s.AbortEODFreeze(subID)
+			return
+		}
 		st2.ReconcileInProgress = false
 		st2.KioskFrozen = false
 		st2.CounterLoginBlocked = false
@@ -263,12 +280,16 @@ type OperationsStatusDTO struct {
 }
 
 func (s *OperationalService) GetStatus(subdivisionID string) (*OperationsStatusDTO, error) {
-	st, err := s.getOperationalStateForRead(subdivisionID)
+	subID, err := s.ResolveSubdivisionForOperationalState(subdivisionID)
+	if err != nil {
+		return nil, err
+	}
+	st, err := s.getOperationalStateForRead(subID)
 	if err != nil {
 		return nil, err
 	}
 	return &OperationsStatusDTO{
-		UnitID:                subdivisionID,
+		UnitID:                subID,
 		Phase:                 st.Phase,
 		KioskFrozen:           st.KioskFrozen,
 		CounterLoginBlocked:   st.CounterLoginBlocked,
@@ -284,7 +305,11 @@ func (s *OperationalService) GetStatus(subdivisionID string) (*OperationsStatusD
 
 // EmergencyUnlockAll clears admission and reconcile flags (admin override).
 func (s *OperationalService) EmergencyUnlockAll(subdivisionID string) error {
-	st, err := s.getOperationalStateForRead(subdivisionID)
+	subID, err := s.ResolveSubdivisionForOperationalState(subdivisionID)
+	if err != nil {
+		return err
+	}
+	st, err := s.getOperationalStateForRead(subID)
 	if err != nil {
 		return err
 	}
@@ -299,7 +324,11 @@ func (s *OperationalService) EmergencyUnlockAll(subdivisionID string) error {
 }
 
 func (s *OperationalService) ClearStatisticsQuiet(subdivisionID string) error {
-	st, err := s.getOperationalStateForRead(subdivisionID)
+	subID, err := s.ResolveSubdivisionForOperationalState(subdivisionID)
+	if err != nil {
+		return err
+	}
+	st, err := s.getOperationalStateForRead(subID)
 	if err != nil {
 		return err
 	}

@@ -102,14 +102,18 @@ func (s *StatisticsService) GetTicketsByService(
 	requestedUserID *string,
 	requestedServiceZoneID string,
 ) (*TicketsByServiceResponse, error) {
-	ok, err := CompanyAllowsBasicReports(ctx, companyID)
+	ok, err := CompanyAllowsBasicReports(ctx, s.db, companyID)
 	if err != nil {
 		return nil, err
 	}
 	if !ok {
 		return nil, errors.New("plan does not include basic reports")
 	}
-	sc := statistics.ResolveScope(user, subdivisionID, viewerID)
+	branchIDs, err := s.statisticsBranchUnitIDs(ctx, subdivisionID)
+	if err != nil {
+		return nil, err
+	}
+	sc := statistics.ResolveScope(user, subdivisionID, viewerID, branchIDs)
 	if sc.Denied {
 		return nil, errors.New("forbidden")
 	}
@@ -184,14 +188,18 @@ func (s *StatisticsService) GetSlaSummary(
 	requestedServiceZoneID string,
 	filterServiceID string,
 ) (*SlaSummaryResponse, error) {
-	ok, err := CompanyAllowsBasicReports(ctx, companyID)
+	ok, err := CompanyAllowsBasicReports(ctx, s.db, companyID)
 	if err != nil {
 		return nil, err
 	}
 	if !ok {
 		return nil, errors.New("plan does not include basic reports")
 	}
-	sc := statistics.ResolveScope(user, subdivisionID, viewerID)
+	branchIDs, err := s.statisticsBranchUnitIDs(ctx, subdivisionID)
+	if err != nil {
+		return nil, err
+	}
+	sc := statistics.ResolveScope(user, subdivisionID, viewerID, branchIDs)
 	if sc.Denied {
 		return nil, errors.New("forbidden")
 	}

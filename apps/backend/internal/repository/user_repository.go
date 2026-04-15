@@ -230,7 +230,7 @@ func (r *userRepository) IsAdminOrHasUnitAccess(userID, unitID string) (bool, er
 		return false, err
 	}
 	for _, ur := range user.Roles {
-		if ur.Role.Name == "admin" {
+		if ur.Role.Name == "admin" || ur.Role.Name == "platform_admin" {
 			return true, nil
 		}
 	}

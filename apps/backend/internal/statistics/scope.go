@@ -24,7 +24,9 @@ type Scope struct {
 }
 
 // ResolveScope computes statistics access for subdivisionID (branch), mirroring shift journal role bypass.
-func ResolveScope(user *models.User, subdivisionID string, viewerUserID string) Scope {
+// When branchUnitIDs is non-nil, ACCESS_STATISTICS_ZONE grants on user_units rows are kept only if uu.UnitID is in that set
+// (subdivision root and descendants), so zone-only access from other branches does not expand the requested branch.
+func ResolveScope(user *models.User, subdivisionID string, viewerUserID string, branchUnitIDs map[string]struct{}) Scope {
 	viewer := strings.TrimSpace(viewerUserID)
 	if user == nil || subdivisionID == "" {
 		if viewer == "" {
@@ -65,7 +67,30 @@ func ResolveScope(user *models.User, subdivisionID string, viewerUserID string) 
 			if uu.UnitID == subdivisionID {
 				continue
 			}
+			if branchUnitIDs != nil {
+				if _, ok := branchUnitIDs[uu.UnitID]; !ok {
+					continue
+				}
+			}
 			zones[uu.UnitID] = struct{}{}
+		}
+	}
+
+	hasBranchAffiliation := false
+	if branchUnitIDs == nil {
+		// Callers that omit the branch set keep legacy behaviour (avoid denying self-scope
+		// when we cannot map user_units rows to the subdivision tree).
+		hasBranchAffiliation = true
+	} else {
+		for _, uu := range user.Units {
+			if uu.UnitID == subdivisionID {
+				hasBranchAffiliation = true
+				break
+			}
+			if _, ok := branchUnitIDs[uu.UnitID]; ok {
+				hasBranchAffiliation = true
+				break
+			}
 		}
 	}
 
@@ -81,7 +106,10 @@ func ResolveScope(user *models.User, subdivisionID string, viewerUserID string) 
 		return out
 	}
 
-	if !out.Expanded && strings.TrimSpace(out.ForceUserID) == "" {
+	if !hasBranchAffiliation {
+		return Scope{Denied: true}
+	}
+	if strings.TrimSpace(out.ForceUserID) == "" {
 		return Scope{Denied: true}
 	}
 	return out

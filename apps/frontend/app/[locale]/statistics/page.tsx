@@ -1,6 +1,12 @@
 'use client';
 
-import { useMemo, useState, type ReactNode } from 'react';
+import {
+  useMemo,
+  useState,
+  type ComponentProps,
+  type ComponentType,
+  type ReactNode
+} from 'react';
 import { useQueries } from '@tanstack/react-query';
 import {
   Area,
@@ -23,7 +29,6 @@ import {
   RadialBarChart,
   Sector
 } from 'recharts';
-import type { PieSectorDataItem, PieSectorShapeProps } from 'recharts';
 import { formatInTimeZone } from 'date-fns-tz';
 import { enUS, ru } from 'date-fns/locale';
 import { useLocale, useTranslations } from 'next-intl';
@@ -100,6 +105,26 @@ function defaultDateRange(timezone?: string | null) {
   return { from: today, to: today };
 }
 
+/** Props passed to Recharts <Pie shape={…}> (not exported from recharts types in all versions). */
+type StatisticsPieSectorProps = {
+  cx?: number;
+  cy?: number;
+  innerRadius?: number;
+  outerRadius?: number;
+  startAngle?: number;
+  endAngle?: number;
+  fill?: string;
+  cornerRadius?: number;
+  index?: number;
+  isActive?: boolean;
+};
+
+const PieWithSectorShape = Pie as ComponentType<
+  ComponentProps<typeof Pie> & {
+    shape?: (props: StatisticsPieSectorProps) => React.ReactNode;
+  }
+>;
+
 function flattenLeafServices(services: ModelsService[]): ModelsService[] {
   const out: ModelsService[] = [];
   for (const s of services) {
@@ -113,7 +138,7 @@ function flattenLeafServices(services: ModelsService[]): ModelsService[] {
   return out;
 }
 
-function StatisticsDonutActiveShape(props: PieSectorDataItem) {
+function StatisticsDonutActiveShape(props: StatisticsPieSectorProps) {
   const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } =
     props;
   return (
@@ -265,7 +290,9 @@ export default function StatisticsPage() {
   const t = useTranslations('statistics');
   const { activeUnitId, assignableUnitIds } = useActiveUnit();
   const { user } = useAuthContext();
-  const [{ from, to }, setRange] = useState(() => defaultDateRange('UTC'));
+  const [{ from, to }, setRange] = useState<{ from: string; to?: string }>(() =>
+    defaultDateRange('UTC')
+  );
   const [manualSubdivisionId, setManualSubdivisionId] = useState<string | null>(
     null
   );
@@ -486,13 +513,16 @@ export default function StatisticsPage() {
     [filterUserId, user?.id]
   );
 
-  const statsEnabled = Boolean(statsSubdivisionId);
+  const rangeComplete = Boolean(to?.trim());
+  const dateToForApi =
+    rangeComplete && to != null && to.trim() !== '' ? to.trim() : from;
+  const statsEnabled = Boolean(statsSubdivisionId && rangeComplete);
 
   const tsQuery = useGetUnitStatisticsTimeseries(
     statsSubdivisionId,
     {
       dateFrom: from,
-      dateTo: to,
+      dateTo: dateToForApi,
       metric: 'wait_time',
       userId: userIdParam,
       serviceZoneId: serviceZoneParam
@@ -504,7 +534,7 @@ export default function StatisticsPage() {
     statsSubdivisionId,
     {
       dateFrom: from,
-      dateTo: to,
+      dateTo: dateToForApi,
       userId: userIdParam,
       serviceZoneId: serviceZoneParam
     },
@@ -515,7 +545,7 @@ export default function StatisticsPage() {
     statsSubdivisionId,
     {
       dateFrom: from,
-      dateTo: to,
+      dateTo: dateToForApi,
       userId: userIdParam,
       serviceZoneId: serviceZoneParam
     },
@@ -526,7 +556,7 @@ export default function StatisticsPage() {
     statsSubdivisionId,
     {
       dateFrom: from,
-      dateTo: to,
+      dateTo: dateToForApi,
       userId: userIdParam,
       serviceZoneId: serviceZoneParam
     },
@@ -538,7 +568,7 @@ export default function StatisticsPage() {
     statsSubdivisionId,
     {
       dateFrom: from,
-      dateTo: to,
+      dateTo: dateToForApi,
       userId: userIdParam,
       serviceZoneId: serviceZoneParam,
       serviceId: slaSummaryServiceId.trim() || undefined
@@ -577,7 +607,7 @@ export default function StatisticsPage() {
     statsSubdivisionId,
     {
       dateFrom: from,
-      dateTo: to,
+      dateTo: dateToForApi,
       surveyId: surveyDefinitionId.trim() || undefined,
       questionIds:
         surveyDefinitionId.trim() && surveyQuestionId.trim()
@@ -606,7 +636,7 @@ export default function StatisticsPage() {
     statsSubdivisionId,
     {
       dateFrom: from,
-      dateTo: to,
+      dateTo: dateToForApi,
       userId: utilizationOperatorId
     },
     {
@@ -972,7 +1002,11 @@ export default function StatisticsPage() {
     return idx >= 0 ? idx : undefined;
   }, [donutSelectionResolved, ticketsPieSlices]);
 
-  const ticketsDonutTotal = ticketsByServiceQuery.data?.data?.total ?? 0;
+  const ticketsByServiceBody =
+    ticketsByServiceQuery.data?.status === 200
+      ? ticketsByServiceQuery.data.data
+      : undefined;
+  const ticketsDonutTotal = ticketsByServiceBody?.total ?? 0;
 
   const ticketsDonutCenterValue = useMemo(() => {
     if (donutSelectionResolved == null) return ticketsDonutTotal;
@@ -999,8 +1033,13 @@ export default function StatisticsPage() {
     ];
   }, [ticketsPieSlices, t]);
 
+  const slaSummaryBody =
+    slaSummaryQuery.data?.status === 200
+      ? slaSummaryQuery.data.data
+      : undefined;
+
   const radialSlaRow = useMemo(() => {
-    const d = slaSummaryQuery.data?.data;
+    const d = slaSummaryBody;
     const met = d?.slaWaitMet ?? 0;
     const tot = d?.slaWaitTotal ?? 0;
     const within = d?.withinPct ?? 0;
@@ -1013,7 +1052,7 @@ export default function StatisticsPage() {
       tot,
       met
     };
-  }, [slaSummaryQuery.data?.data]);
+  }, [slaSummaryBody]);
 
   /** Stacked radial (shadcn-style): сначала «в цели», затем нарушение по дуге слева направо. */
   const slaRadialChartData = useMemo(
@@ -1126,7 +1165,8 @@ export default function StatisticsPage() {
                       setRange({ from: nextFrom, to: nextTo })
                     }
                     labels={{
-                      openCalendar: t('open_calendar')
+                      openCalendar: t('open_calendar'),
+                      rangeAwaitingEnd: t('date_range_awaiting_end')
                     }}
                     className='min-w-[min(100%,280px)]'
                   />
@@ -1255,7 +1295,7 @@ export default function StatisticsPage() {
                               />
                             )}
                           />
-                          <Pie
+                          <PieWithSectorShape
                             data={ticketsPieSlices}
                             dataKey='value'
                             nameKey='name'
@@ -1263,7 +1303,7 @@ export default function StatisticsPage() {
                             outerRadius='78%'
                             strokeWidth={2}
                             cursor='default'
-                            shape={(sectorProps: PieSectorShapeProps) => {
+                            shape={(sectorProps: StatisticsPieSectorProps) => {
                               const highlighted =
                                 donutActiveIndex !== undefined &&
                                 sectorProps.index === donutActiveIndex;
@@ -1303,7 +1343,7 @@ export default function StatisticsPage() {
                             {ticketsPieSlices.map((s) => (
                               <Cell key={s.serviceId} fill={s.fill} />
                             ))}
-                          </Pie>
+                          </PieWithSectorShape>
                         </PieChart>
                       </ChartContainer>
                       <div className='pointer-events-none absolute inset-0 flex flex-col items-center justify-center'>

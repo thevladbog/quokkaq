@@ -94,6 +94,7 @@
     "date_from": "From",
     "date_to": "To",
     "open_calendar": "Choose date or period",
+    "date_range_awaiting_end": "pick end date",
     "filter_subdivision": "Subdivision",
     "subdivision_placeholder": "Choose subdivision",
     "filter_user": "Operator (optional)",
@@ -192,7 +193,12 @@
     "action_clear_quiet": "Resume incremental statistics",
     "toast_unlock_ok": "Emergency unlock applied.",
     "toast_clear_quiet_ok": "Statistics quiet cleared.",
-    "toast_error": "Request failed: {message}"
+    "toast_error": "Request failed: {message}",
+    "unlock_confirm_title": "Emergency unlock",
+    "unlock_confirm_description": "This clears kiosk freeze, counter login blocks, and stuck reconcile flags for this subdivision. Type UNLOCK to confirm.",
+    "unlock_confirm_placeholder": "Type UNLOCK",
+    "unlock_confirm_submit": "Confirm unlock",
+    "unlock_confirm_cancel": "Cancel"
   },
   "home": {
     "title": "QuokkaQ",

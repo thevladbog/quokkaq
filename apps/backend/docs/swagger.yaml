@@ -530,12 +530,8 @@ components:
       - label
       type: object
     handlers.emergencyUnlockBody:
-      description: |
-        Request body for emergency unlock. Destructive admin action: clears kiosk admission freeze
-        and counter-login blocks for the subdivision (EOD recovery). confirm must be exactly UNLOCK.
       properties:
         confirm:
-          description: Must equal UNLOCK exactly to acknowledge the operation.
           enum:
           - UNLOCK
           example: UNLOCK
@@ -6847,9 +6843,7 @@ paths:
       - units
   /units/{unitId}/operations/clear-statistics-quiet:
     post:
-      description: |
-        Admin-only: clears the statistics quiet flag so incremental statistics processing resumes
-        for the subdivision. No request body.
+      description: 'Admin-only: clears the statistics quiet flag so incremental statistics processing resumes for the subdivision. No request body.'
       operationId: postUnitOperationsClearStatisticsQuiet
       parameters:
       - description: Subdivision unit ID
@@ -6861,6 +6855,30 @@ paths:
       responses:
         '204':
           description: No Content
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden (not tenant admin)
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unit not found
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal server error (clear failed or audit log failed)
       security:
       - BearerAuth: []
       summary: Resume incremental statistics processing
@@ -6868,9 +6886,7 @@ paths:
       - operations
   /units/{unitId}/operations/emergency-unlock:
     post:
-      description: |
-        Destructive admin operation: clears kiosk admission freeze and counter-login blocks for the
-        subdivision. JSON body required; confirm must equal UNLOCK exactly.
+      description: 'Destructive admin operation: clears kiosk admission freeze and counter-login blocks for the subdivision. JSON body required; confirm must equal UNLOCK exactly.'
       operationId: postUnitOperationsEmergencyUnlock
       parameters:
       - description: Subdivision unit ID
@@ -6884,13 +6900,42 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/handlers.emergencyUnlockBody'
-        description: |
-          JSON object with required confirm field. confirm must be exactly UNLOCK.
+        description: Required. Send confirm equal to UNLOCK.
         required: true
         x-originalParamName: body
       responses:
         '204':
           description: No Content
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad Request (confirm not UNLOCK or invalid JSON)
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden (not tenant admin)
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unit not found
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal server error (unlock failed or audit log failed)
       security:
       - BearerAuth: []
       summary: Emergency unlock kiosk and counter login
@@ -6913,6 +6958,30 @@ paths:
               schema:
                 $ref: '#/components/schemas/services.OperationsStatusDTO'
           description: OK
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden (not tenant admin)
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unit not found
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal server error
       security:
       - BearerAuth: []
       summary: Unit operations / EOD pipeline status
@@ -7885,6 +7954,36 @@ paths:
               schema:
                 $ref: '#/components/schemas/services.EmployeeRadarResponse'
           description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad Request (missing or invalid query params)
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden (missing statistics access or plan)
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unit not found
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal server error
       security:
       - BearerAuth: []
       summary: Employee radar chart metrics
@@ -7930,6 +8029,36 @@ paths:
               schema:
                 $ref: '#/components/schemas/services.LoadResponse'
           description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad Request (missing or invalid query params)
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden (missing statistics access or plan)
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unit not found
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal server error
       security:
       - BearerAuth: []
       summary: Daily ticket load (created / completed / no-show)
@@ -7975,6 +8104,36 @@ paths:
               schema:
                 $ref: '#/components/schemas/services.SLADeviationsResponse'
           description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad Request (missing or invalid query params)
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden (missing statistics access or plan)
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unit not found
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal server error
       security:
       - BearerAuth: []
       summary: SLA waiting compliance vs breach per day
@@ -8024,6 +8183,36 @@ paths:
               schema:
                 $ref: '#/components/schemas/services.SlaSummaryResponse'
           description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad Request (missing or invalid query params)
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden (missing statistics access or plan)
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unit not found
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal server error
       security:
       - BearerAuth: []
       summary: Aggregate waiting SLA percent for date range (optional service filter)
@@ -8056,13 +8245,15 @@ paths:
         name: surveyId
         schema:
           type: string
-      - description: Question ids (repeat param or comma-separated); native scale
+      - description: Question ids (repeat query param or comma-separated); native scale
         in: query
         name: questionIds
         schema:
           items:
             type: string
           type: array
+        style: form
+        explode: true
       responses:
         '200':
           content:
@@ -8070,6 +8261,36 @@ paths:
               schema:
                 $ref: '#/components/schemas/services.SurveyScoresResponse'
           description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad Request (missing or invalid query params)
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden (missing survey score statistics access or plan)
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unit not found
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal server error
       security:
       - BearerAuth: []
       summary: Guest survey score timeseries (live from responses; hourly for a single day, daily for longer ranges)
@@ -8114,6 +8335,36 @@ paths:
               schema:
                 $ref: '#/components/schemas/services.TicketsByServiceResponse'
           description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad Request (missing or invalid query params)
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden (missing statistics access or plan)
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unit not found
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal server error
       security:
       - BearerAuth: []
       summary: Tickets created in range grouped by business service (donut chart)
@@ -8167,6 +8418,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/services.TimeseriesResponse'
           description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad Request (dates, service zone, or conflicting filters)
         '401':
           content:
             application/json:
@@ -8178,7 +8435,19 @@ paths:
             application/json:
               schema:
                 type: string
-          description: Forbidden
+          description: Forbidden (scope, plan, or zone access)
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unit not found
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal server error
       security:
       - BearerAuth: []
       summary: Statistics timeseries (daily or hourly for a single day)
@@ -8219,6 +8488,36 @@ paths:
               schema:
                 $ref: '#/components/schemas/services.UtilizationResponse'
           description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad Request (missing or invalid query params)
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden (missing statistics access or plan)
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unit not found
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal server error
       security:
       - BearerAuth: []
       summary: Per-operator utilization (serving vs idle/break), calendar days in subdivision TZ

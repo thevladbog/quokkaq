@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strings"
 
@@ -46,6 +47,10 @@ func (h *OperationsHandler) requireTenantAdmin(r *http.Request) (string, bool) {
 // @Security     BearerAuth
 // @Param        unitId path string true "Subdivision unit ID"
 // @Success      200 {object} services.OperationsStatusDTO
+// @Failure      401 {string} string "Unauthorized"
+// @Failure      403 {string} string "Forbidden (not tenant admin)"
+// @Failure      404 {string} string "Unit not found"
+// @Failure      500 {string} string "Internal server error"
 // @Router       /units/{unitId}/operations/status [get]
 func (h *OperationsHandler) GetOperationsStatus(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
@@ -61,8 +66,8 @@ func (h *OperationsHandler) GetOperationsStatus(w http.ResponseWriter, r *http.R
 	RespondJSON(w, st)
 }
 
+// emergencyUnlockBody is the JSON body for emergency unlock; confirm must be the literal UNLOCK.
 type emergencyUnlockBody struct {
-	// Confirm must be exactly UNLOCK. This acknowledges a destructive admin action: clears subdivision kiosk admission freeze and counter-login blocks (EOD recovery).
 	Confirm string `json:"confirm" binding:"required" example:"UNLOCK" enums:"UNLOCK"`
 }
 
@@ -72,9 +77,15 @@ type emergencyUnlockBody struct {
 // @Description  Destructive admin operation: clears kiosk admission freeze and counter-login blocks for the subdivision. JSON body required; confirm must equal UNLOCK exactly.
 // @Tags         operations
 // @Security     BearerAuth
+// @Accept       json
 // @Param        unitId path string true "Subdivision unit ID"
-// @Param        body body emergencyUnlockBody true "application/json: {\"confirm\":\"UNLOCK\"}"
+// @Param        body body emergencyUnlockBody true "Required. Send confirm equal to UNLOCK."
 // @Success      204 "No Content"
+// @Failure      400 {string} string "Bad Request (confirm not UNLOCK or invalid JSON)"
+// @Failure      401 {string} string "Unauthorized"
+// @Failure      403 {string} string "Forbidden (not tenant admin)"
+// @Failure      404 {string} string "Unit not found"
+// @Failure      500 {string} string "Internal server error (unlock failed or audit log failed)"
 // @Router       /units/{unitId}/operations/emergency-unlock [post]
 func (h *OperationsHandler) PostEmergencyUnlock(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
@@ -94,11 +105,15 @@ func (h *OperationsHandler) PostEmergencyUnlock(w http.ResponseWriter, r *http.R
 		return
 	}
 	payload, _ := json.Marshal(map[string]string{"unitId": unitID})
-	_ = h.auditRepo.CreateAuditLog(r.Context(), &models.AuditLog{
+	if err := h.auditRepo.CreateAuditLog(r.Context(), &models.AuditLog{
 		UserID:  &uid,
 		Action:  "operations.emergency_unlock",
 		Payload: payload,
-	})
+	}); err != nil {
+		log.Printf("operations emergency_unlock audit log unitId=%q: %v", unitID, err)
+		http.Error(w, "unlock applied but audit log failed", http.StatusInternalServerError)
+		return
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -110,6 +125,10 @@ func (h *OperationsHandler) PostEmergencyUnlock(w http.ResponseWriter, r *http.R
 // @Security     BearerAuth
 // @Param        unitId path string true "Subdivision unit ID"
 // @Success      204
+// @Failure      401 {string} string "Unauthorized"
+// @Failure      403 {string} string "Forbidden (not tenant admin)"
+// @Failure      404 {string} string "Unit not found"
+// @Failure      500 {string} string "Internal server error (clear failed or audit log failed)"
 // @Router       /units/{unitId}/operations/clear-statistics-quiet [post]
 func (h *OperationsHandler) PostClearStatisticsQuiet(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
@@ -123,10 +142,14 @@ func (h *OperationsHandler) PostClearStatisticsQuiet(w http.ResponseWriter, r *h
 		return
 	}
 	payload, _ := json.Marshal(map[string]string{"unitId": unitID})
-	_ = h.auditRepo.CreateAuditLog(r.Context(), &models.AuditLog{
+	if err := h.auditRepo.CreateAuditLog(r.Context(), &models.AuditLog{
 		UserID:  &uid,
 		Action:  "operations.clear_statistics_quiet",
 		Payload: payload,
-	})
+	}); err != nil {
+		log.Printf("operations clear_statistics_quiet audit log unitId=%q: %v", unitID, err)
+		http.Error(w, "quiet flag cleared but audit log failed", http.StatusInternalServerError)
+		return
+	}
 	w.WriteHeader(http.StatusNoContent)
 }

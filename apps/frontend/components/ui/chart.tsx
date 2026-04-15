@@ -462,13 +462,15 @@ const ChartLegendContent = React.forwardRef<
       >
         {payload
           .filter((item) => item.type !== 'none')
-          .map((item) => {
+          .map((item, index) => {
             const key = configLookupKeyFromPayloadItem(item, nameKey);
             const itemConfig = getPayloadConfigFromPayload(config, item, key);
+            const row = item as ChartPayloadItem;
+            const legendKey = `${String(row.dataKey ?? 'series')}-${index}`;
 
             return (
               <div
-                key={String(item.value)}
+                key={legendKey}
                 className='[&>svg]:text-muted-foreground flex items-center gap-1.5 [&>svg]:h-3 [&>svg]:w-3'
               >
                 {itemConfig?.icon && !hideIcon ? (

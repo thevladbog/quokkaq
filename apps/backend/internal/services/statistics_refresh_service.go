@@ -69,68 +69,74 @@ func (s *StatisticsRefreshService) RollupUnitDay(unitID, bucketDate string) erro
 	startUTC := start.UTC()
 	endUTC := end.UTC()
 
-	type aggRow struct {
-		TicketsCreated   int64
-		TicketsCompleted int64
-		NoShowCount      int64
-		WaitSumMs        int64
-		WaitCount        int64
-		ServiceSumMs     int64
-		ServiceCount     int64
-		SlaWaitMet       int64
-		SlaWaitTotal     int64
-	}
-
-	rollup := func(zoneFilter string) (aggRow, error) {
-		var row aggRow
-		q, args := statisticsRollupSelect(unitID, zoneFilter, startUTC, endUTC)
-		if err := s.db.Raw(q, args...).Scan(&row).Error; err != nil {
-			return row, err
+	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		statsTx := repository.NewStatisticsRepositoryWithDB(tx)
+		segTx := repository.NewStatisticsTicketSegmentsRepositoryWithDB(tx)
+		if err := statsTx.DeleteDailyBucketsForUnitDay(unitID, bucketDate); err != nil {
+			return err
 		}
-		ws, wc, sm, st, err := computeWaitSLAForTicketsCalledInRange(s.segmentsRepo, unitID, startUTC, endUTC, zoneFilter)
+
+		type aggRow struct {
+			TicketsCreated   int64
+			TicketsCompleted int64
+			NoShowCount      int64
+			WaitSumMs        int64
+			WaitCount        int64
+			ServiceSumMs     int64
+			ServiceCount     int64
+			SlaWaitMet       int64
+			SlaWaitTotal     int64
+		}
+
+		rollup := func(zoneFilter string) (aggRow, error) {
+			var row aggRow
+			q, args := statisticsRollupSelect(unitID, zoneFilter, startUTC, endUTC)
+			if err := tx.Raw(q, args...).Scan(&row).Error; err != nil {
+				return row, err
+			}
+			ws, wc, sm, st, err := computeWaitSLAForTicketsCalledInRange(segTx, unitID, startUTC, endUTC, zoneFilter)
+			if err != nil {
+				return row, err
+			}
+			row.WaitSumMs = ws
+			row.WaitCount = int64(wc)
+			row.SlaWaitMet = int64(sm)
+			row.SlaWaitTotal = int64(st)
+			ssum, scnt, err := aggregateServiceTimeForServedTicketsCompletedInRange(segTx, unitID, zoneFilter, startUTC, endUTC)
+			if err != nil {
+				return row, err
+			}
+			row.ServiceSumMs = ssum
+			row.ServiceCount = int64(scnt)
+			return row, nil
+		}
+
+		row, err := rollup("")
 		if err != nil {
-			return row, err
+			return err
 		}
-		row.WaitSumMs = ws
-		row.WaitCount = int64(wc)
-		row.SlaWaitMet = int64(sm)
-		row.SlaWaitTotal = int64(st)
-		ssum, scnt, err := aggregateServiceTimeForServedTicketsCompletedInRange(s.segmentsRepo, unitID, zoneFilter, startUTC, endUTC)
-		if err != nil {
-			return row, err
+		bucket := models.StatisticsDailyBucket{
+			UnitID:           unitID,
+			BucketDate:       bucketDate,
+			ActorUserID:      repository.StatisticsUnitAggregateActor(),
+			ServiceZoneID:    repository.StatisticsWholeSubdivisionServiceZoneID(),
+			WaitSumMs:        row.WaitSumMs,
+			WaitCount:        int(row.WaitCount),
+			ServiceSumMs:     row.ServiceSumMs,
+			ServiceCount:     int(row.ServiceCount),
+			TicketsCreated:   int(row.TicketsCreated),
+			TicketsCompleted: int(row.TicketsCompleted),
+			NoShowCount:      int(row.NoShowCount),
+			SlaWaitMet:       int(row.SlaWaitMet),
+			SlaWaitTotal:     int(row.SlaWaitTotal),
 		}
-		row.ServiceSumMs = ssum
-		row.ServiceCount = int64(scnt)
-		return row, nil
-	}
+		if err := statsTx.UpsertDailyBucket(&bucket); err != nil {
+			return err
+		}
 
-	// Whole subdivision (all zones + tickets with null service_zone_id)
-	row, err := rollup("")
-	if err != nil {
-		return err
-	}
-	bucket := models.StatisticsDailyBucket{
-		UnitID:           unitID,
-		BucketDate:       bucketDate,
-		ActorUserID:      repository.StatisticsUnitAggregateActor(),
-		ServiceZoneID:    repository.StatisticsWholeSubdivisionServiceZoneID(),
-		WaitSumMs:        row.WaitSumMs,
-		WaitCount:        int(row.WaitCount),
-		ServiceSumMs:     row.ServiceSumMs,
-		ServiceCount:     int(row.ServiceCount),
-		TicketsCreated:   int(row.TicketsCreated),
-		TicketsCompleted: int(row.TicketsCompleted),
-		NoShowCount:      int(row.NoShowCount),
-		SlaWaitMet:       int(row.SlaWaitMet),
-		SlaWaitTotal:     int(row.SlaWaitTotal),
-	}
-	if err := s.statsRepo.UpsertDailyBucket(&bucket); err != nil {
-		return err
-	}
-
-	type zid struct{ ServiceZoneID string }
-	var zoneIDs []zid
-	zq := `
+		type zid struct{ ServiceZoneID string }
+		var zoneIDs []zid
+		zq := `
 SELECT DISTINCT service_zone_id::text AS service_zone_id
 FROM tickets
 WHERE unit_id = ?
@@ -141,44 +147,43 @@ WHERE unit_id = ?
     OR (called_at IS NOT NULL AND called_at >= ? AND called_at < ?)
   )
 `
-	if err := s.db.Raw(zq, unitID, startUTC, endUTC, startUTC, endUTC, startUTC, endUTC).Scan(&zoneIDs).Error; err != nil {
-		return err
-	}
-	for _, z := range zoneIDs {
-		zs := strings.TrimSpace(z.ServiceZoneID)
-		if zs == "" {
-			continue
-		}
-		zr, err := rollup(zs)
-		if err != nil {
+		if err := tx.Raw(zq, unitID, startUTC, endUTC, startUTC, endUTC, startUTC, endUTC).Scan(&zoneIDs).Error; err != nil {
 			return err
 		}
-		zb := models.StatisticsDailyBucket{
-			UnitID:           unitID,
-			BucketDate:       bucketDate,
-			ActorUserID:      repository.StatisticsUnitAggregateActor(),
-			ServiceZoneID:    zs,
-			WaitSumMs:        zr.WaitSumMs,
-			WaitCount:        int(zr.WaitCount),
-			ServiceSumMs:     zr.ServiceSumMs,
-			ServiceCount:     int(zr.ServiceCount),
-			TicketsCreated:   int(zr.TicketsCreated),
-			TicketsCompleted: int(zr.TicketsCompleted),
-			NoShowCount:      int(zr.NoShowCount),
-			SlaWaitMet:       int(zr.SlaWaitMet),
-			SlaWaitTotal:     int(zr.SlaWaitTotal),
+		for _, z := range zoneIDs {
+			zs := strings.TrimSpace(z.ServiceZoneID)
+			if zs == "" {
+				continue
+			}
+			zr, err := rollup(zs)
+			if err != nil {
+				return err
+			}
+			zb := models.StatisticsDailyBucket{
+				UnitID:           unitID,
+				BucketDate:       bucketDate,
+				ActorUserID:      repository.StatisticsUnitAggregateActor(),
+				ServiceZoneID:    zs,
+				WaitSumMs:        zr.WaitSumMs,
+				WaitCount:        int(zr.WaitCount),
+				ServiceSumMs:     zr.ServiceSumMs,
+				ServiceCount:     int(zr.ServiceCount),
+				TicketsCreated:   int(zr.TicketsCreated),
+				TicketsCompleted: int(zr.TicketsCompleted),
+				NoShowCount:      int(zr.NoShowCount),
+				SlaWaitMet:       int(zr.SlaWaitMet),
+				SlaWaitTotal:     int(zr.SlaWaitTotal),
+			}
+			if err := statsTx.UpsertDailyBucket(&zb); err != nil {
+				return err
+			}
 		}
-		if err := s.statsRepo.UpsertDailyBucket(&zb); err != nil {
-			return err
-		}
-	}
 
-	// Per-operator buckets (tickets where user appears as actor on status_changed to served that day).
-	type uidRow struct {
-		UserID string
-	}
-	var uids []uidRow
-	if err := s.db.Raw(`
+		type uidRow struct {
+			UserID string
+		}
+		var uids []uidRow
+		if err := tx.Raw(`
 SELECT DISTINCT h.user_id::text AS user_id
 FROM ticket_histories h
 INNER JOIN tickets t ON t.id = h.ticket_id
@@ -187,15 +192,15 @@ WHERE t.unit_id = ?
   AND h.action = 'ticket.status_changed'
   AND h.created_at >= ? AND h.created_at < ?
 `, unitID, startUTC, endUTC).Scan(&uids).Error; err != nil {
-		return err
-	}
-
-	for _, ur := range uids {
-		if strings.TrimSpace(ur.UserID) == "" {
-			continue
+			return err
 		}
-		var pr aggRow
-		pq := `
+
+		for _, ur := range uids {
+			if strings.TrimSpace(ur.UserID) == "" {
+				continue
+			}
+			var pr aggRow
+			pq := `
 WITH touched AS (
   SELECT DISTINCT h.ticket_id
   FROM ticket_histories h
@@ -218,94 +223,97 @@ SELECT
   0 AS sla_wait_met,
   0 AS sla_wait_total
 `
-		if err := s.db.Raw(pq,
-			unitID, ur.UserID, startUTC, endUTC,
-			startUTC, endUTC,
-			startUTC, endUTC,
-			startUTC, endUTC,
-			startUTC, endUTC,
-		).Scan(&pr).Error; err != nil {
-			return err
-		}
-		var touchedIDs []string
-		if err := s.db.Raw(`
+			if err := tx.Raw(pq,
+				unitID, ur.UserID, startUTC, endUTC,
+				startUTC, endUTC,
+				startUTC, endUTC,
+				startUTC, endUTC,
+				startUTC, endUTC,
+			).Scan(&pr).Error; err != nil {
+				return err
+			}
+			var touchedIDs []string
+			if err := tx.Raw(`
 SELECT DISTINCT h.ticket_id::text
 FROM ticket_histories h
 INNER JOIN tickets t ON t.id = h.ticket_id
 WHERE t.unit_id = ? AND h.user_id = ?
   AND h.created_at >= ? AND h.created_at < ?
 `, unitID, ur.UserID, startUTC, endUTC).Scan(&touchedIDs).Error; err != nil {
-			return err
-		}
-		opTicketMap, err := s.segmentsRepo.BatchTicketsByIDs(touchedIDs)
-		if err != nil {
-			return err
-		}
-		opHistMap, err := s.segmentsRepo.BatchHistoriesByTicketIDs(touchedIDs)
-		if err != nil {
-			return err
-		}
-		opSSum, opSCnt := aggregateServiceTimeForOperatorOnTouchedTicketsPreloaded(
-			ur.UserID,
-			touchedIDs,
-			opTicketMap,
-			opHistMap,
-		)
-		pr.ServiceSumMs = opSSum
-		pr.ServiceCount = int64(opSCnt)
-		var wSum int64
-		var wN, slaM, slaT int
-		for _, tid := range touchedIDs {
-			t, ok := opTicketMap[tid]
-			if !ok {
-				continue
+				return err
 			}
-			if t.CalledAt != nil {
-				ca := *t.CalledAt
-				if ca.Before(startUTC) || !ca.Before(endUTC) {
+			opTicketMap, err := segTx.BatchTicketsByIDs(touchedIDs)
+			if err != nil {
+				return err
+			}
+			opHistMap, err := segTx.BatchHistoriesByTicketIDs(touchedIDs)
+			if err != nil {
+				return err
+			}
+			opSSum, opSCnt := aggregateServiceTimeForOperatorOnTouchedTicketsPreloaded(
+				ur.UserID,
+				touchedIDs,
+				opTicketMap,
+				opHistMap,
+			)
+			pr.ServiceSumMs = opSSum
+			pr.ServiceCount = int64(opSCnt)
+			var wSum int64
+			var wN, slaM, slaT int
+			for _, tid := range touchedIDs {
+				t, ok := opTicketMap[tid]
+				if !ok {
 					continue
 				}
-				ws, wc, sm, st := waitSLAMetricsCalledTicketData(t, opHistMap[tid])
+				if t.CalledAt != nil {
+					ca := *t.CalledAt
+					if ca.Before(startUTC) || !ca.Before(endUTC) {
+						continue
+					}
+					ws, wc, sm, st := waitSLAMetricsCalledTicketData(t, opHistMap[tid])
+					wSum += ws
+					wN += wc
+					slaM += sm
+					slaT += st
+					continue
+				}
+				if t.CompletedAt == nil ||
+					t.CompletedAt.Before(startUTC) ||
+					!t.CompletedAt.Before(endUTC) {
+					continue
+				}
+				ws, wc, sm, st := waitSLAMetricsNoCallClosureData(t, opHistMap[tid])
 				wSum += ws
 				wN += wc
 				slaM += sm
 				slaT += st
-				continue
 			}
-			// No call: no_show closed in bucket (e.g. EOD); same window as computeWaitSLAForTicketsCalledInRange no-call IDs.
-			if t.CompletedAt == nil ||
-				t.CompletedAt.Before(startUTC) ||
-				!t.CompletedAt.Before(endUTC) {
-				continue
+			pr.WaitSumMs = wSum
+			pr.WaitCount = int64(wN)
+			pr.SlaWaitMet = int64(slaM)
+			pr.SlaWaitTotal = int64(slaT)
+			ub := models.StatisticsDailyBucket{
+				UnitID:           unitID,
+				BucketDate:       bucketDate,
+				ActorUserID:      ur.UserID,
+				ServiceZoneID:    repository.StatisticsWholeSubdivisionServiceZoneID(),
+				WaitSumMs:        pr.WaitSumMs,
+				WaitCount:        int(pr.WaitCount),
+				ServiceSumMs:     pr.ServiceSumMs,
+				ServiceCount:     int(pr.ServiceCount),
+				TicketsCreated:   int(pr.TicketsCreated),
+				TicketsCompleted: int(pr.TicketsCompleted),
+				NoShowCount:      int(pr.NoShowCount),
+				SlaWaitMet:       int(pr.SlaWaitMet),
+				SlaWaitTotal:     int(pr.SlaWaitTotal),
 			}
-			ws, wc, sm, st := waitSLAMetricsNoCallClosureData(t, opHistMap[tid])
-			wSum += ws
-			wN += wc
-			slaM += sm
-			slaT += st
+			if err := statsTx.UpsertDailyBucket(&ub); err != nil {
+				return err
+			}
 		}
-		pr.WaitSumMs = wSum
-		pr.WaitCount = int64(wN)
-		pr.SlaWaitMet = int64(slaM)
-		pr.SlaWaitTotal = int64(slaT)
-		ub := models.StatisticsDailyBucket{
-			UnitID:           unitID,
-			BucketDate:       bucketDate,
-			ActorUserID:      ur.UserID,
-			ServiceZoneID:    repository.StatisticsWholeSubdivisionServiceZoneID(),
-			WaitSumMs:        pr.WaitSumMs,
-			WaitCount:        int(pr.WaitCount),
-			ServiceSumMs:     pr.ServiceSumMs,
-			ServiceCount:     int(pr.ServiceCount),
-			TicketsCreated:   int(pr.TicketsCreated),
-			TicketsCompleted: int(pr.TicketsCompleted),
-			NoShowCount:      int(pr.NoShowCount),
-			SlaWaitMet:       int(pr.SlaWaitMet),
-			SlaWaitTotal:     int(pr.SlaWaitTotal),
-		}
-		if err := s.statsRepo.UpsertDailyBucket(&ub); err != nil {
-			return err
-		}
+		return nil
+	}); err != nil {
+		return err
 	}
 
 	if err := s.rollupSurveyDay(unitID, bucketDate, startUTC, endUTC); err != nil {
