@@ -1,7 +1,6 @@
 package services
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 	"os"
@@ -18,22 +17,25 @@ import (
 
 // StatisticsRefreshService rolls up ticket data into statistics_daily_buckets.
 type StatisticsRefreshService struct {
-	db        *gorm.DB
-	statsRepo repository.StatisticsRepository
-	unitRepo  repository.UnitRepository
-	opRepo    repository.OperationalStateRepository
+	db           *gorm.DB
+	statsRepo    repository.StatisticsRepository
+	unitRepo     repository.UnitRepository
+	opRepo       repository.OperationalStateRepository
+	segmentsRepo repository.StatisticsTicketSegmentsRepository
 }
 
 func NewStatisticsRefreshService(
 	statsRepo repository.StatisticsRepository,
 	unitRepo repository.UnitRepository,
 	opRepo repository.OperationalStateRepository,
+	segmentsRepo repository.StatisticsTicketSegmentsRepository,
 ) *StatisticsRefreshService {
 	return &StatisticsRefreshService{
-		db:        database.DB,
-		statsRepo: statsRepo,
-		unitRepo:  unitRepo,
-		opRepo:    opRepo,
+		db:           database.DB,
+		statsRepo:    statsRepo,
+		unitRepo:     unitRepo,
+		opRepo:       opRepo,
+		segmentsRepo: segmentsRepo,
 	}
 }
 
@@ -62,7 +64,8 @@ func (s *StatisticsRefreshService) RollupUnitDay(unitID, bucketDate string) erro
 		return fmt.Errorf("bucket date: %w", err)
 	}
 	start := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, loc)
-	end := start.Add(24 * time.Hour)
+	// Next calendar midnight in loc (DST-safe); not a fixed 24h offset.
+	end := start.AddDate(0, 0, 1)
 	startUTC := start.UTC()
 	endUTC := end.UTC()
 
@@ -84,7 +87,7 @@ func (s *StatisticsRefreshService) RollupUnitDay(unitID, bucketDate string) erro
 		if err := s.db.Raw(q, args...).Scan(&row).Error; err != nil {
 			return row, err
 		}
-		ws, wc, sm, st, err := computeWaitSLAForTicketsCalledInRange(s.db, unitID, startUTC, endUTC, zoneFilter)
+		ws, wc, sm, st, err := computeWaitSLAForTicketsCalledInRange(s.segmentsRepo, unitID, startUTC, endUTC, zoneFilter)
 		if err != nil {
 			return row, err
 		}
@@ -92,7 +95,7 @@ func (s *StatisticsRefreshService) RollupUnitDay(unitID, bucketDate string) erro
 		row.WaitCount = int64(wc)
 		row.SlaWaitMet = int64(sm)
 		row.SlaWaitTotal = int64(st)
-		ssum, scnt, err := aggregateServiceTimeForServedTicketsCompletedInRange(s.db, unitID, zoneFilter, startUTC, endUTC)
+		ssum, scnt, err := aggregateServiceTimeForServedTicketsCompletedInRange(s.segmentsRepo, unitID, zoneFilter, startUTC, endUTC)
 		if err != nil {
 			return row, err
 		}
@@ -234,26 +237,48 @@ WHERE t.unit_id = ? AND h.user_id = ?
 `, unitID, ur.UserID, startUTC, endUTC).Scan(&touchedIDs).Error; err != nil {
 			return err
 		}
-		opSSum, opSCnt, err := aggregateServiceTimeForOperatorOnTouchedTickets(s.db, ur.UserID, touchedIDs)
+		opTicketMap, err := s.segmentsRepo.BatchTicketsByIDs(touchedIDs)
 		if err != nil {
 			return err
 		}
+		opHistMap, err := s.segmentsRepo.BatchHistoriesByTicketIDs(touchedIDs)
+		if err != nil {
+			return err
+		}
+		opSSum, opSCnt := aggregateServiceTimeForOperatorOnTouchedTicketsPreloaded(
+			ur.UserID,
+			touchedIDs,
+			opTicketMap,
+			opHistMap,
+		)
 		pr.ServiceSumMs = opSSum
 		pr.ServiceCount = int64(opSCnt)
 		var wSum int64
 		var wN, slaM, slaT int
 		for _, tid := range touchedIDs {
-			var calledAt sql.NullTime
-			if err := s.db.Raw(`SELECT called_at FROM tickets WHERE id = ?`, tid).Scan(&calledAt).Error; err != nil {
-				return err
-			}
-			if !calledAt.Valid || calledAt.Time.Before(startUTC) || !calledAt.Time.Before(endUTC) {
+			t, ok := opTicketMap[tid]
+			if !ok {
 				continue
 			}
-			ws, wc, sm, st, err := waitSLAOneTicket(s.db, tid)
-			if err != nil {
-				return err
+			if t.CalledAt != nil {
+				ca := *t.CalledAt
+				if ca.Before(startUTC) || !ca.Before(endUTC) {
+					continue
+				}
+				ws, wc, sm, st := waitSLAMetricsCalledTicketData(t, opHistMap[tid])
+				wSum += ws
+				wN += wc
+				slaM += sm
+				slaT += st
+				continue
 			}
+			// No call: no_show closed in bucket (e.g. EOD); same window as computeWaitSLAForTicketsCalledInRange no-call IDs.
+			if t.CompletedAt == nil ||
+				t.CompletedAt.Before(startUTC) ||
+				!t.CompletedAt.Before(endUTC) {
+				continue
+			}
+			ws, wc, sm, st := waitSLAMetricsNoCallClosureData(t, opHistMap[tid])
 			wSum += ws
 			wN += wc
 			slaM += sm

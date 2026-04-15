@@ -84,17 +84,21 @@ func accumulateResponseIntoPeriod(
 	}
 }
 
-func (s *StatisticsService) loadSurveyDefinitionsForSubdivision(
-	ctx context.Context,
-	subdivisionID string,
-) (map[string]parsedSurveyDef, error) {
+// surveySubdivisionScopeIDs returns subdivisionID plus direct service_zone children (same scope as survey definitions).
+func (s *StatisticsService) surveySubdivisionScopeIDs(ctx context.Context, subdivisionID string) ([]string, error) {
 	var zoneIDs []string
 	if err := s.db.WithContext(ctx).Model(&models.Unit{}).
 		Where("parent_id = ? AND kind = ?", subdivisionID, models.UnitKindServiceZone).
 		Pluck("id", &zoneIDs).Error; err != nil {
 		return nil, err
 	}
-	scopeIDs := append([]string{subdivisionID}, zoneIDs...)
+	return append([]string{subdivisionID}, zoneIDs...), nil
+}
+
+func (s *StatisticsService) loadSurveyDefinitionsForScopeIDs(
+	ctx context.Context,
+	scopeIDs []string,
+) (map[string]parsedSurveyDef, error) {
 	var defs []models.SurveyDefinition
 	if err := s.db.WithContext(ctx).Where("scope_unit_id IN ?", scopeIDs).Find(&defs).Error; err != nil {
 		return nil, err
@@ -153,15 +157,20 @@ func (s *StatisticsService) getSurveyScoresLive(
 	startUTC := time.Date(df.Year(), df.Month(), df.Day(), 0, 0, 0, 0, loc).UTC()
 	endUTC := time.Date(dt.Year(), dt.Month(), dt.Day(), 0, 0, 0, 0, loc).AddDate(0, 0, 1).UTC()
 
+	scopeIDs, err := s.surveySubdivisionScopeIDs(ctx, subdivisionID)
+	if err != nil {
+		return nil, err
+	}
+
 	var responses []models.SurveyResponse
 	if err := s.db.WithContext(ctx).Where(
-		`unit_id IN (SELECT id FROM units WHERE id = ? OR parent_id = ?) AND submitted_at >= ? AND submitted_at < ?`,
-		subdivisionID, subdivisionID, startUTC, endUTC,
+		"unit_id IN ? AND submitted_at >= ? AND submitted_at < ?",
+		scopeIDs, startUTC, endUTC,
 	).Find(&responses).Error; err != nil {
 		return nil, err
 	}
 
-	defByID, err := s.loadSurveyDefinitionsForSubdivision(ctx, subdivisionID)
+	defByID, err := s.loadSurveyDefinitionsForScopeIDs(ctx, scopeIDs)
 	if err != nil {
 		return nil, err
 	}

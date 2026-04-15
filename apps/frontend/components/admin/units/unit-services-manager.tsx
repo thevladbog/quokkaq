@@ -619,11 +619,16 @@ function ServiceForm({
               <SelectItem value='__none__'>
                 {t('services.restricted_zone_none')}
               </SelectItem>
-              {serviceZones.map((zone) => (
-                <SelectItem key={zone.id} value={zone.id}>
-                  {zone.name}
-                </SelectItem>
-              ))}
+              {serviceZones
+                .filter(
+                  (zone): zone is typeof zone & { id: string } =>
+                    typeof zone.id === 'string' && zone.id.trim().length > 0
+                )
+                .map((zone) => (
+                  <SelectItem key={zone.id} value={zone.id}>
+                    {zone.name}
+                  </SelectItem>
+                ))}
             </SelectContent>
           </Select>
           <p className='text-muted-foreground text-xs'>

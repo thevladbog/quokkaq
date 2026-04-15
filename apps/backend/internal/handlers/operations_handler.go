@@ -62,16 +62,18 @@ func (h *OperationsHandler) GetOperationsStatus(w http.ResponseWriter, r *http.R
 }
 
 type emergencyUnlockBody struct {
-	Confirm string `json:"confirm"`
+	// Confirm must be exactly UNLOCK. This acknowledges a destructive admin action: clears subdivision kiosk admission freeze and counter-login blocks (EOD recovery).
+	Confirm string `json:"confirm" binding:"required" example:"UNLOCK" enums:"UNLOCK"`
 }
 
 // PostEmergencyUnlock godoc
 // @ID           postUnitOperationsEmergencyUnlock
 // @Summary      Emergency unlock kiosk and counter login
+// @Description  Destructive admin operation: clears kiosk admission freeze and counter-login blocks for the subdivision. JSON body required; confirm must equal UNLOCK exactly.
 // @Tags         operations
 // @Security     BearerAuth
 // @Param        unitId path string true "Subdivision unit ID"
-// @Param        body body emergencyUnlockBody false "Send {\"confirm\":\"UNLOCK\"}"
+// @Param        body body emergencyUnlockBody true "application/json: {\"confirm\":\"UNLOCK\"}"
 // @Success      204 "No Content"
 // @Router       /units/{unitId}/operations/emergency-unlock [post]
 func (h *OperationsHandler) PostEmergencyUnlock(w http.ResponseWriter, r *http.Request) {
@@ -103,6 +105,7 @@ func (h *OperationsHandler) PostEmergencyUnlock(w http.ResponseWriter, r *http.R
 // PostClearStatisticsQuiet godoc
 // @ID           postUnitOperationsClearStatisticsQuiet
 // @Summary      Resume incremental statistics processing
+// @Description  Admin-only: clears the statistics quiet flag so incremental statistics processing resumes for the subdivision. No request body.
 // @Tags         operations
 // @Security     BearerAuth
 // @Param        unitId path string true "Subdivision unit ID"

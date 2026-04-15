@@ -168,6 +168,8 @@
     "subdivision_placeholder": "Choose subdivision",
     "status_title": "Current status",
     "status_refreshing": "Refreshing…",
+    "status_placeholder": "—",
+    "status_loading": "Loading…",
     "field_phase": "Phase",
     "field_kiosk": "Kiosk frozen",
     "field_counter": "Counter login",

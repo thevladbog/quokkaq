@@ -5,9 +5,8 @@ import (
 	"time"
 
 	"quokkaq-go-backend/internal/models"
+	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/ticketaudit"
-
-	"gorm.io/gorm"
 )
 
 // computeWaitSLAForTicketsCalledInRange aggregates queue wait (ms) and SLA for:
@@ -16,58 +15,45 @@ import (
 //
 // Wait duration uses the segment after the last ticket.transferred strictly before the end instant (call or closure).
 func computeWaitSLAForTicketsCalledInRange(
-	db *gorm.DB,
+	seg repository.StatisticsTicketSegmentsRepository,
 	unitID string,
 	startUTC, endUTC time.Time,
 	zoneID string,
 ) (waitSumMs int64, waitCount int, slaMet int, slaTotal int, err error) {
-	var z1, z2 interface{}
-	if strings.TrimSpace(zoneID) == "" {
-		z1, z2 = nil, nil
-	} else {
-		z := strings.TrimSpace(zoneID)
-		z1, z2 = z, z
+	ticketIDs, err := seg.ListTicketIDsCalledInRangeForWait(unitID, startUTC, endUTC, zoneID)
+	if err != nil {
+		return 0, 0, 0, 0, err
 	}
-	var ticketIDs []string
-	q := `
-SELECT id::text FROM tickets
-WHERE unit_id = ?
-  AND called_at IS NOT NULL
-  AND called_at >= ? AND called_at < ?
-  AND (NULLIF(TRIM(COALESCE(?::text, '')), '') IS NULL OR service_zone_id::text = NULLIF(TRIM(COALESCE(?::text, '')), ''))
-`
-	if err := db.Raw(q, unitID, startUTC, endUTC, z1, z2).Scan(&ticketIDs).Error; err != nil {
+	noCallIDs, err := seg.ListTicketIDsNoShowClosedInRangeForWait(unitID, startUTC, endUTC, zoneID)
+	if err != nil {
+		return 0, 0, 0, 0, err
+	}
+	allIDs := unionTicketIDLists(ticketIDs, noCallIDs)
+	ticketMap, err := seg.BatchTicketsByIDs(allIDs)
+	if err != nil {
+		return 0, 0, 0, 0, err
+	}
+	histMap, err := seg.BatchHistoriesByTicketIDs(allIDs)
+	if err != nil {
 		return 0, 0, 0, 0, err
 	}
 	for _, tid := range ticketIDs {
-		ws, wc, sm, st, err := waitSLAOneTicket(db, tid)
-		if err != nil {
-			return 0, 0, 0, 0, err
+		t, ok := ticketMap[tid]
+		if !ok {
+			continue
 		}
+		ws, wc, sm, st := waitSLAMetricsCalledTicketData(t, histMap[tid])
 		waitSumMs += ws
 		waitCount += wc
 		slaMet += sm
 		slaTotal += st
 	}
-
-	var noCallIDs []string
-	q2 := `
-SELECT id::text FROM tickets
-WHERE unit_id = ?
-  AND called_at IS NULL
-  AND completed_at IS NOT NULL
-  AND completed_at >= ? AND completed_at < ?
-  AND status = 'no_show'
-  AND (NULLIF(TRIM(COALESCE(?::text, '')), '') IS NULL OR service_zone_id::text = NULLIF(TRIM(COALESCE(?::text, '')), ''))
-`
-	if err := db.Raw(q2, unitID, startUTC, endUTC, z1, z2).Scan(&noCallIDs).Error; err != nil {
-		return 0, 0, 0, 0, err
-	}
 	for _, tid := range noCallIDs {
-		ws, wc, sm, st, err := waitSLANoCallClosureOneTicket(db, tid)
-		if err != nil {
-			return 0, 0, 0, 0, err
+		t, ok := ticketMap[tid]
+		if !ok {
+			continue
 		}
+		ws, wc, sm, st := waitSLAMetricsNoCallClosureData(t, histMap[tid])
 		waitSumMs += ws
 		waitCount += wc
 		slaMet += sm
@@ -76,19 +62,31 @@ WHERE unit_id = ?
 	return waitSumMs, waitCount, slaMet, slaTotal, nil
 }
 
-func waitSLAOneTicket(db *gorm.DB, ticketID string) (waitSumMs int64, waitCount int, slaMet int, slaTotal int, err error) {
-	var t models.Ticket
-	if err := db.Where("id = ?", ticketID).First(&t).Error; err != nil {
-		return 0, 0, 0, 0, err
+func unionTicketIDLists(a, b []string) []string {
+	seen := make(map[string]struct{})
+	out := make([]string, 0, len(a)+len(b))
+	for _, list := range [][]string{a, b} {
+		for _, id := range list {
+			id = strings.TrimSpace(id)
+			if id == "" {
+				continue
+			}
+			if _, ok := seen[id]; ok {
+				continue
+			}
+			seen[id] = struct{}{}
+			out = append(out, id)
+		}
 	}
+	return out
+}
+
+// waitSLAMetricsCalledTicketData applies the same rules as waitSLAOneTicket using preloaded rows (no DB).
+func waitSLAMetricsCalledTicketData(t models.Ticket, histories []models.TicketHistory) (waitSumMs int64, waitCount int, slaMet int, slaTotal int) {
 	if t.CalledAt == nil {
-		return 0, 0, 0, 0, nil
+		return 0, 0, 0, 0
 	}
 	calledAt := *t.CalledAt
-	var histories []models.TicketHistory
-	if err := db.Where("ticket_id = ?", ticketID).Order("created_at ASC").Find(&histories).Error; err != nil {
-		return 0, 0, 0, 0, err
-	}
 	segStart := queueWaitSegmentStart(t.CreatedAt, histories, calledAt)
 	waitMs := calledAt.Sub(segStart).Milliseconds()
 	if waitMs < 0 {
@@ -104,27 +102,18 @@ func waitSLAOneTicket(db *gorm.DB, ticketID string) (waitSumMs int64, waitCount 
 			slaMet = 1
 		}
 	}
-	return waitSumMs, waitCount, slaMet, slaTotal, nil
+	return waitSumMs, waitCount, slaMet, slaTotal
 }
 
-// waitSLANoCallClosureOneTicket is for tickets closed as no_show without ever being called (queue cleared at EOD).
-// Waiting time ends at completed_at instead of called_at.
-func waitSLANoCallClosureOneTicket(db *gorm.DB, ticketID string) (waitSumMs int64, waitCount int, slaMet int, slaTotal int, err error) {
-	var t models.Ticket
-	if err := db.Where("id = ?", ticketID).First(&t).Error; err != nil {
-		return 0, 0, 0, 0, err
-	}
+// waitSLAMetricsNoCallClosureData applies the same rules as waitSLANoCallClosureOneTicket using preloaded rows (no DB).
+func waitSLAMetricsNoCallClosureData(t models.Ticket, histories []models.TicketHistory) (waitSumMs int64, waitCount int, slaMet int, slaTotal int) {
 	if t.CalledAt != nil {
-		return 0, 0, 0, 0, nil
+		return 0, 0, 0, 0
 	}
 	if t.CompletedAt == nil || t.Status != "no_show" {
-		return 0, 0, 0, 0, nil
+		return 0, 0, 0, 0
 	}
 	endAt := *t.CompletedAt
-	var histories []models.TicketHistory
-	if err := db.Where("ticket_id = ?", ticketID).Order("created_at ASC").Find(&histories).Error; err != nil {
-		return 0, 0, 0, 0, err
-	}
 	segStart := queueWaitSegmentStart(t.CreatedAt, histories, endAt)
 	waitMs := endAt.Sub(segStart).Milliseconds()
 	if waitMs < 0 {
@@ -140,7 +129,7 @@ func waitSLANoCallClosureOneTicket(db *gorm.DB, ticketID string) (waitSumMs int6
 			slaMet = 1
 		}
 	}
-	return waitSumMs, waitCount, slaMet, slaTotal, nil
+	return waitSumMs, waitCount, slaMet, slaTotal
 }
 
 // queueWaitSegmentStart returns the start of the waiting segment that ends at calledAt:

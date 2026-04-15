@@ -23,6 +23,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { useUnits } from '@/lib/hooks';
+import { UNIT_PERMISSIONS } from '@/lib/unit-permissions';
 
 interface Template {
   id: string;
@@ -38,20 +39,6 @@ interface InviteDialogProps {
 }
 
 const AVAILABLE_ROLES = ['staff', 'supervisor'];
-const AVAILABLE_PERMISSIONS = [
-  'UNIT_SETTINGS_MANAGE',
-  'UNIT_GRID_MANAGE',
-  'UNIT_SERVICES_MANAGE',
-  'UNIT_TICKET_SCREEN_MANAGE',
-  'UNIT_USERS_MANAGE',
-  'ACCESS_STAFF_PANEL',
-  'ACCESS_KIOSK',
-  'ACCESS_TICKET_SCREEN',
-  'ACCESS_SUPERVISOR_PANEL',
-  'ACCESS_SURVEY_RESPONSES',
-  'ACCESS_STATISTICS_SUBDIVISION',
-  'ACCESS_STATISTICS_ZONE'
-];
 
 export default function InviteDialog({
   open,
@@ -275,25 +262,25 @@ export default function InviteDialog({
 
                     {selectedUnits.includes(unit.id) && (
                       <div className='ml-6 grid grid-cols-1 gap-2'>
-                        {AVAILABLE_PERMISSIONS.map((permId) => (
+                        {UNIT_PERMISSIONS.map((perm) => (
                           <div
-                            key={permId}
+                            key={perm.id}
                             className='flex items-center space-x-2'
                           >
                             <Checkbox
-                              id={`unit-${unit.id}-${permId}`}
+                              id={`unit-${unit.id}-${perm.id}`}
                               checked={(
                                 unitPermissions[unit.id] || []
-                              ).includes(permId)}
+                              ).includes(perm.id)}
                               onCheckedChange={() =>
-                                toggleUnitPermission(unit.id, permId)
+                                toggleUnitPermission(unit.id, perm.id)
                               }
                             />
                             <Label
-                              htmlFor={`unit-${unit.id}-${permId}`}
+                              htmlFor={`unit-${unit.id}-${perm.id}`}
                               className='cursor-pointer text-sm font-normal'
                             >
-                              {tPermissions(permId)}
+                              {tPermissions(perm.id)}
                             </Label>
                           </div>
                         ))}

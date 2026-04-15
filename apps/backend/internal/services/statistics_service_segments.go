@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"quokkaq-go-backend/internal/models"
+	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/ticketaudit"
 
 	"gorm.io/gorm"
@@ -142,51 +143,32 @@ func payloadString(m map[string]interface{}, key string) string {
 	}
 }
 
-func loadTicketHistoriesOrdered(db *gorm.DB, ticketID string) ([]models.TicketHistory, error) {
-	var histories []models.TicketHistory
-	if err := db.Where("ticket_id = ?", ticketID).Order("created_at ASC").Find(&histories).Error; err != nil {
-		return nil, err
-	}
-	return histories, nil
-}
-
 // aggregateServiceTimeForServedTicketsCompletedInRange sums segment durations and counts segments with duration > 0
 // for tickets served with completed_at in [startUTC, endUTC), optionally restricted to service_zone_id.
 func aggregateServiceTimeForServedTicketsCompletedInRange(
-	db *gorm.DB,
+	seg repository.StatisticsTicketSegmentsRepository,
 	unitID string,
 	zoneID string,
 	startUTC, endUTC time.Time,
 ) (sumMs int64, segCount int, err error) {
-	var z1, z2 interface{}
-	if strings.TrimSpace(zoneID) == "" {
-		z1, z2 = nil, nil
-	} else {
-		z := strings.TrimSpace(zoneID)
-		z1, z2 = z, z
+	ids, err := seg.ListTicketIDsServedCompletedInRangeForService(unitID, startUTC, endUTC, zoneID)
+	if err != nil {
+		return 0, 0, err
 	}
-	var ids []string
-	q := `
-SELECT id::text FROM tickets
-WHERE unit_id = ?
-  AND status = 'served'
-  AND completed_at IS NOT NULL
-  AND completed_at >= ? AND completed_at < ?
-  AND (NULLIF(TRIM(COALESCE(?::text, '')), '') IS NULL OR service_zone_id::text = NULLIF(TRIM(COALESCE(?::text, '')), ''))
-`
-	if err := db.Raw(q, unitID, startUTC, endUTC, z1, z2).Scan(&ids).Error; err != nil {
+	ticketMap, err := seg.BatchTicketsByIDs(ids)
+	if err != nil {
+		return 0, 0, err
+	}
+	histMap, err := seg.BatchHistoriesByTicketIDs(ids)
+	if err != nil {
 		return 0, 0, err
 	}
 	for _, tid := range ids {
-		var t models.Ticket
-		if err := db.Where("id = ?", tid).First(&t).Error; err != nil {
-			return 0, 0, err
+		t, ok := ticketMap[tid]
+		if !ok {
+			continue
 		}
-		hist, err := loadTicketHistoriesOrdered(db, tid)
-		if err != nil {
-			return 0, 0, err
-		}
-		segs := buildServiceTimeSegments(hist, t)
+		segs := buildServiceTimeSegments(histMap[tid], t)
 		for _, s := range segs {
 			if s.DurationMs <= 0 {
 				continue
@@ -198,34 +180,28 @@ WHERE unit_id = ?
 	return sumMs, segCount, nil
 }
 
-// aggregateServiceTimeForOperatorOnTouchedTickets sums segments whose opening in_service was acted by operatorUserID,
-// for tickets in touchedTicketIDs (typically “touched” by that operator via any status_changed that day).
-func aggregateServiceTimeForOperatorOnTouchedTickets(
-	db *gorm.DB,
+// aggregateServiceTimeForOperatorOnTouchedTicketsPreloaded sums in_service segments for operatorUserID using
+// tickets and histories already loaded (one batch per rollup operator).
+func aggregateServiceTimeForOperatorOnTouchedTicketsPreloaded(
 	operatorUserID string,
 	touchedTicketIDs []string,
-) (sumMs int64, segCount int, err error) {
+	ticketMap map[string]models.Ticket,
+	histMap map[string][]models.TicketHistory,
+) (sumMs int64, segCount int) {
 	op := strings.TrimSpace(operatorUserID)
 	if op == "" {
-		return 0, 0, nil
+		return 0, 0
 	}
 	for _, tid := range touchedTicketIDs {
 		tid = strings.TrimSpace(tid)
 		if tid == "" {
 			continue
 		}
-		var t models.Ticket
-		if err := db.Where("id = ?", tid).First(&t).Error; err != nil {
-			return 0, 0, err
-		}
-		if t.Status != "served" || t.CompletedAt == nil {
+		t, ok := ticketMap[tid]
+		if !ok || t.Status != "served" || t.CompletedAt == nil {
 			continue
 		}
-		hist, err := loadTicketHistoriesOrdered(db, tid)
-		if err != nil {
-			return 0, 0, err
-		}
-		segs := buildServiceTimeSegments(hist, t)
+		segs := buildServiceTimeSegments(histMap[tid], t)
 		for _, s := range segs {
 			if s.DurationMs <= 0 || s.OperatorUserID == nil {
 				continue
@@ -237,12 +213,13 @@ func aggregateServiceTimeForOperatorOnTouchedTickets(
 			segCount++
 		}
 	}
-	return sumMs, segCount, nil
+	return sumMs, segCount
 }
 
 // operatorServiceMinutesByHourForDay distributes this operator's in_service segment minutes into local
 // hour buckets for bucketDate (same touched-ticket window and served-ticket filter as daily operator rollup).
 func operatorServiceMinutesByHourForDay(
+	seg repository.StatisticsTicketSegmentsRepository,
 	db *gorm.DB,
 	subdivisionID, operatorUserID, bucketDate string,
 	loc *time.Location,
@@ -266,19 +243,20 @@ WHERE t.unit_id::text = ? AND h.user_id::text = ?
 	}
 	ds := time.Date(dayStart.Year(), dayStart.Month(), dayStart.Day(), 0, 0, 0, 0, loc)
 
+	ticketMap, err := seg.BatchTicketsByIDs(touchedIDs)
+	if err != nil {
+		return out, err
+	}
+	histMap, err := seg.BatchHistoriesByTicketIDs(touchedIDs)
+	if err != nil {
+		return out, err
+	}
 	for _, tid := range touchedIDs {
-		var t models.Ticket
-		if err := db.Where("id = ?", tid).First(&t).Error; err != nil {
-			return out, err
-		}
-		if t.Status != "served" || t.CompletedAt == nil {
+		t, ok := ticketMap[tid]
+		if !ok || t.Status != "served" || t.CompletedAt == nil {
 			continue
 		}
-		hist, err := loadTicketHistoriesOrdered(db, tid)
-		if err != nil {
-			return out, err
-		}
-		segs := buildServiceTimeSegments(hist, t)
+		segs := buildServiceTimeSegments(histMap[tid], t)
 		for _, s := range segs {
 			if s.DurationMs <= 0 || s.OperatorUserID == nil {
 				continue
@@ -289,8 +267,15 @@ WHERE t.unit_id::text = ? AND h.user_id::text = ?
 			s0 := s.Start.UTC()
 			s1 := s.End.UTC()
 			for h := 0; h < 24; h++ {
-				hs := ds.Add(time.Duration(h) * time.Hour).UTC()
-				he := hs.Add(time.Hour)
+				hsLoc := time.Date(ds.Year(), ds.Month(), ds.Day(), h, 0, 0, 0, loc)
+				var heLoc time.Time
+				if h == 23 {
+					heLoc = ds.AddDate(0, 0, 1)
+				} else {
+					heLoc = time.Date(ds.Year(), ds.Month(), ds.Day(), h+1, 0, 0, 0, loc)
+				}
+				hs := hsLoc.UTC()
+				he := heLoc.UTC()
 				out[h] += overlapMinutesUTC(s0, s1, hs, he)
 			}
 		}

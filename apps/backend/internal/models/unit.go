@@ -86,5 +86,5 @@ type Unit struct {
 	SlotConfig       *SlotConfig       `gorm:"foreignKey:UnitID" json:"slotConfig,omitempty"`
 
 	// Operations is hydrated for GET /units/{id} (kiosk freeze / EOD phase); not stored on units row.
-	Operations *UnitOperationsPublic `json:"operations,omitempty" gorm:"-"`
+	Operations *UnitOperationsPublic `json:"operations,omitempty" gorm:"-" readonly:"true"`
 }

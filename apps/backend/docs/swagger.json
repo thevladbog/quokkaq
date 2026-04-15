@@ -808,11 +808,20 @@
                 "type": "object"
             },
             "handlers.emergencyUnlockBody": {
+                "description": "Request body for emergency unlock. Destructive admin action: clears kiosk admission freeze and counter-login blocks for the subdivision (EOD recovery). confirm must be exactly UNLOCK.",
                 "properties": {
                     "confirm": {
+                        "description": "Must equal UNLOCK exactly to acknowledge the operation.",
+                        "enum": [
+                            "UNLOCK"
+                        ],
+                        "example": "UNLOCK",
                         "type": "string"
                     }
                 },
+                "required": [
+                    "confirm"
+                ],
                 "type": "object"
             },
             "handlers.guestSurveySubmitRequest": {
@@ -2239,7 +2248,8 @@
                                 "$ref": "#/components/schemas/models.UnitOperationsPublic"
                             }
                         ],
-                        "description": "Operations is hydrated for GET /units/{id} (kiosk freeze / EOD phase); not stored on units row."
+                        "description": "Operations is hydrated for GET /units/{id} (kiosk freeze / EOD phase); not stored on units row.",
+                        "readOnly": true
                     },
                     "parentId": {
                         "type": "string"
@@ -2641,7 +2651,6 @@
                         "type": "string"
                     },
                     "granularity": {
-                        "description": "day | hour — hour when date range is a single calendar day without operator filter",
                         "type": "string"
                     },
                     "points": {
@@ -2649,60 +2658,6 @@
                             "$ref": "#/components/schemas/services.LoadPoint"
                         },
                         "type": "array"
-                    }
-                },
-                "type": "object"
-            },
-            "services.SlaSummaryResponse": {
-                "properties": {
-                    "breachPct": {
-                        "type": "number"
-                    },
-                    "computedAt": {
-                        "type": "string"
-                    },
-                    "serviceId": {
-                        "type": "string"
-                    },
-                    "slaWaitMet": {
-                        "type": "integer"
-                    },
-                    "slaWaitTotal": {
-                        "type": "integer"
-                    },
-                    "withinPct": {
-                        "type": "number"
-                    }
-                },
-                "type": "object"
-            },
-            "services.TicketsByServiceItem": {
-                "properties": {
-                    "count": {
-                        "type": "integer"
-                    },
-                    "serviceId": {
-                        "type": "string"
-                    },
-                    "serviceName": {
-                        "type": "string"
-                    }
-                },
-                "type": "object"
-            },
-            "services.TicketsByServiceResponse": {
-                "properties": {
-                    "computedAt": {
-                        "type": "string"
-                    },
-                    "items": {
-                        "items": {
-                            "$ref": "#/components/schemas/services.TicketsByServiceItem"
-                        },
-                        "type": "array"
-                    },
-                    "total": {
-                        "type": "integer"
                     }
                 },
                 "type": "object"
@@ -2754,11 +2709,9 @@
                         "type": "string"
                     },
                     "slaWaitMet": {
-                        "description": "waiting SLA segments within threshold for this bucket",
                         "type": "integer"
                     },
                     "slaWaitTotal": {
-                        "description": "waiting SLA segments counted for this bucket",
                         "type": "integer"
                     },
                     "withinPct": {
@@ -2773,7 +2726,6 @@
                         "type": "string"
                     },
                     "granularity": {
-                        "description": "day | hour — hour when date range is a single calendar day without operator filter",
                         "type": "string"
                     },
                     "points": {
@@ -2887,6 +2839,29 @@
                 },
                 "type": "object"
             },
+            "services.SlaSummaryResponse": {
+                "properties": {
+                    "breachPct": {
+                        "type": "number"
+                    },
+                    "computedAt": {
+                        "type": "string"
+                    },
+                    "serviceId": {
+                        "type": "string"
+                    },
+                    "slaWaitMet": {
+                        "type": "integer"
+                    },
+                    "slaWaitTotal": {
+                        "type": "integer"
+                    },
+                    "withinPct": {
+                        "type": "number"
+                    }
+                },
+                "type": "object"
+            },
             "services.SurveyScorePoint": {
                 "properties": {
                     "avgScoreNative": {
@@ -2916,7 +2891,6 @@
                         "type": "string"
                     },
                     "granularity": {
-                        "description": "day | hour — hour when date range is a single calendar day",
                         "type": "string"
                     },
                     "mode": {
@@ -2927,6 +2901,37 @@
                             "$ref": "#/components/schemas/services.SurveyScorePoint"
                         },
                         "type": "array"
+                    }
+                },
+                "type": "object"
+            },
+            "services.TicketsByServiceItem": {
+                "properties": {
+                    "count": {
+                        "type": "integer"
+                    },
+                    "serviceId": {
+                        "type": "string"
+                    },
+                    "serviceName": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "services.TicketsByServiceResponse": {
+                "properties": {
+                    "computedAt": {
+                        "type": "string"
+                    },
+                    "items": {
+                        "items": {
+                            "$ref": "#/components/schemas/services.TicketsByServiceItem"
+                        },
+                        "type": "array"
+                    },
+                    "total": {
+                        "type": "integer"
                     }
                 },
                 "type": "object"
@@ -2963,7 +2968,7 @@
                         "type": "string"
                     },
                     "granularity": {
-                        "description": "day | hour — hour when date range is a single calendar day without operator filter; per-hour ticket volume and wait/service/SLA averages from the same rollup rules as daily buckets",
+                        "description": "\"day\" | \"hour\"",
                         "type": "string"
                     },
                     "metric": {
@@ -3048,9 +3053,7 @@
                         "type": "number"
                     },
                     "utilizationPct": {
-                        "type": "number",
-                        "nullable": true,
-                        "description": "Omitted when this hour has no serving and no idle/break (excluded from aggregates)"
+                        "type": "number"
                     }
                 },
                 "type": "object"
@@ -3061,7 +3064,6 @@
                         "type": "string"
                     },
                     "granularity": {
-                        "description": "hour when dateFrom equals dateTo (one point per clock hour); day when range spans multiple calendar days. Percentages ignore hours where serving+idle+break are all zero.",
                         "type": "string"
                     },
                     "points": {
@@ -10931,6 +10933,7 @@
         },
         "/units/{unitId}/operations/clear-statistics-quiet": {
             "post": {
+                "description": "Admin-only: clears the statistics quiet flag so incremental statistics processing resumes for the subdivision. No request body.",
                 "operationId": "postUnitOperationsClearStatisticsQuiet",
                 "parameters": [
                     {
@@ -10961,6 +10964,7 @@
         },
         "/units/{unitId}/operations/emergency-unlock": {
             "post": {
+                "description": "Destructive admin operation: clears kiosk admission freeze and counter-login blocks for the subdivision. JSON body required; confirm must equal UNLOCK exactly.",
                 "operationId": "postUnitOperationsEmergencyUnlock",
                 "parameters": [
                     {
@@ -10975,13 +10979,14 @@
                 ],
                 "requestBody": {
                     "content": {
-                        "*/*": {
+                        "application/json": {
                             "schema": {
                                 "$ref": "#/components/schemas/handlers.emergencyUnlockBody"
                             }
                         }
                     },
-                    "description": "Send {\\",
+                    "description": "JSON object with required confirm field. confirm must be exactly UNLOCK.",
+                    "required": true,
                     "x-originalParamName": "body"
                 },
                 "responses": {
@@ -12629,6 +12634,7 @@
         },
         "/units/{unitId}/statistics/load": {
             "get": {
+                "description": "Same daily bucket source as timeseries volume; wait/service semantics match timeseries when those metrics are derived from the same warehouse rows.",
                 "operationId": "getUnitStatisticsLoad",
                 "parameters": [
                     {
@@ -12693,6 +12699,78 @@
                     }
                 ],
                 "summary": "Daily ticket load (created / completed / no-show)",
+                "tags": [
+                    "statistics"
+                ]
+            }
+        },
+        "/units/{unitId}/statistics/sla-deviations": {
+            "get": {
+                "description": "Waiting SLA shares use the same queue segment definition as timeseries (post-transfer wait before call).",
+                "operationId": "getUnitStatisticsSlaDeviations",
+                "parameters": [
+                    {
+                        "description": "Subdivision unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "YYYY-MM-DD",
+                        "in": "query",
+                        "name": "dateFrom",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "YYYY-MM-DD",
+                        "in": "query",
+                        "name": "dateTo",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Filter by operator (expanded scope only)",
+                        "in": "query",
+                        "name": "userId",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Service zone unit id (child of subdivision)",
+                        "in": "query",
+                        "name": "serviceZoneId",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/services.SLADeviationsResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "SLA waiting compliance vs breach per day",
                 "tags": [
                     "statistics"
                 ]
@@ -12777,9 +12855,9 @@
                 ]
             }
         },
-        "/units/{unitId}/statistics/sla-deviations": {
+        "/units/{unitId}/statistics/survey-scores": {
             "get": {
-                "operationId": "getUnitStatisticsSlaDeviations",
+                "operationId": "getUnitStatisticsSurveyScores",
                 "parameters": [
                     {
                         "description": "Subdivision unit ID",
@@ -12809,19 +12887,22 @@
                         }
                     },
                     {
-                        "description": "Filter by operator (expanded scope only)",
+                        "description": "Single survey definition id (required with questionIds)",
                         "in": "query",
-                        "name": "userId",
+                        "name": "surveyId",
                         "schema": {
                             "type": "string"
                         }
                     },
                     {
-                        "description": "Service zone unit id (child of subdivision)",
+                        "description": "Question ids (repeat param or comma-separated); native scale",
                         "in": "query",
-                        "name": "serviceZoneId",
+                        "name": "questionIds",
                         "schema": {
-                            "type": "string"
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
                         }
                     }
                 ],
@@ -12830,7 +12911,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/services.SLADeviationsResponse"
+                                    "$ref": "#/components/schemas/services.SurveyScoresResponse"
                                 }
                             }
                         },
@@ -12842,7 +12923,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "summary": "SLA waiting compliance vs breach per day",
+                "summary": "Guest survey score timeseries (live from responses; hourly for a single day, daily for longer ranges)",
                 "tags": [
                     "statistics"
                 ]
@@ -12919,83 +13000,9 @@
                 ]
             }
         },
-        "/units/{unitId}/statistics/survey-scores": {
-            "get": {
-                "operationId": "getUnitStatisticsSurveyScores",
-                "parameters": [
-                    {
-                        "description": "Subdivision unit ID",
-                        "in": "path",
-                        "name": "unitId",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "description": "YYYY-MM-DD",
-                        "in": "query",
-                        "name": "dateFrom",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "description": "YYYY-MM-DD",
-                        "in": "query",
-                        "name": "dateTo",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "description": "Single survey definition id (required with questionIds)",
-                        "in": "query",
-                        "name": "surveyId",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "description": "Question ids (repeat param or comma-separated); native scale",
-                        "in": "query",
-                        "name": "questionIds",
-                        "schema": {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/services.SurveyScoresResponse"
-                                }
-                            }
-                        },
-                        "description": "OK"
-                    }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "summary": "Guest survey score timeseries (live from responses; hourly for a single day, daily for longer ranges)",
-                "tags": [
-                    "statistics"
-                ]
-            }
-        },
         "/units/{unitId}/statistics/timeseries": {
             "get": {
-                "description": "Daily metrics from statistics warehouse; when dateFrom equals dateTo (single calendar day) and no operator filter, returns hourly granularity (24 points): ticket volume by hour; wait/service/SLA averages recomputed per hour using the same rules as the daily rollup (calls and completions attributed to that local hour). Requires unit branch access and statistics scope (self or ACCESS_STATISTICS_* / supervisor / admin).",
+                "description": "Daily metrics from statistics warehouse; single calendar day without operator filter yields hourly points with per-hour recomputed wait/service/SLA (same rules as daily rollup). Requires unit branch access and statistics scope (self or ACCESS_STATISTICS_* / supervisor / admin).\nWait averages use queue time after the last ticket.transferred before the call. Service averages sum in_service episodes from ticket_histories (split by transfer / return-to-queue / recall / terminal status); warehouse service_count is the number of those segments with positive duration.",
                 "operationId": "getUnitStatisticsTimeseries",
                 "parameters": [
                     {

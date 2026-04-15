@@ -102,10 +102,17 @@ func (s *StatisticsService) GetTicketsByService(
 	requestedUserID *string,
 	requestedServiceZoneID string,
 ) (*TicketsByServiceResponse, error) {
-	if !CompanyAllowsBasicReports(ctx, companyID) {
+	ok, err := CompanyAllowsBasicReports(ctx, companyID)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
 		return nil, errors.New("plan does not include basic reports")
 	}
 	sc := statistics.ResolveScope(user, subdivisionID, viewerID)
+	if sc.Denied {
+		return nil, errors.New("forbidden")
+	}
 	effectiveUser := sc.ApplyRequestedUserID(requestedUserID)
 	if effectiveUser != nil && strings.TrimSpace(*effectiveUser) != "" && strings.TrimSpace(requestedServiceZoneID) != "" {
 		return nil, errors.New("serviceZoneId cannot be used with userId filter")
@@ -177,10 +184,17 @@ func (s *StatisticsService) GetSlaSummary(
 	requestedServiceZoneID string,
 	filterServiceID string,
 ) (*SlaSummaryResponse, error) {
-	if !CompanyAllowsBasicReports(ctx, companyID) {
+	ok, err := CompanyAllowsBasicReports(ctx, companyID)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
 		return nil, errors.New("plan does not include basic reports")
 	}
 	sc := statistics.ResolveScope(user, subdivisionID, viewerID)
+	if sc.Denied {
+		return nil, errors.New("forbidden")
+	}
 	effectiveUser := sc.ApplyRequestedUserID(requestedUserID)
 	if effectiveUser != nil && strings.TrimSpace(*effectiveUser) != "" && strings.TrimSpace(requestedServiceZoneID) != "" {
 		return nil, errors.New("serviceZoneId cannot be used with userId filter")

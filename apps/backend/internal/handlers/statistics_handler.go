@@ -123,6 +123,10 @@ func (h *StatisticsHandler) GetTimeseries(w http.ResponseWriter, r *http.Request
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		if strings.Contains(err.Error(), "invalid date") || strings.Contains(err.Error(), "dateTo before") {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -181,6 +185,10 @@ func (h *StatisticsHandler) GetSLADeviations(w http.ResponseWriter, r *http.Requ
 			return
 		}
 		if strings.Contains(err.Error(), "service zone not under subdivision") {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if strings.Contains(err.Error(), "invalid date") || strings.Contains(err.Error(), "dateTo before") {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -306,6 +314,10 @@ func (h *StatisticsHandler) GetLoad(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if strings.Contains(err.Error(), "service zone not under subdivision") {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if strings.Contains(err.Error(), "invalid date") || strings.Contains(err.Error(), "dateTo before") {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -101,7 +102,10 @@ func (h *UnitHandler) GetUnitByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if h.operational != nil {
-		if snap, err := h.operational.GetPublicSnapshot(unit.ID); err == nil && snap != nil {
+		snap, snapErr := h.operational.GetPublicSnapshot(unit.ID)
+		if snapErr != nil {
+			log.Printf("GetUnitByID: GetPublicSnapshot unitID=%q err=%v", unit.ID, snapErr)
+		} else if snap != nil {
 			unit.Operations = snap
 		}
 	}

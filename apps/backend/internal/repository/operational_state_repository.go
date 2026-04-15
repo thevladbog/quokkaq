@@ -27,7 +27,7 @@ func NewOperationalStateRepository() OperationalStateRepository {
 
 func (r *operationalStateRepository) Get(unitID string) (*models.UnitOperationalState, error) {
 	var row models.UnitOperationalState
-	err := r.db.Where("unit_id::text = ?", unitID).First(&row).Error
+	err := r.db.Where("unit_id = ?", unitID).First(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return &models.UnitOperationalState{UnitID: unitID, Phase: "idle"}, nil
@@ -49,7 +49,8 @@ func (r *operationalStateRepository) Upsert(state *models.UnitOperationalState) 
 	if state.UnitID == "" {
 		return errors.New("unit id required")
 	}
-	state.UpdatedAt = time.Now().UTC()
+	row := *state
+	row.UpdatedAt = time.Now().UTC()
 	return r.db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "unit_id"}},
 		DoUpdates: clause.AssignmentColumns([]string{
@@ -57,5 +58,5 @@ func (r *operationalStateRepository) Upsert(state *models.UnitOperationalState) 
 			"reconcile_in_progress", "reconcile_progress_note",
 			"last_eod_at", "last_reconcile_at", "last_reconcile_error", "statistics_as_of", "updated_at",
 		}),
-	}).Create(state).Error
+	}).Create(&row).Error
 }

@@ -175,7 +175,7 @@ export interface ModelsUnit {
   kind?: string;
   name?: string;
   /** Operations is hydrated for GET /units/{id} (kiosk freeze / EOD phase); not stored on units row. */
-  operations?: ModelsUnitOperationsPublic;
+  readonly operations?: ModelsUnitOperationsPublic;
   parentId?: string;
   preRegistrations?: ModelsPreRegistration[];
   services?: ModelsService[];
@@ -823,8 +823,22 @@ export interface HandlersCreateVisitorTagDefinitionRequest {
   sortOrder?: number;
 }
 
+/**
+ * Must equal UNLOCK exactly to acknowledge the operation.
+ */
+export type HandlersEmergencyUnlockBodyConfirm = typeof HandlersEmergencyUnlockBodyConfirm[keyof typeof HandlersEmergencyUnlockBodyConfirm];
+
+
+export const HandlersEmergencyUnlockBodyConfirm = {
+  UNLOCK: 'UNLOCK',
+} as const;
+
+/**
+ * Request body for emergency unlock. Destructive admin action: clears kiosk admission freeze and counter-login blocks for the subdivision (EOD recovery). confirm must be exactly UNLOCK.
+ */
 export interface HandlersEmergencyUnlockBody {
-  confirm?: string;
+  /** Must equal UNLOCK exactly to acknowledge the operation. */
+  confirm: HandlersEmergencyUnlockBodyConfirm;
 }
 
 export type HandlersGuestSurveySubmitRequestAnswers = { [key: string]: unknown };
@@ -1196,30 +1210,8 @@ export interface ServicesLoadPoint {
 
 export interface ServicesLoadResponse {
   computedAt?: string;
-  /** day | hour — hour when date range is a single calendar day without operator filter */
   granularity?: string;
   points?: ServicesLoadPoint[];
-}
-
-export interface ServicesSlaSummaryResponse {
-  breachPct?: number;
-  computedAt?: string;
-  serviceId?: string;
-  slaWaitMet?: number;
-  slaWaitTotal?: number;
-  withinPct?: number;
-}
-
-export interface ServicesTicketsByServiceItem {
-  count?: number;
-  serviceId?: string;
-  serviceName?: string;
-}
-
-export interface ServicesTicketsByServiceResponse {
-  computedAt?: string;
-  items?: ServicesTicketsByServiceItem[];
-  total?: number;
 }
 
 export interface ServicesOperationsStatusDTO {
@@ -1239,16 +1231,13 @@ export interface ServicesOperationsStatusDTO {
 export interface ServicesSLADeviationsPoint {
   breachPct?: number;
   date?: string;
-  /** waiting SLA segments within threshold for this bucket */
   slaWaitMet?: number;
-  /** waiting SLA segments counted for this bucket */
   slaWaitTotal?: number;
   withinPct?: number;
 }
 
 export interface ServicesSLADeviationsResponse {
   computedAt?: string;
-  /** day | hour — hour when date range is a single calendar day without operator filter */
   granularity?: string;
   points?: ServicesSLADeviationsPoint[];
 }
@@ -1295,6 +1284,15 @@ export interface ServicesShiftCounterDTO {
   unitId?: string;
 }
 
+export interface ServicesSlaSummaryResponse {
+  breachPct?: number;
+  computedAt?: string;
+  serviceId?: string;
+  slaWaitMet?: number;
+  slaWaitTotal?: number;
+  withinPct?: number;
+}
+
 export interface ServicesSurveyScorePoint {
   avgScoreNative?: number;
   avgScoreNorm5?: number;
@@ -1306,10 +1304,21 @@ export interface ServicesSurveyScorePoint {
 
 export interface ServicesSurveyScoresResponse {
   computedAt?: string;
-  /** day | hour — hour when date range is a single calendar day */
   granularity?: string;
   mode?: string;
   points?: ServicesSurveyScorePoint[];
+}
+
+export interface ServicesTicketsByServiceItem {
+  count?: number;
+  serviceId?: string;
+  serviceName?: string;
+}
+
+export interface ServicesTicketsByServiceResponse {
+  computedAt?: string;
+  items?: ServicesTicketsByServiceItem[];
+  total?: number;
 }
 
 export interface ServicesTimeseriesPoint {
@@ -1324,7 +1333,7 @@ export interface ServicesTimeseriesPoint {
 
 export interface ServicesTimeseriesResponse {
   computedAt?: string;
-  /** day | hour — hour when date range is a single calendar day without operator filter; per-hour ticket volume and wait/service/SLA averages from the same rollup rules as daily buckets */
+  /** "day" | "hour" */
   granularity?: string;
   metric?: string;
   points?: ServicesTimeseriesPoint[];
@@ -1357,16 +1366,11 @@ export interface ServicesUtilizationPoint {
   date?: string;
   idleMinutes?: number;
   servingMinutes?: number;
-  /**
-     * Omitted when this hour has no serving and no idle/break (excluded from aggregates)
-     * @nullable
-     */
-  utilizationPct?: number | null;
+  utilizationPct?: number;
 }
 
 export interface ServicesUtilizationResponse {
   computedAt?: string;
-  /** hour when dateFrom equals dateTo (one point per clock hour); day when range spans multiple calendar days. Percentages ignore hours where serving+idle+break are all zero. */
   granularity?: string;
   points?: ServicesUtilizationPoint[];
 }
@@ -1397,6 +1401,25 @@ userId?: string;
 serviceZoneId?: string;
 };
 
+export type GetUnitStatisticsSlaDeviationsParams = {
+/**
+ * YYYY-MM-DD
+ */
+dateFrom: string;
+/**
+ * YYYY-MM-DD
+ */
+dateTo: string;
+/**
+ * Filter by operator (expanded scope only)
+ */
+userId?: string;
+/**
+ * Service zone unit id (child of subdivision)
+ */
+serviceZoneId?: string;
+};
+
 export type GetUnitStatisticsSlaSummaryParams = {
 /**
  * YYYY-MM-DD
@@ -1420,7 +1443,7 @@ serviceZoneId?: string;
 serviceId?: string;
 };
 
-export type GetUnitStatisticsSlaDeviationsParams = {
+export type GetUnitStatisticsSurveyScoresParams = {
 /**
  * YYYY-MM-DD
  */
@@ -1430,13 +1453,13 @@ dateFrom: string;
  */
 dateTo: string;
 /**
- * Filter by operator (expanded scope only)
+ * Single survey definition id (required with questionIds)
  */
-userId?: string;
+surveyId?: string;
 /**
- * Service zone unit id (child of subdivision)
+ * Question ids (repeat param or comma-separated); native scale
  */
-serviceZoneId?: string;
+questionIds?: string[];
 };
 
 export type GetUnitStatisticsTicketsByServiceParams = {
@@ -1456,25 +1479,6 @@ userId?: string;
  * Service zone unit id
  */
 serviceZoneId?: string;
-};
-
-export type GetUnitStatisticsSurveyScoresParams = {
-/**
- * YYYY-MM-DD
- */
-dateFrom: string;
-/**
- * YYYY-MM-DD
- */
-dateTo: string;
-/**
- * Single survey definition id (required with questionIds)
- */
-surveyId?: string;
-/**
- * Question ids (repeat param or comma-separated); native scale
- */
-questionIds?: string[];
 };
 
 export type GetUnitStatisticsTimeseriesParams = {
@@ -1520,6 +1524,7 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
 /**
+ * Admin-only: clears the statistics quiet flag so incremental statistics processing resumes for the subdivision. No request body.
  * @summary Resume incremental statistics processing
  */
 export type postUnitOperationsClearStatisticsQuietResponse204 = {
@@ -1602,6 +1607,7 @@ export const usePostUnitOperationsClearStatisticsQuiet = <TError = unknown,
     }
 
 /**
+ * Destructive admin operation: clears kiosk admission freeze and counter-login blocks for the subdivision. JSON body required; confirm must equal UNLOCK exactly.
  * @summary Emergency unlock kiosk and counter login
  */
 export type postUnitOperationsEmergencyUnlockResponse204 = {
@@ -1631,7 +1637,7 @@ export const postUnitOperationsEmergencyUnlock = async (unitId: string,
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': '*/*', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(
       handlersEmergencyUnlockBody,)
   }
@@ -1927,6 +1933,7 @@ export function useGetUnitStatisticsEmployeeRadar<TData = Awaited<ReturnType<typ
 
 
 /**
+ * Same daily bucket source as timeseries volume; wait/service semantics match timeseries when those metrics are derived from the same warehouse rows.
  * @summary Daily ticket load (created / completed / no-show)
  */
 export type getUnitStatisticsLoadResponse200 = {
@@ -2042,6 +2049,135 @@ export function useGetUnitStatisticsLoad<TData = Awaited<ReturnType<typeof getUn
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetUnitStatisticsLoadQueryOptions(unitId,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * Waiting SLA shares use the same queue segment definition as timeseries (post-transfer wait before call).
+ * @summary SLA waiting compliance vs breach per day
+ */
+export type getUnitStatisticsSlaDeviationsResponse200 = {
+  data: ServicesSLADeviationsResponse
+  status: 200
+}
+
+export type getUnitStatisticsSlaDeviationsResponseSuccess = (getUnitStatisticsSlaDeviationsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getUnitStatisticsSlaDeviationsResponse = (getUnitStatisticsSlaDeviationsResponseSuccess)
+
+export const getGetUnitStatisticsSlaDeviationsUrl = (unitId: string,
+    params: GetUnitStatisticsSlaDeviationsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/units/${unitId}/statistics/sla-deviations?${stringifiedParams}` : `/units/${unitId}/statistics/sla-deviations`
+}
+
+export const getUnitStatisticsSlaDeviations = async (unitId: string,
+    params: GetUnitStatisticsSlaDeviationsParams, options?: RequestInit): Promise<getUnitStatisticsSlaDeviationsResponse> => {
+
+  return orvalMutator<getUnitStatisticsSlaDeviationsResponse>(getGetUnitStatisticsSlaDeviationsUrl(unitId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetUnitStatisticsSlaDeviationsQueryKey = (unitId: string,
+    params?: GetUnitStatisticsSlaDeviationsParams,) => {
+    return [
+    `/units/${unitId}/statistics/sla-deviations`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetUnitStatisticsSlaDeviationsQueryOptions = <TData = Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>, TError = unknown>(unitId: string,
+    params: GetUnitStatisticsSlaDeviationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetUnitStatisticsSlaDeviationsQueryKey(unitId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>> = ({ signal }) => getUnitStatisticsSlaDeviations(unitId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetUnitStatisticsSlaDeviationsQueryResult = NonNullable<Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>>
+export type GetUnitStatisticsSlaDeviationsQueryError = unknown
+
+
+export function useGetUnitStatisticsSlaDeviations<TData = Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>, TError = unknown>(
+ unitId: string,
+    params: GetUnitStatisticsSlaDeviationsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>,
+          TError,
+          Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetUnitStatisticsSlaDeviations<TData = Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>, TError = unknown>(
+ unitId: string,
+    params: GetUnitStatisticsSlaDeviationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>,
+          TError,
+          Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetUnitStatisticsSlaDeviations<TData = Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>, TError = unknown>(
+ unitId: string,
+    params: GetUnitStatisticsSlaDeviationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary SLA waiting compliance vs breach per day
+ */
+
+export function useGetUnitStatisticsSlaDeviations<TData = Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>, TError = unknown>(
+ unitId: string,
+    params: GetUnitStatisticsSlaDeviationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetUnitStatisticsSlaDeviationsQueryOptions(unitId,params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -2183,22 +2319,22 @@ export function useGetUnitStatisticsSlaSummary<TData = Awaited<ReturnType<typeof
 
 
 /**
- * @summary SLA waiting compliance vs breach per day
+ * @summary Guest survey score timeseries (live from responses; hourly for a single day, daily for longer ranges)
  */
-export type getUnitStatisticsSlaDeviationsResponse200 = {
-  data: ServicesSLADeviationsResponse
+export type getUnitStatisticsSurveyScoresResponse200 = {
+  data: ServicesSurveyScoresResponse
   status: 200
 }
 
-export type getUnitStatisticsSlaDeviationsResponseSuccess = (getUnitStatisticsSlaDeviationsResponse200) & {
+export type getUnitStatisticsSurveyScoresResponseSuccess = (getUnitStatisticsSurveyScoresResponse200) & {
   headers: Headers;
 };
 ;
 
-export type getUnitStatisticsSlaDeviationsResponse = (getUnitStatisticsSlaDeviationsResponseSuccess)
+export type getUnitStatisticsSurveyScoresResponse = (getUnitStatisticsSurveyScoresResponseSuccess)
 
-export const getGetUnitStatisticsSlaDeviationsUrl = (unitId: string,
-    params: GetUnitStatisticsSlaDeviationsParams,) => {
+export const getGetUnitStatisticsSurveyScoresUrl = (unitId: string,
+    params: GetUnitStatisticsSurveyScoresParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -2210,13 +2346,13 @@ export const getGetUnitStatisticsSlaDeviationsUrl = (unitId: string,
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/units/${unitId}/statistics/sla-deviations?${stringifiedParams}` : `/units/${unitId}/statistics/sla-deviations`
+  return stringifiedParams.length > 0 ? `/units/${unitId}/statistics/survey-scores?${stringifiedParams}` : `/units/${unitId}/statistics/survey-scores`
 }
 
-export const getUnitStatisticsSlaDeviations = async (unitId: string,
-    params: GetUnitStatisticsSlaDeviationsParams, options?: RequestInit): Promise<getUnitStatisticsSlaDeviationsResponse> => {
+export const getUnitStatisticsSurveyScores = async (unitId: string,
+    params: GetUnitStatisticsSurveyScoresParams, options?: RequestInit): Promise<getUnitStatisticsSurveyScoresResponse> => {
 
-  return orvalMutator<getUnitStatisticsSlaDeviationsResponse>(getGetUnitStatisticsSlaDeviationsUrl(unitId,params),
+  return orvalMutator<getUnitStatisticsSurveyScoresResponse>(getGetUnitStatisticsSurveyScoresUrl(unitId,params),
   {
     ...options,
     method: 'GET'
@@ -2229,75 +2365,75 @@ export const getUnitStatisticsSlaDeviations = async (unitId: string,
 
 
 
-export const getGetUnitStatisticsSlaDeviationsQueryKey = (unitId: string,
-    params?: GetUnitStatisticsSlaDeviationsParams,) => {
+export const getGetUnitStatisticsSurveyScoresQueryKey = (unitId: string,
+    params?: GetUnitStatisticsSurveyScoresParams,) => {
     return [
-    `/units/${unitId}/statistics/sla-deviations`, ...(params ? [params] : [])
+    `/units/${unitId}/statistics/survey-scores`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetUnitStatisticsSlaDeviationsQueryOptions = <TData = Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>, TError = unknown>(unitId: string,
-    params: GetUnitStatisticsSlaDeviationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export const getGetUnitStatisticsSurveyScoresQueryOptions = <TData = Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>, TError = unknown>(unitId: string,
+    params: GetUnitStatisticsSurveyScoresParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetUnitStatisticsSlaDeviationsQueryKey(unitId,params);
+  const queryKey =  queryOptions?.queryKey ?? getGetUnitStatisticsSurveyScoresQueryKey(unitId,params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>> = ({ signal }) => getUnitStatisticsSlaDeviations(unitId,params, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>> = ({ signal }) => getUnitStatisticsSurveyScores(unitId,params, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type GetUnitStatisticsSlaDeviationsQueryResult = NonNullable<Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>>
-export type GetUnitStatisticsSlaDeviationsQueryError = unknown
+export type GetUnitStatisticsSurveyScoresQueryResult = NonNullable<Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>>
+export type GetUnitStatisticsSurveyScoresQueryError = unknown
 
 
-export function useGetUnitStatisticsSlaDeviations<TData = Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>, TError = unknown>(
+export function useGetUnitStatisticsSurveyScores<TData = Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>, TError = unknown>(
  unitId: string,
-    params: GetUnitStatisticsSlaDeviationsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>, TError, TData>> & Pick<
+    params: GetUnitStatisticsSurveyScoresParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>,
+          Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>,
           TError,
-          Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>
+          Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitStatisticsSlaDeviations<TData = Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>, TError = unknown>(
+export function useGetUnitStatisticsSurveyScores<TData = Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>, TError = unknown>(
  unitId: string,
-    params: GetUnitStatisticsSlaDeviationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>, TError, TData>> & Pick<
+    params: GetUnitStatisticsSurveyScoresParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>,
+          Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>,
           TError,
-          Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>
+          Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitStatisticsSlaDeviations<TData = Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>, TError = unknown>(
+export function useGetUnitStatisticsSurveyScores<TData = Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>, TError = unknown>(
  unitId: string,
-    params: GetUnitStatisticsSlaDeviationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+    params: GetUnitStatisticsSurveyScoresParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary SLA waiting compliance vs breach per day
+ * @summary Guest survey score timeseries (live from responses; hourly for a single day, daily for longer ranges)
  */
 
-export function useGetUnitStatisticsSlaDeviations<TData = Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>, TError = unknown>(
+export function useGetUnitStatisticsSurveyScores<TData = Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>, TError = unknown>(
  unitId: string,
-    params: GetUnitStatisticsSlaDeviationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSlaDeviations>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+    params: GetUnitStatisticsSurveyScoresParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetUnitStatisticsSlaDeviationsQueryOptions(unitId,params,options)
+  const queryOptions = getGetUnitStatisticsSurveyScoresQueryOptions(unitId,params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -2439,135 +2575,8 @@ export function useGetUnitStatisticsTicketsByService<TData = Awaited<ReturnType<
 
 
 /**
- * @summary Guest survey score timeseries (live from responses; hourly for a single day, daily for longer ranges)
- */
-export type getUnitStatisticsSurveyScoresResponse200 = {
-  data: ServicesSurveyScoresResponse
-  status: 200
-}
-
-export type getUnitStatisticsSurveyScoresResponseSuccess = (getUnitStatisticsSurveyScoresResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getUnitStatisticsSurveyScoresResponse = (getUnitStatisticsSurveyScoresResponseSuccess)
-
-export const getGetUnitStatisticsSurveyScoresUrl = (unitId: string,
-    params: GetUnitStatisticsSurveyScoresParams,) => {
-  const normalizedParams = new URLSearchParams();
-
-  Object.entries(params || {}).forEach(([key, value]) => {
-
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : value.toString())
-    }
-  });
-
-  const stringifiedParams = normalizedParams.toString();
-
-  return stringifiedParams.length > 0 ? `/units/${unitId}/statistics/survey-scores?${stringifiedParams}` : `/units/${unitId}/statistics/survey-scores`
-}
-
-export const getUnitStatisticsSurveyScores = async (unitId: string,
-    params: GetUnitStatisticsSurveyScoresParams, options?: RequestInit): Promise<getUnitStatisticsSurveyScoresResponse> => {
-
-  return orvalMutator<getUnitStatisticsSurveyScoresResponse>(getGetUnitStatisticsSurveyScoresUrl(unitId,params),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getGetUnitStatisticsSurveyScoresQueryKey = (unitId: string,
-    params?: GetUnitStatisticsSurveyScoresParams,) => {
-    return [
-    `/units/${unitId}/statistics/survey-scores`, ...(params ? [params] : [])
-    ] as const;
-    }
-
-
-export const getGetUnitStatisticsSurveyScoresQueryOptions = <TData = Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>, TError = unknown>(unitId: string,
-    params: GetUnitStatisticsSurveyScoresParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetUnitStatisticsSurveyScoresQueryKey(unitId,params);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>> = ({ signal }) => getUnitStatisticsSurveyScores(unitId,params, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type GetUnitStatisticsSurveyScoresQueryResult = NonNullable<Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>>
-export type GetUnitStatisticsSurveyScoresQueryError = unknown
-
-
-export function useGetUnitStatisticsSurveyScores<TData = Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>, TError = unknown>(
- unitId: string,
-    params: GetUnitStatisticsSurveyScoresParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>,
-          TError,
-          Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitStatisticsSurveyScores<TData = Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>, TError = unknown>(
- unitId: string,
-    params: GetUnitStatisticsSurveyScoresParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>,
-          TError,
-          Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitStatisticsSurveyScores<TData = Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>, TError = unknown>(
- unitId: string,
-    params: GetUnitStatisticsSurveyScoresParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Guest survey score timeseries (live from responses; hourly for a single day, daily for longer ranges)
- */
-
-export function useGetUnitStatisticsSurveyScores<TData = Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>, TError = unknown>(
- unitId: string,
-    params: GetUnitStatisticsSurveyScoresParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSurveyScores>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getGetUnitStatisticsSurveyScoresQueryOptions(unitId,params,options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-
-
-
-
-
-
-/**
- * Daily metrics from statistics warehouse; when dateFrom equals dateTo (single calendar day) and no operator filter, returns hourly granularity (24 points): ticket volume by hour; wait/service/SLA averages recomputed per hour using the same rules as the daily rollup (calls and completions attributed to that local hour). Requires unit branch access and statistics scope (self or ACCESS_STATISTICS_* / supervisor / admin).
+ * Daily metrics from statistics warehouse; single calendar day without operator filter yields hourly points with per-hour recomputed wait/service/SLA (same rules as daily rollup). Requires unit branch access and statistics scope (self or ACCESS_STATISTICS_* / supervisor / admin).
+Wait averages use queue time after the last ticket.transferred before the call. Service averages sum in_service episodes from ticket_histories (split by transfer / return-to-queue / recall / terminal status); warehouse service_count is the number of those segments with positive duration.
  * @summary Statistics timeseries (daily or hourly for a single day)
  */
 export type getUnitStatisticsTimeseriesResponse200 = {

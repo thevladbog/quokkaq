@@ -13,6 +13,9 @@ const (
 
 // Scope describes what a viewer may read for statistics APIs.
 type Scope struct {
+	// Denied is true when the viewer must not read statistics (e.g. missing auth context or no self scope).
+	// Callers must return forbidden and must not treat ApplyRequestedUserID(nil) as team-wide access.
+	Denied   bool
 	Expanded bool // team mode: full unit or filtered by allowed zones
 	// ForceUserID non-empty => metrics restricted to this user (self mode).
 	ForceUserID string
@@ -22,10 +25,15 @@ type Scope struct {
 
 // ResolveScope computes statistics access for subdivisionID (branch), mirroring shift journal role bypass.
 func ResolveScope(user *models.User, subdivisionID string, viewerUserID string) Scope {
-	out := Scope{ForceUserID: strings.TrimSpace(viewerUserID), Expanded: false}
+	viewer := strings.TrimSpace(viewerUserID)
 	if user == nil || subdivisionID == "" {
-		return out
+		if viewer == "" {
+			return Scope{Denied: true}
+		}
+		return Scope{ForceUserID: viewer, Expanded: false}
 	}
+
+	out := Scope{ForceUserID: viewer, Expanded: false}
 
 	for _, ur := range user.Roles {
 		switch ur.Role.Name {
@@ -73,11 +81,17 @@ func ResolveScope(user *models.User, subdivisionID string, viewerUserID string) 
 		return out
 	}
 
+	if !out.Expanded && strings.TrimSpace(out.ForceUserID) == "" {
+		return Scope{Denied: true}
+	}
 	return out
 }
 
 // ApplyRequestedUserID returns the effective filter user id for queries (empty = all in team mode).
 func (s Scope) ApplyRequestedUserID(requested *string) *string {
+	if s.Denied {
+		return nil
+	}
 	if !s.Expanded {
 		if s.ForceUserID == "" {
 			return nil

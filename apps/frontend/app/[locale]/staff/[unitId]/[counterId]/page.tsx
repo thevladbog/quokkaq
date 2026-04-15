@@ -767,11 +767,16 @@ export default function StaffWorkspacePage({
                         />
                       </SelectTrigger>
                       <SelectContent>
-                        {serviceZones.map((z) => (
-                          <SelectItem key={z.id} value={z.id}>
-                            {z.name}
-                          </SelectItem>
-                        ))}
+                        {serviceZones
+                          .filter(
+                            (z): z is typeof z & { id: string } =>
+                              typeof z.id === 'string' && z.id.trim().length > 0
+                          )
+                          .map((z) => (
+                            <SelectItem key={z.id} value={z.id}>
+                              {z.name}
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
                     {serviceZones.length === 0 && (

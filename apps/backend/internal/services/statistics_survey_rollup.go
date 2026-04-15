@@ -10,6 +10,8 @@ import (
 
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
+
+	"gorm.io/gorm"
 )
 
 type surveyQMeta struct {
@@ -149,10 +151,6 @@ type surveyAcc struct {
 }
 
 func (s *StatisticsRefreshService) rollupSurveyDay(unitID, bucketDate string, startUTC, endUTC time.Time) error {
-	if err := s.statsRepo.DeleteSurveyDailyForUnitDay(unitID, bucketDate); err != nil {
-		return err
-	}
-
 	var zoneIDs []string
 	if err := s.db.Model(&models.Unit{}).
 		Where("parent_id = ? AND kind = ?", unitID, models.UnitKindServiceZone).
@@ -176,8 +174,8 @@ func (s *StatisticsRefreshService) rollupSurveyDay(unitID, bucketDate string, st
 
 	var responses []models.SurveyResponse
 	if err := s.db.Where(
-		`unit_id IN (SELECT id FROM units WHERE id = ? OR parent_id = ?) AND submitted_at >= ? AND submitted_at < ?`,
-		unitID, unitID, startUTC, endUTC,
+		"unit_id IN ? AND submitted_at >= ? AND submitted_at < ?",
+		scopeIDs, startUTC, endUTC,
 	).Find(&responses).Error; err != nil {
 		return err
 	}
@@ -232,59 +230,67 @@ func (s *StatisticsRefreshService) rollupSurveyDay(unitID, bucketDate string, st
 		}
 	}
 
-	upsert := func(row *models.StatisticsSurveyDaily) error {
-		return s.statsRepo.UpsertSurveyDaily(row)
-	}
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		repoTx := repository.NewStatisticsRepositoryWithDB(tx)
+		if err := repoTx.DeleteSurveyDailyForUnitDay(unitID, bucketDate); err != nil {
+			return err
+		}
+		computedAt := time.Now().UTC()
+		upsert := func(row *models.StatisticsSurveyDaily) error {
+			row.ComputedAt = computedAt
+			return repoTx.UpsertSurveyDaily(row)
+		}
 
-	if all.nNorm5 > 0 {
-		if err := upsert(&models.StatisticsSurveyDaily{
-			UnitID:             unitID,
-			BucketDate:         bucketDate,
-			SurveyDefinitionID: repository.StatisticsSurveyAggregateSurveyID(),
-			QuestionKey:        "",
-			SumNorm5:           all.sumNorm5,
-			CountNorm5:         all.nNorm5,
-		}); err != nil {
-			return err
+		if all.nNorm5 > 0 {
+			if err := upsert(&models.StatisticsSurveyDaily{
+				UnitID:             unitID,
+				BucketDate:         bucketDate,
+				SurveyDefinitionID: repository.StatisticsSurveyAggregateSurveyID(),
+				QuestionKey:        "",
+				SumNorm5:           all.sumNorm5,
+				CountNorm5:         all.nNorm5,
+			}); err != nil {
+				return err
+			}
 		}
-	}
-	for sid, a := range perSurvey {
-		if a == nil || a.nNorm5 == 0 {
-			continue
+		for sid, a := range perSurvey {
+			if a == nil || a.nNorm5 == 0 {
+				continue
+			}
+			if err := upsert(&models.StatisticsSurveyDaily{
+				UnitID:             unitID,
+				BucketDate:         bucketDate,
+				SurveyDefinitionID: sid,
+				QuestionKey:        "",
+				SumNorm5:           a.sumNorm5,
+				CountNorm5:         a.nNorm5,
+			}); err != nil {
+				return err
+			}
 		}
-		if err := upsert(&models.StatisticsSurveyDaily{
-			UnitID:             unitID,
-			BucketDate:         bucketDate,
-			SurveyDefinitionID: sid,
-			QuestionKey:        "",
-			SumNorm5:           a.sumNorm5,
-			CountNorm5:         a.nNorm5,
-		}); err != nil {
-			return err
+		for qkey, a := range perQuestion {
+			if a == nil || a.nNat == 0 {
+				continue
+			}
+			parts := strings.SplitN(qkey, "\x00", 2)
+			if len(parts) != 2 {
+				continue
+			}
+			surveyID, qid := parts[0], parts[1]
+			row := &models.StatisticsSurveyDaily{
+				UnitID:             unitID,
+				BucketDate:         bucketDate,
+				SurveyDefinitionID: surveyID,
+				QuestionKey:        qid,
+				SumNative:          a.sumNat,
+				CountNative:        a.nNat,
+				ScaleMin:           a.smin,
+				ScaleMax:           a.smax,
+			}
+			if err := upsert(row); err != nil {
+				return err
+			}
 		}
-	}
-	for qkey, a := range perQuestion {
-		if a == nil || a.nNat == 0 {
-			continue
-		}
-		parts := strings.SplitN(qkey, "\x00", 2)
-		if len(parts) != 2 {
-			continue
-		}
-		surveyID, qid := parts[0], parts[1]
-		row := &models.StatisticsSurveyDaily{
-			UnitID:             unitID,
-			BucketDate:         bucketDate,
-			SurveyDefinitionID: surveyID,
-			QuestionKey:        qid,
-			SumNative:          a.sumNat,
-			CountNative:        a.nNat,
-			ScaleMin:           a.smin,
-			ScaleMax:           a.smax,
-		}
-		if err := upsert(row); err != nil {
-			return err
-		}
-	}
-	return nil
+		return nil
+	})
 }

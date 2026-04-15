@@ -150,12 +150,12 @@ func RequireUnitBranchMember(userRepo repository.UserRepository) func(http.Handl
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 				return
 			}
-			unitID := chi.URLParam(r, "unitId")
+			unitID := strings.TrimSpace(chi.URLParam(r, "unitId"))
 			if unitID == "" {
-				unitID = chi.URLParam(r, "id")
+				unitID = strings.TrimSpace(chi.URLParam(r, "id"))
 			}
 			if unitID == "" {
-				next.ServeHTTP(w, r)
+				http.Error(w, "Unit ID required", http.StatusBadRequest)
 				return
 			}
 			allowed, err := userRepo.HasUnitBranchAccess(userID, unitID)
@@ -181,12 +181,12 @@ func RequireUnitMember(userRepo repository.UserRepository) func(http.Handler) ht
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 				return
 			}
-			unitID := chi.URLParam(r, "unitId")
+			unitID := strings.TrimSpace(chi.URLParam(r, "unitId"))
 			if unitID == "" {
-				unitID = chi.URLParam(r, "id")
+				unitID = strings.TrimSpace(chi.URLParam(r, "id"))
 			}
 			if unitID == "" {
-				next.ServeHTTP(w, r)
+				http.Error(w, "Unit ID required", http.StatusBadRequest)
 				return
 			}
 			allowed, err := userRepo.IsAdminOrHasUnitAccess(userID, unitID)

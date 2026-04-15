@@ -2,9 +2,20 @@
 
 import * as React from 'react';
 import * as RechartsPrimitive from 'recharts';
-import type { Payload as RechartsTooltipPayload } from 'recharts/types/component/DefaultTooltipContent';
 
 import { cn } from '@/lib/utils';
+
+/** Tooltip/legend payload row — keep loose; Recharts 3 `Payload` is generic. */
+type ChartPayloadItem = {
+  dataKey?: unknown;
+  name?: unknown;
+  color?: string;
+  fill?: string;
+  stroke?: string;
+  value?: unknown;
+  type?: string;
+  payload?: unknown;
+};
 
 const THEMES = { light: '', dark: '.dark' } as const;
 
@@ -107,6 +118,10 @@ export type ChartTooltipContentProps = Omit<
   'content'
 > &
   React.ComponentProps<'div'> & {
+    /** Injected by Recharts when this component is used as <Tooltip content={...} /> (not on Tooltip itself in v3). */
+    active?: boolean;
+    payload?: ChartPayloadItem[];
+    label?: unknown;
     hideLabel?: boolean;
     hideIndicator?: boolean;
     indicator?: 'line' | 'dot' | 'dashed';
@@ -116,7 +131,7 @@ export type ChartTooltipContentProps = Omit<
       | React.ReactNode
       | ((props: {
           active?: boolean;
-          payload?: RechartsTooltipPayload[];
+          payload?: ChartPayloadItem[];
           label?: unknown;
         }) => React.ReactNode);
   };
@@ -150,9 +165,13 @@ const ChartTooltipContent = React.forwardRef<
         return null;
       }
       if (labelFormatter) {
+        const lf = labelFormatter as (
+          label: unknown,
+          payload: unknown
+        ) => React.ReactNode;
         return (
           <div className={cn('font-medium', labelClassName)}>
-            {labelFormatter(label, payload ?? [])}
+            {lf(label, payload ?? [])}
           </div>
         );
       }
@@ -210,9 +229,16 @@ const ChartTooltipContent = React.forwardRef<
                 item.value !== undefined &&
                 item.name !== undefined
               ) {
-                const out = formatter(
-                  item.value,
-                  item.name,
+                const fmt = formatter as unknown as (
+                  value: unknown,
+                  name: unknown,
+                  item: ChartPayloadItem,
+                  index: number,
+                  payload: ChartPayloadItem[] | undefined
+                ) => React.ReactNode | [React.ReactNode, React.ReactNode];
+                const out = fmt(
+                  item.value as unknown,
+                  item.name as unknown,
                   item,
                   index,
                   payload
@@ -229,10 +255,10 @@ const ChartTooltipContent = React.forwardRef<
 
               const rawLabel =
                 itemConfig?.label !== undefined ? itemConfig.label : item.name;
-              const labelText =
+              const labelText: React.ReactNode =
                 rawLabel === '' || rawLabel === '\u200b' || rawLabel == null
                   ? null
-                  : rawLabel;
+                  : (rawLabel as React.ReactNode);
 
               return (
                 <div
@@ -303,15 +329,16 @@ ChartTooltipContent.displayName = 'ChartTooltipContent';
 
 /** Prefer `dataKey` for ChartConfig lookup — Recharts `name` is often a localized legend label. */
 function configLookupKeyFromPayloadItem(
-  item: { dataKey?: string | number; name?: unknown },
+  item: { dataKey?: unknown; name?: unknown },
   nameKey?: string
 ): string {
+  const dk = item.dataKey;
   if (
-    item.dataKey !== undefined &&
-    item.dataKey !== null &&
-    item.dataKey !== ''
+    (typeof dk === 'string' || typeof dk === 'number') &&
+    dk !== '' &&
+    dk !== null
   ) {
-    return String(item.dataKey);
+    return String(dk);
   }
   if (nameKey) return nameKey;
   if (item.name !== undefined && item.name !== null && item.name !== '') {
@@ -344,11 +371,15 @@ function isRenderableCssColor(value: string): boolean {
 }
 
 function pickTooltipSwatchColor(
-  item: RechartsTooltipPayload,
+  item: ChartPayloadItem,
   config: ChartConfig,
   override?: string
 ): string {
-  const fromConfig = resolveChartConfigColor(config, item.dataKey);
+  const dataKeyForConfig =
+    typeof item.dataKey === 'string' || typeof item.dataKey === 'number'
+      ? item.dataKey
+      : undefined;
+  const fromConfig = resolveChartConfigColor(config, dataKeyForConfig);
   const candidates: Array<string | undefined> = [
     override,
     typeof item.color === 'string' ? item.color : undefined,
@@ -402,11 +433,13 @@ const ChartLegend = RechartsPrimitive.Legend;
 
 const ChartLegendContent = React.forwardRef<
   HTMLDivElement,
-  React.ComponentProps<'div'> &
-    Pick<RechartsPrimitive.LegendProps, 'payload' | 'verticalAlign'> & {
-      hideIcon?: boolean;
-      nameKey?: string;
-    }
+  React.ComponentProps<'div'> & {
+    /** Passed by Recharts when this component is used as <Legend content={...} /> (not on Legend props in v3). */
+    payload?: readonly ChartPayloadItem[];
+    verticalAlign?: 'top' | 'bottom' | 'middle';
+    hideIcon?: boolean;
+    nameKey?: string;
+  }
 >(
   (
     { className, hideIcon = false, payload, verticalAlign = 'bottom', nameKey },

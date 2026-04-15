@@ -25,8 +25,14 @@ describe('pickGuestSurveyLabelForLocale', () => {
     ).toBe('Hello');
   });
 
-  it('falls back to other locale when preferred is empty', () => {
+  it('falls back to other locale when preferred key is missing', () => {
     expect(pickGuestSurveyLabelForLocale({ en: 'Only' }, 'ru')).toBe('Only');
+  });
+
+  it('falls back to other locale when preferred value is an empty string', () => {
+    expect(pickGuestSurveyLabelForLocale({ en: 'Only', ru: '' }, 'ru')).toBe(
+      'Only'
+    );
   });
 });
 

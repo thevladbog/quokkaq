@@ -530,9 +530,18 @@ components:
       - label
       type: object
     handlers.emergencyUnlockBody:
+      description: |
+        Request body for emergency unlock. Destructive admin action: clears kiosk admission freeze
+        and counter-login blocks for the subdivision (EOD recovery). confirm must be exactly UNLOCK.
       properties:
         confirm:
+          description: Must equal UNLOCK exactly to acknowledge the operation.
+          enum:
+          - UNLOCK
+          example: UNLOCK
           type: string
+      required:
+      - confirm
       type: object
     handlers.guestSurveySubmitRequest:
       properties:
@@ -1491,6 +1500,7 @@ components:
           allOf:
           - $ref: '#/components/schemas/models.UnitOperationsPublic'
           description: Operations is hydrated for GET /units/{id} (kiosk freeze / EOD phase); not stored on units row.
+          readOnly: true
         parentId:
           type: string
         preRegistrations:
@@ -1758,7 +1768,6 @@ components:
         computedAt:
           type: string
         granularity:
-          description: day | hour — hour when date range is a single calendar day without operator filter
           type: string
         points:
           items:
@@ -1797,10 +1806,8 @@ components:
         date:
           type: string
         slaWaitMet:
-          description: waiting SLA segments within threshold for this bucket
           type: integer
         slaWaitTotal:
-          description: waiting SLA segments counted for this bucket
           type: integer
         withinPct:
           type: number
@@ -1810,7 +1817,6 @@ components:
         computedAt:
           type: string
         granularity:
-          description: day | hour — hour when date range is a single calendar day without operator filter
           type: string
         points:
           items:
@@ -1884,6 +1890,21 @@ components:
         unitId:
           type: string
       type: object
+    services.SlaSummaryResponse:
+      properties:
+        breachPct:
+          type: number
+        computedAt:
+          type: string
+        serviceId:
+          type: string
+        slaWaitMet:
+          type: integer
+        slaWaitTotal:
+          type: integer
+        withinPct:
+          type: number
+      type: object
     services.SurveyScorePoint:
       properties:
         avgScoreNative:
@@ -1904,7 +1925,6 @@ components:
         computedAt:
           type: string
         granularity:
-          description: day | hour — hour when date range is a single calendar day
           type: string
         mode:
           type: string
@@ -1912,6 +1932,26 @@ components:
           items:
             $ref: '#/components/schemas/services.SurveyScorePoint'
           type: array
+      type: object
+    services.TicketsByServiceItem:
+      properties:
+        count:
+          type: integer
+        serviceId:
+          type: string
+        serviceName:
+          type: string
+      type: object
+    services.TicketsByServiceResponse:
+      properties:
+        computedAt:
+          type: string
+        items:
+          items:
+            $ref: '#/components/schemas/services.TicketsByServiceItem'
+          type: array
+        total:
+          type: integer
       type: object
     services.TimeseriesPoint:
       properties:
@@ -1935,7 +1975,7 @@ components:
         computedAt:
           type: string
         granularity:
-          description: day | hour — hour when date range is a single calendar day without operator filter; per-hour volume and wait/service/SLA from the same rollup rules as daily buckets
+          description: '"day" | "hour"'
           type: string
         metric:
           type: string
@@ -1991,8 +2031,6 @@ components:
         servingMinutes:
           type: number
         utilizationPct:
-          description: Omitted when this hour has no serving and no idle/break (excluded from aggregates)
-          nullable: true
           type: number
       type: object
     services.UtilizationResponse:
@@ -2000,7 +2038,6 @@ components:
         computedAt:
           type: string
         granularity:
-          description: hour when dateFrom equals dateTo (one point per clock hour); day when range spans multiple calendar days. Percentages ignore hours where serving+idle+break are all zero.
           type: string
         points:
           items:
@@ -6810,6 +6847,9 @@ paths:
       - units
   /units/{unitId}/operations/clear-statistics-quiet:
     post:
+      description: |
+        Admin-only: clears the statistics quiet flag so incremental statistics processing resumes
+        for the subdivision. No request body.
       operationId: postUnitOperationsClearStatisticsQuiet
       parameters:
       - description: Subdivision unit ID
@@ -6828,6 +6868,9 @@ paths:
       - operations
   /units/{unitId}/operations/emergency-unlock:
     post:
+      description: |
+        Destructive admin operation: clears kiosk admission freeze and counter-login blocks for the
+        subdivision. JSON body required; confirm must equal UNLOCK exactly.
       operationId: postUnitOperationsEmergencyUnlock
       parameters:
       - description: Subdivision unit ID
@@ -6838,10 +6881,12 @@ paths:
           type: string
       requestBody:
         content:
-          '*/*':
+          application/json:
             schema:
               $ref: '#/components/schemas/handlers.emergencyUnlockBody'
-        description: Send {\
+        description: |
+          JSON object with required confirm field. confirm must be exactly UNLOCK.
+        required: true
         x-originalParamName: body
       responses:
         '204':
@@ -7847,6 +7892,7 @@ paths:
       - statistics
   /units/{unitId}/statistics/load:
     get:
+      description: Same daily bucket source as timeseries volume; wait/service semantics match timeseries when those metrics are derived from the same warehouse rows.
       operationId: getUnitStatisticsLoad
       parameters:
       - description: Subdivision unit ID
@@ -7891,6 +7937,7 @@ paths:
       - statistics
   /units/{unitId}/statistics/sla-deviations:
     get:
+      description: Waiting SLA shares use the same queue segment definition as timeseries (post-transfer wait before call).
       operationId: getUnitStatisticsSlaDeviations
       parameters:
       - description: Subdivision unit ID
@@ -7931,6 +7978,55 @@ paths:
       security:
       - BearerAuth: []
       summary: SLA waiting compliance vs breach per day
+      tags:
+      - statistics
+  /units/{unitId}/statistics/sla-summary:
+    get:
+      operationId: getUnitStatisticsSlaSummary
+      parameters:
+      - description: Subdivision unit ID
+        in: path
+        name: unitId
+        required: true
+        schema:
+          type: string
+      - description: YYYY-MM-DD
+        in: query
+        name: dateFrom
+        required: true
+        schema:
+          type: string
+      - description: YYYY-MM-DD
+        in: query
+        name: dateTo
+        required: true
+        schema:
+          type: string
+      - description: Filter by operator (expanded scope only)
+        in: query
+        name: userId
+        schema:
+          type: string
+      - description: Service zone unit id
+        in: query
+        name: serviceZoneId
+        schema:
+          type: string
+      - description: Business service id; omit for all services in scope
+        in: query
+        name: serviceId
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/services.SlaSummaryResponse'
+          description: OK
+      security:
+      - BearerAuth: []
+      summary: Aggregate waiting SLA percent for date range (optional service filter)
       tags:
       - statistics
   /units/{unitId}/statistics/survey-scores:
@@ -7979,9 +8075,55 @@ paths:
       summary: Guest survey score timeseries (live from responses; hourly for a single day, daily for longer ranges)
       tags:
       - statistics
+  /units/{unitId}/statistics/tickets-by-service:
+    get:
+      operationId: getUnitStatisticsTicketsByService
+      parameters:
+      - description: Subdivision unit ID
+        in: path
+        name: unitId
+        required: true
+        schema:
+          type: string
+      - description: YYYY-MM-DD
+        in: query
+        name: dateFrom
+        required: true
+        schema:
+          type: string
+      - description: YYYY-MM-DD
+        in: query
+        name: dateTo
+        required: true
+        schema:
+          type: string
+      - description: Filter by operator (expanded scope only)
+        in: query
+        name: userId
+        schema:
+          type: string
+      - description: Service zone unit id
+        in: query
+        name: serviceZoneId
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/services.TicketsByServiceResponse'
+          description: OK
+      security:
+      - BearerAuth: []
+      summary: Tickets created in range grouped by business service (donut chart)
+      tags:
+      - statistics
   /units/{unitId}/statistics/timeseries:
     get:
-      description: Daily metrics from statistics warehouse; when dateFrom equals dateTo (single calendar day) and no operator filter, returns hourly granularity (24 points) with ticket volume by hour and wait/service/SLA averages recomputed per hour (same rules as daily rollup). Requires unit branch access and statistics scope (self or ACCESS_STATISTICS_* / supervisor / admin).
+      description: 'Daily metrics from statistics warehouse; single calendar day without operator filter yields hourly points with per-hour recomputed wait/service/SLA (same rules as daily rollup). Requires unit branch access and statistics scope (self or ACCESS_STATISTICS_* / supervisor / admin).
+
+        Wait averages use queue time after the last ticket.transferred before the call. Service averages sum in_service episodes from ticket_histories (split by transfer / return-to-queue / recall / terminal status); warehouse service_count is the number of those segments with positive duration.'
       operationId: getUnitStatisticsTimeseries
       parameters:
       - description: Subdivision unit ID

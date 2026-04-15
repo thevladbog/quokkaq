@@ -51,6 +51,17 @@ export default function SettingsOperationsPage() {
 
   const st = statusQuery.data?.data;
 
+  const statusField = (
+    resolve: (s: NonNullable<typeof st>) => React.ReactNode
+  ) => {
+    if (st == null) {
+      return statusQuery.isLoading
+        ? t('status_loading')
+        : t('status_placeholder');
+    }
+    return resolve(st);
+  };
+
   const unlockMutation = usePostUnitOperationsEmergencyUnlock({
     mutation: {
       onSuccess: async () => {
@@ -138,19 +149,21 @@ export default function SettingsOperationsPage() {
           <div>
             <span className='text-muted-foreground'>{t('field_kiosk')}</span>{' '}
             <span className='font-medium'>
-              {st?.kioskFrozen ? t('yes') : t('no')}
+              {statusField((s) => (s.kioskFrozen ? t('yes') : t('no')))}
             </span>
           </div>
           <div>
             <span className='text-muted-foreground'>{t('field_counter')}</span>{' '}
             <span className='font-medium'>
-              {st?.counterLoginBlocked ? t('blocked') : t('allowed')}
+              {statusField((s) =>
+                s.counterLoginBlocked ? t('blocked') : t('allowed')
+              )}
             </span>
           </div>
           <div>
             <span className='text-muted-foreground'>{t('field_quiet')}</span>{' '}
             <span className='font-medium'>
-              {st?.statisticsQuiet ? t('yes') : t('no')}
+              {statusField((s) => (s.statisticsQuiet ? t('yes') : t('no')))}
             </span>
           </div>
           <div>
@@ -158,7 +171,9 @@ export default function SettingsOperationsPage() {
               {t('field_reconcile')}
             </span>{' '}
             <span className='font-medium'>
-              {st?.reconcileInProgress ? t('in_progress') : t('idle')}
+              {statusField((s) =>
+                s.reconcileInProgress ? t('in_progress') : t('idle')
+              )}
             </span>
           </div>
           <div className='sm:col-span-2'>

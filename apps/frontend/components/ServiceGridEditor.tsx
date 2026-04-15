@@ -1506,8 +1506,8 @@ const ServiceGridEditor: React.FC<ServiceGridEditorProps> = ({
   const zoneNameById = useMemo(() => {
     const m = new Map<string, string>();
     for (const u of zoneLabelChildUnits) {
-      if (u.kind === 'service_zone') {
-        m.set(u.id, u.name);
+      if (u.kind === 'service_zone' && u.id) {
+        m.set(u.id, u.name ?? '');
       }
     }
     return m;

@@ -47,7 +47,7 @@ func UserCanViewSurveyScoreAggregates(user *models.User, unitID string) bool {
 	}
 	for _, ur := range user.Roles {
 		switch ur.Role.Name {
-		case "admin", "platform_admin", "supervisor":
+		case "admin", "supervisor":
 			return true
 		}
 	}

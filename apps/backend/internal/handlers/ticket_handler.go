@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 
@@ -81,9 +82,16 @@ func (h *TicketHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if h.operational != nil && visitorPhone != nil && h.operational.IsKioskFrozen(unitID) {
-		http.Error(w, "kiosk admission is frozen for end-of-day operations", http.StatusServiceUnavailable)
-		return
+	if h.operational != nil && visitorPhone != nil {
+		frozen, err := h.operational.IsKioskFrozen(unitID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if frozen {
+			http.Error(w, "kiosk admission is frozen for end-of-day operations", http.StatusServiceUnavailable)
+			return
+		}
 	}
 
 	actor := getActorFromRequest(r)
@@ -106,7 +114,15 @@ func (h *TicketHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if h.operational != nil {
-		h.operational.WakeStatisticsIfQuiet(unitID)
+		op, uid := h.operational, unitID
+		go func() {
+			defer func() {
+				if rec := recover(); rec != nil {
+					log.Printf("CreateTicket WakeStatisticsIfQuiet panic (unitID=%q): %v", uid, rec)
+				}
+			}()
+			op.WakeStatisticsIfQuiet(uid)
+		}()
 	}
 
 	w.WriteHeader(http.StatusCreated)

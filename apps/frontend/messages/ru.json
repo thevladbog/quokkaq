@@ -168,6 +168,8 @@
     "subdivision_placeholder": "Выберите подразделение",
     "status_title": "Текущий статус",
     "status_refreshing": "Обновление…",
+    "status_placeholder": "—",
+    "status_loading": "Загрузка…",
     "field_phase": "Фаза",
     "field_kiosk": "Киоск заморожен",
     "field_counter": "Вход на стойки",

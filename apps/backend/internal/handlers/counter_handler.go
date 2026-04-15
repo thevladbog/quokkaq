@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log"
 	"net/http"
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/models"
@@ -232,9 +233,19 @@ func (h *CounterHandler) Occupy(w http.ResponseWriter, r *http.Request) {
 
 	if h.operational != nil && h.counterRepo != nil {
 		c, err := h.counterRepo.FindByID(id)
-		if err == nil && c != nil && h.operational.IsCounterLoginBlocked(c.UnitID) {
-			http.Error(w, "counter login is blocked for end-of-day operations", http.StatusForbidden)
-			return
+		if err != nil {
+			log.Printf("counter Occupy: operational pre-check FindByID(counterId=%q) err=%v", id, err)
+		}
+		if err == nil && c != nil {
+			blocked, opErr := h.operational.IsCounterLoginBlocked(c.UnitID)
+			if opErr != nil {
+				http.Error(w, opErr.Error(), http.StatusInternalServerError)
+				return
+			}
+			if blocked {
+				http.Error(w, "counter login is blocked for end-of-day operations", http.StatusForbidden)
+				return
+			}
 		}
 	}
 

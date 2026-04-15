@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -496,7 +497,7 @@ func (r *ticketRepository) FinalizeEODTicketStatusesTx(tx *gorm.DB, ticketIDs []
 	}
 	var tickets []models.Ticket
 	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-		Where("id IN ?", ticketIDs).
+		Where("id IN ? AND is_eod = ? AND completed_at IS NULL", ticketIDs, true).
 		Find(&tickets).Error; err != nil {
 		return err
 	}
@@ -512,11 +513,17 @@ func (r *ticketRepository) FinalizeEODTicketStatusesTx(tx *gorm.DB, ticketIDs []
 		default:
 			continue
 		}
-		if err := tx.Model(&models.Ticket{}).Where("id = ?", t.ID).Updates(map[string]interface{}{
-			"status":       to,
-			"completed_at": eodCloseAt,
-		}).Error; err != nil {
-			return err
+		res := tx.Model(&models.Ticket{}).
+			Where("id = ? AND is_eod = ? AND completed_at IS NULL", t.ID, true).
+			Updates(map[string]interface{}{
+				"status":       to,
+				"completed_at": eodCloseAt,
+			})
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected != 1 {
+			return fmt.Errorf("finalize eod ticket %s: expected 1 row updated, got %d", t.ID, res.RowsAffected)
 		}
 		payload, err := json.Marshal(map[string]interface{}{
 			"unit_id":     t.UnitID,

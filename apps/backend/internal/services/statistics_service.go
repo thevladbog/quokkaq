@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -16,19 +17,22 @@ import (
 )
 
 type StatisticsService struct {
-	db        *gorm.DB
-	statsRepo repository.StatisticsRepository
-	opRepo    repository.OperationalStateRepository
+	db           *gorm.DB
+	statsRepo    repository.StatisticsRepository
+	opRepo       repository.OperationalStateRepository
+	segmentsRepo repository.StatisticsTicketSegmentsRepository
 }
 
 func NewStatisticsService(
 	statsRepo repository.StatisticsRepository,
 	opRepo repository.OperationalStateRepository,
+	segmentsRepo repository.StatisticsTicketSegmentsRepository,
 ) *StatisticsService {
 	return &StatisticsService{
-		db:        database.DB,
-		statsRepo: statsRepo,
-		opRepo:    opRepo,
+		db:           database.DB,
+		statsRepo:    statsRepo,
+		opRepo:       opRepo,
+		segmentsRepo: segmentsRepo,
 	}
 }
 
@@ -57,58 +61,51 @@ func isMissingDBRelation(err error, relation string) bool {
 	return strings.Contains(msg, rel) && strings.Contains(msg, "does not exist")
 }
 
-// CompanyAllowsBasicReports returns false when plan.features.basic_reports is explicitly false.
-func CompanyAllowsBasicReports(ctx context.Context, companyID string) bool {
+// companyPlanFeatureBool resolves subscription_plans.features[featureKey] for a company.
+// Returns (true, nil) only when the JSON object is present, unmarshals cleanly, and the key is explicitly boolean true.
+// Missing company row, NULL features, absent key, null value, or non-boolean value → (false, nil) or (false, err) on DB/unmarshal errors.
+func companyPlanFeatureBool(ctx context.Context, companyID string, featureKey string) (bool, error) {
 	if strings.TrimSpace(companyID) == "" {
-		return true
+		return false, nil
 	}
 	var raw []byte
-	err := database.DB.WithContext(ctx).Raw(`
+	if err := database.DB.WithContext(ctx).Raw(`
 SELECT sp.features FROM companies c
 LEFT JOIN subscriptions s ON s.id = c.subscription_id
 LEFT JOIN subscription_plans sp ON sp.id = s.plan_id
 WHERE c.id = ? LIMIT 1
-`, companyID).Scan(&raw).Error
-	if err != nil || len(raw) == 0 || string(raw) == "null" {
-		return true
+`, companyID).Scan(&raw).Error; err != nil {
+		return false, err
+	}
+	if len(raw) == 0 || string(raw) == "null" {
+		return false, nil
 	}
 	var m map[string]interface{}
-	if json.Unmarshal(raw, &m) != nil {
-		return true
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return false, err
 	}
-	if v, ok := m["basic_reports"]; ok {
-		if b, ok := v.(bool); ok && !b {
-			return false
-		}
+	v, ok := m[featureKey]
+	if !ok {
+		return false, nil
 	}
-	return true
+	if v == nil {
+		return false, nil
+	}
+	b, ok := v.(bool)
+	if !ok {
+		return false, fmt.Errorf("subscription plan features.%s must be a boolean", featureKey)
+	}
+	return b, nil
 }
 
-// CompanyAllowsAdvancedReports is false when plan.features.advanced_reports is explicitly false.
-func CompanyAllowsAdvancedReports(ctx context.Context, companyID string) bool {
-	if strings.TrimSpace(companyID) == "" {
-		return true
-	}
-	var raw []byte
-	err := database.DB.WithContext(ctx).Raw(`
-SELECT sp.features FROM companies c
-LEFT JOIN subscriptions s ON s.id = c.subscription_id
-LEFT JOIN subscription_plans sp ON sp.id = s.plan_id
-WHERE c.id = ? LIMIT 1
-`, companyID).Scan(&raw).Error
-	if err != nil || len(raw) == 0 || string(raw) == "null" {
-		return true
-	}
-	var m map[string]interface{}
-	if json.Unmarshal(raw, &m) != nil {
-		return true
-	}
-	if v, ok := m["advanced_reports"]; ok {
-		if b, ok := v.(bool); ok && !b {
-			return false
-		}
-	}
-	return true
+// CompanyAllowsBasicReports is true only when plan.features.basic_reports is explicitly true.
+func CompanyAllowsBasicReports(ctx context.Context, companyID string) (bool, error) {
+	return companyPlanFeatureBool(ctx, companyID, "basic_reports")
+}
+
+// CompanyAllowsAdvancedReports is true only when plan.features.advanced_reports is explicitly true.
+func CompanyAllowsAdvancedReports(ctx context.Context, companyID string) (bool, error) {
+	return companyPlanFeatureBool(ctx, companyID, "advanced_reports")
 }
 
 // TimeseriesPoint is one day in a chart.
@@ -140,10 +137,17 @@ func (s *StatisticsService) GetTimeseries(
 	requestedUserID *string,
 	requestedServiceZoneID string,
 ) (*TimeseriesResponse, error) {
-	if !CompanyAllowsBasicReports(ctx, companyID) {
+	ok, err := CompanyAllowsBasicReports(ctx, companyID)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
 		return nil, errors.New("plan does not include basic reports")
 	}
 	sc := statistics.ResolveScope(user, subdivisionID, viewerID)
+	if sc.Denied {
+		return nil, errors.New("forbidden")
+	}
 	effectiveUser := sc.ApplyRequestedUserID(requestedUserID)
 	if effectiveUser != nil && strings.TrimSpace(*effectiveUser) != "" && strings.TrimSpace(requestedServiceZoneID) != "" {
 		return nil, errors.New("serviceZoneId cannot be used with userId filter")
@@ -227,10 +231,17 @@ func (s *StatisticsService) GetSLADeviations(
 	requestedUserID *string,
 	requestedServiceZoneID string,
 ) (*SLADeviationsResponse, error) {
-	if !CompanyAllowsBasicReports(ctx, companyID) {
+	ok, err := CompanyAllowsBasicReports(ctx, companyID)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
 		return nil, errors.New("plan does not include basic reports")
 	}
 	sc := statistics.ResolveScope(user, subdivisionID, viewerID)
+	if sc.Denied {
+		return nil, errors.New("forbidden")
+	}
 	effectiveUser := sc.ApplyRequestedUserID(requestedUserID)
 	if effectiveUser != nil && strings.TrimSpace(*effectiveUser) != "" && strings.TrimSpace(requestedServiceZoneID) != "" {
 		return nil, errors.New("serviceZoneId cannot be used with userId filter")
@@ -370,10 +381,17 @@ func (s *StatisticsService) GetUtilization(
 	targetUserID string,
 	dateFrom, dateTo string,
 ) (*UtilizationResponse, error) {
-	if !CompanyAllowsAdvancedReports(ctx, companyID) {
+	ok, err := CompanyAllowsAdvancedReports(ctx, companyID)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
 		return nil, errors.New("plan does not include advanced reports")
 	}
 	sc := statistics.ResolveScope(user, subdivisionID, viewerID)
+	if sc.Denied {
+		return nil, errors.New("forbidden")
+	}
 	if !sc.Expanded && strings.TrimSpace(sc.ForceUserID) != strings.TrimSpace(targetUserID) {
 		return nil, errors.New("forbidden")
 	}
@@ -426,9 +444,10 @@ WHERE user_id = ?
 		}
 		ds := time.Date(dayStart.Year(), dayStart.Month(), dayStart.Day(), 0, 0, 0, 0, loc)
 		dayStartUTC := ds.UTC()
-		dayEndUTC := ds.Add(24 * time.Hour).UTC()
+		// Next local midnight (not +24h) so DST long/short days stay aligned to the calendar date.
+		dayEndUTC := ds.AddDate(0, 0, 1).UTC()
 
-		servH, err = operatorServiceMinutesByHourForDay(db, subdivisionID, targetUserID, day, loc, dayStartUTC, dayEndUTC)
+		servH, err = operatorServiceMinutesByHourForDay(s.segmentsRepo, db, subdivisionID, targetUserID, day, loc, dayStartUTC, dayEndUTC)
 		if err != nil {
 			return servH, idleH, err
 		}
@@ -506,9 +525,18 @@ WHERE user_id = ?
 
 func idleBreakMinutesByHourForDay(intervalRows []utilizationIntervalRow, dayStartInLoc time.Time, now time.Time) [24]float64 {
 	var out [24]float64
+	loc := dayStartInLoc.Location()
+	day0 := time.Date(dayStartInLoc.Year(), dayStartInLoc.Month(), dayStartInLoc.Day(), 0, 0, 0, 0, loc)
 	for h := 0; h < 24; h++ {
-		hs := dayStartInLoc.Add(time.Duration(h) * time.Hour).UTC()
-		he := hs.Add(time.Hour)
+		hsLoc := time.Date(day0.Year(), day0.Month(), day0.Day(), h, 0, 0, 0, loc)
+		var heLoc time.Time
+		if h == 23 {
+			heLoc = day0.AddDate(0, 0, 1)
+		} else {
+			heLoc = time.Date(day0.Year(), day0.Month(), day0.Day(), h+1, 0, 0, 0, loc)
+		}
+		hs := hsLoc.UTC()
+		he := heLoc.UTC()
 		var sum float64
 		for i := range intervalRows {
 			ir := &intervalRows[i]
@@ -589,10 +617,17 @@ func (s *StatisticsService) GetSurveyScores(
 	surveyID *string,
 	questionIDs []string,
 ) (*SurveyScoresResponse, error) {
-	if !CompanyAllowsBasicReports(ctx, companyID) {
+	ok, err := CompanyAllowsBasicReports(ctx, companyID)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
 		return nil, errors.New("plan does not include basic reports")
 	}
-	_ = statistics.ResolveScope(user, subdivisionID, viewerID)
+	sc := statistics.ResolveScope(user, subdivisionID, viewerID)
+	if sc.Denied {
+		return nil, errors.New("forbidden")
+	}
 	if len(questionIDs) > 0 && (surveyID == nil || strings.TrimSpace(*surveyID) == "") {
 		return nil, errors.New("surveyId is required when questionIds are provided")
 	}
@@ -636,27 +671,34 @@ func (s *StatisticsService) GetEmployeeRadar(
 	viewerID string,
 	targetUserID string,
 ) (*EmployeeRadarResponse, error) {
-	if !CompanyAllowsAdvancedReports(ctx, companyID) {
+	ok, err := CompanyAllowsAdvancedReports(ctx, companyID)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
 		return nil, errors.New("plan does not include advanced reports")
 	}
 	sc := statistics.ResolveScope(user, subdivisionID, viewerID)
+	if sc.Denied {
+		return nil, errors.New("forbidden")
+	}
 	if !sc.Expanded && strings.TrimSpace(sc.ForceUserID) != strings.TrimSpace(targetUserID) {
 		return nil, errors.New("forbidden")
 	}
-	// Last 30d simple average from buckets
-	from := time.Now().UTC().AddDate(0, 0, -30).Format("2006-01-02")
-	to := time.Now().UTC().Format("2006-01-02")
+	// Last 30 calendar days inclusive (today and the prior 29 days).
+	now := time.Now().UTC()
+	from := now.AddDate(0, 0, -29).Format("2006-01-02")
+	to := now.Format("2006-01-02")
 	zq := repository.StatisticsZoneQuery{WholeSubdivision: true}
 	rows, err := s.statsRepo.ListDailyBuckets(subdivisionID, from, to, &targetUserID, zq)
 	if err != nil {
 		return nil, err
 	}
-	var waitN, servN int64
+	var servN int64
 	var servSum int64
 	var slaMet, slaTot int
 	var completed int
 	for _, r := range rows {
-		waitN += int64(r.WaitCount)
 		servN += int64(r.ServiceCount)
 		servSum += r.ServiceSumMs
 		slaMet += r.SlaWaitMet
@@ -707,8 +749,18 @@ func (s *StatisticsService) GetEmployeeRadar(
 			}
 		}
 	}
-	if waitN > 0 {
-		out.TicketsPerHour = float64(completed) / (30.0 * 8.0) // rough
+	daysInclusive := 30
+	if df, errFrom := time.ParseInLocation("2006-01-02", from, time.UTC); errFrom == nil {
+		if dt, errTo := time.ParseInLocation("2006-01-02", to, time.UTC); errTo == nil && !dt.Before(df) {
+			daysInclusive = int(dt.Sub(df).Hours()/24) + 1
+			if daysInclusive < 1 {
+				daysInclusive = 1
+			}
+		}
+	}
+	const workHoursPerDay = 8.0
+	if completed > 0 {
+		out.TicketsPerHour = float64(completed) / (float64(daysInclusive) * workHoursPerDay)
 	}
 	computedAt, err := s.operationalStatisticsAsOf(subdivisionID)
 	if err != nil {

@@ -161,9 +161,10 @@ func main() {
 	auditLogRepo := repository.NewAuditLogRepository()
 	opStateRepo := repository.NewOperationalStateRepository()
 	statsRepo := repository.NewStatisticsRepository()
-	statsRefresh := services.NewStatisticsRefreshService(statsRepo, unitRepo, opStateRepo)
+	statsSegmentsRepo := repository.NewStatisticsTicketSegmentsRepository()
+	statsRefresh := services.NewStatisticsRefreshService(statsRepo, unitRepo, opStateRepo, statsSegmentsRepo)
 	operationalService := services.NewOperationalService(opStateRepo, unitRepo, statsRefresh)
-	statsService := services.NewStatisticsService(statsRepo, opStateRepo)
+	statsService := services.NewStatisticsService(statsRepo, opStateRepo, statsSegmentsRepo)
 	statsRefresh.StartPeriodicRefresh()
 	shiftService := services.NewShiftService(ticketRepo, counterRepo, serviceRepo, auditLogRepo, operatorIntervalRepo, hub, userRepo)
 	templateService := services.NewTemplateService(templateRepo)
@@ -450,7 +451,6 @@ func main() {
 
 		r.Group(func(r chi.Router) {
 			r.Use(authmiddleware.JWTAuth)
-			r.Use(authmiddleware.RequireUnitMember(userRepo))
 			r.Use(authmiddleware.RequireAdmin(userRepo))
 			r.Get("/{unitId}/operations/status", operationsHandler.GetOperationsStatus)
 			r.Post("/{unitId}/operations/emergency-unlock", operationsHandler.PostEmergencyUnlock)

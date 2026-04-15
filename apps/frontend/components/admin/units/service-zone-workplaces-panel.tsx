@@ -33,7 +33,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { unitsApi, type Unit } from '@/lib/api';
+import { unitsApi } from '@/lib/api';
 import { useCreateUnit } from '@/lib/hooks';
 import { useRouter } from '@/src/i18n/navigation';
 import PermissionGuard from '@/components/auth/permission-guard';
@@ -135,7 +135,7 @@ export function ServiceZoneWorkplacesPanel({
     }
   };
 
-  const kindLabel = (u: Unit) =>
+  const kindLabel = (u: { kind?: string }) =>
     u.kind === 'service_zone' ? t('kind_service_zone') : t('kind_subdivision');
 
   return (

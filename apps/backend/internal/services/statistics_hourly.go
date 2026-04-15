@@ -178,14 +178,14 @@ func (s *StatisticsService) rollupWaitServiceSLAForHour(
 	startUTC, endUTC time.Time,
 	zoneQ repository.StatisticsZoneQuery,
 ) (waitSumMs int64, waitCount int, slaMet int, slaTotal int, servSumMs int64, servCount int, err error) {
-	db := s.db.WithContext(ctx)
+	_ = ctx
 	zones := zoneFilterStrings(zoneQ)
 	for _, z := range zones {
-		ws, wc, sm, st, e := computeWaitSLAForTicketsCalledInRange(db, subdivisionID, startUTC, endUTC, z)
+		ws, wc, sm, st, e := computeWaitSLAForTicketsCalledInRange(s.segmentsRepo, subdivisionID, startUTC, endUTC, z)
 		if e != nil {
 			return 0, 0, 0, 0, 0, 0, e
 		}
-		ss, sc, e := aggregateServiceTimeForServedTicketsCompletedInRange(db, subdivisionID, z, startUTC, endUTC)
+		ss, sc, e := aggregateServiceTimeForServedTicketsCompletedInRange(s.segmentsRepo, subdivisionID, z, startUTC, endUTC)
 		if e != nil {
 			return 0, 0, 0, 0, 0, 0, e
 		}

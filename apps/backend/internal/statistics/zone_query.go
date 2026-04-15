@@ -29,6 +29,9 @@ WHERE id = ? AND parent_id = ? AND kind = 'service_zone'
 
 // ResolveDailyBucketZoneQuery maps viewer scope and optional explicit zone to warehouse rows.
 func ResolveDailyBucketZoneQuery(db *gorm.DB, subdivisionID string, sc Scope, requestedServiceZoneID string) (repository.StatisticsZoneQuery, error) {
+	if sc.Denied {
+		return repository.StatisticsZoneQuery{}, errors.New("forbidden")
+	}
 	req := strings.TrimSpace(requestedServiceZoneID)
 	if req != "" {
 		if err := VerifyServiceZoneUnderSubdivision(db, subdivisionID, req); err != nil {

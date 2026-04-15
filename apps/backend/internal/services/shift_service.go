@@ -469,6 +469,15 @@ func (s *shiftService) ExecuteEndOfDay(ctx context.Context, unitID string, userI
 		if err != nil {
 			return fmt.Errorf("end of day: list orphan eod tickets: %w", err)
 		}
+		// Same split semantics as the primary batch: count pre-finalize status, then finalize (response + audit include orphans).
+		if len(orphanIDs) > 0 {
+			ow, oa, err := s.ticketRepo.CountEODTicketSplitByIDsTx(tx, orphanIDs)
+			if err != nil {
+				return err
+			}
+			waitingTicketsNoShow += ow
+			activeTicketsClosed += oa
+		}
 		if err := s.ticketRepo.FinalizeEODTicketStatusesTx(tx, orphanIDs, eodCloseAt, userID); err != nil {
 			return fmt.Errorf("end of day: finalize orphan eod tickets: %w", err)
 		}

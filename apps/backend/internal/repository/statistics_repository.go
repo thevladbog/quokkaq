@@ -38,6 +38,11 @@ func NewStatisticsRepository() StatisticsRepository {
 	return &statisticsRepository{db: database.DB}
 }
 
+// NewStatisticsRepositoryWithDB binds statistics reads/writes to db (e.g. a transaction).
+func NewStatisticsRepositoryWithDB(db *gorm.DB) StatisticsRepository {
+	return &statisticsRepository{db: db}
+}
+
 func (r *statisticsRepository) UpsertDailyBucket(bucket *models.StatisticsDailyBucket) error {
 	if bucket.UnitID == "" || bucket.BucketDate == "" {
 		return errors.New("unit and bucket date required")
@@ -173,7 +178,9 @@ func (r *statisticsRepository) UpsertSurveyDaily(row *models.StatisticsSurveyDai
 	if row.UnitID == "" || row.BucketDate == "" {
 		return errors.New("survey daily: unit and date required")
 	}
-	row.ComputedAt = time.Now().UTC()
+	if row.ComputedAt.IsZero() {
+		row.ComputedAt = time.Now().UTC()
+	}
 	return r.db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{
 			{Name: "unit_id"},

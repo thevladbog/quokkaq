@@ -84,7 +84,7 @@ export function DatePickerSingleOrRange({
             variant='outline'
             className={cn(
               'min-w-[240px] justify-start text-left font-normal',
-              !from && 'text-muted-foreground'
+              summary === labels.openCalendar && 'text-muted-foreground'
             )}
             disabled={disabled}
             aria-label={labels.openCalendar}

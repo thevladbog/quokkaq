@@ -59,6 +59,8 @@ const AppSidebar = () => {
   const isActive = (path: string) => pathname === path;
   const isActiveSub = (path: string) =>
     pathname.startsWith(path) && pathname !== path;
+  const isActiveStatistics =
+    pathname === '/statistics' || pathname.startsWith('/statistics/');
 
   const hasPermissionInAnyUnit = (permission: string) => {
     if (!user?.permissions) return false;
@@ -141,7 +143,7 @@ const AppSidebar = () => {
             icon: BarChart3,
             label: tNav('statistics', { defaultValue: 'Statistics' }),
             href: statisticsHref,
-            active: pathname.startsWith('/statistics'),
+            active: isActiveStatistics,
             roles: ['admin', 'staff', 'supervisor', 'operator'] as const
           }
         ]

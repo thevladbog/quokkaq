@@ -23,8 +23,8 @@ import {
   RadialBarChart,
   Sector
 } from 'recharts';
-import type { PieSectorDataItem } from 'recharts/types/polar/Pie';
-import { format } from 'date-fns';
+import type { PieSectorDataItem, PieSectorShapeProps } from 'recharts';
+import { formatInTimeZone } from 'date-fns-tz';
 import { enUS, ru } from 'date-fns/locale';
 import { useLocale, useTranslations } from 'next-intl';
 import type { User } from '@quokkaq/shared-types';
@@ -93,8 +93,10 @@ import {
   type ChartConfig
 } from '@/components/ui/chart';
 
-function defaultDateRange() {
-  const today = format(new Date(), 'yyyy-MM-dd');
+/** "Today" for statistics date params; must match subdivision calendar (backend buckets). */
+function defaultDateRange(timezone?: string | null) {
+  const tz = (timezone && timezone.trim()) || 'UTC';
+  const today = formatInTimeZone(new Date(), tz, 'yyyy-MM-dd');
   return { from: today, to: today };
 }
 
@@ -263,11 +265,12 @@ export default function StatisticsPage() {
   const t = useTranslations('statistics');
   const { activeUnitId, assignableUnitIds } = useActiveUnit();
   const { user } = useAuthContext();
-  const [{ from, to }, setRange] = useState(defaultDateRange);
+  const [{ from, to }, setRange] = useState(() => defaultDateRange('UTC'));
   const [manualSubdivisionId, setManualSubdivisionId] = useState<string | null>(
     null
   );
   const [prevCtxSub, setPrevCtxSub] = useState('');
+  const [prevDateRangeSig, setPrevDateRangeSig] = useState('');
   const [filterUserId, setFilterUserId] = useState('');
   const [serviceZoneId, setServiceZoneId] = useState('');
   const [surveyDefinitionId, setSurveyDefinitionId] = useState('');
@@ -398,6 +401,25 @@ export default function StatisticsPage() {
 
   const statsSubdivisionId =
     manualSubdivisionId ?? contextResolvedSubdivisionId ?? '';
+
+  const statisticsBucketTimezone = useMemo(() => {
+    if (!statsSubdivisionId) return 'UTC';
+    const u = unitById.get(statsSubdivisionId);
+    if (u?.timezone?.trim()) return u.timezone.trim();
+    if (activeUnit?.id === statsSubdivisionId && activeUnit.timezone?.trim()) {
+      return activeUnit.timezone.trim();
+    }
+    return 'UTC';
+  }, [statsSubdivisionId, unitById, activeUnit]);
+
+  const dateRangeSig =
+    statsSubdivisionId !== ''
+      ? `${statsSubdivisionId}\x1e${statisticsBucketTimezone}`
+      : '';
+  if (dateRangeSig && dateRangeSig !== prevDateRangeSig) {
+    setPrevDateRangeSig(dateRangeSig);
+    setRange(defaultDateRange(statisticsBucketTimezone));
+  }
 
   const childZonesQuery = useGetUnitsUnitIdChildUnits(statsSubdivisionId, {
     query: { enabled: Boolean(statsSubdivisionId) }
@@ -756,11 +778,16 @@ export default function StatisticsPage() {
   }, [hourlyStatsAxis, dateLocale]);
 
   const formatStatsTooltipLabel = useMemo(() => {
-    return (value: string | number) =>
-      formatStatisticsTooltipLabel(value, {
+    return (label: ReactNode): ReactNode => {
+      const value =
+        typeof label === 'string' || typeof label === 'number'
+          ? label
+          : String(label ?? '');
+      return formatStatisticsTooltipLabel(value, {
         hourly: hourlyStatsAxis,
         locale: dateLocale
       });
+    };
   }, [hourlyStatsAxis, dateLocale]);
 
   const formatWaitServiceTooltipValue = useMemo(
@@ -1236,12 +1263,42 @@ export default function StatisticsPage() {
                             outerRadius='78%'
                             strokeWidth={2}
                             cursor='default'
-                            activeIndex={donutActiveIndex}
-                            activeShape={
-                              donutActiveIndex === undefined
-                                ? undefined
-                                : StatisticsDonutActiveShape
-                            }
+                            shape={(sectorProps: PieSectorShapeProps) => {
+                              const highlighted =
+                                donutActiveIndex !== undefined &&
+                                sectorProps.index === donutActiveIndex;
+                              if (highlighted || sectorProps.isActive) {
+                                return (
+                                  <StatisticsDonutActiveShape
+                                    {...sectorProps}
+                                  />
+                                );
+                              }
+                              const {
+                                cx,
+                                cy,
+                                innerRadius,
+                                outerRadius,
+                                startAngle,
+                                endAngle,
+                                fill,
+                                cornerRadius
+                              } = sectorProps;
+                              return (
+                                <Sector
+                                  cx={cx}
+                                  cy={cy}
+                                  innerRadius={innerRadius}
+                                  outerRadius={outerRadius}
+                                  startAngle={startAngle}
+                                  endAngle={endAngle}
+                                  fill={fill}
+                                  cornerRadius={cornerRadius}
+                                  className='stroke-background'
+                                  strokeWidth={2}
+                                />
+                              );
+                            }}
                           >
                             {ticketsPieSlices.map((s) => (
                               <Cell key={s.serviceId} fill={s.fill} />

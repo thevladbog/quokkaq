@@ -83,6 +83,7 @@ export function Combobox({
               <>
                 {selected.swatchColor ? (
                   <span
+                    aria-hidden='true'
                     className='inline-block size-2.5 shrink-0 rounded-sm'
                     style={{ backgroundColor: selected.swatchColor }}
                   />
@@ -129,6 +130,7 @@ export function Combobox({
                   />
                   {option.swatchColor ? (
                     <span
+                      aria-hidden='true'
                       className='mr-2 inline-block size-2.5 shrink-0 rounded-sm'
                       style={{ backgroundColor: option.swatchColor }}
                     />
