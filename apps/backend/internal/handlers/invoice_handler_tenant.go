@@ -52,8 +52,10 @@ const yooKassaDevPaymentReturnURL = "https://localhost/payment-return"
 // @Produce      json
 // @Security     BearerAuth
 // @Param        id   path      string  true  "Invoice ID"
+// @Param        X-Company-Id header string false "Tenant company UUID when the user belongs to multiple organizations"
 // @Success      200  {object}  models.Invoice
 // @Failure      401  {string}  string "Unauthorized"
+// @Failure      403  {string}  string "Forbidden: no access to selected organization"
 // @Failure      404  {string}  string "Not found"
 // @Failure      500  {string}  string "Internal server error"
 // @Router       /invoices/{id} [get]
@@ -63,13 +65,17 @@ func (h *InvoiceHandler) GetMyInvoiceByID(w http.ResponseWriter, r *http.Request
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	companyID, err := h.userRepo.GetCompanyIDByUserID(userID)
+	companyID, err := h.userRepo.ResolveCompanyIDForRequest(userID, r.Header.Get("X-Company-Id"))
 	if err != nil {
+		if errors.Is(err, repository.ErrCompanyAccessDenied) {
+			http.Error(w, "Forbidden: no access to selected organization", http.StatusForbidden)
+			return
+		}
 		if repository.IsNotFound(err) {
 			http.Error(w, "User has no associated company", http.StatusNotFound)
 			return
 		}
-		log.Printf("GetMyInvoiceByID GetCompanyID: %v", err)
+		log.Printf("GetMyInvoiceByID ResolveCompanyIDForRequest: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -130,6 +136,7 @@ func (h *InvoiceHandler) GetSaaSVendor(w http.ResponseWriter, r *http.Request) {
 // @Produce      json
 // @Security     BearerAuth
 // @Param        id   path      string  true  "Invoice ID"
+// @Param        X-Company-Id header string false "Tenant company UUID when the user belongs to multiple organizations"
 // @Success      200  {object}  map[string]string
 // @Failure      400  {string}  string "Bad Request"
 // @Failure      401  {string}  string "Unauthorized"
@@ -145,12 +152,22 @@ func (h *InvoiceHandler) RequestYooKassaPaymentLink(w http.ResponseWriter, r *ht
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	companyID, err := h.userRepo.GetCompanyIDByUserID(userID)
+	companyID, err := h.userRepo.ResolveCompanyIDForRequest(userID, r.Header.Get("X-Company-Id"))
 	if err != nil {
+		if errors.Is(err, repository.ErrCompanyAccessDenied) {
+			http.Error(w, "Forbidden: no access to selected organization", http.StatusForbidden)
+			return
+		}
 		if repository.IsNotFound(err) {
 			http.Error(w, "User has no associated company", http.StatusNotFound)
 			return
 		}
+		log.Printf(
+			"RequestYooKassaPaymentLink ResolveCompanyIDForRequest: userID=%q X-Company-Id=%q err=%v",
+			userID,
+			r.Header.Get("X-Company-Id"),
+			err,
+		)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}

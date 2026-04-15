@@ -43,6 +43,7 @@ import { useTranslations } from 'next-intl';
 import { getInitials, getAvatarColor } from '@/lib/utils';
 import { userCanOpenPlatformOperatorUI } from '@/lib/platform-access';
 import { SidebarActiveUnitSelect } from '@/components/SidebarActiveUnitSelect';
+import { SidebarTenantCompanySelect } from '@/components/SidebarTenantCompanySelect';
 import { SidebarCollapsedLogo } from '@/components/SidebarCollapsedLogo';
 import { SidebarCollapseToggle } from '@/components/SidebarCollapseToggle';
 import { useActiveUnit } from '@/contexts/ActiveUnitContext';
@@ -213,6 +214,7 @@ const AppSidebar = () => {
         {isAuthenticated ? (
           <SidebarGroup>
             <SidebarGroupContent className='gap-1'>
+              <SidebarTenantCompanySelect />
               <SidebarActiveUnitSelect />
               <SidebarMenu>
                 <SidebarMenuItem>

@@ -26,6 +26,7 @@ type RoleInfoDTO struct {
 
 type UserUnitDTO struct {
 	UnitID      string   `json:"unitId"`
+	CompanyID   string   `json:"companyId,omitempty"`
 	Permissions []string `json:"permissions,omitempty"`
 }
 
@@ -57,10 +58,14 @@ func MapUserToResponse(user *models.User) *UserResponse {
 		if permissions == nil {
 			permissions = []string{} // Ensure it's an empty array, not null
 		}
-		response.Units = append(response.Units, UserUnitDTO{
+		uu := UserUnitDTO{
 			UnitID:      userUnit.UnitID,
 			Permissions: permissions,
-		})
+		}
+		if userUnit.Unit.ID != "" && userUnit.Unit.CompanyID != "" {
+			uu.CompanyID = userUnit.Unit.CompanyID
+		}
+		response.Units = append(response.Units, uu)
 
 		// Populate the permissions map for easier frontend access
 		response.Permissions[userUnit.UnitID] = permissions

@@ -261,36 +261,6 @@ async function apiRequestBlob(
   }
 }
 
-// Auth API functions
-export const authApi = {
-  login: (credentials: { email: string; password: string }) =>
-    apiRequest<{ token: string }>('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify(credentials)
-    }).then((res) => ({ accessToken: res.token })), // Map 'token' to 'accessToken' for frontend compatibility
-
-  me: (token: string) =>
-    apiRequest<User>(
-      '/auth/me',
-      {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      },
-      UserModelSchema
-    ),
-
-  getMe: () => apiRequest<User>('/auth/me', {}, UserModelSchema),
-
-  refresh: (refreshToken: string) =>
-    apiRequest<{ accessToken: string }>('/auth/refresh', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${refreshToken}`
-      }
-    })
-};
-
 // User API functions
 export const usersApi = {
   getAll: (search?: string) => {
@@ -1288,7 +1258,7 @@ export const companiesApi = {
 // Subscription API functions
 export const subscriptionsApi = {
   getMySubscription: async () => {
-    const res = await orvalTenantBilling.getSubscriptionsMe();
+    const res = await orvalTenantBilling.getMySubscription();
     return SubscriptionSchema.parse(res.data);
   },
 
@@ -1298,7 +1268,7 @@ export const subscriptionsApi = {
   },
 
   createCheckout: async (planCode: string) => {
-    const res = await orvalTenantBilling.postSubscriptionsCheckout({
+    const res = await orvalTenantBilling.createCheckout({
       planCode
     });
     return z

@@ -60,8 +60,10 @@ func NewInvoiceHandler(
 // @Tags         invoices
 // @Produce      json
 // @Security     BearerAuth
+// @Param        X-Company-Id header string false "Tenant company UUID when the user belongs to multiple organizations"
 // @Success      200  {array}   models.Invoice
 // @Failure      401  {string}  string "Unauthorized"
+// @Failure      403  {string}  string "Forbidden: no access to selected organization"
 // @Failure      404  {string}  string "No company found"
 // @Failure      500  {string}  string "Internal Server Error"
 // @Router       /invoices/me [get]
@@ -72,13 +74,17 @@ func (h *InvoiceHandler) GetMyInvoices(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	companyID, err := h.userRepo.GetCompanyIDByUserID(userID)
+	companyID, err := h.userRepo.ResolveCompanyIDForRequest(userID, r.Header.Get("X-Company-Id"))
 	if err != nil {
+		if errors.Is(err, repository.ErrCompanyAccessDenied) {
+			http.Error(w, "Forbidden: no access to selected organization", http.StatusForbidden)
+			return
+		}
 		if repository.IsNotFound(err) {
 			http.Error(w, "User has no associated company", http.StatusNotFound)
 			return
 		}
-		log.Printf("GetMyInvoices userRepo.GetCompanyIDByUserID: %v", err)
+		log.Printf("GetMyInvoices userRepo.ResolveCompanyIDForRequest: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}

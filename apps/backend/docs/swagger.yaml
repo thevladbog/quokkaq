@@ -1,5 +1,23 @@
 components:
   schemas:
+    handlers.AccessibleCompaniesResponse:
+      properties:
+        companies:
+          items:
+            $ref: '#/components/schemas/handlers.AccessibleCompanyItem'
+          type: array
+      type: object
+    handlers.AccessibleCompanyItem:
+      properties:
+        id:
+          type: string
+        inn:
+          type: string
+        legalName:
+          type: string
+        name:
+          type: string
+      type: object
     handlers.AssignUnitRequest:
       properties:
         permissions:
@@ -196,7 +214,12 @@ components:
       type: object
     handlers.LoginResponse:
       properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
         token:
+          description: same as accessToken (legacy clients)
           type: string
       type: object
     handlers.OperatorCommentPatchDTO:
@@ -366,6 +389,13 @@ components:
           type: string
         price:
           type: integer
+      type: object
+    handlers.RefreshResponse:
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
       type: object
     handlers.RegisterUserRequest:
       properties:
@@ -2100,6 +2130,40 @@ info:
   version: '1.0'
 openapi: 3.0.3
 paths:
+  /auth/accessible-companies:
+    get:
+      description: Distinct tenants from unit assignments and company ownership. Optional query q searches name, legal name, INN, counterparty JSON.
+      operationId: authAccessibleCompanies
+      parameters:
+      - description: Search substring (case-insensitive)
+        in: query
+        name: q
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/handlers.AccessibleCompaniesResponse'
+          description: OK
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: List companies the current user may access
+      tags:
+      - auth
   /auth/forgot-password:
     post:
       description: Sends a password reset link to the user's email
@@ -2129,7 +2193,8 @@ paths:
       - auth
   /auth/login:
     post:
-      description: Authenticates a user and returns a JWT token
+      description: Authenticates a user and returns access and refresh JWTs (`token` duplicates access for legacy clients)
+      operationId: authLogin
       requestBody:
         content:
           application/json:
@@ -2157,6 +2222,12 @@ paths:
               schema:
                 type: string
           description: Unauthorized
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
       summary: User Login
       tags:
       - auth
@@ -2185,6 +2256,34 @@ paths:
       security:
       - BearerAuth: []
       summary: Get current user
+      tags:
+      - auth
+  /auth/refresh:
+    post:
+      description: 'Exchanges a valid refresh JWT for new access and refresh tokens. Send the refresh token as `Authorization: Bearer <refresh>`.'
+      operationId: authRefresh
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/handlers.RefreshResponse'
+          description: OK
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: Refresh tokens
       tags:
       - auth
   /auth/reset-password:
@@ -2223,6 +2322,7 @@ paths:
   /auth/signup:
     post:
       description: Register a new user and organization with trial subscription
+      operationId: authSignup
       requestBody:
         content:
           application/json:
@@ -2698,6 +2798,12 @@ paths:
       - dadata
   /companies/me:
     get:
+      parameters:
+      - description: Tenant company UUID when the user belongs to multiple organizations
+        in: header
+        name: X-Company-Id
+        schema:
+          type: string
       responses:
         '200':
           content:
@@ -2711,6 +2817,12 @@ paths:
               schema:
                 type: string
           description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: 'Forbidden: no access to selected organization'
         '404':
           content:
             application/json:
@@ -2730,6 +2842,12 @@ paths:
       - companies
     patch:
       description: 'Partial update: JSON body matches models.CompanyPatch at the root (not wrapped in a "company" property). Only send fields to change. Cannot combine clearBillingAddress with billingAddress (same for counterparty).'
+      parameters:
+      - description: Tenant company UUID when the user belongs to multiple organizations
+        in: header
+        name: X-Company-Id
+        schema:
+          type: string
       requestBody:
         content:
           application/json:
@@ -2757,6 +2875,12 @@ paths:
               schema:
                 type: string
           description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: 'Forbidden: no access to selected organization'
         '404':
           content:
             application/json:
@@ -2792,6 +2916,12 @@ paths:
               schema:
                 type: string
           description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: 'Forbidden: no access to selected organization'
         '404':
           content:
             application/json:
@@ -3379,6 +3509,11 @@ paths:
         required: true
         schema:
           type: string
+      - description: Tenant company UUID when the user belongs to multiple organizations
+        in: header
+        name: X-Company-Id
+        schema:
+          type: string
       responses:
         '200':
           content:
@@ -3392,6 +3527,12 @@ paths:
               schema:
                 type: string
           description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: 'Forbidden: no access to selected organization'
         '404':
           content:
             application/json:
@@ -3491,6 +3632,11 @@ paths:
         required: true
         schema:
           type: string
+      - description: Tenant company UUID when the user belongs to multiple organizations
+        in: header
+        name: X-Company-Id
+        schema:
+          type: string
       responses:
         '200':
           content:
@@ -3550,6 +3696,12 @@ paths:
   /invoices/me:
     get:
       description: Returns invoices for the authenticated user's company
+      parameters:
+      - description: Tenant company UUID when the user belongs to multiple organizations
+        in: header
+        name: X-Company-Id
+        schema:
+          type: string
       responses:
         '200':
           content:
@@ -3565,6 +3717,12 @@ paths:
               schema:
                 type: string
           description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: 'Forbidden: no access to selected organization'
         '404':
           content:
             application/json:
@@ -4881,6 +5039,13 @@ paths:
   /subscriptions/checkout:
     post:
       description: Creates a checkout session for subscription upgrade
+      operationId: createCheckout
+      parameters:
+      - description: Tenant company UUID when the user belongs to multiple organizations
+        in: header
+        name: X-Company-Id
+        schema:
+          type: string
       requestBody:
         content:
           application/json:
@@ -4940,6 +5105,13 @@ paths:
   /subscriptions/me:
     get:
       description: Returns subscription for the authenticated user's company
+      operationId: getMySubscription
+      parameters:
+      - description: Tenant company UUID when the user belongs to multiple organizations
+        in: header
+        name: X-Company-Id
+        schema:
+          type: string
       responses:
         '200':
           content:
@@ -4953,6 +5125,12 @@ paths:
               schema:
                 type: string
           description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: 'Forbidden: no access to selected organization'
         '404':
           content:
             application/json:
@@ -9099,6 +9277,13 @@ paths:
   /usage-metrics/me:
     get:
       description: Returns current resource usage and limits for the authenticated user's company
+      operationId: getMyUsageMetrics
+      parameters:
+      - description: Tenant company UUID when the user belongs to multiple organizations
+        in: header
+        name: X-Company-Id
+        schema:
+          type: string
       responses:
         '200':
           content:
@@ -9112,6 +9297,12 @@ paths:
               schema:
                 type: string
           description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: 'Forbidden: no access to selected organization'
         '404':
           content:
             application/json:

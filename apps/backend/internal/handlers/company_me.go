@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -38,8 +39,10 @@ func dadataCleanerConfigured() bool {
 // @Tags         companies
 // @Produce      json
 // @Security     BearerAuth
+// @Param        X-Company-Id header string false "Tenant company UUID when the user belongs to multiple organizations"
 // @Success      200  {object}  companyMeResponse
 // @Failure      401  {string}  string "Unauthorized"
+// @Failure      403  {string}  string "Forbidden: no access to selected organization"
 // @Failure      404  {string}  string "No company found"
 // @Failure      500  {string}  string "Internal Server Error"
 // @Router       /companies/me [get]
@@ -50,13 +53,17 @@ func (h *CompanyHandler) GetMyCompany(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	companyID, err := h.userRepo.GetCompanyIDByUserID(userID)
+	companyID, err := h.userRepo.ResolveCompanyIDForRequest(userID, r.Header.Get("X-Company-Id"))
 	if err != nil {
+		if errors.Is(err, repository.ErrCompanyAccessDenied) {
+			http.Error(w, "Forbidden: no access to selected organization", http.StatusForbidden)
+			return
+		}
 		if repository.IsNotFound(err) {
 			http.Error(w, "User has no associated company", http.StatusNotFound)
 			return
 		}
-		log.Printf("GetMyCompany GetCompanyIDByUserID: %v", err)
+		log.Printf("GetMyCompany ResolveCompanyIDForRequest: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -89,10 +96,12 @@ func (h *CompanyHandler) GetMyCompany(w http.ResponseWriter, r *http.Request) {
 // @Accept       json
 // @Produce      json
 // @Param        company  body      models.CompanyPatch  true  "Patch payload"
+// @Param        X-Company-Id header string false "Tenant company UUID when the user belongs to multiple organizations"
 // @Security     BearerAuth
 // @Success      200  {object}  models.Company
 // @Failure      400  {string}  string "Bad request"
 // @Failure      401  {string}  string "Unauthorized"
+// @Failure      403  {string}  string "Forbidden: no access to selected organization"
 // @Failure      404  {string}  string "No company found"
 // @Failure      500  {string}  string "Internal Server Error"
 // @Router       /companies/me [patch]
@@ -103,13 +112,17 @@ func (h *CompanyHandler) PatchMyCompany(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	companyID, err := h.userRepo.GetCompanyIDByUserID(userID)
+	companyID, err := h.userRepo.ResolveCompanyIDForRequest(userID, r.Header.Get("X-Company-Id"))
 	if err != nil {
+		if errors.Is(err, repository.ErrCompanyAccessDenied) {
+			http.Error(w, "Forbidden: no access to selected organization", http.StatusForbidden)
+			return
+		}
 		if repository.IsNotFound(err) {
 			http.Error(w, "User has no associated company", http.StatusNotFound)
 			return
 		}
-		log.Printf("PatchMyCompany GetCompanyIDByUserID: %v", err)
+		log.Printf("PatchMyCompany ResolveCompanyIDForRequest: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}

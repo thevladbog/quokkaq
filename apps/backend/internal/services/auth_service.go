@@ -20,12 +20,19 @@ import (
 // ErrEmailAlreadyExists is returned from Signup when the email is already registered.
 var ErrEmailAlreadyExists = errors.New("email already exists")
 
+// TokenPair holds short-lived access and long-lived refresh JWTs.
+type TokenPair struct {
+	AccessToken  string
+	RefreshToken string
+}
+
 type AuthService interface {
-	Login(email, password string) (string, error)
+	Login(email, password string) (*TokenPair, error)
 	GetMe(userID string) (*models.User, error)
 	RequestPasswordReset(email string) error
 	ResetPassword(token, newPassword string) error
-	Signup(name, email, password, companyName, planCode string) (string, error)
+	Signup(name, email, password, companyName, planCode string) (*TokenPair, error)
+	Refresh(refreshToken string) (*TokenPair, error)
 }
 
 type authService struct {
@@ -42,38 +49,91 @@ func NewAuthService(userRepo repository.UserRepository, mailService MailService,
 	}
 }
 
-func (s *authService) Login(email, password string) (string, error) {
-	user, err := s.userRepo.FindByEmail(email)
-	if err != nil {
-		return "", errors.New("invalid credentials")
-	}
-
-	if user.Password == nil {
-		return "", errors.New("invalid credentials")
-	}
-
-	err = bcrypt.CompareHashAndPassword([]byte(*user.Password), []byte(password))
-	if err != nil {
-		return "", errors.New("invalid credentials")
-	}
-
-	return s.generateToken(user)
-}
-
-func (s *authService) generateToken(user *models.User) (string, error) {
-	claims := jwt.MapClaims{
-		"sub":   user.ID,
-		"email": user.Email,
-		"exp":   time.Now().Add(time.Hour * 24).Unix(), // 24 hours
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+func jwtSecretBytes() []byte {
 	secret := os.Getenv("JWT_SECRET")
 	if secret == "" {
 		secret = "default_secret_please_change"
 	}
+	return []byte(secret)
+}
 
-	return token.SignedString([]byte(secret))
+func (s *authService) Login(email, password string) (*TokenPair, error) {
+	user, err := s.userRepo.FindByEmail(email)
+	if err != nil {
+		return nil, errors.New("invalid credentials")
+	}
+
+	if user.Password == nil {
+		return nil, errors.New("invalid credentials")
+	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(*user.Password), []byte(password))
+	if err != nil {
+		return nil, errors.New("invalid credentials")
+	}
+
+	return s.generateTokenPair(user)
+}
+
+func (s *authService) generateAccessToken(user *models.User) (string, error) {
+	claims := jwt.MapClaims{
+		"sub":   user.ID,
+		"email": user.Email,
+		"typ":   "access",
+		"exp":   time.Now().Add(24 * time.Hour).Unix(),
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(jwtSecretBytes())
+}
+
+func (s *authService) generateRefreshToken(userID string) (string, error) {
+	claims := jwt.MapClaims{
+		"sub": userID,
+		"typ": "refresh",
+		"exp": time.Now().Add(30 * 24 * time.Hour).Unix(),
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(jwtSecretBytes())
+}
+
+func (s *authService) generateTokenPair(user *models.User) (*TokenPair, error) {
+	access, err := s.generateAccessToken(user)
+	if err != nil {
+		return nil, err
+	}
+	refresh, err := s.generateRefreshToken(user.ID)
+	if err != nil {
+		return nil, err
+	}
+	return &TokenPair{AccessToken: access, RefreshToken: refresh}, nil
+}
+
+func (s *authService) Refresh(refreshToken string) (*TokenPair, error) {
+	tok, err := jwt.Parse(refreshToken, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, jwt.ErrSignatureInvalid
+		}
+		return jwtSecretBytes(), nil
+	})
+	if err != nil || !tok.Valid {
+		return nil, errors.New("invalid refresh token")
+	}
+	claims, ok := tok.Claims.(jwt.MapClaims)
+	if !ok {
+		return nil, errors.New("invalid refresh token")
+	}
+	if typ, _ := claims["typ"].(string); typ != "refresh" {
+		return nil, errors.New("invalid refresh token")
+	}
+	userID, ok := claims["sub"].(string)
+	if !ok || strings.TrimSpace(userID) == "" {
+		return nil, errors.New("invalid refresh token")
+	}
+	user, err := s.userRepo.FindByID(userID)
+	if err != nil {
+		return nil, errors.New("invalid refresh token")
+	}
+	return s.generateTokenPair(user)
 }
 
 func (s *authService) GetMe(userID string) (*models.User, error) {
@@ -142,24 +202,24 @@ func (s *authService) ResetPassword(token, newPassword string) error {
 	return s.userRepo.DeletePasswordResetToken(resetToken.ID)
 }
 
-func (s *authService) Signup(name, email, password, companyName, planCode string) (string, error) {
+func (s *authService) Signup(name, email, password, companyName, planCode string) (*TokenPair, error) {
 	// Check if user already exists
 	existingUser, _ := s.userRepo.FindByEmail(email)
 	if existingUser != nil {
-		return "", ErrEmailAlreadyExists
+		return nil, ErrEmailAlreadyExists
 	}
 
 	// Hash password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		return "", fmt.Errorf("failed to hash password: %w", err)
+		return nil, fmt.Errorf("failed to hash password: %w", err)
 	}
 	hashedPasswordStr := string(hashedPassword)
 
 	// Get subscription plan (read-only; outside transaction)
 	plan, err := s.subscriptionRepo.FindPlanByCode(planCode)
 	if err != nil {
-		return "", fmt.Errorf("invalid plan code: %w", err)
+		return nil, fmt.Errorf("invalid plan code: %w", err)
 	}
 
 	company := &models.Company{
@@ -183,7 +243,7 @@ func (s *authService) Signup(name, email, password, companyName, planCode string
 		Type:     "staff",
 	}
 
-	var token string
+	var pair *TokenPair
 	err = database.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(company).Error; err != nil {
 			return fmt.Errorf("failed to create company: %w", err)
@@ -214,14 +274,14 @@ func (s *authService) Signup(name, email, password, companyName, planCode string
 		}
 
 		var genErr error
-		token, genErr = s.generateToken(user)
+		pair, genErr = s.generateTokenPair(user)
 		if genErr != nil {
 			return fmt.Errorf("failed to generate token: %w", genErr)
 		}
 		return nil
 	})
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return token, nil
+	return pair, nil
 }

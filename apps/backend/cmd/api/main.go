@@ -179,7 +179,7 @@ func main() {
 	quotaService := services.NewQuotaService()
 
 	userHandler := handlers.NewUserHandler(userService)
-	authHandler := handlers.NewAuthHandler(authService)
+	authHandler := handlers.NewAuthHandler(authService, userRepo)
 	unitHandler := handlers.NewUnitHandler(unitService, storageService, operationalService)
 	ticketHandler := handlers.NewTicketHandler(ticketService, operationalService)
 	serviceHandler := handlers.NewServiceHandler(serviceService, userRepo)
@@ -262,7 +262,7 @@ func main() {
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   allowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
-		AllowedHeaders:   []string{"Accept", "Accept-Language", "Authorization", "Content-Type", "X-CSRF-Token"},
+		AllowedHeaders:   []string{"Accept", "Accept-Language", "Authorization", "Content-Type", "X-CSRF-Token", "X-Company-Id"},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: true,
 		MaxAge:           300,
@@ -319,6 +319,7 @@ func main() {
 
 	r.Route("/auth", func(r chi.Router) {
 		r.Post("/login", authHandler.Login)
+		r.Post("/refresh", authHandler.Refresh)
 		r.Post("/forgot-password", authHandler.RequestPasswordReset)
 		r.Post("/reset-password", authHandler.ResetPassword)
 		r.With(authmiddleware.TerminalBootstrapRateLimit).Post("/terminal/bootstrap", desktopTerminalHandler.Bootstrap)
@@ -326,6 +327,7 @@ func main() {
 		r.Group(func(r chi.Router) {
 			r.Use(authmiddleware.JWTAuth)
 			r.Get("/me", authHandler.GetMe)
+			r.Get("/accessible-companies", authHandler.ListAccessibleCompanies)
 		})
 	})
 

@@ -6,11 +6,15 @@ import {
   useEffect,
   useState,
   ReactNode,
-  useCallback
+  useCallback,
+  useRef
 } from 'react';
 import { usePathname } from 'next/navigation';
-import { authApi, User } from '../lib/api';
+import { User } from '../lib/api';
+import { fetchCurrentUser } from '../lib/auth-orval';
+import { ACTIVE_COMPANY_ID_STORAGE_KEY } from '../lib/authenticated-api-fetch';
 import { routing } from '@/src/i18n/routing';
+import { logger } from '@/lib/logger';
 
 /** Kiosk uses desktop-terminal JWT; `sub` is terminal id, so GET /auth/me returns 404. */
 function isLocaleKioskPath(pathname: string | null): boolean {
@@ -25,7 +29,8 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   isAuthenticated: boolean;
-  login: (token: string) => void;
+  /** Persists token and loads `/auth/me`. Resolves when the user payload is applied or rejects on failure. */
+  login: (token: string) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
 }
@@ -38,6 +43,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isClient, setIsClient] = useState(false);
   const pathname = usePathname();
+  /** When true, `login()` owns the `/auth/me` fetch — skip duplicate work in the token effect. */
+  const loginFetchOwnsSessionRef = useRef(false);
 
   // Only run API calls on client side
   useEffect(() => {
@@ -59,6 +66,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
+      localStorage.removeItem(ACTIVE_COMPANY_ID_STORAGE_KEY);
       const segments = window.location.pathname.split('/').filter(Boolean);
       const maybeLocale = segments[0];
       const loginPath = routing.locales.includes(maybeLocale as 'en' | 'ru')
@@ -68,28 +76,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  const login = useCallback((newToken: string) => {
-    if (typeof window !== 'undefined') {
-      setToken(newToken);
-      localStorage.setItem('access_token', newToken);
-      // Fetch user data after login
-      authApi
-        .getMe()
-        .then((userData) => {
-          setUser(userData);
-          // Reset loading state after successful login
-          setIsLoading(false);
-        })
-        .catch((error) => {
-          console.error('Failed to fetch user after login:', error);
-          setToken(null);
-          setUser(null);
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('refresh_token');
-          // Reset loading state after failed login
-          setIsLoading(false);
-        });
+  const login = useCallback((newToken: string): Promise<void> => {
+    if (typeof window === 'undefined') {
+      return Promise.resolve();
     }
+    loginFetchOwnsSessionRef.current = true;
+    setIsLoading(true);
+    setToken(newToken);
+    localStorage.setItem('access_token', newToken);
+    return fetchCurrentUser()
+      .then((userData) => {
+        setUser(userData);
+        setIsLoading(false);
+      })
+      .catch((error) => {
+        logger.error('Failed to fetch user after login:', error);
+        setToken(null);
+        setUser(null);
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem(ACTIVE_COMPANY_ID_STORAGE_KEY);
+        setIsLoading(false);
+        throw error;
+      })
+      .finally(() => {
+        loginFetchOwnsSessionRef.current = false;
+      });
   }, []);
 
   // Fetch user after mount / token change. Pathname is only needed for kiosk routes.
@@ -112,15 +124,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
+    if (loginFetchOwnsSessionRef.current) {
+      return;
+    }
+
     setIsLoading(true);
 
     let cancelled = false;
     const fetchUser = async () => {
       try {
-        const userData = await authApi.getMe();
+        const userData = await fetchCurrentUser();
         if (!cancelled) setUser(userData);
       } catch (error) {
-        console.error('Failed to fetch user:', error);
+        logger.error('Failed to fetch user:', error);
         if (!cancelled) logout();
       } finally {
         if (!cancelled) setIsLoading(false);

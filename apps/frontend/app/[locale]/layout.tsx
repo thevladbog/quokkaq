@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { routing } from '../../src/i18n/routing';
 import ConditionalLayout from '@/components/ConditionalLayout';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { ActiveCompanyProvider } from '@/contexts/ActiveCompanyContext';
 import { ActiveUnitGate } from '@/components/ActiveUnitGate';
 import type { Metadata } from 'next';
 
@@ -37,11 +38,13 @@ export default async function LocaleLayout({ children, params }: Props) {
   return (
     <NextIntlClientProvider locale={locale} messages={messages}>
       <AuthProvider>
-        <ActiveUnitGate>
-          <SystemStatusGuard>
-            <ConditionalLayout>{children}</ConditionalLayout>
-          </SystemStatusGuard>
-        </ActiveUnitGate>
+        <ActiveCompanyProvider>
+          <ActiveUnitGate>
+            <SystemStatusGuard>
+              <ConditionalLayout>{children}</ConditionalLayout>
+            </SystemStatusGuard>
+          </ActiveUnitGate>
+        </ActiveCompanyProvider>
       </AuthProvider>
     </NextIntlClientProvider>
   );

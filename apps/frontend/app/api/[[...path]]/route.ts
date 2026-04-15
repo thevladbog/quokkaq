@@ -29,7 +29,8 @@ async function proxy(req: NextRequest, ctx: RouteCtx): Promise<Response> {
     'authorization',
     'content-type',
     'accept-language',
-    'accept'
+    'accept',
+    'x-company-id'
   ]) {
     const v = req.headers.get(name);
     if (v) headers.set(name, v);

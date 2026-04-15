@@ -42,6 +42,10 @@ type UserRepository interface {
 	IsCompanyOwner(userID, companyID string) (bool, error)
 	// GetCompanyIDByUserID returns company_id from the user's first assigned unit (user_units → units).
 	GetCompanyIDByUserID(userID string) (companyID string, err error)
+	// ResolveCompanyIDForRequest uses X-Company-Id when present and allowed; otherwise GetCompanyIDByUserID.
+	ResolveCompanyIDForRequest(userID string, headerCompanyID string) (companyID string, err error)
+	// ListAccessibleCompanies returns tenants the user may access (units + ownership), optional search q.
+	ListAccessibleCompanies(userID string, q string) ([]AccessibleCompanySummary, error)
 	// GetFirstUserUnit returns the first user_units row joined to units for the user (same shape as legacy usage handler query).
 	GetFirstUserUnit(userID string) (UserUnitResult, error)
 	// ResolveJournalActorDisplayNames returns a display label per user id (non-empty trimmed name, else email). Omitted ids are not in the map.

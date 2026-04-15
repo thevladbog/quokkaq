@@ -151,6 +151,7 @@ const ConditionalLayout = ({ children }: ConditionalLayoutProps) => {
   }, [pathWithoutLocale]);
 
   const showBackground =
+    pathWithoutLocale !== '/login' &&
     !pathWithoutLocale.startsWith('/kiosk') &&
     !pathWithoutLocale.startsWith('/counter-display') &&
     !pathWithoutLocale.startsWith('/screen') &&

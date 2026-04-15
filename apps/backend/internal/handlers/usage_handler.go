@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"log"
 	"net/http"
 	"quokkaq-go-backend/internal/middleware"
@@ -69,13 +70,16 @@ func (h *UsageHandler) GetUsageMetrics(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetMyUsageMetrics godoc
+// @ID           getMyUsageMetrics
 // @Summary      Get Current User's Usage Metrics
 // @Description  Returns current resource usage and limits for the authenticated user's company
 // @Tags         usage
 // @Produce      json
 // @Security     BearerAuth
+// @Param        X-Company-Id header string false "Tenant company UUID when the user belongs to multiple organizations"
 // @Success      200  {object}  handlers.UsageMetricsResponse
 // @Failure      401  {string}  string "Unauthorized"
+// @Failure      403  {string}  string "Forbidden: no access to selected organization"
 // @Failure      404  {string}  string "User has no associated company"
 // @Failure      500  {string}  string "Internal Server Error"
 // @Router       /usage-metrics/me [get]
@@ -86,13 +90,17 @@ func (h *UsageHandler) GetMyUsageMetrics(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	companyID, err := h.userRepo.GetCompanyIDByUserID(userID)
+	companyID, err := h.userRepo.ResolveCompanyIDForRequest(userID, r.Header.Get("X-Company-Id"))
 	if err != nil {
+		if errors.Is(err, repository.ErrCompanyAccessDenied) {
+			http.Error(w, "Forbidden: no access to selected organization", http.StatusForbidden)
+			return
+		}
 		if repository.IsNotFound(err) {
 			http.Error(w, "User has no associated company", http.StatusNotFound)
 			return
 		}
-		log.Printf("GetMyUsageMetrics userRepo.GetCompanyIDByUserID: %v", err)
+		log.Printf("GetMyUsageMetrics userRepo.ResolveCompanyIDForRequest: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}

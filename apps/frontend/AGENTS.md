@@ -27,9 +27,10 @@
 ## OpenAPI и Orval (генерация клиента)
 
 - Спека: `../backend/docs/swagger.json` (в монорепо — [`apps/backend/docs/swagger.json`](../../apps/backend/docs/swagger.json)).
-- Конфиг: [`orval.config.ts`](orval.config.ts). Сейчас в Orval попадают операции с тегом **`platform`**; вывод: [`lib/api/generated/platform.ts`](lib/api/generated/platform.ts) (файл **не править вручную**).
+- Конфиг: [`orval.config.ts`](orval.config.ts). Наборы тегов → отдельные файлы в [`lib/api/generated/`](lib/api/generated/) (например **`platform`** → `platform.ts`, **`auth`** → `auth.ts`); файлы **не править вручную**.
 - HTTP для сгенерированных вызовов: [`lib/orval-mutator.ts`](lib/orval-mutator.ts) использует [`lib/authenticated-api-fetch.ts`](lib/authenticated-api-fetch.ts) (JWT и refresh, как в `lib/api.ts`).
 - После изменений swag/OpenAPI: из корня репозитория `pnpm nx run frontend:orval`. Проверка расхождения с коммитом: `pnpm nx run frontend:orval:check`.
+- Эндпоинты **`auth`** (логин, `/auth/me`, список организаций): сгенерированный [`lib/api/generated/auth.ts`](lib/api/generated/auth.ts) и обёртки [`lib/auth-orval.ts`](lib/auth-orval.ts) (валидация пользователя через `UserModelSchema`).
 - Остальной REST по-прежнему через [`lib/api.ts`](lib/api.ts) и TanStack Query до миграции конкретных ручек в Orval.
 - `shared-types` (Zod) остаётся для форм и ручных контрактов; типы из Orval — отдельный слой, дубли убирать постепенно.
 

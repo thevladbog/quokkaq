@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"quokkaq-go-backend/internal/middleware"
@@ -29,6 +30,7 @@ func NewCompanyHandler(companyRepo repository.CompanyRepository, userRepo reposi
 // @Security     BearerAuth
 // @Success      200  {object}  map[string]bool
 // @Failure      401  {string}  string "Unauthorized"
+// @Failure      403  {string}  string "Forbidden: no access to selected organization"
 // @Failure      404  {string}  string "No company found"
 // @Failure      500  {string}  string "Internal Server Error"
 // @Router       /companies/me/complete-onboarding [post]
@@ -39,13 +41,17 @@ func (h *CompanyHandler) CompleteOnboarding(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	companyID, err := h.userRepo.GetCompanyIDByUserID(userID)
+	companyID, err := h.userRepo.ResolveCompanyIDForRequest(userID, r.Header.Get("X-Company-Id"))
 	if err != nil {
+		if errors.Is(err, repository.ErrCompanyAccessDenied) {
+			http.Error(w, "Forbidden: no access to selected organization", http.StatusForbidden)
+			return
+		}
 		if repository.IsNotFound(err) {
 			http.Error(w, "User has no associated company", http.StatusNotFound)
 			return
 		}
-		log.Printf("company CompleteOnboarding: GetCompanyIDByUserID: %v", err)
+		log.Printf("company CompleteOnboarding: ResolveCompanyIDForRequest: %v", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}

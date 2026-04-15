@@ -8,6 +8,7 @@
     "kiosk": "Киоск",
     "screen": "Общий экран",
     "active_unit": "Активное подразделение",
+    "organization": "Организация",
     "active_unit_placeholder": "Выберите подразделение",
     "sidebar_collapse": "Свернуть меню",
     "sidebar_expand": "Развернуть меню",
@@ -1389,6 +1390,8 @@
     }
   },
   "login": {
+    "brandName": "КвоккаКю",
+    "brandTagline": "Система управления очередью",
     "title": "Вход",
     "description": "Войдите в свой аккаунт",
     "email": "Email",
@@ -1398,7 +1401,12 @@
     "signIn": "Войти",
     "signingIn": "Вход...",
     "error": "Ошибка входа. Пожалуйста, проверьте свои данные.",
-    "forgotPassword": "Забыли пароль?"
+    "forgotPassword": "Забыли пароль?",
+    "chooseOrganization": "Выбор организации",
+    "chooseOrganizationDescription": "У вас есть доступ к нескольким организациям. Выберите одну, чтобы продолжить.",
+    "searchOrganizations": "Поиск организаций",
+    "legalEntity": "Юр. лицо",
+    "inn": "ИНН"
   },
   "forgotPassword": {
     "title": "Забыли пароль",

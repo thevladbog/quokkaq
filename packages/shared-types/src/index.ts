@@ -35,6 +35,7 @@ export const UserModelSchema = z.object({
     .array(
       z.object({
         unitId: z.string(),
+        companyId: z.string().optional(),
         permissions: z.array(z.string()).optional().default([]),
         unit: z
           .object({

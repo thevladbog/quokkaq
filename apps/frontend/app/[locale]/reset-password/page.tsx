@@ -16,6 +16,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
+import { postAuthResetPassword } from '@/lib/api/generated/auth';
+import { ApiHttpError } from '@/lib/api';
 
 function ResetPasswordContent() {
   const t = useTranslations('resetPassword');
@@ -49,27 +51,16 @@ function ResetPasswordContent() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/auth/reset-password`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ token, newPassword: password })
-        }
-      );
-
-      if (response.ok) {
-        setIsSuccess(true);
-        toast.success(t('success'));
-      } else {
-        const data = await response.json();
-        toast.error(data.error || t('error'));
-      }
+      await postAuthResetPassword({ token, newPassword: password });
+      setIsSuccess(true);
+      toast.success(t('success'));
     } catch (error) {
       console.error('Reset password error:', error);
-      toast.error(t('error'));
+      const msg =
+        error instanceof ApiHttpError
+          ? error.message || t('error')
+          : t('error');
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }
