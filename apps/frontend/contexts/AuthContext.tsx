@@ -14,6 +14,7 @@ import { User } from '../lib/api';
 import { fetchCurrentUser } from '../lib/auth-orval';
 import { ACTIVE_COMPANY_ID_STORAGE_KEY } from '../lib/authenticated-api-fetch';
 import { routing } from '@/src/i18n/routing';
+import { logger } from '@/lib/logger';
 
 /** Kiosk uses desktop-terminal JWT; `sub` is terminal id, so GET /auth/me returns 404. */
 function isLocaleKioskPath(pathname: string | null): boolean {
@@ -89,7 +90,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setIsLoading(false);
       })
       .catch((error) => {
-        console.error('Failed to fetch user after login:', error);
+        logger.error('Failed to fetch user after login:', error);
         setToken(null);
         setUser(null);
         localStorage.removeItem('access_token');
@@ -135,7 +136,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const userData = await fetchCurrentUser();
         if (!cancelled) setUser(userData);
       } catch (error) {
-        console.error('Failed to fetch user:', error);
+        logger.error('Failed to fetch user:', error);
         if (!cancelled) logout();
       } finally {
         if (!cancelled) setIsLoading(false);

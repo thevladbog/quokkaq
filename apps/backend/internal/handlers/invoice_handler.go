@@ -60,8 +60,10 @@ func NewInvoiceHandler(
 // @Tags         invoices
 // @Produce      json
 // @Security     BearerAuth
+// @Param        X-Company-Id header string false "Tenant company UUID when the user belongs to multiple organizations"
 // @Success      200  {array}   models.Invoice
 // @Failure      401  {string}  string "Unauthorized"
+// @Failure      403  {string}  string "Forbidden: no access to selected organization"
 // @Failure      404  {string}  string "No company found"
 // @Failure      500  {string}  string "Internal Server Error"
 // @Router       /invoices/me [get]

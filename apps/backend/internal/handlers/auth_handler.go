@@ -55,6 +55,7 @@ type SignupRequest struct {
 }
 
 // Login godoc
+// @ID           authLogin
 // @Summary      User Login
 // @Description  Authenticates a user and returns access and refresh JWTs (`token` duplicates access for legacy clients)
 // @Tags         auth
@@ -64,6 +65,7 @@ type SignupRequest struct {
 // @Success      200  {object}  LoginResponse
 // @Failure      400  {string}  string "Bad Request"
 // @Failure      401  {string}  string "Unauthorized"
+// @Failure      500  {string}  string "Internal Server Error"
 // @Router       /auth/login [post]
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req LoginRequest
@@ -89,6 +91,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 }
 
 // Refresh godoc
+// @ID           authRefresh
 // @Summary      Refresh tokens
 // @Description  Exchanges a valid refresh JWT for new access and refresh tokens. Send the refresh token as `Authorization: Bearer <refresh>`.
 // @Tags         auth
@@ -96,6 +99,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 // @Security     BearerAuth
 // @Success      200  {object}  RefreshResponse
 // @Failure      401  {string}  string "Unauthorized"
+// @Failure      500  {string}  string "Internal Server Error"
 // @Router       /auth/refresh [post]
 func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	authHeader := r.Header.Get("Authorization")
@@ -168,6 +172,7 @@ type AccessibleCompaniesResponse struct {
 }
 
 // ListAccessibleCompanies godoc
+// @ID           authAccessibleCompanies
 // @Summary      List companies the current user may access
 // @Description  Distinct tenants from unit assignments and company ownership. Optional query q searches name, legal name, INN, counterparty JSON.
 // @Tags         auth
@@ -176,6 +181,7 @@ type AccessibleCompaniesResponse struct {
 // @Security     BearerAuth
 // @Success      200  {object}  AccessibleCompaniesResponse
 // @Failure      401  {string}  string "Unauthorized"
+// @Failure      500  {string}  string "Internal Server Error"
 // @Router       /auth/accessible-companies [get]
 func (h *AuthHandler) ListAccessibleCompanies(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserIDFromContext(r.Context())
@@ -271,6 +277,7 @@ func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 }
 
 // Signup godoc
+// @ID           authSignup
 // @Summary      Sign Up
 // @Description  Register a new user and organization with trial subscription
 // @Tags         auth

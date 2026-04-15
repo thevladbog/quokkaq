@@ -30,6 +30,7 @@ func NewCompanyHandler(companyRepo repository.CompanyRepository, userRepo reposi
 // @Security     BearerAuth
 // @Success      200  {object}  map[string]bool
 // @Failure      401  {string}  string "Unauthorized"
+// @Failure      403  {string}  string "Forbidden: no access to selected organization"
 // @Failure      404  {string}  string "No company found"
 // @Failure      500  {string}  string "Internal Server Error"
 // @Router       /companies/me/complete-onboarding [post]

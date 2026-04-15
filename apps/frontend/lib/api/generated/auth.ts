@@ -1387,7 +1387,7 @@ export interface ServicesUtilizationResponse {
   points?: ServicesUtilizationPoint[];
 }
 
-export type GetAuthAccessibleCompaniesParams = {
+export type AuthAccessibleCompaniesParams = {
 /**
  * Search substring (case-insensitive)
  */
@@ -1402,26 +1402,31 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
  * Distinct tenants from unit assignments and company ownership. Optional query q searches name, legal name, INN, counterparty JSON.
  * @summary List companies the current user may access
  */
-export type getAuthAccessibleCompaniesResponse200 = {
+export type authAccessibleCompaniesResponse200 = {
   data: HandlersAccessibleCompaniesResponse
   status: 200
 }
 
-export type getAuthAccessibleCompaniesResponse401 = {
+export type authAccessibleCompaniesResponse401 = {
   data: string
   status: 401
 }
 
-export type getAuthAccessibleCompaniesResponseSuccess = (getAuthAccessibleCompaniesResponse200) & {
+export type authAccessibleCompaniesResponse500 = {
+  data: string
+  status: 500
+}
+
+export type authAccessibleCompaniesResponseSuccess = (authAccessibleCompaniesResponse200) & {
   headers: Headers;
 };
-export type getAuthAccessibleCompaniesResponseError = (getAuthAccessibleCompaniesResponse401) & {
+export type authAccessibleCompaniesResponseError = (authAccessibleCompaniesResponse401 | authAccessibleCompaniesResponse500) & {
   headers: Headers;
 };
 
-export type getAuthAccessibleCompaniesResponse = (getAuthAccessibleCompaniesResponseSuccess | getAuthAccessibleCompaniesResponseError)
+export type authAccessibleCompaniesResponse = (authAccessibleCompaniesResponseSuccess | authAccessibleCompaniesResponseError)
 
-export const getGetAuthAccessibleCompaniesUrl = (params?: GetAuthAccessibleCompaniesParams,) => {
+export const getAuthAccessibleCompaniesUrl = (params?: AuthAccessibleCompaniesParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -1436,9 +1441,9 @@ export const getGetAuthAccessibleCompaniesUrl = (params?: GetAuthAccessibleCompa
   return stringifiedParams.length > 0 ? `/auth/accessible-companies?${stringifiedParams}` : `/auth/accessible-companies`
 }
 
-export const getAuthAccessibleCompanies = async (params?: GetAuthAccessibleCompaniesParams, options?: RequestInit): Promise<getAuthAccessibleCompaniesResponse> => {
+export const authAccessibleCompanies = async (params?: AuthAccessibleCompaniesParams, options?: RequestInit): Promise<authAccessibleCompaniesResponse> => {
 
-  return orvalMutator<getAuthAccessibleCompaniesResponse>(getGetAuthAccessibleCompaniesUrl(params),
+  return orvalMutator<authAccessibleCompaniesResponse>(getAuthAccessibleCompaniesUrl(params),
   {
     ...options,
     method: 'GET'
@@ -1451,69 +1456,69 @@ export const getAuthAccessibleCompanies = async (params?: GetAuthAccessibleCompa
 
 
 
-export const getGetAuthAccessibleCompaniesQueryKey = (params?: GetAuthAccessibleCompaniesParams,) => {
+export const getAuthAccessibleCompaniesQueryKey = (params?: AuthAccessibleCompaniesParams,) => {
     return [
     `/auth/accessible-companies`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetAuthAccessibleCompaniesQueryOptions = <TData = Awaited<ReturnType<typeof getAuthAccessibleCompanies>>, TError = string>(params?: GetAuthAccessibleCompaniesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAuthAccessibleCompanies>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export const getAuthAccessibleCompaniesQueryOptions = <TData = Awaited<ReturnType<typeof authAccessibleCompanies>>, TError = string>(params?: AuthAccessibleCompaniesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authAccessibleCompanies>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetAuthAccessibleCompaniesQueryKey(params);
+  const queryKey =  queryOptions?.queryKey ?? getAuthAccessibleCompaniesQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAuthAccessibleCompanies>>> = ({ signal }) => getAuthAccessibleCompanies(params, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof authAccessibleCompanies>>> = ({ signal }) => authAccessibleCompanies(params, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAuthAccessibleCompanies>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof authAccessibleCompanies>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type GetAuthAccessibleCompaniesQueryResult = NonNullable<Awaited<ReturnType<typeof getAuthAccessibleCompanies>>>
-export type GetAuthAccessibleCompaniesQueryError = string
+export type AuthAccessibleCompaniesQueryResult = NonNullable<Awaited<ReturnType<typeof authAccessibleCompanies>>>
+export type AuthAccessibleCompaniesQueryError = string
 
 
-export function useGetAuthAccessibleCompanies<TData = Awaited<ReturnType<typeof getAuthAccessibleCompanies>>, TError = string>(
- params: undefined |  GetAuthAccessibleCompaniesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAuthAccessibleCompanies>>, TError, TData>> & Pick<
+export function useAuthAccessibleCompanies<TData = Awaited<ReturnType<typeof authAccessibleCompanies>>, TError = string>(
+ params: undefined |  AuthAccessibleCompaniesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof authAccessibleCompanies>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getAuthAccessibleCompanies>>,
+          Awaited<ReturnType<typeof authAccessibleCompanies>>,
           TError,
-          Awaited<ReturnType<typeof getAuthAccessibleCompanies>>
+          Awaited<ReturnType<typeof authAccessibleCompanies>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetAuthAccessibleCompanies<TData = Awaited<ReturnType<typeof getAuthAccessibleCompanies>>, TError = string>(
- params?: GetAuthAccessibleCompaniesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAuthAccessibleCompanies>>, TError, TData>> & Pick<
+export function useAuthAccessibleCompanies<TData = Awaited<ReturnType<typeof authAccessibleCompanies>>, TError = string>(
+ params?: AuthAccessibleCompaniesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authAccessibleCompanies>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getAuthAccessibleCompanies>>,
+          Awaited<ReturnType<typeof authAccessibleCompanies>>,
           TError,
-          Awaited<ReturnType<typeof getAuthAccessibleCompanies>>
+          Awaited<ReturnType<typeof authAccessibleCompanies>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetAuthAccessibleCompanies<TData = Awaited<ReturnType<typeof getAuthAccessibleCompanies>>, TError = string>(
- params?: GetAuthAccessibleCompaniesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAuthAccessibleCompanies>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useAuthAccessibleCompanies<TData = Awaited<ReturnType<typeof authAccessibleCompanies>>, TError = string>(
+ params?: AuthAccessibleCompaniesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authAccessibleCompanies>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List companies the current user may access
  */
 
-export function useGetAuthAccessibleCompanies<TData = Awaited<ReturnType<typeof getAuthAccessibleCompanies>>, TError = string>(
- params?: GetAuthAccessibleCompaniesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAuthAccessibleCompanies>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useAuthAccessibleCompanies<TData = Awaited<ReturnType<typeof authAccessibleCompanies>>, TError = string>(
+ params?: AuthAccessibleCompaniesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authAccessibleCompanies>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetAuthAccessibleCompaniesQueryOptions(params,options)
+  const queryOptions = getAuthAccessibleCompaniesQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -1621,31 +1626,36 @@ export const usePostAuthForgotPassword = <TError = string,
  * Authenticates a user and returns access and refresh JWTs (`token` duplicates access for legacy clients)
  * @summary User Login
  */
-export type postAuthLoginResponse200 = {
+export type authLoginResponse200 = {
   data: HandlersLoginResponse
   status: 200
 }
 
-export type postAuthLoginResponse400 = {
+export type authLoginResponse400 = {
   data: string
   status: 400
 }
 
-export type postAuthLoginResponse401 = {
+export type authLoginResponse401 = {
   data: string
   status: 401
 }
 
-export type postAuthLoginResponseSuccess = (postAuthLoginResponse200) & {
+export type authLoginResponse500 = {
+  data: string
+  status: 500
+}
+
+export type authLoginResponseSuccess = (authLoginResponse200) & {
   headers: Headers;
 };
-export type postAuthLoginResponseError = (postAuthLoginResponse400 | postAuthLoginResponse401) & {
+export type authLoginResponseError = (authLoginResponse400 | authLoginResponse401 | authLoginResponse500) & {
   headers: Headers;
 };
 
-export type postAuthLoginResponse = (postAuthLoginResponseSuccess | postAuthLoginResponseError)
+export type authLoginResponse = (authLoginResponseSuccess | authLoginResponseError)
 
-export const getPostAuthLoginUrl = () => {
+export const getAuthLoginUrl = () => {
 
 
 
@@ -1653,9 +1663,9 @@ export const getPostAuthLoginUrl = () => {
   return `/auth/login`
 }
 
-export const postAuthLogin = async (handlersLoginRequest: HandlersLoginRequest, options?: RequestInit): Promise<postAuthLoginResponse> => {
+export const authLogin = async (handlersLoginRequest: HandlersLoginRequest, options?: RequestInit): Promise<authLoginResponse> => {
 
-  return orvalMutator<postAuthLoginResponse>(getPostAuthLoginUrl(),
+  return orvalMutator<authLoginResponse>(getAuthLoginUrl(),
   {
     ...options,
     method: 'POST',
@@ -1668,11 +1678,11 @@ export const postAuthLogin = async (handlersLoginRequest: HandlersLoginRequest, 
 
 
 
-export const getPostAuthLoginMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAuthLogin>>, TError,{data: HandlersLoginRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof postAuthLogin>>, TError,{data: HandlersLoginRequest}, TContext> => {
+export const getAuthLoginMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authLogin>>, TError,{data: HandlersLoginRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof authLogin>>, TError,{data: HandlersLoginRequest}, TContext> => {
 
-const mutationKey = ['postAuthLogin'];
+const mutationKey = ['authLogin'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -1682,10 +1692,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postAuthLogin>>, {data: HandlersLoginRequest}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof authLogin>>, {data: HandlersLoginRequest}> = (props) => {
           const {data} = props ?? {};
 
-          return  postAuthLogin(data,requestOptions)
+          return  authLogin(data,requestOptions)
         }
 
 
@@ -1695,22 +1705,22 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PostAuthLoginMutationResult = NonNullable<Awaited<ReturnType<typeof postAuthLogin>>>
-    export type PostAuthLoginMutationBody = HandlersLoginRequest
-    export type PostAuthLoginMutationError = string
+    export type AuthLoginMutationResult = NonNullable<Awaited<ReturnType<typeof authLogin>>>
+    export type AuthLoginMutationBody = HandlersLoginRequest
+    export type AuthLoginMutationError = string
 
     /**
  * @summary User Login
  */
-export const usePostAuthLogin = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAuthLogin>>, TError,{data: HandlersLoginRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const useAuthLogin = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authLogin>>, TError,{data: HandlersLoginRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof postAuthLogin>>,
+        Awaited<ReturnType<typeof authLogin>>,
         TError,
         {data: HandlersLoginRequest},
         TContext
       > => {
-      return useMutation(getPostAuthLoginMutationOptions(options), queryClient);
+      return useMutation(getAuthLoginMutationOptions(options), queryClient);
     }
 
 /**
@@ -1843,26 +1853,31 @@ export function useGetAuthMe<TData = Awaited<ReturnType<typeof getAuthMe>>, TErr
  * Exchanges a valid refresh JWT for new access and refresh tokens. Send the refresh token as `Authorization: Bearer <refresh>`.
  * @summary Refresh tokens
  */
-export type postAuthRefreshResponse200 = {
+export type authRefreshResponse200 = {
   data: HandlersRefreshResponse
   status: 200
 }
 
-export type postAuthRefreshResponse401 = {
+export type authRefreshResponse401 = {
   data: string
   status: 401
 }
 
-export type postAuthRefreshResponseSuccess = (postAuthRefreshResponse200) & {
+export type authRefreshResponse500 = {
+  data: string
+  status: 500
+}
+
+export type authRefreshResponseSuccess = (authRefreshResponse200) & {
   headers: Headers;
 };
-export type postAuthRefreshResponseError = (postAuthRefreshResponse401) & {
+export type authRefreshResponseError = (authRefreshResponse401 | authRefreshResponse500) & {
   headers: Headers;
 };
 
-export type postAuthRefreshResponse = (postAuthRefreshResponseSuccess | postAuthRefreshResponseError)
+export type authRefreshResponse = (authRefreshResponseSuccess | authRefreshResponseError)
 
-export const getPostAuthRefreshUrl = () => {
+export const getAuthRefreshUrl = () => {
 
 
 
@@ -1870,9 +1885,9 @@ export const getPostAuthRefreshUrl = () => {
   return `/auth/refresh`
 }
 
-export const postAuthRefresh = async ( options?: RequestInit): Promise<postAuthRefreshResponse> => {
+export const authRefresh = async ( options?: RequestInit): Promise<authRefreshResponse> => {
 
-  return orvalMutator<postAuthRefreshResponse>(getPostAuthRefreshUrl(),
+  return orvalMutator<authRefreshResponse>(getAuthRefreshUrl(),
   {
     ...options,
     method: 'POST'
@@ -1884,11 +1899,11 @@ export const postAuthRefresh = async ( options?: RequestInit): Promise<postAuthR
 
 
 
-export const getPostAuthRefreshMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAuthRefresh>>, TError,void, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof postAuthRefresh>>, TError,void, TContext> => {
+export const getAuthRefreshMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authRefresh>>, TError,void, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof authRefresh>>, TError,void, TContext> => {
 
-const mutationKey = ['postAuthRefresh'];
+const mutationKey = ['authRefresh'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -1898,10 +1913,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postAuthRefresh>>, void> = () => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof authRefresh>>, void> = () => {
 
 
-          return  postAuthRefresh(requestOptions)
+          return  authRefresh(requestOptions)
         }
 
 
@@ -1911,22 +1926,22 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PostAuthRefreshMutationResult = NonNullable<Awaited<ReturnType<typeof postAuthRefresh>>>
+    export type AuthRefreshMutationResult = NonNullable<Awaited<ReturnType<typeof authRefresh>>>
 
-    export type PostAuthRefreshMutationError = string
+    export type AuthRefreshMutationError = string
 
     /**
  * @summary Refresh tokens
  */
-export const usePostAuthRefresh = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAuthRefresh>>, TError,void, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const useAuthRefresh = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authRefresh>>, TError,void, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof postAuthRefresh>>,
+        Awaited<ReturnType<typeof authRefresh>>,
         TError,
         void,
         TContext
       > => {
-      return useMutation(getPostAuthRefreshMutationOptions(options), queryClient);
+      return useMutation(getAuthRefreshMutationOptions(options), queryClient);
     }
 
 /**
@@ -2029,36 +2044,36 @@ export const usePostAuthResetPassword = <TError = string,
  * Register a new user and organization with trial subscription
  * @summary Sign Up
  */
-export type postAuthSignupResponse201 = {
+export type authSignupResponse201 = {
   data: HandlersLoginResponse
   status: 201
 }
 
-export type postAuthSignupResponse400 = {
+export type authSignupResponse400 = {
   data: string
   status: 400
 }
 
-export type postAuthSignupResponse409 = {
+export type authSignupResponse409 = {
   data: string
   status: 409
 }
 
-export type postAuthSignupResponse500 = {
+export type authSignupResponse500 = {
   data: string
   status: 500
 }
 
-export type postAuthSignupResponseSuccess = (postAuthSignupResponse201) & {
+export type authSignupResponseSuccess = (authSignupResponse201) & {
   headers: Headers;
 };
-export type postAuthSignupResponseError = (postAuthSignupResponse400 | postAuthSignupResponse409 | postAuthSignupResponse500) & {
+export type authSignupResponseError = (authSignupResponse400 | authSignupResponse409 | authSignupResponse500) & {
   headers: Headers;
 };
 
-export type postAuthSignupResponse = (postAuthSignupResponseSuccess | postAuthSignupResponseError)
+export type authSignupResponse = (authSignupResponseSuccess | authSignupResponseError)
 
-export const getPostAuthSignupUrl = () => {
+export const getAuthSignupUrl = () => {
 
 
 
@@ -2066,9 +2081,9 @@ export const getPostAuthSignupUrl = () => {
   return `/auth/signup`
 }
 
-export const postAuthSignup = async (handlersSignupRequest: HandlersSignupRequest, options?: RequestInit): Promise<postAuthSignupResponse> => {
+export const authSignup = async (handlersSignupRequest: HandlersSignupRequest, options?: RequestInit): Promise<authSignupResponse> => {
 
-  return orvalMutator<postAuthSignupResponse>(getPostAuthSignupUrl(),
+  return orvalMutator<authSignupResponse>(getAuthSignupUrl(),
   {
     ...options,
     method: 'POST',
@@ -2081,11 +2096,11 @@ export const postAuthSignup = async (handlersSignupRequest: HandlersSignupReques
 
 
 
-export const getPostAuthSignupMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAuthSignup>>, TError,{data: HandlersSignupRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof postAuthSignup>>, TError,{data: HandlersSignupRequest}, TContext> => {
+export const getAuthSignupMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authSignup>>, TError,{data: HandlersSignupRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof authSignup>>, TError,{data: HandlersSignupRequest}, TContext> => {
 
-const mutationKey = ['postAuthSignup'];
+const mutationKey = ['authSignup'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -2095,10 +2110,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postAuthSignup>>, {data: HandlersSignupRequest}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof authSignup>>, {data: HandlersSignupRequest}> = (props) => {
           const {data} = props ?? {};
 
-          return  postAuthSignup(data,requestOptions)
+          return  authSignup(data,requestOptions)
         }
 
 
@@ -2108,20 +2123,20 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PostAuthSignupMutationResult = NonNullable<Awaited<ReturnType<typeof postAuthSignup>>>
-    export type PostAuthSignupMutationBody = HandlersSignupRequest
-    export type PostAuthSignupMutationError = string
+    export type AuthSignupMutationResult = NonNullable<Awaited<ReturnType<typeof authSignup>>>
+    export type AuthSignupMutationBody = HandlersSignupRequest
+    export type AuthSignupMutationError = string
 
     /**
  * @summary Sign Up
  */
-export const usePostAuthSignup = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAuthSignup>>, TError,{data: HandlersSignupRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const useAuthSignup = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authSignup>>, TError,{data: HandlersSignupRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof postAuthSignup>>,
+        Awaited<ReturnType<typeof authSignup>>,
         TError,
         {data: HandlersSignupRequest},
         TContext
       > => {
-      return useMutation(getPostAuthSignupMutationOptions(options), queryClient);
+      return useMutation(getAuthSignupMutationOptions(options), queryClient);
     }

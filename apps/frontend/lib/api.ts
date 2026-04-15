@@ -1258,7 +1258,7 @@ export const companiesApi = {
 // Subscription API functions
 export const subscriptionsApi = {
   getMySubscription: async () => {
-    const res = await orvalTenantBilling.getSubscriptionsMe();
+    const res = await orvalTenantBilling.getMySubscription();
     return SubscriptionSchema.parse(res.data);
   },
 
@@ -1268,7 +1268,7 @@ export const subscriptionsApi = {
   },
 
   createCheckout: async (planCode: string) => {
-    const res = await orvalTenantBilling.postSubscriptionsCheckout({
+    const res = await orvalTenantBilling.createCheckout({
       planCode
     });
     return z

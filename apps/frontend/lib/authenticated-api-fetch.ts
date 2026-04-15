@@ -212,11 +212,11 @@ export async function authenticatedApiFetch(
     ) {
       try {
         if (refreshToken) {
-          const { postAuthRefresh } = await import('@/lib/api/generated/auth');
+          const { authRefresh } = await import('@/lib/api/generated/auth');
 
           let refreshPayload: Record<string, unknown> | null = null;
           try {
-            const refreshRes = await postAuthRefresh({
+            const refreshRes = await authRefresh({
               headers: {
                 'Content-Type': 'application/json',
                 Authorization: `Bearer ${refreshToken}`

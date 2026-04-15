@@ -37,10 +37,9 @@ export function ActiveUnitProvider({ children }: { children: ReactNode }) {
       return units.map((u: { unitId: string }) => u.unitId);
     }
     return units
-      .filter((u: { unitId: string; companyId?: string }) => {
-        if (!u.companyId) return true;
-        return u.companyId === cid;
-      })
+      .filter(
+        (u: { unitId: string; companyId?: string }) => u.companyId === cid
+      )
       .map((u: { unitId: string }) => u.unitId);
   }, [user?.units, activeCompanyId]);
 

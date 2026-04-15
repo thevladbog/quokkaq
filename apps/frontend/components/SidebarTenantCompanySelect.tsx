@@ -4,7 +4,11 @@ import { useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { Building } from 'lucide-react';
-import { useGetAuthAccessibleCompanies } from '@/lib/api/generated/auth';
+import {
+  useAuthAccessibleCompanies,
+  type authAccessibleCompaniesResponse,
+  type HandlersAccessibleCompanyItem
+} from '@/lib/api/generated/auth';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useActiveCompany } from '@/contexts/ActiveCompanyContext';
 import {
@@ -23,6 +27,18 @@ import {
 import { SidebarMenuButton, useSidebar } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
 
+/** Orval query keys use absolute API path strings; refetch tenant data without nuking unrelated queries (e.g. i18n). */
+function isTenantScopedQueryKey(queryKey: readonly unknown[]): boolean {
+  const first = queryKey[0];
+  if (typeof first !== 'string' || !first.startsWith('/')) {
+    return false;
+  }
+  if (first === '/auth/me') {
+    return false;
+  }
+  return true;
+}
+
 export function SidebarTenantCompanySelect({
   className
 }: {
@@ -34,13 +50,16 @@ export function SidebarTenantCompanySelect({
   const queryClient = useQueryClient();
   const { state, isMobile } = useSidebar();
 
-  const { data: companies = [], isLoading } = useGetAuthAccessibleCompanies(
+  const { data: companies = [], isLoading } = useAuthAccessibleCompanies(
     undefined,
     {
       query: {
         enabled: isAuthenticated,
         staleTime: 60 * 1000,
-        select: (r) => (r.status === 200 ? (r.data.companies ?? []) : [])
+        select: (
+          r: authAccessibleCompaniesResponse
+        ): HandlersAccessibleCompanyItem[] =>
+          r.status === 200 ? (r.data.companies ?? []) : []
       }
     }
   );
@@ -65,7 +84,9 @@ export function SidebarTenantCompanySelect({
 
   const handleChange = (id: string) => {
     setActiveCompanyId(id);
-    void queryClient.invalidateQueries();
+    void queryClient.invalidateQueries({
+      predicate: (q) => isTenantScopedQueryKey(q.queryKey)
+    });
   };
 
   if (!isAuthenticated || companies.length <= 1 || isLoading) {
@@ -94,13 +115,15 @@ export function SidebarTenantCompanySelect({
         <SelectValue placeholder={tNav('organization')} className='truncate' />
       </SelectTrigger>
       <SelectContent position='popper' align='start' className='z-[110]'>
-        {companies.map((c) => (
-          <SelectItem key={c.id} value={c.id}>
-            <span className='truncate' title={c.name}>
-              {c.name}
-            </span>
-          </SelectItem>
-        ))}
+        {companies
+          .filter((c): c is typeof c & { id: string } => Boolean(c.id))
+          .map((c) => (
+            <SelectItem key={c.id} value={c.id}>
+              <span className='truncate' title={c.name}>
+                {c.name}
+              </span>
+            </SelectItem>
+          ))}
       </SelectContent>
     </Select>
   );

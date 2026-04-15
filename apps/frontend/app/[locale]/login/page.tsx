@@ -20,11 +20,14 @@ import { useActiveCompany } from '@/contexts/ActiveCompanyContext';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import ThemeToggle from '@/components/ThemeToggle';
 import {
-  getAuthAccessibleCompanies,
-  useGetAuthAccessibleCompanies,
+  authAccessibleCompanies,
+  useAuthAccessibleCompanies,
+  type authAccessibleCompaniesResponse,
   type HandlersAccessibleCompanyItem
 } from '@/lib/api/generated/auth';
 import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { logger } from '@/lib/logger';
 
 type Step = 'form' | 'company';
 
@@ -56,10 +59,10 @@ export default function LoginPage() {
     data: companyRows = [],
     isLoading: companiesLoading,
     isError: companiesError
-  } = useGetAuthAccessibleCompanies(accessibleCompaniesParams, {
+  } = useAuthAccessibleCompanies(accessibleCompaniesParams, {
     query: {
       enabled: step === 'company',
-      select: (r) => {
+      select: (r: authAccessibleCompaniesResponse) => {
         if (r.status !== 200) {
           throw new Error('accessible_companies_failed');
         }
@@ -76,7 +79,7 @@ export default function LoginPage() {
 
       if (response && response.accessToken) {
         await login(response.accessToken);
-        const acRes = await getAuthAccessibleCompanies();
+        const acRes = await authAccessibleCompanies();
         if (acRes.status !== 200) {
           throw new Error('accessible_companies_failed');
         }
@@ -91,12 +94,16 @@ export default function LoginPage() {
         router.push('/');
       }
     } catch (error) {
-      console.error('Login failed:', error);
+      logger.error('Login failed:', error);
     }
   };
 
   const pickCompany = (c: HandlersAccessibleCompanyItem) => {
-    if (!c.id) return;
+    if (!c.id) {
+      logger.warn('pickCompany: missing company id', { name: c.name });
+      toast.error(t('error'));
+      return;
+    }
     setActiveCompanyId(c.id);
     router.push('/');
   };

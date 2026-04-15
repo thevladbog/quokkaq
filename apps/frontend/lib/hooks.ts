@@ -595,6 +595,8 @@ export const useLogin = () => {
         localStorage.setItem('access_token', data.accessToken);
         if (data.refreshToken) {
           localStorage.setItem('refresh_token', data.refreshToken);
+        } else {
+          localStorage.removeItem('refresh_token');
         }
       }
     }

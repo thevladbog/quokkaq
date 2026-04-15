@@ -1407,6 +1407,11 @@ export type getInvoicesMeResponse401 = {
   status: 401
 }
 
+export type getInvoicesMeResponse403 = {
+  data: string
+  status: 403
+}
+
 export type getInvoicesMeResponse404 = {
   data: string
   status: 404
@@ -1420,7 +1425,7 @@ export type getInvoicesMeResponse500 = {
 export type getInvoicesMeResponseSuccess = (getInvoicesMeResponse200) & {
   headers: Headers;
 };
-export type getInvoicesMeResponseError = (getInvoicesMeResponse401 | getInvoicesMeResponse404 | getInvoicesMeResponse500) & {
+export type getInvoicesMeResponseError = (getInvoicesMeResponse401 | getInvoicesMeResponse403 | getInvoicesMeResponse404 | getInvoicesMeResponse500) & {
   headers: Headers;
 };
 
@@ -1669,6 +1674,11 @@ export type getInvoicesIdResponse401 = {
   status: 401
 }
 
+export type getInvoicesIdResponse403 = {
+  data: string
+  status: 403
+}
+
 export type getInvoicesIdResponse404 = {
   data: string
   status: 404
@@ -1682,7 +1692,7 @@ export type getInvoicesIdResponse500 = {
 export type getInvoicesIdResponseSuccess = (getInvoicesIdResponse200) & {
   headers: Headers;
 };
-export type getInvoicesIdResponseError = (getInvoicesIdResponse401 | getInvoicesIdResponse404 | getInvoicesIdResponse500) & {
+export type getInvoicesIdResponseError = (getInvoicesIdResponse401 | getInvoicesIdResponse403 | getInvoicesIdResponse404 | getInvoicesIdResponse500) & {
   headers: Headers;
 };
 
@@ -2081,51 +2091,51 @@ export const usePostInvoicesIdYookassaPaymentLink = <TError = string,
  * Creates a checkout session for subscription upgrade
  * @summary Create Checkout Session
  */
-export type postSubscriptionsCheckoutResponse200 = {
+export type createCheckoutResponse200 = {
   data: HandlersCreateCheckoutResponse
   status: 200
 }
 
-export type postSubscriptionsCheckoutResponse400 = {
+export type createCheckoutResponse400 = {
   data: string
   status: 400
 }
 
-export type postSubscriptionsCheckoutResponse401 = {
+export type createCheckoutResponse401 = {
   data: string
   status: 401
 }
 
-export type postSubscriptionsCheckoutResponse403 = {
+export type createCheckoutResponse403 = {
   data: string
   status: 403
 }
 
-export type postSubscriptionsCheckoutResponse404 = {
+export type createCheckoutResponse404 = {
   data: string
   status: 404
 }
 
-export type postSubscriptionsCheckoutResponse500 = {
+export type createCheckoutResponse500 = {
   data: string
   status: 500
 }
 
-export type postSubscriptionsCheckoutResponse501 = {
+export type createCheckoutResponse501 = {
   data: string
   status: 501
 }
 
-export type postSubscriptionsCheckoutResponseSuccess = (postSubscriptionsCheckoutResponse200) & {
+export type createCheckoutResponseSuccess = (createCheckoutResponse200) & {
   headers: Headers;
 };
-export type postSubscriptionsCheckoutResponseError = (postSubscriptionsCheckoutResponse400 | postSubscriptionsCheckoutResponse401 | postSubscriptionsCheckoutResponse403 | postSubscriptionsCheckoutResponse404 | postSubscriptionsCheckoutResponse500 | postSubscriptionsCheckoutResponse501) & {
+export type createCheckoutResponseError = (createCheckoutResponse400 | createCheckoutResponse401 | createCheckoutResponse403 | createCheckoutResponse404 | createCheckoutResponse500 | createCheckoutResponse501) & {
   headers: Headers;
 };
 
-export type postSubscriptionsCheckoutResponse = (postSubscriptionsCheckoutResponseSuccess | postSubscriptionsCheckoutResponseError)
+export type createCheckoutResponse = (createCheckoutResponseSuccess | createCheckoutResponseError)
 
-export const getPostSubscriptionsCheckoutUrl = () => {
+export const getCreateCheckoutUrl = () => {
 
 
 
@@ -2133,9 +2143,9 @@ export const getPostSubscriptionsCheckoutUrl = () => {
   return `/subscriptions/checkout`
 }
 
-export const postSubscriptionsCheckout = async (handlersCreateCheckoutRequest: HandlersCreateCheckoutRequest, options?: RequestInit): Promise<postSubscriptionsCheckoutResponse> => {
+export const createCheckout = async (handlersCreateCheckoutRequest: HandlersCreateCheckoutRequest, options?: RequestInit): Promise<createCheckoutResponse> => {
 
-  return orvalMutator<postSubscriptionsCheckoutResponse>(getPostSubscriptionsCheckoutUrl(),
+  return orvalMutator<createCheckoutResponse>(getCreateCheckoutUrl(),
   {
     ...options,
     method: 'POST',
@@ -2148,11 +2158,11 @@ export const postSubscriptionsCheckout = async (handlersCreateCheckoutRequest: H
 
 
 
-export const getPostSubscriptionsCheckoutMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postSubscriptionsCheckout>>, TError,{data: HandlersCreateCheckoutRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof postSubscriptionsCheckout>>, TError,{data: HandlersCreateCheckoutRequest}, TContext> => {
+export const getCreateCheckoutMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCheckout>>, TError,{data: HandlersCreateCheckoutRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof createCheckout>>, TError,{data: HandlersCreateCheckoutRequest}, TContext> => {
 
-const mutationKey = ['postSubscriptionsCheckout'];
+const mutationKey = ['createCheckout'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -2162,10 +2172,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postSubscriptionsCheckout>>, {data: HandlersCreateCheckoutRequest}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createCheckout>>, {data: HandlersCreateCheckoutRequest}> = (props) => {
           const {data} = props ?? {};
 
-          return  postSubscriptionsCheckout(data,requestOptions)
+          return  createCheckout(data,requestOptions)
         }
 
 
@@ -2175,58 +2185,63 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PostSubscriptionsCheckoutMutationResult = NonNullable<Awaited<ReturnType<typeof postSubscriptionsCheckout>>>
-    export type PostSubscriptionsCheckoutMutationBody = HandlersCreateCheckoutRequest
-    export type PostSubscriptionsCheckoutMutationError = string
+    export type CreateCheckoutMutationResult = NonNullable<Awaited<ReturnType<typeof createCheckout>>>
+    export type CreateCheckoutMutationBody = HandlersCreateCheckoutRequest
+    export type CreateCheckoutMutationError = string
 
     /**
  * @summary Create Checkout Session
  */
-export const usePostSubscriptionsCheckout = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postSubscriptionsCheckout>>, TError,{data: HandlersCreateCheckoutRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const useCreateCheckout = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCheckout>>, TError,{data: HandlersCreateCheckoutRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof postSubscriptionsCheckout>>,
+        Awaited<ReturnType<typeof createCheckout>>,
         TError,
         {data: HandlersCreateCheckoutRequest},
         TContext
       > => {
-      return useMutation(getPostSubscriptionsCheckoutMutationOptions(options), queryClient);
+      return useMutation(getCreateCheckoutMutationOptions(options), queryClient);
     }
 
 /**
  * Returns subscription for the authenticated user's company
  * @summary Get Current User's Subscription
  */
-export type getSubscriptionsMeResponse200 = {
+export type getMySubscriptionResponse200 = {
   data: ModelsSubscription
   status: 200
 }
 
-export type getSubscriptionsMeResponse401 = {
+export type getMySubscriptionResponse401 = {
   data: string
   status: 401
 }
 
-export type getSubscriptionsMeResponse404 = {
+export type getMySubscriptionResponse403 = {
+  data: string
+  status: 403
+}
+
+export type getMySubscriptionResponse404 = {
   data: string
   status: 404
 }
 
-export type getSubscriptionsMeResponse500 = {
+export type getMySubscriptionResponse500 = {
   data: string
   status: 500
 }
 
-export type getSubscriptionsMeResponseSuccess = (getSubscriptionsMeResponse200) & {
+export type getMySubscriptionResponseSuccess = (getMySubscriptionResponse200) & {
   headers: Headers;
 };
-export type getSubscriptionsMeResponseError = (getSubscriptionsMeResponse401 | getSubscriptionsMeResponse404 | getSubscriptionsMeResponse500) & {
+export type getMySubscriptionResponseError = (getMySubscriptionResponse401 | getMySubscriptionResponse403 | getMySubscriptionResponse404 | getMySubscriptionResponse500) & {
   headers: Headers;
 };
 
-export type getSubscriptionsMeResponse = (getSubscriptionsMeResponseSuccess | getSubscriptionsMeResponseError)
+export type getMySubscriptionResponse = (getMySubscriptionResponseSuccess | getMySubscriptionResponseError)
 
-export const getGetSubscriptionsMeUrl = () => {
+export const getGetMySubscriptionUrl = () => {
 
 
 
@@ -2234,9 +2249,9 @@ export const getGetSubscriptionsMeUrl = () => {
   return `/subscriptions/me`
 }
 
-export const getSubscriptionsMe = async ( options?: RequestInit): Promise<getSubscriptionsMeResponse> => {
+export const getMySubscription = async ( options?: RequestInit): Promise<getMySubscriptionResponse> => {
 
-  return orvalMutator<getSubscriptionsMeResponse>(getGetSubscriptionsMeUrl(),
+  return orvalMutator<getMySubscriptionResponse>(getGetMySubscriptionUrl(),
   {
     ...options,
     method: 'GET'
@@ -2249,69 +2264,69 @@ export const getSubscriptionsMe = async ( options?: RequestInit): Promise<getSub
 
 
 
-export const getGetSubscriptionsMeQueryKey = () => {
+export const getGetMySubscriptionQueryKey = () => {
     return [
     `/subscriptions/me`
     ] as const;
     }
 
 
-export const getGetSubscriptionsMeQueryOptions = <TData = Awaited<ReturnType<typeof getSubscriptionsMe>>, TError = string>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSubscriptionsMe>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export const getGetMySubscriptionQueryOptions = <TData = Awaited<ReturnType<typeof getMySubscription>>, TError = string>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMySubscription>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetSubscriptionsMeQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetMySubscriptionQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSubscriptionsMe>>> = ({ signal }) => getSubscriptionsMe({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMySubscription>>> = ({ signal }) => getMySubscription({ signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSubscriptionsMe>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMySubscription>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type GetSubscriptionsMeQueryResult = NonNullable<Awaited<ReturnType<typeof getSubscriptionsMe>>>
-export type GetSubscriptionsMeQueryError = string
+export type GetMySubscriptionQueryResult = NonNullable<Awaited<ReturnType<typeof getMySubscription>>>
+export type GetMySubscriptionQueryError = string
 
 
-export function useGetSubscriptionsMe<TData = Awaited<ReturnType<typeof getSubscriptionsMe>>, TError = string>(
-  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSubscriptionsMe>>, TError, TData>> & Pick<
+export function useGetMySubscription<TData = Awaited<ReturnType<typeof getMySubscription>>, TError = string>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMySubscription>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getSubscriptionsMe>>,
+          Awaited<ReturnType<typeof getMySubscription>>,
           TError,
-          Awaited<ReturnType<typeof getSubscriptionsMe>>
+          Awaited<ReturnType<typeof getMySubscription>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetSubscriptionsMe<TData = Awaited<ReturnType<typeof getSubscriptionsMe>>, TError = string>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSubscriptionsMe>>, TError, TData>> & Pick<
+export function useGetMySubscription<TData = Awaited<ReturnType<typeof getMySubscription>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMySubscription>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getSubscriptionsMe>>,
+          Awaited<ReturnType<typeof getMySubscription>>,
           TError,
-          Awaited<ReturnType<typeof getSubscriptionsMe>>
+          Awaited<ReturnType<typeof getMySubscription>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetSubscriptionsMe<TData = Awaited<ReturnType<typeof getSubscriptionsMe>>, TError = string>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSubscriptionsMe>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useGetMySubscription<TData = Awaited<ReturnType<typeof getMySubscription>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMySubscription>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get Current User's Subscription
  */
 
-export function useGetSubscriptionsMe<TData = Awaited<ReturnType<typeof getSubscriptionsMe>>, TError = string>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSubscriptionsMe>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useGetMySubscription<TData = Awaited<ReturnType<typeof getMySubscription>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMySubscription>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetSubscriptionsMeQueryOptions(options)
+  const queryOptions = getGetMySubscriptionQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

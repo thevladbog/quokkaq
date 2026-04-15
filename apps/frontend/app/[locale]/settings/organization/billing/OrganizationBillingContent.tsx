@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 import type { SubscriptionPlan } from '@quokkaq/shared-types';
 import {
   getGetSubscriptionPlansQueryKey,
-  getGetSubscriptionsMeQueryKey
+  getGetMySubscriptionQueryKey
 } from '@/lib/api/generated/tenant-billing';
 import { subscriptionsApi } from '@/lib/api';
 import { formatApiToastErrorMessage } from '@/lib/format-api-toast-error';
@@ -27,7 +27,7 @@ export function OrganizationBillingContent() {
   const queryClient = useQueryClient();
 
   const { data: subscription, isLoading: subscriptionLoading } = useQuery({
-    queryKey: getGetSubscriptionsMeQueryKey(),
+    queryKey: getGetMySubscriptionQueryKey(),
     queryFn: () => subscriptionsApi.getMySubscription()
   });
 
@@ -55,7 +55,7 @@ export function OrganizationBillingContent() {
       subscriptionsApi.cancelSubscription(subscriptionId),
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: getGetSubscriptionsMeQueryKey()
+        queryKey: getGetMySubscriptionQueryKey()
       });
       toast.success(t('toastSubscriptionCanceled'));
     },

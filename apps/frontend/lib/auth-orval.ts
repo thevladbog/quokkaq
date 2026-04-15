@@ -1,7 +1,7 @@
 /**
  * Auth flows via Orval-generated clients ({@link ./api/generated/auth.ts}) + shared-types validation.
  */
-import { getAuthMe, postAuthLogin } from '@/lib/api/generated/auth';
+import { authLogin, getAuthMe } from '@/lib/api/generated/auth';
 import type { User } from '@quokkaq/shared-types';
 import { UserModelSchema } from '@quokkaq/shared-types';
 
@@ -17,7 +17,7 @@ export async function loginWithPassword(credentials: {
   email: string;
   password: string;
 }): Promise<{ accessToken: string; refreshToken?: string }> {
-  const res = await postAuthLogin({
+  const res = await authLogin({
     email: credentials.email,
     password: credentials.password
   });

@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { postAuthForgotPassword } from '@/lib/api/generated/auth';
+import { logger } from '@/lib/logger';
 
 export default function ForgotPasswordPage() {
   const t = useTranslations('forgotPassword');
@@ -28,11 +29,11 @@ export default function ForgotPasswordPage() {
     setIsSubmitting(true);
 
     try {
-      await postAuthForgotPassword({ email }).catch(() => undefined);
+      await postAuthForgotPassword({ email });
       setIsSuccess(true);
       toast.success(t('success'));
     } catch (error) {
-      console.error('Forgot password error:', error);
+      logger.error('Forgot password error:', error);
       toast.error(t('requestError'));
     } finally {
       setIsSubmitting(false);

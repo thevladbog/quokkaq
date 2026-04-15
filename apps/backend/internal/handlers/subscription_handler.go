@@ -96,13 +96,16 @@ func (h *SubscriptionHandler) requireBillingAdmin(w http.ResponseWriter, userID,
 }
 
 // GetMySubscription godoc
+// @ID           getMySubscription
 // @Summary      Get Current User's Subscription
 // @Description  Returns subscription for the authenticated user's company
 // @Tags         subscriptions
 // @Produce      json
 // @Security     BearerAuth
+// @Param        X-Company-Id header string false "Tenant company UUID when the user belongs to multiple organizations"
 // @Success      200  {object}  models.Subscription
 // @Failure      401  {string}  string "Unauthorized"
+// @Failure      403  {string}  string "Forbidden: no access to selected organization"
 // @Failure      404  {string}  string "No subscription found"
 // @Failure      500  {string}  string "Internal Server Error"
 // @Router       /subscriptions/me [get]
@@ -195,12 +198,14 @@ type CreateCheckoutResponse struct {
 }
 
 // CreateCheckout godoc
+// @ID           createCheckout
 // @Summary      Create Checkout Session
 // @Description  Creates a checkout session for subscription upgrade
 // @Tags         subscriptions
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
+// @Param        X-Company-Id header string false "Tenant company UUID when the user belongs to multiple organizations"
 // @Param        request body CreateCheckoutRequest true "Checkout Request"
 // @Success      200  {object}  CreateCheckoutResponse
 // @Failure      400  {string}  string "Bad Request (e.g. missing public APP_BASE_URL for real checkout)"
