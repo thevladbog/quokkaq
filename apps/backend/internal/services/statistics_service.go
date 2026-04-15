@@ -2,9 +2,10 @@ package services
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -66,73 +67,119 @@ func (s *StatisticsService) statisticsBranchUnitIDs(ctx context.Context, subdivi
 	if strings.TrimSpace(subdivisionID) == "" {
 		return map[string]struct{}{}, nil
 	}
-	var ids []string
-	err := s.db.WithContext(ctx).Raw(`
+	rows, err := s.db.WithContext(ctx).Raw(`
 WITH RECURSIVE branch AS (
   SELECT id::text AS id FROM units WHERE id::text = ?
   UNION ALL
   SELECT u.id::text FROM units u INNER JOIN branch b ON u.parent_id::text = b.id
 )
 SELECT id FROM branch
-`, subdivisionID).Scan(&ids).Error
+`, subdivisionID).Rows()
 	if err != nil {
 		return nil, err
 	}
-	m := make(map[string]struct{}, len(ids))
-	for _, id := range ids {
+	defer func() { _ = rows.Close() }()
+	m := make(map[string]struct{})
+	for rows.Next() {
+		var id string
+		if scanErr := rows.Scan(&id); scanErr != nil {
+			return nil, scanErr
+		}
 		id = strings.TrimSpace(id)
 		if id != "" {
 			m[id] = struct{}{}
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return m, nil
 }
 
-// companyPlanFeatureBool resolves subscription_plans.features[featureKey] for a company.
-// Returns (true, nil) only when the JSON object is present, unmarshals cleanly, and the key is explicitly boolean true.
-// Missing company row, NULL features, absent key, null value, or non-boolean value → (false, nil) or (false, err) on DB/unmarshal errors.
-func companyPlanFeatureBool(ctx context.Context, db *gorm.DB, companyID string, featureKey string) (bool, error) {
-	if strings.TrimSpace(companyID) == "" {
-		return false, nil
-	}
-	var raw []byte
-	if err := db.WithContext(ctx).Raw(`
+// loadCompanyPlanFeaturesJSON returns subscription_plans.features for the company's active subscription plan.
+func loadCompanyPlanFeaturesJSON(ctx context.Context, db *gorm.DB, companyID string) ([]byte, error) {
+	row := db.WithContext(ctx).Raw(`
 SELECT sp.features FROM companies c
 LEFT JOIN subscriptions s ON s.id = c.subscription_id
 LEFT JOIN subscription_plans sp ON sp.id = s.plan_id
 WHERE c.id = ? LIMIT 1
-`, companyID).Scan(&raw).Error; err != nil {
+`, companyID).Row()
+	var raw []byte
+	if err := row.Scan(&raw); err != nil {
+		return nil, err
+	}
+	return raw, nil
+}
+
+// subscriptionPlanFeatureTruthy interprets subscription_plans.features values stored as bool, JSON number, or string.
+func subscriptionPlanFeatureTruthy(v interface{}) bool {
+	switch t := v.(type) {
+	case bool:
+		return t
+	case float64:
+		// JSON numbers decode as float64; accept plain 1/0 flags from legacy seeds.
+		return !math.IsNaN(t) && t == 1
+	case string:
+		s := strings.ToLower(strings.TrimSpace(t))
+		return s == "true" || s == "1" || s == "yes"
+	default:
+		return false
+	}
+}
+
+// CompanyAllowsBasicReports is true when plan.features.basic_reports is truthy, or when the flag is
+// absent/null/empty features (legacy tenants and plans created before the flag existed). Explicit false
+// (boolean, 0, "false", etc.) still denies.
+func CompanyAllowsBasicReports(ctx context.Context, db *gorm.DB, companyID string) (bool, error) {
+	if strings.TrimSpace(companyID) == "" {
+		return true, nil
+	}
+	raw, err := loadCompanyPlanFeaturesJSON(ctx, db, companyID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return true, nil
+		}
 		return false, err
 	}
 	if len(raw) == 0 || string(raw) == "null" {
-		return false, nil
+		return true, nil
 	}
 	var m map[string]interface{}
 	if err := json.Unmarshal(raw, &m); err != nil {
+		return true, nil
+	}
+	v, ok := m["basic_reports"]
+	if !ok || v == nil {
+		return true, nil
+	}
+	return subscriptionPlanFeatureTruthy(v), nil
+}
+
+// CompanyAllowsAdvancedReports is true when plan.features.advanced_reports is truthy, or when the flag is
+// absent/null/empty features (legacy tenants). Explicit false still denies. Used for utilization, employee radar, etc.
+func CompanyAllowsAdvancedReports(ctx context.Context, db *gorm.DB, companyID string) (bool, error) {
+	if strings.TrimSpace(companyID) == "" {
+		return true, nil
+	}
+	raw, err := loadCompanyPlanFeaturesJSON(ctx, db, companyID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return true, nil
+		}
 		return false, err
 	}
-	v, ok := m[featureKey]
-	if !ok {
-		return false, nil
+	if len(raw) == 0 || string(raw) == "null" {
+		return true, nil
 	}
-	if v == nil {
-		return false, nil
+	var m map[string]interface{}
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return true, nil
 	}
-	b, ok := v.(bool)
-	if !ok {
-		return false, fmt.Errorf("subscription plan features.%s must be a boolean", featureKey)
+	v, ok := m["advanced_reports"]
+	if !ok || v == nil {
+		return true, nil
 	}
-	return b, nil
-}
-
-// CompanyAllowsBasicReports is true only when plan.features.basic_reports is explicitly true.
-func CompanyAllowsBasicReports(ctx context.Context, db *gorm.DB, companyID string) (bool, error) {
-	return companyPlanFeatureBool(ctx, db, companyID, "basic_reports")
-}
-
-// CompanyAllowsAdvancedReports is true only when plan.features.advanced_reports is explicitly true.
-func CompanyAllowsAdvancedReports(ctx context.Context, db *gorm.DB, companyID string) (bool, error) {
-	return companyPlanFeatureBool(ctx, db, companyID, "advanced_reports")
+	return subscriptionPlanFeatureTruthy(v), nil
 }
 
 // TimeseriesPoint is one day in a chart.
@@ -678,22 +725,7 @@ func (s *StatisticsService) GetSurveyScores(
 }
 
 func statisticsDayList(from, to string) ([]string, error) {
-	df, err := time.Parse("2006-01-02", strings.TrimSpace(from))
-	if err != nil {
-		return nil, errors.New("invalid dateFrom")
-	}
-	dt, err := time.Parse("2006-01-02", strings.TrimSpace(to))
-	if err != nil {
-		return nil, errors.New("invalid dateTo")
-	}
-	if dt.Before(df) {
-		return nil, errors.New("dateTo before dateFrom")
-	}
-	var days []string
-	for d := df; !d.After(dt); d = d.AddDate(0, 0, 1) {
-		days = append(days, d.Format("2006-01-02"))
-	}
-	return days, nil
+	return statisticsDayListInLocation(time.UTC, from, to)
 }
 
 // EmployeeRadarResponse normalized axes 0–100 (MVP from latest bucket averages).
@@ -765,6 +797,11 @@ func (s *StatisticsService) GetEmployeeRadar(
 		out.SlaWait = 100
 	}
 	if servN > 0 {
+		// Employee radar "service SLA" axis (MVP heuristic, minutes):
+		// - avgMin is mean in-service duration per counted segment (service_sum_ms / service_count), in minutes.
+		// - targetMin is the nominal on-target service time (20 minutes).
+		// - Above target, pen = (avgMin - targetMin) / targetMin grows linearly and is capped at 1 (100% over target).
+		// - Score scales down by at most 65%: worst case 100 * (1 - 0.65) = 35 when pen == 1.
 		avgMin := float64(servSum) / float64(servN) / 60000.0
 		const targetMin = 20.0
 		if avgMin <= targetMin {
@@ -803,8 +840,8 @@ func (s *StatisticsService) GetEmployeeRadar(
 		}
 	}
 	daysInclusive := 30
-	if df, errFrom := time.ParseInLocation("2006-01-02", from, time.UTC); errFrom == nil {
-		if dt, errTo := time.ParseInLocation("2006-01-02", to, time.UTC); errTo == nil && !dt.Before(df) {
+	if df, errFrom := time.ParseInLocation("2006-01-02", from, locRadar); errFrom == nil {
+		if dt, errTo := time.ParseInLocation("2006-01-02", to, locRadar); errTo == nil && !dt.Before(df) {
 			daysInclusive = int(dt.Sub(df).Hours()/24) + 1
 			if daysInclusive < 1 {
 				daysInclusive = 1

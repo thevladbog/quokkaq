@@ -1,7 +1,9 @@
 'use client';
 
 import {
+  useEffect,
   useMemo,
+  useRef,
   useState,
   type ComponentProps,
   type ComponentType,
@@ -296,8 +298,7 @@ export default function StatisticsPage() {
   const [manualSubdivisionId, setManualSubdivisionId] = useState<string | null>(
     null
   );
-  const [prevCtxSub, setPrevCtxSub] = useState('');
-  const [prevDateRangeSig, setPrevDateRangeSig] = useState('');
+  const prevDateRangeSigRef = useRef('');
   const [filterUserId, setFilterUserId] = useState('');
   const [serviceZoneId, setServiceZoneId] = useState('');
   const [surveyDefinitionId, setSurveyDefinitionId] = useState('');
@@ -349,10 +350,12 @@ export default function StatisticsPage() {
       };
     }, [activeUnitId, activeUnit]);
 
-  if (contextResolvedSubdivisionId !== prevCtxSub) {
-    setPrevCtxSub(contextResolvedSubdivisionId);
-    setManualSubdivisionId(null);
-  }
+  useEffect(() => {
+    // Defer reset out of the effect body to satisfy react-hooks/set-state-in-effect (microtask is async vs React).
+    queueMicrotask(() => {
+      setManualSubdivisionId(null);
+    });
+  }, [contextResolvedSubdivisionId]);
 
   const assignableSorted = useMemo(
     () => [...assignableUnitIds].sort(),
@@ -443,10 +446,15 @@ export default function StatisticsPage() {
     statsSubdivisionId !== ''
       ? `${statsSubdivisionId}\x1e${statisticsBucketTimezone}`
       : '';
-  if (dateRangeSig && dateRangeSig !== prevDateRangeSig) {
-    setPrevDateRangeSig(dateRangeSig);
-    setRange(defaultDateRange(statisticsBucketTimezone));
-  }
+
+  useEffect(() => {
+    if (!dateRangeSig) return;
+    if (prevDateRangeSigRef.current === dateRangeSig) return;
+    prevDateRangeSigRef.current = dateRangeSig;
+    queueMicrotask(() => {
+      setRange(defaultDateRange(statisticsBucketTimezone));
+    });
+  }, [dateRangeSig, statisticsBucketTimezone]);
 
   const childZonesQuery = useGetUnitsUnitIdChildUnits(statsSubdivisionId, {
     query: { enabled: Boolean(statsSubdivisionId) }

@@ -50,6 +50,20 @@ func TestApplyRequestedUserID_DeniedReturnsNil(t *testing.T) {
 	}
 }
 
+func TestResolveScope_nilBranchSkipsZoneGrantsOutsideValidatedTree(t *testing.T) {
+	u := &models.User{
+		Units: []models.UserUnit{{
+			UnitID:      "zone-child",
+			Permissions: models.StringArray{PermStatisticsZone},
+		}},
+	}
+	// Without branchUnitIDs we must not attach arbitrary service_zone user_units as statistics scope.
+	sc := ResolveScope(u, "sub-root", "viewer-1", nil)
+	if !sc.Denied {
+		t.Fatalf("expected Denied without branch validation and no subdivision row, got %#v", sc)
+	}
+}
+
 func TestResolveScope_zonePermissionOtherBranchFiltered(t *testing.T) {
 	u := &models.User{
 		Units: []models.UserUnit{

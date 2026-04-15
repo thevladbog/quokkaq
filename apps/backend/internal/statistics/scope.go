@@ -67,26 +67,25 @@ func ResolveScope(user *models.User, subdivisionID string, viewerUserID string, 
 			if uu.UnitID == subdivisionID {
 				continue
 			}
-			if branchUnitIDs != nil {
-				if _, ok := branchUnitIDs[uu.UnitID]; !ok {
-					continue
-				}
+			// Without a validated branch tree, do not attach zone grants from arbitrary user_units rows:
+			// those may belong to another subdivision branch.
+			if branchUnitIDs == nil {
+				continue
+			}
+			if _, ok := branchUnitIDs[uu.UnitID]; !ok {
+				continue
 			}
 			zones[uu.UnitID] = struct{}{}
 		}
 	}
 
-	hasBranchAffiliation := false
-	if branchUnitIDs == nil {
-		// Callers that omit the branch set keep legacy behaviour (avoid denying self-scope
-		// when we cannot map user_units rows to the subdivision tree).
-		hasBranchAffiliation = true
-	} else {
-		for _, uu := range user.Units {
-			if uu.UnitID == subdivisionID {
-				hasBranchAffiliation = true
-				break
-			}
+	var hasBranchAffiliation bool
+	for _, uu := range user.Units {
+		if uu.UnitID == subdivisionID {
+			hasBranchAffiliation = true
+			break
+		}
+		if branchUnitIDs != nil {
 			if _, ok := branchUnitIDs[uu.UnitID]; ok {
 				hasBranchAffiliation = true
 				break

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"quokkaq-go-backend/internal/services"
 
 	"github.com/go-chi/chi/v5"
+	"gorm.io/gorm"
 )
 
 type OperationsHandler struct {
@@ -40,6 +42,16 @@ func (h *OperationsHandler) requireTenantAdmin(r *http.Request) (string, bool) {
 	return uid, true
 }
 
+func operationsHTTPStatus(err error) int {
+	if err == nil {
+		return http.StatusOK
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return http.StatusNotFound
+	}
+	return http.StatusInternalServerError
+}
+
 // GetOperationsStatus godoc
 // @ID           getUnitOperationsStatus
 // @Summary      Unit operations / EOD pipeline status
@@ -60,7 +72,7 @@ func (h *OperationsHandler) GetOperationsStatus(w http.ResponseWriter, r *http.R
 	}
 	st, err := h.opService.GetStatus(unitID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, err.Error(), operationsHTTPStatus(err))
 		return
 	}
 	RespondJSON(w, st)
@@ -101,7 +113,7 @@ func (h *OperationsHandler) PostEmergencyUnlock(w http.ResponseWriter, r *http.R
 		return
 	}
 	if err := h.opService.EmergencyUnlockAll(unitID); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, err.Error(), operationsHTTPStatus(err))
 		return
 	}
 	payload, _ := json.Marshal(map[string]string{"unitId": unitID})
@@ -138,7 +150,7 @@ func (h *OperationsHandler) PostClearStatisticsQuiet(w http.ResponseWriter, r *h
 		return
 	}
 	if err := h.opService.ClearStatisticsQuiet(unitID); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, err.Error(), operationsHTTPStatus(err))
 		return
 	}
 	payload, _ := json.Marshal(map[string]string{"unitId": unitID})

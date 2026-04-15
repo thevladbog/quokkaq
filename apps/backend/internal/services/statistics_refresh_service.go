@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -316,6 +317,8 @@ WHERE t.unit_id = ? AND h.user_id = ?
 		return err
 	}
 
+	// Survey daily buckets and StatisticsAsOf run after the ticket bucket transaction commits.
+	// RollupUnitDay is safe to re-run: bucket rows are deleted and rebuilt; survey rollup and Upsert are idempotent for a given day.
 	if err := s.rollupSurveyDay(unitID, bucketDate, startUTC, endUTC); err != nil {
 		return err
 	}
@@ -356,7 +359,8 @@ func (s *StatisticsRefreshService) RefreshRecentDays() {
 }
 
 // StartPeriodicRefresh runs RefreshRecentDays on an interval (default 5m, env STATISTICS_REFRESH_INTERVAL_SEC).
-func (s *StatisticsRefreshService) StartPeriodicRefresh() {
+// The goroutine exits when ctx is cancelled (e.g. API shutdown).
+func (s *StatisticsRefreshService) StartPeriodicRefresh(ctx context.Context) {
 	sec := 300
 	if v := strings.TrimSpace(os.Getenv("STATISTICS_REFRESH_INTERVAL_SEC")); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 {
@@ -368,8 +372,13 @@ func (s *StatisticsRefreshService) StartPeriodicRefresh() {
 		t := time.NewTicker(d)
 		defer t.Stop()
 		s.RefreshRecentDays()
-		for range t.C {
-			s.RefreshRecentDays()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				s.RefreshRecentDays()
+			}
 		}
 	}()
 }

@@ -60,6 +60,44 @@ func (h *StatisticsHandler) subdivisionCompanyID(ctx context.Context, subdivisio
 	return u.CompanyID, nil
 }
 
+// respondStatisticsServiceErr maps known statistics service errors to 4xx; returns true if the response was written.
+func respondStatisticsServiceErr(w http.ResponseWriter, err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	low := strings.ToLower(msg)
+	if strings.Contains(low, "surveyid is required") {
+		http.Error(w, msg, http.StatusBadRequest)
+		return true
+	}
+	if strings.Contains(msg, "plan does not include") {
+		http.Error(w, msg, http.StatusForbidden)
+		return true
+	}
+	if strings.Contains(low, "forbidden") {
+		http.Error(w, msg, http.StatusForbidden)
+		return true
+	}
+	if strings.Contains(low, "servicezoneid cannot be used with userid filter") {
+		http.Error(w, msg, http.StatusBadRequest)
+		return true
+	}
+	if strings.Contains(msg, "service zone not under subdivision") {
+		http.Error(w, msg, http.StatusBadRequest)
+		return true
+	}
+	if strings.Contains(low, "service not found under subdivision") {
+		http.Error(w, msg, http.StatusBadRequest)
+		return true
+	}
+	if strings.Contains(msg, "invalid date") || strings.Contains(msg, "dateTo before") {
+		http.Error(w, msg, http.StatusBadRequest)
+		return true
+	}
+	return false
+}
+
 // GetTimeseries godoc
 // @ID           getUnitStatisticsTimeseries
 // @Summary      Statistics timeseries (daily or hourly for a single day)
@@ -114,29 +152,10 @@ func (h *StatisticsHandler) GetTimeseries(w http.ResponseWriter, r *http.Request
 	svcZone := strings.TrimSpace(r.URL.Query().Get("serviceZoneId"))
 	resp, err := h.service.GetTimeseries(r.Context(), unitID, companyID, user, viewerID, dateFrom, dateTo, metric, reqUser, svcZone)
 	if err != nil {
-		msg := err.Error()
-		low := strings.ToLower(msg)
-		if strings.Contains(msg, "plan does not include") {
-			http.Error(w, msg, http.StatusForbidden)
+		if respondStatisticsServiceErr(w, err) {
 			return
 		}
-		if strings.Contains(low, "servicezoneid cannot be used with userid filter") {
-			http.Error(w, msg, http.StatusBadRequest)
-			return
-		}
-		if strings.Contains(low, "forbidden") {
-			http.Error(w, msg, http.StatusForbidden)
-			return
-		}
-		if strings.Contains(msg, "service zone not under subdivision") {
-			http.Error(w, msg, http.StatusBadRequest)
-			return
-		}
-		if strings.Contains(msg, "invalid date") || strings.Contains(msg, "dateTo before") {
-			http.Error(w, msg, http.StatusBadRequest)
-			return
-		}
-		http.Error(w, msg, http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	RespondJSON(w, resp)
@@ -190,20 +209,7 @@ func (h *StatisticsHandler) GetSLADeviations(w http.ResponseWriter, r *http.Requ
 	svcZone := strings.TrimSpace(r.URL.Query().Get("serviceZoneId"))
 	resp, err := h.service.GetSLADeviations(r.Context(), unitID, companyID, user, viewerID, dateFrom, dateTo, reqUser, svcZone)
 	if err != nil {
-		if strings.Contains(err.Error(), "plan does not include") {
-			http.Error(w, err.Error(), http.StatusForbidden)
-			return
-		}
-		if strings.Contains(err.Error(), "forbidden service zone") {
-			http.Error(w, err.Error(), http.StatusForbidden)
-			return
-		}
-		if strings.Contains(err.Error(), "service zone not under subdivision") {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		if strings.Contains(err.Error(), "invalid date") || strings.Contains(err.Error(), "dateTo before") {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+		if respondStatisticsServiceErr(w, err) {
 			return
 		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -263,16 +269,7 @@ func (h *StatisticsHandler) GetSurveyScores(w http.ResponseWriter, r *http.Reque
 	qids := parseStatisticsQuestionIDs(r.URL.Query())
 	resp, err := h.service.GetSurveyScores(r.Context(), unitID, companyID, user, viewerID, dateFrom, dateTo, surveyID, qids)
 	if err != nil {
-		if strings.Contains(err.Error(), "surveyId is required") {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		if strings.Contains(err.Error(), "invalid date") || strings.Contains(err.Error(), "dateTo before") {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		if strings.Contains(err.Error(), "plan does not include") {
-			http.Error(w, err.Error(), http.StatusForbidden)
+		if respondStatisticsServiceErr(w, err) {
 			return
 		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -329,20 +326,7 @@ func (h *StatisticsHandler) GetLoad(w http.ResponseWriter, r *http.Request) {
 	svcZone := strings.TrimSpace(r.URL.Query().Get("serviceZoneId"))
 	resp, err := h.service.GetLoad(r.Context(), unitID, companyID, user, viewerID, dateFrom, dateTo, reqUser, svcZone)
 	if err != nil {
-		if strings.Contains(err.Error(), "plan does not include") {
-			http.Error(w, err.Error(), http.StatusForbidden)
-			return
-		}
-		if strings.Contains(err.Error(), "forbidden service zone") {
-			http.Error(w, err.Error(), http.StatusForbidden)
-			return
-		}
-		if strings.Contains(err.Error(), "service zone not under subdivision") {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		if strings.Contains(err.Error(), "invalid date") || strings.Contains(err.Error(), "dateTo before") {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+		if respondStatisticsServiceErr(w, err) {
 			return
 		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -397,16 +381,7 @@ func (h *StatisticsHandler) GetUtilization(w http.ResponseWriter, r *http.Reques
 	}
 	resp, err := h.service.GetUtilization(r.Context(), unitID, companyID, user, viewerID, target, dateFrom, dateTo)
 	if err != nil {
-		if err.Error() == "forbidden" {
-			http.Error(w, err.Error(), http.StatusForbidden)
-			return
-		}
-		if strings.Contains(err.Error(), "plan does not include") {
-			http.Error(w, err.Error(), http.StatusForbidden)
-			return
-		}
-		if strings.Contains(err.Error(), "invalid date") || strings.Contains(err.Error(), "dateTo before") {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+		if respondStatisticsServiceErr(w, err) {
 			return
 		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -462,20 +437,7 @@ func (h *StatisticsHandler) GetTicketsByService(w http.ResponseWriter, r *http.R
 	svcZone := strings.TrimSpace(r.URL.Query().Get("serviceZoneId"))
 	resp, err := h.service.GetTicketsByService(r.Context(), unitID, companyID, user, viewerID, dateFrom, dateTo, reqUser, svcZone)
 	if err != nil {
-		if strings.Contains(err.Error(), "plan does not include") {
-			http.Error(w, err.Error(), http.StatusForbidden)
-			return
-		}
-		if strings.Contains(err.Error(), "forbidden service zone") {
-			http.Error(w, err.Error(), http.StatusForbidden)
-			return
-		}
-		if strings.Contains(err.Error(), "service zone not under subdivision") {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		if strings.Contains(err.Error(), "invalid date") || strings.Contains(err.Error(), "dateTo before") {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+		if respondStatisticsServiceErr(w, err) {
 			return
 		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -533,24 +495,7 @@ func (h *StatisticsHandler) GetSlaSummary(w http.ResponseWriter, r *http.Request
 	filterSvc := strings.TrimSpace(r.URL.Query().Get("serviceId"))
 	resp, err := h.service.GetSlaSummary(r.Context(), unitID, companyID, user, viewerID, dateFrom, dateTo, reqUser, svcZone, filterSvc)
 	if err != nil {
-		if err.Error() == "service not found under subdivision" {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		if strings.Contains(err.Error(), "plan does not include") {
-			http.Error(w, err.Error(), http.StatusForbidden)
-			return
-		}
-		if strings.Contains(err.Error(), "forbidden service zone") {
-			http.Error(w, err.Error(), http.StatusForbidden)
-			return
-		}
-		if strings.Contains(err.Error(), "service zone not under subdivision") {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		if strings.Contains(err.Error(), "invalid date") || strings.Contains(err.Error(), "dateTo before") {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+		if respondStatisticsServiceErr(w, err) {
 			return
 		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -597,12 +542,7 @@ func (h *StatisticsHandler) GetEmployeeRadar(w http.ResponseWriter, r *http.Requ
 	}
 	resp, err := h.service.GetEmployeeRadar(r.Context(), unitID, companyID, user, viewerID, target)
 	if err != nil {
-		if err.Error() == "forbidden" {
-			http.Error(w, err.Error(), http.StatusForbidden)
-			return
-		}
-		if strings.Contains(err.Error(), "plan does not include") {
-			http.Error(w, err.Error(), http.StatusForbidden)
+		if respondStatisticsServiceErr(w, err) {
 			return
 		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)

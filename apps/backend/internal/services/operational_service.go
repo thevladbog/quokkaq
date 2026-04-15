@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"strings"
 	"sync"
@@ -71,15 +72,35 @@ func (s *OperationalService) getOperationalStateForRead(unitID string) (*models.
 }
 
 // ResolveSubdivisionForOperationalState returns the subdivision id used for operational_state rows.
+// Service zones may nest; walk parents until a subdivision (or a non-zone kind) is found.
 func (s *OperationalService) ResolveSubdivisionForOperationalState(unitID string) (string, error) {
-	u, err := s.unitRepo.FindByIDLight(unitID)
-	if err != nil {
-		return "", err
+	const maxHops = 64
+	cur := strings.TrimSpace(unitID)
+	if cur == "" {
+		return "", errors.New("operational state: empty unit id")
 	}
-	if u.Kind == models.UnitKindServiceZone && u.ParentID != nil && strings.TrimSpace(*u.ParentID) != "" {
-		return strings.TrimSpace(*u.ParentID), nil
+	seen := make(map[string]struct{}, 8)
+	for hop := 0; hop < maxHops; hop++ {
+		if _, dup := seen[cur]; dup {
+			return "", fmt.Errorf("operational state: parent cycle involving %s", cur)
+		}
+		seen[cur] = struct{}{}
+		u, err := s.unitRepo.FindByIDLight(cur)
+		if err != nil {
+			return "", err
+		}
+		if u.Kind == models.UnitKindSubdivision {
+			return strings.TrimSpace(u.ID), nil
+		}
+		if u.Kind != models.UnitKindServiceZone {
+			return "", fmt.Errorf("operational state: unit %s kind %q is not a subdivision or service zone", u.ID, u.Kind)
+		}
+		if u.ParentID == nil || strings.TrimSpace(*u.ParentID) == "" {
+			return "", fmt.Errorf("operational state: service zone %s has no parent", u.ID)
+		}
+		cur = strings.TrimSpace(*u.ParentID)
 	}
-	return u.ID, nil
+	return "", fmt.Errorf("operational state: exceeded %d parent hops from %s", maxHops, unitID)
 }
 
 func (s *OperationalService) GetPublicSnapshot(unitID string) (*models.UnitOperationsPublic, error) {
@@ -260,7 +281,36 @@ func (s *OperationalService) CompleteEODPipeline(subdivisionID string) {
 		} else {
 			st2.LastReconcileError = nil
 		}
-		_ = s.opRepo.Upsert(st2)
+		var upErr error
+		for attempt := 0; attempt < 3; attempt++ {
+			if attempt > 0 {
+				time.Sleep(100 * time.Millisecond)
+			}
+			upErr = s.opRepo.Upsert(st2)
+			if upErr == nil {
+				break
+			}
+		}
+		if upErr != nil {
+			log.Printf("eod pipeline: finalize Upsert failed unit=%s rollupErr=%v upsertErr=%v (after retries)", subID, rollupErr, upErr)
+			// Compensating path: clear latch flags (already intended after rollup), then retry persisting.
+			st2.ReconcileInProgress = false
+			st2.KioskFrozen = false
+			st2.CounterLoginBlocked = false
+			for attempt := 0; attempt < 3; attempt++ {
+				if attempt > 0 {
+					time.Sleep(100 * time.Millisecond)
+				}
+				upErr = s.opRepo.Upsert(st2)
+				if upErr == nil {
+					break
+				}
+			}
+			if upErr != nil {
+				log.Printf("eod pipeline: compensating Upsert failed unit=%s rollupErr=%v upsertErr=%v; forcing AbortEODFreeze", subID, rollupErr, upErr)
+				s.AbortEODFreeze(subID)
+			}
+		}
 	}()
 }
 

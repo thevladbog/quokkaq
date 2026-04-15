@@ -33,10 +33,17 @@ import {
 import { useUnits } from '@/lib/hooks';
 import {
   getGetUnitOperationsStatusQueryKey,
+  type ServicesOperationsStatusDTO,
   useGetUnitOperationsStatus,
   usePostUnitOperationsClearStatisticsQuiet,
   usePostUnitOperationsEmergencyUnlock
 } from '@/lib/api/generated/statistics';
+
+function mutationErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  return String(error);
+}
 
 export default function SettingsOperationsPage() {
   const t = useTranslations('operations');
@@ -61,17 +68,18 @@ export default function SettingsOperationsPage() {
     }
   });
 
-  const st = statusQuery.data?.data;
+  const statusBody =
+    statusQuery.data?.status === 200 ? statusQuery.data.data : undefined;
 
   const statusField = (
-    resolve: (s: NonNullable<typeof st>) => React.ReactNode
+    resolve: (s: ServicesOperationsStatusDTO) => React.ReactNode
   ) => {
-    if (st == null) {
+    if (statusBody == null) {
       return statusQuery.isLoading
         ? t('status_loading')
         : t('status_placeholder');
     }
-    return resolve(st);
+    return resolve(statusBody);
   };
 
   const unlockMutation = usePostUnitOperationsEmergencyUnlock({
@@ -83,8 +91,7 @@ export default function SettingsOperationsPage() {
         });
       },
       onError: (e) => {
-        const message = e instanceof Error ? e.message : String(e);
-        toast.error(t('toast_error', { message }));
+        toast.error(t('toast_error', { message: mutationErrorMessage(e) }));
       }
     }
   });
@@ -98,8 +105,7 @@ export default function SettingsOperationsPage() {
         });
       },
       onError: (e) => {
-        const message = e instanceof Error ? e.message : String(e);
-        toast.error(t('toast_error', { message }));
+        toast.error(t('toast_error', { message: mutationErrorMessage(e) }));
       }
     }
   });
@@ -156,7 +162,7 @@ export default function SettingsOperationsPage() {
         <CardContent className='grid gap-3 text-sm sm:grid-cols-2'>
           <div>
             <span className='text-muted-foreground'>{t('field_phase')}</span>{' '}
-            <span className='font-medium'>{st?.phase ?? '—'}</span>
+            <span className='font-medium'>{statusBody?.phase ?? '—'}</span>
           </div>
           <div>
             <span className='text-muted-foreground'>{t('field_kiosk')}</span>{' '}
@@ -193,29 +199,35 @@ export default function SettingsOperationsPage() {
               {t('field_reconcile_note')}
             </span>{' '}
             <span className='font-medium'>
-              {st?.reconcileProgressNote?.trim() || '—'}
+              {statusBody?.reconcileProgressNote?.trim() || '—'}
             </span>
           </div>
           <div>
             <span className='text-muted-foreground'>{t('field_last_eod')}</span>{' '}
-            <span className='font-medium'>{fmtTime(st?.lastEodAt)}</span>
+            <span className='font-medium'>
+              {fmtTime(statusBody?.lastEodAt)}
+            </span>
           </div>
           <div>
             <span className='text-muted-foreground'>
               {t('field_last_reconcile')}
             </span>{' '}
-            <span className='font-medium'>{fmtTime(st?.lastReconcileAt)}</span>
+            <span className='font-medium'>
+              {fmtTime(statusBody?.lastReconcileAt)}
+            </span>
           </div>
           <div className='sm:col-span-2'>
             <span className='text-muted-foreground'>
               {t('field_stats_as_of')}
             </span>{' '}
-            <span className='font-medium'>{fmtTime(st?.statisticsAsOf)}</span>
+            <span className='font-medium'>
+              {fmtTime(statusBody?.statisticsAsOf)}
+            </span>
           </div>
-          {st?.lastReconcileError ? (
+          {statusBody?.lastReconcileError ? (
             <div className='text-destructive sm:col-span-2'>
               <span className='font-medium'>{t('field_last_error')}</span>{' '}
-              {st.lastReconcileError}
+              {statusBody.lastReconcileError}
             </div>
           ) : null}
         </CardContent>

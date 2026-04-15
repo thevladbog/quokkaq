@@ -495,6 +495,9 @@ func (r *ticketRepository) FinalizeEODTicketStatusesTx(tx *gorm.DB, ticketIDs []
 	if len(ticketIDs) == 0 {
 		return nil
 	}
+	if eodCloseAt.IsZero() {
+		return fmt.Errorf("invalid eodCloseAt: zero value")
+	}
 	var tickets []models.Ticket
 	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("id IN ? AND is_eod = ? AND completed_at IS NULL AND status IN ?", ticketIDs, true, []string{"waiting", "called", "in_service"}).

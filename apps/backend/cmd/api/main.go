@@ -165,7 +165,9 @@ func main() {
 	statsRefresh := services.NewStatisticsRefreshService(statsRepo, unitRepo, opStateRepo, statsSegmentsRepo)
 	operationalService := services.NewOperationalService(opStateRepo, unitRepo, statsRefresh)
 	statsService := services.NewStatisticsService(statsRepo, opStateRepo, statsSegmentsRepo)
-	statsRefresh.StartPeriodicRefresh()
+	refreshCtx, refreshCancel := context.WithCancel(context.Background())
+	defer refreshCancel()
+	statsRefresh.StartPeriodicRefresh(refreshCtx)
 	shiftService := services.NewShiftService(ticketRepo, counterRepo, serviceRepo, auditLogRepo, operatorIntervalRepo, hub, userRepo)
 	templateService := services.NewTemplateService(templateRepo)
 	invitationService := services.NewInvitationService(invitationRepo, mailService, userRepo, templateService)
@@ -660,6 +662,7 @@ func main() {
 			log.Fatalf("ListenAndServe: %v", err)
 		}
 	case <-quit:
+		refreshCancel()
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		if err := srv.Shutdown(ctx); err != nil {
