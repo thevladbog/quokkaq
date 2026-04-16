@@ -2364,6 +2364,8 @@
       "protocolLabel": "Протокол",
       "protocolOidc": "OpenID Connect (OIDC)",
       "protocolSaml": "SAML 2.0",
+      "samlSlugRequiredTitle": "Сначала сохраните slug организации",
+      "samlSlugRequiredDescription": "URL ACS и метаданных SAML содержат slug арендатора. Сохраните slug в блоке выше, затем вернитесь сюда для настройки SAML и копирования URL.",
       "samlAcsLabel": "ACS URL (Assertion Consumer Service)",
       "samlSpMetadataLabel": "URL метаданных SP (XML)",
       "samlIdpMetadataUrl": "URL метаданных IdP",

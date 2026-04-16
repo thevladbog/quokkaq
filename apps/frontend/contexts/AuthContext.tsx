@@ -13,6 +13,7 @@ import { usePathname } from 'next/navigation';
 import { User } from '../lib/api';
 import { fetchCurrentUser } from '../lib/auth-orval';
 import { ACTIVE_COMPANY_ID_STORAGE_KEY } from '../lib/authenticated-api-fetch';
+import { authLogout } from '@/lib/api/generated/auth';
 import { routing } from '@/src/i18n/routing';
 import { logger } from '@/lib/logger';
 
@@ -72,24 +73,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = useCallback(() => {
     sessionProbeGenRef.current++;
-    setToken(null);
-    setUser(null);
-    setIsLoading(false);
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-      localStorage.removeItem(ACTIVE_COMPANY_ID_STORAGE_KEY);
-      const segments = window.location.pathname.split('/').filter(Boolean);
-      const maybeLocale = segments[0];
-      const loginPath = routing.locales.includes(maybeLocale as 'en' | 'ru')
-        ? `/${maybeLocale}/login`
-        : '/login';
-      const current = window.location.pathname;
-      if (current === loginPath || isPublicAuthShellPath(current)) {
-        return;
-      }
-      window.location.href = loginPath;
+    const gen = sessionProbeGenRef.current;
+    if (typeof window === 'undefined') {
+      setToken(null);
+      setUser(null);
+      setIsLoading(false);
+      return;
     }
+    void (async () => {
+      try {
+        await authLogout();
+      } catch (e) {
+        logger.warn('Server logout failed; clearing local session anyway.', e);
+      } finally {
+        if (gen !== sessionProbeGenRef.current) {
+          return;
+        }
+        setToken(null);
+        setUser(null);
+        setIsLoading(false);
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem(ACTIVE_COMPANY_ID_STORAGE_KEY);
+        const segments = window.location.pathname.split('/').filter(Boolean);
+        const maybeLocale = segments[0];
+        const loginPath = routing.locales.includes(maybeLocale as 'en' | 'ru')
+          ? `/${maybeLocale}/login`
+          : '/login';
+        const current = window.location.pathname;
+        if (current === loginPath || isPublicAuthShellPath(current)) {
+          return;
+        }
+        window.location.href = loginPath;
+      }
+    })();
   }, []);
 
   const login = useCallback(
@@ -103,6 +120,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setIsLoading(true);
       if (legacyAccessToken) {
         localStorage.setItem('access_token', legacyAccessToken);
+      } else {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
       }
       setToken(SESSION_MARKER);
       return fetchCurrentUser()

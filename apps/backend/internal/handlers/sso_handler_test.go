@@ -18,10 +18,12 @@ import (
 
 type fakeAuthExchange struct{}
 
-func (fakeAuthExchange) Login(string, string) (*services.TokenPair, error) { panic("unexpected") }
-func (fakeAuthExchange) GetMe(string) (*models.User, error)                { panic("unexpected") }
-func (fakeAuthExchange) RequestPasswordReset(string) error                 { panic("unexpected") }
-func (fakeAuthExchange) ResetPassword(string, string) error                { panic("unexpected") }
+func (fakeAuthExchange) Login(string, string, string) (*services.TokenPair, error) {
+	panic("unexpected")
+}
+func (fakeAuthExchange) GetMe(string) (*models.User, error) { panic("unexpected") }
+func (fakeAuthExchange) RequestPasswordReset(string) error  { panic("unexpected") }
+func (fakeAuthExchange) ResetPassword(string, string) error { panic("unexpected") }
 func (fakeAuthExchange) Signup(string, string, string, string, string, *string) (*services.TokenPair, error) {
 	panic("unexpected")
 }
@@ -36,6 +38,7 @@ func TestSSOHandler_TenantHint_JSONShape(t *testing.T) {
 		testsupport.StrictPublicTenantCompanyRepo{},
 		testsupport.PanicUserRepo{},
 		testsupport.PanicSSORepo{},
+		testsupport.PanicUnitRepo{},
 		fakeAuthExchange{},
 	)
 	h := NewSSOHandler(svc)
@@ -71,6 +74,7 @@ func TestSSOHandler_PublicTenant_StrictReturns404(t *testing.T) {
 		testsupport.StrictPublicTenantCompanyRepo{},
 		testsupport.PanicUserRepo{},
 		testsupport.PanicSSORepo{},
+		testsupport.PanicUnitRepo{},
 		fakeAuthExchange{},
 	)
 	h := NewSSOHandler(svc)
@@ -91,6 +95,7 @@ func TestSSOHandler_SSOExchange_InvalidCode401(t *testing.T) {
 		testsupport.StrictPublicTenantCompanyRepo{},
 		testsupport.PanicUserRepo{},
 		testsupport.PanicSSORepo{},
+		testsupport.PanicUnitRepo{},
 		fakeAuthExchange{},
 	)
 	h := NewSSOHandler(svc)

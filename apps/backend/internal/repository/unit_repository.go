@@ -28,6 +28,8 @@ type UnitRepository interface {
 	DeleteMaterial(id string) error
 	Count() (int64, error)
 	CreateCompany(company *models.Company) error
+	// FindFirstByCompanyIDTx returns the oldest unit for a company (used for SSO JIT provisioning).
+	FindFirstByCompanyIDTx(tx *gorm.DB, companyID string) (*models.Unit, error)
 }
 
 type unitRepository struct {
@@ -130,4 +132,13 @@ func (r *unitRepository) Count() (int64, error) {
 
 func (r *unitRepository) CreateCompany(company *models.Company) error {
 	return r.db.Create(company).Error
+}
+
+func (r *unitRepository) FindFirstByCompanyIDTx(tx *gorm.DB, companyID string) (*models.Unit, error) {
+	var unit models.Unit
+	err := tx.Where("company_id = ?", companyID).Order("created_at ASC").First(&unit).Error
+	if err != nil {
+		return nil, err
+	}
+	return &unit, nil
 }

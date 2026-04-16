@@ -2364,6 +2364,8 @@
       "protocolLabel": "Protocol",
       "protocolOidc": "OpenID Connect (OIDC)",
       "protocolSaml": "SAML 2.0",
+      "samlSlugRequiredTitle": "Save your organization slug first",
+      "samlSlugRequiredDescription": "SAML ACS and metadata URLs include your tenant slug. Save the slug in the section above, then return here to configure SAML and copy the URLs.",
       "samlAcsLabel": "ACS URL (Assertion Consumer Service)",
       "samlSpMetadataLabel": "SP metadata URL (XML)",
       "samlIdpMetadataUrl": "IdP metadata URL",

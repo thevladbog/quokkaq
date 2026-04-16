@@ -408,6 +408,7 @@ export interface HandlersInvoicePDFPrerequisiteError {
 export interface HandlersLoginRequest {
   email?: string;
   password?: string;
+  tenantSlug?: string;
 }
 
 export interface HandlersLoginResponse {
@@ -1778,7 +1779,7 @@ export const usePostAuthForgotPassword = <TError = string,
     }
 
 /**
- * Authenticates a user and returns access and refresh JWTs (`token` duplicates access for legacy clients)
+ * Authenticates a user and returns access and refresh JWTs (`token` duplicates access for legacy clients). Optional `tenantSlug` scopes login to a tenant the user can access (same slug as public tenant); omit for default behavior.
  * @summary User Login
  */
 export type authLoginResponse200 = {

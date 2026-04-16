@@ -76,6 +76,20 @@ func GetJSON(ctx context.Context, key string, dest any) error {
 	return json.Unmarshal([]byte(s), dest)
 }
 
+// GetAndDeleteJSON atomically reads JSON then removes the key (Redis GETDEL).
+// Same error semantics as GetJSON; returns redis.Nil if the key was absent.
+func GetAndDeleteJSON(ctx context.Context, key string, dest any) error {
+	c := Client()
+	if c == nil {
+		return fmt.Errorf("redis not configured")
+	}
+	s, err := c.GetDel(ctx, key).Result()
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal([]byte(s), dest)
+}
+
 // Del removes a key.
 func Del(ctx context.Context, keys ...string) error {
 	c := Client()

@@ -8,6 +8,7 @@ import (
 	"quokkaq-go-backend/pkg/database"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // SSORepository persists OIDC and login-link data.
@@ -17,6 +18,7 @@ type SSORepository interface {
 	FindCompaniesByEmailDomain(domain string) ([]models.Company, []models.CompanySSOConnection, error)
 	FindExternalIdentity(issuer, subject string) (*models.UserExternalIdentity, error)
 	CreateExternalIdentity(id *models.UserExternalIdentity) error
+	CreateExternalIdentityTx(tx *gorm.DB, id *models.UserExternalIdentity) error
 	FindLoginLinkByHash(tokenHash string) (*models.TenantLoginLink, error)
 	CreateLoginLink(link *models.TenantLoginLink) error
 	RevokeLoginLink(id string) error
@@ -39,16 +41,20 @@ func (r *ssoRepository) GetConnectionByCompanyID(companyID string) (*models.Comp
 }
 
 func (r *ssoRepository) UpsertConnection(conn *models.CompanySSOConnection) error {
-	var existing models.CompanySSOConnection
-	err := database.DB.Where("company_id = ?", conn.CompanyID).First(&existing).Error
-	if err == gorm.ErrRecordNotFound {
-		return database.DB.Create(conn).Error
-	}
-	if err != nil {
-		return err
-	}
-	conn.ID = existing.ID
-	return database.DB.Save(conn).Error
+	return database.DB.Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "company_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{
+			"enabled",
+			"sso_protocol",
+			"saml_idp_metadata_url",
+			"issuer_url",
+			"client_id",
+			"client_secret_encrypted",
+			"email_domains",
+			"scopes",
+			"updated_at",
+		}),
+	}).Create(conn).Error
 }
 
 // FindCompaniesByEmailDomain returns companies whose SSO connection lists the domain (case-insensitive).
@@ -58,34 +64,28 @@ func (r *ssoRepository) FindCompaniesByEmailDomain(domain string) ([]models.Comp
 		return nil, nil, nil
 	}
 	var conns []models.CompanySSOConnection
-	err := database.DB.Where("enabled = ?", true).Find(&conns).Error
+	err := database.DB.Where(
+		`enabled = ? AND EXISTS (
+			SELECT 1 FROM unnest(COALESCE(email_domains, '{}'::text[])) AS dom
+			WHERE lower(trim(dom)) = ?
+		)`,
+		true, d,
+	).Find(&conns).Error
 	if err != nil {
 		return nil, nil, err
 	}
-	type match struct {
-		conn models.CompanySSOConnection
-	}
-	var matches []match
-	for i := range conns {
-		c := &conns[i]
-		for _, dom := range c.EmailDomains {
-			if strings.EqualFold(strings.TrimSpace(dom), d) {
-				matches = append(matches, match{conn: *c})
-				break
-			}
-		}
-	}
-	if len(matches) == 0 {
+	if len(conns) == 0 {
 		return nil, nil, nil
 	}
-	seen := make(map[string]struct{}, len(matches))
+	seen := make(map[string]struct{}, len(conns))
 	var ids []string
-	for _, m := range matches {
-		if _, ok := seen[m.conn.CompanyID]; ok {
+	for i := range conns {
+		cid := conns[i].CompanyID
+		if _, ok := seen[cid]; ok {
 			continue
 		}
-		seen[m.conn.CompanyID] = struct{}{}
-		ids = append(ids, m.conn.CompanyID)
+		seen[cid] = struct{}{}
+		ids = append(ids, cid)
 	}
 
 	var companies []models.Company
@@ -96,12 +96,13 @@ func (r *ssoRepository) FindCompaniesByEmailDomain(domain string) ([]models.Comp
 	for i := range companies {
 		byID[companies[i].ID] = companies[i]
 	}
-	outCompanies := make([]models.Company, 0, len(matches))
-	outConns := make([]models.CompanySSOConnection, 0, len(matches))
-	for _, m := range matches {
-		if comp, ok := byID[m.conn.CompanyID]; ok {
+	outCompanies := make([]models.Company, 0, len(conns))
+	outConns := make([]models.CompanySSOConnection, 0, len(conns))
+	for i := range conns {
+		c := conns[i]
+		if comp, ok := byID[c.CompanyID]; ok {
 			outCompanies = append(outCompanies, comp)
-			outConns = append(outConns, m.conn)
+			outConns = append(outConns, c)
 		}
 	}
 	return outCompanies, outConns, nil
@@ -118,6 +119,10 @@ func (r *ssoRepository) FindExternalIdentity(issuer, subject string) (*models.Us
 
 func (r *ssoRepository) CreateExternalIdentity(id *models.UserExternalIdentity) error {
 	return database.DB.Create(id).Error
+}
+
+func (r *ssoRepository) CreateExternalIdentityTx(tx *gorm.DB, id *models.UserExternalIdentity) error {
+	return tx.Create(id).Error
 }
 
 func (r *ssoRepository) FindLoginLinkByHash(tokenHash string) (*models.TenantLoginLink, error) {

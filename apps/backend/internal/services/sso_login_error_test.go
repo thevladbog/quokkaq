@@ -31,6 +31,10 @@ func (noTenantAccessUserRepo) HasCompanyAccess(string, string) (bool, error) {
 	return false, nil
 }
 
+func (noTenantAccessUserRepo) CreateUserUnitTx(*gorm.DB, *models.UserUnit) error {
+	panic("unexpected")
+}
+
 func TestSSOErrorQueryCode(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -65,6 +69,7 @@ func TestResolveSSOUser_NoCompanyAccessSentinel(t *testing.T) {
 		testsupport.PanicCompanyRepo{},
 		&noTenantAccessUserRepo{},
 		&extNotFoundSSORepo{},
+		testsupport.PanicUnitRepo{},
 		fakeAuthExchange{},
 	)
 	company := &models.Company{ID: "c1", SsoJitProvisioning: true}
@@ -109,7 +114,7 @@ func TestRedirectLoginSSOError_AuditAndLocation(t *testing.T) {
 	t.Setenv("PUBLIC_APP_URL", "http://app.test")
 	t.Setenv("LOGIN_REDIRECT_LOCALE", "en")
 	repo := &captureAuditSSORepo{}
-	svc := NewSSOService(testsupport.PanicCompanyRepo{}, testsupport.PanicUserRepo{}, repo, fakeAuthExchange{})
+	svc := NewSSOService(testsupport.PanicCompanyRepo{}, testsupport.PanicUserRepo{}, repo, testsupport.PanicUnitRepo{}, fakeAuthExchange{})
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
 	cid := "co-1"

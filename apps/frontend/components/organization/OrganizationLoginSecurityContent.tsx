@@ -78,22 +78,24 @@ function OrganizationLoginSecurityForm({ company, sso }: LoginFormProps) {
     exampleUrl: string;
   } | null>(null);
 
+  const hasPersistedSlug = Boolean((company.slug ?? '').trim());
+
   const oidcRedirectUri = useMemo(
     () => `${apiPublicBase()}/auth/sso/callback`,
     []
   );
 
-  const samlAcsUrl = useMemo(
-    () =>
-      `${apiPublicBase()}/auth/saml/acs?tenant=${encodeURIComponent(company.slug ?? '')}`,
-    [company.slug]
-  );
+  const samlAcsUrl = useMemo(() => {
+    const slug = (company.slug ?? '').trim();
+    if (!slug) return '';
+    return `${apiPublicBase()}/auth/saml/acs?tenant=${encodeURIComponent(slug)}`;
+  }, [company.slug]);
 
-  const samlSpMetadataUrl = useMemo(
-    () =>
-      `${apiPublicBase()}/auth/saml/metadata?tenant=${encodeURIComponent(company.slug ?? '')}`,
-    [company.slug]
-  );
+  const samlSpMetadataUrl = useMemo(() => {
+    const slug = (company.slug ?? '').trim();
+    if (!slug) return '';
+    return `${apiPublicBase()}/auth/saml/metadata?tenant=${encodeURIComponent(slug)}`;
+  }, [company.slug]);
 
   const copyText = async (text: string, okMsg: string) => {
     try {
@@ -259,7 +261,9 @@ function OrganizationLoginSecurityForm({ company, sso }: LoginFormProps) {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value='oidc'>{t('protocolOidc')}</SelectItem>
-                <SelectItem value='saml'>{t('protocolSaml')}</SelectItem>
+                <SelectItem value='saml' disabled={!hasPersistedSlug}>
+                  {t('protocolSaml')}
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -284,18 +288,31 @@ function OrganizationLoginSecurityForm({ company, sso }: LoginFormProps) {
             </div>
           ) : (
             <>
+              {!hasPersistedSlug ? (
+                <Alert>
+                  <AlertCircle className='h-4 w-4' />
+                  <AlertTitle>{t('samlSlugRequiredTitle')}</AlertTitle>
+                  <AlertDescription>
+                    {t('samlSlugRequiredDescription')}
+                  </AlertDescription>
+                </Alert>
+              ) : null}
               <div className='flex items-center justify-between gap-4 rounded-lg border p-3'>
                 <div>
                   <p className='font-medium'>{t('samlAcsLabel')}</p>
                   <p className='text-muted-foreground mt-1 font-mono text-xs break-all'>
-                    {samlAcsUrl}
+                    {hasPersistedSlug ? samlAcsUrl : '—'}
                   </p>
                 </div>
                 <Button
                   type='button'
                   variant='outline'
                   size='sm'
-                  onClick={() => void copyText(samlAcsUrl, t('copied'))}
+                  disabled={!hasPersistedSlug || !samlAcsUrl}
+                  onClick={() => {
+                    if (!samlAcsUrl) return;
+                    void copyText(samlAcsUrl, t('copied'));
+                  }}
                 >
                   <Copy className='mr-1 size-4' />
                   {t('copy')}
@@ -305,14 +322,18 @@ function OrganizationLoginSecurityForm({ company, sso }: LoginFormProps) {
                 <div>
                   <p className='font-medium'>{t('samlSpMetadataLabel')}</p>
                   <p className='text-muted-foreground mt-1 font-mono text-xs break-all'>
-                    {samlSpMetadataUrl}
+                    {hasPersistedSlug ? samlSpMetadataUrl : '—'}
                   </p>
                 </div>
                 <Button
                   type='button'
                   variant='outline'
                   size='sm'
-                  onClick={() => void copyText(samlSpMetadataUrl, t('copied'))}
+                  disabled={!hasPersistedSlug || !samlSpMetadataUrl}
+                  onClick={() => {
+                    if (!samlSpMetadataUrl) return;
+                    void copyText(samlSpMetadataUrl, t('copied'));
+                  }}
                 >
                   <Copy className='mr-1 size-4' />
                   {t('copy')}
@@ -403,7 +424,9 @@ function OrganizationLoginSecurityForm({ company, sso }: LoginFormProps) {
           <Button
             type='button'
             onClick={() => onSaveSso()}
-            disabled={patchSso.isPending}
+            disabled={
+              patchSso.isPending || (protocol === 'saml' && !hasPersistedSlug)
+            }
           >
             {patchSso.isPending ? t('saving') : t('saveSso')}
           </Button>

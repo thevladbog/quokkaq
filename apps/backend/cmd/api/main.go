@@ -147,9 +147,9 @@ func main() {
 
 	userService := services.NewUserService(userRepo)
 	mailService := services.NewMailService()
-	authService := services.NewAuthService(userRepo, mailService, subscriptionRepo)
+	authService := services.NewAuthService(userRepo, companyRepo, mailService, subscriptionRepo)
 	ssoRepo := repository.NewSSORepository()
-	ssoService := services.NewSSOService(companyRepo, userRepo, ssoRepo, authService)
+	ssoService := services.NewSSOService(companyRepo, userRepo, ssoRepo, unitRepo, authService)
 	unitClientRepo := repository.NewUnitClientRepository()
 	visitorTagDefRepo := repository.NewVisitorTagDefinitionRepository()
 	unitClientHistRepo := repository.NewUnitClientHistoryRepository()

@@ -416,7 +416,7 @@ export function OrganizationPageContent() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className='text-sm text-gray-600'>{t(descKey)}</p>
+                <p className='text-muted-foreground text-sm'>{t(descKey)}</p>
               </CardContent>
             </Card>
           </Link>

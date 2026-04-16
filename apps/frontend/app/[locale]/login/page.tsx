@@ -31,6 +31,10 @@ import {
   type AuthSSOAuthorizeLocale,
   type HandlersAccessibleCompanyItem
 } from '@/lib/api/generated/auth';
+import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { logger } from '@/lib/logger';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 function toAuthSSOAuthorizeLocale(
   loc: string
@@ -38,10 +42,6 @@ function toAuthSSOAuthorizeLocale(
   if (loc === 'en' || loc === 'ru') return loc;
   return undefined;
 }
-import { Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
-import { logger } from '@/lib/logger';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const SSO_ERROR_CODES = [
   'no_tenant_access',
@@ -221,7 +221,11 @@ export default function LoginPage() {
     e.preventDefault();
 
     try {
-      const response = await loginMutation.mutateAsync({ email, password });
+      const response = await loginMutation.mutateAsync({
+        email,
+        password,
+        tenantSlug: effectiveSlug || undefined
+      });
 
       if (response && response.accessToken) {
         await login(response.accessToken);

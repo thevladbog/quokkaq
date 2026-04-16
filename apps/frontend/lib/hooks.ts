@@ -588,8 +588,15 @@ export const useCallNextTicket = () => {
 // Auth-related hooks
 export const useLogin = () => {
   return useMutation({
-    mutationFn: ({ email, password }: { email: string; password: string }) =>
-      loginWithPassword({ email, password }),
+    mutationFn: ({
+      email,
+      password,
+      tenantSlug
+    }: {
+      email: string;
+      password: string;
+      tenantSlug?: string;
+    }) => loginWithPassword({ email, password, tenantSlug }),
     onSuccess: () => {
       // Session cookies are set by POST /auth/login; optional legacy tokens may still be in the JSON body.
     }

@@ -75,7 +75,7 @@ def _response_302_with_location(description: str) -> dict[str, Any]:
         "headers": {
             "Location": {
                 "description": "Absolute or relative URL the client should follow (RFC 9110).",
-                "schema": {"type": "string", "format": "uri"},
+                "schema": {"type": "string", "format": "uri-reference"},
             }
         },
     }
@@ -234,8 +234,59 @@ def _patch_auth_sso_authorize_locale_enum(doc: dict[str, Any]) -> None:
             if not isinstance(sch, dict):
                 sch = {}
                 p["schema"] = sch
+            if "type" not in sch:
+                sch["type"] = "string"
             sch["enum"] = ["en", "ru"]
             break
+
+
+_SET_COOKIE_HEADER = {
+    "description": (
+        "When present, sets or rotates the `quokkaq_refresh` HttpOnly JWT used as the refresh token "
+        "(Path=/api or /; SameSite=Lax; Secure when served over HTTPS). When clearing the session "
+        "(logout or invalid refresh), the server may omit this header or send an empty/expired cookie. "
+        "See components.securitySchemes.SessionCookie."
+    ),
+    "schema": {"type": "string"},
+}
+
+
+def _patch_auth_set_cookie_response_headers(doc: dict[str, Any]) -> None:
+    """Document Set-Cookie on auth endpoints that mutate the refresh session."""
+    paths = doc.get("paths")
+    if not isinstance(paths, dict):
+        return
+    targets: list[tuple[str, str, str]] = [
+        ("/auth/login", "post", "200"),
+        ("/auth/refresh", "post", "200"),
+        ("/auth/logout", "post", "204"),
+    ]
+    extra = (
+        " Refresh session is carried by the `quokkaq_refresh` cookie (SessionCookie); "
+        "JSON may still include access tokens for legacy clients."
+    )
+    for path, method, code in targets:
+        item = paths.get(path)
+        if not isinstance(item, dict):
+            continue
+        op = item.get(method)
+        if not isinstance(op, dict):
+            continue
+        responses = op.get("responses")
+        if not isinstance(responses, dict):
+            continue
+        resp = responses.get(code)
+        if not isinstance(resp, dict):
+            continue
+        hdrs = resp.setdefault("headers", {})
+        if isinstance(hdrs, dict):
+            hdrs["Set-Cookie"] = dict(_SET_COOKIE_HEADER)
+        if code == "204":
+            resp["description"] = "No Content"
+        else:
+            desc = resp.get("description")
+            if isinstance(desc, str) and "quokkaq_refresh" not in desc.lower():
+                resp["description"] = (desc.rstrip(".") + "." + extra).strip()
 
 
 def _patch_statistics_survey_scores_question_ids_param(doc: dict[str, Any]) -> None:
@@ -275,6 +326,7 @@ def apply_openapi_tweaks(doc: dict[str, Any]) -> None:
     _patch_security_schemes_session_cookie(doc)
     _patch_saml_acs_request_body_required(doc)
     _patch_auth_redirect_302_headers(doc)
+    _patch_auth_set_cookie_response_headers(doc)
     _patch_login_link_response_schema(doc)
     _patch_tenant_hint_sso_protocol_enums(doc)
     _patch_auth_sso_authorize_locale_enum(doc)

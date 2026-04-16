@@ -51,7 +51,7 @@ func TestExchangeFinishCode_SecondCallFailsAfterRedisDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	svc := NewSSOService(testsupport.PanicCompanyRepo{}, testsupport.PanicUserRepo{}, testsupport.SSORepoNoopAudit{}, fakeAuthExchange{})
+	svc := NewSSOService(testsupport.PanicCompanyRepo{}, testsupport.PanicUserRepo{}, testsupport.SSORepoNoopAudit{}, testsupport.PanicUnitRepo{}, fakeAuthExchange{})
 	pair, err := svc.ExchangeFinishCode(ctx, code)
 	if err != nil || pair == nil || pair.AccessToken == "" {
 		t.Fatalf("first exchange: err=%v pair=%v", err, pair)

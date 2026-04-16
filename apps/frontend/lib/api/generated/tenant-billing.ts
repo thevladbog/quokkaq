@@ -408,6 +408,7 @@ export interface HandlersInvoicePDFPrerequisiteError {
 export interface HandlersLoginRequest {
   email?: string;
   password?: string;
+  tenantSlug?: string;
 }
 
 export interface HandlersLoginResponse {

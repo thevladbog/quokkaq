@@ -60,6 +60,7 @@ func (PanicUserRepo) FindByEmail(string) (*models.User, error)                  
 func (PanicUserRepo) Update(*models.User) error                                 { panic("unexpected") }
 func (PanicUserRepo) Delete(string) error                                       { panic("unexpected") }
 func (PanicUserRepo) AssignUnit(string, string, []string) error                 { panic("unexpected") }
+func (PanicUserRepo) CreateUserUnitTx(*gorm.DB, *models.UserUnit) error         { panic("unexpected") }
 func (PanicUserRepo) RemoveUnit(string, string) error                           { panic("unexpected") }
 func (PanicUserRepo) AssignRole(string, string) error                           { panic("unexpected") }
 func (PanicUserRepo) AssignRoleTx(*gorm.DB, string, string) error               { panic("unexpected") }
@@ -111,6 +112,9 @@ func (PanicSSORepo) FindExternalIdentity(string, string) (*models.UserExternalId
 	panic("unexpected")
 }
 func (PanicSSORepo) CreateExternalIdentity(*models.UserExternalIdentity) error { panic("unexpected") }
+func (PanicSSORepo) CreateExternalIdentityTx(*gorm.DB, *models.UserExternalIdentity) error {
+	panic("unexpected")
+}
 func (PanicSSORepo) FindLoginLinkByHash(string) (*models.TenantLoginLink, error) {
 	panic("unexpected")
 }

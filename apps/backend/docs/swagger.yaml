@@ -211,6 +211,8 @@ components:
           type: string
         password:
           type: string
+        tenantSlug:
+          type: string
       type: object
     handlers.LoginResponse:
       properties:
@@ -2331,7 +2333,7 @@ paths:
       - auth
   /auth/login:
     post:
-      description: Authenticates a user and returns access and refresh JWTs (`token` duplicates access for legacy clients)
+      description: Authenticates a user and returns access and refresh JWTs (`token` duplicates access for legacy clients). Optional `tenantSlug` scopes login to a tenant the user can access (same slug as public tenant); omit for default behavior.
       operationId: authLogin
       requestBody:
         content:
@@ -2347,7 +2349,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/handlers.LoginResponse'
-          description: OK
+          description: OK. Refresh session is carried by the `quokkaq_refresh` cookie (SessionCookie); JSON may still include access tokens for legacy clients.
+          headers:
+            Set-Cookie:
+              description: When present, sets or rotates the `quokkaq_refresh` HttpOnly JWT used as the refresh token (Path=/api or /; SameSite=Lax; Secure when served over HTTPS). When clearing the session (logout or invalid refresh), the server may omit this header or send an empty/expired cookie. See components.securitySchemes.SessionCookie.
+              schema: &id001
+                type: string
         '400':
           content:
             application/json:
@@ -2417,6 +2424,10 @@ paths:
       responses:
         '204':
           description: No Content
+          headers:
+            Set-Cookie:
+              description: When present, sets or rotates the `quokkaq_refresh` HttpOnly JWT used as the refresh token (Path=/api or /; SameSite=Lax; Secure when served over HTTPS). When clearing the session (logout or invalid refresh), the server may omit this header or send an empty/expired cookie. See components.securitySchemes.SessionCookie.
+              schema: *id001
       summary: Log out (clear session cookies)
       tags:
       - auth
@@ -2457,7 +2468,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/handlers.RefreshResponse'
-          description: OK
+          description: OK. Refresh session is carried by the `quokkaq_refresh` cookie (SessionCookie); JSON may still include access tokens for legacy clients.
+          headers:
+            Set-Cookie:
+              description: When present, sets or rotates the `quokkaq_refresh` HttpOnly JWT used as the refresh token (Path=/api or /; SameSite=Lax; Secure when served over HTTPS). When clearing the session (logout or invalid refresh), the server may omit this header or send an empty/expired cookie. See components.securitySchemes.SessionCookie.
+              schema: *id001
         '401':
           content:
             application/json:
@@ -2537,7 +2552,7 @@ paths:
               description: Absolute or relative URL the client should follow (RFC 9110).
               schema:
                 type: string
-                format: uri
+                format: uri-reference
         '400':
           content:
             application/json:
@@ -2639,7 +2654,7 @@ paths:
               description: Absolute or relative URL the client should follow (RFC 9110).
               schema:
                 type: string
-                format: uri
+                format: uri-reference
       summary: Start SSO (OIDC or SAML — redirect to IdP)
       tags:
       - auth
@@ -2667,7 +2682,7 @@ paths:
               description: Absolute or relative URL the client should follow (RFC 9110).
               schema:
                 type: string
-                format: uri
+                format: uri-reference
       summary: OIDC callback
       tags:
       - auth

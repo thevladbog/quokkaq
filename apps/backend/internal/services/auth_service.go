@@ -44,7 +44,7 @@ type TokenPair struct {
 }
 
 type AuthService interface {
-	Login(email, password string) (*TokenPair, error)
+	Login(email, password, tenantSlug string) (*TokenPair, error)
 	GetMe(userID string) (*models.User, error)
 	RequestPasswordReset(email string) error
 	ResetPassword(token, newPassword string) error
@@ -56,13 +56,20 @@ type AuthService interface {
 
 type authService struct {
 	userRepo         repository.UserRepository
+	companyRepo      repository.CompanyRepository
 	mailService      MailService
 	subscriptionRepo repository.SubscriptionRepository
 }
 
-func NewAuthService(userRepo repository.UserRepository, mailService MailService, subscriptionRepo repository.SubscriptionRepository) AuthService {
+func NewAuthService(
+	userRepo repository.UserRepository,
+	companyRepo repository.CompanyRepository,
+	mailService MailService,
+	subscriptionRepo repository.SubscriptionRepository,
+) AuthService {
 	return &authService{
 		userRepo:         userRepo,
+		companyRepo:      companyRepo,
 		mailService:      mailService,
 		subscriptionRepo: subscriptionRepo,
 	}
@@ -76,7 +83,7 @@ func jwtSecretBytes() []byte {
 	return []byte(secret)
 }
 
-func (s *authService) Login(email, password string) (*TokenPair, error) {
+func (s *authService) Login(email, password, tenantSlug string) (*TokenPair, error) {
 	user, err := s.userRepo.FindByEmail(email)
 	if err != nil {
 		return nil, errors.New("invalid credentials")
@@ -89,6 +96,24 @@ func (s *authService) Login(email, password string) (*TokenPair, error) {
 	err = bcrypt.CompareHashAndPassword([]byte(*user.Password), []byte(password))
 	if err != nil {
 		return nil, errors.New("invalid credentials")
+	}
+
+	slug := strings.TrimSpace(tenantSlug)
+	if slug != "" {
+		comp, err := s.companyRepo.FindBySlug(slug)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, errors.New("invalid credentials")
+			}
+			return nil, err
+		}
+		ok, err := s.userRepo.HasCompanyAccess(user.ID, comp.ID)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			return nil, errors.New("invalid credentials")
+		}
 	}
 
 	return s.generateTokenPair(user)

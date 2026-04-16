@@ -22,8 +22,9 @@ func NewAuthHandler(service services.AuthService, userRepo repository.UserReposi
 }
 
 type LoginRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Email      string `json:"email"`
+	Password   string `json:"password"`
+	TenantSlug string `json:"tenantSlug,omitempty"`
 }
 
 type LoginResponse struct {
@@ -59,7 +60,7 @@ type SignupRequest struct {
 // Login godoc
 // @ID           authLogin
 // @Summary      User Login
-// @Description  Authenticates a user and returns access and refresh JWTs (`token` duplicates access for legacy clients)
+// @Description  Authenticates a user and returns access and refresh JWTs (`token` duplicates access for legacy clients). Optional `tenantSlug` scopes login to a tenant the user can access (same slug as public tenant); omit for default behavior.
 // @Tags         auth
 // @Accept       json
 // @Produce      json
@@ -76,7 +77,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pair, err := h.service.Login(req.Email, req.Password)
+	pair, err := h.service.Login(req.Email, req.Password, strings.TrimSpace(req.TenantSlug))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return

@@ -19,7 +19,6 @@ import (
 	"quokkaq-go-backend/internal/pkg/tenantslug"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/sso/redisstore"
-	"quokkaq-go-backend/pkg/database"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/google/uuid"
@@ -57,6 +56,7 @@ type SSOService struct {
 	companyRepo repository.CompanyRepository
 	userRepo    repository.UserRepository
 	ssoRepo     repository.SSORepository
+	unitRepo    repository.UnitRepository
 	authSvc     AuthService
 }
 
@@ -64,12 +64,14 @@ func NewSSOService(
 	companyRepo repository.CompanyRepository,
 	userRepo repository.UserRepository,
 	ssoRepo repository.SSORepository,
+	unitRepo repository.UnitRepository,
 	authSvc AuthService,
 ) *SSOService {
 	return &SSOService{
 		companyRepo: companyRepo,
 		userRepo:    userRepo,
 		ssoRepo:     ssoRepo,
+		unitRepo:    unitRepo,
 		authSvc:     authSvc,
 	}
 }
@@ -379,11 +381,10 @@ func (s *SSOService) HandleCallback(ctx context.Context, w http.ResponseWriter, 
 		return
 	}
 	var payload OAuthStatePayload
-	if err := redisstore.GetJSON(ctx, redisstore.KeyOAuthState(state), &payload); err != nil {
+	if err := redisstore.GetAndDeleteJSON(ctx, redisstore.KeyOAuthState(state), &payload); err != nil {
 		http.Error(w, "invalid or expired state", http.StatusBadRequest)
 		return
 	}
-	_ = redisstore.Del(ctx, redisstore.KeyOAuthState(state))
 
 	conn, err := s.ssoRepo.GetConnectionByCompanyID(payload.CompanyID)
 	if err != nil {
@@ -525,22 +526,24 @@ func (s *SSOService) resolveSSOUser(ctx context.Context, company *models.Company
 		if !ok {
 			return nil, ErrSSONoCompanyAccess
 		}
-		_ = s.ssoRepo.CreateExternalIdentity(&models.UserExternalIdentity{
+		if err := s.ssoRepo.CreateExternalIdentity(&models.UserExternalIdentity{
 			UserID:    user.ID,
 			CompanyID: company.ID,
 			Issuer:    iss,
 			Subject:   sub,
-		})
+		}); err != nil {
+			log.Printf(
+				"sso create external identity: user=%s company=%s iss=%s sub=%s: %v",
+				user.ID, company.ID, iss, sub, err,
+			)
+			return nil, fmt.Errorf("create external identity: %w", err)
+		}
 		return user, nil
 	}
 	if !company.SsoJitProvisioning {
 		return nil, ErrSSONotProvisioned
 	}
 	// JIT: create user and assign first unit + staff role
-	var unit models.Unit
-	if err := database.DB.Where("company_id = ?", company.ID).Order("created_at ASC").First(&unit).Error; err != nil {
-		return nil, fmt.Errorf("no unit for jit: %w", err)
-	}
 	emailPtr := strings.TrimSpace(email)
 	newUser := &models.User{
 		Name:     strings.TrimSpace(name),
@@ -552,7 +555,11 @@ func (s *SSOService) resolveSSOUser(ctx context.Context, company *models.Company
 	if newUser.Name == "" {
 		newUser.Name = emailPtr
 	}
-	err = database.DB.Transaction(func(tx *gorm.DB) error {
+	err = s.unitRepo.Transaction(func(tx *gorm.DB) error {
+		unit, err := s.unitRepo.FindFirstByCompanyIDTx(tx, company.ID)
+		if err != nil {
+			return fmt.Errorf("no unit for jit: %w", err)
+		}
 		staffRole, err := s.userRepo.EnsureRoleExistsTx(tx, "staff")
 		if err != nil {
 			return err
@@ -563,12 +570,12 @@ func (s *SSOService) resolveSSOUser(ctx context.Context, company *models.Company
 		if err := s.userRepo.AssignRoleTx(tx, newUser.ID, staffRole.ID); err != nil {
 			return err
 		}
-		uu := models.UserUnit{
+		uu := &models.UserUnit{
 			UserID:      newUser.ID,
 			UnitID:      unit.ID,
 			Permissions: nil,
 		}
-		if err := tx.Create(&uu).Error; err != nil {
+		if err := s.userRepo.CreateUserUnitTx(tx, uu); err != nil {
 			return err
 		}
 		ext := &models.UserExternalIdentity{
@@ -577,7 +584,7 @@ func (s *SSOService) resolveSSOUser(ctx context.Context, company *models.Company
 			Issuer:    iss,
 			Subject:   sub,
 		}
-		return tx.Create(ext).Error
+		return s.ssoRepo.CreateExternalIdentityTx(tx, ext)
 	})
 	if err != nil {
 		return nil, err
@@ -592,10 +599,9 @@ func (s *SSOService) ExchangeFinishCode(ctx context.Context, code string) (*Toke
 		return nil, errors.New("missing code")
 	}
 	var m map[string]string
-	if err := redisstore.GetJSON(ctx, redisstore.KeyExchange(code), &m); err != nil {
+	if err := redisstore.GetAndDeleteJSON(ctx, redisstore.KeyExchange(code), &m); err != nil {
 		return nil, err
 	}
-	_ = redisstore.Del(ctx, redisstore.KeyExchange(code))
 	uid := m["userId"]
 	if uid == "" {
 		return nil, errors.New("invalid exchange")
