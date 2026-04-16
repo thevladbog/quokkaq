@@ -1297,7 +1297,7 @@ export interface ServicesCreateCalendarIntegrationRequest {
   caldavBaseUrl?: string;
   calendarPath: string;
   displayName?: string;
-  enabled?: boolean;
+  enabled: boolean;
   kind?: string;
   timezone?: string;
   unitId: string;
@@ -1544,7 +1544,7 @@ export interface ServicesUpdateCalendarIntegrationRequest {
   caldavBaseUrl?: string;
   calendarPath: string;
   displayName?: string;
-  enabled?: boolean;
+  enabled: boolean;
   timezone?: string;
   username: string;
 }
@@ -1554,7 +1554,7 @@ export interface ServicesUpsertIntegrationRequest {
   appPassword?: string;
   caldavBaseUrl?: string;
   calendarPath: string;
-  enabled?: boolean;
+  enabled: boolean;
   timezone?: string;
   username: string;
 }

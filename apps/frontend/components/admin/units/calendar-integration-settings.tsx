@@ -45,11 +45,14 @@ import { Badge } from '@/components/ui/badge';
 import PermissionGuard from '@/components/auth/permission-guard';
 import { buildIanaTimezoneComboboxOptions } from '@/lib/iana-timezone-combobox-options';
 import {
-  getGetCompaniesMeCalendarIntegrationsQueryKey,
-  useDeleteCompaniesMeCalendarIntegrationsIntegrationId,
-  useGetCompaniesMeCalendarIntegrations,
-  usePostCompaniesMeCalendarIntegrations,
-  usePutCompaniesMeCalendarIntegrationsIntegrationId,
+  getCalendarIntegrationListMineQueryKey,
+  useCalendarIntegrationCreateMine,
+  useCalendarIntegrationDeleteMine,
+  useCalendarIntegrationListMine,
+  useCalendarIntegrationPutMine,
+  type calendarIntegrationCreateMineResponse,
+  type calendarIntegrationDeleteMineResponse,
+  type calendarIntegrationPutMineResponse,
   type ServicesCalendarIntegrationPublic,
   type ServicesCreateCalendarIntegrationRequest,
   type ServicesUpdateCalendarIntegrationRequest
@@ -97,13 +100,13 @@ function CalendarIntegrationCardForm({
     pub.adminNotifyEmails ?? ''
   );
 
-  const putMutation = usePutCompaniesMeCalendarIntegrationsIntegrationId({
+  const putMutation = useCalendarIntegrationPutMine({
     mutation: {
-      onSuccess: (res) => {
+      onSuccess: (res: calendarIntegrationPutMineResponse) => {
         if (res.status === 200) {
           toast.success(t('save_success'));
           queryClient.invalidateQueries({
-            queryKey: getGetCompaniesMeCalendarIntegrationsQueryKey()
+            queryKey: getCalendarIntegrationListMineQueryKey()
           });
           setAppPassword('');
         }
@@ -112,13 +115,13 @@ function CalendarIntegrationCardForm({
     }
   });
 
-  const delMutation = useDeleteCompaniesMeCalendarIntegrationsIntegrationId({
+  const delMutation = useCalendarIntegrationDeleteMine({
     mutation: {
-      onSuccess: (res) => {
+      onSuccess: (res: calendarIntegrationDeleteMineResponse) => {
         if (res.status === 204) {
           toast.success(t('delete_success'));
           queryClient.invalidateQueries({
-            queryKey: getGetCompaniesMeCalendarIntegrationsQueryKey()
+            queryKey: getCalendarIntegrationListMineQueryKey()
           });
         }
       },
@@ -367,18 +370,20 @@ function CreateCalendarIntegrationDialog({
 
   const countForUnit = useMemo(() => {
     if (!unitId) return 0;
-    return integrations.filter((i) => i.unitId === unitId).length;
+    return integrations.filter(
+      (i: ServicesCalendarIntegrationPublic) => i.unitId === unitId
+    ).length;
   }, [integrations, unitId]);
 
   const atLimit = countForUnit >= 4;
 
-  const postMutation = usePostCompaniesMeCalendarIntegrations({
+  const postMutation = useCalendarIntegrationCreateMine({
     mutation: {
-      onSuccess: (res) => {
+      onSuccess: (res: calendarIntegrationCreateMineResponse) => {
         if (res.status === 200) {
           toast.success(t('create_success'));
           queryClient.invalidateQueries({
-            queryKey: getGetCompaniesMeCalendarIntegrationsQueryKey()
+            queryKey: getCalendarIntegrationListMineQueryKey()
           });
           onOpenChange(false);
         }
@@ -574,7 +579,7 @@ export function CalendarIntegrationsPanel({
 }: CalendarIntegrationsPanelProps) {
   const t = useTranslations('admin.integrations');
   const tCal = useTranslations('admin.calendar_integration');
-  const listQuery = useGetCompaniesMeCalendarIntegrations({
+  const listQuery = useCalendarIntegrationListMine({
     query: { staleTime: 30_000 }
   });
   const [createOpen, setCreateOpen] = useState(false);
@@ -586,7 +591,9 @@ export function CalendarIntegrationsPanel({
 
   const filtered = useMemo(() => {
     if (!filterUnitId) return rawList;
-    return rawList.filter((i) => i.unitId === filterUnitId);
+    return rawList.filter(
+      (i: ServicesCalendarIntegrationPublic) => i.unitId === filterUnitId
+    );
   }, [rawList, filterUnitId]);
 
   const sorted = useMemo(() => {

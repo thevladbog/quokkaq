@@ -13,6 +13,8 @@ import (
 	"gorm.io/gorm"
 )
 
+func boolPtr(b bool) *bool { return &b }
+
 func setupCalendarIntegrationServiceTestDB(t *testing.T) func() {
 	t.Helper()
 	db, err := gorm.Open(glebarezsqlite.Open(":memory:"), &gorm.Config{
@@ -108,7 +110,7 @@ func TestCalendarIntegrationService_CreateIntegration_LimitFourPerUnit(t *testin
 		return &CreateCalendarIntegrationRequest{
 			UnitID:        "unit-limit",
 			Kind:          models.CalendarIntegrationKindYandexCalDAV,
-			Enabled:       true,
+			Enabled:       boolPtr(true),
 			CaldavBaseURL: "https://caldav.yandex.ru",
 			CalendarPath:  "/cal/p/",
 			Username:      "u@yandex.ru",
@@ -151,7 +153,7 @@ func TestCalendarIntegrationService_CreateIntegration_UnitNotInCompany(t *testin
 	_, err := svc.CreateIntegration("co1", &CreateCalendarIntegrationRequest{
 		UnitID:       "unit-b",
 		Kind:         models.CalendarIntegrationKindYandexCalDAV,
-		Enabled:      true,
+		Enabled:      boolPtr(true),
 		CalendarPath: "/x/",
 		Username:     "x@yandex.ru",
 		AppPassword:  "app-pass-123456789012",
@@ -188,7 +190,7 @@ func TestCalendarIntegrationService_ListPublicForCompany(t *testing.T) {
 		_, err := svc.CreateIntegration("co-list", &CreateCalendarIntegrationRequest{
 			UnitID:       "u1",
 			Kind:         models.CalendarIntegrationKindYandexCalDAV,
-			Enabled:      true,
+			Enabled:      boolPtr(true),
 			CalendarPath: path,
 			Username:     "x@yandex.ru",
 			AppPassword:  "app-pass-123456789012",
@@ -201,7 +203,7 @@ func TestCalendarIntegrationService_ListPublicForCompany(t *testing.T) {
 	_, err := svc.CreateIntegration("co-list", &CreateCalendarIntegrationRequest{
 		UnitID:       "u2",
 		Kind:         models.CalendarIntegrationKindYandexCalDAV,
-		Enabled:      false,
+		Enabled:      boolPtr(false),
 		CalendarPath: "/c/",
 		Username:     "y@yandex.ru",
 		AppPassword:  "app-pass-123456789012",
@@ -248,7 +250,7 @@ func TestCalendarIntegrationService_DeleteIntegration_BlocksActivePreRegistratio
 	pub, err := svc.CreateIntegration("co-del", &CreateCalendarIntegrationRequest{
 		UnitID:       "unit-del",
 		Kind:         models.CalendarIntegrationKindYandexCalDAV,
-		Enabled:      true,
+		Enabled:      boolPtr(true),
 		CalendarPath: "/z/",
 		Username:     "z@yandex.ru",
 		AppPassword:  "app-pass-123456789012",
@@ -308,7 +310,7 @@ func TestCalendarIntegrationService_SyncIntegration_NoOpWhenMissingOrDisabled(t 
 	pub, err := svc.CreateIntegration("co-s", &CreateCalendarIntegrationRequest{
 		UnitID:       "unit-sync",
 		Kind:         models.CalendarIntegrationKindYandexCalDAV,
-		Enabled:      false,
+		Enabled:      boolPtr(false),
 		CalendarPath: "/off/",
 		Username:     "off@yandex.ru",
 		AppPassword:  "app-pass-123456789012",
@@ -339,7 +341,7 @@ func TestCalendarIntegrationService_ResolveIntegrationForPreReg_ExplicitID(t *te
 	a, err := svc.CreateIntegration("co-r", &CreateCalendarIntegrationRequest{
 		UnitID:       "unit-r",
 		Kind:         models.CalendarIntegrationKindYandexCalDAV,
-		Enabled:      true,
+		Enabled:      boolPtr(true),
 		CalendarPath: "/r1/",
 		Username:     "a@yandex.ru",
 		AppPassword:  "app-pass-123456789012",
@@ -351,7 +353,7 @@ func TestCalendarIntegrationService_ResolveIntegrationForPreReg_ExplicitID(t *te
 	b, err := svc.CreateIntegration("co-r", &CreateCalendarIntegrationRequest{
 		UnitID:       "unit-r",
 		Kind:         models.CalendarIntegrationKindYandexCalDAV,
-		Enabled:      true,
+		Enabled:      boolPtr(true),
 		CalendarPath: "/r2/",
 		Username:     "b@yandex.ru",
 		AppPassword:  "app-pass-123456789012",

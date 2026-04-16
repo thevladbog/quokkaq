@@ -41,10 +41,11 @@ export function normalizeTenantSlug(raw: string): string {
       }
     }
   }
-  out = out.replace(/^-+|-+$/g, '');
-  while (out.includes('--')) {
-    out = out.replace(/--/g, '-');
-  }
+  // Linear-time: trim leading/trailing '-' and collapse '--' (mirrors Go Trim + ReplaceAll), no ReDoS-prone regexes.
+  out = out
+    .split('-')
+    .filter((p) => p.length > 0)
+    .join('-');
   return out;
 }
 

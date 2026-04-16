@@ -2887,6 +2887,7 @@
                 "required": [
                     "appPassword",
                     "calendarPath",
+                    "enabled",
                     "unitId",
                     "username"
                 ],
@@ -3455,6 +3456,7 @@
                 },
                 "required": [
                     "calendarPath",
+                    "enabled",
                     "username"
                 ],
                 "type": "object"
@@ -3485,6 +3487,7 @@
                 },
                 "required": [
                     "calendarPath",
+                    "enabled",
                     "username"
                 ],
                 "type": "object"

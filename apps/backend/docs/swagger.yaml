@@ -1930,6 +1930,7 @@ components:
       required:
       - appPassword
       - calendarPath
+      - enabled
       - unitId
       - username
       type: object
@@ -2303,6 +2304,7 @@ components:
           type: string
       required:
       - calendarPath
+      - enabled
       - username
       type: object
     services.UpsertIntegrationRequest:
@@ -2323,6 +2325,7 @@ components:
           type: string
       required:
       - calendarPath
+      - enabled
       - username
       type: object
     services.UtilizationPoint:

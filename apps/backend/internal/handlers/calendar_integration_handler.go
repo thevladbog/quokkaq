@@ -75,6 +75,8 @@ func respondCalendarIntegrationError(w http.ResponseWriter, op string, err error
 		http.Error(w, calendarIntMsgForbidden, http.StatusForbidden)
 	case errors.Is(err, services.ErrCalendarAppPasswordRequired):
 		http.Error(w, calendarIntMsgBadRequest, http.StatusBadRequest)
+	case errors.Is(err, services.ErrCalendarEnabledRequired):
+		http.Error(w, services.ErrCalendarEnabledRequired.Error(), http.StatusBadRequest)
 	case errors.Is(err, services.ErrCalendarIntegrationBlockedByActivePreRegistrations):
 		http.Error(w, calendarIntMsgActivePreRegsBlock, http.StatusBadRequest)
 	default:

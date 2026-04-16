@@ -35,6 +35,7 @@ var (
 	ErrCalendarIntegrationKindUnknown = errors.New("unsupported calendar integration kind")
 	ErrCalendarUnitCompanyMismatch    = errors.New("unit does not belong to company")
 	ErrCalendarAppPasswordRequired    = errors.New("app password is required for new calendar integration")
+	ErrCalendarEnabledRequired        = errors.New("enabled is required")
 	// ErrCalendarIntegrationBlockedByActivePreRegistrations is returned when delete or disable would strand active bookings.
 	ErrCalendarIntegrationBlockedByActivePreRegistrations = errors.New("active pre-registrations still reference this calendar integration")
 )
@@ -247,7 +248,7 @@ type CreateCalendarIntegrationRequest struct {
 	UnitID            string `json:"unitId" binding:"required"`
 	Kind              string `json:"kind"`
 	DisplayName       string `json:"displayName,omitempty"`
-	Enabled           bool   `json:"enabled"`
+	Enabled           *bool  `json:"enabled" binding:"required"`
 	CaldavBaseURL     string `json:"caldavBaseUrl"`
 	CalendarPath      string `json:"calendarPath" binding:"required"`
 	Username          string `json:"username" binding:"required"`
@@ -258,6 +259,9 @@ type CreateCalendarIntegrationRequest struct {
 
 // CreateIntegration validates limits and creates a row.
 func (s *CalendarIntegrationService) CreateIntegration(companyID string, req *CreateCalendarIntegrationRequest) (*CalendarIntegrationPublic, error) {
+	if req.Enabled == nil {
+		return nil, ErrCalendarEnabledRequired
+	}
 	if err := s.VerifyUnitBelongsToCompany(req.UnitID, companyID); err != nil {
 		return nil, err
 	}
@@ -279,7 +283,7 @@ func (s *CalendarIntegrationService) CreateIntegration(companyID string, req *Cr
 		UnitID:            req.UnitID,
 		Kind:              kind,
 		DisplayName:       strings.TrimSpace(req.DisplayName),
-		Enabled:           req.Enabled,
+		Enabled:           *req.Enabled,
 		CaldavBaseURL:     req.CaldavBaseURL,
 		CalendarPath:      strings.TrimSpace(req.CalendarPath),
 		Username:          strings.TrimSpace(req.Username),
@@ -309,7 +313,7 @@ func (s *CalendarIntegrationService) CreateIntegration(companyID string, req *Cr
 // UpdateCalendarIntegrationRequest is PUT body (unitId changes not allowed in MVP).
 type UpdateCalendarIntegrationRequest struct {
 	DisplayName       string `json:"displayName,omitempty"`
-	Enabled           bool   `json:"enabled"`
+	Enabled           *bool  `json:"enabled" binding:"required"`
 	CaldavBaseURL     string `json:"caldavBaseUrl"`
 	CalendarPath      string `json:"calendarPath" binding:"required"`
 	Username          string `json:"username" binding:"required"`
@@ -320,6 +324,9 @@ type UpdateCalendarIntegrationRequest struct {
 
 // UpdateIntegration updates fields for an existing integration; companyID scopes access.
 func (s *CalendarIntegrationService) UpdateIntegration(companyID, integrationID string, req *UpdateCalendarIntegrationRequest) (*CalendarIntegrationPublic, error) {
+	if req.Enabled == nil {
+		return nil, ErrCalendarEnabledRequired
+	}
 	row, err := s.repo.GetByID(integrationID)
 	if err != nil {
 		return nil, err
@@ -327,7 +334,7 @@ func (s *CalendarIntegrationService) UpdateIntegration(companyID, integrationID 
 	if err := s.VerifyUnitBelongsToCompany(row.UnitID, companyID); err != nil {
 		return nil, err
 	}
-	if row.Enabled && !req.Enabled {
+	if row.Enabled && !*req.Enabled {
 		n, err := s.repo.CountActivePreRegistrationsForIntegration(integrationID)
 		if err != nil {
 			return nil, err
@@ -337,7 +344,7 @@ func (s *CalendarIntegrationService) UpdateIntegration(companyID, integrationID 
 		}
 	}
 	row.DisplayName = strings.TrimSpace(req.DisplayName)
-	row.Enabled = req.Enabled
+	row.Enabled = *req.Enabled
 	row.CaldavBaseURL = req.CaldavBaseURL
 	row.CalendarPath = strings.TrimSpace(req.CalendarPath)
 	row.Username = strings.TrimSpace(req.Username)
@@ -383,7 +390,7 @@ func (s *CalendarIntegrationService) DeleteIntegration(companyID, integrationID 
 
 // UpsertIntegrationRequest is the admin payload (password optional when unchanged).
 type UpsertIntegrationRequest struct {
-	Enabled           bool   `json:"enabled"`
+	Enabled           *bool  `json:"enabled" binding:"required"`
 	CaldavBaseURL     string `json:"caldavBaseUrl"`
 	CalendarPath      string `json:"calendarPath" binding:"required"`
 	Username          string `json:"username" binding:"required"`
@@ -394,6 +401,9 @@ type UpsertIntegrationRequest struct {
 
 // Upsert saves integration for legacy PUT /units/{unitId}/calendar-integration (updates oldest row or creates).
 func (s *CalendarIntegrationService) UpsertIntegration(unitID, companyID string, req *UpsertIntegrationRequest) (*CalendarIntegrationPublic, error) {
+	if req.Enabled == nil {
+		return nil, ErrCalendarEnabledRequired
+	}
 	if err := s.VerifyUnitBelongsToCompany(unitID, companyID); err != nil {
 		return nil, err
 	}
@@ -405,7 +415,7 @@ func (s *CalendarIntegrationService) UpsertIntegration(unitID, companyID string,
 	row := models.UnitCalendarIntegration{
 		Kind:              models.CalendarIntegrationKindYandexCalDAV,
 		UnitID:            unitID,
-		Enabled:           req.Enabled,
+		Enabled:           *req.Enabled,
 		CaldavBaseURL:     req.CaldavBaseURL,
 		CalendarPath:      req.CalendarPath,
 		Username:          req.Username,

@@ -27,7 +27,10 @@ import {
 import { DatePicker } from '@/components/ui/date-picker';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { slotsApi, unitsApi, Service } from '@/lib/api';
-import { useGetCompaniesMeCalendarIntegrations } from '@/lib/api/generated/calendar-integration';
+import {
+  useCalendarIntegrationListMine,
+  type ServicesCalendarIntegrationPublic
+} from '@/lib/api/generated/calendar-integration';
 
 // Type for translation function from next-intl
 type TranslationFunction = (
@@ -141,7 +144,7 @@ export function SlotConfiguration({ unitId }: SlotConfigurationProps) {
     queryFn: () => slotsApi.getCapacities(unitId)
   });
 
-  const companyCalQuery = useGetCompaniesMeCalendarIntegrations({
+  const companyCalQuery = useCalendarIntegrationListMine({
     query: { staleTime: 60_000 }
   });
   const isCalendarLoading = companyCalQuery.isLoading;
@@ -151,7 +154,8 @@ export function SlotConfiguration({ unitId }: SlotConfigurationProps) {
         ? (companyCalQuery.data.data ?? [])
         : [];
     const forUnit = list.filter(
-      (i) => i.unitId === unitId && i.enabled === true
+      (i: ServicesCalendarIntegrationPublic) =>
+        i.unitId === unitId && i.enabled === true
     );
     return forUnit.length > 0;
   }, [companyCalQuery.data, unitId]);
