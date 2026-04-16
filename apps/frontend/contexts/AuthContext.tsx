@@ -171,7 +171,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(null);
         setToken(null);
       } finally {
-        if (!cancelled) {
+        if (!cancelled && myGen === sessionProbeGenRef.current) {
           setIsLoading(false);
         }
       }

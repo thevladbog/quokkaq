@@ -1192,6 +1192,14 @@ export interface ModelsWeeklySlotCapacity {
   updatedAt?: string;
 }
 
+export type ServicesCompanySSOGetResponseSsoProtocol = typeof ServicesCompanySSOGetResponseSsoProtocol[keyof typeof ServicesCompanySSOGetResponseSsoProtocol];
+
+
+export const ServicesCompanySSOGetResponseSsoProtocol = {
+  oidc: 'oidc',
+  saml: 'saml',
+} as const;
+
 export interface ServicesCompanySSOGetResponse {
   clientId?: string;
   clientSecretSet?: boolean;
@@ -1200,8 +1208,19 @@ export interface ServicesCompanySSOGetResponse {
   issuerUrl?: string;
   samlIdpMetadataUrl?: string;
   scopes?: string;
-  ssoProtocol?: string;
+  ssoProtocol?: ServicesCompanySSOGetResponseSsoProtocol;
 }
+
+/**
+ * "oidc" | "saml"
+ */
+export type ServicesCompanySSOPatchSsoProtocol = typeof ServicesCompanySSOPatchSsoProtocol[keyof typeof ServicesCompanySSOPatchSsoProtocol];
+
+
+export const ServicesCompanySSOPatchSsoProtocol = {
+  oidc: 'oidc',
+  saml: 'saml',
+} as const;
 
 export interface ServicesCompanySSOPatch {
   clientId?: string;
@@ -1213,7 +1232,7 @@ export interface ServicesCompanySSOPatch {
   samlIdpMetadataUrl?: string;
   scopes?: string;
   /** "oidc" | "saml" */
-  ssoProtocol?: string;
+  ssoProtocol?: ServicesCompanySSOPatchSsoProtocol;
 }
 
 export interface ServicesEmployeeRadarResponse {
@@ -1377,10 +1396,22 @@ export interface ServicesSurveyScoresResponse {
   points?: ServicesSurveyScorePoint[];
 }
 
+/**
+ * sso | password | choose_slug
+ */
+export type ServicesTenantHintResponseNext = typeof ServicesTenantHintResponseNext[keyof typeof ServicesTenantHintResponseNext];
+
+
+export const ServicesTenantHintResponseNext = {
+  sso: 'sso',
+  password: 'password',
+  choose_slug: 'choose_slug',
+} as const;
+
 export interface ServicesTenantHintResponse {
   displayName?: string;
   /** sso | password | choose_slug */
-  next?: string;
+  next?: ServicesTenantHintResponseNext;
   ssoAvailable?: boolean;
   tenantSlug?: string;
 }
@@ -1449,6 +1480,13 @@ export interface ServicesUtilizationResponse {
   computedAt?: string;
   granularity?: string;
   points?: ServicesUtilizationPoint[];
+}
+
+export interface HandlersLoginLinkResponse {
+  /** Opaque tenant login token for strict-tenant links */
+  token: string;
+  /** Example full login URL including the token query parameter */
+  exampleUrl: string;
 }
 
 export type PostInvoicesIdYookassaPaymentLink200 = {[key: string]: string};

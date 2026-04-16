@@ -501,7 +501,10 @@ func (s *SSOService) resolveSSOUser(ctx context.Context, company *models.Company
 		if err != nil {
 			return nil, err
 		}
-		ok, _ := s.userRepo.HasCompanyAccess(u.ID, company.ID)
+		ok, err := s.userRepo.HasCompanyAccess(u.ID, company.ID)
+		if err != nil {
+			return nil, err
+		}
 		if ok {
 			return u, nil
 		}
@@ -515,7 +518,10 @@ func (s *SSOService) resolveSSOUser(ctx context.Context, company *models.Company
 		return nil, err
 	}
 	if err == nil && user != nil {
-		ok, _ := s.userRepo.HasCompanyAccess(user.ID, company.ID)
+		ok, accErr := s.userRepo.HasCompanyAccess(user.ID, company.ID)
+		if accErr != nil {
+			return nil, accErr
+		}
 		if !ok {
 			return nil, ErrSSONoCompanyAccess
 		}

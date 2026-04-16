@@ -1788,6 +1788,9 @@ components:
           type: string
         ssoProtocol:
           type: string
+          enum:
+          - oidc
+          - saml
       type: object
     services.CompanySSOPatch:
       properties:
@@ -1811,6 +1814,9 @@ components:
         ssoProtocol:
           description: '"oidc" | "saml"'
           type: string
+          enum:
+          - oidc
+          - saml
       type: object
     services.EmployeeRadarResponse:
       properties:
@@ -2064,6 +2070,10 @@ components:
         next:
           description: sso | password | choose_slug
           type: string
+          enum:
+          - sso
+          - password
+          - choose_slug
         ssoAvailable:
           type: boolean
         tenantSlug:
@@ -2221,11 +2231,29 @@ components:
       - visitorPhone
       - visitorLocale
       additionalProperties: false
+    handlers.LoginLinkResponse:
+      type: object
+      required:
+      - token
+      - exampleUrl
+      properties:
+        token:
+          type: string
+          description: Opaque tenant login token for strict-tenant links
+        exampleUrl:
+          type: string
+          format: uri
+          description: Example full login URL including the token query parameter
   securitySchemes:
     BearerAuth:
       in: header
       name: Authorization
       type: apiKey
+    SessionCookie:
+      type: apiKey
+      in: cookie
+      name: quokkaq_refresh
+      description: HttpOnly refresh JWT cookie (same-origin /api). When present, POST /auth/refresh does not require Authorization. Legacy clients may still send Bearer refresh.
 info:
   contact:
     email: support@swagger.io
@@ -2444,6 +2472,7 @@ paths:
           description: Internal Server Error
       security:
       - BearerAuth: []
+      - SessionCookie: []
       summary: Refresh tokens
       tags:
       - auth
@@ -2499,9 +2528,16 @@ paths:
               required:
               - SAMLResponse
               type: object
+        required: true
       responses:
         '302':
           description: Redirect to app with one-time code
+          headers:
+            Location:
+              description: Absolute or relative URL the client should follow (RFC 9110).
+              schema:
+                type: string
+                format: uri
         '400':
           content:
             application/json:
@@ -2592,9 +2628,18 @@ paths:
         name: locale
         schema:
           type: string
+          enum:
+          - en
+          - ru
       responses:
         '302':
-          description: Redirect
+          description: Redirect to IdP authorization endpoint
+          headers:
+            Location:
+              description: Absolute or relative URL the client should follow (RFC 9110).
+              schema:
+                type: string
+                format: uri
       summary: Start SSO (OIDC or SAML — redirect to IdP)
       tags:
       - auth
@@ -2616,7 +2661,13 @@ paths:
           type: string
       responses:
         '302':
-          description: Redirect to app
+          description: Redirect to app after OIDC callback
+          headers:
+            Location:
+              description: Absolute or relative URL the client should follow (RFC 9110).
+              schema:
+                type: string
+                format: uri
       summary: OIDC callback
       tags:
       - auth
@@ -3229,9 +3280,7 @@ paths:
           content:
             application/json:
               schema:
-                additionalProperties:
-                  type: string
-                type: object
+                $ref: '#/components/schemas/handlers.LoginLinkResponse'
           description: OK
       security:
       - BearerAuth: []

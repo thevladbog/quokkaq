@@ -14,6 +14,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import type { LucideIcon } from 'lucide-react';
 import {
   AlertCircle,
   Building2,
@@ -23,7 +24,7 @@ import {
   Settings,
   Shield
 } from 'lucide-react';
-import { Link, useRouter } from '@/src/i18n/navigation';
+import { Link } from '@/src/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { companiesApiExt } from '@/lib/api';
@@ -43,8 +44,49 @@ import {
   type PaymentAccount
 } from '@quokkaq/shared-types';
 
+type OrganizationQuickLink = {
+  href: string;
+  titleKey:
+    | 'quickLinks.billing'
+    | 'quickLinks.team'
+    | 'quickLinks.units'
+    | 'quickLinks.login';
+  descKey:
+    | 'quickLinks.billingDesc'
+    | 'quickLinks.teamDesc'
+    | 'quickLinks.unitsDesc'
+    | 'quickLinks.loginDesc';
+  Icon: LucideIcon;
+};
+
+const organizationQuickLinks: OrganizationQuickLink[] = [
+  {
+    href: '/settings/organization/billing',
+    titleKey: 'quickLinks.billing',
+    descKey: 'quickLinks.billingDesc',
+    Icon: CreditCard
+  },
+  {
+    href: '/settings/users',
+    titleKey: 'quickLinks.team',
+    descKey: 'quickLinks.teamDesc',
+    Icon: Users
+  },
+  {
+    href: '/settings/units',
+    titleKey: 'quickLinks.units',
+    descKey: 'quickLinks.unitsDesc',
+    Icon: MapPin
+  },
+  {
+    href: '/settings/organization/login',
+    titleKey: 'quickLinks.login',
+    descKey: 'quickLinks.loginDesc',
+    Icon: Shield
+  }
+];
+
 export function OrganizationPageContent() {
-  const router = useRouter();
   const t = useTranslations('organization');
   const qc = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
@@ -359,72 +401,26 @@ export function OrganizationPageContent() {
       </Card>
 
       <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
-        <Card
-          className='cursor-pointer transition-shadow hover:shadow-lg'
-          onClick={() => router.push('/settings/organization/billing')}
-        >
-          <CardHeader>
-            <CardTitle className='flex items-center gap-2 text-lg'>
-              <CreditCard className='h-5 w-5' />
-              {t('quickLinks.billing')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className='text-sm text-gray-600'>
-              {t('quickLinks.billingDesc')}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card
-          className='cursor-pointer transition-shadow hover:shadow-lg'
-          onClick={() => router.push('/settings/users')}
-        >
-          <CardHeader>
-            <CardTitle className='flex items-center gap-2 text-lg'>
-              <Users className='h-5 w-5' />
-              {t('quickLinks.team')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className='text-sm text-gray-600'>{t('quickLinks.teamDesc')}</p>
-          </CardContent>
-        </Card>
-
-        <Card
-          className='cursor-pointer transition-shadow hover:shadow-lg'
-          onClick={() => router.push('/settings/units')}
-        >
-          <CardHeader>
-            <CardTitle className='flex items-center gap-2 text-lg'>
-              <MapPin className='h-5 w-5' />
-              {t('quickLinks.units')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className='text-sm text-gray-600'>{t('quickLinks.unitsDesc')}</p>
-          </CardContent>
-        </Card>
-
-        <Link
-          href='/settings/organization/login'
-          className='focus-visible:ring-ring block rounded-lg focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none'
-          aria-label={t('quickLinks.login')}
-        >
-          <Card className='h-full cursor-pointer transition-shadow hover:shadow-lg'>
-            <CardHeader>
-              <CardTitle className='flex items-center gap-2 text-lg'>
-                <Shield className='h-5 w-5' />
-                {t('quickLinks.login')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className='text-sm text-gray-600'>
-                {t('quickLinks.loginDesc')}
-              </p>
-            </CardContent>
-          </Card>
-        </Link>
+        {organizationQuickLinks.map(({ href, titleKey, descKey, Icon }) => (
+          <Link
+            key={href}
+            href={href}
+            className='focus-visible:ring-ring block cursor-pointer rounded-lg transition-shadow hover:shadow-lg focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none'
+            aria-label={t(titleKey)}
+          >
+            <Card className='h-full'>
+              <CardHeader>
+                <CardTitle className='flex items-center gap-2 text-lg'>
+                  <Icon className='h-5 w-5' />
+                  {t(titleKey)}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className='text-sm text-gray-600'>{t(descKey)}</p>
+              </CardContent>
+            </Card>
+          </Link>
+        ))}
       </div>
     </div>
   );

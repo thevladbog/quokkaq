@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"strings"
-	"time"
 
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/pkg/database"
@@ -123,7 +122,7 @@ func (r *ssoRepository) CreateExternalIdentity(id *models.UserExternalIdentity) 
 
 func (r *ssoRepository) FindLoginLinkByHash(tokenHash string) (*models.TenantLoginLink, error) {
 	var t models.TenantLoginLink
-	err := database.DB.Where("token_hash = ? AND revoked = ? AND expires_at > ?", tokenHash, false, time.Now()).First(&t).Error
+	err := database.DB.Where("token_hash = ? AND revoked = ? AND expires_at > NOW()", tokenHash, false).First(&t).Error
 	if err != nil {
 		return nil, err
 	}

@@ -505,13 +505,19 @@ function PlatformLoginPolicySection({
   const [jit, setJit] = useState(company.ssoJitProvisioning === true);
 
   const save = useMutation({
-    mutationFn: () =>
-      patchPlatformCompaniesId(companyId, {
-        slug: slug.trim(),
+    mutationFn: () => {
+      const trimmed = slug.trim();
+      const initialSlug = company.slug ?? '';
+      const body: HandlersPatchPlatformCompanyBody = {
         strictPublicTenantResolve: strict,
         opaqueLoginLinksOnly: opaque,
         ssoJitProvisioning: jit
-      }),
+      };
+      if (trimmed !== '' && trimmed !== initialSlug) {
+        body.slug = trimmed;
+      }
+      return patchPlatformCompaniesId(companyId, body);
+    },
     onSuccess: () => {
       void qc.invalidateQueries({
         queryKey: getGetPlatformCompaniesIdQueryKey(companyId)
