@@ -1,7 +1,10 @@
 /**
  * Browser-oriented fetch to the Next `/api` proxy. Session uses HttpOnly cookies (same-origin);
  * optional `Authorization: Bearer` from caller headers for non-browser clients (kiosk, scripts).
- * Legacy: if cookies are absent, falls back to refresh/access in localStorage until cleared.
+ * Legacy: on 401, POST /auth/refresh tries the session cookie first, then Bearer refresh from
+ * localStorage. We do not send a stale `access_token` from localStorage on every request; that
+ * could override an active cookie session. Bearer access is attached only after a legacy refresh
+ * succeeded (see {@link tryRefreshSessionOnce}).
  */
 import { logger } from './logger';
 
@@ -194,30 +197,40 @@ async function persistRotatedTokensFromRefreshResponse(
   }
 }
 
-let refreshSessionInFlight: Promise<boolean> | null = null;
+type RefreshSessionResult = {
+  ok: boolean;
+  /** True when rotation used `Authorization: Bearer <refresh>` (cookie refresh did not succeed). */
+  usedBearerRefresh: boolean;
+};
+
+let refreshSessionInFlight: Promise<RefreshSessionResult> | null = null;
 
 /**
  * Single-flight refresh: concurrent 401s await the same refresh attempt.
- * Returns true when a refresh returned HTTP 200 (tokens may be cookie-only).
+ * `ok` when a refresh returned HTTP 200. `usedBearerRefresh` means the session was renewed via
+ * legacy Bearer refresh — callers may attach `access_token` from localStorage on the retry.
  */
-async function tryRefreshSessionOnce(): Promise<boolean> {
+async function tryRefreshSessionOnce(): Promise<RefreshSessionResult> {
   if (refreshSessionInFlight) {
     return refreshSessionInFlight;
   }
-  const run = async (): Promise<boolean> => {
+  const run = async (): Promise<RefreshSessionResult> => {
     try {
       let refreshRes = await postRefreshCookie();
       await persistRotatedTokensFromRefreshResponse(refreshRes);
       if (refreshRes.status === 200) {
-        return true;
+        return { ok: true, usedBearerRefresh: false };
       }
       const rt = legacyRefreshToken();
       if (!rt) {
-        return false;
+        return { ok: false, usedBearerRefresh: false };
       }
       refreshRes = await postRefreshBearer(rt);
       await persistRotatedTokensFromRefreshResponse(refreshRes);
-      return refreshRes.status === 200;
+      if (refreshRes.status === 200) {
+        return { ok: true, usedBearerRefresh: true };
+      }
+      return { ok: false, usedBearerRefresh: false };
     } finally {
       refreshSessionInFlight = null;
     }
@@ -274,10 +287,8 @@ export async function authenticatedApiFetch(
   const shouldSetContentType =
     !hasContentTypeHeader(callerHeaders) && !isMultipartBody(body);
 
-  const legacy = legacyAccessToken();
   const authHeaders: Record<string, string> = {
     ...(shouldSetContentType && { 'Content-Type': 'application/json' }),
-    ...(legacy && { Authorization: `Bearer ${legacy}` }),
     ...(currentLocale && { 'Accept-Language': currentLocale }),
     ...activeCompanyIdHeader()
   };
@@ -300,7 +311,7 @@ export async function authenticatedApiFetch(
       try {
         const refreshed = await tryRefreshSessionOnce();
 
-        if (refreshed) {
+        if (refreshed.ok) {
           const retryShouldSetContentType =
             !hasContentTypeHeader(
               headersInitWithoutAuthorization(callerHeaders)
@@ -311,7 +322,10 @@ export async function authenticatedApiFetch(
             ...(retryShouldSetContentType && {
               'Content-Type': 'application/json'
             }),
-            ...(newLegacy && { Authorization: `Bearer ${newLegacy}` }),
+            ...(refreshed.usedBearerRefresh &&
+              newLegacy && {
+                Authorization: `Bearer ${newLegacy}`
+              }),
             ...(currentLocale && { 'Accept-Language': currentLocale }),
             ...activeCompanyIdHeader()
           };
