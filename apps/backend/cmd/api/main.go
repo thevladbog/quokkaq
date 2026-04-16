@@ -160,7 +160,7 @@ func main() {
 	unitClientService := services.NewUnitClientService(unitClientRepo, visitorTagDefRepo, unitClientHistRepo, database.DB)
 	unitService := services.NewUnitService(unitRepo, unitClientService)
 	visitorTagDefService := services.NewVisitorTagDefinitionService(visitorTagDefRepo)
-	calendarIntegrationService := services.NewCalendarIntegrationService(calendarIntegrationRepo, serviceRepo, mailService)
+	calendarIntegrationService := services.NewCalendarIntegrationService(calendarIntegrationRepo, serviceRepo, unitRepo, mailService)
 	ticketService := services.NewTicketService(ticketRepo, counterRepo, serviceRepo, unitRepo, operatorIntervalRepo, unitClientRepo, visitorTagDefRepo, unitClientHistRepo, preRegRepo, calendarIntegrationService, hub, jobClient)
 	serviceService := services.NewServiceService(serviceRepo, unitRepo)
 	counterService := services.NewCounterService(counterRepo, ticketRepo, serviceRepo, userRepo, operatorIntervalRepo, unitRepo, hub)
@@ -189,9 +189,9 @@ func main() {
 					continue
 				}
 				for i := range rows {
-					uid := rows[i].UnitID
-					if err := calendarIntegrationService.SyncUnit(context.Background(), uid); err != nil {
-						log.Printf("calendar SyncUnit %s: %v", uid, err)
+					iid := rows[i].ID
+					if err := calendarIntegrationService.SyncIntegration(context.Background(), iid); err != nil {
+						log.Printf("calendar SyncIntegration %s: %v", iid, err)
 					}
 				}
 			}
@@ -223,7 +223,7 @@ func main() {
 	invitationHandler := handlers.NewInvitationHandler(invitationService)
 	slotHandler := handlers.NewSlotHandler(slotService, calendarIntegrationService)
 	preRegHandler := handlers.NewPreRegistrationHandler(preRegService, ticketService)
-	calendarIntegrationHandler := handlers.NewCalendarIntegrationHandler(calendarIntegrationService)
+	calendarIntegrationHandler := handlers.NewCalendarIntegrationHandler(calendarIntegrationService, userRepo)
 	unitClientHandler := handlers.NewUnitClientHandler(unitClientService, ticketService)
 	visitorTagHandler := handlers.NewVisitorTagHandler(visitorTagDefService)
 	uploadHandler := handlers.NewUploadHandler(storageService)
@@ -603,6 +603,10 @@ func main() {
 			r.Patch("/me/sso", companySSOHTTP.PatchCompanySSO)
 			r.Patch("/me/slug", companySSOHTTP.PatchCompanySlug)
 			r.Post("/me/login-links", companySSOHTTP.CreateOpaqueLoginLink)
+			r.Get("/me/calendar-integrations", calendarIntegrationHandler.ListMine)
+			r.Post("/me/calendar-integrations", calendarIntegrationHandler.CreateMine)
+			r.Put("/me/calendar-integrations/{integrationId}", calendarIntegrationHandler.PutMine)
+			r.Delete("/me/calendar-integrations/{integrationId}", calendarIntegrationHandler.DeleteMine)
 			r.Post("/dadata/party/find-by-inn", dadataHandler.FindPartyByInn)
 			r.Post("/dadata/party/suggest", dadataHandler.SuggestParty)
 			r.Post("/dadata/address/suggest", dadataHandler.SuggestAddress)

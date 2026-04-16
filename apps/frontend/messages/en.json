@@ -509,7 +509,15 @@
       "ssoLoadError": "Could not load SSO settings.",
       "calendar_relocated_title": "Calendar integration",
       "calendar_relocated_hint": "Yandex Calendar (CalDAV) for this unit is configured under Integrations → Calendars (select this unit).",
-      "calendar_relocated_link": "Open Integrations — Calendars"
+      "calendar_relocated_link": "Open Integrations — Calendars",
+      "filter_unit_label": "Filter by unit",
+      "filter_unit_placeholder": "All units",
+      "filter_all_units": "All units",
+      "filter_unit_hint": "Narrows the list below. Each calendar connection still belongs to one unit.",
+      "add_calendar": "Add calendar",
+      "calendar_list_empty": "No calendar connections yet. Add one to import slots from Yandex Calendar (CalDAV).",
+      "calendars_list_hint": "Up to four CalDAV connections per unit. Open a row to edit or remove.",
+      "select_unit_error": "Select a unit."
     },
     "desktop_terminals": {
       "title": "Desktop terminals",
@@ -897,7 +905,8 @@
       "cancel_dialog_confirm": "Yes, cancel",
       "pick_calendar_slot": "Select a calendar slot",
       "reschedule_pick_calendar_slot": "Pick a new calendar slot for the new date or time",
-      "reschedule_calendar_unavailable": "No slots available to reschedule; try another day or turn off calendar integration temporarily"
+      "reschedule_calendar_unavailable": "No slots available to reschedule; try another day or turn off calendar integration temporarily",
+      "select_calendar_connection": "Calendar connection"
     },
     "calendar_integration": {
       "title": "Yandex Calendar (CalDAV)",
@@ -907,7 +916,9 @@
       "calendar_path": "Calendar path (e.g. /calendars/…/events/)",
       "username": "Yandex login",
       "app_password": "App password (leave blank to keep)",
-      "timezone": "Timezone (IANA, e.g. Europe/Moscow)",
+      "timezone": "Timezone",
+      "timezone_hint": "IANA name (e.g. Europe/Moscow) for interpreting calendar slot times.",
+      "timezone_no_match": "No matching timezone.",
       "admin_emails": "Admin emails for sync issues (comma-separated)",
       "last_sync": "Last sync",
       "last_error": "Last error",
@@ -916,7 +927,26 @@
       "save_error": "Failed to save calendar settings",
       "required_fields": "Calendar path and Yandex username are required",
       "load_error": "Could not load calendar integration settings.",
-      "no_data": "No calendar integration data."
+      "no_data": "No calendar integration data.",
+      "unit_label": "Unit",
+      "display_name": "Label (optional)",
+      "display_name_placeholder": "e.g. Front desk calendar",
+      "unit_readonly_hint": "The unit for this connection is set when the calendar is created and cannot be changed here.",
+      "delete": "Remove",
+      "delete_success": "Calendar connection removed",
+      "delete_error": "Could not remove this calendar connection",
+      "delete_confirm_title": "Remove this calendar connection?",
+      "delete_confirm_desc": "Pre-registrations that reference this connection may need to be canceled first.",
+      "cancel": "Cancel",
+      "create_dialog_description": "Choose the unit and enter CalDAV credentials. You can add several calendars per unit (up to four).",
+      "kind_label": "Type",
+      "kind_yandex": "Yandex Calendar (CalDAV)",
+      "required_fields_create": "Calendar path, Yandex login, and app password are required when the calendar is enabled.",
+      "app_password_new": "App password",
+      "create_success": "Calendar connection created",
+      "create_error": "Could not create calendar connection",
+      "limit_error": "This unit already has the maximum of four calendar connections.",
+      "create_submit": "Create"
     }
   },
   "staff": {

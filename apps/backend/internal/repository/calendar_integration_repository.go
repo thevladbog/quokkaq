@@ -24,29 +24,83 @@ func (r *CalendarIntegrationRepository) ListEnabled() ([]models.UnitCalendarInte
 	return rows, err
 }
 
-func (r *CalendarIntegrationRepository) GetByUnitID(unitID string) (*models.UnitCalendarIntegration, error) {
+// ListByUnitID returns all calendar integrations for a unit (any state), oldest first.
+func (r *CalendarIntegrationRepository) ListByUnitID(unitID string) ([]models.UnitCalendarIntegration, error) {
+	var rows []models.UnitCalendarIntegration
+	err := database.DB.Where("unit_id = ?", unitID).Order("created_at ASC").Find(&rows).Error
+	return rows, err
+}
+
+// ListEnabledByUnitID returns enabled integrations for a unit.
+func (r *CalendarIntegrationRepository) ListEnabledByUnitID(unitID string) ([]models.UnitCalendarIntegration, error) {
+	var rows []models.UnitCalendarIntegration
+	err := database.DB.Where("unit_id = ? AND enabled = ?", unitID, true).Order("created_at ASC").Find(&rows).Error
+	return rows, err
+}
+
+// ListByCompanyID returns integrations for all units belonging to the company.
+func (r *CalendarIntegrationRepository) ListByCompanyID(companyID string) ([]models.UnitCalendarIntegration, error) {
+	var rows []models.UnitCalendarIntegration
+	err := database.DB.
+		Joins("JOIN units ON units.id = unit_calendar_integrations.unit_id").
+		Where("units.company_id = ?", companyID).
+		Order("unit_calendar_integrations.unit_id ASC, unit_calendar_integrations.created_at ASC").
+		Find(&rows).Error
+	return rows, err
+}
+
+// GetFirstByUnitID returns the oldest integration row for a unit (legacy single-integration behavior).
+func (r *CalendarIntegrationRepository) GetFirstByUnitID(unitID string) (*models.UnitCalendarIntegration, error) {
 	var row models.UnitCalendarIntegration
-	err := database.DB.Where("unit_id = ?", unitID).First(&row).Error
+	err := database.DB.Where("unit_id = ?", unitID).Order("created_at ASC").First(&row).Error
 	if err != nil {
 		return nil, err
 	}
 	return &row, nil
 }
 
-func (r *CalendarIntegrationRepository) SaveIntegration(row *models.UnitCalendarIntegration) error {
-	var existing models.UnitCalendarIntegration
-	err := database.DB.Where("unit_id = ?", row.UnitID).First(&existing).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return database.DB.Create(row).Error
-	}
+// GetByID loads one integration by primary key.
+func (r *CalendarIntegrationRepository) GetByID(id string) (*models.UnitCalendarIntegration, error) {
+	var row models.UnitCalendarIntegration
+	err := database.DB.First(&row, "id = ?", id).Error
 	if err != nil {
-		return err
+		return nil, err
 	}
-	row.ID = existing.ID
-	row.CreatedAt = existing.CreatedAt
+	return &row, nil
+}
+
+// CountByUnitID counts integrations for a unit.
+func (r *CalendarIntegrationRepository) CountByUnitID(unitID string) (int64, error) {
+	var n int64
+	err := database.DB.Model(&models.UnitCalendarIntegration{}).Where("unit_id = ?", unitID).Count(&n).Error
+	return n, err
+}
+
+// CreateIntegration inserts a new row (must not reuse unit_id uniqueness).
+func (r *CalendarIntegrationRepository) CreateIntegration(row *models.UnitCalendarIntegration) error {
+	return database.DB.Create(row).Error
+}
+
+// UpdateIntegration saves an existing row by ID.
+func (r *CalendarIntegrationRepository) UpdateIntegration(row *models.UnitCalendarIntegration) error {
 	return database.DB.Save(row).Error
 }
 
+// DeleteIntegration removes a calendar integration row.
+func (r *CalendarIntegrationRepository) DeleteIntegration(id string) error {
+	return database.DB.Delete(&models.UnitCalendarIntegration{}, "id = ?", id).Error
+}
+
+// CountActivePreRegistrationsForIntegration counts non-final pre-regs tied to this integration.
+func (r *CalendarIntegrationRepository) CountActivePreRegistrationsForIntegration(integrationID string) (int64, error) {
+	var n int64
+	err := database.DB.Model(&models.PreRegistration{}).
+		Where("calendar_integration_id = ? AND status IN ?", integrationID, []string{"created", "ticket_issued"}).
+		Count(&n).Error
+	return n, err
+}
+
+// UpdateSyncMeta updates last sync fields for an integration.
 func (r *CalendarIntegrationRepository) UpdateSyncMeta(id string, lastSyncAt time.Time, syncErr string) error {
 	return database.DB.Model(&models.UnitCalendarIntegration{}).Where("id = ?", id).Updates(map[string]interface{}{
 		"last_sync_at":    lastSyncAt,
@@ -83,6 +137,22 @@ func (r *CalendarIntegrationRepository) ListExternalSlotsForServiceDate(unitID, 
 	var rows []models.CalendarExternalSlot
 	err = database.DB.Where("unit_id = ? AND service_id = ? AND start_utc >= ? AND start_utc < ? AND parsed_state = ?",
 		unitID, serviceID, startDay.UTC(), endDay.UTC(), summary.StateFree).
+		Order("start_utc").
+		Find(&rows).Error
+	return rows, err
+}
+
+// ListExternalSlotsForIntegrationServiceDate filters by integration and interprets localDate in loc (integration TZ).
+func (r *CalendarIntegrationRepository) ListExternalSlotsForIntegrationServiceDate(integrationID, unitID, serviceID, localDate string, loc *time.Location) ([]models.CalendarExternalSlot, error) {
+	startDay, err := time.ParseInLocation("2006-01-02", localDate, loc)
+	if err != nil {
+		return nil, err
+	}
+	endDay := startDay.Add(24 * time.Hour)
+	var rows []models.CalendarExternalSlot
+	err = database.DB.Where(
+		"integration_id = ? AND unit_id = ? AND service_id = ? AND start_utc >= ? AND start_utc < ? AND parsed_state = ?",
+		integrationID, unitID, serviceID, startDay.UTC(), endDay.UTC(), summary.StateFree).
 		Order("start_utc").
 		Find(&rows).Error
 	return rows, err

@@ -1121,8 +1121,10 @@ export interface ModelsMessageTemplate {
 }
 
 export interface ModelsPreRegCalendarSlotItem {
+  calendarIntegrationId?: string;
   eTag?: string;
   externalEventHref?: string;
+  integrationLabel?: string;
   time?: string;
 }
 
@@ -1131,6 +1133,8 @@ export interface ModelsPreRegistrationCodeRequest {
 }
 
 export interface ModelsPreRegistrationCreateRequest {
+  /** CalendarIntegrationID identifies which calendar connection to use when the unit has multiple. */
+  calendarIntegrationId?: string;
   comment?: string;
   customerFirstName?: string;
   customerLastName?: string;
@@ -1150,6 +1154,7 @@ export interface ModelsPreRegistrationRedeemResponse {
 }
 
 export interface ModelsPreRegistrationUpdateRequest {
+  calendarIntegrationId?: string;
   comment?: string;
   customerFirstName?: string;
   customerLastName?: string;
@@ -1246,11 +1251,16 @@ export interface ServicesCalendarIntegrationPublic {
   adminNotifyEmails?: string;
   caldavBaseUrl?: string;
   calendarPath?: string;
+  displayName?: string;
   enabled?: boolean;
+  id?: string;
+  kind?: string;
   lastSyncAt?: string;
   lastSyncError?: string;
   readOnlyCapacity?: boolean;
   timezone?: string;
+  unitId?: string;
+  unitName?: string;
   username?: string;
 }
 
@@ -1295,6 +1305,19 @@ export interface ServicesCompanySSOPatch {
   scopes?: string;
   /** "oidc" | "saml" */
   ssoProtocol?: ServicesCompanySSOPatchSsoProtocol;
+}
+
+export interface ServicesCreateCalendarIntegrationRequest {
+  adminNotifyEmails?: string;
+  appPassword?: string;
+  caldavBaseUrl?: string;
+  calendarPath?: string;
+  displayName?: string;
+  enabled?: boolean;
+  kind?: string;
+  timezone?: string;
+  unitId?: string;
+  username?: string;
 }
 
 export interface ServicesEmployeeRadarResponse {
@@ -1529,6 +1552,17 @@ export interface ServicesUnitClientHistoryListResponse {
 export interface ServicesUnitClientListResponse {
   items?: ModelsUnitClient[];
   nextCursor?: string;
+}
+
+export interface ServicesUpdateCalendarIntegrationRequest {
+  adminNotifyEmails?: string;
+  appPassword?: string;
+  caldavBaseUrl?: string;
+  calendarPath?: string;
+  displayName?: string;
+  enabled?: boolean;
+  timezone?: string;
+  username?: string;
 }
 
 export interface ServicesUpsertIntegrationRequest {

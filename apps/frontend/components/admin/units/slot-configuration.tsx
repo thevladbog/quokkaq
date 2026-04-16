@@ -27,7 +27,7 @@ import {
 import { DatePicker } from '@/components/ui/date-picker';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { slotsApi, unitsApi, Service } from '@/lib/api';
-import { useGetUnitsUnitIdCalendarIntegration } from '@/lib/api/generated/calendar-integration';
+import { useGetCompaniesMeCalendarIntegrations } from '@/lib/api/generated/calendar-integration';
 
 // Type for translation function from next-intl
 type TranslationFunction = (
@@ -141,21 +141,20 @@ export function SlotConfiguration({ unitId }: SlotConfigurationProps) {
     queryFn: () => slotsApi.getCapacities(unitId)
   });
 
-  const calendarIntegrationQuery = useGetUnitsUnitIdCalendarIntegration(
-    unitId,
-    {
-      query: {
-        staleTime: 60_000
-      }
-    }
-  );
-  const isCalendarLoading = calendarIntegrationQuery.isLoading;
-  const calendarIntegration =
-    calendarIntegrationQuery.data?.status === 200
-      ? calendarIntegrationQuery.data.data
-      : undefined;
-
-  const readOnlyCapacity = calendarIntegration?.readOnlyCapacity === true;
+  const companyCalQuery = useGetCompaniesMeCalendarIntegrations({
+    query: { staleTime: 60_000 }
+  });
+  const isCalendarLoading = companyCalQuery.isLoading;
+  const readOnlyCapacity = useMemo(() => {
+    const list =
+      companyCalQuery.data?.status === 200
+        ? (companyCalQuery.data.data ?? [])
+        : [];
+    const forUnit = list.filter(
+      (i) => i.unitId === unitId && i.enabled === true
+    );
+    return forUnit.length > 0;
+  }, [companyCalQuery.data, unitId]);
 
   if (
     isConfigLoading ||

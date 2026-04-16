@@ -29,7 +29,9 @@ var (
 // preRegCalendarSync abstracts CalDAV operations for pre-registration cancel/reschedule.
 // Implemented by *CalendarIntegrationService.
 type preRegCalendarSync interface {
-	GetIntegration(unitID string) (*models.UnitCalendarIntegration, error)
+	ResolveIntegrationForPreReg(unitID, optionalIntegrationID string) (*models.UnitCalendarIntegration, error)
+	ResolveIntegrationForRelease(pr *models.PreRegistration) (*models.UnitCalendarIntegration, error)
+	HasEnabledCalendarIntegration(unitID string) (bool, error)
 	ReleaseFreeSlot(ctx context.Context, integ *models.UnitCalendarIntegration, svc *models.Service, href, etag string) error
 	ValidateAndApplyBooked(ctx context.Context, integ *models.UnitCalendarIntegration, svc *models.Service, href, etag string, pr *models.PreRegistration) (newETag string, err error)
 	ListCalendarSlots(unitID, serviceID, date string) ([]models.PreRegCalendarSlotItem, error)
@@ -70,7 +72,7 @@ func (s *PreRegistrationService) GetByID(id string) (*models.PreRegistration, er
 }
 
 // Create persists a pre-registration. When calendar integration is enabled for the unit, externalHref/externalETag must be supplied.
-func (s *PreRegistrationService) Create(ctx context.Context, preReg *models.PreRegistration, externalHref, externalETag string) error {
+func (s *PreRegistrationService) Create(ctx context.Context, preReg *models.PreRegistration, externalHref, externalETag, calendarIntegrationID string) error {
 	code, err := s.generateUniqueCode(preReg.Date)
 	if err != nil {
 		return err
@@ -80,32 +82,38 @@ func (s *PreRegistrationService) Create(ctx context.Context, preReg *models.PreR
 	preReg.Status = "created"
 
 	if s.calendar != nil {
-		integ, ierr := s.calendar.GetIntegration(preReg.UnitID)
-		if ierr != nil {
-			return ierr
+		hasCal, herr := s.calendar.HasEnabledCalendarIntegration(preReg.UnitID)
+		if herr != nil {
+			return herr
 		}
-		if integ != nil && integ.Enabled {
-			if strings.TrimSpace(externalHref) == "" {
-				return fmt.Errorf("externalEventHref is required when calendar integration is enabled")
+		if hasCal {
+			integ, ierr := s.calendar.ResolveIntegrationForPreReg(preReg.UnitID, calendarIntegrationID)
+			if ierr != nil {
+				return ierr
 			}
-			svc, err := s.serviceRepo.FindByID(preReg.ServiceID)
-			if err != nil {
-				return err
+			if integ != nil && integ.Enabled {
+				if strings.TrimSpace(externalHref) == "" {
+					return fmt.Errorf("externalEventHref is required when calendar integration is enabled")
+				}
+				svc, err := s.serviceRepo.FindByID(preReg.ServiceID)
+				if err != nil {
+					return err
+				}
+				if err := s.repo.Create(preReg); err != nil {
+					return err
+				}
+				newETag, err := s.calendar.ValidateAndApplyBooked(ctx, integ, svc, externalHref, externalETag, preReg)
+				if err != nil {
+					_ = s.repo.DeleteByID(preReg.ID)
+					return err
+				}
+				h := externalHref
+				preReg.ExternalEventHref = &h
+				preReg.ExternalEventETag = &newETag
+				iid := integ.ID
+				preReg.CalendarIntegrationID = &iid
+				return s.repo.Update(preReg)
 			}
-			if err := s.repo.Create(preReg); err != nil {
-				return err
-			}
-			newETag, err := s.calendar.ValidateAndApplyBooked(ctx, integ, svc, externalHref, externalETag, preReg)
-			if err != nil {
-				_ = s.repo.DeleteByID(preReg.ID)
-				return err
-			}
-			h := externalHref
-			preReg.ExternalEventHref = &h
-			preReg.ExternalEventETag = &newETag
-			iid := integ.ID
-			preReg.CalendarIntegrationID = &iid
-			return s.repo.Update(preReg)
 		}
 	}
 
@@ -124,7 +132,7 @@ func (s *PreRegistrationService) Update(ctx context.Context, previous *models.Pr
 		}
 		next.Status = "canceled"
 		if s.calendar != nil && previous.ExternalEventHref != nil && strings.TrimSpace(*previous.ExternalEventHref) != "" {
-			integ, err := s.calendar.GetIntegration(previous.UnitID)
+			integ, err := s.calendar.ResolveIntegrationForRelease(previous)
 			if err != nil {
 				return err
 			}
@@ -151,11 +159,11 @@ func (s *PreRegistrationService) Update(ctx context.Context, previous *models.Pr
 	slotChanged := previous.Date != next.Date || previous.Time != next.Time || previous.ServiceID != next.ServiceID
 	if slotChanged && previous.Status == "created" &&
 		previous.ExternalEventHref != nil && strings.TrimSpace(*previous.ExternalEventHref) != "" && s.calendar != nil {
-		integ, err := s.calendar.GetIntegration(previous.UnitID)
+		integOld, err := s.calendar.ResolveIntegrationForRelease(previous)
 		if err != nil {
 			return err
 		}
-		if integ != nil && integ.Enabled {
+		if integOld != nil && integOld.Enabled {
 			oldSvc, err := s.serviceRepo.FindByID(previous.ServiceID)
 			if err != nil {
 				return err
@@ -164,7 +172,7 @@ func (s *PreRegistrationService) Update(ctx context.Context, previous *models.Pr
 			if previous.ExternalEventETag != nil {
 				etag = *previous.ExternalEventETag
 			}
-			if err := s.calendar.ReleaseFreeSlot(ctx, integ, oldSvc, *previous.ExternalEventHref, etag); err != nil {
+			if err := s.calendar.ReleaseFreeSlot(ctx, integOld, oldSvc, *previous.ExternalEventHref, etag); err != nil {
 				return err
 			}
 			next.ExternalEventHref = nil
@@ -173,22 +181,31 @@ func (s *PreRegistrationService) Update(ctx context.Context, previous *models.Pr
 
 			newHref := ""
 			newETag := ""
+			newIntegID := ""
 			if req != nil {
 				newHref = strings.TrimSpace(req.ExternalEventHref)
 				newETag = strings.TrimSpace(req.ExternalEventEtag)
+				newIntegID = strings.TrimSpace(req.CalendarIntegrationID)
 			}
 			if newHref != "" {
 				newSvc, err := s.serviceRepo.FindByID(next.ServiceID)
 				if err != nil {
 					return err
 				}
-				newETag2, err := s.calendar.ValidateAndApplyBooked(ctx, integ, newSvc, newHref, newETag, next)
+				integNew, err := s.calendar.ResolveIntegrationForPreReg(next.UnitID, newIntegID)
+				if err != nil {
+					return err
+				}
+				if integNew == nil || !integNew.Enabled {
+					return fmt.Errorf("calendar integration is not available for reschedule")
+				}
+				newETag2, err := s.calendar.ValidateAndApplyBooked(ctx, integNew, newSvc, newHref, newETag, next)
 				if err != nil {
 					return err
 				}
 				next.ExternalEventHref = &newHref
 				next.ExternalEventETag = &newETag2
-				iid := integ.ID
+				iid := integNew.ID
 				next.CalendarIntegrationID = &iid
 			}
 		}
@@ -274,8 +291,8 @@ func (s *PreRegistrationService) ListCalendarSlotItems(unitID, serviceID, date s
 	if s.calendar == nil {
 		return nil, nil
 	}
-	integ, err := s.calendar.GetIntegration(unitID)
-	if err != nil || integ == nil || !integ.Enabled {
+	has, err := s.calendar.HasEnabledCalendarIntegration(unitID)
+	if err != nil || !has {
 		return nil, nil
 	}
 	return s.calendar.ListCalendarSlots(unitID, serviceID, date)
@@ -284,11 +301,11 @@ func (s *PreRegistrationService) ListCalendarSlotItems(unitID, serviceID, date s
 // GetAvailableSlots calculates available slots for a given date
 func (s *PreRegistrationService) GetAvailableSlots(unitID, serviceID, date string) ([]string, error) {
 	if s.calendar != nil {
-		integ, err := s.calendar.GetIntegration(unitID)
+		has, err := s.calendar.HasEnabledCalendarIntegration(unitID)
 		if err != nil {
 			return nil, err
 		}
-		if integ != nil && integ.Enabled {
+		if has {
 			items, err := s.calendar.ListCalendarSlots(unitID, serviceID, date)
 			if err != nil {
 				return nil, err

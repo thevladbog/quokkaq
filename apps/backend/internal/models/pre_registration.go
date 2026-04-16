@@ -67,6 +67,8 @@ type PreRegistrationCreateRequest struct {
 	// ExternalEventHref is required for units with calendar integration (identifies the CalDAV resource).
 	ExternalEventHref string `json:"externalEventHref,omitempty"`
 	ExternalEventEtag string `json:"externalEventEtag,omitempty"`
+	// CalendarIntegrationID identifies which calendar connection to use when the unit has multiple.
+	CalendarIntegrationID string `json:"calendarIntegrationId,omitempty"`
 }
 
 // PreRegistrationUpdateRequest is the JSON body for updating an existing pre-registration.
@@ -81,8 +83,9 @@ type PreRegistrationUpdateRequest struct {
 	// Status optional; only "canceled" is accepted to cancel an active pre-registration.
 	Status string `json:"status,omitempty"`
 	// When rescheduling with calendar integration, provide the new CalDAV slot (same as create).
-	ExternalEventHref string `json:"externalEventHref,omitempty"`
-	ExternalEventEtag string `json:"externalEventEtag,omitempty"`
+	ExternalEventHref     string `json:"externalEventHref,omitempty"`
+	ExternalEventEtag     string `json:"externalEventEtag,omitempty"`
+	CalendarIntegrationID string `json:"calendarIntegrationId,omitempty"`
 }
 
 // PreRegistrationCodeRequest is the JSON body for kiosk validate and redeem endpoints.
@@ -99,7 +102,9 @@ type PreRegistrationRedeemResponse struct {
 
 // PreRegCalendarSlotItem is one bookable slot when the unit uses CalDAV-backed capacity.
 type PreRegCalendarSlotItem struct {
-	Time              string `json:"time"`
-	ExternalEventHref string `json:"externalEventHref"`
-	ETag              string `json:"eTag,omitempty"`
+	Time                  string `json:"time"`
+	ExternalEventHref     string `json:"externalEventHref"`
+	ETag                  string `json:"eTag,omitempty"`
+	CalendarIntegrationID string `json:"calendarIntegrationId"`
+	IntegrationLabel      string `json:"integrationLabel,omitempty"`
 }

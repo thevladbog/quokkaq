@@ -69,15 +69,14 @@ func NewJobWorker(ttsService services.TtsService, ticketRepo repository.TicketRe
 }
 
 func (w *jobWorker) Start() {
-	go func() {
-		if err := w.server.Run(w.mux); err != nil {
-			log.Fatalf("could not run server: %v", err)
-		}
-	}()
+	// Run() also registers SIGINT/SIGTERM and races with main's signal.Notify; Start() + Shutdown() from main avoids that.
+	if err := w.server.Start(w.mux); err != nil {
+		log.Fatalf("could not start asynq worker: %v", err)
+	}
 }
 
 func (w *jobWorker) Stop() {
-	w.server.Stop()
+	w.server.Shutdown()
 }
 
 func (w *jobWorker) handleTtsGenerate(ctx context.Context, t *asynq.Task) error {

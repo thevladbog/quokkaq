@@ -20,18 +20,25 @@ import (
 	"gorm.io/gorm"
 )
 
+// MaxCalendarIntegrationsPerUnit limits how many calendar connections a single unit may have.
+const MaxCalendarIntegrationsPerUnit = 4
+
 // Calendar errors for HTTP mapping.
 var (
-	ErrCalendarSlotTaken        = errors.New("calendar slot already taken or changed")
-	ErrCalendarSlotNotFree      = errors.New("calendar slot is not available")
-	ErrCalendarIntegrationOff   = errors.New("calendar integration is not configured for this unit")
-	ErrCalendarValidationFailed = errors.New("calendar validation failed")
+	ErrCalendarSlotTaken              = errors.New("calendar slot already taken or changed")
+	ErrCalendarSlotNotFree            = errors.New("calendar slot is not available")
+	ErrCalendarIntegrationOff         = errors.New("calendar integration is not configured for this unit")
+	ErrCalendarValidationFailed       = errors.New("calendar validation failed")
+	ErrCalendarIntegrationLimit       = errors.New("maximum number of calendar integrations for this unit reached")
+	ErrCalendarIntegrationIDRequired  = errors.New("calendarIntegrationId is required when multiple calendars are enabled")
+	ErrCalendarIntegrationKindUnknown = errors.New("unsupported calendar integration kind")
 )
 
 // CalendarIntegrationService syncs Yandex CalDAV and mirrors pre-registration state into events.
 type CalendarIntegrationService struct {
 	repo        *repository.CalendarIntegrationRepository
 	serviceRepo repository.ServiceRepository
+	unitRepo    repository.UnitRepository
 	mail        MailService
 	appBaseURL  string
 }
@@ -39,18 +46,23 @@ type CalendarIntegrationService struct {
 func NewCalendarIntegrationService(
 	repo *repository.CalendarIntegrationRepository,
 	serviceRepo repository.ServiceRepository,
+	unitRepo repository.UnitRepository,
 	mail MailService,
 ) *CalendarIntegrationService {
 	base := strings.TrimRight(os.Getenv("APP_BASE_URL"), "/")
 	return &CalendarIntegrationService{
 		repo:        repo,
 		serviceRepo: serviceRepo,
+		unitRepo:    unitRepo,
 		mail:        mail,
 		appBaseURL:  base,
 	}
 }
 
 func (s *CalendarIntegrationService) clientForIntegration(integ *models.UnitCalendarIntegration) (*caldavclient.Client, error) {
+	if integ.Kind != "" && integ.Kind != models.CalendarIntegrationKindYandexCalDAV {
+		return nil, ErrCalendarIntegrationKindUnknown
+	}
 	raw, err := ssocrypto.DecryptAES256GCM(integ.AppPasswordEncrypted)
 	if err != nil {
 		return nil, err
@@ -58,17 +70,86 @@ func (s *CalendarIntegrationService) clientForIntegration(integ *models.UnitCale
 	return caldavclient.NewYandexClient(integ.Username, string(raw))
 }
 
-// GetIntegration returns integration row for a unit (nil if not found).
+// GetIntegration returns the first integration row for a unit (legacy), or nil if none.
 func (s *CalendarIntegrationService) GetIntegration(unitID string) (*models.UnitCalendarIntegration, error) {
-	row, err := s.repo.GetByUnitID(unitID)
+	row, err := s.repo.GetFirstByUnitID(unitID)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 	return row, err
 }
 
+// ResolveIntegrationForRelease picks the calendar row for cancel/reschedule release (legacy rows may lack integration id).
+func (s *CalendarIntegrationService) ResolveIntegrationForRelease(pr *models.PreRegistration) (*models.UnitCalendarIntegration, error) {
+	if pr.CalendarIntegrationID != nil && strings.TrimSpace(*pr.CalendarIntegrationID) != "" {
+		row, err := s.repo.GetByID(strings.TrimSpace(*pr.CalendarIntegrationID))
+		if err != nil {
+			return nil, err
+		}
+		if row.UnitID != pr.UnitID {
+			return nil, fmt.Errorf("calendar integration does not belong to this unit")
+		}
+		return row, nil
+	}
+	enabled, err := s.repo.ListEnabledByUnitID(pr.UnitID)
+	if err != nil {
+		return nil, err
+	}
+	if len(enabled) == 0 {
+		return nil, nil
+	}
+	return &enabled[0], nil
+}
+
+// ResolveIntegrationForPreReg picks the calendar row for create/cancel/reschedule.
+func (s *CalendarIntegrationService) ResolveIntegrationForPreReg(unitID string, optionalIntegrationID string) (*models.UnitCalendarIntegration, error) {
+	if strings.TrimSpace(optionalIntegrationID) != "" {
+		row, err := s.repo.GetByID(strings.TrimSpace(optionalIntegrationID))
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, fmt.Errorf("calendar integration not found")
+			}
+			return nil, err
+		}
+		if row.UnitID != unitID {
+			return nil, fmt.Errorf("calendar integration does not belong to this unit")
+		}
+		return row, nil
+	}
+	enabled, err := s.repo.ListEnabledByUnitID(unitID)
+	if err != nil {
+		return nil, err
+	}
+	if len(enabled) == 0 {
+		return nil, nil
+	}
+	if len(enabled) > 1 {
+		return nil, ErrCalendarIntegrationIDRequired
+	}
+	return &enabled[0], nil
+}
+
+// UnitHasCalendarReadOnlyCapacity is true if any enabled calendar integration exists for the unit.
+func (s *CalendarIntegrationService) UnitHasCalendarReadOnlyCapacity(unitID string) (bool, error) {
+	return s.HasEnabledCalendarIntegration(unitID)
+}
+
+// HasEnabledCalendarIntegration reports whether the unit has at least one enabled calendar connection.
+func (s *CalendarIntegrationService) HasEnabledCalendarIntegration(unitID string) (bool, error) {
+	enabled, err := s.repo.ListEnabledByUnitID(unitID)
+	if err != nil {
+		return false, err
+	}
+	return len(enabled) > 0, nil
+}
+
 // CalendarIntegrationPublic is safe for API responses (no secrets).
 type CalendarIntegrationPublic struct {
+	ID                string     `json:"id"`
+	UnitID            string     `json:"unitId"`
+	UnitName          string     `json:"unitName,omitempty"`
+	Kind              string     `json:"kind"`
+	DisplayName       string     `json:"displayName,omitempty"`
 	Enabled           bool       `json:"enabled"`
 	CaldavBaseURL     string     `json:"caldavBaseUrl"`
 	CalendarPath      string     `json:"calendarPath"`
@@ -80,16 +161,17 @@ type CalendarIntegrationPublic struct {
 	ReadOnlyCapacity  bool       `json:"readOnlyCapacity"`
 }
 
-// GetPublic returns integration settings for admins.
-func (s *CalendarIntegrationService) GetPublic(unitID string) (*CalendarIntegrationPublic, error) {
-	row, err := s.repo.GetByUnitID(unitID)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return &CalendarIntegrationPublic{ReadOnlyCapacity: false}, nil
-	}
-	if err != nil {
-		return nil, err
+func (s *CalendarIntegrationService) rowToPublic(row *models.UnitCalendarIntegration, unitName string) *CalendarIntegrationPublic {
+	kind := row.Kind
+	if kind == "" {
+		kind = models.CalendarIntegrationKindYandexCalDAV
 	}
 	return &CalendarIntegrationPublic{
+		ID:                row.ID,
+		UnitID:            row.UnitID,
+		UnitName:          unitName,
+		Kind:              kind,
+		DisplayName:       row.DisplayName,
 		Enabled:           row.Enabled,
 		CaldavBaseURL:     row.CaldavBaseURL,
 		CalendarPath:      row.CalendarPath,
@@ -99,7 +181,192 @@ func (s *CalendarIntegrationService) GetPublic(unitID string) (*CalendarIntegrat
 		LastSyncAt:        row.LastSyncAt,
 		LastSyncError:     row.LastSyncError,
 		ReadOnlyCapacity:  row.Enabled,
-	}, nil
+	}
+}
+
+// GetPublic returns the first integration's public data (legacy GET /units/{id}/calendar-integration).
+func (s *CalendarIntegrationService) GetPublic(unitID string) (*CalendarIntegrationPublic, error) {
+	row, err := s.repo.GetFirstByUnitID(unitID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return &CalendarIntegrationPublic{ReadOnlyCapacity: false}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return s.rowToPublic(row, ""), nil
+}
+
+// ListPublicForCompany returns integrations for all units in the company (admin UI).
+func (s *CalendarIntegrationService) ListPublicForCompany(companyID string) ([]CalendarIntegrationPublic, error) {
+	rows, err := s.repo.ListByCompanyID(companyID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]CalendarIntegrationPublic, 0, len(rows))
+	for i := range rows {
+		row := &rows[i]
+		uname := ""
+		if u, err := s.unitRepo.FindByIDLight(row.UnitID); err == nil && u != nil {
+			uname = u.Name
+		}
+		out = append(out, *s.rowToPublic(row, uname))
+	}
+	return out, nil
+}
+
+// GetPublicByID returns one integration by id (must belong to company — caller verifies).
+func (s *CalendarIntegrationService) GetPublicByID(integrationID string) (*CalendarIntegrationPublic, error) {
+	row, err := s.repo.GetByID(integrationID)
+	if err != nil {
+		return nil, err
+	}
+	uname := ""
+	if u, err := s.unitRepo.FindByIDLight(row.UnitID); err == nil && u != nil {
+		uname = u.Name
+	}
+	return s.rowToPublic(row, uname), nil
+}
+
+// VerifyUnitBelongsToCompany ensures unit scope for company-scoped APIs.
+func (s *CalendarIntegrationService) VerifyUnitBelongsToCompany(unitID, companyID string) error {
+	u, err := s.unitRepo.FindByIDLight(unitID)
+	if err != nil {
+		return err
+	}
+	if u.CompanyID != companyID {
+		return fmt.Errorf("unit does not belong to company")
+	}
+	return nil
+}
+
+// CreateCalendarIntegrationRequest is POST /companies/me/calendar-integrations body.
+type CreateCalendarIntegrationRequest struct {
+	UnitID            string `json:"unitId"`
+	Kind              string `json:"kind"`
+	DisplayName       string `json:"displayName,omitempty"`
+	Enabled           bool   `json:"enabled"`
+	CaldavBaseURL     string `json:"caldavBaseUrl"`
+	CalendarPath      string `json:"calendarPath"`
+	Username          string `json:"username"`
+	AppPassword       string `json:"appPassword,omitempty"`
+	Timezone          string `json:"timezone"`
+	AdminNotifyEmails string `json:"adminNotifyEmails,omitempty"`
+}
+
+// CreateIntegration validates limits and creates a row.
+func (s *CalendarIntegrationService) CreateIntegration(companyID string, req *CreateCalendarIntegrationRequest) (*CalendarIntegrationPublic, error) {
+	if err := s.VerifyUnitBelongsToCompany(req.UnitID, companyID); err != nil {
+		return nil, err
+	}
+	n, err := s.repo.CountByUnitID(req.UnitID)
+	if err != nil {
+		return nil, err
+	}
+	if n >= MaxCalendarIntegrationsPerUnit {
+		return nil, ErrCalendarIntegrationLimit
+	}
+	kind := strings.TrimSpace(req.Kind)
+	if kind == "" {
+		kind = models.CalendarIntegrationKindYandexCalDAV
+	}
+	if kind != models.CalendarIntegrationKindYandexCalDAV {
+		return nil, ErrCalendarIntegrationKindUnknown
+	}
+	row := models.UnitCalendarIntegration{
+		UnitID:            req.UnitID,
+		Kind:              kind,
+		DisplayName:       strings.TrimSpace(req.DisplayName),
+		Enabled:           req.Enabled,
+		CaldavBaseURL:     req.CaldavBaseURL,
+		CalendarPath:      strings.TrimSpace(req.CalendarPath),
+		Username:          strings.TrimSpace(req.Username),
+		Timezone:          req.Timezone,
+		AdminNotifyEmails: req.AdminNotifyEmails,
+	}
+	if row.CaldavBaseURL == "" {
+		row.CaldavBaseURL = "https://caldav.yandex.ru"
+	}
+	if row.Timezone == "" {
+		row.Timezone = "Europe/Moscow"
+	}
+	if strings.TrimSpace(req.AppPassword) == "" {
+		return nil, fmt.Errorf("app password is required for new calendar integration")
+	}
+	enc, encErr := ssocrypto.EncryptAES256GCM([]byte(strings.TrimSpace(req.AppPassword)))
+	if encErr != nil {
+		return nil, encErr
+	}
+	row.AppPasswordEncrypted = enc
+	if err := s.repo.CreateIntegration(&row); err != nil {
+		return nil, err
+	}
+	return s.GetPublicByID(row.ID)
+}
+
+// UpdateCalendarIntegrationRequest is PUT body (unitId changes not allowed in MVP).
+type UpdateCalendarIntegrationRequest struct {
+	DisplayName       string `json:"displayName,omitempty"`
+	Enabled           bool   `json:"enabled"`
+	CaldavBaseURL     string `json:"caldavBaseUrl"`
+	CalendarPath      string `json:"calendarPath"`
+	Username          string `json:"username"`
+	AppPassword       string `json:"appPassword,omitempty"`
+	Timezone          string `json:"timezone"`
+	AdminNotifyEmails string `json:"adminNotifyEmails,omitempty"`
+}
+
+// UpdateIntegration updates fields for an existing integration; companyID scopes access.
+func (s *CalendarIntegrationService) UpdateIntegration(companyID, integrationID string, req *UpdateCalendarIntegrationRequest) (*CalendarIntegrationPublic, error) {
+	row, err := s.repo.GetByID(integrationID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.VerifyUnitBelongsToCompany(row.UnitID, companyID); err != nil {
+		return nil, err
+	}
+	row.DisplayName = strings.TrimSpace(req.DisplayName)
+	row.Enabled = req.Enabled
+	row.CaldavBaseURL = req.CaldavBaseURL
+	row.CalendarPath = strings.TrimSpace(req.CalendarPath)
+	row.Username = strings.TrimSpace(req.Username)
+	row.Timezone = req.Timezone
+	row.AdminNotifyEmails = req.AdminNotifyEmails
+	if row.CaldavBaseURL == "" {
+		row.CaldavBaseURL = "https://caldav.yandex.ru"
+	}
+	if row.Timezone == "" {
+		row.Timezone = "Europe/Moscow"
+	}
+	if strings.TrimSpace(req.AppPassword) != "" {
+		enc, encErr := ssocrypto.EncryptAES256GCM([]byte(strings.TrimSpace(req.AppPassword)))
+		if encErr != nil {
+			return nil, encErr
+		}
+		row.AppPasswordEncrypted = enc
+	}
+	if err := s.repo.UpdateIntegration(row); err != nil {
+		return nil, err
+	}
+	return s.GetPublicByID(integrationID)
+}
+
+// DeleteIntegration removes an integration if company matches and no active pre-regs reference it.
+func (s *CalendarIntegrationService) DeleteIntegration(companyID, integrationID string) error {
+	row, err := s.repo.GetByID(integrationID)
+	if err != nil {
+		return err
+	}
+	if err := s.VerifyUnitBelongsToCompany(row.UnitID, companyID); err != nil {
+		return err
+	}
+	n, err := s.repo.CountActivePreRegistrationsForIntegration(integrationID)
+	if err != nil {
+		return err
+	}
+	if n > 0 {
+		return fmt.Errorf("cannot delete calendar integration: %d active pre-registrations still reference it", n)
+	}
+	return s.repo.DeleteIntegration(integrationID)
 }
 
 // UpsertIntegrationRequest is the admin payload (password optional when unchanged).
@@ -113,14 +380,15 @@ type UpsertIntegrationRequest struct {
 	AdminNotifyEmails string `json:"adminNotifyEmails,omitempty"`
 }
 
-// Upsert saves integration; encrypts app password when provided.
+// Upsert saves integration for legacy PUT /units/{unitId}/calendar-integration (updates oldest row or creates).
 func (s *CalendarIntegrationService) UpsertIntegration(unitID string, req *UpsertIntegrationRequest) (*CalendarIntegrationPublic, error) {
-	existing, err := s.repo.GetByUnitID(unitID)
+	existing, err := s.repo.GetFirstByUnitID(unitID)
 	hasExisting := err == nil
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
 	row := models.UnitCalendarIntegration{
+		Kind:              models.CalendarIntegrationKindYandexCalDAV,
 		UnitID:            unitID,
 		Enabled:           req.Enabled,
 		CaldavBaseURL:     req.CaldavBaseURL,
@@ -139,6 +407,11 @@ func (s *CalendarIntegrationService) UpsertIntegration(unitID string, req *Upser
 		row.AppPasswordEncrypted = existing.AppPasswordEncrypted
 		row.ID = existing.ID
 		row.CreatedAt = existing.CreatedAt
+		row.Kind = existing.Kind
+		if row.Kind == "" {
+			row.Kind = models.CalendarIntegrationKindYandexCalDAV
+		}
+		row.DisplayName = existing.DisplayName
 	}
 	if strings.TrimSpace(req.AppPassword) != "" {
 		enc, encErr := ssocrypto.EncryptAES256GCM([]byte(strings.TrimSpace(req.AppPassword)))
@@ -149,21 +422,35 @@ func (s *CalendarIntegrationService) UpsertIntegration(unitID string, req *Upser
 	} else if !hasExisting {
 		return nil, fmt.Errorf("app password is required for new calendar integration")
 	}
-	if err := s.repo.SaveIntegration(&row); err != nil {
-		return nil, err
+	if !hasExisting {
+		n, cerr := s.repo.CountByUnitID(unitID)
+		if cerr != nil {
+			return nil, cerr
+		}
+		if n >= MaxCalendarIntegrationsPerUnit {
+			return nil, ErrCalendarIntegrationLimit
+		}
+		if err := s.repo.CreateIntegration(&row); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := s.repo.UpdateIntegration(&row); err != nil {
+			return nil, err
+		}
 	}
 	return s.GetPublic(unitID)
 }
 
-// SyncUnit pulls CalDAV events into calendar_external_slots and handles orphan detection.
-func (s *CalendarIntegrationService) SyncUnit(ctx context.Context, unitID string) error {
-	integ, err := s.repo.GetByUnitID(unitID)
+// SyncIntegration pulls CalDAV events for one integration id.
+func (s *CalendarIntegrationService) SyncIntegration(ctx context.Context, integrationID string) error {
+	integ, err := s.repo.GetByID(integrationID)
 	if errors.Is(err, gorm.ErrRecordNotFound) || !integ.Enabled {
 		return nil
 	}
 	if err != nil {
 		return err
 	}
+	unitID := integ.UnitID
 	client, err := s.clientForIntegration(integ)
 	if err != nil {
 		_ = s.markSyncError(integ.ID, err.Error())
@@ -185,7 +472,6 @@ func (s *CalendarIntegrationService) SyncUnit(ctx context.Context, unitID string
 		return err
 	}
 
-	// Include services defined on child units (zones) under the same subdivision branch.
 	svcRows, err := s.serviceRepo.FindAllByUnitSubtree(unitID)
 	if err != nil {
 		return err
@@ -269,6 +555,9 @@ func (s *CalendarIntegrationService) SyncUnit(ctx context.Context, unitID string
 		if pr.ExternalEventHref == nil || *pr.ExternalEventHref == "" {
 			continue
 		}
+		if pr.CalendarIntegrationID != nil && *pr.CalendarIntegrationID != integ.ID {
+			continue
+		}
 		href := *pr.ExternalEventHref
 		if _, ok := seen[href]; ok {
 			continue
@@ -277,7 +566,6 @@ func (s *CalendarIntegrationService) SyncUnit(ctx context.Context, unitID string
 		if gerr == nil && co != nil {
 			continue
 		}
-		// Missing from calendar
 		_ = s.raiseOrphanIncident(unitID, integ, pr, href)
 	}
 
@@ -331,37 +619,42 @@ func (s *CalendarIntegrationService) notifyAdminsOrphan(integ *models.UnitCalend
 	}
 }
 
-// ListCalendarSlots returns free slots for a service/date when integration is enabled.
+// ListCalendarSlots returns free slots merged from all enabled integrations for the unit.
 func (s *CalendarIntegrationService) ListCalendarSlots(unitID, serviceID, date string) ([]models.PreRegCalendarSlotItem, error) {
-	integ, err := s.repo.GetByUnitID(unitID)
+	enabled, err := s.repo.ListEnabledByUnitID(unitID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
 		return nil, err
 	}
-	if !integ.Enabled {
+	if len(enabled) == 0 {
 		return nil, nil
 	}
-	loc, err := time.LoadLocation(integ.Timezone)
-	if err != nil {
-		loc = time.UTC
-	}
-	rows, err := s.repo.ListExternalSlotsForServiceDate(unitID, serviceID, date, loc)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]models.PreRegCalendarSlotItem, 0, len(rows))
-	for i := range rows {
-		r := &rows[i]
-		startLocal := r.StartUTC.In(loc)
-		t := startLocal.Format("15:04")
-		etag := r.ETag
-		out = append(out, models.PreRegCalendarSlotItem{
-			Time:              t,
-			ExternalEventHref: r.Href,
-			ETag:              etag,
-		})
+	var out []models.PreRegCalendarSlotItem
+	for i := range enabled {
+		integ := &enabled[i]
+		loc, err := time.LoadLocation(integ.Timezone)
+		if err != nil {
+			loc = time.UTC
+		}
+		label := strings.TrimSpace(integ.DisplayName)
+		if label == "" {
+			label = integ.Username
+		}
+		rows, err := s.repo.ListExternalSlotsForIntegrationServiceDate(integ.ID, unitID, serviceID, date, loc)
+		if err != nil {
+			return nil, err
+		}
+		for j := range rows {
+			r := &rows[j]
+			startLocal := r.StartUTC.In(loc)
+			t := startLocal.Format("15:04")
+			out = append(out, models.PreRegCalendarSlotItem{
+				Time:                  t,
+				ExternalEventHref:     r.Href,
+				ETag:                  r.ETag,
+				CalendarIntegrationID: integ.ID,
+				IntegrationLabel:      label,
+			})
+		}
 	}
 	return out, nil
 }
@@ -405,7 +698,6 @@ func (s *CalendarIntegrationService) ValidateAndApplyBooked(ctx context.Context,
 		}
 		return "", err
 	}
-	// Re-fetch etag
 	co2, err := client.GetEvent(ctx, href)
 	if err != nil {
 		return "", err

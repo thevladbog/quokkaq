@@ -27,10 +27,9 @@ import {
   companiesMeSSOGet,
   getCompaniesMeSSOGetQueryKey
 } from '@/lib/api/generated/auth';
-import { CalendarIntegrationSettings } from '@/components/admin/units/calendar-integration-settings';
+import { CalendarIntegrationsPanel } from '@/components/admin/units/calendar-integration-settings';
 import { OrganizationTenantSlugCard } from '@/components/organization/organization-tenant-slug-card';
 import { OrganizationSsoSettingsCard } from '@/components/organization/organization-sso-settings-card';
-import PermissionGuard from '@/components/auth/permission-guard';
 
 export function IntegrationsSettingsContent() {
   const t = useTranslations('admin.integrations');
@@ -75,16 +74,20 @@ export function IntegrationsSettingsContent() {
     return [...list].sort((a, b) => a.name.localeCompare(b.name));
   }, [unitsQuery.data]);
 
-  const selectedUnitId = useMemo(() => {
-    if (unitOptions.length === 0) return '';
+  /** Optional filter: `?unit=` from URL (e.g. deep link from a unit page). */
+  const filterUnitId = useMemo(() => {
     const uq = searchParams.get('unit');
     if (uq && unitOptions.some((u) => u.id === uq)) return uq;
-    return unitOptions[0].id;
-  }, [unitOptions, searchParams]);
+    return null;
+  }, [searchParams, unitOptions]);
 
-  const setSelectedUnitId = (id: string) => {
+  const setFilterUnitId = (value: string) => {
     const q = new URLSearchParams(searchParams.toString());
-    q.set('unit', id);
+    if (value === 'all') {
+      q.delete('unit');
+    } else {
+      q.set('unit', value);
+    }
     router.replace(`${pathname}?${q.toString()}`);
   };
 
@@ -136,15 +139,20 @@ export function IntegrationsSettingsContent() {
             ) : (
               <>
                 <div className='max-w-md space-y-2'>
-                  <Label htmlFor='integration-unit'>{t('unit_label')}</Label>
+                  <Label htmlFor='integration-unit-filter'>
+                    {t('filter_unit_label')}
+                  </Label>
                   <Select
-                    value={selectedUnitId}
-                    onValueChange={setSelectedUnitId}
+                    value={filterUnitId ?? 'all'}
+                    onValueChange={setFilterUnitId}
                   >
-                    <SelectTrigger id='integration-unit'>
-                      <SelectValue placeholder={t('unit_placeholder')} />
+                    <SelectTrigger id='integration-unit-filter'>
+                      <SelectValue placeholder={t('filter_unit_placeholder')} />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value='all'>
+                        {t('filter_all_units')}
+                      </SelectItem>
                       {unitOptions.map((u) => (
                         <SelectItem key={u.id} value={u.id}>
                           {u.name}
@@ -152,22 +160,17 @@ export function IntegrationsSettingsContent() {
                       ))}
                     </SelectContent>
                   </Select>
+                  <p className='text-muted-foreground text-xs'>
+                    {t('filter_unit_hint')}
+                  </p>
                 </div>
-                {selectedUnitId ? (
-                  <PermissionGuard
-                    permissions={['UNIT_SETTINGS_MANAGE']}
-                    unitId={selectedUnitId}
-                    fallback={
-                      <Alert>
-                        <AlertDescription>
-                          {t('calendar_no_access')}
-                        </AlertDescription>
-                      </Alert>
-                    }
-                  >
-                    <CalendarIntegrationSettings unitId={selectedUnitId} />
-                  </PermissionGuard>
-                ) : null}
+                <CalendarIntegrationsPanel
+                  filterUnitId={filterUnitId}
+                  unitOptions={unitOptions.map((u) => ({
+                    id: u.id,
+                    name: u.name
+                  }))}
+                />
               </>
             )}
           </CardContent>

@@ -1147,9 +1147,13 @@ components:
       type: object
     models.PreRegCalendarSlotItem:
       properties:
+        calendarIntegrationId:
+          type: string
         eTag:
           type: string
         externalEventHref:
+          type: string
+        integrationLabel:
           type: string
         time:
           type: string
@@ -1207,6 +1211,9 @@ components:
       type: object
     models.PreRegistrationCreateRequest:
       properties:
+        calendarIntegrationId:
+          description: CalendarIntegrationID identifies which calendar connection to use when the unit has multiple.
+          type: string
         comment:
           type: string
         customerFirstName:
@@ -1238,6 +1245,8 @@ components:
       type: object
     models.PreRegistrationUpdateRequest:
       properties:
+        calendarIntegrationId:
+          type: string
         comment:
           type: string
         customerFirstName:
@@ -1818,8 +1827,14 @@ components:
           type: string
         calendarPath:
           type: string
+        displayName:
+          type: string
         enabled:
           type: boolean
+        id:
+          type: string
+        kind:
+          type: string
         lastSyncAt:
           type: string
         lastSyncError:
@@ -1827,6 +1842,10 @@ components:
         readOnlyCapacity:
           type: boolean
         timezone:
+          type: string
+        unitId:
+          type: string
+        unitName:
           type: string
         username:
           type: string
@@ -1880,6 +1899,29 @@ components:
           enum:
           - oidc
           - saml
+      type: object
+    services.CreateCalendarIntegrationRequest:
+      properties:
+        adminNotifyEmails:
+          type: string
+        appPassword:
+          type: string
+        caldavBaseUrl:
+          type: string
+        calendarPath:
+          type: string
+        displayName:
+          type: string
+        enabled:
+          type: boolean
+        kind:
+          type: string
+        timezone:
+          type: string
+        unitId:
+          type: string
+        username:
+          type: string
       type: object
     services.EmployeeRadarResponse:
       properties:
@@ -2229,6 +2271,25 @@ components:
             $ref: '#/components/schemas/models.UnitClient'
           type: array
         nextCursor:
+          type: string
+      type: object
+    services.UpdateCalendarIntegrationRequest:
+      properties:
+        adminNotifyEmails:
+          type: string
+        appPassword:
+          type: string
+        caldavBaseUrl:
+          type: string
+        calendarPath:
+          type: string
+        displayName:
+          type: string
+        enabled:
+          type: boolean
+        timezone:
+          type: string
+        username:
           type: string
       type: object
     services.UpsertIntegrationRequest:
@@ -3330,6 +3391,88 @@ paths:
       summary: Update current user's company (tenant admin)
       tags:
       - companies
+  /companies/me/calendar-integrations:
+    get:
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/services.CalendarIntegrationPublic'
+                type: array
+          description: OK
+      security:
+      - BearerAuth: []
+      summary: List calendar integrations for current company
+      tags:
+      - calendar-integration
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/services.CreateCalendarIntegrationRequest'
+        description: Payload
+        required: true
+        x-originalParamName: body
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/services.CalendarIntegrationPublic'
+          description: OK
+      security:
+      - BearerAuth: []
+      summary: Create a calendar integration for a unit in the company
+      tags:
+      - calendar-integration
+  /companies/me/calendar-integrations/{integrationId}:
+    delete:
+      parameters:
+      - description: Integration ID
+        in: path
+        name: integrationId
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: No Content
+      security:
+      - BearerAuth: []
+      summary: Delete a calendar integration
+      tags:
+      - calendar-integration
+    put:
+      parameters:
+      - description: Integration ID
+        in: path
+        name: integrationId
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/services.UpdateCalendarIntegrationRequest'
+        description: Payload
+        required: true
+        x-originalParamName: body
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/services.CalendarIntegrationPublic'
+          description: OK
+      security:
+      - BearerAuth: []
+      summary: Update a calendar integration
+      tags:
+      - calendar-integration
   /companies/me/complete-onboarding:
     post:
       description: Marks onboarding as complete for the user's company
@@ -6528,7 +6671,7 @@ paths:
           description: OK
       security:
       - BearerAuth: []
-      summary: Get calendar integration settings for a unit
+      summary: 'Get calendar integration settings for a unit (legacy: first integration)'
       tags:
       - calendar-integration
     put:
@@ -6556,7 +6699,7 @@ paths:
           description: OK
       security:
       - BearerAuth: []
-      summary: Create or update calendar integration for a unit
+      summary: Create or update calendar integration for a unit (legacy)
       tags:
       - calendar-integration
   /units/{unitId}/call-next:

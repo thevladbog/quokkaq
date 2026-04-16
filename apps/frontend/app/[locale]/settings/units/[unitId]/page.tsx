@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useState } from 'react';
+import { use, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
@@ -16,6 +16,7 @@ import {
   CardTitle
 } from '@/components/ui/card';
 import { Combobox } from '@/components/ui/combobox';
+import { buildIanaTimezoneComboboxOptions } from '@/lib/iana-timezone-combobox-options';
 import { getGetUnitsIdQueryKey } from '@/lib/api/generated/units';
 import { unitsApi } from '@/lib/api';
 import { useUpdateUnit } from '@/lib/hooks';
@@ -68,6 +69,11 @@ export default function UnitPage({ params }: UnitPageProps) {
   }
 
   const updateUnitMutation = useUpdateUnit();
+
+  const timezoneOptions = useMemo(
+    () => buildIanaTimezoneComboboxOptions(unitTimezone),
+    [unitTimezone]
+  );
 
   const handleSaveGeneral = () => {
     updateUnitMutation.mutate(
@@ -504,10 +510,7 @@ export default function UnitPage({ params }: UnitPageProps) {
                 <div className='space-y-2'>
                   <Label htmlFor='timezone'>{t('units.timezone')}</Label>
                   <Combobox
-                    options={Intl.supportedValuesOf('timeZone').map((tz) => ({
-                      value: tz,
-                      label: tz
-                    }))}
+                    options={timezoneOptions}
                     value={unitTimezone}
                     onChange={setUnitTimezone}
                     placeholder={t('units.select_timezone', {

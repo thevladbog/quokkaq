@@ -20,12 +20,24 @@ type recordingPreRegCalendar struct {
 	lastETag     string
 }
 
-func (r *recordingPreRegCalendar) GetIntegration(unitID string) (*models.UnitCalendarIntegration, error) {
+func (r *recordingPreRegCalendar) ResolveIntegrationForPreReg(unitID, _ string) (*models.UnitCalendarIntegration, error) {
 	return &models.UnitCalendarIntegration{
 		ID:      "ci-test",
 		UnitID:  unitID,
 		Enabled: true,
 	}, nil
+}
+
+func (r *recordingPreRegCalendar) ResolveIntegrationForRelease(pr *models.PreRegistration) (*models.UnitCalendarIntegration, error) {
+	return &models.UnitCalendarIntegration{
+		ID:      "ci-test",
+		UnitID:  pr.UnitID,
+		Enabled: true,
+	}, nil
+}
+
+func (r *recordingPreRegCalendar) HasEnabledCalendarIntegration(_ string) (bool, error) {
+	return true, nil
 }
 
 func (r *recordingPreRegCalendar) ReleaseFreeSlot(_ context.Context, _ *models.UnitCalendarIntegration, _ *models.Service, href, etag string) error {

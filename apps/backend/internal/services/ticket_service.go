@@ -436,7 +436,7 @@ func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID 
 	}
 
 	if s.calendar != nil && preReg != nil && preReg.ExternalEventHref != nil && *preReg.ExternalEventHref != "" {
-		integ, err := s.calendar.GetIntegration(unitID)
+		integ, err := s.calendar.ResolveIntegrationForRelease(preReg)
 		if err == nil && integ != nil && integ.Enabled {
 			svc, err := s.serviceRepo.FindByID(serviceID)
 			if err == nil {

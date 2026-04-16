@@ -1094,8 +1094,10 @@ export interface ModelsMessageTemplate {
 }
 
 export interface ModelsPreRegCalendarSlotItem {
+  calendarIntegrationId?: string;
   eTag?: string;
   externalEventHref?: string;
+  integrationLabel?: string;
   time?: string;
 }
 
@@ -1104,6 +1106,8 @@ export interface ModelsPreRegistrationCodeRequest {
 }
 
 export interface ModelsPreRegistrationCreateRequest {
+  /** CalendarIntegrationID identifies which calendar connection to use when the unit has multiple. */
+  calendarIntegrationId?: string;
   comment?: string;
   customerFirstName?: string;
   customerLastName?: string;
@@ -1123,6 +1127,7 @@ export interface ModelsPreRegistrationRedeemResponse {
 }
 
 export interface ModelsPreRegistrationUpdateRequest {
+  calendarIntegrationId?: string;
   comment?: string;
   customerFirstName?: string;
   customerLastName?: string;
@@ -1219,11 +1224,16 @@ export interface ServicesCalendarIntegrationPublic {
   adminNotifyEmails?: string;
   caldavBaseUrl?: string;
   calendarPath?: string;
+  displayName?: string;
   enabled?: boolean;
+  id?: string;
+  kind?: string;
   lastSyncAt?: string;
   lastSyncError?: string;
   readOnlyCapacity?: boolean;
   timezone?: string;
+  unitId?: string;
+  unitName?: string;
   username?: string;
 }
 
@@ -1268,6 +1278,19 @@ export interface ServicesCompanySSOPatch {
   scopes?: string;
   /** "oidc" | "saml" */
   ssoProtocol?: ServicesCompanySSOPatchSsoProtocol;
+}
+
+export interface ServicesCreateCalendarIntegrationRequest {
+  adminNotifyEmails?: string;
+  appPassword?: string;
+  caldavBaseUrl?: string;
+  calendarPath?: string;
+  displayName?: string;
+  enabled?: boolean;
+  kind?: string;
+  timezone?: string;
+  unitId?: string;
+  username?: string;
 }
 
 export interface ServicesEmployeeRadarResponse {
@@ -1504,6 +1527,17 @@ export interface ServicesUnitClientListResponse {
   nextCursor?: string;
 }
 
+export interface ServicesUpdateCalendarIntegrationRequest {
+  adminNotifyEmails?: string;
+  appPassword?: string;
+  caldavBaseUrl?: string;
+  calendarPath?: string;
+  displayName?: string;
+  enabled?: boolean;
+  timezone?: string;
+  username?: string;
+}
+
 export interface ServicesUpsertIntegrationRequest {
   adminNotifyEmails?: string;
   appPassword?: string;
@@ -1539,7 +1573,369 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
 /**
- * @summary Get calendar integration settings for a unit
+ * @summary List calendar integrations for current company
+ */
+export type getCompaniesMeCalendarIntegrationsResponse200 = {
+  data: ServicesCalendarIntegrationPublic[]
+  status: 200
+}
+
+export type getCompaniesMeCalendarIntegrationsResponseSuccess = (getCompaniesMeCalendarIntegrationsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getCompaniesMeCalendarIntegrationsResponse = (getCompaniesMeCalendarIntegrationsResponseSuccess)
+
+export const getGetCompaniesMeCalendarIntegrationsUrl = () => {
+
+
+
+
+  return `/companies/me/calendar-integrations`
+}
+
+export const getCompaniesMeCalendarIntegrations = async ( options?: RequestInit): Promise<getCompaniesMeCalendarIntegrationsResponse> => {
+
+  return orvalMutator<getCompaniesMeCalendarIntegrationsResponse>(getGetCompaniesMeCalendarIntegrationsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCompaniesMeCalendarIntegrationsQueryKey = () => {
+    return [
+    `/companies/me/calendar-integrations`
+    ] as const;
+    }
+
+
+export const getGetCompaniesMeCalendarIntegrationsQueryOptions = <TData = Awaited<ReturnType<typeof getCompaniesMeCalendarIntegrations>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeCalendarIntegrations>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCompaniesMeCalendarIntegrationsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCompaniesMeCalendarIntegrations>>> = ({ signal }) => getCompaniesMeCalendarIntegrations({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeCalendarIntegrations>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetCompaniesMeCalendarIntegrationsQueryResult = NonNullable<Awaited<ReturnType<typeof getCompaniesMeCalendarIntegrations>>>
+export type GetCompaniesMeCalendarIntegrationsQueryError = unknown
+
+
+export function useGetCompaniesMeCalendarIntegrations<TData = Awaited<ReturnType<typeof getCompaniesMeCalendarIntegrations>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeCalendarIntegrations>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCompaniesMeCalendarIntegrations>>,
+          TError,
+          Awaited<ReturnType<typeof getCompaniesMeCalendarIntegrations>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCompaniesMeCalendarIntegrations<TData = Awaited<ReturnType<typeof getCompaniesMeCalendarIntegrations>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeCalendarIntegrations>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCompaniesMeCalendarIntegrations>>,
+          TError,
+          Awaited<ReturnType<typeof getCompaniesMeCalendarIntegrations>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCompaniesMeCalendarIntegrations<TData = Awaited<ReturnType<typeof getCompaniesMeCalendarIntegrations>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeCalendarIntegrations>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List calendar integrations for current company
+ */
+
+export function useGetCompaniesMeCalendarIntegrations<TData = Awaited<ReturnType<typeof getCompaniesMeCalendarIntegrations>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeCalendarIntegrations>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetCompaniesMeCalendarIntegrationsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * @summary Create a calendar integration for a unit in the company
+ */
+export type postCompaniesMeCalendarIntegrationsResponse200 = {
+  data: ServicesCalendarIntegrationPublic
+  status: 200
+}
+
+export type postCompaniesMeCalendarIntegrationsResponseSuccess = (postCompaniesMeCalendarIntegrationsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type postCompaniesMeCalendarIntegrationsResponse = (postCompaniesMeCalendarIntegrationsResponseSuccess)
+
+export const getPostCompaniesMeCalendarIntegrationsUrl = () => {
+
+
+
+
+  return `/companies/me/calendar-integrations`
+}
+
+export const postCompaniesMeCalendarIntegrations = async (servicesCreateCalendarIntegrationRequest: ServicesCreateCalendarIntegrationRequest, options?: RequestInit): Promise<postCompaniesMeCalendarIntegrationsResponse> => {
+
+  return orvalMutator<postCompaniesMeCalendarIntegrationsResponse>(getPostCompaniesMeCalendarIntegrationsUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      servicesCreateCalendarIntegrationRequest,)
+  }
+);}
+
+
+
+
+export const getPostCompaniesMeCalendarIntegrationsMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postCompaniesMeCalendarIntegrations>>, TError,{data: ServicesCreateCalendarIntegrationRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof postCompaniesMeCalendarIntegrations>>, TError,{data: ServicesCreateCalendarIntegrationRequest}, TContext> => {
+
+const mutationKey = ['postCompaniesMeCalendarIntegrations'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postCompaniesMeCalendarIntegrations>>, {data: ServicesCreateCalendarIntegrationRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  postCompaniesMeCalendarIntegrations(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostCompaniesMeCalendarIntegrationsMutationResult = NonNullable<Awaited<ReturnType<typeof postCompaniesMeCalendarIntegrations>>>
+    export type PostCompaniesMeCalendarIntegrationsMutationBody = ServicesCreateCalendarIntegrationRequest
+    export type PostCompaniesMeCalendarIntegrationsMutationError = unknown
+
+    /**
+ * @summary Create a calendar integration for a unit in the company
+ */
+export const usePostCompaniesMeCalendarIntegrations = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postCompaniesMeCalendarIntegrations>>, TError,{data: ServicesCreateCalendarIntegrationRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postCompaniesMeCalendarIntegrations>>,
+        TError,
+        {data: ServicesCreateCalendarIntegrationRequest},
+        TContext
+      > => {
+      return useMutation(getPostCompaniesMeCalendarIntegrationsMutationOptions(options), queryClient);
+    }
+
+/**
+ * @summary Delete a calendar integration
+ */
+export type deleteCompaniesMeCalendarIntegrationsIntegrationIdResponse204 = {
+  data: void
+  status: 204
+}
+
+export type deleteCompaniesMeCalendarIntegrationsIntegrationIdResponseSuccess = (deleteCompaniesMeCalendarIntegrationsIntegrationIdResponse204) & {
+  headers: Headers;
+};
+;
+
+export type deleteCompaniesMeCalendarIntegrationsIntegrationIdResponse = (deleteCompaniesMeCalendarIntegrationsIntegrationIdResponseSuccess)
+
+export const getDeleteCompaniesMeCalendarIntegrationsIntegrationIdUrl = (integrationId: string,) => {
+
+
+
+
+  return `/companies/me/calendar-integrations/${integrationId}`
+}
+
+export const deleteCompaniesMeCalendarIntegrationsIntegrationId = async (integrationId: string, options?: RequestInit): Promise<deleteCompaniesMeCalendarIntegrationsIntegrationIdResponse> => {
+
+  return orvalMutator<deleteCompaniesMeCalendarIntegrationsIntegrationIdResponse>(getDeleteCompaniesMeCalendarIntegrationsIntegrationIdUrl(integrationId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteCompaniesMeCalendarIntegrationsIntegrationIdMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCompaniesMeCalendarIntegrationsIntegrationId>>, TError,{integrationId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteCompaniesMeCalendarIntegrationsIntegrationId>>, TError,{integrationId: string}, TContext> => {
+
+const mutationKey = ['deleteCompaniesMeCalendarIntegrationsIntegrationId'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteCompaniesMeCalendarIntegrationsIntegrationId>>, {integrationId: string}> = (props) => {
+          const {integrationId} = props ?? {};
+
+          return  deleteCompaniesMeCalendarIntegrationsIntegrationId(integrationId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteCompaniesMeCalendarIntegrationsIntegrationIdMutationResult = NonNullable<Awaited<ReturnType<typeof deleteCompaniesMeCalendarIntegrationsIntegrationId>>>
+
+    export type DeleteCompaniesMeCalendarIntegrationsIntegrationIdMutationError = unknown
+
+    /**
+ * @summary Delete a calendar integration
+ */
+export const useDeleteCompaniesMeCalendarIntegrationsIntegrationId = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCompaniesMeCalendarIntegrationsIntegrationId>>, TError,{integrationId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteCompaniesMeCalendarIntegrationsIntegrationId>>,
+        TError,
+        {integrationId: string},
+        TContext
+      > => {
+      return useMutation(getDeleteCompaniesMeCalendarIntegrationsIntegrationIdMutationOptions(options), queryClient);
+    }
+
+/**
+ * @summary Update a calendar integration
+ */
+export type putCompaniesMeCalendarIntegrationsIntegrationIdResponse200 = {
+  data: ServicesCalendarIntegrationPublic
+  status: 200
+}
+
+export type putCompaniesMeCalendarIntegrationsIntegrationIdResponseSuccess = (putCompaniesMeCalendarIntegrationsIntegrationIdResponse200) & {
+  headers: Headers;
+};
+;
+
+export type putCompaniesMeCalendarIntegrationsIntegrationIdResponse = (putCompaniesMeCalendarIntegrationsIntegrationIdResponseSuccess)
+
+export const getPutCompaniesMeCalendarIntegrationsIntegrationIdUrl = (integrationId: string,) => {
+
+
+
+
+  return `/companies/me/calendar-integrations/${integrationId}`
+}
+
+export const putCompaniesMeCalendarIntegrationsIntegrationId = async (integrationId: string,
+    servicesUpdateCalendarIntegrationRequest: ServicesUpdateCalendarIntegrationRequest, options?: RequestInit): Promise<putCompaniesMeCalendarIntegrationsIntegrationIdResponse> => {
+
+  return orvalMutator<putCompaniesMeCalendarIntegrationsIntegrationIdResponse>(getPutCompaniesMeCalendarIntegrationsIntegrationIdUrl(integrationId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      servicesUpdateCalendarIntegrationRequest,)
+  }
+);}
+
+
+
+
+export const getPutCompaniesMeCalendarIntegrationsIntegrationIdMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putCompaniesMeCalendarIntegrationsIntegrationId>>, TError,{integrationId: string;data: ServicesUpdateCalendarIntegrationRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof putCompaniesMeCalendarIntegrationsIntegrationId>>, TError,{integrationId: string;data: ServicesUpdateCalendarIntegrationRequest}, TContext> => {
+
+const mutationKey = ['putCompaniesMeCalendarIntegrationsIntegrationId'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putCompaniesMeCalendarIntegrationsIntegrationId>>, {integrationId: string;data: ServicesUpdateCalendarIntegrationRequest}> = (props) => {
+          const {integrationId,data} = props ?? {};
+
+          return  putCompaniesMeCalendarIntegrationsIntegrationId(integrationId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PutCompaniesMeCalendarIntegrationsIntegrationIdMutationResult = NonNullable<Awaited<ReturnType<typeof putCompaniesMeCalendarIntegrationsIntegrationId>>>
+    export type PutCompaniesMeCalendarIntegrationsIntegrationIdMutationBody = ServicesUpdateCalendarIntegrationRequest
+    export type PutCompaniesMeCalendarIntegrationsIntegrationIdMutationError = unknown
+
+    /**
+ * @summary Update a calendar integration
+ */
+export const usePutCompaniesMeCalendarIntegrationsIntegrationId = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putCompaniesMeCalendarIntegrationsIntegrationId>>, TError,{integrationId: string;data: ServicesUpdateCalendarIntegrationRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof putCompaniesMeCalendarIntegrationsIntegrationId>>,
+        TError,
+        {integrationId: string;data: ServicesUpdateCalendarIntegrationRequest},
+        TContext
+      > => {
+      return useMutation(getPutCompaniesMeCalendarIntegrationsIntegrationIdMutationOptions(options), queryClient);
+    }
+
+/**
+ * @summary Get calendar integration settings for a unit (legacy: first integration)
  */
 export type getUnitsUnitIdCalendarIntegrationResponse200 = {
   data: ServicesCalendarIntegrationPublic
@@ -1630,7 +2026,7 @@ export function useGetUnitsUnitIdCalendarIntegration<TData = Awaited<ReturnType<
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Get calendar integration settings for a unit
+ * @summary Get calendar integration settings for a unit (legacy: first integration)
  */
 
 export function useGetUnitsUnitIdCalendarIntegration<TData = Awaited<ReturnType<typeof getUnitsUnitIdCalendarIntegration>>, TError = unknown>(
@@ -1652,7 +2048,7 @@ export function useGetUnitsUnitIdCalendarIntegration<TData = Awaited<ReturnType<
 
 
 /**
- * @summary Create or update calendar integration for a unit
+ * @summary Create or update calendar integration for a unit (legacy)
  */
 export type putUnitsUnitIdCalendarIntegrationResponse200 = {
   data: ServicesCalendarIntegrationPublic
@@ -1722,7 +2118,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PutUnitsUnitIdCalendarIntegrationMutationError = unknown
 
     /**
- * @summary Create or update calendar integration for a unit
+ * @summary Create or update calendar integration for a unit (legacy)
  */
 export const usePutUnitsUnitIdCalendarIntegration = <TError = unknown,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putUnitsUnitIdCalendarIntegration>>, TError,{unitId: string;data: ServicesUpsertIntegrationRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}

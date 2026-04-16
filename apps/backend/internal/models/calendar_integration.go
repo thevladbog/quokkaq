@@ -2,11 +2,16 @@ package models
 
 import "time"
 
-// UnitCalendarIntegration stores Yandex (CalDAV) credentials and calendar path for a unit.
-// App password is stored encrypted (same AES-GCM as SSO secrets).
+// CalendarIntegrationKind identifies the provider implementation (extensible).
+const CalendarIntegrationKindYandexCalDAV = "yandex_caldav"
+
+// UnitCalendarIntegration stores CalDAV credentials and calendar path per unit.
+// Multiple rows per unit_id are allowed (max enforced in service). App password is encrypted (AES-GCM, same as SSO).
 type UnitCalendarIntegration struct {
 	ID                   string     `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
-	UnitID               string     `gorm:"not null;uniqueIndex" json:"unitId"`
+	UnitID               string     `gorm:"not null;index:idx_unit_calendar_integrations_unit_id" json:"unitId"`
+	Kind                 string     `gorm:"not null;default:'yandex_caldav'" json:"kind"`
+	DisplayName          string     `gorm:"not null;default:''" json:"displayName,omitempty"`
 	Enabled              bool       `gorm:"default:false" json:"enabled"`
 	CaldavBaseURL        string     `gorm:"not null;default:'https://caldav.yandex.ru'" json:"caldavBaseUrl"`
 	CalendarPath         string     `gorm:"not null" json:"calendarPath"` // e.g. /calendars/xxx@yandex.ru/events-xxx/

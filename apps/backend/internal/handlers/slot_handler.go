@@ -22,12 +22,12 @@ func (h *SlotHandler) rejectIfCalendarReadOnly(w http.ResponseWriter, unitID str
 	if h.calendar == nil {
 		return false
 	}
-	pub, err := h.calendar.GetPublic(unitID)
+	ro, err := h.calendar.UnitHasCalendarReadOnlyCapacity(unitID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return true
 	}
-	if pub.ReadOnlyCapacity {
+	if ro {
 		http.Error(w, "slot capacity is managed by calendar integration", http.StatusConflict)
 		return true
 	}

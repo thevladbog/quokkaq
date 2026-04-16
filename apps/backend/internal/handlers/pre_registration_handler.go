@@ -104,7 +104,7 @@ func (h *PreRegistrationHandler) Create(w http.ResponseWriter, r *http.Request) 
 		Comment:           req.Comment,
 	}
 
-	if err := h.service.Create(r.Context(), &preReg, req.ExternalEventHref, req.ExternalEventEtag); err != nil {
+	if err := h.service.Create(r.Context(), &preReg, req.ExternalEventHref, req.ExternalEventEtag, req.CalendarIntegrationID); err != nil {
 		if errors.Is(err, services.ErrCalendarSlotTaken) || errors.Is(err, services.ErrCalendarSlotNotFree) {
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
