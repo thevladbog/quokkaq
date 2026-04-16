@@ -531,14 +531,17 @@ def apply_openapi_tweaks(doc: dict[str, Any]) -> None:
     if isinstance(cfg, dict):
         cfg["required"] = ["kiosk"]
 
-    # Calendar integration bodies: bool `enabled` cannot use binding:"required" (false is zero),
-    # but OpenAPI should still list it so clients send explicit true/false.
-    create_cal = _schema(comp, "services.CreateCalendarIntegrationRequest")
-    _merge_schema_required(create_cal, ["enabled"])
-    update_cal = _schema(comp, "services.UpdateCalendarIntegrationRequest")
-    _merge_schema_required(update_cal, ["enabled"])
-    upsert_cal = _schema(comp, "services.UpsertIntegrationRequest")
-    _merge_schema_required(upsert_cal, ["enabled"])
+    # Calendar integration bodies: document `enabled` as required when the property exists in
+    # swag output; fail fast if kin/swag drops the field (schema drift).
+    _merge_schema_required_if_prop_present(
+        comp, "services.CreateCalendarIntegrationRequest", "enabled"
+    )
+    _merge_schema_required_if_prop_present(
+        comp, "services.UpdateCalendarIntegrationRequest", "enabled"
+    )
+    _merge_schema_required_if_prop_present(
+        comp, "services.UpsertIntegrationRequest", "enabled"
+    )
 
 
 def _patch_create_ticket_request(components: dict[str, Any]) -> None:

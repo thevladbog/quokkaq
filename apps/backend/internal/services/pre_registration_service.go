@@ -19,12 +19,13 @@ import (
 
 // Pre-registration validation errors returned to HTTP layer (kiosk validate / redeem).
 var (
-	ErrPreRegistrationNotFound          = errors.New("pre-registration not found")
-	ErrPreRegistrationConsumed          = errors.New("pre-registration already used or canceled")
-	ErrPreRegistrationTooEarly          = errors.New("too early to redeem ticket")
-	ErrPreRegistrationTooLate           = errors.New("too late to redeem ticket")
-	ErrPreRegistrationCannotCancel      = errors.New("pre-registration cannot be canceled in current status")
-	ErrPreRegistrationCanceledImmutable = errors.New("canceled pre-registration cannot be updated")
+	ErrPreRegistrationNotFound                      = errors.New("pre-registration not found")
+	ErrPreRegistrationConsumed                      = errors.New("pre-registration already used or canceled")
+	ErrPreRegistrationTooEarly                      = errors.New("too early to redeem ticket")
+	ErrPreRegistrationTooLate                       = errors.New("too late to redeem ticket")
+	ErrPreRegistrationCannotCancel                  = errors.New("pre-registration cannot be canceled in current status")
+	ErrPreRegistrationCanceledImmutable             = errors.New("canceled pre-registration cannot be updated")
+	ErrPreRegistrationScheduleImmutableWhenConsumed = errors.New("service, date, and time cannot be changed after the pre-registration is completed or a ticket was issued")
 	// ErrPreRegistrationCancelPersistAfterCalendarRelease is returned when ReleaseFreeSlot succeeded but persisting the canceled row failed.
 	// The calendar may already show the slot as free while the DB still references the old external event — ops should reconcile.
 	ErrPreRegistrationCancelPersistAfterCalendarRelease = errors.New("pre-registration cancel could not be persisted after the calendar slot was released")
@@ -175,6 +176,11 @@ func (s *PreRegistrationService) Update(ctx context.Context, previous *models.Pr
 			return err
 		}
 		return nil
+	}
+
+	if (previous.Status == "ticket_issued" || previous.Status == "completed") &&
+		(previous.ServiceID != next.ServiceID || previous.Date != next.Date || previous.Time != next.Time) {
+		return ErrPreRegistrationScheduleImmutableWhenConsumed
 	}
 
 	slotChanged := previous.Date != next.Date || previous.Time != next.Time || previous.ServiceID != next.ServiceID

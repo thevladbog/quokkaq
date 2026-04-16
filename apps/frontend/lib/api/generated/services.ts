@@ -105,7 +105,8 @@ export interface ModelsUnitOperationsPublic {
 
 export interface ModelsService {
   backgroundColor?: string;
-  /** CalendarSlotKey optional unique label segment in [QQ] SUMMARY when names collide (calendar integration). */
+  /** CalendarSlotKey optional label segment in [QQ] SUMMARY when names collide (calendar integration).
+  When non-empty (after trim), it must be unique per unit — enforced by DB partial unique index and create/update validation. */
   calendarSlotKey?: string;
   children?: ModelsService[];
   description?: string;
@@ -1095,7 +1096,7 @@ export interface ModelsMessageTemplate {
 
 export interface ModelsPreRegCalendarSlotItem {
   calendarIntegrationId?: string;
-  eTag?: string;
+  externalEventEtag?: string;
   externalEventHref?: string;
   integrationLabel?: string;
   time?: string;
@@ -1126,6 +1127,16 @@ export interface ModelsPreRegistrationRedeemResponse {
   ticket?: ModelsTicket;
 }
 
+/**
+ * Status optional; only "canceled" is accepted to cancel an active pre-registration.
+ */
+export type ModelsPreRegistrationUpdateRequestStatus = typeof ModelsPreRegistrationUpdateRequestStatus[keyof typeof ModelsPreRegistrationUpdateRequestStatus];
+
+
+export const ModelsPreRegistrationUpdateRequestStatus = {
+  canceled: 'canceled',
+} as const;
+
 export interface ModelsPreRegistrationUpdateRequest {
   calendarIntegrationId?: string;
   comment?: string;
@@ -1138,7 +1149,7 @@ export interface ModelsPreRegistrationUpdateRequest {
   externalEventHref?: string;
   serviceId?: string;
   /** Status optional; only "canceled" is accepted to cancel an active pre-registration. */
-  status?: string;
+  status?: ModelsPreRegistrationUpdateRequestStatus;
   time?: string;
 }
 
@@ -1282,15 +1293,15 @@ export interface ServicesCompanySSOPatch {
 
 export interface ServicesCreateCalendarIntegrationRequest {
   adminNotifyEmails?: string;
-  appPassword?: string;
+  appPassword: string;
   caldavBaseUrl?: string;
-  calendarPath?: string;
+  calendarPath: string;
   displayName?: string;
   enabled?: boolean;
   kind?: string;
   timezone?: string;
-  unitId?: string;
-  username?: string;
+  unitId: string;
+  username: string;
 }
 
 export interface ServicesEmployeeRadarResponse {
@@ -1531,21 +1542,21 @@ export interface ServicesUpdateCalendarIntegrationRequest {
   adminNotifyEmails?: string;
   appPassword?: string;
   caldavBaseUrl?: string;
-  calendarPath?: string;
+  calendarPath: string;
   displayName?: string;
   enabled?: boolean;
   timezone?: string;
-  username?: string;
+  username: string;
 }
 
 export interface ServicesUpsertIntegrationRequest {
   adminNotifyEmails?: string;
   appPassword?: string;
   caldavBaseUrl?: string;
-  calendarPath?: string;
+  calendarPath: string;
   enabled?: boolean;
   timezone?: string;
-  username?: string;
+  username: string;
 }
 
 export interface ServicesUtilizationPoint {
@@ -1596,6 +1607,11 @@ export type postServicesResponse403 = {
   status: 403
 }
 
+export type postServicesResponse409 = {
+  data: string
+  status: 409
+}
+
 export type postServicesResponse500 = {
   data: string
   status: 500
@@ -1604,7 +1620,7 @@ export type postServicesResponse500 = {
 export type postServicesResponseSuccess = (postServicesResponse201) & {
   headers: Headers;
 };
-export type postServicesResponseError = (postServicesResponse400 | postServicesResponse401 | postServicesResponse403 | postServicesResponse500) & {
+export type postServicesResponseError = (postServicesResponse400 | postServicesResponse401 | postServicesResponse403 | postServicesResponse409 | postServicesResponse500) & {
   headers: Headers;
 };
 

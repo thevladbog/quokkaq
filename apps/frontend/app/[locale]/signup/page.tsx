@@ -24,54 +24,7 @@ import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
 import { authAccessibleCompanies } from '@/lib/api/generated/auth';
-
-const SLUG_PART = /^[a-z0-9]+(-[a-z0-9]+)*$/;
-const RESERVED = new Set([
-  'www',
-  'api',
-  'admin',
-  'login',
-  'auth',
-  'static',
-  'health',
-  'swagger',
-  'docs',
-  'ws',
-  'system',
-  'en',
-  'ru',
-  't'
-]);
-
-function normalizeTenantSlug(raw: string): string {
-  const s = raw.toLowerCase().trim();
-  let b = '';
-  let prevDash = false;
-  for (const ch of s) {
-    const code = ch.charCodeAt(0);
-    if ((code >= 97 && code <= 122) || (code >= 48 && code <= 57)) {
-      b += ch;
-      prevDash = false;
-    } else if (ch === ' ' || ch === '-' || ch === '_') {
-      if (b.length > 0 && !prevDash) {
-        b += '-';
-        prevDash = true;
-      }
-    }
-  }
-  let out = b.replace(/^-+|-+$/g, '');
-  while (out.includes('--')) {
-    out = out.replaceAll('--', '-');
-  }
-  return out;
-}
-
-function validateTenantSlug(s: string): boolean {
-  if (s.length < 3 || s.length > 63) return false;
-  if (!SLUG_PART.test(s)) return false;
-  if (RESERVED.has(s)) return false;
-  return true;
-}
+import { isValidTenantSlug, normalizeTenantSlug } from '@quokkaq/shared-types';
 
 export default function SignupPage() {
   const t = useTranslations('signup');
@@ -109,7 +62,7 @@ export default function SignupPage() {
     let companySlug: string | undefined;
     if (slugTrim !== '') {
       const norm = normalizeTenantSlug(slugTrim);
-      if (!validateTenantSlug(norm)) {
+      if (!isValidTenantSlug(norm)) {
         toast.error(t('companySlugInvalid'));
         return;
       }

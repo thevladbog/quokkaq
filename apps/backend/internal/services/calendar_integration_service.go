@@ -33,6 +33,10 @@ var (
 	ErrCalendarIntegrationLimit       = errors.New("maximum number of calendar integrations for this unit reached")
 	ErrCalendarIntegrationIDRequired  = errors.New("calendarIntegrationId is required when multiple calendars are enabled")
 	ErrCalendarIntegrationKindUnknown = errors.New("unsupported calendar integration kind")
+	ErrCalendarUnitCompanyMismatch    = errors.New("unit does not belong to company")
+	ErrCalendarAppPasswordRequired    = errors.New("app password is required for new calendar integration")
+	// ErrCalendarIntegrationBlockedByActivePreRegistrations is returned when delete or disable would strand active bookings.
+	ErrCalendarIntegrationBlockedByActivePreRegistrations = errors.New("active pre-registrations still reference this calendar integration")
 )
 
 // CalendarIntegrationService syncs Yandex CalDAV and mirrors pre-registration state into events.
@@ -128,11 +132,6 @@ func (s *CalendarIntegrationService) ResolveIntegrationForPreReg(unitID string, 
 		return nil, ErrCalendarIntegrationIDRequired
 	}
 	return &enabled[0], nil
-}
-
-// UnitHasCalendarReadOnlyCapacity is true if any enabled calendar integration exists for the unit.
-func (s *CalendarIntegrationService) UnitHasCalendarReadOnlyCapacity(unitID string) (bool, error) {
-	return s.HasEnabledCalendarIntegration(unitID)
 }
 
 // HasEnabledCalendarIntegration reports whether the unit has at least one enabled calendar connection.
@@ -238,7 +237,7 @@ func (s *CalendarIntegrationService) VerifyUnitBelongsToCompany(unitID, companyI
 		return err
 	}
 	if u.CompanyID != companyID {
-		return fmt.Errorf("unit does not belong to company")
+		return ErrCalendarUnitCompanyMismatch
 	}
 	return nil
 }
@@ -294,7 +293,7 @@ func (s *CalendarIntegrationService) CreateIntegration(companyID string, req *Cr
 		row.Timezone = "Europe/Moscow"
 	}
 	if strings.TrimSpace(req.AppPassword) == "" {
-		return nil, fmt.Errorf("app password is required for new calendar integration")
+		return nil, ErrCalendarAppPasswordRequired
 	}
 	enc, encErr := ssocrypto.EncryptAES256GCM([]byte(strings.TrimSpace(req.AppPassword)))
 	if encErr != nil {
@@ -327,6 +326,15 @@ func (s *CalendarIntegrationService) UpdateIntegration(companyID, integrationID 
 	}
 	if err := s.VerifyUnitBelongsToCompany(row.UnitID, companyID); err != nil {
 		return nil, err
+	}
+	if row.Enabled && !req.Enabled {
+		n, err := s.repo.CountActivePreRegistrationsForIntegration(integrationID)
+		if err != nil {
+			return nil, err
+		}
+		if n > 0 {
+			return nil, fmt.Errorf("%w: cannot disable while %d active pre-registrations still reference it", ErrCalendarIntegrationBlockedByActivePreRegistrations, n)
+		}
 	}
 	row.DisplayName = strings.TrimSpace(req.DisplayName)
 	row.Enabled = req.Enabled
@@ -368,7 +376,7 @@ func (s *CalendarIntegrationService) DeleteIntegration(companyID, integrationID 
 		return err
 	}
 	if n > 0 {
-		return fmt.Errorf("cannot delete calendar integration: %d active pre-registrations still reference it", n)
+		return fmt.Errorf("%w: %d active pre-registrations still reference it", ErrCalendarIntegrationBlockedByActivePreRegistrations, n)
 	}
 	return s.repo.DeleteIntegration(integrationID)
 }
@@ -427,7 +435,7 @@ func (s *CalendarIntegrationService) UpsertIntegration(unitID, companyID string,
 		}
 		row.AppPasswordEncrypted = enc
 	} else if !hasExisting {
-		return nil, fmt.Errorf("app password is required for new calendar integration")
+		return nil, ErrCalendarAppPasswordRequired
 	}
 	if !hasExisting {
 		n, cerr := s.repo.CountByUnitID(unitID)

@@ -1932,7 +1932,6 @@ components:
       - calendarPath
       - unitId
       - username
-      - enabled
       type: object
     services.EmployeeRadarResponse:
       properties:
@@ -2305,7 +2304,6 @@ components:
       required:
       - calendarPath
       - username
-      - enabled
       type: object
     services.UpsertIntegrationRequest:
       properties:
@@ -2326,7 +2324,6 @@ components:
       required:
       - calendarPath
       - username
-      - enabled
       type: object
     services.UtilizationPoint:
       properties:
@@ -3413,6 +3410,12 @@ paths:
   /companies/me/calendar-integrations:
     get:
       operationId: calendarIntegrationListMine
+      parameters:
+      - description: Optional company selector for admins with multiple companies
+        in: header
+        name: X-Company-Id
+        schema:
+          type: string
       responses:
         '200':
           content:
@@ -3422,6 +3425,42 @@ paths:
                   $ref: '#/components/schemas/services.CalendarIntegrationPublic'
                 type: array
           description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad Request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Not Found
+        '409':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Conflict
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
       security:
       - BearerAuth: []
       summary: List calendar integrations for current company
@@ -3429,6 +3468,12 @@ paths:
       - calendar-integration
     post:
       operationId: calendarIntegrationCreateMine
+      parameters:
+      - description: Optional company selector for admins with multiple companies
+        in: header
+        name: X-Company-Id
+        schema:
+          type: string
       requestBody:
         content:
           application/json:
@@ -3444,6 +3489,42 @@ paths:
               schema:
                 $ref: '#/components/schemas/services.CalendarIntegrationPublic'
           description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad Request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Not Found
+        '409':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Conflict
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
       security:
       - BearerAuth: []
       summary: Create a calendar integration for a unit in the company
@@ -3453,6 +3534,11 @@ paths:
     delete:
       operationId: calendarIntegrationDeleteMine
       parameters:
+      - description: Optional company selector for admins with multiple companies
+        in: header
+        name: X-Company-Id
+        schema:
+          type: string
       - description: Integration ID
         in: path
         name: integrationId
@@ -3462,6 +3548,42 @@ paths:
       responses:
         '204':
           description: No Content
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad Request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Not Found
+        '409':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Conflict
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
       security:
       - BearerAuth: []
       summary: Delete a calendar integration
@@ -3470,6 +3592,11 @@ paths:
     put:
       operationId: calendarIntegrationPutMine
       parameters:
+      - description: Optional company selector for admins with multiple companies
+        in: header
+        name: X-Company-Id
+        schema:
+          type: string
       - description: Integration ID
         in: path
         name: integrationId
@@ -3491,6 +3618,42 @@ paths:
               schema:
                 $ref: '#/components/schemas/services.CalendarIntegrationPublic'
           description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad Request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Not Found
+        '409':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Conflict
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
       security:
       - BearerAuth: []
       summary: Update a calendar integration
@@ -5570,6 +5733,12 @@ paths:
               schema:
                 type: string
           description: Forbidden
+        '409':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Conflict (duplicate calendar slot key for unit)
         '500':
           content:
             application/json:
@@ -6680,6 +6849,11 @@ paths:
     get:
       operationId: calendarIntegrationGet
       parameters:
+      - description: Optional company selector for admins with multiple companies
+        in: header
+        name: X-Company-Id
+        schema:
+          type: string
       - description: Unit ID
         in: path
         name: unitId
@@ -6693,6 +6867,42 @@ paths:
               schema:
                 $ref: '#/components/schemas/services.CalendarIntegrationPublic'
           description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad Request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Not Found
+        '409':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Conflict
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
       security:
       - BearerAuth: []
       summary: 'Get calendar integration settings for a unit (legacy: first integration)'
@@ -6701,6 +6911,11 @@ paths:
     put:
       operationId: calendarIntegrationPut
       parameters:
+      - description: Optional company selector for admins with multiple companies
+        in: header
+        name: X-Company-Id
+        schema:
+          type: string
       - description: Unit ID
         in: path
         name: unitId
@@ -6722,6 +6937,42 @@ paths:
               schema:
                 $ref: '#/components/schemas/services.CalendarIntegrationPublic'
           description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad Request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Not Found
+        '409':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Conflict
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
       security:
       - BearerAuth: []
       summary: Create or update calendar integration for a unit (legacy)
@@ -7995,6 +8246,12 @@ paths:
               schema:
                 type: string
           description: Forbidden
+        '409':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Conflict (calendar slot taken or not free)
         '500':
           content:
             application/json:

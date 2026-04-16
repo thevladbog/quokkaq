@@ -105,7 +105,8 @@ export interface ModelsUnitOperationsPublic {
 
 export interface ModelsService {
   backgroundColor?: string;
-  /** CalendarSlotKey optional unique label segment in [QQ] SUMMARY when names collide (calendar integration). */
+  /** CalendarSlotKey optional label segment in [QQ] SUMMARY when names collide (calendar integration).
+  When non-empty (after trim), it must be unique per unit — enforced by DB partial unique index and create/update validation. */
   calendarSlotKey?: string;
   children?: ModelsService[];
   description?: string;
@@ -1095,7 +1096,7 @@ export interface ModelsMessageTemplate {
 
 export interface ModelsPreRegCalendarSlotItem {
   calendarIntegrationId?: string;
-  eTag?: string;
+  externalEventEtag?: string;
   externalEventHref?: string;
   integrationLabel?: string;
   time?: string;
@@ -1126,6 +1127,16 @@ export interface ModelsPreRegistrationRedeemResponse {
   ticket?: ModelsTicket;
 }
 
+/**
+ * Status optional; only "canceled" is accepted to cancel an active pre-registration.
+ */
+export type ModelsPreRegistrationUpdateRequestStatus = typeof ModelsPreRegistrationUpdateRequestStatus[keyof typeof ModelsPreRegistrationUpdateRequestStatus];
+
+
+export const ModelsPreRegistrationUpdateRequestStatus = {
+  canceled: 'canceled',
+} as const;
+
 export interface ModelsPreRegistrationUpdateRequest {
   calendarIntegrationId?: string;
   comment?: string;
@@ -1138,7 +1149,7 @@ export interface ModelsPreRegistrationUpdateRequest {
   externalEventHref?: string;
   serviceId?: string;
   /** Status optional; only "canceled" is accepted to cancel an active pre-registration. */
-  status?: string;
+  status?: ModelsPreRegistrationUpdateRequestStatus;
   time?: string;
 }
 
@@ -1282,15 +1293,15 @@ export interface ServicesCompanySSOPatch {
 
 export interface ServicesCreateCalendarIntegrationRequest {
   adminNotifyEmails?: string;
-  appPassword?: string;
+  appPassword: string;
   caldavBaseUrl?: string;
-  calendarPath?: string;
+  calendarPath: string;
   displayName?: string;
   enabled?: boolean;
   kind?: string;
   timezone?: string;
-  unitId?: string;
-  username?: string;
+  unitId: string;
+  username: string;
 }
 
 export interface ServicesEmployeeRadarResponse {
@@ -1531,21 +1542,21 @@ export interface ServicesUpdateCalendarIntegrationRequest {
   adminNotifyEmails?: string;
   appPassword?: string;
   caldavBaseUrl?: string;
-  calendarPath?: string;
+  calendarPath: string;
   displayName?: string;
   enabled?: boolean;
   timezone?: string;
-  username?: string;
+  username: string;
 }
 
 export interface ServicesUpsertIntegrationRequest {
   adminNotifyEmails?: string;
   appPassword?: string;
   caldavBaseUrl?: string;
-  calendarPath?: string;
+  calendarPath: string;
   enabled?: boolean;
   timezone?: string;
-  username?: string;
+  username: string;
 }
 
 export interface ServicesUtilizationPoint {
@@ -1568,13 +1579,13 @@ export interface HandlersLoginLinkResponse {
   exampleUrl: string;
 }
 
-export type GetUnitsUnitIdPreRegistrationsCalendarSlotsParams = {
+export type GetCalendarSlotsByUnitParams = {
 /**
  * Service ID
  */
 serviceId: string;
 /**
- * Date YYYY-MM-DD
+ * Date (YYYY-MM-DD)
  */
 date: string;
 };
@@ -1749,6 +1760,11 @@ export type postUnitsUnitIdPreRegistrationsResponse403 = {
   status: 403
 }
 
+export type postUnitsUnitIdPreRegistrationsResponse409 = {
+  data: string
+  status: 409
+}
+
 export type postUnitsUnitIdPreRegistrationsResponse500 = {
   data: string
   status: 500
@@ -1757,7 +1773,7 @@ export type postUnitsUnitIdPreRegistrationsResponse500 = {
 export type postUnitsUnitIdPreRegistrationsResponseSuccess = (postUnitsUnitIdPreRegistrationsResponse200) & {
   headers: Headers;
 };
-export type postUnitsUnitIdPreRegistrationsResponseError = (postUnitsUnitIdPreRegistrationsResponse400 | postUnitsUnitIdPreRegistrationsResponse401 | postUnitsUnitIdPreRegistrationsResponse403 | postUnitsUnitIdPreRegistrationsResponse500) & {
+export type postUnitsUnitIdPreRegistrationsResponseError = (postUnitsUnitIdPreRegistrationsResponse400 | postUnitsUnitIdPreRegistrationsResponse401 | postUnitsUnitIdPreRegistrationsResponse403 | postUnitsUnitIdPreRegistrationsResponse409 | postUnitsUnitIdPreRegistrationsResponse500) & {
   headers: Headers;
 };
 
@@ -1833,22 +1849,45 @@ export const usePostUnitsUnitIdPreRegistrations = <TError = string,
     }
 
 /**
+ * Returns CalDAV slot rows (href, etag, time) for a service and date; requires Bearer auth and unit membership. Empty array when no integration or no slots.
  * @summary List calendar-backed slots with CalDAV hrefs (when integration enabled)
  */
-export type getUnitsUnitIdPreRegistrationsCalendarSlotsResponse200 = {
+export type getCalendarSlotsByUnitResponse200 = {
   data: ModelsPreRegCalendarSlotItem[]
   status: 200
 }
 
-export type getUnitsUnitIdPreRegistrationsCalendarSlotsResponseSuccess = (getUnitsUnitIdPreRegistrationsCalendarSlotsResponse200) & {
+export type getCalendarSlotsByUnitResponse400 = {
+  data: string
+  status: 400
+}
+
+export type getCalendarSlotsByUnitResponse401 = {
+  data: string
+  status: 401
+}
+
+export type getCalendarSlotsByUnitResponse403 = {
+  data: string
+  status: 403
+}
+
+export type getCalendarSlotsByUnitResponse500 = {
+  data: string
+  status: 500
+}
+
+export type getCalendarSlotsByUnitResponseSuccess = (getCalendarSlotsByUnitResponse200) & {
   headers: Headers;
 };
-;
+export type getCalendarSlotsByUnitResponseError = (getCalendarSlotsByUnitResponse400 | getCalendarSlotsByUnitResponse401 | getCalendarSlotsByUnitResponse403 | getCalendarSlotsByUnitResponse500) & {
+  headers: Headers;
+};
 
-export type getUnitsUnitIdPreRegistrationsCalendarSlotsResponse = (getUnitsUnitIdPreRegistrationsCalendarSlotsResponseSuccess)
+export type getCalendarSlotsByUnitResponse = (getCalendarSlotsByUnitResponseSuccess | getCalendarSlotsByUnitResponseError)
 
-export const getGetUnitsUnitIdPreRegistrationsCalendarSlotsUrl = (unitId: string,
-    params: GetUnitsUnitIdPreRegistrationsCalendarSlotsParams,) => {
+export const getGetCalendarSlotsByUnitUrl = (unitId: string,
+    params: GetCalendarSlotsByUnitParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -1863,10 +1902,10 @@ export const getGetUnitsUnitIdPreRegistrationsCalendarSlotsUrl = (unitId: string
   return stringifiedParams.length > 0 ? `/units/${unitId}/pre-registrations/calendar-slots?${stringifiedParams}` : `/units/${unitId}/pre-registrations/calendar-slots`
 }
 
-export const getUnitsUnitIdPreRegistrationsCalendarSlots = async (unitId: string,
-    params: GetUnitsUnitIdPreRegistrationsCalendarSlotsParams, options?: RequestInit): Promise<getUnitsUnitIdPreRegistrationsCalendarSlotsResponse> => {
+export const getCalendarSlotsByUnit = async (unitId: string,
+    params: GetCalendarSlotsByUnitParams, options?: RequestInit): Promise<getCalendarSlotsByUnitResponse> => {
 
-  return orvalMutator<getUnitsUnitIdPreRegistrationsCalendarSlotsResponse>(getGetUnitsUnitIdPreRegistrationsCalendarSlotsUrl(unitId,params),
+  return orvalMutator<getCalendarSlotsByUnitResponse>(getGetCalendarSlotsByUnitUrl(unitId,params),
   {
     ...options,
     method: 'GET'
@@ -1879,75 +1918,75 @@ export const getUnitsUnitIdPreRegistrationsCalendarSlots = async (unitId: string
 
 
 
-export const getGetUnitsUnitIdPreRegistrationsCalendarSlotsQueryKey = (unitId: string,
-    params?: GetUnitsUnitIdPreRegistrationsCalendarSlotsParams,) => {
+export const getGetCalendarSlotsByUnitQueryKey = (unitId: string,
+    params?: GetCalendarSlotsByUnitParams,) => {
     return [
     `/units/${unitId}/pre-registrations/calendar-slots`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetUnitsUnitIdPreRegistrationsCalendarSlotsQueryOptions = <TData = Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsCalendarSlots>>, TError = unknown>(unitId: string,
-    params: GetUnitsUnitIdPreRegistrationsCalendarSlotsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsCalendarSlots>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export const getGetCalendarSlotsByUnitQueryOptions = <TData = Awaited<ReturnType<typeof getCalendarSlotsByUnit>>, TError = string>(unitId: string,
+    params: GetCalendarSlotsByUnitParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCalendarSlotsByUnit>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetUnitsUnitIdPreRegistrationsCalendarSlotsQueryKey(unitId,params);
+  const queryKey =  queryOptions?.queryKey ?? getGetCalendarSlotsByUnitQueryKey(unitId,params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsCalendarSlots>>> = ({ signal }) => getUnitsUnitIdPreRegistrationsCalendarSlots(unitId,params, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCalendarSlotsByUnit>>> = ({ signal }) => getCalendarSlotsByUnit(unitId,params, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsCalendarSlots>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCalendarSlotsByUnit>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type GetUnitsUnitIdPreRegistrationsCalendarSlotsQueryResult = NonNullable<Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsCalendarSlots>>>
-export type GetUnitsUnitIdPreRegistrationsCalendarSlotsQueryError = unknown
+export type GetCalendarSlotsByUnitQueryResult = NonNullable<Awaited<ReturnType<typeof getCalendarSlotsByUnit>>>
+export type GetCalendarSlotsByUnitQueryError = string
 
 
-export function useGetUnitsUnitIdPreRegistrationsCalendarSlots<TData = Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsCalendarSlots>>, TError = unknown>(
+export function useGetCalendarSlotsByUnit<TData = Awaited<ReturnType<typeof getCalendarSlotsByUnit>>, TError = string>(
  unitId: string,
-    params: GetUnitsUnitIdPreRegistrationsCalendarSlotsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsCalendarSlots>>, TError, TData>> & Pick<
+    params: GetCalendarSlotsByUnitParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCalendarSlotsByUnit>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsCalendarSlots>>,
+          Awaited<ReturnType<typeof getCalendarSlotsByUnit>>,
           TError,
-          Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsCalendarSlots>>
+          Awaited<ReturnType<typeof getCalendarSlotsByUnit>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitsUnitIdPreRegistrationsCalendarSlots<TData = Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsCalendarSlots>>, TError = unknown>(
+export function useGetCalendarSlotsByUnit<TData = Awaited<ReturnType<typeof getCalendarSlotsByUnit>>, TError = string>(
  unitId: string,
-    params: GetUnitsUnitIdPreRegistrationsCalendarSlotsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsCalendarSlots>>, TError, TData>> & Pick<
+    params: GetCalendarSlotsByUnitParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCalendarSlotsByUnit>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsCalendarSlots>>,
+          Awaited<ReturnType<typeof getCalendarSlotsByUnit>>,
           TError,
-          Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsCalendarSlots>>
+          Awaited<ReturnType<typeof getCalendarSlotsByUnit>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitsUnitIdPreRegistrationsCalendarSlots<TData = Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsCalendarSlots>>, TError = unknown>(
+export function useGetCalendarSlotsByUnit<TData = Awaited<ReturnType<typeof getCalendarSlotsByUnit>>, TError = string>(
  unitId: string,
-    params: GetUnitsUnitIdPreRegistrationsCalendarSlotsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsCalendarSlots>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+    params: GetCalendarSlotsByUnitParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCalendarSlotsByUnit>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List calendar-backed slots with CalDAV hrefs (when integration enabled)
  */
 
-export function useGetUnitsUnitIdPreRegistrationsCalendarSlots<TData = Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsCalendarSlots>>, TError = unknown>(
+export function useGetCalendarSlotsByUnit<TData = Awaited<ReturnType<typeof getCalendarSlotsByUnit>>, TError = string>(
  unitId: string,
-    params: GetUnitsUnitIdPreRegistrationsCalendarSlotsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsCalendarSlots>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+    params: GetCalendarSlotsByUnitParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCalendarSlotsByUnit>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetUnitsUnitIdPreRegistrationsCalendarSlotsQueryOptions(unitId,params,options)
+  const queryOptions = getGetCalendarSlotsByUnitQueryOptions(unitId,params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -2329,6 +2368,11 @@ export type putUnitsUnitIdPreRegistrationsIdResponse404 = {
   status: 404
 }
 
+export type putUnitsUnitIdPreRegistrationsIdResponse409 = {
+  data: string
+  status: 409
+}
+
 export type putUnitsUnitIdPreRegistrationsIdResponse500 = {
   data: string
   status: 500
@@ -2337,7 +2381,7 @@ export type putUnitsUnitIdPreRegistrationsIdResponse500 = {
 export type putUnitsUnitIdPreRegistrationsIdResponseSuccess = (putUnitsUnitIdPreRegistrationsIdResponse200) & {
   headers: Headers;
 };
-export type putUnitsUnitIdPreRegistrationsIdResponseError = (putUnitsUnitIdPreRegistrationsIdResponse400 | putUnitsUnitIdPreRegistrationsIdResponse401 | putUnitsUnitIdPreRegistrationsIdResponse403 | putUnitsUnitIdPreRegistrationsIdResponse404 | putUnitsUnitIdPreRegistrationsIdResponse500) & {
+export type putUnitsUnitIdPreRegistrationsIdResponseError = (putUnitsUnitIdPreRegistrationsIdResponse400 | putUnitsUnitIdPreRegistrationsIdResponse401 | putUnitsUnitIdPreRegistrationsIdResponse403 | putUnitsUnitIdPreRegistrationsIdResponse404 | putUnitsUnitIdPreRegistrationsIdResponse409 | putUnitsUnitIdPreRegistrationsIdResponse500) & {
   headers: Headers;
 };
 

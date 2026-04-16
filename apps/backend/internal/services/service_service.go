@@ -74,7 +74,13 @@ func (s *serviceService) CreateService(service *models.Service) error {
 	if err := ValidateOptionalChildServiceZone(s.unitRepo, service.UnitID, &service.RestrictedServiceZoneID); err != nil {
 		return err
 	}
-	return s.repo.Create(service)
+	if err := s.repo.Create(service); err != nil {
+		if errors.Is(err, repository.ErrDuplicateCalendarSlotKey) {
+			return ErrDuplicateCalendarSlotKey
+		}
+		return err
+	}
+	return nil
 }
 
 func (s *serviceService) GetServicesByUnit(unitID string) ([]models.Service, error) {
@@ -107,7 +113,13 @@ func (s *serviceService) UpdateService(service *models.Service) error {
 	if err := ValidateOptionalChildServiceZone(s.unitRepo, service.UnitID, &service.RestrictedServiceZoneID); err != nil {
 		return err
 	}
-	return s.repo.Update(service)
+	if err := s.repo.Update(service); err != nil {
+		if errors.Is(err, repository.ErrDuplicateCalendarSlotKey) {
+			return ErrDuplicateCalendarSlotKey
+		}
+		return err
+	}
+	return nil
 }
 
 func (s *serviceService) DeleteService(id string) error {

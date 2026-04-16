@@ -5,7 +5,6 @@ import (
 	"errors"
 	"log"
 	"net/http"
-	"strings"
 
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/repository"
@@ -44,12 +43,13 @@ func (h *CalendarIntegrationHandler) resolveCompanyID(w http.ResponseWriter, r *
 }
 
 const (
-	calendarIntMsgInternal     = "Internal server error"
-	calendarIntMsgInvalidJSON  = "Invalid request body"
-	calendarIntMsgBadRequest   = "Bad request"
-	calendarIntMsgForbidden    = "Forbidden"
-	calendarIntMsgNotFound     = "Not found"
-	calendarIntMsgCannotDelete = "Cannot delete integration"
+	calendarIntMsgInternal           = "Internal server error"
+	calendarIntMsgInvalidJSON        = "Invalid request body"
+	calendarIntMsgBadRequest         = "Bad request"
+	calendarIntMsgForbidden          = "Forbidden"
+	calendarIntMsgNotFound           = "Not found"
+	calendarIntMsgCannotDelete       = "Cannot delete integration"
+	calendarIntMsgActivePreRegsBlock = "Active pre-registrations reference this calendar integration"
 )
 
 func logCalendarIntegration(op string, err error) {
@@ -71,10 +71,12 @@ func respondCalendarIntegrationError(w http.ResponseWriter, op string, err error
 		http.Error(w, services.ErrCalendarIntegrationKindUnknown.Error(), http.StatusBadRequest)
 	case errors.Is(err, gorm.ErrRecordNotFound):
 		http.Error(w, calendarIntMsgNotFound, http.StatusNotFound)
-	case isCalendarUnitCompanyMismatch(err):
+	case errors.Is(err, services.ErrCalendarUnitCompanyMismatch):
 		http.Error(w, calendarIntMsgForbidden, http.StatusForbidden)
-	case isCalendarAppPasswordRequired(err):
+	case errors.Is(err, services.ErrCalendarAppPasswordRequired):
 		http.Error(w, calendarIntMsgBadRequest, http.StatusBadRequest)
+	case errors.Is(err, services.ErrCalendarIntegrationBlockedByActivePreRegistrations):
+		http.Error(w, calendarIntMsgActivePreRegsBlock, http.StatusBadRequest)
 	default:
 		http.Error(w, calendarIntMsgInternal, http.StatusInternalServerError)
 	}
@@ -85,25 +87,13 @@ func respondCalendarIntegrationDeleteError(w http.ResponseWriter, op string, err
 	switch {
 	case errors.Is(err, gorm.ErrRecordNotFound):
 		http.Error(w, calendarIntMsgNotFound, http.StatusNotFound)
-	case isCalendarUnitCompanyMismatch(err):
+	case errors.Is(err, services.ErrCalendarUnitCompanyMismatch):
 		http.Error(w, calendarIntMsgForbidden, http.StatusForbidden)
-	case isCalendarCannotDeleteWithPreRegs(err):
+	case errors.Is(err, services.ErrCalendarIntegrationBlockedByActivePreRegistrations):
 		http.Error(w, calendarIntMsgCannotDelete, http.StatusBadRequest)
 	default:
 		http.Error(w, calendarIntMsgInternal, http.StatusInternalServerError)
 	}
-}
-
-func isCalendarUnitCompanyMismatch(err error) bool {
-	return err != nil && strings.Contains(err.Error(), "unit does not belong to company")
-}
-
-func isCalendarAppPasswordRequired(err error) bool {
-	return err != nil && strings.Contains(err.Error(), "app password is required")
-}
-
-func isCalendarCannotDeleteWithPreRegs(err error) bool {
-	return err != nil && strings.Contains(err.Error(), "cannot delete calendar integration")
 }
 
 // Get godoc
@@ -112,8 +102,15 @@ func isCalendarCannotDeleteWithPreRegs(err error) bool {
 // @Tags         calendar-integration
 // @Produce      json
 // @Security     BearerAuth
+// @Param        X-Company-Id header string false "Optional company selector for admins with multiple companies"
 // @Param        unitId path string true "Unit ID"
 // @Success      200 {object} services.CalendarIntegrationPublic
+// @Failure      400 {string} string "Bad Request"
+// @Failure      401 {string} string "Unauthorized"
+// @Failure      403 {string} string "Forbidden"
+// @Failure      404 {string} string "Not Found"
+// @Failure      409 {string} string "Conflict"
+// @Failure      500 {string} string "Internal Server Error"
 // @Router       /units/{unitId}/calendar-integration [get]
 func (h *CalendarIntegrationHandler) Get(w http.ResponseWriter, r *http.Request) {
 	companyID, ok := h.resolveCompanyID(w, r)
@@ -136,9 +133,16 @@ func (h *CalendarIntegrationHandler) Get(w http.ResponseWriter, r *http.Request)
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
+// @Param        X-Company-Id header string false "Optional company selector for admins with multiple companies"
 // @Param        unitId path string true "Unit ID"
 // @Param        body body services.UpsertIntegrationRequest true "Settings"
 // @Success      200 {object} services.CalendarIntegrationPublic
+// @Failure      400 {string} string "Bad Request"
+// @Failure      401 {string} string "Unauthorized"
+// @Failure      403 {string} string "Forbidden"
+// @Failure      404 {string} string "Not Found"
+// @Failure      409 {string} string "Conflict"
+// @Failure      500 {string} string "Internal Server Error"
 // @Router       /units/{unitId}/calendar-integration [put]
 func (h *CalendarIntegrationHandler) Put(w http.ResponseWriter, r *http.Request) {
 	companyID, ok := h.resolveCompanyID(w, r)
@@ -165,7 +169,14 @@ func (h *CalendarIntegrationHandler) Put(w http.ResponseWriter, r *http.Request)
 // @Tags         calendar-integration
 // @Produce      json
 // @Security     BearerAuth
+// @Param        X-Company-Id header string false "Optional company selector for admins with multiple companies"
 // @Success      200 {array} services.CalendarIntegrationPublic
+// @Failure      400 {string} string "Bad Request"
+// @Failure      401 {string} string "Unauthorized"
+// @Failure      403 {string} string "Forbidden"
+// @Failure      404 {string} string "Not Found"
+// @Failure      409 {string} string "Conflict"
+// @Failure      500 {string} string "Internal Server Error"
 // @Router       /companies/me/calendar-integrations [get]
 func (h *CalendarIntegrationHandler) ListMine(w http.ResponseWriter, r *http.Request) {
 	companyID, ok := h.resolveCompanyID(w, r)
@@ -190,8 +201,15 @@ func (h *CalendarIntegrationHandler) ListMine(w http.ResponseWriter, r *http.Req
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
+// @Param        X-Company-Id header string false "Optional company selector for admins with multiple companies"
 // @Param        body body services.CreateCalendarIntegrationRequest true "Payload"
 // @Success      200 {object} services.CalendarIntegrationPublic
+// @Failure      400 {string} string "Bad Request"
+// @Failure      401 {string} string "Unauthorized"
+// @Failure      403 {string} string "Forbidden"
+// @Failure      404 {string} string "Not Found"
+// @Failure      409 {string} string "Conflict"
+// @Failure      500 {string} string "Internal Server Error"
 // @Router       /companies/me/calendar-integrations [post]
 func (h *CalendarIntegrationHandler) CreateMine(w http.ResponseWriter, r *http.Request) {
 	companyID, ok := h.resolveCompanyID(w, r)
@@ -218,9 +236,16 @@ func (h *CalendarIntegrationHandler) CreateMine(w http.ResponseWriter, r *http.R
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
+// @Param        X-Company-Id header string false "Optional company selector for admins with multiple companies"
 // @Param        integrationId path string true "Integration ID"
 // @Param        body body services.UpdateCalendarIntegrationRequest true "Payload"
 // @Success      200 {object} services.CalendarIntegrationPublic
+// @Failure      400 {string} string "Bad Request"
+// @Failure      401 {string} string "Unauthorized"
+// @Failure      403 {string} string "Forbidden"
+// @Failure      404 {string} string "Not Found"
+// @Failure      409 {string} string "Conflict"
+// @Failure      500 {string} string "Internal Server Error"
 // @Router       /companies/me/calendar-integrations/{integrationId} [put]
 func (h *CalendarIntegrationHandler) PutMine(w http.ResponseWriter, r *http.Request) {
 	companyID, ok := h.resolveCompanyID(w, r)
@@ -246,8 +271,15 @@ func (h *CalendarIntegrationHandler) PutMine(w http.ResponseWriter, r *http.Requ
 // @Summary      Delete a calendar integration
 // @Tags         calendar-integration
 // @Security     BearerAuth
+// @Param        X-Company-Id header string false "Optional company selector for admins with multiple companies"
 // @Param        integrationId path string true "Integration ID"
 // @Success      204
+// @Failure      400 {string} string "Bad Request"
+// @Failure      401 {string} string "Unauthorized"
+// @Failure      403 {string} string "Forbidden"
+// @Failure      404 {string} string "Not Found"
+// @Failure      409 {string} string "Conflict"
+// @Failure      500 {string} string "Internal Server Error"
 // @Router       /companies/me/calendar-integrations/{integrationId} [delete]
 func (h *CalendarIntegrationHandler) DeleteMine(w http.ResponseWriter, r *http.Request) {
 	companyID, ok := h.resolveCompanyID(w, r)

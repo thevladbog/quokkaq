@@ -75,6 +75,26 @@ func TestPreRegistrationService_Update_CannotCancelFromNonCreated(t *testing.T) 
 	}
 }
 
+func TestPreRegistrationService_Update_BlockScheduleChangeWhenConsumed(t *testing.T) {
+	svc := &PreRegistrationService{}
+	prev := &models.PreRegistration{
+		Status:    "ticket_issued",
+		ServiceID: "s1",
+		Date:      "2026-01-01",
+		Time:      "10:00",
+	}
+	next := &models.PreRegistration{
+		Status:    "ticket_issued",
+		ServiceID: "s2",
+		Date:      "2026-01-01",
+		Time:      "10:00",
+	}
+	err := svc.Update(context.Background(), prev, next, nil)
+	if !errors.Is(err, ErrPreRegistrationScheduleImmutableWhenConsumed) {
+		t.Fatalf("want ErrPreRegistrationScheduleImmutableWhenConsumed, got %v", err)
+	}
+}
+
 func TestPreRegistrationService_Update_Cancel_ReleasesCalendar(t *testing.T) {
 	db, err := gorm.Open(glebarezsqlite.Open(":memory:"), &gorm.Config{
 		DisableForeignKeyConstraintWhenMigrating: true,

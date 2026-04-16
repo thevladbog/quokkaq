@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -19,6 +20,32 @@ import (
 	"github.com/emersion/go-webdav"
 	"github.com/emersion/go-webdav/caldav"
 )
+
+// caldavSafeResourcePath matches normalized CalDAV resource paths (RFC 3986 "pchar"
+// subset) so hrefs cannot inject schemes, hosts, or CRLF into constructed URLs.
+// CodeQL's go/request-forgery query treats regexp.MatchString on the path as a barrier guard.
+var caldavSafeResourcePath = regexp.MustCompile(
+	`^/[A-Za-z0-9/._~%!$&'()*+,;=:@-]*$`,
+)
+
+// parseETag normalizes CalDAV ETag headers for storage and If-Match round-trips.
+// Weak validators (RFC 9110) use the form W/"value"; strconv.Unquote rejects those.
+func parseETag(raw string) string {
+	s := strings.TrimSpace(raw)
+	if s == "" {
+		return ""
+	}
+	if len(s) >= 2 && (s[0] == 'W' || s[0] == 'w') && s[1] == '/' {
+		return s
+	}
+	if uq, err := strconv.Unquote(s); err == nil {
+		return uq
+	}
+	if len(s) >= 2 && s[0] == '"' && s[len(s)-1] == '"' {
+		return s[1 : len(s)-1]
+	}
+	return s
+}
 
 // Client is a thin wrapper with Yandex-friendly helpers.
 type Client struct {
@@ -56,7 +83,65 @@ func NewYandexClient(baseURL, username, appPassword string) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
+	next := httpClient.Transport
+	if next == nil {
+		next = http.DefaultTransport
+	}
+	httpClient.Transport = &caldavBoundRoundTripper{base: baseNorm, next: next}
 	return &Client{caldav: cl, httpClient: httpClient, base: baseNorm, user: username, pass: appPassword}, nil
+}
+
+// caldavBoundRoundTripper rejects outbound requests whose URL is not the same
+// HTTPS origin as the configured CalDAV base. This blocks SSRF / request-forgery
+// if a caller ever passes a crafted URL to the shared http.Client (defense in depth
+// alongside resolveCalDAVResourceURL).
+type caldavBoundRoundTripper struct {
+	base *url.URL
+	next http.RoundTripper
+}
+
+func (t *caldavBoundRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req == nil || req.URL == nil {
+		return nil, fmt.Errorf("caldav: invalid request")
+	}
+	if err := caldavURLsSameOrigin(req.URL, t.base); err != nil {
+		return nil, err
+	}
+	return t.next.RoundTrip(req)
+}
+
+func caldavHTTPSHostPort(u *url.URL) (host, port string, err error) {
+	if u == nil {
+		return "", "", fmt.Errorf("caldav: nil URL")
+	}
+	if !strings.EqualFold(u.Scheme, "https") {
+		return "", "", fmt.Errorf("caldav: only https is allowed")
+	}
+	host = strings.ToLower(strings.TrimSpace(u.Hostname()))
+	if host == "" {
+		return "", "", fmt.Errorf("caldav: missing host")
+	}
+	port = u.Port()
+	if port == "" {
+		port = "443"
+	}
+	return host, port, nil
+}
+
+// caldavURLsSameOrigin returns nil when a and b denote the same https host:port.
+func caldavURLsSameOrigin(a, b *url.URL) error {
+	ah, ap, err := caldavHTTPSHostPort(a)
+	if err != nil {
+		return err
+	}
+	bh, bp, err := caldavHTTPSHostPort(b)
+	if err != nil {
+		return err
+	}
+	if ah != bh || ap != bp {
+		return fmt.Errorf("caldav: URL origin does not match configured base (got %s:%s, want %s:%s)", ah, ap, bh, bp)
+	}
+	return nil
 }
 
 // PrincipalPath returns the standard Yandex principal URL path.
@@ -145,11 +230,7 @@ func (c *Client) GetEvent(ctx context.Context, hrefPath string) (*caldav.Calenda
 		Data: cal,
 	}
 	if etag := resp.Header.Get("ETag"); etag != "" {
-		uq, err := strconv.Unquote(etag)
-		if err != nil {
-			return nil, err
-		}
-		co.ETag = uq
+		co.ETag = parseETag(etag)
 	}
 	return co, nil
 }
@@ -172,9 +253,26 @@ func (c *Client) resolveCalDAVResourceURL(hrefPath string) (*url.URL, error) {
 	if !strings.HasPrefix(p, "/") {
 		p = "/" + p
 	}
-	p = path.Clean(p)
+	decoded := p
+	for i := 0; i < 8; i++ {
+		unescaped, err := url.PathUnescape(decoded)
+		if err != nil {
+			return nil, fmt.Errorf("caldav: invalid path")
+		}
+		if unescaped == decoded {
+			break
+		}
+		decoded = unescaped
+	}
+	if strings.Contains(decoded, "..") {
+		return nil, fmt.Errorf("caldav: invalid path")
+	}
+	p = path.Clean(decoded)
 	if !strings.HasPrefix(p, "/") || strings.Contains(p, "..") {
 		return nil, fmt.Errorf("caldav: invalid path")
+	}
+	if !caldavSafeResourcePath.MatchString(p) {
+		return nil, fmt.Errorf("caldav: disallowed path characters")
 	}
 	baseStr := strings.TrimRight(c.base.String(), "/")
 	fullURL := baseStr + p
@@ -182,12 +280,8 @@ func (c *Client) resolveCalDAVResourceURL(hrefPath string) (*url.URL, error) {
 	if err != nil {
 		return nil, err
 	}
-	if u.Scheme != "https" {
-		return nil, fmt.Errorf("caldav: only https is allowed")
-	}
-	wantHost := strings.ToLower(strings.TrimSpace(c.base.Hostname()))
-	if strings.ToLower(u.Hostname()) != wantHost {
-		return nil, fmt.Errorf("caldav: unexpected host %q", u.Hostname())
+	if err := caldavURLsSameOrigin(u, c.base); err != nil {
+		return nil, err
 	}
 	return u, nil
 }
@@ -230,10 +324,7 @@ func (c *Client) PutCalendar(ctx context.Context, hrefPath, etag string, cal *ic
 	if raw == "" {
 		return "", nil
 	}
-	if uq, uerr := strconv.Unquote(raw); uerr == nil {
-		return uq, nil
-	}
-	return strings.Trim(raw, `"`), nil
+	return parseETag(raw), nil
 }
 
 // ErrPreconditionFailed is returned when If-Match ETag does not match (slot taken).

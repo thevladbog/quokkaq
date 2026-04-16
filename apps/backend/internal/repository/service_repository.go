@@ -7,13 +7,26 @@ import (
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/pkg/database"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
 )
+
+// ErrDuplicateCalendarSlotKey is returned when a concurrent create/update hits the partial unique index on (unit_id, calendar_slot_key).
+var ErrDuplicateCalendarSlotKey = errors.New("calendar slot key already in use for this unit")
+
+func isCalendarSlotKeyUniqueViolation(err error) bool {
+	var pe *pgconn.PgError
+	if !errors.As(err, &pe) || pe.Code != "23505" {
+		return false
+	}
+	cn := strings.ToLower(pe.ConstraintName)
+	return strings.Contains(cn, "calendar_slot_key") || cn == "idx_services_unit_calendar_slot_key_uq"
+}
 
 type ServiceRepository interface {
 	Create(service *models.Service) error
 	FindAllByUnit(unitID string) ([]models.Service, error)
-	// FindAllByUnitSubtree returns services for rootUnitID and all descendant units (BFS tree).
+	// FindAllByUnitSubtree returns services for rootUnitID and all descendant units (single recursive CTE).
 	FindAllByUnitSubtree(rootUnitID string) ([]models.Service, error)
 	FindByID(id string) (*models.Service, error)
 	FindByIDTx(tx *gorm.DB, id string) (*models.Service, error)
@@ -36,7 +49,11 @@ func NewServiceRepository() ServiceRepository {
 }
 
 func (r *serviceRepository) Create(service *models.Service) error {
-	return r.db.Create(service).Error
+	err := r.db.Create(service).Error
+	if err != nil && isCalendarSlotKeyUniqueViolation(err) {
+		return ErrDuplicateCalendarSlotKey
+	}
+	return err
 }
 
 func (r *serviceRepository) FindAllByUnit(unitID string) ([]models.Service, error) {
@@ -45,40 +62,24 @@ func (r *serviceRepository) FindAllByUnit(unitID string) ([]models.Service, erro
 	return services, err
 }
 
-func (r *serviceRepository) collectUnitIDsInSubtree(root string) ([]string, error) {
-	var ids []string
-	queue := []string{root}
-	seen := make(map[string]bool)
-	for len(queue) > 0 {
-		id := queue[0]
-		queue = queue[1:]
-		if seen[id] {
-			continue
-		}
-		seen[id] = true
-		ids = append(ids, id)
-		var children []models.Unit
-		err := r.db.Select("id").Where("parent_id = ?", id).Find(&children).Error
-		if err != nil {
-			return nil, err
-		}
-		for i := range children {
-			queue = append(queue, children[i].ID)
-		}
-	}
-	return ids, nil
-}
-
 func (r *serviceRepository) FindAllByUnitSubtree(rootUnitID string) ([]models.Service, error) {
-	ids, err := r.collectUnitIDsInSubtree(rootUnitID)
-	if err != nil {
-		return nil, err
-	}
-	if len(ids) == 0 {
+	rootUnitID = strings.TrimSpace(rootUnitID)
+	if rootUnitID == "" {
 		return nil, nil
 	}
 	var services []models.Service
-	err = r.db.Where("unit_id IN ?", ids).Find(&services).Error
+	// Anchor includes rootUnitID so behavior matches the prior BFS (root counted even if missing from units).
+	// PostgreSQL and SQLite both support this recursive CTE shape.
+	const q = `
+WITH RECURSIVE subtree AS (
+	SELECT ? AS id
+	UNION ALL
+	SELECT u.id FROM units u
+	INNER JOIN subtree s ON u.parent_id = s.id
+)
+SELECT services.* FROM services
+WHERE services.unit_id IN (SELECT id FROM subtree)`
+	err := r.db.Raw(q, rootUnitID).Scan(&services).Error
 	return services, err
 }
 
@@ -158,7 +159,11 @@ func (r *serviceRepository) CountByUnitAndCalendarSlotKey(unitID, calendarSlotKe
 
 func (r *serviceRepository) Update(service *models.Service) error {
 	// Use Updates to update only the provided fields without touching associations
-	return r.db.Model(&models.Service{}).Where("id = ?", service.ID).Updates(service).Error
+	err := r.db.Model(&models.Service{}).Where("id = ?", service.ID).Updates(service).Error
+	if err != nil && isCalendarSlotKeyUniqueViolation(err) {
+		return ErrDuplicateCalendarSlotKey
+	}
+	return err
 }
 
 func (r *serviceRepository) Delete(id string) error {

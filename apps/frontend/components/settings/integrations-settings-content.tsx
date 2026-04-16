@@ -90,10 +90,11 @@ export function IntegrationsSettingsContent() {
     } else {
       q.set('unit', value);
     }
-    router.replace(`${pathname}?${q.toString()}`);
+    const qs = q.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname);
   };
 
-  if (companyMe.isLoading || ssoQ.isLoading) {
+  if (companyMe.isLoading) {
     return (
       <div className='flex justify-center py-12'>
         <Loader2 className='text-muted-foreground h-8 w-8 animate-spin' />
@@ -175,19 +176,27 @@ export function IntegrationsSettingsContent() {
       </TabsContent>
 
       <TabsContent value='auth' className='space-y-6'>
+        {ssoQ.isLoading && (
+          <div className='text-muted-foreground flex items-center gap-2 text-sm'>
+            <Loader2 className='h-4 w-4 animate-spin' />
+            {t('sso_loading')}
+          </div>
+        )}
         {ssoLoadFailed && (
           <Alert variant='destructive'>
             <AlertDescription>{t('ssoLoadError')}</AlertDescription>
           </Alert>
         )}
         <OrganizationTenantSlugCard company={company} />
-        {!ssoLoadFailed && (
-          <OrganizationSsoSettingsCard
-            company={company}
-            sso={ssoQ.data.data}
-            publicApiUrl={companyMe.data?.publicApiUrl}
-          />
-        )}
+        {!ssoLoadFailed &&
+          ssoQ.data?.status === 200 &&
+          ssoQ.data.data != null && (
+            <OrganizationSsoSettingsCard
+              company={company}
+              sso={ssoQ.data.data}
+              publicApiUrl={companyMe.data?.publicApiUrl}
+            />
+          )}
       </TabsContent>
     </Tabs>
   );

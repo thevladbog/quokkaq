@@ -1,5 +1,15 @@
 import { z } from 'zod';
 
+export {
+  TENANT_SLUG_MIN_LEN,
+  TENANT_SLUG_MAX_LEN,
+  RESERVED_TENANT_SLUGS,
+  normalizeTenantSlug,
+  isReservedTenantSlug,
+  TENANT_SLUG_PART_RE,
+  isValidTenantSlug
+} from './tenant-slug';
+
 // ==========================
 // Zod Schemas
 // ==========================

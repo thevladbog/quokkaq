@@ -77,6 +77,7 @@ func (h *PreRegistrationHandler) GetByUnit(w http.ResponseWriter, r *http.Reques
 // @Failure      400    {string}  string "Bad Request"
 // @Failure      401    {string}  string "Unauthorized"
 // @Failure      403    {string}  string "Forbidden"
+// @Failure      409    {string}  string "Conflict (calendar slot taken or not free)"
 // @Failure      500    {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/pre-registrations [post]
 func (h *PreRegistrationHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -181,6 +182,8 @@ func (h *PreRegistrationHandler) Update(w http.ResponseWriter, r *http.Request) 
 
 	if err := h.service.Update(r.Context(), previous, existing, &updateData); err != nil {
 		switch {
+		case errors.Is(err, services.ErrPreRegistrationScheduleImmutableWhenConsumed):
+			http.Error(w, err.Error(), http.StatusBadRequest)
 		case errors.Is(err, services.ErrPreRegistrationCannotCancel),
 			errors.Is(err, services.ErrPreRegistrationCanceledImmutable):
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -224,7 +227,8 @@ func (h *PreRegistrationHandler) GetCalendarSlots(w http.ResponseWriter, r *http
 	}
 	items, err := h.service.ListCalendarSlotItems(unitID, serviceID, date)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("pre-registration calendar-slots: ListCalendarSlotItems unitID=%s serviceID=%s date=%s err=%v", unitID, serviceID, date, err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 	if items == nil {

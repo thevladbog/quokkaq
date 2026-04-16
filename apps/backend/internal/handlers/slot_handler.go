@@ -22,7 +22,7 @@ func (h *SlotHandler) rejectIfCalendarReadOnly(w http.ResponseWriter, unitID str
 	if h.calendar == nil {
 		return false
 	}
-	ro, err := h.calendar.UnitHasCalendarReadOnlyCapacity(unitID)
+	ro, err := h.calendar.HasEnabledCalendarIntegration(unitID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return true

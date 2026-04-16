@@ -508,6 +508,7 @@
       "calendar_no_access": "You do not have permission to manage settings for this unit.",
       "loadError": "Could not load organization.",
       "ssoLoadError": "Could not load SSO settings.",
+      "sso_loading": "Loading SSO settings…",
       "calendar_relocated_title": "Calendar integration",
       "calendar_relocated_hint": "Yandex Calendar (CalDAV) for this unit is configured under Integrations → Calendars (select this unit).",
       "calendar_relocated_link": "Open Integrations — Calendars",

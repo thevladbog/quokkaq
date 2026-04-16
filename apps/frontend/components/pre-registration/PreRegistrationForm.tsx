@@ -23,9 +23,9 @@ import {
   PreRegistration,
   Service
 } from '@/lib/api';
-import { useGetCompaniesMeCalendarIntegrations } from '@/lib/api/generated/calendar-integration';
+import { useCalendarIntegrationListMine } from '@/lib/api/generated/calendar-integration';
 import {
-  useGetUnitsUnitIdPreRegistrationsCalendarSlots,
+  useGetCalendarSlotsByUnit,
   usePostUnitsUnitIdPreRegistrations,
   usePutUnitsUnitIdPreRegistrationsId
 } from '@/lib/api/generated/pre-registrations';
@@ -121,7 +121,7 @@ export function PreRegistrationForm({
     queryFn: () => unitsApi.getServices(unitId)
   });
 
-  const companyCalQuery = useGetCompaniesMeCalendarIntegrations({
+  const companyCalQuery = useCalendarIntegrationListMine({
     query: { staleTime: 60_000 }
   });
 
@@ -157,7 +157,7 @@ export function PreRegistrationForm({
     (unitCalIntegrations.length <= 1 || !!effectiveCalendarIntegrationId)
   );
 
-  const calSlotsQuery = useGetUnitsUnitIdPreRegistrationsCalendarSlots(
+  const calSlotsQuery = useGetCalendarSlotsByUnit(
     unitId,
     { serviceId, date },
     {
@@ -226,8 +226,10 @@ export function PreRegistrationForm({
 
   const handleDateChange = (newDate: string) => {
     setDate(newDate);
-    setExternalHref(undefined);
-    setExternalEtag(undefined);
+    if (newDate !== initialData?.date) {
+      setExternalHref(undefined);
+      setExternalEtag(undefined);
+    }
     if (!newDate) {
       setTime('');
       return;
