@@ -25,17 +25,36 @@ function isLocaleKioskPath(pathname: string | null): boolean {
   );
 }
 
+/** Paths where 401 is expected for guests; do not `location.assign` the same page (reload loop). */
+function isPublicAuthShellPath(path: string): boolean {
+  const p = path.split('?')[0] ?? path;
+  if (p === '/login' || p === '/forgot-password' || p === '/signup')
+    return true;
+  for (const loc of routing.locales) {
+    if (
+      p === `/${loc}/login` ||
+      p === `/${loc}/forgot-password` ||
+      p === `/${loc}/signup`
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 interface AuthContextType {
   user: User | null;
+  /** Set when a browser session is active (cookie or legacy localStorage). */
   token: string | null;
   isAuthenticated: boolean;
-  /** Persists token and loads `/auth/me`. Resolves when the user payload is applied or rejects on failure. */
-  login: (token: string) => Promise<void>;
+  login: (legacyAccessToken?: string | null) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const SESSION_MARKER = '1';
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [token, setToken] = useState<string | null>(null);
@@ -43,20 +62,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isClient, setIsClient] = useState(false);
   const pathname = usePathname();
-  /** When true, `login()` owns the `/auth/me` fetch — skip duplicate work in the token effect. */
   const loginFetchOwnsSessionRef = useRef(false);
 
-  // Only run API calls on client side
   useEffect(() => {
     setIsClient(true);
-    // Check if we're on the client before accessing localStorage
-    if (typeof window !== 'undefined') {
-      // Initialize token from localStorage on mount
-      const storedToken = localStorage.getItem('access_token');
-      if (storedToken) {
-        setToken(storedToken);
-      }
-    }
   }, []);
 
   const logout = useCallback(() => {
@@ -72,55 +81,55 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const loginPath = routing.locales.includes(maybeLocale as 'en' | 'ru')
         ? `/${maybeLocale}/login`
         : '/login';
+      const current = window.location.pathname;
+      if (current === loginPath || isPublicAuthShellPath(current)) {
+        return;
+      }
       window.location.href = loginPath;
     }
   }, []);
 
-  const login = useCallback((newToken: string): Promise<void> => {
-    if (typeof window === 'undefined') {
-      return Promise.resolve();
-    }
-    loginFetchOwnsSessionRef.current = true;
-    setIsLoading(true);
-    setToken(newToken);
-    localStorage.setItem('access_token', newToken);
-    return fetchCurrentUser()
-      .then((userData) => {
-        setUser(userData);
-        setIsLoading(false);
-      })
-      .catch((error) => {
-        logger.error('Failed to fetch user after login:', error);
-        setToken(null);
-        setUser(null);
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        localStorage.removeItem(ACTIVE_COMPANY_ID_STORAGE_KEY);
-        setIsLoading(false);
-        throw error;
-      })
-      .finally(() => {
-        loginFetchOwnsSessionRef.current = false;
-      });
-  }, []);
+  const login = useCallback(
+    (legacyAccessToken?: string | null): Promise<void> => {
+      if (typeof window === 'undefined') {
+        return Promise.resolve();
+      }
+      loginFetchOwnsSessionRef.current = true;
+      setIsLoading(true);
+      if (legacyAccessToken) {
+        localStorage.setItem('access_token', legacyAccessToken);
+      }
+      setToken(SESSION_MARKER);
+      return fetchCurrentUser()
+        .then((userData) => {
+          setUser(userData);
+          setIsLoading(false);
+        })
+        .catch((error) => {
+          logger.error('Failed to fetch user after login:', error);
+          setToken(null);
+          setUser(null);
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('refresh_token');
+          localStorage.removeItem(ACTIVE_COMPANY_ID_STORAGE_KEY);
+          setIsLoading(false);
+          throw error;
+        })
+        .finally(() => {
+          loginFetchOwnsSessionRef.current = false;
+        });
+    },
+    []
+  );
 
-  // Fetch user after mount / token change. Pathname is only needed for kiosk routes.
-  // Do not set isLoading on every pathname change — that remounts ProtectedRoute and flashes the sidebar.
+  // Load session from HttpOnly cookies (same-origin /api) or legacy tokens.
   useEffect(() => {
     if (!isClient) return;
 
-    if (!token) {
-      setIsLoading(false);
-      return;
-    }
-
     if (isLocaleKioskPath(pathname)) {
       setUser(null);
+      setToken(null);
       setIsLoading(false);
-      return;
-    }
-
-    if (user !== null) {
       return;
     }
 
@@ -128,28 +137,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
+    if (user !== null) {
+      return;
+    }
+
     setIsLoading(true);
 
     let cancelled = false;
-    const fetchUser = async () => {
+    const run = async () => {
       try {
         const userData = await fetchCurrentUser();
-        if (!cancelled) setUser(userData);
-      } catch (error) {
-        logger.error('Failed to fetch user:', error);
-        if (!cancelled) logout();
+        if (!cancelled) {
+          setUser(userData);
+          setToken(SESSION_MARKER);
+        }
+      } catch {
+        if (!cancelled) {
+          setUser(null);
+          setToken(null);
+        }
       } finally {
-        if (!cancelled) setIsLoading(false);
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       }
     };
 
-    void fetchUser();
+    void run();
     return () => {
       cancelled = true;
     };
-  }, [isClient, token, pathname, logout, user]);
+  }, [isClient, pathname, user]);
 
-  // Listen for global 'auth:logout' events (dispatched by apiRequest on 401 / refresh failure)
   useEffect(() => {
     const handleGlobalLogout = () => {
       logout();
@@ -175,7 +194,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const value = {
     user,
     token,
-    isAuthenticated: !!token && !!user,
+    isAuthenticated: !!user,
     login,
     logout,
     isLoading

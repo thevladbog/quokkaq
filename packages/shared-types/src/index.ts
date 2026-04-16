@@ -1137,6 +1137,10 @@ export type SaasVendor = z.infer<typeof SaasVendorSchema>;
 export const CompanySchema = z.object({
   id: z.string(),
   name: z.string(),
+  slug: z.string().optional(),
+  strictPublicTenantResolve: z.boolean().optional(),
+  opaqueLoginLinksOnly: z.boolean().optional(),
+  ssoJitProvisioning: z.boolean().optional(),
   ownerUserId: z.string().optional(),
   subscriptionId: z.string().nullable().optional(),
   isSaasOperator: z.boolean().optional(),

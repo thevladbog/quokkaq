@@ -436,7 +436,11 @@ export interface HandlersPatchPlatformCompanyBody {
   counterparty?: HandlersPatchPlatformCompanyBodyCounterparty;
   isSaasOperator?: boolean;
   name?: string;
+  opaqueLoginLinksOnly?: boolean;
   paymentAccounts?: HandlersPatchPlatformCompanyBodyPaymentAccountsItem[];
+  slug?: string;
+  ssoJitProvisioning?: boolean;
+  strictPublicTenantResolve?: boolean;
 }
 
 export interface HandlersPatchPlatformInvoiceBody {
@@ -566,6 +570,8 @@ export interface HandlersSaasVendorResponse {
 
 export interface HandlersSignupRequest {
   companyName: string;
+  /** optional; if empty, generated from company name */
+  companySlug?: string;
   email: string;
   name: string;
   password: string;
@@ -799,12 +805,20 @@ export interface ModelsCompany {
   name?: string;
   /** onboarding progress */
   onboardingState?: ModelsCompanyOnboardingState;
+  /** OpaqueLoginLinksOnly: deep links should use TenantLoginLink tokens instead of slug-based branding. */
+  opaqueLoginLinksOnly?: boolean;
   /** owner of the organization */
   ownerUserId?: string;
   /** RU bank accounts (JSON array) */
   paymentAccounts?: ModelsCompanyPaymentAccountsItem[];
   /** company settings */
   settings?: ModelsCompanySettings;
+  /** public tenant slug for login URLs */
+  slug?: string;
+  /** SsoJitProvisioning: allow creating a user on first successful SSO when policy permits. */
+  ssoJitProvisioning?: boolean;
+  /** StrictPublicTenantResolve: SaaS-enabled — GET /public/tenants/{slug} does not expose org metadata for slug guessing. */
+  strictPublicTenantResolve?: boolean;
   subscription?: ModelsSubscription;
   /** FK to Subscription */
   subscriptionId?: string;
@@ -942,6 +956,14 @@ export interface HandlersSetupFirstAdminRequest {
   password?: string;
 }
 
+export interface HandlersSsoExchangeRequest {
+  code?: string;
+}
+
+export interface HandlersTenantHintRequest {
+  email?: string;
+}
+
 export interface ModelsCatalogItemCreateRequest {
   article?: string;
   currency?: string;
@@ -983,6 +1005,7 @@ export interface ModelsCompanyPatch {
   name?: string;
   /** items: @quokkaq/shared-types PaymentAccountSchema */
   paymentAccounts?: ModelsCompanyPatchPaymentAccountsItem[];
+  slug?: string;
 }
 
 export interface ModelsServiceSlot {
@@ -1166,6 +1189,33 @@ export interface ModelsWeeklySlotCapacity {
   updatedAt?: string;
 }
 
+export interface ServicesCompanySSOGetResponse {
+  clientId?: string;
+  clientSecretSet?: boolean;
+  emailDomains?: string[];
+  enabled?: boolean;
+  issuerUrl?: string;
+  /** IdP metadata URL for SAML */
+  samlIdpMetadataUrl?: string;
+  scopes?: string;
+  /** oidc | saml */
+  ssoProtocol?: string;
+}
+
+export interface ServicesCompanySSOPatch {
+  clientId?: string;
+  /** plaintext once; stored encrypted */
+  clientSecret?: string;
+  emailDomains?: string[];
+  enabled?: boolean;
+  issuerUrl?: string;
+  /** IdP metadata URL for SAML */
+  samlIdpMetadataUrl?: string;
+  scopes?: string;
+  /** oidc | saml */
+  ssoProtocol?: string;
+}
+
 export interface ServicesEmployeeRadarResponse {
   computedAt?: string;
   rating?: number;
@@ -1238,6 +1288,12 @@ export interface ServicesOperationsStatusDTO {
   statisticsAsOf?: string;
   statisticsQuiet?: boolean;
   unitId?: string;
+}
+
+export interface ServicesPublicTenantResponse {
+  displayName?: string;
+  slug?: string;
+  ssoAvailable?: boolean;
 }
 
 export interface ServicesSLADeviationsPoint {
@@ -1321,6 +1377,14 @@ export interface ServicesSurveyScoresResponse {
   points?: ServicesSurveyScorePoint[];
 }
 
+export interface ServicesTenantHintResponse {
+  displayName?: string;
+  /** sso | password | choose_slug */
+  next?: string;
+  ssoAvailable?: boolean;
+  tenantSlug?: string;
+}
+
 export interface ServicesTicketsByServiceItem {
   count?: number;
   serviceId?: string;
@@ -1393,6 +1457,37 @@ export type AuthAccessibleCompaniesParams = {
  */
 q?: string;
 };
+
+export type AuthLoginContextParams = {
+/**
+ * Opaque token
+ */
+token: string;
+};
+
+export type AuthSSOAuthorizeParams = {
+/**
+ * Tenant slug
+ */
+tenant: string;
+/**
+ * UI locale for post-SSO redirects (en or ru)
+ */
+locale?: string;
+};
+
+export type AuthSAMLMetadataParams = {
+/**
+ * Tenant slug
+ */
+tenant: string;
+};
+
+export type PostCompaniesMeCompleteOnboarding200 = {[key: string]: boolean};
+
+export type CompaniesMeLoginLinkPost200 = {[key: string]: string};
+
+export type CompaniesMeSlugPatchBody = { [key: string]: unknown };
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
@@ -1721,6 +1816,209 @@ export const useAuthLogin = <TError = string,
         TContext
       > => {
       return useMutation(getAuthLoginMutationOptions(options), queryClient);
+    }
+
+/**
+ * @summary Resolve tenant context by opaque login token
+ */
+export type authLoginContextResponse200 = {
+  data: ServicesPublicTenantResponse
+  status: 200
+}
+
+export type authLoginContextResponseSuccess = (authLoginContextResponse200) & {
+  headers: Headers;
+};
+;
+
+export type authLoginContextResponse = (authLoginContextResponseSuccess)
+
+export const getAuthLoginContextUrl = (params: AuthLoginContextParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/auth/login-context?${stringifiedParams}` : `/auth/login-context`
+}
+
+export const authLoginContext = async (params: AuthLoginContextParams, options?: RequestInit): Promise<authLoginContextResponse> => {
+
+  return orvalMutator<authLoginContextResponse>(getAuthLoginContextUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getAuthLoginContextQueryKey = (params?: AuthLoginContextParams,) => {
+    return [
+    `/auth/login-context`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getAuthLoginContextQueryOptions = <TData = Awaited<ReturnType<typeof authLoginContext>>, TError = unknown>(params: AuthLoginContextParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authLoginContext>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getAuthLoginContextQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof authLoginContext>>> = ({ signal }) => authLoginContext(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof authLoginContext>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type AuthLoginContextQueryResult = NonNullable<Awaited<ReturnType<typeof authLoginContext>>>
+export type AuthLoginContextQueryError = unknown
+
+
+export function useAuthLoginContext<TData = Awaited<ReturnType<typeof authLoginContext>>, TError = unknown>(
+ params: AuthLoginContextParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof authLoginContext>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof authLoginContext>>,
+          TError,
+          Awaited<ReturnType<typeof authLoginContext>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAuthLoginContext<TData = Awaited<ReturnType<typeof authLoginContext>>, TError = unknown>(
+ params: AuthLoginContextParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authLoginContext>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof authLoginContext>>,
+          TError,
+          Awaited<ReturnType<typeof authLoginContext>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAuthLoginContext<TData = Awaited<ReturnType<typeof authLoginContext>>, TError = unknown>(
+ params: AuthLoginContextParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authLoginContext>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Resolve tenant context by opaque login token
+ */
+
+export function useAuthLoginContext<TData = Awaited<ReturnType<typeof authLoginContext>>, TError = unknown>(
+ params: AuthLoginContextParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authLoginContext>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getAuthLoginContextQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * @summary Resolve next login step from email (tenant hint)
+ */
+export type authTenantHintResponse200 = {
+  data: ServicesTenantHintResponse
+  status: 200
+}
+
+export type authTenantHintResponseSuccess = (authTenantHintResponse200) & {
+  headers: Headers;
+};
+;
+
+export type authTenantHintResponse = (authTenantHintResponseSuccess)
+
+export const getAuthTenantHintUrl = () => {
+
+
+
+
+  return `/auth/login/tenant-hint`
+}
+
+export const authTenantHint = async (handlersTenantHintRequest: HandlersTenantHintRequest, options?: RequestInit): Promise<authTenantHintResponse> => {
+
+  return orvalMutator<authTenantHintResponse>(getAuthTenantHintUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersTenantHintRequest,)
+  }
+);}
+
+
+
+
+export const getAuthTenantHintMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authTenantHint>>, TError,{data: HandlersTenantHintRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof authTenantHint>>, TError,{data: HandlersTenantHintRequest}, TContext> => {
+
+const mutationKey = ['authTenantHint'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof authTenantHint>>, {data: HandlersTenantHintRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  authTenantHint(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AuthTenantHintMutationResult = NonNullable<Awaited<ReturnType<typeof authTenantHint>>>
+    export type AuthTenantHintMutationBody = HandlersTenantHintRequest
+    export type AuthTenantHintMutationError = unknown
+
+    /**
+ * @summary Resolve next login step from email (tenant hint)
+ */
+export const useAuthTenantHint = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authTenantHint>>, TError,{data: HandlersTenantHintRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof authTenantHint>>,
+        TError,
+        {data: HandlersTenantHintRequest},
+        TContext
+      > => {
+      return useMutation(getAuthTenantHintMutationOptions(options), queryClient);
     }
 
 /**
@@ -2140,3 +2438,1359 @@ export const useAuthSignup = <TError = string,
       > => {
       return useMutation(getAuthSignupMutationOptions(options), queryClient);
     }
+
+/**
+ * @summary Start SSO (OIDC or SAML — redirect to IdP)
+ */
+export type authSSOAuthorizeResponse302 = {
+  data: void
+  status: 302
+}
+
+;
+export type authSSOAuthorizeResponseError = (authSSOAuthorizeResponse302) & {
+  headers: Headers;
+};
+
+export type authSSOAuthorizeResponse = (authSSOAuthorizeResponseError)
+
+export const getAuthSSOAuthorizeUrl = (params: AuthSSOAuthorizeParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/auth/sso/authorize?${stringifiedParams}` : `/auth/sso/authorize`
+}
+
+export const authSSOAuthorize = async (params: AuthSSOAuthorizeParams, options?: RequestInit): Promise<authSSOAuthorizeResponse> => {
+
+  return orvalMutator<authSSOAuthorizeResponse>(getAuthSSOAuthorizeUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getAuthSSOAuthorizeQueryKey = (params?: AuthSSOAuthorizeParams,) => {
+    return [
+    `/auth/sso/authorize`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getAuthSSOAuthorizeQueryOptions = <TData = Awaited<ReturnType<typeof authSSOAuthorize>>, TError = void>(params: AuthSSOAuthorizeParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authSSOAuthorize>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getAuthSSOAuthorizeQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof authSSOAuthorize>>> = ({ signal }) => authSSOAuthorize(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof authSSOAuthorize>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type AuthSSOAuthorizeQueryResult = NonNullable<Awaited<ReturnType<typeof authSSOAuthorize>>>
+export type AuthSSOAuthorizeQueryError = void
+
+
+export function useAuthSSOAuthorize<TData = Awaited<ReturnType<typeof authSSOAuthorize>>, TError = void>(
+ params: AuthSSOAuthorizeParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof authSSOAuthorize>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof authSSOAuthorize>>,
+          TError,
+          Awaited<ReturnType<typeof authSSOAuthorize>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAuthSSOAuthorize<TData = Awaited<ReturnType<typeof authSSOAuthorize>>, TError = void>(
+ params: AuthSSOAuthorizeParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authSSOAuthorize>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof authSSOAuthorize>>,
+          TError,
+          Awaited<ReturnType<typeof authSSOAuthorize>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAuthSSOAuthorize<TData = Awaited<ReturnType<typeof authSSOAuthorize>>, TError = void>(
+ params: AuthSSOAuthorizeParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authSSOAuthorize>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Start SSO (OIDC or SAML — redirect to IdP)
+ */
+
+export function useAuthSSOAuthorize<TData = Awaited<ReturnType<typeof authSSOAuthorize>>, TError = void>(
+ params: AuthSSOAuthorizeParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authSSOAuthorize>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getAuthSSOAuthorizeQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * @summary SAML Assertion Consumer Service (POST from IdP)
+ */
+export type authSAMLACSResponse302 = {
+  data: void
+  status: 302
+}
+
+export type authSAMLACSResponse400 = {
+  data: string
+  status: 400
+}
+
+;
+export type authSAMLACSResponseError = (authSAMLACSResponse302 | authSAMLACSResponse400) & {
+  headers: Headers;
+};
+
+export type authSAMLACSResponse = (authSAMLACSResponseError)
+
+export const getAuthSAMLACSUrl = () => {
+
+
+
+
+  return `/auth/saml/acs`
+}
+
+export const authSAMLACS = async ( options?: RequestInit): Promise<authSAMLACSResponse> => {
+
+  return orvalMutator<authSAMLACSResponse>(getAuthSAMLACSUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getAuthSAMLACSMutationOptions = <TError = void | string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authSAMLACS>>, TError,void, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof authSAMLACS>>, TError,void, TContext> => {
+
+const mutationKey = ['authSAMLACS'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof authSAMLACS>>, void> = () => {
+
+
+          return  authSAMLACS(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AuthSAMLACSMutationResult = NonNullable<Awaited<ReturnType<typeof authSAMLACS>>>
+
+    export type AuthSAMLACSMutationError = void | string
+
+    /**
+ * @summary SAML Assertion Consumer Service (POST from IdP)
+ */
+export const useAuthSAMLACS = <TError = void | string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authSAMLACS>>, TError,void, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof authSAMLACS>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getAuthSAMLACSMutationOptions(options), queryClient);
+    }
+
+/**
+ * @summary SAML SP metadata XML (register at IdP)
+ */
+export type authSAMLMetadataResponse200 = {
+  data: void
+  status: 200
+}
+
+export type authSAMLMetadataResponse404 = {
+  data: string
+  status: 404
+}
+
+export type authSAMLMetadataResponseSuccess = (authSAMLMetadataResponse200) & {
+  headers: Headers;
+};
+export type authSAMLMetadataResponseError = (authSAMLMetadataResponse404) & {
+  headers: Headers;
+};
+
+export type authSAMLMetadataResponse = (authSAMLMetadataResponseSuccess | authSAMLMetadataResponseError)
+
+export const getAuthSAMLMetadataUrl = (params: AuthSAMLMetadataParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/auth/saml/metadata?${stringifiedParams}` : `/auth/saml/metadata`
+}
+
+export const authSAMLMetadata = async (params: AuthSAMLMetadataParams, options?: RequestInit): Promise<authSAMLMetadataResponse> => {
+
+  return orvalMutator<authSAMLMetadataResponse>(getAuthSAMLMetadataUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getAuthSAMLMetadataQueryKey = (params?: AuthSAMLMetadataParams,) => {
+    return [
+    `/auth/saml/metadata`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getAuthSAMLMetadataQueryOptions = <TData = Awaited<ReturnType<typeof authSAMLMetadata>>, TError = string>(params: AuthSAMLMetadataParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authSAMLMetadata>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getAuthSAMLMetadataQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof authSAMLMetadata>>> = ({ signal }) => authSAMLMetadata(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof authSAMLMetadata>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type AuthSAMLMetadataQueryResult = NonNullable<Awaited<ReturnType<typeof authSAMLMetadata>>>
+export type AuthSAMLMetadataQueryError = string
+
+
+export function useAuthSAMLMetadata<TData = Awaited<ReturnType<typeof authSAMLMetadata>>, TError = string>(
+ params: AuthSAMLMetadataParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof authSAMLMetadata>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof authSAMLMetadata>>,
+          TError,
+          Awaited<ReturnType<typeof authSAMLMetadata>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAuthSAMLMetadata<TData = Awaited<ReturnType<typeof authSAMLMetadata>>, TError = string>(
+ params: AuthSAMLMetadataParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authSAMLMetadata>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof authSAMLMetadata>>,
+          TError,
+          Awaited<ReturnType<typeof authSAMLMetadata>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAuthSAMLMetadata<TData = Awaited<ReturnType<typeof authSAMLMetadata>>, TError = string>(
+ params: AuthSAMLMetadataParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authSAMLMetadata>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary SAML SP metadata XML (register at IdP)
+ */
+
+export function useAuthSAMLMetadata<TData = Awaited<ReturnType<typeof authSAMLMetadata>>, TError = string>(
+ params: AuthSAMLMetadataParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authSAMLMetadata>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getAuthSAMLMetadataQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * @summary OIDC callback
+ */
+export type authSSOCallbackResponse302 = {
+  data: void
+  status: 302
+}
+
+;
+export type authSSOCallbackResponseError = (authSSOCallbackResponse302) & {
+  headers: Headers;
+};
+
+export type authSSOCallbackResponse = (authSSOCallbackResponseError)
+
+export const getAuthSSOCallbackUrl = () => {
+
+
+
+
+  return `/auth/sso/callback`
+}
+
+export const authSSOCallback = async ( options?: RequestInit): Promise<authSSOCallbackResponse> => {
+
+  return orvalMutator<authSSOCallbackResponse>(getAuthSSOCallbackUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getAuthSSOCallbackQueryKey = () => {
+    return [
+    `/auth/sso/callback`
+    ] as const;
+    }
+
+
+export const getAuthSSOCallbackQueryOptions = <TData = Awaited<ReturnType<typeof authSSOCallback>>, TError = void>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authSSOCallback>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getAuthSSOCallbackQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof authSSOCallback>>> = ({ signal }) => authSSOCallback({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof authSSOCallback>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type AuthSSOCallbackQueryResult = NonNullable<Awaited<ReturnType<typeof authSSOCallback>>>
+export type AuthSSOCallbackQueryError = void
+
+
+export function useAuthSSOCallback<TData = Awaited<ReturnType<typeof authSSOCallback>>, TError = void>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof authSSOCallback>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof authSSOCallback>>,
+          TError,
+          Awaited<ReturnType<typeof authSSOCallback>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAuthSSOCallback<TData = Awaited<ReturnType<typeof authSSOCallback>>, TError = void>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authSSOCallback>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof authSSOCallback>>,
+          TError,
+          Awaited<ReturnType<typeof authSSOCallback>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAuthSSOCallback<TData = Awaited<ReturnType<typeof authSSOCallback>>, TError = void>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authSSOCallback>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary OIDC callback
+ */
+
+export function useAuthSSOCallback<TData = Awaited<ReturnType<typeof authSSOCallback>>, TError = void>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authSSOCallback>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getAuthSSOCallbackQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * @summary Exchange one-time SSO code for JWT pair
+ */
+export type authSSOExchangeResponse200 = {
+  data: HandlersLoginResponse
+  status: 200
+}
+
+export type authSSOExchangeResponseSuccess = (authSSOExchangeResponse200) & {
+  headers: Headers;
+};
+;
+
+export type authSSOExchangeResponse = (authSSOExchangeResponseSuccess)
+
+export const getAuthSSOExchangeUrl = () => {
+
+
+
+
+  return `/auth/sso/exchange`
+}
+
+export const authSSOExchange = async (handlersSsoExchangeRequest: HandlersSsoExchangeRequest, options?: RequestInit): Promise<authSSOExchangeResponse> => {
+
+  return orvalMutator<authSSOExchangeResponse>(getAuthSSOExchangeUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersSsoExchangeRequest,)
+  }
+);}
+
+
+
+
+export const getAuthSSOExchangeMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authSSOExchange>>, TError,{data: HandlersSsoExchangeRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof authSSOExchange>>, TError,{data: HandlersSsoExchangeRequest}, TContext> => {
+
+const mutationKey = ['authSSOExchange'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof authSSOExchange>>, {data: HandlersSsoExchangeRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  authSSOExchange(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AuthSSOExchangeMutationResult = NonNullable<Awaited<ReturnType<typeof authSSOExchange>>>
+    export type AuthSSOExchangeMutationBody = HandlersSsoExchangeRequest
+    export type AuthSSOExchangeMutationError = unknown
+
+    /**
+ * @summary Exchange one-time SSO code for JWT pair
+ */
+export const useAuthSSOExchange = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authSSOExchange>>, TError,{data: HandlersSsoExchangeRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof authSSOExchange>>,
+        TError,
+        {data: HandlersSsoExchangeRequest},
+        TContext
+      > => {
+      return useMutation(getAuthSSOExchangeMutationOptions(options), queryClient);
+    }
+
+/**
+ * @summary Get current user's company (tenant admin)
+ */
+export type getCompaniesMeResponse200 = {
+  data: HandlersCompanyMeResponse
+  status: 200
+}
+
+export type getCompaniesMeResponse401 = {
+  data: string
+  status: 401
+}
+
+export type getCompaniesMeResponse403 = {
+  data: string
+  status: 403
+}
+
+export type getCompaniesMeResponse404 = {
+  data: string
+  status: 404
+}
+
+export type getCompaniesMeResponse500 = {
+  data: string
+  status: 500
+}
+
+export type getCompaniesMeResponseSuccess = (getCompaniesMeResponse200) & {
+  headers: Headers;
+};
+export type getCompaniesMeResponseError = (getCompaniesMeResponse401 | getCompaniesMeResponse403 | getCompaniesMeResponse404 | getCompaniesMeResponse500) & {
+  headers: Headers;
+};
+
+export type getCompaniesMeResponse = (getCompaniesMeResponseSuccess | getCompaniesMeResponseError)
+
+export const getGetCompaniesMeUrl = () => {
+
+
+
+
+  return `/companies/me`
+}
+
+export const getCompaniesMe = async ( options?: RequestInit): Promise<getCompaniesMeResponse> => {
+
+  return orvalMutator<getCompaniesMeResponse>(getGetCompaniesMeUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCompaniesMeQueryKey = () => {
+    return [
+    `/companies/me`
+    ] as const;
+    }
+
+
+export const getGetCompaniesMeQueryOptions = <TData = Awaited<ReturnType<typeof getCompaniesMe>>, TError = string>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMe>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCompaniesMeQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCompaniesMe>>> = ({ signal }) => getCompaniesMe({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMe>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetCompaniesMeQueryResult = NonNullable<Awaited<ReturnType<typeof getCompaniesMe>>>
+export type GetCompaniesMeQueryError = string
+
+
+export function useGetCompaniesMe<TData = Awaited<ReturnType<typeof getCompaniesMe>>, TError = string>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMe>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCompaniesMe>>,
+          TError,
+          Awaited<ReturnType<typeof getCompaniesMe>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCompaniesMe<TData = Awaited<ReturnType<typeof getCompaniesMe>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMe>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCompaniesMe>>,
+          TError,
+          Awaited<ReturnType<typeof getCompaniesMe>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCompaniesMe<TData = Awaited<ReturnType<typeof getCompaniesMe>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMe>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get current user's company (tenant admin)
+ */
+
+export function useGetCompaniesMe<TData = Awaited<ReturnType<typeof getCompaniesMe>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMe>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetCompaniesMeQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * Partial update: JSON body matches models.CompanyPatch at the root (not wrapped in a "company" property). Only send fields to change. Cannot combine clearBillingAddress with billingAddress (same for counterparty).
+ * @summary Update current user's company (tenant admin)
+ */
+export type patchCompaniesMeResponse200 = {
+  data: ModelsCompany
+  status: 200
+}
+
+export type patchCompaniesMeResponse400 = {
+  data: string
+  status: 400
+}
+
+export type patchCompaniesMeResponse401 = {
+  data: string
+  status: 401
+}
+
+export type patchCompaniesMeResponse403 = {
+  data: string
+  status: 403
+}
+
+export type patchCompaniesMeResponse404 = {
+  data: string
+  status: 404
+}
+
+export type patchCompaniesMeResponse500 = {
+  data: string
+  status: 500
+}
+
+export type patchCompaniesMeResponseSuccess = (patchCompaniesMeResponse200) & {
+  headers: Headers;
+};
+export type patchCompaniesMeResponseError = (patchCompaniesMeResponse400 | patchCompaniesMeResponse401 | patchCompaniesMeResponse403 | patchCompaniesMeResponse404 | patchCompaniesMeResponse500) & {
+  headers: Headers;
+};
+
+export type patchCompaniesMeResponse = (patchCompaniesMeResponseSuccess | patchCompaniesMeResponseError)
+
+export const getPatchCompaniesMeUrl = () => {
+
+
+
+
+  return `/companies/me`
+}
+
+export const patchCompaniesMe = async (modelsCompanyPatch: ModelsCompanyPatch, options?: RequestInit): Promise<patchCompaniesMeResponse> => {
+
+  return orvalMutator<patchCompaniesMeResponse>(getPatchCompaniesMeUrl(),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      modelsCompanyPatch,)
+  }
+);}
+
+
+
+
+export const getPatchCompaniesMeMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchCompaniesMe>>, TError,{data: ModelsCompanyPatch}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof patchCompaniesMe>>, TError,{data: ModelsCompanyPatch}, TContext> => {
+
+const mutationKey = ['patchCompaniesMe'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchCompaniesMe>>, {data: ModelsCompanyPatch}> = (props) => {
+          const {data} = props ?? {};
+
+          return  patchCompaniesMe(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PatchCompaniesMeMutationResult = NonNullable<Awaited<ReturnType<typeof patchCompaniesMe>>>
+    export type PatchCompaniesMeMutationBody = ModelsCompanyPatch
+    export type PatchCompaniesMeMutationError = string
+
+    /**
+ * @summary Update current user's company (tenant admin)
+ */
+export const usePatchCompaniesMe = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchCompaniesMe>>, TError,{data: ModelsCompanyPatch}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof patchCompaniesMe>>,
+        TError,
+        {data: ModelsCompanyPatch},
+        TContext
+      > => {
+      return useMutation(getPatchCompaniesMeMutationOptions(options), queryClient);
+    }
+
+/**
+ * Marks onboarding as complete for the user's company
+ * @summary Complete Onboarding
+ */
+export type postCompaniesMeCompleteOnboardingResponse200 = {
+  data: PostCompaniesMeCompleteOnboarding200
+  status: 200
+}
+
+export type postCompaniesMeCompleteOnboardingResponse401 = {
+  data: string
+  status: 401
+}
+
+export type postCompaniesMeCompleteOnboardingResponse403 = {
+  data: string
+  status: 403
+}
+
+export type postCompaniesMeCompleteOnboardingResponse404 = {
+  data: string
+  status: 404
+}
+
+export type postCompaniesMeCompleteOnboardingResponse500 = {
+  data: string
+  status: 500
+}
+
+export type postCompaniesMeCompleteOnboardingResponseSuccess = (postCompaniesMeCompleteOnboardingResponse200) & {
+  headers: Headers;
+};
+export type postCompaniesMeCompleteOnboardingResponseError = (postCompaniesMeCompleteOnboardingResponse401 | postCompaniesMeCompleteOnboardingResponse403 | postCompaniesMeCompleteOnboardingResponse404 | postCompaniesMeCompleteOnboardingResponse500) & {
+  headers: Headers;
+};
+
+export type postCompaniesMeCompleteOnboardingResponse = (postCompaniesMeCompleteOnboardingResponseSuccess | postCompaniesMeCompleteOnboardingResponseError)
+
+export const getPostCompaniesMeCompleteOnboardingUrl = () => {
+
+
+
+
+  return `/companies/me/complete-onboarding`
+}
+
+export const postCompaniesMeCompleteOnboarding = async ( options?: RequestInit): Promise<postCompaniesMeCompleteOnboardingResponse> => {
+
+  return orvalMutator<postCompaniesMeCompleteOnboardingResponse>(getPostCompaniesMeCompleteOnboardingUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getPostCompaniesMeCompleteOnboardingMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postCompaniesMeCompleteOnboarding>>, TError,void, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof postCompaniesMeCompleteOnboarding>>, TError,void, TContext> => {
+
+const mutationKey = ['postCompaniesMeCompleteOnboarding'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postCompaniesMeCompleteOnboarding>>, void> = () => {
+
+
+          return  postCompaniesMeCompleteOnboarding(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostCompaniesMeCompleteOnboardingMutationResult = NonNullable<Awaited<ReturnType<typeof postCompaniesMeCompleteOnboarding>>>
+
+    export type PostCompaniesMeCompleteOnboardingMutationError = string
+
+    /**
+ * @summary Complete Onboarding
+ */
+export const usePostCompaniesMeCompleteOnboarding = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postCompaniesMeCompleteOnboarding>>, TError,void, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postCompaniesMeCompleteOnboarding>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getPostCompaniesMeCompleteOnboardingMutationOptions(options), queryClient);
+    }
+
+/**
+ * @summary Create opaque login link
+ */
+export type companiesMeLoginLinkPostResponse200 = {
+  data: CompaniesMeLoginLinkPost200
+  status: 200
+}
+
+export type companiesMeLoginLinkPostResponseSuccess = (companiesMeLoginLinkPostResponse200) & {
+  headers: Headers;
+};
+;
+
+export type companiesMeLoginLinkPostResponse = (companiesMeLoginLinkPostResponseSuccess)
+
+export const getCompaniesMeLoginLinkPostUrl = () => {
+
+
+
+
+  return `/companies/me/login-links`
+}
+
+export const companiesMeLoginLinkPost = async ( options?: RequestInit): Promise<companiesMeLoginLinkPostResponse> => {
+
+  return orvalMutator<companiesMeLoginLinkPostResponse>(getCompaniesMeLoginLinkPostUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getCompaniesMeLoginLinkPostMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof companiesMeLoginLinkPost>>, TError,void, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof companiesMeLoginLinkPost>>, TError,void, TContext> => {
+
+const mutationKey = ['companiesMeLoginLinkPost'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof companiesMeLoginLinkPost>>, void> = () => {
+
+
+          return  companiesMeLoginLinkPost(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CompaniesMeLoginLinkPostMutationResult = NonNullable<Awaited<ReturnType<typeof companiesMeLoginLinkPost>>>
+
+    export type CompaniesMeLoginLinkPostMutationError = unknown
+
+    /**
+ * @summary Create opaque login link
+ */
+export const useCompaniesMeLoginLinkPost = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof companiesMeLoginLinkPost>>, TError,void, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof companiesMeLoginLinkPost>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getCompaniesMeLoginLinkPostMutationOptions(options), queryClient);
+    }
+
+/**
+ * @summary Update tenant slug
+ */
+export type companiesMeSlugPatchResponse200 = {
+  data: ModelsCompany
+  status: 200
+}
+
+export type companiesMeSlugPatchResponseSuccess = (companiesMeSlugPatchResponse200) & {
+  headers: Headers;
+};
+;
+
+export type companiesMeSlugPatchResponse = (companiesMeSlugPatchResponseSuccess)
+
+export const getCompaniesMeSlugPatchUrl = () => {
+
+
+
+
+  return `/companies/me/slug`
+}
+
+export const companiesMeSlugPatch = async (companiesMeSlugPatchBody: CompaniesMeSlugPatchBody, options?: RequestInit): Promise<companiesMeSlugPatchResponse> => {
+
+  return orvalMutator<companiesMeSlugPatchResponse>(getCompaniesMeSlugPatchUrl(),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      companiesMeSlugPatchBody,)
+  }
+);}
+
+
+
+
+export const getCompaniesMeSlugPatchMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof companiesMeSlugPatch>>, TError,{data: CompaniesMeSlugPatchBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof companiesMeSlugPatch>>, TError,{data: CompaniesMeSlugPatchBody}, TContext> => {
+
+const mutationKey = ['companiesMeSlugPatch'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof companiesMeSlugPatch>>, {data: CompaniesMeSlugPatchBody}> = (props) => {
+          const {data} = props ?? {};
+
+          return  companiesMeSlugPatch(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CompaniesMeSlugPatchMutationResult = NonNullable<Awaited<ReturnType<typeof companiesMeSlugPatch>>>
+    export type CompaniesMeSlugPatchMutationBody = CompaniesMeSlugPatchBody
+    export type CompaniesMeSlugPatchMutationError = unknown
+
+    /**
+ * @summary Update tenant slug
+ */
+export const useCompaniesMeSlugPatch = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof companiesMeSlugPatch>>, TError,{data: CompaniesMeSlugPatchBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof companiesMeSlugPatch>>,
+        TError,
+        {data: CompaniesMeSlugPatchBody},
+        TContext
+      > => {
+      return useMutation(getCompaniesMeSlugPatchMutationOptions(options), queryClient);
+    }
+
+/**
+ * @summary Get SSO OIDC settings
+ */
+export type companiesMeSSOGetResponse200 = {
+  data: ServicesCompanySSOGetResponse
+  status: 200
+}
+
+export type companiesMeSSOGetResponseSuccess = (companiesMeSSOGetResponse200) & {
+  headers: Headers;
+};
+;
+
+export type companiesMeSSOGetResponse = (companiesMeSSOGetResponseSuccess)
+
+export const getCompaniesMeSSOGetUrl = () => {
+
+
+
+
+  return `/companies/me/sso`
+}
+
+export const companiesMeSSOGet = async ( options?: RequestInit): Promise<companiesMeSSOGetResponse> => {
+
+  return orvalMutator<companiesMeSSOGetResponse>(getCompaniesMeSSOGetUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getCompaniesMeSSOGetQueryKey = () => {
+    return [
+    `/companies/me/sso`
+    ] as const;
+    }
+
+
+export const getCompaniesMeSSOGetQueryOptions = <TData = Awaited<ReturnType<typeof companiesMeSSOGet>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof companiesMeSSOGet>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getCompaniesMeSSOGetQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof companiesMeSSOGet>>> = ({ signal }) => companiesMeSSOGet({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof companiesMeSSOGet>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type CompaniesMeSSOGetQueryResult = NonNullable<Awaited<ReturnType<typeof companiesMeSSOGet>>>
+export type CompaniesMeSSOGetQueryError = unknown
+
+
+export function useCompaniesMeSSOGet<TData = Awaited<ReturnType<typeof companiesMeSSOGet>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof companiesMeSSOGet>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof companiesMeSSOGet>>,
+          TError,
+          Awaited<ReturnType<typeof companiesMeSSOGet>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useCompaniesMeSSOGet<TData = Awaited<ReturnType<typeof companiesMeSSOGet>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof companiesMeSSOGet>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof companiesMeSSOGet>>,
+          TError,
+          Awaited<ReturnType<typeof companiesMeSSOGet>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useCompaniesMeSSOGet<TData = Awaited<ReturnType<typeof companiesMeSSOGet>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof companiesMeSSOGet>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get SSO OIDC settings
+ */
+
+export function useCompaniesMeSSOGet<TData = Awaited<ReturnType<typeof companiesMeSSOGet>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof companiesMeSSOGet>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getCompaniesMeSSOGetQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * @summary Update SSO OIDC settings
+ */
+export type companiesMeSSOPatchResponse204 = {
+  data: void
+  status: 204
+}
+
+export type companiesMeSSOPatchResponseSuccess = (companiesMeSSOPatchResponse204) & {
+  headers: Headers;
+};
+;
+
+export type companiesMeSSOPatchResponse = (companiesMeSSOPatchResponseSuccess)
+
+export const getCompaniesMeSSOPatchUrl = () => {
+
+
+
+
+  return `/companies/me/sso`
+}
+
+export const companiesMeSSOPatch = async (servicesCompanySSOPatch: ServicesCompanySSOPatch, options?: RequestInit): Promise<companiesMeSSOPatchResponse> => {
+
+  return orvalMutator<companiesMeSSOPatchResponse>(getCompaniesMeSSOPatchUrl(),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      servicesCompanySSOPatch,)
+  }
+);}
+
+
+
+
+export const getCompaniesMeSSOPatchMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof companiesMeSSOPatch>>, TError,{data: ServicesCompanySSOPatch}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof companiesMeSSOPatch>>, TError,{data: ServicesCompanySSOPatch}, TContext> => {
+
+const mutationKey = ['companiesMeSSOPatch'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof companiesMeSSOPatch>>, {data: ServicesCompanySSOPatch}> = (props) => {
+          const {data} = props ?? {};
+
+          return  companiesMeSSOPatch(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CompaniesMeSSOPatchMutationResult = NonNullable<Awaited<ReturnType<typeof companiesMeSSOPatch>>>
+    export type CompaniesMeSSOPatchMutationBody = ServicesCompanySSOPatch
+    export type CompaniesMeSSOPatchMutationError = unknown
+
+    /**
+ * @summary Update SSO OIDC settings
+ */
+export const useCompaniesMeSSOPatch = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof companiesMeSSOPatch>>, TError,{data: ServicesCompanySSOPatch}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof companiesMeSSOPatch>>,
+        TError,
+        {data: ServicesCompanySSOPatch},
+        TContext
+      > => {
+      return useMutation(getCompaniesMeSSOPatchMutationOptions(options), queryClient);
+    }
+
+/**
+ * @summary Public tenant metadata by slug
+ */
+export type publicTenantBySlugResponse200 = {
+  data: ServicesPublicTenantResponse
+  status: 200
+}
+
+export type publicTenantBySlugResponse404 = {
+  data: string
+  status: 404
+}
+
+export type publicTenantBySlugResponseSuccess = (publicTenantBySlugResponse200) & {
+  headers: Headers;
+};
+export type publicTenantBySlugResponseError = (publicTenantBySlugResponse404) & {
+  headers: Headers;
+};
+
+export type publicTenantBySlugResponse = (publicTenantBySlugResponseSuccess | publicTenantBySlugResponseError)
+
+export const getPublicTenantBySlugUrl = (slug: string,) => {
+
+
+
+
+  return `/public/tenants/${slug}`
+}
+
+export const publicTenantBySlug = async (slug: string, options?: RequestInit): Promise<publicTenantBySlugResponse> => {
+
+  return orvalMutator<publicTenantBySlugResponse>(getPublicTenantBySlugUrl(slug),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getPublicTenantBySlugQueryKey = (slug: string,) => {
+    return [
+    `/public/tenants/${slug}`
+    ] as const;
+    }
+
+
+export const getPublicTenantBySlugQueryOptions = <TData = Awaited<ReturnType<typeof publicTenantBySlug>>, TError = string>(slug: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof publicTenantBySlug>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getPublicTenantBySlugQueryKey(slug);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof publicTenantBySlug>>> = ({ signal }) => publicTenantBySlug(slug, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(slug), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof publicTenantBySlug>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type PublicTenantBySlugQueryResult = NonNullable<Awaited<ReturnType<typeof publicTenantBySlug>>>
+export type PublicTenantBySlugQueryError = string
+
+
+export function usePublicTenantBySlug<TData = Awaited<ReturnType<typeof publicTenantBySlug>>, TError = string>(
+ slug: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof publicTenantBySlug>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof publicTenantBySlug>>,
+          TError,
+          Awaited<ReturnType<typeof publicTenantBySlug>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function usePublicTenantBySlug<TData = Awaited<ReturnType<typeof publicTenantBySlug>>, TError = string>(
+ slug: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof publicTenantBySlug>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof publicTenantBySlug>>,
+          TError,
+          Awaited<ReturnType<typeof publicTenantBySlug>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function usePublicTenantBySlug<TData = Awaited<ReturnType<typeof publicTenantBySlug>>, TError = string>(
+ slug: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof publicTenantBySlug>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Public tenant metadata by slug
+ */
+
+export function usePublicTenantBySlug<TData = Awaited<ReturnType<typeof publicTenantBySlug>>, TError = string>(
+ slug: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof publicTenantBySlug>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getPublicTenantBySlugQueryOptions(slug,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}

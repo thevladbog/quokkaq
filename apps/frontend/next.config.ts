@@ -26,6 +26,11 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       {
+        source: '/:locale/settings/settings/:path*',
+        destination: '/:locale/settings/:path*',
+        permanent: false
+      },
+      {
         source: '/:locale/admin/pre-registrations/:unitId',
         destination: '/:locale/pre-registrations/:unitId',
         permanent: true

@@ -1,0 +1,30 @@
+# Local test identity provider (Keycloak) for OIDC and SAML SSO integration.
+# Not for production.
+#
+#   docker compose -f docker-compose.test-idp.yml up -d
+#   open http://localhost:8080  (admin / admin — change after first login)
+#
+# Realm `quokkaq-test` is imported on first start from tools/test-idp/keycloak/import/.
+# See tools/test-idp/README.md for Quokka env and tenant settings.
+
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0.7
+    container_name: quokkaq-test-keycloak
+    command: start-dev --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HEALTH_ENABLED: "true"
+      KC_HOSTNAME_STRICT: "false"
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./tools/test-idp/keycloak/import:/opt/keycloak/data/import:ro
+    # Image has bash but not curl; port open is enough for compose --wait.
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080'"]
+      interval: 10s
+      timeout: 5s
+      retries: 24
+      start_period: 120s

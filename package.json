@@ -14,7 +14,8 @@
       "unrs-resolver"
     ],
     "overrides": {
-      "es5-ext": "0.10.63"
+      "es5-ext": "0.10.63",
+      "follow-redirects": "1.16.0"
     }
   },
   "scripts": {

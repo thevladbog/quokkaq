@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"quokkaq-go-backend/internal/models"
+	"quokkaq-go-backend/internal/pkg/tenantslug"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/pkg/database"
 
@@ -20,6 +21,12 @@ import (
 // ErrEmailAlreadyExists is returned from Signup when the email is already registered.
 var ErrEmailAlreadyExists = errors.New("email already exists")
 
+// ErrInvalidCompanySlug is returned when optional companySlug fails format/reserved rules.
+var ErrInvalidCompanySlug = errors.New("invalid company slug")
+
+// ErrCompanySlugTaken is returned when optional companySlug is already in use.
+var ErrCompanySlugTaken = errors.New("company slug already taken")
+
 // TokenPair holds short-lived access and long-lived refresh JWTs.
 type TokenPair struct {
 	AccessToken  string
@@ -31,8 +38,10 @@ type AuthService interface {
 	GetMe(userID string) (*models.User, error)
 	RequestPasswordReset(email string) error
 	ResetPassword(token, newPassword string) error
-	Signup(name, email, password, companyName, planCode string) (*TokenPair, error)
+	Signup(name, email, password, companyName, planCode string, preferredSlug *string) (*TokenPair, error)
 	Refresh(refreshToken string) (*TokenPair, error)
+	// IssueTokenPairForUserID issues JWT access+refresh for an existing user (e.g. after SSO).
+	IssueTokenPairForUserID(userID string) (*TokenPair, error)
 }
 
 type authService struct {
@@ -106,6 +115,14 @@ func (s *authService) generateTokenPair(user *models.User) (*TokenPair, error) {
 		return nil, err
 	}
 	return &TokenPair{AccessToken: access, RefreshToken: refresh}, nil
+}
+
+func (s *authService) IssueTokenPairForUserID(userID string) (*TokenPair, error) {
+	user, err := s.userRepo.FindByID(userID)
+	if err != nil {
+		return nil, err
+	}
+	return s.generateTokenPair(user)
 }
 
 func (s *authService) Refresh(refreshToken string) (*TokenPair, error) {
@@ -202,7 +219,7 @@ func (s *authService) ResetPassword(token, newPassword string) error {
 	return s.userRepo.DeletePasswordResetToken(resetToken.ID)
 }
 
-func (s *authService) Signup(name, email, password, companyName, planCode string) (*TokenPair, error) {
+func (s *authService) Signup(name, email, password, companyName, planCode string, preferredSlug *string) (*TokenPair, error) {
 	// Check if user already exists
 	existingUser, _ := s.userRepo.FindByEmail(email)
 	if existingUser != nil {
@@ -245,6 +262,35 @@ func (s *authService) Signup(name, email, password, companyName, planCode string
 
 	var pair *TokenPair
 	err = database.DB.Transaction(func(tx *gorm.DB) error {
+		var slug string
+		if preferredSlug != nil && strings.TrimSpace(*preferredSlug) != "" {
+			n := tenantslug.Normalize(strings.TrimSpace(*preferredSlug))
+			if err := tenantslug.Validate(n); err != nil {
+				return ErrInvalidCompanySlug
+			}
+			var cnt int64
+			if err := tx.Model(&models.Company{}).Where("slug = ?", n).Count(&cnt).Error; err != nil {
+				return err
+			}
+			if cnt > 0 {
+				return ErrCompanySlugTaken
+			}
+			slug = n
+		} else {
+			var pickErr error
+			slug, pickErr = tenantslug.PickUniqueSlug(companyName, func(s string) (bool, error) {
+				var n int64
+				if err := tx.Model(&models.Company{}).Where("slug = ?", s).Count(&n).Error; err != nil {
+					return false, err
+				}
+				return n > 0, nil
+			})
+			if pickErr != nil {
+				return pickErr
+			}
+		}
+		company.Slug = slug
+
 		if err := tx.Create(company).Error; err != nil {
 			return fmt.Errorf("failed to create company: %w", err)
 		}

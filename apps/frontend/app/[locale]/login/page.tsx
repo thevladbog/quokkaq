@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useRouter, Link } from '@/src/i18n/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
@@ -21,6 +22,10 @@ import LanguageSwitcher from '@/components/LanguageSwitcher';
 import ThemeToggle from '@/components/ThemeToggle';
 import {
   authAccessibleCompanies,
+  authLoginContext,
+  authTenantHint,
+  getAuthSSOAuthorizeUrl,
+  publicTenantBySlug,
   useAuthAccessibleCompanies,
   type authAccessibleCompaniesResponse,
   type HandlersAccessibleCompanyItem
@@ -28,18 +33,50 @@ import {
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+
+const SSO_ERROR_CODES = [
+  'no_tenant_access',
+  'not_provisioned',
+  'email_required',
+  'denied',
+  'email_unverified',
+  'saml_email_missing'
+] as const;
+
+type SSOErrorCode = (typeof SSO_ERROR_CODES)[number];
+
+function normalizeSsoErrorCode(raw: string | null): SSOErrorCode | null {
+  if (!raw?.trim()) return null;
+  const v = raw.trim();
+  for (const c of SSO_ERROR_CODES) {
+    if (c === v) return c;
+  }
+  return 'denied';
+}
 
 type Step = 'form' | 'company';
+type SubStep = 'email' | 'password';
 
 export default function LoginPage() {
   const t = useTranslations('login');
   const locale = useLocale();
+  const searchParams = useSearchParams();
   const wordmarkSrc = locale === 'ru' ? '/logo-text-ru.svg' : '/logo-text.svg';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [tenantSlugManual, setTenantSlugManual] = useState('');
+  const [subStep, setSubStep] = useState<SubStep>('email');
+  const [hintNext, setHintNext] = useState<string | null>(null);
+  const [hintSso, setHintSso] = useState(false);
+  const [hintSlug, setHintSlug] = useState<string | null>(null);
+  const [hintDisplay, setHintDisplay] = useState<string | null>(null);
+  const [tenantBanner, setTenantBanner] = useState<string | null>(null);
+  const [hintLoading, setHintLoading] = useState(false);
   const [step, setStep] = useState<Step>('form');
   const [companySearch, setCompanySearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [ssoErrorCode, setSsoErrorCode] = useState<SSOErrorCode | null>(null);
   const router = useRouter();
   const loginMutation = useLogin();
   const { login } = useAuthContext();
@@ -49,6 +86,13 @@ export default function LoginPage() {
     const timer = setTimeout(() => setDebouncedSearch(companySearch), 300);
     return () => clearTimeout(timer);
   }, [companySearch]);
+
+  useEffect(() => {
+    const code = normalizeSsoErrorCode(searchParams.get('sso_error'));
+    if (!code) return;
+    setSsoErrorCode(code);
+    router.replace('/login');
+  }, [searchParams, router]);
 
   const accessibleCompaniesParams = useMemo(() => {
     const q = debouncedSearch.trim();
@@ -70,6 +114,96 @@ export default function LoginPage() {
       }
     }
   });
+
+  useEffect(() => {
+    const tenant = searchParams.get('tenant')?.trim();
+    const loginToken = searchParams.get('login_token')?.trim();
+    if (loginToken) {
+      void (async () => {
+        try {
+          const res = await authLoginContext({ token: loginToken });
+          if (res.status === 200 && res.data) {
+            setTenantBanner(res.data.displayName ?? res.data.slug ?? '');
+            setHintSlug(res.data.slug ?? null);
+            setHintSso(!!res.data.ssoAvailable);
+            setSubStep('password');
+          }
+        } catch {
+          /* ignore */
+        }
+      })();
+      return;
+    }
+    if (tenant) {
+      void (async () => {
+        try {
+          const res = await publicTenantBySlug(tenant);
+          if (res.status === 200 && res.data) {
+            setTenantBanner(res.data.displayName ?? tenant);
+            setHintSlug(res.data.slug ?? tenant);
+            setHintSso(!!res.data.ssoAvailable);
+            setSubStep('password');
+          }
+        } catch {
+          /* ignore */
+        }
+      })();
+    }
+  }, [searchParams]);
+
+  const continueFromEmail = async () => {
+    const trimmed = email.trim();
+    if (!trimmed) {
+      toast.error(t('email'));
+      return;
+    }
+    setHintLoading(true);
+    try {
+      const res = await authTenantHint({ email: trimmed });
+      if (res.status !== 200 || !res.data) {
+        throw new Error('hint');
+      }
+      const d = res.data;
+      setHintNext(d.next ?? null);
+      setHintSso(!!d.ssoAvailable);
+      setHintSlug(d.tenantSlug ?? null);
+      setHintDisplay(d.displayName ?? null);
+      if (d.displayName) {
+        setTenantBanner(d.displayName);
+      }
+      setSubStep('password');
+    } catch {
+      toast.error(t('error'));
+    } finally {
+      setHintLoading(false);
+    }
+  };
+
+  const effectiveSlug =
+    (hintSlug || '').trim() || tenantSlugManual.trim() || '';
+
+  const startSso = () => {
+    if (!effectiveSlug) {
+      toast.error(t('tenantSlug'));
+      return;
+    }
+    window.location.href =
+      '/api' + getAuthSSOAuthorizeUrl({ tenant: effectiveSlug, locale });
+  };
+
+  const backToEmailStep = () => {
+    setSubStep('email');
+    setHintNext(null);
+    setHintSso(false);
+    setHintSlug(null);
+    setHintDisplay(null);
+    if (
+      !searchParams.get('tenant')?.trim() &&
+      !searchParams.get('login_token')?.trim()
+    ) {
+      setTenantBanner(null);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -137,55 +271,144 @@ export default function LoginPage() {
             <>
               <CardHeader className='text-center'>
                 <CardTitle className='text-2xl'>{t('title')}</CardTitle>
-                <CardDescription>{t('description')}</CardDescription>
+                <CardDescription>
+                  {subStep === 'password' && (tenantBanner || hintDisplay)
+                    ? t('passwordStepDescription', {
+                        org: tenantBanner || hintDisplay || ''
+                      })
+                    : t('description')}
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleSubmit} className='space-y-4'>
-                  <div className='grid gap-2'>
-                    <Label htmlFor='email'>{t('email')}</Label>
-                    <Input
-                      id='email'
-                      type='email'
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      placeholder={t('emailPlaceholder')}
-                    />
-                  </div>
-
-                  <div className='grid gap-2'>
-                    <Label htmlFor='password'>{t('password')}</Label>
-                    <Input
-                      id='password'
-                      type='password'
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      placeholder={t('passwordPlaceholder')}
-                    />
-                  </div>
-
-                  <div className='flex justify-end'>
-                    <Link
-                      href='/forgot-password'
-                      className='text-muted-foreground hover:text-primary text-sm underline-offset-4 hover:underline'
+                {ssoErrorCode ? (
+                  <Alert variant='destructive' className='mb-4'>
+                    <AlertDescription>
+                      {t(`ssoError.${ssoErrorCode}`)}
+                    </AlertDescription>
+                  </Alert>
+                ) : null}
+                {subStep === 'email' ? (
+                  <div className='space-y-4'>
+                    <div className='grid gap-2'>
+                      <Label htmlFor='email'>{t('workEmail')}</Label>
+                      <Input
+                        id='email'
+                        type='email'
+                        autoComplete='email'
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        placeholder={t('emailPlaceholder')}
+                      />
+                    </div>
+                    <Button
+                      type='button'
+                      className='w-full'
+                      onClick={() => void continueFromEmail()}
+                      disabled={hintLoading}
                     >
-                      {t('forgotPassword')}
-                    </Link>
+                      {hintLoading ? (
+                        <Loader2 className='size-4 animate-spin' />
+                      ) : (
+                        t('continue')
+                      )}
+                    </Button>
+                    <button
+                      type='button'
+                      className='text-muted-foreground hover:text-primary w-full text-center text-sm underline-offset-4 hover:underline'
+                      onClick={() => setSubStep('password')}
+                    >
+                      {t('combinedLoginLink')}
+                    </button>
                   </div>
+                ) : (
+                  <form onSubmit={handleSubmit} className='space-y-4'>
+                    {tenantBanner ? (
+                      <div className='bg-muted/50 text-muted-foreground rounded-md px-3 py-2 text-sm'>
+                        {tenantBanner}
+                      </div>
+                    ) : null}
 
-                  {loginMutation.isError && (
-                    <div className='text-sm text-red-600'>{t('error')}</div>
-                  )}
+                    <div className='grid gap-2'>
+                      <Label htmlFor='login-email'>{t('email')}</Label>
+                      <Input
+                        id='login-email'
+                        type='email'
+                        autoComplete='email'
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        placeholder={t('emailPlaceholder')}
+                      />
+                    </div>
 
-                  <Button
-                    type='submit'
-                    className='w-full'
-                    disabled={loginMutation.isPending}
-                  >
-                    {loginMutation.isPending ? t('signingIn') : t('signIn')}
-                  </Button>
-                </form>
+                    {hintNext === 'choose_slug' && !hintSlug?.trim() ? (
+                      <div className='grid gap-2'>
+                        <Label htmlFor='tenant-slug'>{t('tenantSlug')}</Label>
+                        <Input
+                          id='tenant-slug'
+                          value={tenantSlugManual}
+                          onChange={(e) => setTenantSlugManual(e.target.value)}
+                          placeholder={t('tenantSlugHint')}
+                          autoComplete='organization'
+                        />
+                      </div>
+                    ) : null}
+
+                    <div className='grid gap-2'>
+                      <Label htmlFor='password'>{t('password')}</Label>
+                      <Input
+                        id='password'
+                        type='password'
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        placeholder={t('passwordPlaceholder')}
+                        autoComplete='current-password'
+                      />
+                    </div>
+
+                    <div className='flex justify-end'>
+                      <Link
+                        href='/forgot-password'
+                        className='text-muted-foreground hover:text-primary text-sm underline-offset-4 hover:underline'
+                      >
+                        {t('forgotPassword')}
+                      </Link>
+                    </div>
+
+                    {hintSso ? (
+                      <Button
+                        type='button'
+                        variant='outline'
+                        className='w-full'
+                        onClick={startSso}
+                      >
+                        {t('continueSso')}
+                      </Button>
+                    ) : null}
+
+                    {loginMutation.isError && (
+                      <div className='text-sm text-red-600'>{t('error')}</div>
+                    )}
+
+                    <Button
+                      type='submit'
+                      className='w-full'
+                      disabled={loginMutation.isPending}
+                    >
+                      {loginMutation.isPending ? t('signingIn') : t('signIn')}
+                    </Button>
+
+                    <button
+                      type='button'
+                      className='text-muted-foreground hover:text-primary w-full text-center text-sm underline-offset-4 hover:underline'
+                      onClick={backToEmailStep}
+                    >
+                      {t('changeEmail')}
+                    </button>
+                  </form>
+                )}
               </CardContent>
             </>
           ) : (

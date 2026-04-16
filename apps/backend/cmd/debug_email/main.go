@@ -79,7 +79,7 @@ func main() {
 		}
 
 		// Start TLS
-		tlsConfig := &tls.Config{InsecureSkipVerify: true, ServerName: host}
+		tlsConfig := &tls.Config{ServerName: host}
 		if ok, _ := c.Extension("STARTTLS"); ok {
 			fmt.Println("   > Server supports STARTTLS, upgrading...")
 			if err := c.StartTLS(tlsConfig); err != nil {

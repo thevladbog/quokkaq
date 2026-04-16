@@ -1,0 +1,41 @@
+name: Test IdP (Keycloak smoke)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+    paths:
+      - 'docker-compose.test-idp.yml'
+      - 'tools/test-idp/**'
+      - '.github/workflows/test-idp-smoke.yml'
+  pull_request:
+    paths:
+      - 'docker-compose.test-idp.yml'
+      - 'tools/test-idp/**'
+      - '.github/workflows/test-idp-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  keycloak-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Start Keycloak
+        run: docker compose -f docker-compose.test-idp.yml up -d --wait
+
+      - name: OIDC discovery (realm quokkaq-test)
+        run: |
+          curl -fsS "http://127.0.0.1:8080/realms/quokkaq-test/.well-known/openid-configuration" | head -c 600
+          echo ""
+
+      - name: SAML IdP descriptor
+        run: |
+          curl -fsS "http://127.0.0.1:8080/realms/quokkaq-test/protocol/saml/descriptor" | head -c 600
+          echo ""
+
+      - name: Stop Keycloak
+        if: always()
+        run: docker compose -f docker-compose.test-idp.yml down -v

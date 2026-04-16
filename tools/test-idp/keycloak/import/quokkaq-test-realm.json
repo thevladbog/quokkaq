@@ -1,0 +1,61 @@
+{
+  "id": "quokkaq-test",
+  "realm": "quokkaq-test",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "clients": [
+    {
+      "clientId": "quokkaq-oidc",
+      "name": "Quokkaq OIDC (local dev)",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "quokkaq-oidc-secret-change-me",
+      "redirectUris": ["http://localhost:3001/auth/sso/callback"],
+      "webOrigins": ["http://localhost:3001", "http://localhost:3000"],
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "fullScopeAllowed": true
+    },
+    {
+      "clientId": "http://localhost:3001/auth/saml/metadata?tenant=test",
+      "name": "Quokkaq SAML SP (tenant=test)",
+      "enabled": true,
+      "protocol": "saml",
+      "publicClient": false,
+      "fullScopeAllowed": true,
+      "redirectUris": ["http://localhost:3001/auth/saml/acs?tenant=test"],
+      "webOrigins": [],
+      "attributes": {
+        "saml.assertion.signature": "true",
+        "saml.force.post.binding": "true",
+        "saml.server.signature": "true",
+        "saml.client.signature": "false",
+        "saml.authnstatement": "true",
+        "saml_name_id_format": "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "ssotest",
+      "enabled": true,
+      "email": "ssotest@example.com",
+      "emailVerified": true,
+      "firstName": "SSO",
+      "lastName": "Test",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "ssotest",
+          "temporary": false
+        }
+      ]
+    }
+  ]
+}

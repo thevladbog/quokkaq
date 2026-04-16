@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 
+	"quokkaq-go-backend/internal/pkg/authcookie"
+
 	"github.com/golang-jwt/jwt/v5"
 )
 
@@ -25,20 +27,20 @@ const TerminalCounterIDKey contextKey = "terminalCounterID"
 // JWTAuth is a middleware that validates JWT tokens and extracts user ID
 func JWTAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		authHeader := r.Header.Get("Authorization")
-		if authHeader == "" {
-			http.Error(w, "Authorization header required", http.StatusUnauthorized)
-			return
+		tokenString := authcookie.AccessTokenFromRequest(r)
+		if tokenString == "" {
+			authHeader := r.Header.Get("Authorization")
+			if authHeader == "" {
+				http.Error(w, "Authentication required", http.StatusUnauthorized)
+				return
+			}
+			parts := strings.Split(authHeader, " ")
+			if len(parts) != 2 || parts[0] != "Bearer" {
+				http.Error(w, "Invalid authorization header format", http.StatusUnauthorized)
+				return
+			}
+			tokenString = parts[1]
 		}
-
-		// Extract token from "Bearer <token>"
-		parts := strings.Split(authHeader, " ")
-		if len(parts) != 2 || parts[0] != "Bearer" {
-			http.Error(w, "Invalid authorization header format", http.StatusUnauthorized)
-			return
-		}
-
-		tokenString := parts[1]
 		secret := os.Getenv("JWT_SECRET")
 		if secret == "" {
 			secret = "default_secret_please_change"

@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"quokkaq-go-backend/internal/middleware"
+	"quokkaq-go-backend/internal/pkg/authcookie"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
 	"strings"
@@ -51,7 +52,8 @@ type SignupRequest struct {
 	Email       string `json:"email" binding:"required"`
 	Password    string `json:"password" binding:"required"`
 	CompanyName string `json:"companyName" binding:"required"`
-	PlanCode    string `json:"planCode"` // optional, defaults to starter with trial
+	PlanCode    string `json:"planCode"`    // optional, defaults to starter with trial
+	CompanySlug string `json:"companySlug"` // optional; if empty, generated from company name
 }
 
 // Login godoc
@@ -80,6 +82,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	authcookie.WriteSessionCookies(w, r, pair)
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(LoginResponse{
 		Token:        pair.AccessToken,
@@ -102,23 +105,28 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 // @Failure      500  {string}  string "Internal Server Error"
 // @Router       /auth/refresh [post]
 func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
-	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" {
-		http.Error(w, "Authorization header required", http.StatusUnauthorized)
-		return
-	}
-	parts := strings.Split(authHeader, " ")
-	if len(parts) != 2 || parts[0] != "Bearer" {
-		http.Error(w, "Invalid authorization header format", http.StatusUnauthorized)
-		return
+	refresh := authcookie.RefreshTokenFromRequest(r)
+	if refresh == "" {
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			http.Error(w, "Authentication required", http.StatusUnauthorized)
+			return
+		}
+		parts := strings.Split(authHeader, " ")
+		if len(parts) != 2 || parts[0] != "Bearer" {
+			http.Error(w, "Invalid authorization header format", http.StatusUnauthorized)
+			return
+		}
+		refresh = parts[1]
 	}
 
-	pair, err := h.service.Refresh(parts[1])
+	pair, err := h.service.Refresh(refresh)
 	if err != nil {
 		http.Error(w, "Invalid or expired refresh token", http.StatusUnauthorized)
 		return
 	}
 
+	authcookie.WriteSessionCookies(w, r, pair)
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(RefreshResponse{
 		AccessToken:  pair.AccessToken,
@@ -126,6 +134,16 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	}); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 	}
+}
+
+// Logout godoc
+// @Summary      Log out (clear session cookies)
+// @Tags         auth
+// @Success      204
+// @Router       /auth/logout [post]
+func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	authcookie.ClearSessionCookies(w, r)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // GetMe godoc
@@ -307,10 +325,22 @@ func (h *AuthHandler) Signup(w http.ResponseWriter, r *http.Request) {
 		req.PlanCode = "starter"
 	}
 
-	pair, err := h.service.Signup(req.Name, req.Email, req.Password, req.CompanyName, req.PlanCode)
+	var preferredSlug *string
+	if s := strings.TrimSpace(req.CompanySlug); s != "" {
+		preferredSlug = &s
+	}
+	pair, err := h.service.Signup(req.Name, req.Email, req.Password, req.CompanyName, req.PlanCode, preferredSlug)
 	if err != nil {
 		if errors.Is(err, services.ErrEmailAlreadyExists) {
 			http.Error(w, "An account with this email already exists", http.StatusConflict)
+			return
+		}
+		if errors.Is(err, services.ErrInvalidCompanySlug) {
+			http.Error(w, "Invalid company slug", http.StatusBadRequest)
+			return
+		}
+		if errors.Is(err, services.ErrCompanySlugTaken) {
+			http.Error(w, "Company slug is already taken", http.StatusConflict)
 			return
 		}
 		log.Printf("Signup: %v", err)
@@ -318,6 +348,7 @@ func (h *AuthHandler) Signup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	authcookie.WriteSessionCookies(w, r, pair)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	if err := json.NewEncoder(w).Encode(LoginResponse{

@@ -375,11 +375,23 @@
                     "name": {
                         "type": "string"
                     },
+                    "opaqueLoginLinksOnly": {
+                        "type": "boolean"
+                    },
                     "paymentAccounts": {
                         "items": {
                             "type": "object"
                         },
                         "type": "array"
+                    },
+                    "slug": {
+                        "type": "string"
+                    },
+                    "ssoJitProvisioning": {
+                        "type": "boolean"
+                    },
+                    "strictPublicTenantResolve": {
+                        "type": "boolean"
                     }
                 },
                 "type": "object"
@@ -665,6 +677,10 @@
             "handlers.SignupRequest": {
                 "properties": {
                     "companyName": {
+                        "type": "string"
+                    },
+                    "companySlug": {
+                        "description": "optional; if empty, generated from company name",
                         "type": "string"
                     },
                     "email": {
@@ -1036,6 +1052,22 @@
                 },
                 "type": "object"
             },
+            "handlers.ssoExchangeRequest": {
+                "properties": {
+                    "code": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "handlers.tenantHintRequest": {
+                "properties": {
+                    "email": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "models.Booking": {
                 "properties": {
                     "code": {
@@ -1269,6 +1301,10 @@
                         "description": "onboarding progress",
                         "type": "object"
                     },
+                    "opaqueLoginLinksOnly": {
+                        "description": "OpaqueLoginLinksOnly: deep links should use TenantLoginLink tokens instead of slug-based branding.",
+                        "type": "boolean"
+                    },
                     "ownerUserId": {
                         "description": "owner of the organization",
                         "type": "string"
@@ -1283,6 +1319,18 @@
                     "settings": {
                         "description": "company settings",
                         "type": "object"
+                    },
+                    "slug": {
+                        "description": "public tenant slug for login URLs",
+                        "type": "string"
+                    },
+                    "ssoJitProvisioning": {
+                        "description": "SsoJitProvisioning: allow creating a user on first successful SSO when policy permits.",
+                        "type": "boolean"
+                    },
+                    "strictPublicTenantResolve": {
+                        "description": "StrictPublicTenantResolve: SaaS-enabled — GET /public/tenants/{slug} does not expose org metadata for slug guessing.",
+                        "type": "boolean"
                     },
                     "subscription": {
                         "$ref": "#/components/schemas/models.Subscription"
@@ -1336,6 +1384,9 @@
                             "type": "object"
                         },
                         "type": "array"
+                    },
+                    "slug": {
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -2588,6 +2639,75 @@
                 },
                 "type": "object"
             },
+            "services.CompanySSOGetResponse": {
+                "properties": {
+                    "clientId": {
+                        "type": "string"
+                    },
+                    "clientSecretSet": {
+                        "type": "boolean"
+                    },
+                    "emailDomains": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "enabled": {
+                        "type": "boolean"
+                    },
+                    "issuerUrl": {
+                        "type": "string"
+                    },
+                    "samlIdpMetadataUrl": {
+                        "description": "IdP metadata URL for SAML",
+                        "type": "string"
+                    },
+                    "scopes": {
+                        "type": "string"
+                    },
+                    "ssoProtocol": {
+                        "description": "oidc | saml",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "services.CompanySSOPatch": {
+                "properties": {
+                    "clientId": {
+                        "type": "string"
+                    },
+                    "clientSecret": {
+                        "description": "plaintext once; stored encrypted",
+                        "type": "string"
+                    },
+                    "emailDomains": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "enabled": {
+                        "type": "boolean"
+                    },
+                    "issuerUrl": {
+                        "type": "string"
+                    },
+                    "samlIdpMetadataUrl": {
+                        "description": "IdP metadata URL for SAML",
+                        "type": "string"
+                    },
+                    "scopes": {
+                        "type": "string"
+                    },
+                    "ssoProtocol": {
+                        "description": "oidc | saml",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "services.EmployeeRadarResponse": {
                 "properties": {
                     "computedAt": {
@@ -2740,6 +2860,20 @@
                     },
                     "unitId": {
                         "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "services.PublicTenantResponse": {
+                "properties": {
+                    "displayName": {
+                        "type": "string"
+                    },
+                    "slug": {
+                        "type": "string"
+                    },
+                    "ssoAvailable": {
+                        "type": "boolean"
                     }
                 },
                 "type": "object"
@@ -2945,6 +3079,24 @@
                             "$ref": "#/components/schemas/services.SurveyScorePoint"
                         },
                         "type": "array"
+                    }
+                },
+                "type": "object"
+            },
+            "services.TenantHintResponse": {
+                "properties": {
+                    "displayName": {
+                        "type": "string"
+                    },
+                    "next": {
+                        "description": "sso | password | choose_slug",
+                        "type": "string"
+                    },
+                    "ssoAvailable": {
+                        "type": "boolean"
+                    },
+                    "tenantSlug": {
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -3366,6 +3518,71 @@
                 ]
             }
         },
+        "/auth/login-context": {
+            "get": {
+                "operationId": "authLoginContext",
+                "parameters": [
+                    {
+                        "description": "Opaque token",
+                        "in": "query",
+                        "name": "token",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/services.PublicTenantResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "summary": "Resolve tenant context by opaque login token",
+                "tags": [
+                    "auth"
+                ]
+            }
+        },
+        "/auth/login/tenant-hint": {
+            "post": {
+                "operationId": "authTenantHint",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.tenantHintRequest"
+                            }
+                        }
+                    },
+                    "description": "Email",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/services.TenantHintResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "summary": "Resolve next login step from email (tenant hint)",
+                "tags": [
+                    "auth"
+                ]
+            }
+        },
         "/auth/me": {
             "get": {
                 "description": "Returns the currently authenticated user's information",
@@ -3571,6 +3788,146 @@
                     }
                 },
                 "summary": "Sign Up",
+                "tags": [
+                    "auth"
+                ]
+            }
+        },
+        "/auth/sso/authorize": {
+            "get": {
+                "operationId": "authSSOAuthorize",
+                "parameters": [
+                    {
+                        "description": "Tenant slug",
+                        "in": "query",
+                        "name": "tenant",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "UI locale for post-SSO redirects (en or ru)",
+                        "in": "query",
+                        "name": "locale",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "302": {
+                        "description": "Redirect"
+                    }
+                },
+                "summary": "Start SSO (OIDC or SAML — redirect to IdP)",
+                "tags": [
+                    "auth"
+                ]
+            }
+        },
+        "/auth/saml/acs": {
+            "post": {
+                "operationId": "authSAMLACS",
+                "responses": {
+                    "302": {
+                        "description": "Redirect to app with one-time code"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad request"
+                    }
+                },
+                "summary": "SAML Assertion Consumer Service (POST from IdP)",
+                "tags": [
+                    "auth"
+                ]
+            }
+        },
+        "/auth/saml/metadata": {
+            "get": {
+                "operationId": "authSAMLMetadata",
+                "parameters": [
+                    {
+                        "description": "Tenant slug",
+                        "in": "query",
+                        "name": "tenant",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "SAML metadata XML"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Not found"
+                    }
+                },
+                "summary": "SAML SP metadata XML (register at IdP)",
+                "tags": [
+                    "auth"
+                ]
+            }
+        },
+        "/auth/sso/callback": {
+            "get": {
+                "operationId": "authSSOCallback",
+                "responses": {
+                    "302": {
+                        "description": "Redirect to app"
+                    }
+                },
+                "summary": "OIDC callback",
+                "tags": [
+                    "auth"
+                ]
+            }
+        },
+        "/auth/sso/exchange": {
+            "post": {
+                "operationId": "authSSOExchange",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.ssoExchangeRequest"
+                            }
+                        }
+                    },
+                    "description": "One-time code",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.LoginResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "summary": "Exchange one-time SSO code for JWT pair",
                 "tags": [
                     "auth"
                 ]
@@ -4452,6 +4809,128 @@
                     }
                 ],
                 "summary": "Complete Onboarding",
+                "tags": [
+                    "companies"
+                ]
+            }
+        },
+        "/companies/me/login-links": {
+            "post": {
+                "operationId": "companiesMeLoginLinkPost",
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": {
+                                        "type": "string"
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Create opaque login link",
+                "tags": [
+                    "companies"
+                ]
+            }
+        },
+        "/companies/me/slug": {
+            "patch": {
+                "operationId": "companiesMeSlugPatch",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    },
+                    "description": "Slug",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/models.Company"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Update tenant slug",
+                "tags": [
+                    "companies"
+                ]
+            }
+        },
+        "/companies/me/sso": {
+            "get": {
+                "operationId": "companiesMeSSOGet",
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/services.CompanySSOGetResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get SSO OIDC settings",
+                "tags": [
+                    "companies"
+                ]
+            },
+            "patch": {
+                "operationId": "companiesMeSSOPatch",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/services.CompanySSOPatch"
+                            }
+                        }
+                    },
+                    "description": "SSO settings",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Update SSO OIDC settings",
                 "tags": [
                     "companies"
                 ]
@@ -7666,6 +8145,48 @@
                 "summary": "Update subscription fields (platform; may diverge from Stripe)",
                 "tags": [
                     "platform"
+                ]
+            }
+        },
+        "/public/tenants/{slug}": {
+            "get": {
+                "operationId": "publicTenantBySlug",
+                "parameters": [
+                    {
+                        "description": "Tenant slug",
+                        "in": "path",
+                        "name": "slug",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/services.PublicTenantResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Not found"
+                    }
+                },
+                "summary": "Public tenant metadata by slug",
+                "tags": [
+                    "auth"
                 ]
             }
         },

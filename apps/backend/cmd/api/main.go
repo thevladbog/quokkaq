@@ -148,6 +148,8 @@ func main() {
 	userService := services.NewUserService(userRepo)
 	mailService := services.NewMailService()
 	authService := services.NewAuthService(userRepo, mailService, subscriptionRepo)
+	ssoRepo := repository.NewSSORepository()
+	ssoService := services.NewSSOService(companyRepo, userRepo, ssoRepo, authService)
 	unitClientRepo := repository.NewUnitClientRepository()
 	visitorTagDefRepo := repository.NewVisitorTagDefinitionRepository()
 	unitClientHistRepo := repository.NewUnitClientHistoryRepository()
@@ -180,6 +182,8 @@ func main() {
 
 	userHandler := handlers.NewUserHandler(userService)
 	authHandler := handlers.NewAuthHandler(authService, userRepo)
+	ssoHandler := handlers.NewSSOHandler(ssoService)
+	companySSOHTTP := handlers.NewCompanySSOHTTP(ssoService, userRepo, companyRepo)
 	unitHandler := handlers.NewUnitHandler(unitService, storageService, operationalService)
 	ticketHandler := handlers.NewTicketHandler(ticketService, operationalService)
 	serviceHandler := handlers.NewServiceHandler(serviceService, userRepo)
@@ -281,6 +285,11 @@ func main() {
 
 	r.Post("/webhooks/yookassa", handlers.ServeYooKassaWebhook)
 
+	r.Route("/public", func(r chi.Router) {
+		r.Use(authmiddleware.SSOPublicRateLimit)
+		r.Get("/tenants/{slug}", ssoHandler.PublicTenant)
+	})
+
 	r.Get("/ws", func(w http.ResponseWriter, r *http.Request) {
 		ws.ServeWs(hub, w, r)
 	})
@@ -319,6 +328,16 @@ func main() {
 
 	r.Route("/auth", func(r chi.Router) {
 		r.Post("/login", authHandler.Login)
+		r.Post("/signup", authHandler.Signup)
+		r.Post("/logout", authHandler.Logout)
+		r.With(authmiddleware.SSOPublicRateLimit).Post("/login/tenant-hint", ssoHandler.TenantHint)
+		r.With(authmiddleware.SSOPublicRateLimit).Get("/login-context", ssoHandler.LoginContext)
+		r.With(authmiddleware.SSOPublicRateLimit).Get("/sso/authorize", ssoHandler.SSOAuthorize)
+		r.With(authmiddleware.SSOPublicRateLimit).Get("/saml/metadata", ssoHandler.SAMLMetadata)
+		r.With(authmiddleware.SSOPublicRateLimit).Post("/saml/acs", ssoHandler.SAMLACS)
+		// Callback uses SSOCallbackRateLimit (softer than SSOPublicRateLimit): IdP redirect chains can hit this route more often than typical API calls. See middleware/sso_ratelimit.go.
+		r.With(authmiddleware.SSOCallbackRateLimit).Get("/sso/callback", ssoHandler.SSOCallback)
+		r.With(authmiddleware.SSOPublicRateLimit).Post("/sso/exchange", ssoHandler.SSOExchange)
 		r.Post("/refresh", authHandler.Refresh)
 		r.Post("/forgot-password", authHandler.RequestPasswordReset)
 		r.Post("/reset-password", authHandler.ResetPassword)
@@ -549,6 +568,10 @@ func main() {
 			r.Use(authmiddleware.RequireAdmin(userRepo))
 			r.Get("/me", companyHandler.GetMyCompany)
 			r.Patch("/me", companyHandler.PatchMyCompany)
+			r.Get("/me/sso", companySSOHTTP.GetCompanySSO)
+			r.Patch("/me/sso", companySSOHTTP.PatchCompanySSO)
+			r.Patch("/me/slug", companySSOHTTP.PatchCompanySlug)
+			r.Post("/me/login-links", companySSOHTTP.CreateOpaqueLoginLink)
 			r.Post("/dadata/party/find-by-inn", dadataHandler.FindPartyByInn)
 			r.Post("/dadata/party/suggest", dadataHandler.SuggestParty)
 			r.Post("/dadata/address/suggest", dadataHandler.SuggestAddress)

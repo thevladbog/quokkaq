@@ -19,6 +19,7 @@ import {
 } from '@/lib/api/generated/platform';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { DateTimePicker } from '@/components/ui/datetime-picker';
 import {
@@ -486,6 +487,105 @@ function PlatformCompanyCounterpartySection({
   );
 }
 
+function PlatformLoginPolicySection({
+  companyId,
+  company,
+  t
+}: {
+  companyId: string;
+  company: Company;
+  t: ReturnType<typeof useTranslations<'platform.companyDetail'>>;
+}) {
+  const qc = useQueryClient();
+  const [slug, setSlug] = useState(company.slug ?? '');
+  const [strict, setStrict] = useState(
+    company.strictPublicTenantResolve === true
+  );
+  const [opaque, setOpaque] = useState(company.opaqueLoginLinksOnly === true);
+  const [jit, setJit] = useState(company.ssoJitProvisioning === true);
+
+  const save = useMutation({
+    mutationFn: () =>
+      patchPlatformCompaniesId(companyId, {
+        slug: slug.trim() || undefined,
+        strictPublicTenantResolve: strict,
+        opaqueLoginLinksOnly: opaque,
+        ssoJitProvisioning: jit
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({
+        queryKey: getGetPlatformCompaniesIdQueryKey(companyId)
+      });
+      toast.success(t('toastLoginPolicySaved'));
+    },
+    onError: (e: Error) => {
+      toast.error(t('toastLoginPolicyError', { message: e.message }));
+    }
+  });
+
+  return (
+    <Card className='mt-6'>
+      <CardHeader>
+        <CardTitle>{t('loginPolicyTitle')}</CardTitle>
+      </CardHeader>
+      <CardContent className='space-y-4'>
+        <p className='text-muted-foreground text-sm'>{t('loginPolicyDesc')}</p>
+        <div className='grid gap-2'>
+          <Label htmlFor='platform-login-slug'>{t('loginPolicySlug')}</Label>
+          <Input
+            id='platform-login-slug'
+            value={slug}
+            onChange={(e) => setSlug(e.target.value)}
+            autoComplete='off'
+          />
+        </div>
+        <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+          <div>
+            <Label htmlFor='login-strict'>{t('loginPolicyStrict')}</Label>
+            <p className='text-muted-foreground text-xs'>
+              {t('loginPolicyStrictHint')}
+            </p>
+          </div>
+          <Switch
+            id='login-strict'
+            checked={strict}
+            onCheckedChange={setStrict}
+          />
+        </div>
+        <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+          <div>
+            <Label htmlFor='login-opaque'>{t('loginPolicyOpaque')}</Label>
+            <p className='text-muted-foreground text-xs'>
+              {t('loginPolicyOpaqueHint')}
+            </p>
+          </div>
+          <Switch
+            id='login-opaque'
+            checked={opaque}
+            onCheckedChange={setOpaque}
+          />
+        </div>
+        <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+          <div>
+            <Label htmlFor='login-jit'>{t('loginPolicyJit')}</Label>
+            <p className='text-muted-foreground text-xs'>
+              {t('loginPolicyJitHint')}
+            </p>
+          </div>
+          <Switch id='login-jit' checked={jit} onCheckedChange={setJit} />
+        </div>
+        <Button
+          type='button'
+          disabled={save.isPending}
+          onClick={() => save.mutate()}
+        >
+          {t('saveLoginPolicy')}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function PlatformCompanyDetailPage() {
   const t = useTranslations('platform.companyDetail');
   const tBilling = useTranslations('organization.billing');
@@ -591,6 +691,13 @@ export default function PlatformCompanyDetailPage() {
           </CardContent>
         )}
       </Card>
+
+      <PlatformLoginPolicySection
+        key={`${company.updatedAt ?? ''}-login-policy`}
+        companyId={id}
+        company={company}
+        t={t}
+      />
 
       <div className='mt-8 grid gap-6 lg:grid-cols-2'>
         <Card>

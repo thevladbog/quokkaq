@@ -46,7 +46,7 @@ export function OrganizationInvoicesContent() {
     <div className='space-y-6'>
       <Button
         variant='ghost'
-        onClick={() => router.push('settings/organization/billing')}
+        onClick={() => router.push('/settings/organization/billing')}
       >
         <ArrowLeft className='mr-2 h-4 w-4' />
         {t('backToBilling')}

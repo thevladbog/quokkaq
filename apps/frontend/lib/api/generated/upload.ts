@@ -427,7 +427,11 @@ export interface HandlersPatchPlatformCompanyBody {
   counterparty?: HandlersPatchPlatformCompanyBodyCounterparty;
   isSaasOperator?: boolean;
   name?: string;
+  opaqueLoginLinksOnly?: boolean;
   paymentAccounts?: HandlersPatchPlatformCompanyBodyPaymentAccountsItem[];
+  slug?: string;
+  ssoJitProvisioning?: boolean;
+  strictPublicTenantResolve?: boolean;
 }
 
 export interface HandlersPatchPlatformInvoiceBody {
@@ -557,6 +561,8 @@ export interface HandlersSaasVendorResponse {
 
 export interface HandlersSignupRequest {
   companyName: string;
+  /** optional; if empty, generated from company name */
+  companySlug?: string;
   email: string;
   name: string;
   password: string;
@@ -790,12 +796,20 @@ export interface ModelsCompany {
   name?: string;
   /** onboarding progress */
   onboardingState?: ModelsCompanyOnboardingState;
+  /** OpaqueLoginLinksOnly: deep links should use TenantLoginLink tokens instead of slug-based branding. */
+  opaqueLoginLinksOnly?: boolean;
   /** owner of the organization */
   ownerUserId?: string;
   /** RU bank accounts (JSON array) */
   paymentAccounts?: ModelsCompanyPaymentAccountsItem[];
   /** company settings */
   settings?: ModelsCompanySettings;
+  /** public tenant slug for login URLs */
+  slug?: string;
+  /** SsoJitProvisioning: allow creating a user on first successful SSO when policy permits. */
+  ssoJitProvisioning?: boolean;
+  /** StrictPublicTenantResolve: SaaS-enabled — GET /public/tenants/{slug} does not expose org metadata for slug guessing. */
+  strictPublicTenantResolve?: boolean;
   subscription?: ModelsSubscription;
   /** FK to Subscription */
   subscriptionId?: string;
@@ -933,6 +947,14 @@ export interface HandlersSetupFirstAdminRequest {
   password?: string;
 }
 
+export interface HandlersSsoExchangeRequest {
+  code?: string;
+}
+
+export interface HandlersTenantHintRequest {
+  email?: string;
+}
+
 export interface ModelsCatalogItemCreateRequest {
   article?: string;
   currency?: string;
@@ -974,6 +996,7 @@ export interface ModelsCompanyPatch {
   name?: string;
   /** items: @quokkaq/shared-types PaymentAccountSchema */
   paymentAccounts?: ModelsCompanyPatchPaymentAccountsItem[];
+  slug?: string;
 }
 
 export interface ModelsServiceSlot {
@@ -1157,6 +1180,33 @@ export interface ModelsWeeklySlotCapacity {
   updatedAt?: string;
 }
 
+export interface ServicesCompanySSOGetResponse {
+  clientId?: string;
+  clientSecretSet?: boolean;
+  emailDomains?: string[];
+  enabled?: boolean;
+  issuerUrl?: string;
+  /** IdP metadata URL for SAML */
+  samlIdpMetadataUrl?: string;
+  scopes?: string;
+  /** oidc | saml */
+  ssoProtocol?: string;
+}
+
+export interface ServicesCompanySSOPatch {
+  clientId?: string;
+  /** plaintext once; stored encrypted */
+  clientSecret?: string;
+  emailDomains?: string[];
+  enabled?: boolean;
+  issuerUrl?: string;
+  /** IdP metadata URL for SAML */
+  samlIdpMetadataUrl?: string;
+  scopes?: string;
+  /** oidc | saml */
+  ssoProtocol?: string;
+}
+
 export interface ServicesEmployeeRadarResponse {
   computedAt?: string;
   rating?: number;
@@ -1229,6 +1279,12 @@ export interface ServicesOperationsStatusDTO {
   statisticsAsOf?: string;
   statisticsQuiet?: boolean;
   unitId?: string;
+}
+
+export interface ServicesPublicTenantResponse {
+  displayName?: string;
+  slug?: string;
+  ssoAvailable?: boolean;
 }
 
 export interface ServicesSLADeviationsPoint {
@@ -1310,6 +1366,14 @@ export interface ServicesSurveyScoresResponse {
   granularity?: string;
   mode?: string;
   points?: ServicesSurveyScorePoint[];
+}
+
+export interface ServicesTenantHintResponse {
+  displayName?: string;
+  /** sso | password | choose_slug */
+  next?: string;
+  ssoAvailable?: boolean;
+  tenantSlug?: string;
 }
 
 export interface ServicesTicketsByServiceItem {

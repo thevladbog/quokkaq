@@ -12,9 +12,11 @@ import (
 type CompanyRepository interface {
 	FindByID(id string) (*models.Company, error)
 	FindByIDWithBilling(id string) (*models.Company, error)
+	FindBySlug(slug string) (*models.Company, error)
 	FindSaaSOperatorCompany() (*models.Company, error)
 	ListPaginated(search string, limit, offset int) ([]models.Company, int64, error)
 	Update(company *models.Company) error
+	IsSlugTakenByOther(slug string, excludeCompanyID string) (bool, error)
 }
 
 type companyRepository struct{}
@@ -30,6 +32,27 @@ func (r *companyRepository) FindByID(id string) (*models.Company, error) {
 		return nil, err
 	}
 	return &company, nil
+}
+
+func (r *companyRepository) FindBySlug(slug string) (*models.Company, error) {
+	var company models.Company
+	err := database.DB.Where("slug = ?", slug).First(&company).Error
+	if err != nil {
+		return nil, err
+	}
+	return &company, nil
+}
+
+func (r *companyRepository) IsSlugTakenByOther(slug string, excludeCompanyID string) (bool, error) {
+	var count int64
+	q := database.DB.Model(&models.Company{}).Where("slug = ?", slug)
+	if excludeCompanyID != "" {
+		q = q.Where("id <> ?", excludeCompanyID)
+	}
+	if err := q.Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
 
 func (r *companyRepository) FindByIDWithBilling(id string) (*models.Company, error) {

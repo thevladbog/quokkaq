@@ -20,9 +20,10 @@ import {
   MapPin,
   CreditCard,
   Users,
-  Settings
+  Settings,
+  Shield
 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/src/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { companiesApiExt } from '@/lib/api';
@@ -357,7 +358,7 @@ export function OrganizationPageContent() {
         )}
       </Card>
 
-      <div className='grid gap-4 md:grid-cols-3'>
+      <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
         <Card
           className='cursor-pointer transition-shadow hover:shadow-lg'
           onClick={() => router.push('/settings/organization/billing')}
@@ -402,6 +403,21 @@ export function OrganizationPageContent() {
           </CardHeader>
           <CardContent>
             <p className='text-sm text-gray-600'>{t('quickLinks.unitsDesc')}</p>
+          </CardContent>
+        </Card>
+
+        <Card
+          className='cursor-pointer transition-shadow hover:shadow-lg'
+          onClick={() => router.push('/settings/organization/login')}
+        >
+          <CardHeader>
+            <CardTitle className='flex items-center gap-2 text-lg'>
+              <Shield className='h-5 w-5' />
+              {t('quickLinks.login')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className='text-sm text-gray-600'>{t('quickLinks.loginDesc')}</p>
           </CardContent>
         </Card>
       </div>

@@ -27,6 +27,7 @@ async function proxy(req: NextRequest, ctx: RouteCtx): Promise<Response> {
   const headers = new Headers();
   for (const name of [
     'authorization',
+    'cookie',
     'content-type',
     'accept-language',
     'accept',

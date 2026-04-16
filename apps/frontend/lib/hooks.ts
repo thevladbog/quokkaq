@@ -590,15 +590,8 @@ export const useLogin = () => {
   return useMutation({
     mutationFn: ({ email, password }: { email: string; password: string }) =>
       loginWithPassword({ email, password }),
-    onSuccess: (data) => {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('access_token', data.accessToken);
-        if (data.refreshToken) {
-          localStorage.setItem('refresh_token', data.refreshToken);
-        } else {
-          localStorage.removeItem('refresh_token');
-        }
-      }
+    onSuccess: () => {
+      // Session cookies are set by POST /auth/login; optional legacy tokens may still be in the JSON body.
     }
   });
 };
