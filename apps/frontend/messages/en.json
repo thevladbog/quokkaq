@@ -2392,6 +2392,7 @@
       "generating": "Generating…",
       "linkCreated": "Link generated",
       "linkError": "Could not generate link",
+      "validationInvalidUrl": "Enter a valid http(s) URL.",
       "opaqueHint": "Example URL (token expires; treat as sensitive):"
     },
     "billing": {

@@ -2,6 +2,9 @@
 
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm, useWatch } from 'react-hook-form';
+import { z } from 'zod';
 import {
   Card,
   CardContent,
@@ -11,9 +14,15 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage
+} from '@/components/ui/form';
 import { Link } from '@/src/i18n/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { toast } from 'sonner';
@@ -25,6 +34,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import type { Company } from '@quokkaq/shared-types';
 import { companiesApiExt } from '@/lib/api';
 import {
@@ -48,6 +58,101 @@ function appPublicBase(): string {
   return u && u.length > 0 ? u : 'http://localhost:3000';
 }
 
+function isValidHttpUrl(raw: string): boolean {
+  const s = raw.trim();
+  if (!s) return true;
+  try {
+    const u = new URL(s);
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function parseEmailDomains(emailDomainsStr: string): string[] {
+  return emailDomainsStr
+    .split(/[,;\s]+/)
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+const slugFormSchema = z.object({
+  slug: z.string()
+});
+
+type SlugFormValues = z.infer<typeof slugFormSchema>;
+
+type SsoSchemaOpts = {
+  hasPersistedSlug: boolean;
+  invalidUrl: string;
+  samlNeedsSlug: string;
+};
+
+function createSsoFormSchema(opts: SsoSchemaOpts) {
+  return z
+    .object({
+      enabled: z.boolean(),
+      protocol: z.enum(['oidc', 'saml']),
+      issuerUrl: z.string(),
+      clientId: z.string(),
+      clientSecret: z.string(),
+      scopes: z.string(),
+      samlIdpMetadataUrl: z.string(),
+      emailDomainsStr: z.string()
+    })
+    .superRefine((data, ctx) => {
+      if (data.protocol === 'saml' && !opts.hasPersistedSlug) {
+        ctx.addIssue({
+          code: 'custom',
+          message: opts.samlNeedsSlug,
+          path: ['protocol']
+        });
+      }
+      if (data.protocol === 'oidc') {
+        const issuer = data.issuerUrl.trim();
+        if (issuer && !isValidHttpUrl(issuer)) {
+          ctx.addIssue({
+            code: 'custom',
+            message: opts.invalidUrl,
+            path: ['issuerUrl']
+          });
+        }
+      }
+      if (data.protocol === 'saml') {
+        const meta = data.samlIdpMetadataUrl.trim();
+        if (meta && !isValidHttpUrl(meta)) {
+          ctx.addIssue({
+            code: 'custom',
+            message: opts.invalidUrl,
+            path: ['samlIdpMetadataUrl']
+          });
+        }
+      }
+    });
+}
+
+type SsoFormValues = z.infer<ReturnType<typeof createSsoFormSchema>>;
+
+function buildSsoPatchBody(values: SsoFormValues): ServicesCompanySSOPatch {
+  const domains = parseEmailDomains(values.emailDomainsStr);
+  const body: ServicesCompanySSOPatch = {
+    enabled: values.enabled,
+    ssoProtocol: values.protocol,
+    emailDomains: domains.length > 0 ? domains : undefined
+  };
+  if (values.protocol === 'oidc') {
+    body.issuerUrl = values.issuerUrl.trim() || undefined;
+    body.clientId = values.clientId.trim() || undefined;
+    body.scopes = values.scopes.trim() || undefined;
+    if (values.clientSecret.trim() !== '') {
+      body.clientSecret = values.clientSecret.trim();
+    }
+  } else {
+    body.samlIdpMetadataUrl = values.samlIdpMetadataUrl.trim() || undefined;
+  }
+  return body;
+}
+
 type LoginFormProps = {
   company: Company;
   sso: ServicesCompanySSOGetResponse;
@@ -58,27 +163,53 @@ function OrganizationLoginSecurityForm({ company, sso }: LoginFormProps) {
   const locale = useLocale();
   const qc = useQueryClient();
 
-  const [slugDraft, setSlugDraft] = useState(company.slug ?? '');
-  const [issuerUrl, setIssuerUrl] = useState(sso.issuerUrl ?? '');
-  const [clientId, setClientId] = useState(sso.clientId ?? '');
-  const [clientSecret, setClientSecret] = useState('');
-  const [scopes, setScopes] = useState(sso.scopes ?? 'openid email profile');
-  const [protocol, setProtocol] = useState<'oidc' | 'saml'>(
-    sso.ssoProtocol === 'saml' ? 'saml' : 'oidc'
+  const hasPersistedSlug = Boolean((company.slug ?? '').trim());
+
+  const ssoSchema = useMemo(
+    () =>
+      createSsoFormSchema({
+        hasPersistedSlug,
+        invalidUrl: t('validationInvalidUrl'),
+        samlNeedsSlug: t('samlSlugRequiredTitle')
+      }),
+    [hasPersistedSlug, t]
   );
-  const [samlIdpMetadataUrl, setSamlIdpMetadataUrl] = useState(
-    sso.samlIdpMetadataUrl ?? ''
+
+  const slugDefaults = useMemo<SlugFormValues>(
+    () => ({ slug: company.slug ?? '' }),
+    [company.slug]
   );
-  const [emailDomainsStr, setEmailDomainsStr] = useState(
-    (sso.emailDomains ?? []).join(', ')
+
+  const ssoDefaults = useMemo<SsoFormValues>(
+    () => ({
+      enabled: !!sso.enabled,
+      protocol: sso.ssoProtocol === 'saml' ? 'saml' : 'oidc',
+      issuerUrl: sso.issuerUrl ?? '',
+      clientId: sso.clientId ?? '',
+      clientSecret: '',
+      scopes: sso.scopes ?? 'openid email profile',
+      samlIdpMetadataUrl: sso.samlIdpMetadataUrl ?? '',
+      emailDomainsStr: (sso.emailDomains ?? []).join(', ')
+    }),
+    [sso]
   );
-  const [enabled, setEnabled] = useState(!!sso.enabled);
+
+  const slugForm = useForm<SlugFormValues>({
+    resolver: zodResolver(slugFormSchema),
+    defaultValues: slugDefaults
+  });
+
+  const ssoForm = useForm<SsoFormValues>({
+    resolver: zodResolver(ssoSchema),
+    defaultValues: ssoDefaults
+  });
+
+  const protocol = useWatch({ control: ssoForm.control, name: 'protocol' });
+
   const [opaqueLink, setOpaqueLink] = useState<{
     token: string;
     exampleUrl: string;
   } | null>(null);
-
-  const hasPersistedSlug = Boolean((company.slug ?? '').trim());
 
   const oidcRedirectUri = useMemo(
     () => `${apiPublicBase()}/auth/sso/callback`,
@@ -130,7 +261,10 @@ function OrganizationLoginSecurityForm({ company, sso }: LoginFormProps) {
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: getCompaniesMeSSOGetQueryKey() });
-      setClientSecret('');
+      ssoForm.reset({
+        ...ssoForm.getValues(),
+        clientSecret: ''
+      });
       toast.success(t('ssoSaved'));
     },
     onError: () => toast.error(t('saveError'))
@@ -156,32 +290,13 @@ function OrganizationLoginSecurityForm({ company, sso }: LoginFormProps) {
     onError: () => toast.error(t('linkError'))
   });
 
-  const onSaveSso = () => {
-    const domains = emailDomainsStr
-      .split(/[,;\s]+/)
-      .map((s) => s.trim().toLowerCase())
-      .filter(Boolean);
-    const body: ServicesCompanySSOPatch = {
-      enabled,
-      ssoProtocol: protocol,
-      emailDomains: domains.length > 0 ? domains : undefined
-    };
-    if (protocol === 'oidc') {
-      body.issuerUrl = issuerUrl.trim() || undefined;
-      body.clientId = clientId.trim() || undefined;
-      body.scopes = scopes.trim() || undefined;
-      if (clientSecret.trim() !== '') {
-        body.clientSecret = clientSecret.trim();
-      }
-    } else {
-      body.samlIdpMetadataUrl = samlIdpMetadataUrl.trim() || undefined;
-    }
-    patchSso.mutate(body);
-  };
+  const onSubmitSlug = slugForm.handleSubmit((values) => {
+    patchSlug.mutate(values.slug.trim());
+  });
 
-  const onSaveSlug = () => {
-    patchSlug.mutate(slugDraft.trim());
-  };
+  const onSubmitSso = ssoForm.handleSubmit((values) => {
+    patchSso.mutate(buildSsoPatchBody(values));
+  });
 
   const secretSet = !!sso.clientSecretSet;
 
@@ -204,26 +319,33 @@ function OrganizationLoginSecurityForm({ company, sso }: LoginFormProps) {
           </CardTitle>
           <CardDescription>{t('slugDescription')}</CardDescription>
         </CardHeader>
-        <CardContent className='space-y-4'>
-          <div className='grid gap-2'>
-            <Label htmlFor='tenant-slug'>{t('slugLabel')}</Label>
-            <Input
-              id='tenant-slug'
-              value={slugDraft}
-              onChange={(e) => setSlugDraft(e.target.value)}
-              autoComplete='off'
-            />
-            <p className='text-muted-foreground text-xs'>{t('slugHint')}</p>
-          </div>
-          <Button
-            type='button'
-            onClick={() => onSaveSlug()}
-            disabled={
-              patchSlug.isPending || slugDraft.trim() === (company.slug ?? '')
-            }
-          >
-            {patchSlug.isPending ? t('saving') : t('saveSlug')}
-          </Button>
+        <CardContent>
+          <Form {...slugForm}>
+            <form onSubmit={onSubmitSlug} className='space-y-4'>
+              <FormField
+                control={slugForm.control}
+                name='slug'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('slugLabel')}</FormLabel>
+                    <FormControl>
+                      <Input autoComplete='off' {...field} />
+                    </FormControl>
+                    <p className='text-muted-foreground text-xs'>
+                      {t('slugHint')}
+                    </p>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button
+                type='submit'
+                disabled={patchSlug.isPending || !slugForm.formState.isDirty}
+              >
+                {patchSlug.isPending ? t('saving') : t('saveSlug')}
+              </Button>
+            </form>
+          </Form>
         </CardContent>
       </Card>
 
@@ -235,201 +357,265 @@ function OrganizationLoginSecurityForm({ company, sso }: LoginFormProps) {
           </CardTitle>
           <CardDescription>{t('ssoDescription')}</CardDescription>
         </CardHeader>
-        <CardContent className='space-y-4'>
-          <div className='flex items-center justify-between gap-4'>
-            <div>
-              <Label htmlFor='sso-enabled'>{t('enabledLabel')}</Label>
-              <p className='text-muted-foreground text-xs'>
-                {t('enabledHint')}
-              </p>
-            </div>
-            <Switch
-              id='sso-enabled'
-              checked={enabled}
-              onCheckedChange={setEnabled}
-            />
-          </div>
-
-          <div className='grid gap-2'>
-            <Label htmlFor='sso-protocol'>{t('protocolLabel')}</Label>
-            <Select
-              value={protocol}
-              onValueChange={(v) => setProtocol(v as 'oidc' | 'saml')}
-            >
-              <SelectTrigger id='sso-protocol' className='w-full max-w-md'>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value='oidc'>{t('protocolOidc')}</SelectItem>
-                <SelectItem value='saml' disabled={!hasPersistedSlug}>
-                  {t('protocolSaml')}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {protocol === 'oidc' ? (
-            <div className='flex items-center justify-between gap-4 rounded-lg border p-3'>
-              <div>
-                <p className='font-medium'>{t('redirectUriLabel')}</p>
-                <p className='text-muted-foreground mt-1 font-mono text-xs break-all'>
-                  {oidcRedirectUri}
-                </p>
-              </div>
-              <Button
-                type='button'
-                variant='outline'
-                size='sm'
-                onClick={() => void copyText(oidcRedirectUri, t('copied'))}
-              >
-                <Copy className='mr-1 size-4' />
-                {t('copy')}
-              </Button>
-            </div>
-          ) : (
-            <>
-              {!hasPersistedSlug ? (
-                <Alert>
-                  <AlertCircle className='h-4 w-4' />
-                  <AlertTitle>{t('samlSlugRequiredTitle')}</AlertTitle>
-                  <AlertDescription>
-                    {t('samlSlugRequiredDescription')}
-                  </AlertDescription>
-                </Alert>
-              ) : null}
-              <div className='flex items-center justify-between gap-4 rounded-lg border p-3'>
-                <div>
-                  <p className='font-medium'>{t('samlAcsLabel')}</p>
-                  <p className='text-muted-foreground mt-1 font-mono text-xs break-all'>
-                    {hasPersistedSlug ? samlAcsUrl : '—'}
-                  </p>
-                </div>
-                <Button
-                  type='button'
-                  variant='outline'
-                  size='sm'
-                  disabled={!hasPersistedSlug || !samlAcsUrl}
-                  onClick={() => {
-                    if (!samlAcsUrl) return;
-                    void copyText(samlAcsUrl, t('copied'));
-                  }}
-                >
-                  <Copy className='mr-1 size-4' />
-                  {t('copy')}
-                </Button>
-              </div>
-              <div className='flex items-center justify-between gap-4 rounded-lg border p-3'>
-                <div>
-                  <p className='font-medium'>{t('samlSpMetadataLabel')}</p>
-                  <p className='text-muted-foreground mt-1 font-mono text-xs break-all'>
-                    {hasPersistedSlug ? samlSpMetadataUrl : '—'}
-                  </p>
-                </div>
-                <Button
-                  type='button'
-                  variant='outline'
-                  size='sm'
-                  disabled={!hasPersistedSlug || !samlSpMetadataUrl}
-                  onClick={() => {
-                    if (!samlSpMetadataUrl) return;
-                    void copyText(samlSpMetadataUrl, t('copied'));
-                  }}
-                >
-                  <Copy className='mr-1 size-4' />
-                  {t('copy')}
-                </Button>
-              </div>
-            </>
-          )}
-
-          {protocol === 'oidc' ? (
-            <>
-              <div className='grid gap-2'>
-                <Label htmlFor='issuer'>{t('issuerUrl')}</Label>
-                <Input
-                  id='issuer'
-                  value={issuerUrl}
-                  onChange={(e) => setIssuerUrl(e.target.value)}
-                  placeholder='https://login.microsoftonline.com/.../v2.0'
-                />
-              </div>
-
-              <div className='grid gap-2'>
-                <Label htmlFor='client-id'>{t('clientId')}</Label>
-                <Input
-                  id='client-id'
-                  value={clientId}
-                  onChange={(e) => setClientId(e.target.value)}
-                  autoComplete='off'
-                />
-              </div>
-
-              <div className='grid gap-2'>
-                <Label htmlFor='client-secret'>{t('clientSecret')}</Label>
-                <Input
-                  id='client-secret'
-                  type='password'
-                  value={clientSecret}
-                  onChange={(e) => setClientSecret(e.target.value)}
-                  placeholder={secretSet ? t('clientSecretPlaceholderSet') : ''}
-                  autoComplete='new-password'
-                />
-                {secretSet ? (
-                  <p className='text-muted-foreground text-xs'>
-                    {t('secretSetHint')}
-                  </p>
-                ) : null}
-              </div>
-
-              <div className='grid gap-2'>
-                <Label htmlFor='scopes'>{t('scopes')}</Label>
-                <Input
-                  id='scopes'
-                  value={scopes}
-                  onChange={(e) => setScopes(e.target.value)}
-                />
-              </div>
-            </>
-          ) : (
-            <div className='grid gap-2'>
-              <Label htmlFor='saml-idp-metadata'>
-                {t('samlIdpMetadataUrl')}
-              </Label>
-              <Input
-                id='saml-idp-metadata'
-                value={samlIdpMetadataUrl}
-                onChange={(e) => setSamlIdpMetadataUrl(e.target.value)}
-                placeholder='https://…/federationmetadata/2007-06/federationmetadata.xml'
-                autoComplete='off'
+        <CardContent>
+          <Form {...ssoForm}>
+            <form onSubmit={onSubmitSso} className='space-y-4'>
+              <FormField
+                control={ssoForm.control}
+                name='enabled'
+                render={({ field }) => (
+                  <FormItem className='flex flex-row items-center justify-between gap-4 rounded-lg border p-3'>
+                    <div className='space-y-1'>
+                      <FormLabel htmlFor='sso-enabled' className='text-base'>
+                        {t('enabledLabel')}
+                      </FormLabel>
+                      <p className='text-muted-foreground text-xs'>
+                        {t('enabledHint')}
+                      </p>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        id='sso-enabled'
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
               />
-              <p className='text-muted-foreground text-xs'>
-                {t('samlIdpMetadataHint')}
-              </p>
-            </div>
-          )}
 
-          <div className='grid gap-2'>
-            <Label htmlFor='email-domains'>{t('emailDomains')}</Label>
-            <Input
-              id='email-domains'
-              value={emailDomainsStr}
-              onChange={(e) => setEmailDomainsStr(e.target.value)}
-              placeholder='example.com, example.org'
-            />
-            <p className='text-muted-foreground text-xs'>
-              {t('emailDomainsHint')}
-            </p>
-          </div>
+              <FormField
+                control={ssoForm.control}
+                name='protocol'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('protocolLabel')}</FormLabel>
+                    <Select
+                      value={field.value}
+                      onValueChange={(v) =>
+                        field.onChange(v as 'oidc' | 'saml')
+                      }
+                    >
+                      <FormControl>
+                        <SelectTrigger
+                          id='sso-protocol'
+                          className='w-full max-w-md'
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value='oidc'>
+                          {t('protocolOidc')}
+                        </SelectItem>
+                        <SelectItem value='saml' disabled={!hasPersistedSlug}>
+                          {t('protocolSaml')}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-          <Button
-            type='button'
-            onClick={() => onSaveSso()}
-            disabled={
-              patchSso.isPending || (protocol === 'saml' && !hasPersistedSlug)
-            }
-          >
-            {patchSso.isPending ? t('saving') : t('saveSso')}
-          </Button>
+              {protocol === 'oidc' ? (
+                <div className='flex items-center justify-between gap-4 rounded-lg border p-3'>
+                  <div>
+                    <p className='font-medium'>{t('redirectUriLabel')}</p>
+                    <p className='text-muted-foreground mt-1 font-mono text-xs break-all'>
+                      {oidcRedirectUri}
+                    </p>
+                  </div>
+                  <Button
+                    type='button'
+                    variant='outline'
+                    size='sm'
+                    onClick={() => void copyText(oidcRedirectUri, t('copied'))}
+                  >
+                    <Copy className='mr-1 size-4' />
+                    {t('copy')}
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  {!hasPersistedSlug ? (
+                    <Alert>
+                      <AlertCircle className='h-4 w-4' />
+                      <AlertTitle>{t('samlSlugRequiredTitle')}</AlertTitle>
+                      <AlertDescription>
+                        {t('samlSlugRequiredDescription')}
+                      </AlertDescription>
+                    </Alert>
+                  ) : null}
+                  <div className='flex items-center justify-between gap-4 rounded-lg border p-3'>
+                    <div>
+                      <p className='font-medium'>{t('samlAcsLabel')}</p>
+                      <p className='text-muted-foreground mt-1 font-mono text-xs break-all'>
+                        {hasPersistedSlug ? samlAcsUrl : '—'}
+                      </p>
+                    </div>
+                    <Button
+                      type='button'
+                      variant='outline'
+                      size='sm'
+                      disabled={!hasPersistedSlug || !samlAcsUrl}
+                      onClick={() => {
+                        if (!samlAcsUrl) return;
+                        void copyText(samlAcsUrl, t('copied'));
+                      }}
+                    >
+                      <Copy className='mr-1 size-4' />
+                      {t('copy')}
+                    </Button>
+                  </div>
+                  <div className='flex items-center justify-between gap-4 rounded-lg border p-3'>
+                    <div>
+                      <p className='font-medium'>{t('samlSpMetadataLabel')}</p>
+                      <p className='text-muted-foreground mt-1 font-mono text-xs break-all'>
+                        {hasPersistedSlug ? samlSpMetadataUrl : '—'}
+                      </p>
+                    </div>
+                    <Button
+                      type='button'
+                      variant='outline'
+                      size='sm'
+                      disabled={!hasPersistedSlug || !samlSpMetadataUrl}
+                      onClick={() => {
+                        if (!samlSpMetadataUrl) return;
+                        void copyText(samlSpMetadataUrl, t('copied'));
+                      }}
+                    >
+                      <Copy className='mr-1 size-4' />
+                      {t('copy')}
+                    </Button>
+                  </div>
+                </>
+              )}
+
+              {protocol === 'oidc' ? (
+                <>
+                  <FormField
+                    control={ssoForm.control}
+                    name='issuerUrl'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('issuerUrl')}</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder='https://login.microsoftonline.com/.../v2.0'
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={ssoForm.control}
+                    name='clientId'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('clientId')}</FormLabel>
+                        <FormControl>
+                          <Input autoComplete='off' {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={ssoForm.control}
+                    name='clientSecret'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('clientSecret')}</FormLabel>
+                        <FormControl>
+                          <Input
+                            type='password'
+                            autoComplete='new-password'
+                            placeholder={
+                              secretSet ? t('clientSecretPlaceholderSet') : ''
+                            }
+                            {...field}
+                          />
+                        </FormControl>
+                        {secretSet ? (
+                          <p className='text-muted-foreground text-xs'>
+                            {t('secretSetHint')}
+                          </p>
+                        ) : null}
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={ssoForm.control}
+                    name='scopes'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('scopes')}</FormLabel>
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </>
+              ) : (
+                <FormField
+                  control={ssoForm.control}
+                  name='samlIdpMetadataUrl'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('samlIdpMetadataUrl')}</FormLabel>
+                      <FormControl>
+                        <Input
+                          autoComplete='off'
+                          placeholder='https://…/federationmetadata/2007-06/federationmetadata.xml'
+                          {...field}
+                        />
+                      </FormControl>
+                      <p className='text-muted-foreground text-xs'>
+                        {t('samlIdpMetadataHint')}
+                      </p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              <FormField
+                control={ssoForm.control}
+                name='emailDomainsStr'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('emailDomains')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder='example.com, example.org'
+                        {...field}
+                      />
+                    </FormControl>
+                    <p className='text-muted-foreground text-xs'>
+                      {t('emailDomainsHint')}
+                    </p>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <Button
+                type='submit'
+                disabled={
+                  patchSso.isPending ||
+                  (protocol === 'saml' && !hasPersistedSlug)
+                }
+              >
+                {patchSso.isPending ? t('saving') : t('saveSso')}
+              </Button>
+            </form>
+          </Form>
         </CardContent>
       </Card>
 

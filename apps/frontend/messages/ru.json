@@ -2392,6 +2392,7 @@
       "generating": "Создание…",
       "linkCreated": "Ссылка создана",
       "linkError": "Не удалось создать ссылку",
+      "validationInvalidUrl": "Укажите корректный URL (http или https).",
       "opaqueHint": "Пример URL (токен ограничен по времени; считайте конфиденциальным):"
     },
     "billing": {

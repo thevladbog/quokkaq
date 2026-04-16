@@ -688,7 +688,15 @@ func (s *SSOService) PatchCompanySSO(company *models.Company, body CompanySSOPat
 		conn.ClientSecretEncrypted = enc
 	}
 	if body.EmailDomains != nil {
-		conn.EmailDomains = models.StringArray(*body.EmailDomains)
+		raw := *body.EmailDomains
+		norm := make([]string, 0, len(raw))
+		for _, d := range raw {
+			x := strings.ToLower(strings.TrimSpace(d))
+			if x != "" {
+				norm = append(norm, x)
+			}
+		}
+		conn.EmailDomains = models.StringArray(norm)
 	}
 	if body.Scopes != nil && strings.TrimSpace(*body.Scopes) != "" {
 		conn.Scopes = strings.TrimSpace(*body.Scopes)

@@ -15,7 +15,8 @@
     ],
     "overrides": {
       "es5-ext": "0.10.63",
-      "follow-redirects": "1.16.0"
+      "follow-redirects": "1.16.0",
+      "hono": ">=4.12.14"
     }
   },
   "scripts": {

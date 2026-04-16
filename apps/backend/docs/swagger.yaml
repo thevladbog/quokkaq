@@ -2255,7 +2255,7 @@ components:
       type: apiKey
       in: cookie
       name: quokkaq_refresh
-      description: HttpOnly refresh JWT cookie (same-origin /api). When present, POST /auth/refresh does not require Authorization. Legacy clients may still send Bearer refresh.
+      description: HttpOnly refresh JWT cookie (same-origin /api). When present, POST /auth/refresh does not require Authorization. POST /auth/logout clears this cookie (and the access cookie) via Set-Cookie. Legacy clients may still send Bearer refresh.
 info:
   contact:
     email: support@swagger.io
@@ -2352,7 +2352,7 @@ paths:
           description: OK. Refresh session is carried by the `quokkaq_refresh` cookie (SessionCookie); JSON may still include access tokens for legacy clients.
           headers:
             Set-Cookie:
-              description: When present, sets or rotates the `quokkaq_refresh` HttpOnly JWT used as the refresh token (Path=/api or /; SameSite=Lax; Secure when served over HTTPS). When clearing the session (logout or invalid refresh), the server may omit this header or send an empty/expired cookie. See components.securitySchemes.SessionCookie.
+              description: 'When present, sets or rotates browser session cookies: `quokkaq_access` and `quokkaq_refresh` HttpOnly JWTs (Path=/; SameSite=Lax; Secure). Used after successful login or token refresh; the JSON body may still include tokens for legacy clients. See components.securitySchemes.SessionCookie.'
               schema: &id001
                 type: string
         '400':
@@ -2426,8 +2426,9 @@ paths:
           description: No Content
           headers:
             Set-Cookie:
-              description: When present, sets or rotates the `quokkaq_refresh` HttpOnly JWT used as the refresh token (Path=/api or /; SameSite=Lax; Secure when served over HTTPS). When clearing the session (logout or invalid refresh), the server may omit this header or send an empty/expired cookie. See components.securitySchemes.SessionCookie.
-              schema: *id001
+              description: 'Clears the browser session: `quokkaq_access` and `quokkaq_refresh` are typically sent as Set-Cookie with empty values and Max-Age=0 (or expired) so the browser drops them (HttpOnly, Path=/, SameSite=Lax, Secure). The header may be omitted if there was no session cookie.'
+              schema:
+                type: string
       summary: Log out (clear session cookies)
       tags:
       - auth
@@ -2471,7 +2472,7 @@ paths:
           description: OK. Refresh session is carried by the `quokkaq_refresh` cookie (SessionCookie); JSON may still include access tokens for legacy clients.
           headers:
             Set-Cookie:
-              description: When present, sets or rotates the `quokkaq_refresh` HttpOnly JWT used as the refresh token (Path=/api or /; SameSite=Lax; Secure when served over HTTPS). When clearing the session (logout or invalid refresh), the server may omit this header or send an empty/expired cookie. See components.securitySchemes.SessionCookie.
+              description: 'When present, sets or rotates browser session cookies: `quokkaq_access` and `quokkaq_refresh` HttpOnly JWTs (Path=/; SameSite=Lax; Secure). Used after successful login or token refresh; the JSON body may still include tokens for legacy clients. See components.securitySchemes.SessionCookie.'
               schema: *id001
         '401':
           content:
@@ -2703,7 +2704,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/handlers.LoginResponse'
-          description: OK
+          description: OK. Session cookies (`quokkaq_access`, `quokkaq_refresh`) are set as in POST /auth/login.
+          headers:
+            Set-Cookie:
+              description: 'Sets the same session cookies as password login: `quokkaq_access` and `quokkaq_refresh` HttpOnly JWTs (Path=/; SameSite=Lax; Secure; refresh ~30d, access ~24h Max-Age). Returned together with the JSON body from this endpoint.'
+              schema:
+                type: string
       summary: Exchange one-time SSO code for JWT pair
       tags:
       - auth

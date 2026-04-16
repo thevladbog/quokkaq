@@ -98,7 +98,7 @@ func (s *authService) Login(email, password, tenantSlug string) (*TokenPair, err
 		return nil, errors.New("invalid credentials")
 	}
 
-	slug := strings.TrimSpace(tenantSlug)
+	slug := tenantslug.Normalize(strings.TrimSpace(tenantSlug))
 	if slug != "" {
 		comp, err := s.companyRepo.FindBySlug(slug)
 		if err != nil {

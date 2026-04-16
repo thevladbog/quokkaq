@@ -97,7 +97,8 @@ def _patch_security_schemes_session_cookie(doc: dict[str, Any]) -> None:
             "name": "quokkaq_refresh",
             "description": (
                 "HttpOnly refresh JWT cookie (same-origin /api). When present, POST /auth/refresh "
-                "does not require Authorization. Legacy clients may still send Bearer refresh."
+                "does not require Authorization. POST /auth/logout clears this cookie (and the access "
+                "cookie) via Set-Cookie. Legacy clients may still send Bearer refresh."
             ),
         },
     )
@@ -150,7 +151,16 @@ def _patch_auth_redirect_302_headers(doc: dict[str, Any]) -> None:
         r302 = responses.get("302")
         if not isinstance(r302, dict):
             continue
-        r302.update(_response_302_with_location(desc))
+        patch = _response_302_with_location(desc)
+        new_desc = patch.get("description")
+        if isinstance(new_desc, str):
+            r302["description"] = new_desc
+        new_headers = patch.get("headers")
+        if isinstance(new_headers, dict):
+            cur = r302.get("headers")
+            if not isinstance(cur, dict):
+                cur = {}
+            r302["headers"] = {**cur, **new_headers}
 
 
 def _patch_login_link_response_schema(doc: dict[str, Any]) -> None:
@@ -240,12 +250,29 @@ def _patch_auth_sso_authorize_locale_enum(doc: dict[str, Any]) -> None:
             break
 
 
-_SET_COOKIE_HEADER = {
+_SET_COOKIE_HEADER_LOGIN_REFRESH = {
     "description": (
-        "When present, sets or rotates the `quokkaq_refresh` HttpOnly JWT used as the refresh token "
-        "(Path=/api or /; SameSite=Lax; Secure when served over HTTPS). When clearing the session "
-        "(logout or invalid refresh), the server may omit this header or send an empty/expired cookie. "
-        "See components.securitySchemes.SessionCookie."
+        "When present, sets or rotates browser session cookies: `quokkaq_access` and `quokkaq_refresh` "
+        "HttpOnly JWTs (Path=/; SameSite=Lax; Secure). Used after successful login or token refresh; "
+        "the JSON body may still include tokens for legacy clients. See components.securitySchemes.SessionCookie."
+    ),
+    "schema": {"type": "string"},
+}
+
+_SET_COOKIE_HEADER_LOGOUT = {
+    "description": (
+        "Clears the browser session: `quokkaq_access` and `quokkaq_refresh` are typically sent as "
+        "Set-Cookie with empty values and Max-Age=0 (or expired) so the browser drops them "
+        "(HttpOnly, Path=/, SameSite=Lax, Secure). The header may be omitted if there was no session cookie."
+    ),
+    "schema": {"type": "string"},
+}
+
+_SET_COOKIE_HEADER_SSO_EXCHANGE = {
+    "description": (
+        "Sets the same session cookies as password login: `quokkaq_access` and `quokkaq_refresh` "
+        "HttpOnly JWTs (Path=/; SameSite=Lax; Secure; refresh ~30d, access ~24h Max-Age). "
+        "Returned together with the JSON body from this endpoint."
     ),
     "schema": {"type": "string"},
 }
@@ -256,16 +283,16 @@ def _patch_auth_set_cookie_response_headers(doc: dict[str, Any]) -> None:
     paths = doc.get("paths")
     if not isinstance(paths, dict):
         return
-    targets: list[tuple[str, str, str]] = [
-        ("/auth/login", "post", "200"),
-        ("/auth/refresh", "post", "200"),
-        ("/auth/logout", "post", "204"),
+    targets: list[tuple[str, str, str, dict[str, Any]]] = [
+        ("/auth/login", "post", "200", _SET_COOKIE_HEADER_LOGIN_REFRESH),
+        ("/auth/refresh", "post", "200", _SET_COOKIE_HEADER_LOGIN_REFRESH),
+        ("/auth/logout", "post", "204", _SET_COOKIE_HEADER_LOGOUT),
     ]
     extra = (
         " Refresh session is carried by the `quokkaq_refresh` cookie (SessionCookie); "
         "JSON may still include access tokens for legacy clients."
     )
-    for path, method, code in targets:
+    for path, method, code, cookie_hdr in targets:
         item = paths.get(path)
         if not isinstance(item, dict):
             continue
@@ -280,13 +307,41 @@ def _patch_auth_set_cookie_response_headers(doc: dict[str, Any]) -> None:
             continue
         hdrs = resp.setdefault("headers", {})
         if isinstance(hdrs, dict):
-            hdrs["Set-Cookie"] = dict(_SET_COOKIE_HEADER)
+            hdrs["Set-Cookie"] = dict(cookie_hdr)
         if code == "204":
             resp["description"] = "No Content"
         else:
             desc = resp.get("description")
             if isinstance(desc, str) and "quokkaq_refresh" not in desc.lower():
                 resp["description"] = (desc.rstrip(".") + "." + extra).strip()
+
+
+def _patch_auth_sso_exchange_response_cookies(doc: dict[str, Any]) -> None:
+    """POST /auth/sso/exchange sets session cookies alongside handlers.LoginResponse JSON."""
+    paths = doc.get("paths")
+    if not isinstance(paths, dict):
+        return
+    ex = paths.get("/auth/sso/exchange")
+    if not isinstance(ex, dict):
+        return
+    post = ex.get("post")
+    if not isinstance(post, dict):
+        return
+    responses = post.get("responses")
+    if not isinstance(responses, dict):
+        return
+    r200 = responses.get("200")
+    if not isinstance(r200, dict):
+        return
+    hdrs = r200.setdefault("headers", {})
+    if isinstance(hdrs, dict):
+        hdrs["Set-Cookie"] = dict(_SET_COOKIE_HEADER_SSO_EXCHANGE)
+    desc = r200.get("description")
+    if isinstance(desc, str) and "quokkaq_access" not in desc.lower():
+        r200["description"] = (
+            desc.rstrip(".")
+            + ". Session cookies (`quokkaq_access`, `quokkaq_refresh`) are set as in POST /auth/login."
+        ).strip()
 
 
 def _patch_statistics_survey_scores_question_ids_param(doc: dict[str, Any]) -> None:
@@ -327,6 +382,7 @@ def apply_openapi_tweaks(doc: dict[str, Any]) -> None:
     _patch_saml_acs_request_body_required(doc)
     _patch_auth_redirect_302_headers(doc)
     _patch_auth_set_cookie_response_headers(doc)
+    _patch_auth_sso_exchange_response_cookies(doc)
     _patch_login_link_response_schema(doc)
     _patch_tenant_hint_sso_protocol_enums(doc)
     _patch_auth_sso_authorize_locale_enum(doc)
