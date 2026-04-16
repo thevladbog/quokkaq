@@ -25,6 +25,7 @@ type UserRepository interface {
 	Update(user *models.User) error
 	Delete(id string) error
 	AssignUnit(userID, unitID string, permissions []string) error
+	CreateUserUnitTx(tx *gorm.DB, uu *models.UserUnit) error
 	RemoveUnit(userID, unitID string) error
 	AssignRole(userID, roleID string) error
 	AssignRoleTx(tx *gorm.DB, userID, roleID string) error
@@ -118,6 +119,10 @@ func (r *userRepository) AssignUnit(userID, unitID string, permissions []string)
 		Permissions: models.StringArray(permissions),
 	}
 	return r.db.Create(&userUnit).Error
+}
+
+func (r *userRepository) CreateUserUnitTx(tx *gorm.DB, uu *models.UserUnit) error {
+	return tx.Create(uu).Error
 }
 
 func (r *userRepository) AssignRole(userID, roleID string) error {

@@ -1,8 +1,10 @@
 /**
- * Browser-oriented fetch (localStorage, window, refresh). Safe from Client Components
- * and other client-only code; do not call authenticated flows from React Server Components.
- * This file intentionally does not use the Next.js `"use client"` directive so `@/lib/api`
- * can stay importable from the server for types and non-browser paths.
+ * Browser-oriented fetch to the Next `/api` proxy. Session uses HttpOnly cookies (same-origin);
+ * optional `Authorization: Bearer` from caller headers for non-browser clients (kiosk, scripts).
+ * Legacy: on 401, POST /auth/refresh tries the session cookie first, then Bearer refresh from
+ * localStorage. We do not send a stale `access_token` from localStorage on every request; that
+ * could override an active cookie session. Bearer access is attached only after a legacy refresh
+ * succeeded (see {@link tryRefreshSessionOnce}).
  */
 import { logger } from './logger';
 
@@ -50,9 +52,6 @@ export function isRequestAbortError(error: unknown): boolean {
   return false;
 }
 
-/**
- * Check if caller provided Content-Type header (case-insensitive).
- */
 function hasContentTypeHeader(callerHeaders: HeadersInit | undefined): boolean {
   if (!callerHeaders) return false;
   if (callerHeaders instanceof Headers) {
@@ -71,9 +70,6 @@ function hasContentTypeHeader(callerHeaders: HeadersInit | undefined): boolean {
   return false;
 }
 
-/**
- * Check if body is multipart-like (should not have Content-Type set by default).
- */
 function isMultipartBody(body: unknown): boolean {
   if (body == null) return false;
   return (
@@ -87,11 +83,6 @@ function isMultipartBody(body: unknown): boolean {
   );
 }
 
-/**
- * Defaults first, then caller headers on top — so explicit `Authorization` (refresh/me)
- * wins over the access token from localStorage, while `Content-Type` from callers no longer
- * wipes auth (the old `...options` after `headers` bug).
- */
 function mergeRequestInitHeaders(
   callerHeaders: HeadersInit | undefined,
   authHeaders: Record<string, string>
@@ -111,7 +102,6 @@ function mergeRequestInitHeaders(
   return { ...authHeaders, ...fromCaller };
 }
 
-/** Caller headers without Authorization so retry merges keep the refreshed Bearer token. */
 function headersInitWithoutAuthorization(
   callerHeaders: HeadersInit | undefined
 ): HeadersInit | undefined {
@@ -141,10 +131,122 @@ function headersInitWithoutAuthorization(
   return o;
 }
 
+/** Legacy Bearer access token from localStorage (migration). Not used when session is cookie-only. */
+function legacyAccessToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('access_token');
+}
+
+function legacyRefreshToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('refresh_token');
+}
+
+async function postRefreshCookie(): Promise<Response> {
+  return fetch(`${API_BASE_URL}/auth/refresh`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+
+async function postRefreshBearer(refreshToken: string): Promise<Response> {
+  return fetch(`${API_BASE_URL}/auth/refresh`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${refreshToken}`
+    }
+  });
+}
+
+/** If the refresh response includes rotated bearer tokens, persist them for legacy clients. */
+async function persistRotatedTokensFromRefreshResponse(
+  res: Response
+): Promise<void> {
+  if (typeof window === 'undefined' || res.status !== 200) {
+    return;
+  }
+  const ct = res.headers.get('content-type') ?? '';
+  if (!ct.includes('application/json')) {
+    return;
+  }
+  const clone = res.clone();
+  try {
+    const data: unknown = await clone.json();
+    if (!data || typeof data !== 'object') {
+      return;
+    }
+    const rec = data as Record<string, unknown>;
+    const at =
+      (typeof rec.accessToken === 'string' && rec.accessToken) ||
+      (typeof rec.access_token === 'string' && rec.access_token) ||
+      (typeof rec.token === 'string' && rec.token);
+    const rt =
+      (typeof rec.refreshToken === 'string' && rec.refreshToken) ||
+      (typeof rec.refresh_token === 'string' && rec.refresh_token);
+    if (typeof at === 'string' && at.trim() !== '') {
+      localStorage.setItem('access_token', at);
+    }
+    if (typeof rt === 'string' && rt.trim() !== '') {
+      localStorage.setItem('refresh_token', rt);
+    }
+  } catch {
+    // Ignore malformed refresh JSON; cookies may still carry the session.
+  }
+}
+
+type RefreshSessionResult = {
+  ok: boolean;
+  /** True when rotation used `Authorization: Bearer <refresh>` (cookie refresh did not succeed). */
+  usedBearerRefresh: boolean;
+};
+
+let refreshSessionInFlight: Promise<RefreshSessionResult> | null = null;
+
+/**
+ * Single-flight refresh: concurrent 401s await the same refresh attempt.
+ * `ok` when a refresh returned HTTP 200. `usedBearerRefresh` means the session was renewed via
+ * legacy Bearer refresh — callers may attach `access_token` from localStorage on the retry.
+ */
+async function tryRefreshSessionOnce(): Promise<RefreshSessionResult> {
+  if (refreshSessionInFlight) {
+    return refreshSessionInFlight;
+  }
+  const run = async (): Promise<RefreshSessionResult> => {
+    try {
+      let refreshRes = await postRefreshCookie();
+      await persistRotatedTokensFromRefreshResponse(refreshRes);
+      if (refreshRes.status === 200) {
+        return { ok: true, usedBearerRefresh: false };
+      }
+      const rt = legacyRefreshToken();
+      if (!rt) {
+        return { ok: false, usedBearerRefresh: false };
+      }
+      refreshRes = await postRefreshBearer(rt);
+      await persistRotatedTokensFromRefreshResponse(refreshRes);
+      if (refreshRes.status === 200) {
+        return { ok: true, usedBearerRefresh: true };
+      }
+      return { ok: false, usedBearerRefresh: false };
+    } finally {
+      refreshSessionInFlight = null;
+    }
+  };
+  refreshSessionInFlight = run();
+  return refreshSessionInFlight;
+}
+
 function clearClientAuthSession(): void {
   if (typeof window === 'undefined') {
     return;
   }
+  void fetch(`${API_BASE_URL}/auth/logout`, {
+    method: 'POST',
+    credentials: 'include'
+  }).catch(() => {});
   localStorage.removeItem('access_token');
   localStorage.removeItem('refresh_token');
   localStorage.removeItem(ACTIVE_COMPANY_ID_STORAGE_KEY);
@@ -161,20 +263,16 @@ function clearClientAuthSession(): void {
 }
 
 /**
- * Authenticated fetch to the Next.js API proxy (`/api/...`). Performs JWT refresh on 401 once (client only).
+ * Authenticated fetch to the Next.js API proxy (`/api/...`). Uses cookies (`credentials: 'include'`).
+ * On 401, tries POST /auth/refresh (cookie first, then legacy Bearer refresh), then retries once.
  */
 export async function authenticatedApiFetch(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<Response> {
-  let token = null;
-  let refreshToken = null;
-  let currentLocale = null;
+  let currentLocale: string | null = null;
 
   if (typeof window !== 'undefined') {
-    token = localStorage.getItem('access_token') || null;
-    refreshToken = localStorage.getItem('refresh_token') || null;
-
     const lsLocale = localStorage.getItem('NEXT_LOCALE');
     const navLocale = window.navigator?.language?.split('-')[0] || 'en';
     const inferredLocale = lsLocale || navLocale;
@@ -191,13 +289,13 @@ export async function authenticatedApiFetch(
 
   const authHeaders: Record<string, string> = {
     ...(shouldSetContentType && { 'Content-Type': 'application/json' }),
-    ...(token && { Authorization: `Bearer ${token}` }),
     ...(currentLocale && { 'Accept-Language': currentLocale }),
     ...activeCompanyIdHeader()
   };
 
   const config: RequestInit = {
     ...restOptions,
+    credentials: 'include',
     ...(body !== undefined && { body }),
     headers: mergeRequestInitHeaders(callerHeaders, authHeaders)
   };
@@ -211,74 +309,38 @@ export async function authenticatedApiFetch(
       !isAuthRefreshPath(endpoint)
     ) {
       try {
-        if (refreshToken) {
-          const { authRefresh } = await import('@/lib/api/generated/auth');
+        const refreshed = await tryRefreshSessionOnce();
 
-          let refreshPayload: Record<string, unknown> | null = null;
-          try {
-            const refreshRes = await authRefresh({
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${refreshToken}`
-              }
-            });
-            if (refreshRes.status === 200 && refreshRes.data) {
-              refreshPayload = refreshRes.data as Record<string, unknown>;
-            }
-          } catch (refreshErr) {
-            if (!isRequestAbortError(refreshErr)) {
-              logger.error('Token refresh failed:', refreshErr);
-            }
-          }
+        if (refreshed.ok) {
+          const retryShouldSetContentType =
+            !hasContentTypeHeader(
+              headersInitWithoutAuthorization(callerHeaders)
+            ) && !isMultipartBody(body);
 
-          if (refreshPayload) {
-            const data = refreshPayload;
-            const newAccessToken =
-              (typeof data.accessToken === 'string' && data.accessToken) ||
-              (typeof data.access_token === 'string' && data.access_token) ||
-              (typeof data.token === 'string' && data.token) ||
-              null;
-            const newRefresh =
-              (typeof data.refreshToken === 'string' && data.refreshToken) ||
-              (typeof data.refresh_token === 'string' && data.refresh_token) ||
-              null;
+          const newLegacy = legacyAccessToken();
+          const retryAuthHeaders: Record<string, string> = {
+            ...(retryShouldSetContentType && {
+              'Content-Type': 'application/json'
+            }),
+            ...(refreshed.usedBearerRefresh &&
+              newLegacy && {
+                Authorization: `Bearer ${newLegacy}`
+              }),
+            ...(currentLocale && { 'Accept-Language': currentLocale }),
+            ...activeCompanyIdHeader()
+          };
 
-            if (!newAccessToken) {
-              logger.error(
-                'Token refresh: response OK but no access token field',
-                {}
-              );
-            } else {
-              localStorage.setItem('access_token', newAccessToken);
-              if (newRefresh) {
-                localStorage.setItem('refresh_token', newRefresh);
-              }
+          const retryConfig: RequestInit = {
+            ...restOptions,
+            credentials: 'include',
+            ...(body !== undefined && { body }),
+            headers: mergeRequestInitHeaders(
+              headersInitWithoutAuthorization(callerHeaders),
+              retryAuthHeaders
+            )
+          };
 
-              const retryShouldSetContentType =
-                !hasContentTypeHeader(
-                  headersInitWithoutAuthorization(callerHeaders)
-                ) && !isMultipartBody(body);
-
-              const retryAuthHeaders: Record<string, string> = {
-                ...(retryShouldSetContentType && {
-                  'Content-Type': 'application/json'
-                }),
-                Authorization: `Bearer ${newAccessToken}`,
-                ...(currentLocale && { 'Accept-Language': currentLocale }),
-                ...activeCompanyIdHeader()
-              };
-              const retryConfig: RequestInit = {
-                ...restOptions,
-                ...(body !== undefined && { body }),
-                headers: mergeRequestInitHeaders(
-                  headersInitWithoutAuthorization(callerHeaders),
-                  retryAuthHeaders
-                )
-              };
-
-              response = await fetch(url, retryConfig);
-            }
-          }
+          response = await fetch(url, retryConfig);
         }
       } catch (refreshError) {
         if (!isRequestAbortError(refreshError)) {

@@ -23,6 +23,7 @@ func UnitKindAllowsChildUnits(k string) bool {
 type Company struct {
 	ID              string          `gorm:"primaryKey" json:"id"`
 	Name            string          `gorm:"not null" json:"name"`
+	Slug            string          `gorm:"uniqueIndex;size:63" json:"slug,omitempty"`                              // public tenant slug for login URLs
 	OwnerUserID     string          `gorm:"index" json:"ownerUserId,omitempty"`                                     // owner of the organization
 	SubscriptionID  *string         `gorm:"index" json:"subscriptionId,omitempty"`                                  // FK to Subscription
 	IsSaaSOperator  bool            `gorm:"column:is_saas_operator;not null;default:false" json:"isSaasOperator"`   // single operator tenant per deployment; quotas bypassed
@@ -32,8 +33,14 @@ type Company struct {
 	Counterparty    json.RawMessage `gorm:"type:jsonb" json:"counterparty,omitempty" swaggertype:"object"`          // legal profile (RU): partyType, inn, addresses, etc.
 	Settings        json.RawMessage `gorm:"type:jsonb" json:"settings,omitempty" swaggertype:"object"`              // company settings
 	OnboardingState json.RawMessage `gorm:"type:jsonb" json:"onboardingState,omitempty" swaggertype:"object"`       // onboarding progress
-	CreatedAt       time.Time       `gorm:"autoCreateTime" json:"createdAt"`
-	UpdatedAt       time.Time       `gorm:"autoUpdateTime" json:"updatedAt"`
+	// StrictPublicTenantResolve: SaaS-enabled — GET /public/tenants/{slug} does not expose org metadata for slug guessing.
+	StrictPublicTenantResolve bool `gorm:"column:strict_public_tenant_resolve;not null;default:false" json:"strictPublicTenantResolve"`
+	// OpaqueLoginLinksOnly: deep links should use TenantLoginLink tokens instead of slug-based branding.
+	OpaqueLoginLinksOnly bool `gorm:"column:opaque_login_links_only;not null;default:false" json:"opaqueLoginLinksOnly"`
+	// SsoJitProvisioning: allow creating a user on first successful SSO when policy permits.
+	SsoJitProvisioning bool      `gorm:"column:sso_jit_provisioning;not null;default:false" json:"ssoJitProvisioning"`
+	CreatedAt          time.Time `gorm:"autoCreateTime" json:"createdAt"`
+	UpdatedAt          time.Time `gorm:"autoUpdateTime" json:"updatedAt"`
 
 	// Relations
 	Units        []Unit        `gorm:"foreignKey:CompanyID" json:"units,omitempty"`
@@ -60,6 +67,7 @@ type CompanyPatch struct {
 	BillingAddress      *json.RawMessage `json:"billingAddress,omitempty" swaggertype:"object"`
 	ClearBillingAddress *bool            `json:"clearBillingAddress,omitempty"`
 	PaymentAccounts     *json.RawMessage `json:"paymentAccounts,omitempty" swaggertype:"array,object"` // items: @quokkaq/shared-types PaymentAccountSchema
+	Slug                *string          `json:"slug,omitempty"`
 }
 
 type Unit struct {

@@ -12,12 +12,15 @@ import (
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
+	"quokkaq-go-backend/internal/services"
 )
 
 // companyMeResponse is returned by GET /companies/me.
 type companyMeResponse struct {
-	Company  *models.Company `json:"company"`
-	Features FeaturesFlags   `json:"features"`
+	Company      *models.Company `json:"company"`
+	Features     FeaturesFlags   `json:"features"`
+	PublicAPIURL string          `json:"publicApiUrl" example:"https://api.example.com"`
+	PublicAppURL string          `json:"publicAppUrl" example:"https://app.example.com"`
 }
 
 // FeaturesFlags describes DaData-related UI toggles for the deployment.
@@ -86,6 +89,8 @@ func (h *CompanyHandler) GetMyCompany(w http.ResponseWriter, r *http.Request) {
 			DaData:        dadataConfigured(),
 			DaDataCleaner: dadataCleanerConfigured(),
 		},
+		PublicAPIURL: services.APIPublicURL(),
+		PublicAppURL: services.PublicAppURL(),
 	})
 }
 

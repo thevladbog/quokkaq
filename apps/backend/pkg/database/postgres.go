@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	dbmodels "quokkaq-go-backend/internal/models"
+	"quokkaq-go-backend/internal/pkg/tenantslug"
 	"strconv"
 	"strings"
 
@@ -960,6 +961,85 @@ func RunVersionedMigrations(models ...interface{}) error {
 	})
 	if err != nil {
 		return fmt.Errorf("failed to run unit_operational_states migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.2.0_sso_tenant_slug", func(db *gorm.DB) error {
+		if err := db.Exec(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS slug TEXT`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS strict_public_tenant_resolve BOOLEAN NOT NULL DEFAULT false`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS opaque_login_links_only BOOLEAN NOT NULL DEFAULT false`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS sso_jit_provisioning BOOLEAN NOT NULL DEFAULT false`).Error; err != nil {
+			return err
+		}
+		if err := db.AutoMigrate(
+			&dbmodels.CompanySSOConnection{},
+			&dbmodels.UserExternalIdentity{},
+			&dbmodels.TenantLoginLink{},
+		); err != nil {
+			return err
+		}
+		var companies []dbmodels.Company
+		if err := db.Where("slug IS NULL OR btrim(COALESCE(slug,'')) = ''").Find(&companies).Error; err != nil {
+			return err
+		}
+		for i := range companies {
+			c := &companies[i]
+			base := tenantslug.Normalize(c.Name)
+			if len(base) < tenantslug.MinLen {
+				base = "tenant"
+			}
+			var slug string
+			found := false
+			for attempt := 0; attempt < 50; attempt++ {
+				if attempt == 0 {
+					slug = base
+				} else {
+					slug = fmt.Sprintf("%s-%d", base, attempt)
+				}
+				var n int64
+				if err := db.Model(&dbmodels.Company{}).Where("slug = ?", slug).Count(&n).Error; err != nil {
+					return err
+				}
+				if n == 0 {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return fmt.Errorf("unable to generate unique company slug after 50 attempts for company id %s", c.ID)
+			}
+			if err := db.Model(c).Update("slug", slug).Error; err != nil {
+				return err
+			}
+		}
+		if err := db.Exec(`
+			CREATE UNIQUE INDEX IF NOT EXISTS companies_slug_uq ON companies (slug) WHERE btrim(COALESCE(slug, '')) <> ''
+		`).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.2.0_sso_tenant_slug migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.2.1_sso_audit_events", func(db *gorm.DB) error {
+		return db.AutoMigrate(&dbmodels.SSOAuditEvent{})
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.2.1_sso_audit_events migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.2.2_sso_saml_protocol", func(db *gorm.DB) error {
+		return db.AutoMigrate(&dbmodels.CompanySSOConnection{})
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.2.2_sso_saml_protocol migration: %w", err)
 	}
 
 	fmt.Println("All migrations completed successfully")

@@ -11,6 +11,7 @@ import (
 
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/models"
+	"quokkaq-go-backend/internal/pkg/tenantslug"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/pkg/database"
 
@@ -290,14 +291,18 @@ func (h *PlatformHandler) GetCompany(w http.ResponseWriter, r *http.Request) {
 
 // PatchPlatformCompanyBody is the JSON body for PATCH /platform/companies/{id}.
 type PatchPlatformCompanyBody struct {
-	Name                *string          `json:"name"`
-	BillingEmail        *string          `json:"billingEmail"`
-	Counterparty        *json.RawMessage `json:"counterparty" swaggertype:"object"`
-	ClearCounterparty   *bool            `json:"clearCounterparty"`
-	BillingAddress      *json.RawMessage `json:"billingAddress" swaggertype:"object"`
-	ClearBillingAddress *bool            `json:"clearBillingAddress"`
-	PaymentAccounts     *json.RawMessage `json:"paymentAccounts" swaggertype:"array,object"`
-	IsSaasOperator      *bool            `json:"isSaasOperator"`
+	Name                      *string          `json:"name"`
+	BillingEmail              *string          `json:"billingEmail"`
+	Counterparty              *json.RawMessage `json:"counterparty" swaggertype:"object"`
+	ClearCounterparty         *bool            `json:"clearCounterparty"`
+	BillingAddress            *json.RawMessage `json:"billingAddress" swaggertype:"object"`
+	ClearBillingAddress       *bool            `json:"clearBillingAddress"`
+	PaymentAccounts           *json.RawMessage `json:"paymentAccounts" swaggertype:"array,object"`
+	IsSaasOperator            *bool            `json:"isSaasOperator"`
+	Slug                      *string          `json:"slug"`
+	StrictPublicTenantResolve *bool            `json:"strictPublicTenantResolve"`
+	OpaqueLoginLinksOnly      *bool            `json:"opaqueLoginLinksOnly"`
+	SsoJitProvisioning        *bool            `json:"ssoJitProvisioning"`
 }
 
 // PatchCompany godoc
@@ -381,6 +386,33 @@ func (h *PlatformHandler) PatchCompany(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		company.PaymentAccounts = out
+	}
+
+	if body.StrictPublicTenantResolve != nil {
+		company.StrictPublicTenantResolve = *body.StrictPublicTenantResolve
+	}
+	if body.OpaqueLoginLinksOnly != nil {
+		company.OpaqueLoginLinksOnly = *body.OpaqueLoginLinksOnly
+	}
+	if body.SsoJitProvisioning != nil {
+		company.SsoJitProvisioning = *body.SsoJitProvisioning
+	}
+	if body.Slug != nil {
+		n := tenantslug.Normalize(*body.Slug)
+		if err := tenantslug.Validate(n); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		taken, err := h.companyRepo.IsSlugTakenByOther(n, company.ID)
+		if err != nil {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		if taken {
+			http.Error(w, "slug already taken", http.StatusBadRequest)
+			return
+		}
+		company.Slug = n
 	}
 
 	if body.IsSaasOperator != nil {

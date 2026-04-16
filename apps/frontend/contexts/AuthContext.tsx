@@ -13,6 +13,7 @@ import { usePathname } from 'next/navigation';
 import { User } from '../lib/api';
 import { fetchCurrentUser } from '../lib/auth-orval';
 import { ACTIVE_COMPANY_ID_STORAGE_KEY } from '../lib/authenticated-api-fetch';
+import { authLogout } from '@/lib/api/generated/auth';
 import { routing } from '@/src/i18n/routing';
 import { logger } from '@/lib/logger';
 
@@ -25,17 +26,36 @@ function isLocaleKioskPath(pathname: string | null): boolean {
   );
 }
 
+/** Paths where 401 is expected for guests; do not `location.assign` the same page (reload loop). */
+function isPublicAuthShellPath(path: string): boolean {
+  const p = path.split('?')[0] ?? path;
+  if (p === '/login' || p === '/forgot-password' || p === '/signup')
+    return true;
+  for (const loc of routing.locales) {
+    if (
+      p === `/${loc}/login` ||
+      p === `/${loc}/forgot-password` ||
+      p === `/${loc}/signup`
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 interface AuthContextType {
   user: User | null;
+  /** Set when a browser session is active (cookie or legacy localStorage). */
   token: string | null;
   isAuthenticated: boolean;
-  /** Persists token and loads `/auth/me`. Resolves when the user payload is applied or rejects on failure. */
-  login: (token: string) => Promise<void>;
+  login: (legacyAccessToken?: string | null) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const SESSION_MARKER = '1';
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [token, setToken] = useState<string | null>(null);
@@ -43,84 +63,104 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isClient, setIsClient] = useState(false);
   const pathname = usePathname();
-  /** When true, `login()` owns the `/auth/me` fetch — skip duplicate work in the token effect. */
   const loginFetchOwnsSessionRef = useRef(false);
+  /** Bumped when login() runs or on logout so stale `/auth/me` probes cannot clobber a newer session. */
+  const sessionProbeGenRef = useRef(0);
 
-  // Only run API calls on client side
   useEffect(() => {
     setIsClient(true);
-    // Check if we're on the client before accessing localStorage
-    if (typeof window !== 'undefined') {
-      // Initialize token from localStorage on mount
-      const storedToken = localStorage.getItem('access_token');
-      if (storedToken) {
-        setToken(storedToken);
-      }
-    }
   }, []);
 
   const logout = useCallback(() => {
-    setToken(null);
-    setUser(null);
-    setIsLoading(false);
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-      localStorage.removeItem(ACTIVE_COMPANY_ID_STORAGE_KEY);
-      const segments = window.location.pathname.split('/').filter(Boolean);
-      const maybeLocale = segments[0];
-      const loginPath = routing.locales.includes(maybeLocale as 'en' | 'ru')
-        ? `/${maybeLocale}/login`
-        : '/login';
-      window.location.href = loginPath;
-    }
-  }, []);
-
-  const login = useCallback((newToken: string): Promise<void> => {
+    sessionProbeGenRef.current++;
+    const gen = sessionProbeGenRef.current;
     if (typeof window === 'undefined') {
-      return Promise.resolve();
-    }
-    loginFetchOwnsSessionRef.current = true;
-    setIsLoading(true);
-    setToken(newToken);
-    localStorage.setItem('access_token', newToken);
-    return fetchCurrentUser()
-      .then((userData) => {
-        setUser(userData);
-        setIsLoading(false);
-      })
-      .catch((error) => {
-        logger.error('Failed to fetch user after login:', error);
-        setToken(null);
-        setUser(null);
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        localStorage.removeItem(ACTIVE_COMPANY_ID_STORAGE_KEY);
-        setIsLoading(false);
-        throw error;
-      })
-      .finally(() => {
-        loginFetchOwnsSessionRef.current = false;
-      });
-  }, []);
-
-  // Fetch user after mount / token change. Pathname is only needed for kiosk routes.
-  // Do not set isLoading on every pathname change — that remounts ProtectedRoute and flashes the sidebar.
-  useEffect(() => {
-    if (!isClient) return;
-
-    if (!token) {
-      setIsLoading(false);
-      return;
-    }
-
-    if (isLocaleKioskPath(pathname)) {
+      setToken(null);
       setUser(null);
       setIsLoading(false);
       return;
     }
+    void (async () => {
+      try {
+        await authLogout();
+      } catch (e) {
+        logger.warn('Server logout failed; clearing local session anyway.', e);
+      } finally {
+        if (gen !== sessionProbeGenRef.current) {
+          return;
+        }
+        setToken(null);
+        setUser(null);
+        setIsLoading(false);
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem(ACTIVE_COMPANY_ID_STORAGE_KEY);
+        const segments = window.location.pathname.split('/').filter(Boolean);
+        const maybeLocale = segments[0];
+        const loginPath = routing.locales.includes(maybeLocale as 'en' | 'ru')
+          ? `/${maybeLocale}/login`
+          : '/login';
+        const current = window.location.pathname;
+        if (current === loginPath || isPublicAuthShellPath(current)) {
+          return;
+        }
+        window.location.href = loginPath;
+      }
+    })();
+  }, []);
 
-    if (user !== null) {
+  const login = useCallback(
+    (legacyAccessToken?: string | null): Promise<void> => {
+      if (typeof window === 'undefined') {
+        return Promise.resolve();
+      }
+      sessionProbeGenRef.current++;
+      const loginGen = sessionProbeGenRef.current;
+      loginFetchOwnsSessionRef.current = true;
+      setIsLoading(true);
+      if (legacyAccessToken) {
+        localStorage.setItem('access_token', legacyAccessToken);
+      } else {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+      }
+      setToken(SESSION_MARKER);
+      return fetchCurrentUser()
+        .then((userData) => {
+          if (loginGen !== sessionProbeGenRef.current) {
+            return;
+          }
+          setUser(userData);
+          setIsLoading(false);
+        })
+        .catch((error) => {
+          logger.error('Failed to fetch user after login:', error);
+          if (loginGen !== sessionProbeGenRef.current) {
+            return;
+          }
+          setToken(null);
+          setUser(null);
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('refresh_token');
+          localStorage.removeItem(ACTIVE_COMPANY_ID_STORAGE_KEY);
+          setIsLoading(false);
+          throw error;
+        })
+        .finally(() => {
+          loginFetchOwnsSessionRef.current = false;
+        });
+    },
+    []
+  );
+
+  // Load session from HttpOnly cookies (same-origin /api) or legacy tokens.
+  useEffect(() => {
+    if (!isClient) return;
+
+    if (isLocaleKioskPath(pathname)) {
+      setUser(null);
+      setToken(null);
+      setIsLoading(false);
       return;
     }
 
@@ -128,28 +168,41 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
+    if (user !== null) {
+      return;
+    }
+
     setIsLoading(true);
 
     let cancelled = false;
-    const fetchUser = async () => {
+    const myGen = ++sessionProbeGenRef.current;
+    const run = async () => {
       try {
         const userData = await fetchCurrentUser();
-        if (!cancelled) setUser(userData);
-      } catch (error) {
-        logger.error('Failed to fetch user:', error);
-        if (!cancelled) logout();
+        if (cancelled || myGen !== sessionProbeGenRef.current) {
+          return;
+        }
+        setUser(userData);
+        setToken(SESSION_MARKER);
+      } catch {
+        if (cancelled || myGen !== sessionProbeGenRef.current) {
+          return;
+        }
+        setUser(null);
+        setToken(null);
       } finally {
-        if (!cancelled) setIsLoading(false);
+        if (!cancelled && myGen === sessionProbeGenRef.current) {
+          setIsLoading(false);
+        }
       }
     };
 
-    void fetchUser();
+    void run();
     return () => {
       cancelled = true;
     };
-  }, [isClient, token, pathname, logout, user]);
+  }, [isClient, pathname, user]);
 
-  // Listen for global 'auth:logout' events (dispatched by apiRequest on 401 / refresh failure)
   useEffect(() => {
     const handleGlobalLogout = () => {
       logout();
@@ -175,7 +228,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const value = {
     user,
     token,
-    isAuthenticated: !!token && !!user,
+    isAuthenticated: !!user,
     login,
     logout,
     isLoading

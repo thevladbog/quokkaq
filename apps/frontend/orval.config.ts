@@ -162,7 +162,7 @@ export default defineConfig({
       target: '../backend/docs/swagger.json',
       filters: {
         mode: 'include',
-        tags: ['auth']
+        tags: ['auth', 'companies']
       }
     },
     output: {

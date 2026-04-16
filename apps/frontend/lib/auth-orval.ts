@@ -16,10 +16,13 @@ export async function fetchCurrentUser(): Promise<User> {
 export async function loginWithPassword(credentials: {
   email: string;
   password: string;
+  tenantSlug?: string;
 }): Promise<{ accessToken: string; refreshToken?: string }> {
+  const slug = credentials.tenantSlug?.trim();
   const res = await authLogin({
     email: credentials.email,
-    password: credentials.password
+    password: credentials.password,
+    ...(slug ? { tenantSlug: slug } : {})
   });
   if (res.status !== 200) {
     throw new Error('Login failed');
@@ -29,7 +32,6 @@ export async function loginWithPassword(credentials: {
     throw new Error('No token in login response');
   }
   return {
-    accessToken: token,
-    refreshToken: res.data.refreshToken
+    accessToken: token
   };
 }

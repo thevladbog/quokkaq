@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"quokkaq-go-backend/internal/middleware"
+	"quokkaq-go-backend/internal/pkg/authcookie"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
 	"strings"
@@ -21,20 +22,22 @@ func NewAuthHandler(service services.AuthService, userRepo repository.UserReposi
 }
 
 type LoginRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Email      string `json:"email" binding:"required"`
+	Password   string `json:"password" binding:"required"`
+	TenantSlug string `json:"tenantSlug,omitempty"`
 }
 
-type LoginResponse struct {
-	Token        string `json:"token"` // same as accessToken (legacy clients)
-	AccessToken  string `json:"accessToken"`
-	RefreshToken string `json:"refreshToken"`
+// LoginSessionResponse is the JSON body for cookie-based login, signup, and SSO exchange.
+// Refresh JWTs are issued only via HttpOnly Set-Cookie (see operation response headers).
+type LoginSessionResponse struct {
+	Token       string `json:"token"`       // same as accessToken (legacy clients)
+	AccessToken string `json:"accessToken"` // legacy field name; same JWT as token
 }
 
 // RefreshResponse is the body of POST /auth/refresh.
+// Refresh tokens are rotated via HttpOnly cookies only; the JSON body exposes the new access JWT.
 type RefreshResponse struct {
-	AccessToken  string `json:"accessToken"`
-	RefreshToken string `json:"refreshToken"`
+	AccessToken string `json:"accessToken"`
 }
 
 type ForgotPasswordRequest struct {
@@ -51,18 +54,19 @@ type SignupRequest struct {
 	Email       string `json:"email" binding:"required"`
 	Password    string `json:"password" binding:"required"`
 	CompanyName string `json:"companyName" binding:"required"`
-	PlanCode    string `json:"planCode"` // optional, defaults to starter with trial
+	PlanCode    string `json:"planCode"`    // optional, defaults to starter with trial
+	CompanySlug string `json:"companySlug"` // optional; if empty, generated from company name
 }
 
 // Login godoc
 // @ID           authLogin
 // @Summary      User Login
-// @Description  Authenticates a user and returns access and refresh JWTs (`token` duplicates access for legacy clients)
+// @Description  Authenticates a user; refresh JWT is set only via HttpOnly `Set-Cookie` (SessionCookie). JSON returns access JWT (`token` duplicates `accessToken` for legacy clients). Optional `tenantSlug` scopes login to a tenant the user can access; omit for default behavior.
 // @Tags         auth
 // @Accept       json
 // @Produce      json
 // @Param        request body LoginRequest true "Login Credentials"
-// @Success      200  {object}  LoginResponse
+// @Success      200  {object}  LoginSessionResponse
 // @Failure      400  {string}  string "Bad Request"
 // @Failure      401  {string}  string "Unauthorized"
 // @Failure      500  {string}  string "Internal Server Error"
@@ -73,18 +77,22 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	if strings.TrimSpace(req.Email) == "" || strings.TrimSpace(req.Password) == "" {
+		http.Error(w, "email and password are required", http.StatusBadRequest)
+		return
+	}
 
-	pair, err := h.service.Login(req.Email, req.Password)
+	pair, err := h.service.Login(req.Email, req.Password, strings.TrimSpace(req.TenantSlug))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
 
+	authcookie.WriteSessionCookies(w, r, pair)
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(LoginResponse{
-		Token:        pair.AccessToken,
-		AccessToken:  pair.AccessToken,
-		RefreshToken: pair.RefreshToken,
+	if err := json.NewEncoder(w).Encode(LoginSessionResponse{
+		Token:       pair.AccessToken,
+		AccessToken: pair.AccessToken,
 	}); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 	}
@@ -93,7 +101,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 // Refresh godoc
 // @ID           authRefresh
 // @Summary      Refresh tokens
-// @Description  Exchanges a valid refresh JWT for new access and refresh tokens. Send the refresh token as `Authorization: Bearer <refresh>`.
+// @Description  Exchanges a valid refresh JWT for a new access JWT. The refresh token is read from HttpOnly session cookies when present; otherwise send `Authorization: Bearer <refresh>`. Rotated refresh tokens are returned only via `Set-Cookie`, not in the JSON body.
 // @Tags         auth
 // @Produce      json
 // @Security     BearerAuth
@@ -102,30 +110,50 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 // @Failure      500  {string}  string "Internal Server Error"
 // @Router       /auth/refresh [post]
 func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
-	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" {
-		http.Error(w, "Authorization header required", http.StatusUnauthorized)
-		return
-	}
-	parts := strings.Split(authHeader, " ")
-	if len(parts) != 2 || parts[0] != "Bearer" {
-		http.Error(w, "Invalid authorization header format", http.StatusUnauthorized)
-		return
+	refresh := authcookie.RefreshTokenFromRequest(r)
+	if refresh == "" {
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			http.Error(w, "Authentication required", http.StatusUnauthorized)
+			return
+		}
+		parts := strings.Split(authHeader, " ")
+		if len(parts) != 2 || parts[0] != "Bearer" {
+			http.Error(w, "Invalid authorization header format", http.StatusUnauthorized)
+			return
+		}
+		refresh = parts[1]
 	}
 
-	pair, err := h.service.Refresh(parts[1])
+	pair, err := h.service.Refresh(refresh)
 	if err != nil {
+		if errors.Is(err, services.ErrUserInactive) {
+			http.Error(w, err.Error(), http.StatusForbidden)
+			return
+		}
 		http.Error(w, "Invalid or expired refresh token", http.StatusUnauthorized)
 		return
 	}
 
+	authcookie.WriteSessionCookies(w, r, pair)
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(RefreshResponse{
-		AccessToken:  pair.AccessToken,
-		RefreshToken: pair.RefreshToken,
+		AccessToken: pair.AccessToken,
 	}); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 	}
+}
+
+// Logout godoc
+// @ID           authLogout
+// @Summary      Log out (clear session cookies)
+// @Description  Clears HttpOnly session cookies set by login and refresh. Does not require a JSON body.
+// @Tags         auth
+// @Success      204
+// @Router       /auth/logout [post]
+func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	authcookie.ClearSessionCookies(w, r)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // GetMe godoc
@@ -284,7 +312,7 @@ func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 // @Accept       json
 // @Produce      json
 // @Param        request body SignupRequest true "Signup Information"
-// @Success      201  {object}  LoginResponse "Created"
+// @Success      201  {object}  LoginSessionResponse "Created"
 // @Failure      400  {string}  string "Bad Request"
 // @Failure      409  {string}  string "Email already exists"
 // @Failure      500  {string}  string "Internal Server Error"
@@ -307,10 +335,22 @@ func (h *AuthHandler) Signup(w http.ResponseWriter, r *http.Request) {
 		req.PlanCode = "starter"
 	}
 
-	pair, err := h.service.Signup(req.Name, req.Email, req.Password, req.CompanyName, req.PlanCode)
+	var preferredSlug *string
+	if s := strings.TrimSpace(req.CompanySlug); s != "" {
+		preferredSlug = &s
+	}
+	pair, err := h.service.Signup(req.Name, req.Email, req.Password, req.CompanyName, req.PlanCode, preferredSlug)
 	if err != nil {
 		if errors.Is(err, services.ErrEmailAlreadyExists) {
 			http.Error(w, "An account with this email already exists", http.StatusConflict)
+			return
+		}
+		if errors.Is(err, services.ErrInvalidCompanySlug) {
+			http.Error(w, "Invalid company slug", http.StatusBadRequest)
+			return
+		}
+		if errors.Is(err, services.ErrCompanySlugTaken) {
+			http.Error(w, "Company slug is already taken", http.StatusConflict)
 			return
 		}
 		log.Printf("Signup: %v", err)
@@ -318,12 +358,12 @@ func (h *AuthHandler) Signup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	authcookie.WriteSessionCookies(w, r, pair)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	if err := json.NewEncoder(w).Encode(LoginResponse{
-		Token:        pair.AccessToken,
-		AccessToken:  pair.AccessToken,
-		RefreshToken: pair.RefreshToken,
+	if err := json.NewEncoder(w).Encode(LoginSessionResponse{
+		Token:       pair.AccessToken,
+		AccessToken: pair.AccessToken,
 	}); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 	}

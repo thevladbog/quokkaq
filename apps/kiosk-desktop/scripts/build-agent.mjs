@@ -2,7 +2,7 @@
 /**
  * Cross-build the Go sidecar into src-tauri/binaries/ with the Tauri target triple name.
  */
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -48,10 +48,14 @@ const env = {
   CGO_ENABLED: '0'
 };
 
-execSync(`go build -trimpath -ldflags="-s -w" -o ${JSON.stringify(outPath)} .`, {
-  cwd: agentDir,
-  env,
-  stdio: 'inherit'
-});
+execFileSync(
+  'go',
+  ['build', '-trimpath', '-ldflags=-s -w', '-o', outPath, '.'],
+  {
+    cwd: agentDir,
+    env,
+    stdio: 'inherit'
+  }
+);
 
 console.log(`Built agent: ${outPath}`);
