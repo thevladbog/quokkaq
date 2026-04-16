@@ -10,11 +10,28 @@ import (
 )
 
 type SlotHandler struct {
-	service *services.SlotService
+	service  *services.SlotService
+	calendar *services.CalendarIntegrationService
 }
 
-func NewSlotHandler(service *services.SlotService) *SlotHandler {
-	return &SlotHandler{service: service}
+func NewSlotHandler(service *services.SlotService, calendar *services.CalendarIntegrationService) *SlotHandler {
+	return &SlotHandler{service: service, calendar: calendar}
+}
+
+func (h *SlotHandler) rejectIfCalendarReadOnly(w http.ResponseWriter, unitID string) bool {
+	if h.calendar == nil {
+		return false
+	}
+	pub, err := h.calendar.GetPublic(unitID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return true
+	}
+	if pub.ReadOnlyCapacity {
+		http.Error(w, "slot capacity is managed by calendar integration", http.StatusConflict)
+		return true
+	}
+	return false
 }
 
 // GetConfig godoc
@@ -62,6 +79,9 @@ func (h *SlotHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	unitID := chi.URLParam(r, "unitId")
+	if h.rejectIfCalendarReadOnly(w, unitID) {
+		return
+	}
 	config.UnitID = unitID
 
 	if err := h.service.UpdateConfig(&config); err != nil {
@@ -116,6 +136,9 @@ func (h *SlotHandler) UpdateCapacities(w http.ResponseWriter, r *http.Request) {
 	}
 
 	unitID := chi.URLParam(r, "unitId")
+	if h.rejectIfCalendarReadOnly(w, unitID) {
+		return
+	}
 	// Ensure all capacities have the correct UnitID
 	for i := range capacities {
 		capacities[i].UnitID = unitID
@@ -151,6 +174,9 @@ func (h *SlotHandler) Generate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	unitID := chi.URLParam(r, "unitId")
+	if h.rejectIfCalendarReadOnly(w, unitID) {
+		return
+	}
 	if err := h.service.GenerateSlots(unitID, req.From, req.To); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -218,6 +244,10 @@ func (h *SlotHandler) UpdateDay(w http.ResponseWriter, r *http.Request) {
 
 	unitID := chi.URLParam(r, "unitId")
 	date := chi.URLParam(r, "date")
+
+	if h.rejectIfCalendarReadOnly(w, unitID) {
+		return
+	}
 
 	if err := h.service.UpdateDaySlots(unitID, date, req); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

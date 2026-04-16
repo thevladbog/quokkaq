@@ -104,7 +104,11 @@ func (h *PreRegistrationHandler) Create(w http.ResponseWriter, r *http.Request) 
 		Comment:           req.Comment,
 	}
 
-	if err := h.service.Create(&preReg); err != nil {
+	if err := h.service.Create(r.Context(), &preReg, req.ExternalEventHref, req.ExternalEventEtag); err != nil {
+		if errors.Is(err, services.ErrCalendarSlotTaken) || errors.Is(err, services.ErrCalendarSlotNotFree) {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -136,11 +140,21 @@ func (h *PreRegistrationHandler) Update(w http.ResponseWriter, r *http.Request) 
 	}
 
 	id := chi.URLParam(r, "id")
+	unitID := chi.URLParam(r, "unitId")
 
 	// Get existing pre-registration
 	existing, err := h.service.GetByID(id)
 	if err != nil {
 		http.Error(w, "Pre-registration not found", http.StatusNotFound)
+		return
+	}
+	if existing.UnitID != unitID {
+		http.Error(w, "Pre-registration not found", http.StatusNotFound)
+		return
+	}
+
+	if st := strings.TrimSpace(updateData.Status); st != "" && st != "canceled" {
+		http.Error(w, `only "canceled" is allowed for status`, http.StatusBadRequest)
 		return
 	}
 
@@ -150,6 +164,8 @@ func (h *PreRegistrationHandler) Update(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	previous := models.ClonePreRegistration(existing)
+
 	// Update only editable fields
 	existing.ServiceID = updateData.ServiceID
 	existing.Date = updateData.Date
@@ -158,17 +174,54 @@ func (h *PreRegistrationHandler) Update(w http.ResponseWriter, r *http.Request) 
 	existing.CustomerLastName = ln
 	existing.CustomerPhone = normalizedPhone
 	existing.Comment = updateData.Comment
+	if strings.TrimSpace(updateData.Status) == "canceled" {
+		existing.Status = "canceled"
+	}
 
-	if err := h.service.Update(existing); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	if err := h.service.Update(r.Context(), previous, existing, &updateData); err != nil {
+		switch {
+		case errors.Is(err, services.ErrPreRegistrationCannotCancel),
+			errors.Is(err, services.ErrPreRegistrationCanceledImmutable):
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		default:
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 		return
 	}
 	RespondJSON(w, existing)
 }
 
+// GetCalendarSlots godoc
+// @Summary      List calendar-backed slots with CalDAV hrefs (when integration enabled)
+// @Tags         pre-registrations
+// @Produce      json
+// @Param        unitId path string true "Unit ID"
+// @Param        serviceId query string true "Service ID"
+// @Param        date query string true "Date YYYY-MM-DD"
+// @Success      200 {array} models.PreRegCalendarSlotItem
+// @Router       /units/{unitId}/pre-registrations/calendar-slots [get]
+func (h *PreRegistrationHandler) GetCalendarSlots(w http.ResponseWriter, r *http.Request) {
+	unitID := chi.URLParam(r, "unitId")
+	serviceID := r.URL.Query().Get("serviceId")
+	date := r.URL.Query().Get("date")
+	if serviceID == "" || date == "" {
+		http.Error(w, "serviceId and date are required", http.StatusBadRequest)
+		return
+	}
+	items, err := h.service.ListCalendarSlotItems(unitID, serviceID, date)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if items == nil {
+		items = []models.PreRegCalendarSlotItem{}
+	}
+	RespondJSON(w, items)
+}
+
 // GetAvailableSlots godoc
 // @Summary      Get available time slots for pre-registration
-// @Description  Returns HH:MM slot strings for a service on a given date, accounting for capacity and existing bookings.
+// @Description  Returns HH:MM slot strings; uses CalDAV when integration is enabled.
 // @Tags         pre-registrations
 // @Produce      json
 // @Param        unitId    path      string  true  "Unit ID"

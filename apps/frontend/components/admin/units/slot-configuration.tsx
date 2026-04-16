@@ -25,7 +25,9 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { DatePicker } from '@/components/ui/date-picker';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { slotsApi, unitsApi, Service } from '@/lib/api';
+import { useGetUnitsUnitIdCalendarIntegration } from '@/lib/api/generated/calendar-integration';
 
 // Type for translation function from next-intl
 type TranslationFunction = (
@@ -139,7 +141,28 @@ export function SlotConfiguration({ unitId }: SlotConfigurationProps) {
     queryFn: () => slotsApi.getCapacities(unitId)
   });
 
-  if (isConfigLoading || isCapacitiesLoading || isServicesLoading) {
+  const calendarIntegrationQuery = useGetUnitsUnitIdCalendarIntegration(
+    unitId,
+    {
+      query: {
+        staleTime: 60_000
+      }
+    }
+  );
+  const isCalendarLoading = calendarIntegrationQuery.isLoading;
+  const calendarIntegration =
+    calendarIntegrationQuery.data?.status === 200
+      ? calendarIntegrationQuery.data.data
+      : undefined;
+
+  const readOnlyCapacity = calendarIntegration?.readOnlyCapacity === true;
+
+  if (
+    isConfigLoading ||
+    isCapacitiesLoading ||
+    isServicesLoading ||
+    isCalendarLoading
+  ) {
     return (
       <div className='flex justify-center p-8'>
         <Loader2 className='animate-spin' />
@@ -149,8 +172,28 @@ export function SlotConfiguration({ unitId }: SlotConfigurationProps) {
 
   return (
     <div className='space-y-6'>
+      {readOnlyCapacity && (
+        <Alert>
+          <AlertTitle>
+            {t('calendar_readonly_title', {
+              defaultValue: 'Capacity is managed in the calendar'
+            })}
+          </AlertTitle>
+          <AlertDescription>
+            {t('calendar_readonly_desc', {
+              defaultValue:
+                'This unit uses Yandex Calendar (CalDAV) for slot capacity. Weekly capacity, generation, and day overrides are read-only here; edit events in the connected calendar.'
+            })}
+          </AlertDescription>
+        </Alert>
+      )}
       {config && (
-        <SlotConfigForm unitId={unitId} initialConfig={config} t={t} />
+        <SlotConfigForm
+          unitId={unitId}
+          initialConfig={config}
+          t={t}
+          readOnly={readOnlyCapacity}
+        />
       )}
 
       {capacities && services && (
@@ -161,15 +204,17 @@ export function SlotConfiguration({ unitId }: SlotConfigurationProps) {
           t={t}
           getLocalizedServiceName={getLocalizedServiceName}
           config={config}
+          readOnly={readOnlyCapacity}
         />
       )}
 
-      <GenerationSection unitId={unitId} t={t} />
+      <GenerationSection unitId={unitId} t={t} readOnly={readOnlyCapacity} />
       <DayManagementSection
         unitId={unitId}
         t={t}
         services={services || []}
         getLocalizedServiceName={getLocalizedServiceName}
+        readOnly={readOnlyCapacity}
       />
     </div>
   );
@@ -178,11 +223,13 @@ export function SlotConfiguration({ unitId }: SlotConfigurationProps) {
 function SlotConfigForm({
   unitId,
   initialConfig,
-  t
+  t,
+  readOnly = false
 }: {
   unitId: string;
   initialConfig: SlotConfig;
   t: TranslationFunction;
+  readOnly?: boolean;
 }) {
   const queryClient = useQueryClient();
   const [startTime, setStartTime] = useState(
@@ -246,6 +293,7 @@ function SlotConfigForm({
               type='time'
               value={startTime}
               onChange={(e) => setStartTime(e.target.value)}
+              disabled={readOnly}
             />
           </div>
           <div className='space-y-2'>
@@ -254,6 +302,7 @@ function SlotConfigForm({
               type='time'
               value={endTime}
               onChange={(e) => setEndTime(e.target.value)}
+              disabled={readOnly}
             />
           </div>
           <div className='space-y-2'>
@@ -264,6 +313,7 @@ function SlotConfigForm({
               type='number'
               value={interval}
               onChange={(e) => setInterval(parseInt(e.target.value))}
+              disabled={readOnly}
             />
           </div>
         </div>
@@ -277,6 +327,7 @@ function SlotConfigForm({
                   id={`day-${day}`}
                   checked={workingDays.includes(day)}
                   onCheckedChange={() => toggleWorkingDay(day)}
+                  disabled={readOnly}
                 />
                 <Label htmlFor={`day-${day}`}>
                   {t(`days.${day}`, { defaultValue: day })}
@@ -288,7 +339,7 @@ function SlotConfigForm({
 
         <Button
           onClick={handleConfigSave}
-          disabled={updateConfigMutation.isPending}
+          disabled={readOnly || updateConfigMutation.isPending}
         >
           {updateConfigMutation.isPending && (
             <Loader2 className='mr-2 h-4 w-4 animate-spin' />
@@ -306,7 +357,8 @@ function SlotCapacitiesForm({
   services,
   t,
   getLocalizedServiceName,
-  config
+  config,
+  readOnly = false
 }: {
   unitId: string;
   initialCapacities: SlotCapacity[];
@@ -314,6 +366,7 @@ function SlotCapacitiesForm({
   t: TranslationFunction;
   getLocalizedServiceName: (s: Service, list?: Service[]) => string;
   config?: SlotConfig;
+  readOnly?: boolean;
 }) {
   const queryClient = useQueryClient();
   const [selectedServiceId, setSelectedServiceId] = useState<string>(() => {
@@ -452,6 +505,7 @@ function SlotCapacitiesForm({
             <Select
               value={selectedServiceId}
               onValueChange={setSelectedServiceId}
+              disabled={readOnly}
             >
               <SelectTrigger>
                 <SelectValue
@@ -473,7 +527,11 @@ function SlotCapacitiesForm({
           </div>
           <Button
             onClick={handleCapacitiesSave}
-            disabled={updateCapacitiesMutation.isPending || !selectedServiceId}
+            disabled={
+              readOnly ||
+              updateCapacitiesMutation.isPending ||
+              !selectedServiceId
+            }
           >
             {updateCapacitiesMutation.isPending && (
               <Loader2 className='mr-2 h-4 w-4 animate-spin' />
@@ -528,6 +586,7 @@ function SlotCapacitiesForm({
                             onChange={(e) =>
                               handleCapacityChange(day, time, e.target.value)
                             }
+                            disabled={readOnly}
                           />
                         </td>
                       );
@@ -545,10 +604,12 @@ function SlotCapacitiesForm({
 
 function GenerationSection({
   unitId,
-  t
+  t,
+  readOnly = false
 }: {
   unitId: string;
   t: TranslationFunction;
+  readOnly?: boolean;
 }) {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -593,6 +654,7 @@ function GenerationSection({
               value={from}
               onChange={setFrom}
               placeholder={t('from_date', { defaultValue: 'From Date' })}
+              disabled={readOnly}
             />
           </div>
           <div className='space-y-2'>
@@ -601,11 +663,12 @@ function GenerationSection({
               value={to}
               onChange={setTo}
               placeholder={t('to_date', { defaultValue: 'To Date' })}
+              disabled={readOnly}
             />
           </div>
           <Button
             onClick={() => generateMutation.mutate()}
-            disabled={!from || !to || generateMutation.isPending}
+            disabled={readOnly || !from || !to || generateMutation.isPending}
           >
             {generateMutation.isPending && (
               <Loader2 className='mr-2 h-4 w-4 animate-spin' />
@@ -622,7 +685,8 @@ function DayManagementSection({
   unitId,
   t,
   services,
-  getLocalizedServiceName
+  getLocalizedServiceName,
+  readOnly = false
 }: {
   unitId: string;
   t: TranslationFunction;
@@ -631,6 +695,7 @@ function DayManagementSection({
     service: Service,
     servicesList?: Service[]
   ) => string;
+  readOnly?: boolean;
 }) {
   const [date, setDate] = useState('');
 
@@ -670,6 +735,7 @@ function DayManagementSection({
             value={date}
             onChange={setDate}
             placeholder={t('select_day', { defaultValue: 'Select Day' })}
+            disabled={readOnly}
           />
         </div>
 
@@ -692,6 +758,7 @@ function DayManagementSection({
             services={services}
             getLocalizedServiceName={getLocalizedServiceName}
             onSaved={refetch}
+            readOnly={readOnly}
           />
         )}
       </CardContent>
@@ -705,7 +772,8 @@ function DayEditor({
   t,
   services,
   getLocalizedServiceName,
-  onSaved
+  onSaved,
+  readOnly = false
 }: {
   unitId: string;
   initialData: DaySchedule;
@@ -713,6 +781,7 @@ function DayEditor({
   services: Service[];
   getLocalizedServiceName: (s: Service, list?: Service[]) => string;
   onSaved: () => void;
+  readOnly?: boolean;
 }) {
   const [details, setDetails] = useState<DaySchedule>(initialData);
 
@@ -783,6 +852,7 @@ function DayEditor({
           id='is-day-off'
           checked={details.isDayOff}
           onCheckedChange={toggleDayOff}
+          disabled={readOnly}
         />
         <Label htmlFor='is-day-off' className='font-bold text-red-600'>
           {t('mark_as_day_off', { defaultValue: 'Mark as Day Off (Holiday)' })}
@@ -827,6 +897,7 @@ function DayEditor({
                         onChange={(e) =>
                           handleCapacityChange(slot.id, e.target.value)
                         }
+                        disabled={readOnly}
                       />
                     </div>
                   ))}
@@ -837,7 +908,10 @@ function DayEditor({
         </div>
       )}
 
-      <Button onClick={handleSave} disabled={updateDayMutation.isPending}>
+      <Button
+        onClick={handleSave}
+        disabled={readOnly || updateDayMutation.isPending}
+      >
         {updateDayMutation.isPending && (
           <Loader2 className='mr-2 h-4 w-4 animate-spin' />
         )}

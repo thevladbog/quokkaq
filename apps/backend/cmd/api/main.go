@@ -97,6 +97,9 @@ func main() {
 			&models.MessageTemplate{},
 			&models.PasswordResetToken{},
 			&models.PreRegistration{},
+			&models.UnitCalendarIntegration{},
+			&models.CalendarExternalSlot{},
+			&models.CalendarSyncIncident{},
 			&models.SlotConfig{},
 			&models.WeeklySlotCapacity{},
 			&models.DaySchedule{},
@@ -134,6 +137,7 @@ func main() {
 	invitationRepo := repository.NewInvitationRepository()
 	slotRepo := repository.NewSlotRepository()
 	preRegRepo := repository.NewPreRegistrationRepository()
+	calendarIntegrationRepo := repository.NewCalendarIntegrationRepository()
 	desktopTerminalRepo := repository.NewDesktopTerminalRepository()
 	subscriptionRepo := repository.NewSubscriptionRepository()
 	invoiceRepo := repository.NewInvoiceRepository()
@@ -156,7 +160,8 @@ func main() {
 	unitClientService := services.NewUnitClientService(unitClientRepo, visitorTagDefRepo, unitClientHistRepo, database.DB)
 	unitService := services.NewUnitService(unitRepo, unitClientService)
 	visitorTagDefService := services.NewVisitorTagDefinitionService(visitorTagDefRepo)
-	ticketService := services.NewTicketService(ticketRepo, counterRepo, serviceRepo, unitRepo, operatorIntervalRepo, unitClientRepo, visitorTagDefRepo, unitClientHistRepo, preRegRepo, hub, jobClient)
+	calendarIntegrationService := services.NewCalendarIntegrationService(calendarIntegrationRepo, serviceRepo, mailService)
+	ticketService := services.NewTicketService(ticketRepo, counterRepo, serviceRepo, unitRepo, operatorIntervalRepo, unitClientRepo, visitorTagDefRepo, unitClientHistRepo, preRegRepo, calendarIntegrationService, hub, jobClient)
 	serviceService := services.NewServiceService(serviceRepo, unitRepo)
 	counterService := services.NewCounterService(counterRepo, ticketRepo, serviceRepo, userRepo, operatorIntervalRepo, unitRepo, hub)
 	bookingService := services.NewBookingService(bookingRepo)
@@ -170,11 +175,33 @@ func main() {
 	refreshCtx, refreshCancel := context.WithCancel(context.Background())
 	defer refreshCancel()
 	statsRefresh.StartPeriodicRefresh(refreshCtx)
+	go func() {
+		ticker := time.NewTicker(3 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-refreshCtx.Done():
+				return
+			case <-ticker.C:
+				rows, err := calendarIntegrationRepo.ListEnabled()
+				if err != nil {
+					log.Printf("calendar ListEnabled: %v", err)
+					continue
+				}
+				for i := range rows {
+					uid := rows[i].UnitID
+					if err := calendarIntegrationService.SyncUnit(context.Background(), uid); err != nil {
+						log.Printf("calendar SyncUnit %s: %v", uid, err)
+					}
+				}
+			}
+		}
+	}()
 	shiftService := services.NewShiftService(ticketRepo, counterRepo, serviceRepo, auditLogRepo, operatorIntervalRepo, hub, userRepo)
 	templateService := services.NewTemplateService(templateRepo)
 	invitationService := services.NewInvitationService(invitationRepo, mailService, userRepo, templateService)
 	slotService := services.NewSlotService(slotRepo, preRegRepo)
-	preRegService := services.NewPreRegistrationService(preRegRepo, slotRepo, ticketRepo, serviceRepo)
+	preRegService := services.NewPreRegistrationService(preRegRepo, slotRepo, ticketRepo, serviceRepo, calendarIntegrationService)
 	desktopTerminalService := services.NewDesktopTerminalService(desktopTerminalRepo, unitRepo, counterRepo)
 	surveyRepo := repository.NewSurveyRepository()
 	surveyService := services.NewSurveyService(surveyRepo, unitRepo, userRepo, ticketRepo, desktopTerminalRepo, counterRepo, storageService)
@@ -194,8 +221,9 @@ func main() {
 	operationsHandler := handlers.NewOperationsHandler(operationalService, userRepo, auditLogRepo)
 	templateHandler := handlers.NewTemplateHandler(templateService)
 	invitationHandler := handlers.NewInvitationHandler(invitationService)
-	slotHandler := handlers.NewSlotHandler(slotService)
+	slotHandler := handlers.NewSlotHandler(slotService, calendarIntegrationService)
 	preRegHandler := handlers.NewPreRegistrationHandler(preRegService, ticketService)
+	calendarIntegrationHandler := handlers.NewCalendarIntegrationHandler(calendarIntegrationService)
 	unitClientHandler := handlers.NewUnitClientHandler(unitClientService, ticketService)
 	visitorTagHandler := handlers.NewVisitorTagHandler(visitorTagDefService)
 	uploadHandler := handlers.NewUploadHandler(storageService)
@@ -378,6 +406,7 @@ func main() {
 		r.Get("/{unitId}/counters", counterHandler.GetCountersByUnit)
 		r.Get("/{unitId}/materials", unitHandler.GetMaterials)
 		r.Get("/{unitId}/pre-registrations/slots", preRegHandler.GetAvailableSlots)
+		r.Get("/{unitId}/pre-registrations/calendar-slots", preRegHandler.GetCalendarSlots)
 		r.Post("/{unitId}/pre-registrations/validate", preRegHandler.Validate)
 		r.Post("/{unitId}/pre-registrations", preRegHandler.Create)
 		r.Post("/{unitId}/pre-registrations/redeem", preRegHandler.Redeem)
@@ -435,6 +464,8 @@ func main() {
 			r.Put("/{unitId}/slots/day/{date}", slotHandler.UpdateDay)
 			r.Get("/{unitId}/pre-registrations", preRegHandler.GetByUnit)
 			r.Put("/{unitId}/pre-registrations/{id}", preRegHandler.Update)
+			r.Get("/{unitId}/calendar-integration", calendarIntegrationHandler.Get)
+			r.Put("/{unitId}/calendar-integration", calendarIntegrationHandler.Put)
 			r.Get("/{unitId}/clients/search", unitClientHandler.SearchClients)
 			r.Get("/{unitId}/clients/{clientId}/history", unitClientHandler.ListClientHistory)
 			r.Get("/{unitId}/clients/{clientId}/visits", unitClientHandler.ListClientVisits)

@@ -1214,7 +1214,22 @@ export const preRegistrationsApi = {
       body: JSON.stringify(data)
     }),
 
-  update: (unitId: string, id: string, data: Partial<PreRegistration>) =>
+  update: (
+    unitId: string,
+    id: string,
+    data: {
+      serviceId: string;
+      date: string;
+      time: string;
+      customerFirstName: string;
+      customerLastName: string;
+      customerPhone: string;
+      comment?: string;
+      status?: string;
+      externalEventHref?: string;
+      externalEventEtag?: string;
+    }
+  ) =>
     apiRequest<PreRegistration>(`/units/${unitId}/pre-registrations/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data)

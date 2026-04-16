@@ -169,5 +169,31 @@ export default defineConfig({
       ...reactQueryOutput,
       target: './lib/api/generated/auth.ts'
     }
+  },
+  quokkaqCalendarIntegration: {
+    input: {
+      target: '../backend/docs/swagger.json',
+      filters: {
+        mode: 'include',
+        tags: ['calendar-integration']
+      }
+    },
+    output: {
+      ...reactQueryOutput,
+      target: './lib/api/generated/calendar-integration.ts'
+    }
+  },
+  quokkaqPreRegistrations: {
+    input: {
+      target: '../backend/docs/swagger.json',
+      filters: {
+        mode: 'include',
+        tags: ['pre-registrations']
+      }
+    },
+    output: {
+      ...reactQueryOutput,
+      target: './lib/api/generated/pre-registrations.ts'
+    }
   }
 });

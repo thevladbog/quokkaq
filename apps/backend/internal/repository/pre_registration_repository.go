@@ -49,6 +49,10 @@ func (r *PreRegistrationRepository) GetByTicketID(ticketID string) (*models.PreR
 	return &preReg, err
 }
 
+func (r *PreRegistrationRepository) DeleteByID(id string) error {
+	return database.DB.Delete(&models.PreRegistration{}, "id = ?", id).Error
+}
+
 func (r *PreRegistrationRepository) CountByServiceDateAndTime(serviceID, date, time string) (int64, error) {
 	var count int64
 	err := database.DB.Model(&models.PreRegistration{}).

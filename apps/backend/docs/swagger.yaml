@@ -1145,8 +1145,19 @@ components:
         updatedAt:
           type: string
       type: object
+    models.PreRegCalendarSlotItem:
+      properties:
+        eTag:
+          type: string
+        externalEventHref:
+          type: string
+        time:
+          type: string
+      type: object
     models.PreRegistration:
       properties:
+        calendarIntegrationId:
+          type: string
         code:
           description: 6-digit unique code
           type: string
@@ -1162,6 +1173,11 @@ components:
           type: string
         date:
           description: YYYY-MM-DD
+          type: string
+        externalEventEtag:
+          type: string
+        externalEventHref:
+          description: 'Calendar (CalDAV) mirror: booking is tied to a specific event resource.'
           type: string
         id:
           type: string
@@ -1201,6 +1217,11 @@ components:
           type: string
         date:
           type: string
+        externalEventEtag:
+          type: string
+        externalEventHref:
+          description: ExternalEventHref is required for units with calendar integration (identifies the CalDAV resource).
+          type: string
         serviceId:
           type: string
         time:
@@ -1227,7 +1248,15 @@ components:
           type: string
         date:
           type: string
+        externalEventEtag:
+          type: string
+        externalEventHref:
+          description: When rescheduling with calendar integration, provide the new CalDAV slot (same as create).
+          type: string
         serviceId:
+          type: string
+        status:
+          description: Status optional; only "canceled" is accepted to cancel an active pre-registration.
           type: string
         time:
           type: string
@@ -1242,6 +1271,9 @@ components:
     models.Service:
       properties:
         backgroundColor:
+          type: string
+        calendarSlotKey:
+          description: CalendarSlotKey optional unique label segment in [QQ] SUMMARY when names collide (calendar integration).
           type: string
         children:
           items:
@@ -1778,6 +1810,27 @@ components:
         updatedAt:
           type: string
       type: object
+    services.CalendarIntegrationPublic:
+      properties:
+        adminNotifyEmails:
+          type: string
+        caldavBaseUrl:
+          type: string
+        calendarPath:
+          type: string
+        enabled:
+          type: boolean
+        lastSyncAt:
+          type: string
+        lastSyncError:
+          type: string
+        readOnlyCapacity:
+          type: boolean
+        timezone:
+          type: string
+        username:
+          type: string
+      type: object
     services.CompanySSOGetResponse:
       properties:
         clientId:
@@ -2176,6 +2229,23 @@ components:
             $ref: '#/components/schemas/models.UnitClient'
           type: array
         nextCursor:
+          type: string
+      type: object
+    services.UpsertIntegrationRequest:
+      properties:
+        adminNotifyEmails:
+          type: string
+        appPassword:
+          type: string
+        caldavBaseUrl:
+          type: string
+        calendarPath:
+          type: string
+        enabled:
+          type: boolean
+        timezone:
+          type: string
+        username:
           type: string
       type: object
     services.UtilizationPoint:
@@ -6440,6 +6510,55 @@ paths:
       summary: Get bookings by unit
       tags:
       - bookings
+  /units/{unitId}/calendar-integration:
+    get:
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/services.CalendarIntegrationPublic'
+          description: OK
+      security:
+      - BearerAuth: []
+      summary: Get calendar integration settings for a unit
+      tags:
+      - calendar-integration
+    put:
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/services.UpsertIntegrationRequest'
+        description: Settings
+        required: true
+        x-originalParamName: body
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/services.CalendarIntegrationPublic'
+          description: OK
+      security:
+      - BearerAuth: []
+      summary: Create or update calendar integration for a unit
+      tags:
+      - calendar-integration
   /units/{unitId}/call-next:
     post:
       description: Calls the next waiting ticket for a unit. Request body is required and must include counterId. Optional serviceIds (or legacy serviceId) limit the queue; omit or empty filter means all services in the unit.
@@ -7785,6 +7904,39 @@ paths:
       summary: Update a pre-registration
       tags:
       - pre-registrations
+  /units/{unitId}/pre-registrations/calendar-slots:
+    get:
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        schema:
+          type: string
+      - description: Service ID
+        in: query
+        name: serviceId
+        required: true
+        schema:
+          type: string
+      - description: Date YYYY-MM-DD
+        in: query
+        name: date
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/models.PreRegCalendarSlotItem'
+                type: array
+          description: OK
+      summary: List calendar-backed slots with CalDAV hrefs (when integration enabled)
+      tags:
+      - pre-registrations
   /units/{unitId}/pre-registrations/redeem:
     post:
       description: Validates the code, creates a ticket, and marks the pre-registration redeemed. Invalid codes return HTTP 200 with success=false and a message; server errors use 5xx.
@@ -7827,7 +7979,7 @@ paths:
       - pre-registrations
   /units/{unitId}/pre-registrations/slots:
     get:
-      description: Returns HH:MM slot strings for a service on a given date, accounting for capacity and existing bookings.
+      description: Returns HH:MM slot strings; uses CalDAV when integration is enabled.
       parameters:
       - description: Unit ID
         in: path

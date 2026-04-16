@@ -26,6 +26,7 @@ import { WorkplaceParentBanner } from '@/components/admin/units/workplace-parent
 import { AdScreenSettings } from '@/components/admin/units/ad-screen-settings';
 import { UnitServicesManager } from '@/components/admin/units/unit-services-manager';
 import { KioskSettings } from '@/components/admin/units/kiosk-settings';
+import { Link } from '@/src/i18n/navigation';
 import { SlotConfiguration } from '@/components/admin/units/slot-configuration';
 import { UnitVisitorTagsSettings } from '@/components/admin/units/unit-visitor-tags-settings';
 import { UnitGuestSurveySettings } from '@/components/admin/units/unit-guest-survey-settings';
@@ -537,7 +538,25 @@ export default function UnitPage({ params }: UnitPageProps) {
             unitId={unitId}
             fallback={<div>{t('access_denied')}</div>}
           >
-            <SlotConfiguration unitId={unitId} />
+            <div className='space-y-8'>
+              <Alert>
+                <AlertTitle>
+                  {t('integrations.calendar_relocated_title')}
+                </AlertTitle>
+                <AlertDescription className='space-y-2'>
+                  <p>{t('integrations.calendar_relocated_hint')}</p>
+                  <p>
+                    <Link
+                      href={`/settings/integrations?tab=calendars&unit=${unitId}`}
+                      className='text-primary font-medium underline'
+                    >
+                      {t('integrations.calendar_relocated_link')}
+                    </Link>
+                  </p>
+                </AlertDescription>
+              </Alert>
+              <SlotConfiguration unitId={unitId} />
+            </div>
           </PermissionGuard>
         </TabsContent>
 

@@ -3,23 +3,25 @@ package models
 import "time"
 
 type Service struct {
-	ID                  string  `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
-	UnitID              string  `gorm:"not null" json:"unitId"`
-	ParentID            *string `json:"parentId,omitempty"`
-	Name                string  `gorm:"not null" json:"name"`
-	NameRu              *string `json:"nameRu,omitempty"`
-	NameEn              *string `json:"nameEn,omitempty"`
-	Description         *string `json:"description,omitempty"`
-	DescriptionRu       *string `json:"descriptionRu,omitempty"`
-	DescriptionEn       *string `json:"descriptionEn,omitempty"`
-	ImageUrl            *string `json:"imageUrl,omitempty"`
-	BackgroundColor     *string `json:"backgroundColor,omitempty"`
-	TextColor           *string `json:"textColor,omitempty"`
-	Prefix              *string `json:"prefix,omitempty"`
-	NumberSequence      *string `json:"numberSequence,omitempty"`
-	Duration            *int    `json:"duration,omitempty"`       // In seconds
-	MaxWaitingTime      *int    `json:"maxWaitingTime,omitempty"` // In seconds
-	Prebook             bool    `gorm:"default:false" json:"prebook"`
+	ID              string  `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
+	UnitID          string  `gorm:"not null" json:"unitId"`
+	ParentID        *string `json:"parentId,omitempty"`
+	Name            string  `gorm:"not null" json:"name"`
+	NameRu          *string `json:"nameRu,omitempty"`
+	NameEn          *string `json:"nameEn,omitempty"`
+	Description     *string `json:"description,omitempty"`
+	DescriptionRu   *string `json:"descriptionRu,omitempty"`
+	DescriptionEn   *string `json:"descriptionEn,omitempty"`
+	ImageUrl        *string `json:"imageUrl,omitempty"`
+	BackgroundColor *string `json:"backgroundColor,omitempty"`
+	TextColor       *string `json:"textColor,omitempty"`
+	Prefix          *string `json:"prefix,omitempty"`
+	NumberSequence  *string `json:"numberSequence,omitempty"`
+	Duration        *int    `json:"duration,omitempty"`       // In seconds
+	MaxWaitingTime  *int    `json:"maxWaitingTime,omitempty"` // In seconds
+	Prebook         bool    `gorm:"default:false" json:"prebook"`
+	// CalendarSlotKey optional unique label segment in [QQ] SUMMARY when names collide (calendar integration).
+	CalendarSlotKey     *string `json:"calendarSlotKey,omitempty" gorm:"column:calendar_slot_key"`
 	OfferIdentification bool    `gorm:"default:false" json:"offerIdentification"`
 	IsLeaf              bool    `gorm:"default:false" json:"isLeaf"`
 	// RestrictedServiceZoneID: when set, this leaf service is only offered in that service_zone's waiting pool (child of UnitID subdivision).

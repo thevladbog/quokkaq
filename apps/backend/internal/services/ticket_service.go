@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -219,6 +220,7 @@ type ticketService struct {
 	tagDefRepo         repository.VisitorTagDefinitionRepository
 	unitClientHistRepo repository.UnitClientHistoryRepository
 	preRegRepo         *repository.PreRegistrationRepository
+	calendar           *CalendarIntegrationService
 	hub                *ws.Hub
 	jobClient          JobEnqueuer
 	log                *slog.Logger
@@ -234,6 +236,7 @@ func NewTicketService(
 	tagDefRepo repository.VisitorTagDefinitionRepository,
 	unitClientHistRepo repository.UnitClientHistoryRepository,
 	preRegRepo *repository.PreRegistrationRepository,
+	calendar *CalendarIntegrationService,
 	hub *ws.Hub,
 	jobClient JobEnqueuer,
 ) TicketService {
@@ -247,6 +250,7 @@ func NewTicketService(
 		tagDefRepo:         tagDefRepo,
 		unitClientHistRepo: unitClientHistRepo,
 		preRegRepo:         preRegRepo,
+		calendar:           calendar,
 		hub:                hub,
 		jobClient:          jobClient,
 		log:                slog.Default(),
@@ -429,6 +433,18 @@ func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID 
 		return s.writeTicketHistoryTx(tx, ticket.ID, actorUserID, ticketaudit.ActionTicketCreated, payload)
 	}); err != nil {
 		return nil, err
+	}
+
+	if s.calendar != nil && preReg != nil && preReg.ExternalEventHref != nil && *preReg.ExternalEventHref != "" {
+		integ, err := s.calendar.GetIntegration(unitID)
+		if err == nil && integ != nil && integ.Enabled {
+			svc, err := s.serviceRepo.FindByID(serviceID)
+			if err == nil {
+				if err := s.calendar.ApplyTicketFormat(context.Background(), integ, svc, preReg, ticket); err != nil {
+					s.log.Warn("calendar ticket format", "err", err)
+				}
+			}
+		}
 	}
 
 	s.hub.BroadcastEvent("ticket.created", ticket, ticket.UnitID)

@@ -50,12 +50,14 @@ type OrganizationQuickLink = {
     | 'quickLinks.billing'
     | 'quickLinks.team'
     | 'quickLinks.units'
-    | 'quickLinks.login';
+    | 'quickLinks.login'
+    | 'quickLinks.integrations';
   descKey:
     | 'quickLinks.billingDesc'
     | 'quickLinks.teamDesc'
     | 'quickLinks.unitsDesc'
-    | 'quickLinks.loginDesc';
+    | 'quickLinks.loginDesc'
+    | 'quickLinks.integrationsDesc';
   Icon: LucideIcon;
 };
 
@@ -79,9 +81,9 @@ const organizationQuickLinks: OrganizationQuickLink[] = [
     Icon: MapPin
   },
   {
-    href: '/settings/organization/login',
-    titleKey: 'quickLinks.login',
-    descKey: 'quickLinks.loginDesc',
+    href: '/settings/integrations',
+    titleKey: 'quickLinks.integrations',
+    descKey: 'quickLinks.integrationsDesc',
     Icon: Shield
   }
 ];

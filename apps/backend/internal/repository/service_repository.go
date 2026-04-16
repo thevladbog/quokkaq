@@ -13,6 +13,8 @@ import (
 type ServiceRepository interface {
 	Create(service *models.Service) error
 	FindAllByUnit(unitID string) ([]models.Service, error)
+	// FindAllByUnitSubtree returns services for rootUnitID and all descendant units (BFS tree).
+	FindAllByUnitSubtree(rootUnitID string) ([]models.Service, error)
 	FindByID(id string) (*models.Service, error)
 	FindByIDTx(tx *gorm.DB, id string) (*models.Service, error)
 	// FindMapByIDs returns services keyed by id; missing rows are omitted.
@@ -38,6 +40,43 @@ func (r *serviceRepository) Create(service *models.Service) error {
 func (r *serviceRepository) FindAllByUnit(unitID string) ([]models.Service, error) {
 	var services []models.Service
 	err := r.db.Where("unit_id = ?", unitID).Find(&services).Error
+	return services, err
+}
+
+func (r *serviceRepository) collectUnitIDsInSubtree(root string) ([]string, error) {
+	var ids []string
+	queue := []string{root}
+	seen := make(map[string]bool)
+	for len(queue) > 0 {
+		id := queue[0]
+		queue = queue[1:]
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		ids = append(ids, id)
+		var children []models.Unit
+		err := r.db.Select("id").Where("parent_id = ?", id).Find(&children).Error
+		if err != nil {
+			return nil, err
+		}
+		for i := range children {
+			queue = append(queue, children[i].ID)
+		}
+	}
+	return ids, nil
+}
+
+func (r *serviceRepository) FindAllByUnitSubtree(rootUnitID string) ([]models.Service, error) {
+	ids, err := r.collectUnitIDsInSubtree(rootUnitID)
+	if err != nil {
+		return nil, err
+	}
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	var services []models.Service
+	err = r.db.Where("unit_id IN ?", ids).Find(&services).Error
 	return services, err
 }
 

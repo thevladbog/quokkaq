@@ -1042,6 +1042,20 @@ func RunVersionedMigrations(models ...interface{}) error {
 		return fmt.Errorf("failed to run v1.2.2_sso_saml_protocol migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.2.3_calendar_integration", func(db *gorm.DB) error {
+		if err := db.AutoMigrate(
+			&dbmodels.UnitCalendarIntegration{},
+			&dbmodels.CalendarExternalSlot{},
+			&dbmodels.CalendarSyncIncident{},
+		); err != nil {
+			return err
+		}
+		return db.AutoMigrate(&dbmodels.PreRegistration{}, &dbmodels.Service{})
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.2.3_calendar_integration migration: %w", err)
+	}
+
 	fmt.Println("All migrations completed successfully")
 	return nil
 }
