@@ -171,7 +171,7 @@ type ssoExchangeRequest struct {
 // @Accept       json
 // @Produce      json
 // @Param        body body ssoExchangeRequest true "One-time code"
-// @Success      200  {object}  LoginResponse
+// @Success      200  {object}  LoginSessionResponse
 // @Router       /auth/sso/exchange [post]
 func (h *SSOHandler) SSOExchange(w http.ResponseWriter, r *http.Request) {
 	var body ssoExchangeRequest
@@ -185,15 +185,18 @@ func (h *SSOHandler) SSOExchange(w http.ResponseWriter, r *http.Request) {
 	}
 	pair, err := h.sso.ExchangeFinishCode(r.Context(), body.Code)
 	if err != nil {
+		if errors.Is(err, services.ErrUserInactive) {
+			http.Error(w, err.Error(), http.StatusForbidden)
+			return
+		}
 		http.Error(w, "invalid or expired code", http.StatusUnauthorized)
 		return
 	}
 	authcookie.WriteSessionCookies(w, r, pair)
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(LoginResponse{
-		Token:        pair.AccessToken,
-		AccessToken:  pair.AccessToken,
-		RefreshToken: pair.RefreshToken,
+	_ = json.NewEncoder(w).Encode(LoginSessionResponse{
+		Token:       pair.AccessToken,
+		AccessToken: pair.AccessToken,
 	})
 }
 

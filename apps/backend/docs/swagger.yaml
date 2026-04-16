@@ -213,12 +213,14 @@ components:
           type: string
         tenantSlug:
           type: string
+      required:
+      - email
+      - password
       type: object
-    handlers.LoginResponse:
+    handlers.LoginSessionResponse:
       properties:
         accessToken:
-          type: string
-        refreshToken:
+          description: legacy field name; same JWT as token
           type: string
         token:
           description: same as accessToken (legacy clients)
@@ -2333,7 +2335,7 @@ paths:
       - auth
   /auth/login:
     post:
-      description: Authenticates a user and returns access and refresh JWTs (`token` duplicates access for legacy clients). Optional `tenantSlug` scopes login to a tenant the user can access (same slug as public tenant); omit for default behavior.
+      description: Authenticates a user; refresh JWT is set only via HttpOnly `Set-Cookie` (SessionCookie). JSON returns access JWT (`token` duplicates `accessToken` for legacy clients). Optional `tenantSlug` scopes login to a tenant the user can access; omit for default behavior.
       operationId: authLogin
       requestBody:
         content:
@@ -2348,11 +2350,11 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/handlers.LoginResponse'
+                $ref: '#/components/schemas/handlers.LoginSessionResponse'
           description: OK. Refresh session is carried by the `quokkaq_refresh` cookie (SessionCookie); JSON may still include access tokens for legacy clients.
           headers:
             Set-Cookie:
-              description: 'When present, sets or rotates browser session cookies: `quokkaq_access` and `quokkaq_refresh` HttpOnly JWTs (Path=/; SameSite=Lax; Secure). Used after successful login or token refresh; the JSON body may still include tokens for legacy clients. See components.securitySchemes.SessionCookie.'
+              description: 'When present, sets or rotates browser session cookies: `quokkaq_access` and `quokkaq_refresh` HttpOnly JWTs (Path=/; SameSite=Lax; Secure). Used after successful login or token refresh; the JSON body may still include access tokens for legacy clients (refresh only via cookies). See components.securitySchemes.SessionCookie.'
               schema: &id001
                 type: string
         '400':
@@ -2472,7 +2474,7 @@ paths:
           description: OK. Refresh session is carried by the `quokkaq_refresh` cookie (SessionCookie); JSON may still include access tokens for legacy clients.
           headers:
             Set-Cookie:
-              description: 'When present, sets or rotates browser session cookies: `quokkaq_access` and `quokkaq_refresh` HttpOnly JWTs (Path=/; SameSite=Lax; Secure). Used after successful login or token refresh; the JSON body may still include tokens for legacy clients. See components.securitySchemes.SessionCookie.'
+              description: 'When present, sets or rotates browser session cookies: `quokkaq_access` and `quokkaq_refresh` HttpOnly JWTs (Path=/; SameSite=Lax; Secure). Used after successful login or token refresh; the JSON body may still include access tokens for legacy clients (refresh only via cookies). See components.securitySchemes.SessionCookie.'
               schema: *id001
         '401':
           content:
@@ -2606,7 +2608,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/handlers.LoginResponse'
+                $ref: '#/components/schemas/handlers.LoginSessionResponse'
           description: Created
         '400':
           content:
@@ -2703,7 +2705,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/handlers.LoginResponse'
+                $ref: '#/components/schemas/handlers.LoginSessionResponse'
           description: OK. Session cookies (`quokkaq_access`, `quokkaq_refresh`) are set as in POST /auth/login.
           headers:
             Set-Cookie:

@@ -14,6 +14,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -27,9 +28,16 @@ var ErrInvalidCompanySlug = errors.New("invalid company slug")
 // ErrCompanySlugTaken is returned when optional companySlug is already in use.
 var ErrCompanySlugTaken = errors.New("company slug already taken")
 
+// ErrUserInactive is returned when issuing tokens for a disabled user account.
+var ErrUserInactive = errors.New("user account is inactive")
+
 func isUniqueConstraintViolation(err error) bool {
 	if err == nil {
 		return false
+	}
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		return true
 	}
 	msg := strings.ToLower(err.Error())
 	return strings.Contains(msg, "duplicate key") ||
@@ -156,6 +164,9 @@ func (s *authService) IssueTokenPairForUserID(userID string) (*TokenPair, error)
 	user, err := s.userRepo.FindByID(userID)
 	if err != nil {
 		return nil, err
+	}
+	if !user.IsActive {
+		return nil, ErrUserInactive
 	}
 	return s.generateTokenPair(user)
 }

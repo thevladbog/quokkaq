@@ -254,7 +254,7 @@ _SET_COOKIE_HEADER_LOGIN_REFRESH = {
     "description": (
         "When present, sets or rotates browser session cookies: `quokkaq_access` and `quokkaq_refresh` "
         "HttpOnly JWTs (Path=/; SameSite=Lax; Secure). Used after successful login or token refresh; "
-        "the JSON body may still include tokens for legacy clients. See components.securitySchemes.SessionCookie."
+        "the JSON body may still include access tokens for legacy clients (refresh only via cookies). See components.securitySchemes.SessionCookie."
     ),
     "schema": {"type": "string"},
 }
@@ -317,7 +317,7 @@ def _patch_auth_set_cookie_response_headers(doc: dict[str, Any]) -> None:
 
 
 def _patch_auth_sso_exchange_response_cookies(doc: dict[str, Any]) -> None:
-    """POST /auth/sso/exchange sets session cookies alongside handlers.LoginResponse JSON."""
+    """POST /auth/sso/exchange sets session cookies alongside handlers.LoginSessionResponse JSON."""
     paths = doc.get("paths")
     if not isinstance(paths, dict):
         return

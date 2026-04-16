@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, useWatch } from 'react-hook-form';
@@ -18,6 +18,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -70,10 +71,15 @@ function isValidHttpUrl(raw: string): boolean {
 }
 
 function parseEmailDomains(emailDomainsStr: string): string[] {
-  return emailDomainsStr
-    .split(/[,;\s]+/)
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of emailDomainsStr.split(/[,;\s]+/)) {
+    const x = raw.trim().toLowerCase();
+    if (!x || seen.has(x)) continue;
+    seen.add(x);
+    out.push(x);
+  }
+  return out;
 }
 
 const slugFormSchema = z.object({
@@ -133,6 +139,34 @@ function createSsoFormSchema(opts: SsoSchemaOpts) {
 
 type SsoFormValues = z.infer<ReturnType<typeof createSsoFormSchema>>;
 
+function ssoDefaultsFromServer(
+  sso: ServicesCompanySSOGetResponse
+): SsoFormValues {
+  return {
+    enabled: !!sso.enabled,
+    protocol: sso.ssoProtocol === 'saml' ? 'saml' : 'oidc',
+    issuerUrl: sso.issuerUrl ?? '',
+    clientId: sso.clientId ?? '',
+    clientSecret: '',
+    scopes: sso.scopes ?? 'openid email profile',
+    samlIdpMetadataUrl: sso.samlIdpMetadataUrl ?? '',
+    emailDomainsStr: (sso.emailDomains ?? []).join(', ')
+  };
+}
+
+function ssoServerFingerprint(sso: ServicesCompanySSOGetResponse): string {
+  return JSON.stringify({
+    enabled: sso.enabled,
+    ssoProtocol: sso.ssoProtocol,
+    issuerUrl: sso.issuerUrl ?? '',
+    clientId: sso.clientId ?? '',
+    samlIdpMetadataUrl: sso.samlIdpMetadataUrl ?? '',
+    scopes: sso.scopes ?? '',
+    emailDomains: sso.emailDomains ?? [],
+    clientSecretSet: sso.clientSecretSet
+  });
+}
+
 function buildSsoPatchBody(values: SsoFormValues): ServicesCompanySSOPatch {
   const domains = parseEmailDomains(values.emailDomainsStr);
   const body: ServicesCompanySSOPatch = {
@@ -175,34 +209,28 @@ function OrganizationLoginSecurityForm({ company, sso }: LoginFormProps) {
     [hasPersistedSlug, t]
   );
 
-  const slugDefaults = useMemo<SlugFormValues>(
-    () => ({ slug: company.slug ?? '' }),
-    [company.slug]
-  );
-
-  const ssoDefaults = useMemo<SsoFormValues>(
-    () => ({
-      enabled: !!sso.enabled,
-      protocol: sso.ssoProtocol === 'saml' ? 'saml' : 'oidc',
-      issuerUrl: sso.issuerUrl ?? '',
-      clientId: sso.clientId ?? '',
-      clientSecret: '',
-      scopes: sso.scopes ?? 'openid email profile',
-      samlIdpMetadataUrl: sso.samlIdpMetadataUrl ?? '',
-      emailDomainsStr: (sso.emailDomains ?? []).join(', ')
-    }),
-    [sso]
-  );
+  const ssoFingerprint = useMemo(() => ssoServerFingerprint(sso), [sso]);
 
   const slugForm = useForm<SlugFormValues>({
     resolver: zodResolver(slugFormSchema),
-    defaultValues: slugDefaults
+    defaultValues: { slug: company.slug ?? '' }
   });
 
   const ssoForm = useForm<SsoFormValues>({
     resolver: zodResolver(ssoSchema),
-    defaultValues: ssoDefaults
+    defaultValues: ssoDefaultsFromServer(sso)
   });
+
+  useEffect(() => {
+    slugForm.reset({ slug: company.slug ?? '' });
+  }, [company.slug, slugForm]);
+
+  useEffect(() => {
+    ssoForm.reset(ssoDefaultsFromServer(sso));
+    // Intentionally depend on `ssoFingerprint` only: `sso` gets a new reference on every RQ
+    // refetch even when the payload is unchanged; the fingerprint avoids wiping dirty form state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ssoFingerprint, ssoForm]);
 
   const protocol = useWatch({ control: ssoForm.control, name: 'protocol' });
 
@@ -331,9 +359,7 @@ function OrganizationLoginSecurityForm({ company, sso }: LoginFormProps) {
                     <FormControl>
                       <Input autoComplete='off' {...field} />
                     </FormControl>
-                    <p className='text-muted-foreground text-xs'>
-                      {t('slugHint')}
-                    </p>
+                    <FormDescription>{t('slugHint')}</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -369,9 +395,7 @@ function OrganizationLoginSecurityForm({ company, sso }: LoginFormProps) {
                       <FormLabel htmlFor='sso-enabled' className='text-base'>
                         {t('enabledLabel')}
                       </FormLabel>
-                      <p className='text-muted-foreground text-xs'>
-                        {t('enabledHint')}
-                      </p>
+                      <FormDescription>{t('enabledHint')}</FormDescription>
                     </div>
                     <FormControl>
                       <Switch
@@ -502,7 +526,7 @@ function OrganizationLoginSecurityForm({ company, sso }: LoginFormProps) {
                         <FormLabel>{t('issuerUrl')}</FormLabel>
                         <FormControl>
                           <Input
-                            placeholder='https://login.microsoftonline.com/.../v2.0'
+                            placeholder={t('microsoftIssuerExample')}
                             {...field}
                           />
                         </FormControl>
@@ -517,7 +541,11 @@ function OrganizationLoginSecurityForm({ company, sso }: LoginFormProps) {
                       <FormItem>
                         <FormLabel>{t('clientId')}</FormLabel>
                         <FormControl>
-                          <Input autoComplete='off' {...field} />
+                          <Input
+                            autoComplete='off'
+                            placeholder={t('authClientIdExample')}
+                            {...field}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -540,9 +568,9 @@ function OrganizationLoginSecurityForm({ company, sso }: LoginFormProps) {
                           />
                         </FormControl>
                         {secretSet ? (
-                          <p className='text-muted-foreground text-xs'>
+                          <FormDescription>
                             {t('secretSetHint')}
-                          </p>
+                          </FormDescription>
                         ) : null}
                         <FormMessage />
                       </FormItem>
@@ -572,13 +600,13 @@ function OrganizationLoginSecurityForm({ company, sso }: LoginFormProps) {
                       <FormControl>
                         <Input
                           autoComplete='off'
-                          placeholder='https://…/federationmetadata/2007-06/federationmetadata.xml'
+                          placeholder={t('samlFederationMetadataExample')}
                           {...field}
                         />
                       </FormControl>
-                      <p className='text-muted-foreground text-xs'>
+                      <FormDescription>
                         {t('samlIdpMetadataHint')}
-                      </p>
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -592,14 +620,9 @@ function OrganizationLoginSecurityForm({ company, sso }: LoginFormProps) {
                   <FormItem>
                     <FormLabel>{t('emailDomains')}</FormLabel>
                     <FormControl>
-                      <Input
-                        placeholder='example.com, example.org'
-                        {...field}
-                      />
+                      <Input placeholder={t('authTenantExample')} {...field} />
                     </FormControl>
-                    <p className='text-muted-foreground text-xs'>
-                      {t('emailDomainsHint')}
-                    </p>
+                    <FormDescription>{t('emailDomainsHint')}</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -702,13 +725,7 @@ export function OrganizationLoginSecurityContent() {
     );
   }
 
-  const formVersion = `${company.updatedAt ?? ''}-${ssoQ.dataUpdatedAt}`;
-
   return (
-    <OrganizationLoginSecurityForm
-      key={formVersion}
-      company={company}
-      sso={ssoQ.data.data}
-    />
+    <OrganizationLoginSecurityForm company={company} sso={ssoQ.data.data} />
   );
 }

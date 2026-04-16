@@ -406,14 +406,14 @@ export interface HandlersInvoicePDFPrerequisiteError {
 }
 
 export interface HandlersLoginRequest {
-  email?: string;
-  password?: string;
+  email: string;
+  password: string;
   tenantSlug?: string;
 }
 
-export interface HandlersLoginResponse {
+export interface HandlersLoginSessionResponse {
+  /** legacy field name; same JWT as token */
   accessToken?: string;
-  refreshToken?: string;
   /** same as accessToken (legacy clients) */
   token?: string;
 }

@@ -32,7 +32,6 @@ export async function loginWithPassword(credentials: {
     throw new Error('No token in login response');
   }
   return {
-    accessToken: token,
-    refreshToken: res.data.refreshToken
+    accessToken: token
   };
 }

@@ -304,7 +304,7 @@ func splitScopes(s string) []string {
 func randomHex(n int) string {
 	b := make([]byte, n)
 	if _, err := rand.Read(b); err != nil {
-		return uuid.New().String()
+		return strings.ReplaceAll(uuid.New().String(), "-", "")
 	}
 	return hex.EncodeToString(b)
 }
@@ -689,12 +689,18 @@ func (s *SSOService) PatchCompanySSO(company *models.Company, body CompanySSOPat
 	}
 	if body.EmailDomains != nil {
 		raw := *body.EmailDomains
+		seen := make(map[string]struct{}, len(raw))
 		norm := make([]string, 0, len(raw))
 		for _, d := range raw {
 			x := strings.ToLower(strings.TrimSpace(d))
-			if x != "" {
-				norm = append(norm, x)
+			if x == "" {
+				continue
 			}
+			if _, ok := seen[x]; ok {
+				continue
+			}
+			seen[x] = struct{}{}
+			norm = append(norm, x)
 		}
 		conn.EmailDomains = models.StringArray(norm)
 	}

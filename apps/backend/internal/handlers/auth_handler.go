@@ -22,15 +22,16 @@ func NewAuthHandler(service services.AuthService, userRepo repository.UserReposi
 }
 
 type LoginRequest struct {
-	Email      string `json:"email"`
-	Password   string `json:"password"`
+	Email      string `json:"email" binding:"required"`
+	Password   string `json:"password" binding:"required"`
 	TenantSlug string `json:"tenantSlug,omitempty"`
 }
 
-type LoginResponse struct {
-	Token        string `json:"token"` // same as accessToken (legacy clients)
-	AccessToken  string `json:"accessToken"`
-	RefreshToken string `json:"refreshToken"`
+// LoginSessionResponse is the JSON body for cookie-based login, signup, and SSO exchange.
+// Refresh JWTs are issued only via HttpOnly Set-Cookie (see operation response headers).
+type LoginSessionResponse struct {
+	Token       string `json:"token"`       // same as accessToken (legacy clients)
+	AccessToken string `json:"accessToken"` // legacy field name; same JWT as token
 }
 
 // RefreshResponse is the body of POST /auth/refresh.
@@ -60,12 +61,12 @@ type SignupRequest struct {
 // Login godoc
 // @ID           authLogin
 // @Summary      User Login
-// @Description  Authenticates a user and returns access and refresh JWTs (`token` duplicates access for legacy clients). Optional `tenantSlug` scopes login to a tenant the user can access (same slug as public tenant); omit for default behavior.
+// @Description  Authenticates a user; refresh JWT is set only via HttpOnly `Set-Cookie` (SessionCookie). JSON returns access JWT (`token` duplicates `accessToken` for legacy clients). Optional `tenantSlug` scopes login to a tenant the user can access; omit for default behavior.
 // @Tags         auth
 // @Accept       json
 // @Produce      json
 // @Param        request body LoginRequest true "Login Credentials"
-// @Success      200  {object}  LoginResponse
+// @Success      200  {object}  LoginSessionResponse
 // @Failure      400  {string}  string "Bad Request"
 // @Failure      401  {string}  string "Unauthorized"
 // @Failure      500  {string}  string "Internal Server Error"
@@ -74,6 +75,10 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if strings.TrimSpace(req.Email) == "" || strings.TrimSpace(req.Password) == "" {
+		http.Error(w, "email and password are required", http.StatusBadRequest)
 		return
 	}
 
@@ -85,10 +90,9 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	authcookie.WriteSessionCookies(w, r, pair)
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(LoginResponse{
-		Token:        pair.AccessToken,
-		AccessToken:  pair.AccessToken,
-		RefreshToken: pair.RefreshToken,
+	if err := json.NewEncoder(w).Encode(LoginSessionResponse{
+		Token:       pair.AccessToken,
+		AccessToken: pair.AccessToken,
 	}); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 	}
@@ -304,7 +308,7 @@ func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 // @Accept       json
 // @Produce      json
 // @Param        request body SignupRequest true "Signup Information"
-// @Success      201  {object}  LoginResponse "Created"
+// @Success      201  {object}  LoginSessionResponse "Created"
 // @Failure      400  {string}  string "Bad Request"
 // @Failure      409  {string}  string "Email already exists"
 // @Failure      500  {string}  string "Internal Server Error"
@@ -353,10 +357,9 @@ func (h *AuthHandler) Signup(w http.ResponseWriter, r *http.Request) {
 	authcookie.WriteSessionCookies(w, r, pair)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	if err := json.NewEncoder(w).Encode(LoginResponse{
-		Token:        pair.AccessToken,
-		AccessToken:  pair.AccessToken,
-		RefreshToken: pair.RefreshToken,
+	if err := json.NewEncoder(w).Encode(LoginSessionResponse{
+		Token:       pair.AccessToken,
+		AccessToken: pair.AccessToken,
 	}); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 	}

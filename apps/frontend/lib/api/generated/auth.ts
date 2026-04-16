@@ -406,14 +406,14 @@ export interface HandlersInvoicePDFPrerequisiteError {
 }
 
 export interface HandlersLoginRequest {
-  email?: string;
-  password?: string;
+  email: string;
+  password: string;
   tenantSlug?: string;
 }
 
-export interface HandlersLoginResponse {
+export interface HandlersLoginSessionResponse {
+  /** legacy field name; same JWT as token */
   accessToken?: string;
-  refreshToken?: string;
   /** same as accessToken (legacy clients) */
   token?: string;
 }
@@ -1779,11 +1779,11 @@ export const usePostAuthForgotPassword = <TError = string,
     }
 
 /**
- * Authenticates a user and returns access and refresh JWTs (`token` duplicates access for legacy clients). Optional `tenantSlug` scopes login to a tenant the user can access (same slug as public tenant); omit for default behavior.
+ * Authenticates a user; refresh JWT is set only via HttpOnly `Set-Cookie` (SessionCookie). JSON returns access JWT (`token` duplicates `accessToken` for legacy clients). Optional `tenantSlug` scopes login to a tenant the user can access; omit for default behavior.
  * @summary User Login
  */
 export type authLoginResponse200 = {
-  data: HandlersLoginResponse
+  data: HandlersLoginSessionResponse
   status: 200
 }
 
@@ -2707,7 +2707,7 @@ export function useAuthSAMLMetadata<TData = Awaited<ReturnType<typeof authSAMLMe
  * @summary Sign Up
  */
 export type authSignupResponse201 = {
-  data: HandlersLoginResponse
+  data: HandlersLoginSessionResponse
   status: 201
 }
 
@@ -3047,7 +3047,7 @@ export function useAuthSSOCallback<TData = Awaited<ReturnType<typeof authSSOCall
  * @summary Exchange one-time SSO code for JWT pair
  */
 export type authSSOExchangeResponse200 = {
-  data: HandlersLoginResponse
+  data: HandlersLoginSessionResponse
   status: 200
 }
 
