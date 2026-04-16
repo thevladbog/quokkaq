@@ -158,6 +158,74 @@ async function postRefreshBearer(refreshToken: string): Promise<Response> {
   });
 }
 
+/** If the refresh response includes rotated bearer tokens, persist them for legacy clients. */
+async function persistRotatedTokensFromRefreshResponse(
+  res: Response
+): Promise<void> {
+  if (typeof window === 'undefined' || res.status !== 200) {
+    return;
+  }
+  const ct = res.headers.get('content-type') ?? '';
+  if (!ct.includes('application/json')) {
+    return;
+  }
+  const clone = res.clone();
+  try {
+    const data: unknown = await clone.json();
+    if (!data || typeof data !== 'object') {
+      return;
+    }
+    const rec = data as Record<string, unknown>;
+    const at =
+      (typeof rec.accessToken === 'string' && rec.accessToken) ||
+      (typeof rec.access_token === 'string' && rec.access_token) ||
+      (typeof rec.token === 'string' && rec.token);
+    const rt =
+      (typeof rec.refreshToken === 'string' && rec.refreshToken) ||
+      (typeof rec.refresh_token === 'string' && rec.refresh_token);
+    if (typeof at === 'string' && at.trim() !== '') {
+      localStorage.setItem('access_token', at);
+    }
+    if (typeof rt === 'string' && rt.trim() !== '') {
+      localStorage.setItem('refresh_token', rt);
+    }
+  } catch {
+    // Ignore malformed refresh JSON; cookies may still carry the session.
+  }
+}
+
+let refreshSessionInFlight: Promise<boolean> | null = null;
+
+/**
+ * Single-flight refresh: concurrent 401s await the same refresh attempt.
+ * Returns true when a refresh returned HTTP 200 (tokens may be cookie-only).
+ */
+async function tryRefreshSessionOnce(): Promise<boolean> {
+  if (refreshSessionInFlight) {
+    return refreshSessionInFlight;
+  }
+  const run = async (): Promise<boolean> => {
+    try {
+      let refreshRes = await postRefreshCookie();
+      await persistRotatedTokensFromRefreshResponse(refreshRes);
+      if (refreshRes.status === 200) {
+        return true;
+      }
+      const rt = legacyRefreshToken();
+      if (!rt) {
+        return false;
+      }
+      refreshRes = await postRefreshBearer(rt);
+      await persistRotatedTokensFromRefreshResponse(refreshRes);
+      return refreshRes.status === 200;
+    } finally {
+      refreshSessionInFlight = null;
+    }
+  };
+  refreshSessionInFlight = run();
+  return refreshSessionInFlight;
+}
+
 function clearClientAuthSession(): void {
   if (typeof window === 'undefined') {
     return;
@@ -230,18 +298,7 @@ export async function authenticatedApiFetch(
       !isAuthRefreshPath(endpoint)
     ) {
       try {
-        let refreshed = false;
-
-        let refreshRes = await postRefreshCookie();
-        if (refreshRes.status === 200) {
-          refreshed = true;
-        } else {
-          const rt = legacyRefreshToken();
-          if (rt) {
-            refreshRes = await postRefreshBearer(rt);
-            refreshed = refreshRes.status === 200;
-          }
-        }
+        const refreshed = await tryRefreshSessionOnce();
 
         if (refreshed) {
           const retryShouldSetContentType =

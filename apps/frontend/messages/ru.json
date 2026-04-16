@@ -1416,6 +1416,8 @@
     "passwordStepDescription": "Введите пароль для {org}",
     "combinedLoginLink": "Войти с email и паролем на одном экране",
     "ssoCallbackError": "Не удалось завершить вход через SSO. Попробуйте снова или используйте пароль.",
+    "ssoCallbackErrorMissingCode": "В ответе SSO нет одноразового кода. Начните вход снова со страницы входа.",
+    "ssoCallbackErrorExchangeFailed": "Не удалось обменять код SSO на сессию. Попробуйте снова или войдите по паролю.",
     "ssoCallbackWorking": "Завершаем вход…",
     "ssoError": {
       "no_tenant_access": "У вас нет доступа к этой организации. Обратитесь к администратору.",

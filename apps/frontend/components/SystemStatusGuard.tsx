@@ -27,7 +27,8 @@ export default function SystemStatusGuard({
       }
       const data = await res.json();
       const isInitialized = data.initialized;
-      const isSetupPage = pathname.includes('/setup');
+      const isSetupPage =
+        pathname === '/setup' || pathname.startsWith('/setup/');
 
       if (!isInitialized && !isSetupPage) {
         void router.push('/setup');

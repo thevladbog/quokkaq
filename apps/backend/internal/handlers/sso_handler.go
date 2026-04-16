@@ -46,6 +46,10 @@ func (h *SSOHandler) TenantHint(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
+	if strings.TrimSpace(body.Email) == "" {
+		http.Error(w, "email required", http.StatusBadRequest)
+		return
+	}
 	out := h.sso.TenantHint(body.Email)
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(out)
@@ -121,8 +125,9 @@ func (h *SSOHandler) SSOAuthorize(w http.ResponseWriter, r *http.Request) {
 // @ID           authSAMLMetadata
 // @Summary      SAML SP metadata XML (register at IdP)
 // @Tags         auth
+// @Produce      application/xml
 // @Param        tenant query string true "Tenant slug"
-// @Success      200  "SAML metadata XML"
+// @Success      200  {string}  string  "SP metadata XML"
 // @Failure      404  {string}  string "Not found"
 // @Router       /auth/saml/metadata [get]
 func (h *SSOHandler) SAMLMetadata(w http.ResponseWriter, r *http.Request) {
@@ -133,6 +138,9 @@ func (h *SSOHandler) SAMLMetadata(w http.ResponseWriter, r *http.Request) {
 // @ID           authSAMLACS
 // @Summary      SAML Assertion Consumer Service (POST from IdP)
 // @Tags         auth
+// @Accept       x-www-form-urlencoded
+// @Param        SAMLResponse formData string true "SAML Response (Base64)"
+// @Param        RelayState   formData string false "Relay state from SP-initiated login"
 // @Success      302  "Redirect to app with one-time code"
 // @Failure      400  {string}  string "Bad request"
 // @Router       /auth/saml/acs [post]
@@ -144,6 +152,8 @@ func (h *SSOHandler) SAMLACS(w http.ResponseWriter, r *http.Request) {
 // @ID           authSSOCallback
 // @Summary      OIDC callback
 // @Tags         auth
+// @Param        code  query  string  true  "Authorization code from IdP"
+// @Param        state query  string  true  "OAuth state"
 // @Success      302  "Redirect to app"
 // @Router       /auth/sso/callback [get]
 func (h *SSOHandler) SSOCallback(w http.ResponseWriter, r *http.Request) {
@@ -169,6 +179,10 @@ func (h *SSOHandler) SSOExchange(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
+	if strings.TrimSpace(body.Code) == "" {
+		http.Error(w, "code required", http.StatusBadRequest)
+		return
+	}
 	pair, err := h.sso.ExchangeFinishCode(r.Context(), body.Code)
 	if err != nil {
 		http.Error(w, "invalid or expired code", http.StatusUnauthorized)
@@ -181,6 +195,11 @@ func (h *SSOHandler) SSOExchange(w http.ResponseWriter, r *http.Request) {
 		AccessToken:  pair.AccessToken,
 		RefreshToken: pair.RefreshToken,
 	})
+}
+
+// patchCompanySlugRequest is PATCH /companies/me/slug JSON body.
+type patchCompanySlugRequest struct {
+	Slug string `json:"slug" example:"acme-corp"`
 }
 
 // CompanySSOHTTP SSO admin endpoints for current company.
@@ -265,7 +284,8 @@ func (h *CompanySSOHTTP) PatchCompanySSO(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if err := h.sso.PatchCompanySSO(c, body); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		log.Printf("PatchCompanySSO: %v", err)
+		http.Error(w, "Unable to update SSO settings", http.StatusBadRequest)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -278,7 +298,7 @@ func (h *CompanySSOHTTP) PatchCompanySSO(w http.ResponseWriter, r *http.Request)
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
-// @Param        body  body  object  true  "Slug"  example({"slug":"acme-corp"})
+// @Param        body  body  patchCompanySlugRequest  true  "New slug"
 // @Success      200  {object} models.Company
 // @Router       /companies/me/slug [patch]
 func (h *CompanySSOHTTP) PatchCompanySlug(w http.ResponseWriter, r *http.Request) {
@@ -286,9 +306,7 @@ func (h *CompanySSOHTTP) PatchCompanySlug(w http.ResponseWriter, r *http.Request
 	if !ok {
 		return
 	}
-	var body struct {
-		Slug string `json:"slug"`
-	}
+	var body patchCompanySlugRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return

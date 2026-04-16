@@ -536,7 +536,6 @@ export interface HandlersPlatformUpdateSubscriptionPlanBody {
 
 export interface HandlersRefreshResponse {
   accessToken?: string;
-  refreshToken?: string;
 }
 
 export interface HandlersRegisterUserRequest {
@@ -875,6 +874,10 @@ export interface HandlersGuestSurveySubmitRequest {
   ticketId: string;
 }
 
+export interface HandlersPatchCompanySlugRequest {
+  slug: string;
+}
+
 export type HandlersPatchSurveyRequestCompletionMessage = { [key: string]: unknown };
 
 export type HandlersPatchSurveyRequestDisplayTheme = { [key: string]: unknown };
@@ -957,11 +960,11 @@ export interface HandlersSetupFirstAdminRequest {
 }
 
 export interface HandlersSsoExchangeRequest {
-  code?: string;
+  code: string;
 }
 
 export interface HandlersTenantHintRequest {
-  email?: string;
+  email: string;
 }
 
 export interface ModelsCatalogItemCreateRequest {
@@ -1195,10 +1198,8 @@ export interface ServicesCompanySSOGetResponse {
   emailDomains?: string[];
   enabled?: boolean;
   issuerUrl?: string;
-  /** IdP metadata URL for SAML */
   samlIdpMetadataUrl?: string;
   scopes?: string;
-  /** oidc | saml */
   ssoProtocol?: string;
 }
 
@@ -1209,10 +1210,9 @@ export interface ServicesCompanySSOPatch {
   emailDomains?: string[];
   enabled?: boolean;
   issuerUrl?: string;
-  /** IdP metadata URL for SAML */
   samlIdpMetadataUrl?: string;
   scopes?: string;
-  /** oidc | saml */
+  /** "oidc" | "saml" */
   ssoProtocol?: string;
 }
 
@@ -1465,15 +1465,11 @@ export type AuthLoginContextParams = {
 token: string;
 };
 
-export type AuthSSOAuthorizeParams = {
-/**
- * Tenant slug
- */
-tenant: string;
-/**
- * UI locale for post-SSO redirects (en or ru)
- */
-locale?: string;
+export type AuthSAMLACSBody = {
+  /** Relay state from SP-initiated login */
+  RelayState?: string;
+  /** SAML Response (Base64) */
+  SAMLResponse: string;
 };
 
 export type AuthSAMLMetadataParams = {
@@ -1483,11 +1479,31 @@ export type AuthSAMLMetadataParams = {
 tenant: string;
 };
 
+export type AuthSSOAuthorizeParams = {
+/**
+ * Tenant slug
+ */
+tenant: string;
+/**
+ * UI locale for post-SSO redirects (en|ru)
+ */
+locale?: string;
+};
+
+export type AuthSSOCallbackParams = {
+/**
+ * Authorization code from IdP
+ */
+code: string;
+/**
+ * OAuth state
+ */
+state: string;
+};
+
 export type PostCompaniesMeCompleteOnboarding200 = {[key: string]: boolean};
 
 export type CompaniesMeLoginLinkPost200 = {[key: string]: string};
-
-export type CompaniesMeSlugPatchBody = { [key: string]: unknown };
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
@@ -2022,6 +2038,89 @@ export const useAuthTenantHint = <TError = unknown,
     }
 
 /**
+ * Clears HttpOnly session cookies set by login and refresh. Does not require a JSON body.
+ * @summary Log out (clear session cookies)
+ */
+export type authLogoutResponse204 = {
+  data: void
+  status: 204
+}
+
+export type authLogoutResponseSuccess = (authLogoutResponse204) & {
+  headers: Headers;
+};
+;
+
+export type authLogoutResponse = (authLogoutResponseSuccess)
+
+export const getAuthLogoutUrl = () => {
+
+
+
+
+  return `/auth/logout`
+}
+
+export const authLogout = async ( options?: RequestInit): Promise<authLogoutResponse> => {
+
+  return orvalMutator<authLogoutResponse>(getAuthLogoutUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getAuthLogoutMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authLogout>>, TError,void, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof authLogout>>, TError,void, TContext> => {
+
+const mutationKey = ['authLogout'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof authLogout>>, void> = () => {
+
+
+          return  authLogout(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AuthLogoutMutationResult = NonNullable<Awaited<ReturnType<typeof authLogout>>>
+
+    export type AuthLogoutMutationError = unknown
+
+    /**
+ * @summary Log out (clear session cookies)
+ */
+export const useAuthLogout = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authLogout>>, TError,void, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof authLogout>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getAuthLogoutMutationOptions(options), queryClient);
+    }
+
+/**
  * Returns the currently authenticated user's information
  * @summary Get current user
  */
@@ -2148,7 +2247,7 @@ export function useGetAuthMe<TData = Awaited<ReturnType<typeof getAuthMe>>, TErr
 
 
 /**
- * Exchanges a valid refresh JWT for new access and refresh tokens. Send the refresh token as `Authorization: Bearer <refresh>`.
+ * Exchanges a valid refresh JWT for a new access JWT. The refresh token is read from HttpOnly session cookies when present; otherwise send `Authorization: Bearer <refresh>`. Rotated refresh tokens are returned only via `Set-Cookie`, not in the JSON body.
  * @summary Refresh tokens
  */
 export type authRefreshResponse200 = {
@@ -2337,6 +2436,226 @@ export const usePostAuthResetPassword = <TError = string,
       > => {
       return useMutation(getPostAuthResetPasswordMutationOptions(options), queryClient);
     }
+
+/**
+ * @summary SAML Assertion Consumer Service (POST from IdP)
+ */
+export type authSAMLACSResponse302 = {
+  data: void
+  status: 302
+}
+
+export type authSAMLACSResponse400 = {
+  data: string
+  status: 400
+}
+
+;
+export type authSAMLACSResponseError = (authSAMLACSResponse302 | authSAMLACSResponse400) & {
+  headers: Headers;
+};
+
+export type authSAMLACSResponse = (authSAMLACSResponseError)
+
+export const getAuthSAMLACSUrl = () => {
+
+
+
+
+  return `/auth/saml/acs`
+}
+
+export const authSAMLACS = async (authSAMLACSBody: AuthSAMLACSBody, options?: RequestInit): Promise<authSAMLACSResponse> => {
+    const formUrlEncoded = new URLSearchParams();
+if(authSAMLACSBody.RelayState !== undefined) {
+ formUrlEncoded.append(`RelayState`, authSAMLACSBody.RelayState);
+ }
+formUrlEncoded.append(`SAMLResponse`, authSAMLACSBody.SAMLResponse);
+
+  return orvalMutator<authSAMLACSResponse>(getAuthSAMLACSUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...options?.headers },
+    body:
+      formUrlEncoded,
+  }
+);}
+
+
+
+
+export const getAuthSAMLACSMutationOptions = <TError = void | string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authSAMLACS>>, TError,{data: AuthSAMLACSBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof authSAMLACS>>, TError,{data: AuthSAMLACSBody}, TContext> => {
+
+const mutationKey = ['authSAMLACS'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof authSAMLACS>>, {data: AuthSAMLACSBody}> = (props) => {
+          const {data} = props ?? {};
+
+          return  authSAMLACS(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AuthSAMLACSMutationResult = NonNullable<Awaited<ReturnType<typeof authSAMLACS>>>
+    export type AuthSAMLACSMutationBody = AuthSAMLACSBody
+    export type AuthSAMLACSMutationError = void | string
+
+    /**
+ * @summary SAML Assertion Consumer Service (POST from IdP)
+ */
+export const useAuthSAMLACS = <TError = void | string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authSAMLACS>>, TError,{data: AuthSAMLACSBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof authSAMLACS>>,
+        TError,
+        {data: AuthSAMLACSBody},
+        TContext
+      > => {
+      return useMutation(getAuthSAMLACSMutationOptions(options), queryClient);
+    }
+
+/**
+ * @summary SAML SP metadata XML (register at IdP)
+ */
+export type authSAMLMetadataResponse200 = {
+  data: string
+  status: 200
+}
+
+export type authSAMLMetadataResponse404 = {
+  data: string
+  status: 404
+}
+
+export type authSAMLMetadataResponseSuccess = (authSAMLMetadataResponse200) & {
+  headers: Headers;
+};
+export type authSAMLMetadataResponseError = (authSAMLMetadataResponse404) & {
+  headers: Headers;
+};
+
+export type authSAMLMetadataResponse = (authSAMLMetadataResponseSuccess | authSAMLMetadataResponseError)
+
+export const getAuthSAMLMetadataUrl = (params: AuthSAMLMetadataParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/auth/saml/metadata?${stringifiedParams}` : `/auth/saml/metadata`
+}
+
+export const authSAMLMetadata = async (params: AuthSAMLMetadataParams, options?: RequestInit): Promise<authSAMLMetadataResponse> => {
+
+  return orvalMutator<authSAMLMetadataResponse>(getAuthSAMLMetadataUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getAuthSAMLMetadataQueryKey = (params?: AuthSAMLMetadataParams,) => {
+    return [
+    `/auth/saml/metadata`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getAuthSAMLMetadataQueryOptions = <TData = Awaited<ReturnType<typeof authSAMLMetadata>>, TError = string>(params: AuthSAMLMetadataParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authSAMLMetadata>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getAuthSAMLMetadataQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof authSAMLMetadata>>> = ({ signal }) => authSAMLMetadata(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof authSAMLMetadata>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type AuthSAMLMetadataQueryResult = NonNullable<Awaited<ReturnType<typeof authSAMLMetadata>>>
+export type AuthSAMLMetadataQueryError = string
+
+
+export function useAuthSAMLMetadata<TData = Awaited<ReturnType<typeof authSAMLMetadata>>, TError = string>(
+ params: AuthSAMLMetadataParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof authSAMLMetadata>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof authSAMLMetadata>>,
+          TError,
+          Awaited<ReturnType<typeof authSAMLMetadata>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAuthSAMLMetadata<TData = Awaited<ReturnType<typeof authSAMLMetadata>>, TError = string>(
+ params: AuthSAMLMetadataParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authSAMLMetadata>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof authSAMLMetadata>>,
+          TError,
+          Awaited<ReturnType<typeof authSAMLMetadata>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAuthSAMLMetadata<TData = Awaited<ReturnType<typeof authSAMLMetadata>>, TError = string>(
+ params: AuthSAMLMetadataParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authSAMLMetadata>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary SAML SP metadata XML (register at IdP)
+ */
+
+export function useAuthSAMLMetadata<TData = Awaited<ReturnType<typeof authSAMLMetadata>>, TError = string>(
+ params: AuthSAMLMetadataParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authSAMLMetadata>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getAuthSAMLMetadataQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 /**
  * Register a new user and organization with trial subscription
@@ -2560,220 +2879,6 @@ export function useAuthSSOAuthorize<TData = Awaited<ReturnType<typeof authSSOAut
 
 
 /**
- * @summary SAML Assertion Consumer Service (POST from IdP)
- */
-export type authSAMLACSResponse302 = {
-  data: void
-  status: 302
-}
-
-export type authSAMLACSResponse400 = {
-  data: string
-  status: 400
-}
-
-;
-export type authSAMLACSResponseError = (authSAMLACSResponse302 | authSAMLACSResponse400) & {
-  headers: Headers;
-};
-
-export type authSAMLACSResponse = (authSAMLACSResponseError)
-
-export const getAuthSAMLACSUrl = () => {
-
-
-
-
-  return `/auth/saml/acs`
-}
-
-export const authSAMLACS = async ( options?: RequestInit): Promise<authSAMLACSResponse> => {
-
-  return orvalMutator<authSAMLACSResponse>(getAuthSAMLACSUrl(),
-  {
-    ...options,
-    method: 'POST'
-
-
-  }
-);}
-
-
-
-
-export const getAuthSAMLACSMutationOptions = <TError = void | string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authSAMLACS>>, TError,void, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof authSAMLACS>>, TError,void, TContext> => {
-
-const mutationKey = ['authSAMLACS'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof authSAMLACS>>, void> = () => {
-
-
-          return  authSAMLACS(requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type AuthSAMLACSMutationResult = NonNullable<Awaited<ReturnType<typeof authSAMLACS>>>
-
-    export type AuthSAMLACSMutationError = void | string
-
-    /**
- * @summary SAML Assertion Consumer Service (POST from IdP)
- */
-export const useAuthSAMLACS = <TError = void | string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authSAMLACS>>, TError,void, TContext>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof authSAMLACS>>,
-        TError,
-        void,
-        TContext
-      > => {
-      return useMutation(getAuthSAMLACSMutationOptions(options), queryClient);
-    }
-
-/**
- * @summary SAML SP metadata XML (register at IdP)
- */
-export type authSAMLMetadataResponse200 = {
-  data: void
-  status: 200
-}
-
-export type authSAMLMetadataResponse404 = {
-  data: string
-  status: 404
-}
-
-export type authSAMLMetadataResponseSuccess = (authSAMLMetadataResponse200) & {
-  headers: Headers;
-};
-export type authSAMLMetadataResponseError = (authSAMLMetadataResponse404) & {
-  headers: Headers;
-};
-
-export type authSAMLMetadataResponse = (authSAMLMetadataResponseSuccess | authSAMLMetadataResponseError)
-
-export const getAuthSAMLMetadataUrl = (params: AuthSAMLMetadataParams,) => {
-  const normalizedParams = new URLSearchParams();
-
-  Object.entries(params || {}).forEach(([key, value]) => {
-
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : value.toString())
-    }
-  });
-
-  const stringifiedParams = normalizedParams.toString();
-
-  return stringifiedParams.length > 0 ? `/auth/saml/metadata?${stringifiedParams}` : `/auth/saml/metadata`
-}
-
-export const authSAMLMetadata = async (params: AuthSAMLMetadataParams, options?: RequestInit): Promise<authSAMLMetadataResponse> => {
-
-  return orvalMutator<authSAMLMetadataResponse>(getAuthSAMLMetadataUrl(params),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getAuthSAMLMetadataQueryKey = (params?: AuthSAMLMetadataParams,) => {
-    return [
-    `/auth/saml/metadata`, ...(params ? [params] : [])
-    ] as const;
-    }
-
-
-export const getAuthSAMLMetadataQueryOptions = <TData = Awaited<ReturnType<typeof authSAMLMetadata>>, TError = string>(params: AuthSAMLMetadataParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authSAMLMetadata>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getAuthSAMLMetadataQueryKey(params);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof authSAMLMetadata>>> = ({ signal }) => authSAMLMetadata(params, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof authSAMLMetadata>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type AuthSAMLMetadataQueryResult = NonNullable<Awaited<ReturnType<typeof authSAMLMetadata>>>
-export type AuthSAMLMetadataQueryError = string
-
-
-export function useAuthSAMLMetadata<TData = Awaited<ReturnType<typeof authSAMLMetadata>>, TError = string>(
- params: AuthSAMLMetadataParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof authSAMLMetadata>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof authSAMLMetadata>>,
-          TError,
-          Awaited<ReturnType<typeof authSAMLMetadata>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useAuthSAMLMetadata<TData = Awaited<ReturnType<typeof authSAMLMetadata>>, TError = string>(
- params: AuthSAMLMetadataParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authSAMLMetadata>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof authSAMLMetadata>>,
-          TError,
-          Awaited<ReturnType<typeof authSAMLMetadata>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useAuthSAMLMetadata<TData = Awaited<ReturnType<typeof authSAMLMetadata>>, TError = string>(
- params: AuthSAMLMetadataParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authSAMLMetadata>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary SAML SP metadata XML (register at IdP)
- */
-
-export function useAuthSAMLMetadata<TData = Awaited<ReturnType<typeof authSAMLMetadata>>, TError = string>(
- params: AuthSAMLMetadataParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authSAMLMetadata>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getAuthSAMLMetadataQueryOptions(params,options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-
-
-
-
-
-
-/**
  * @summary OIDC callback
  */
 export type authSSOCallbackResponse302 = {
@@ -2788,17 +2893,24 @@ export type authSSOCallbackResponseError = (authSSOCallbackResponse302) & {
 
 export type authSSOCallbackResponse = (authSSOCallbackResponseError)
 
-export const getAuthSSOCallbackUrl = () => {
+export const getAuthSSOCallbackUrl = (params: AuthSSOCallbackParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/auth/sso/callback`
+  return stringifiedParams.length > 0 ? `/auth/sso/callback?${stringifiedParams}` : `/auth/sso/callback`
 }
 
-export const authSSOCallback = async ( options?: RequestInit): Promise<authSSOCallbackResponse> => {
+export const authSSOCallback = async (params: AuthSSOCallbackParams, options?: RequestInit): Promise<authSSOCallbackResponse> => {
 
-  return orvalMutator<authSSOCallbackResponse>(getAuthSSOCallbackUrl(),
+  return orvalMutator<authSSOCallbackResponse>(getAuthSSOCallbackUrl(params),
   {
     ...options,
     method: 'GET'
@@ -2811,23 +2923,23 @@ export const authSSOCallback = async ( options?: RequestInit): Promise<authSSOCa
 
 
 
-export const getAuthSSOCallbackQueryKey = () => {
+export const getAuthSSOCallbackQueryKey = (params?: AuthSSOCallbackParams,) => {
     return [
-    `/auth/sso/callback`
+    `/auth/sso/callback`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getAuthSSOCallbackQueryOptions = <TData = Awaited<ReturnType<typeof authSSOCallback>>, TError = void>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authSSOCallback>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export const getAuthSSOCallbackQueryOptions = <TData = Awaited<ReturnType<typeof authSSOCallback>>, TError = void>(params: AuthSSOCallbackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authSSOCallback>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getAuthSSOCallbackQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getAuthSSOCallbackQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof authSSOCallback>>> = ({ signal }) => authSSOCallback({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof authSSOCallback>>> = ({ signal }) => authSSOCallback(params, { signal, ...requestOptions });
 
 
 
@@ -2841,7 +2953,7 @@ export type AuthSSOCallbackQueryError = void
 
 
 export function useAuthSSOCallback<TData = Awaited<ReturnType<typeof authSSOCallback>>, TError = void>(
-  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof authSSOCallback>>, TError, TData>> & Pick<
+ params: AuthSSOCallbackParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof authSSOCallback>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof authSSOCallback>>,
           TError,
@@ -2851,7 +2963,7 @@ export function useAuthSSOCallback<TData = Awaited<ReturnType<typeof authSSOCall
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useAuthSSOCallback<TData = Awaited<ReturnType<typeof authSSOCallback>>, TError = void>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authSSOCallback>>, TError, TData>> & Pick<
+ params: AuthSSOCallbackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authSSOCallback>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof authSSOCallback>>,
           TError,
@@ -2861,7 +2973,7 @@ export function useAuthSSOCallback<TData = Awaited<ReturnType<typeof authSSOCall
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useAuthSSOCallback<TData = Awaited<ReturnType<typeof authSSOCallback>>, TError = void>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authSSOCallback>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ params: AuthSSOCallbackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authSSOCallback>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
@@ -2869,11 +2981,11 @@ export function useAuthSSOCallback<TData = Awaited<ReturnType<typeof authSSOCall
  */
 
 export function useAuthSSOCallback<TData = Awaited<ReturnType<typeof authSSOCallback>>, TError = void>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authSSOCallback>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ params: AuthSSOCallbackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authSSOCallback>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getAuthSSOCallbackQueryOptions(options)
+  const queryOptions = getAuthSSOCallbackQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -3425,7 +3537,7 @@ export const getCompaniesMeSlugPatchUrl = () => {
   return `/companies/me/slug`
 }
 
-export const companiesMeSlugPatch = async (companiesMeSlugPatchBody: CompaniesMeSlugPatchBody, options?: RequestInit): Promise<companiesMeSlugPatchResponse> => {
+export const companiesMeSlugPatch = async (handlersPatchCompanySlugRequest: HandlersPatchCompanySlugRequest, options?: RequestInit): Promise<companiesMeSlugPatchResponse> => {
 
   return orvalMutator<companiesMeSlugPatchResponse>(getCompaniesMeSlugPatchUrl(),
   {
@@ -3433,7 +3545,7 @@ export const companiesMeSlugPatch = async (companiesMeSlugPatchBody: CompaniesMe
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(
-      companiesMeSlugPatchBody,)
+      handlersPatchCompanySlugRequest,)
   }
 );}
 
@@ -3441,8 +3553,8 @@ export const companiesMeSlugPatch = async (companiesMeSlugPatchBody: CompaniesMe
 
 
 export const getCompaniesMeSlugPatchMutationOptions = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof companiesMeSlugPatch>>, TError,{data: CompaniesMeSlugPatchBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof companiesMeSlugPatch>>, TError,{data: CompaniesMeSlugPatchBody}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof companiesMeSlugPatch>>, TError,{data: HandlersPatchCompanySlugRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof companiesMeSlugPatch>>, TError,{data: HandlersPatchCompanySlugRequest}, TContext> => {
 
 const mutationKey = ['companiesMeSlugPatch'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -3454,7 +3566,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof companiesMeSlugPatch>>, {data: CompaniesMeSlugPatchBody}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof companiesMeSlugPatch>>, {data: HandlersPatchCompanySlugRequest}> = (props) => {
           const {data} = props ?? {};
 
           return  companiesMeSlugPatch(data,requestOptions)
@@ -3468,25 +3580,25 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CompaniesMeSlugPatchMutationResult = NonNullable<Awaited<ReturnType<typeof companiesMeSlugPatch>>>
-    export type CompaniesMeSlugPatchMutationBody = CompaniesMeSlugPatchBody
+    export type CompaniesMeSlugPatchMutationBody = HandlersPatchCompanySlugRequest
     export type CompaniesMeSlugPatchMutationError = unknown
 
     /**
  * @summary Update tenant slug
  */
 export const useCompaniesMeSlugPatch = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof companiesMeSlugPatch>>, TError,{data: CompaniesMeSlugPatchBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof companiesMeSlugPatch>>, TError,{data: HandlersPatchCompanySlugRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof companiesMeSlugPatch>>,
         TError,
-        {data: CompaniesMeSlugPatchBody},
+        {data: HandlersPatchCompanySlugRequest},
         TContext
       > => {
       return useMutation(getCompaniesMeSlugPatchMutationOptions(options), queryClient);
     }
 
 /**
- * @summary Get SSO OIDC settings
+ * @summary Get SSO settings (OIDC or SAML)
  */
 export type companiesMeSSOGetResponse200 = {
   data: ServicesCompanySSOGetResponse
@@ -3577,7 +3689,7 @@ export function useCompaniesMeSSOGet<TData = Awaited<ReturnType<typeof companies
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Get SSO OIDC settings
+ * @summary Get SSO settings (OIDC or SAML)
  */
 
 export function useCompaniesMeSSOGet<TData = Awaited<ReturnType<typeof companiesMeSSOGet>>, TError = unknown>(
@@ -3599,7 +3711,7 @@ export function useCompaniesMeSSOGet<TData = Awaited<ReturnType<typeof companies
 
 
 /**
- * @summary Update SSO OIDC settings
+ * @summary Update SSO settings (OIDC or SAML)
  */
 export type companiesMeSSOPatchResponse204 = {
   data: void
@@ -3668,7 +3780,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type CompaniesMeSSOPatchMutationError = unknown
 
     /**
- * @summary Update SSO OIDC settings
+ * @summary Update SSO settings (OIDC or SAML)
  */
 export const useCompaniesMeSSOPatch = <TError = unknown,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof companiesMeSSOPatch>>, TError,{data: ServicesCompanySSOPatch}, TContext>, request?: SecondParameter<typeof orvalMutator>}

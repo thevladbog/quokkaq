@@ -131,6 +131,15 @@ def apply_openapi_tweaks(doc: dict[str, Any]) -> None:
     guest_submit = _schema(comp, "handlers.guestSurveySubmitRequest")
     _merge_schema_required(guest_submit, ["ticketId", "surveyId", "answers"])
 
+    tenant_hint = _schema(comp, "handlers.tenantHintRequest")
+    _merge_schema_required(tenant_hint, ["email"])
+
+    sso_exchange = _schema(comp, "handlers.ssoExchangeRequest")
+    _merge_schema_required(sso_exchange, ["code"])
+
+    patch_slug = _schema(comp, "handlers.patchCompanySlugRequest")
+    _merge_schema_required(patch_slug, ["slug"])
+
     patch_survey = _schema(comp, "handlers.patchSurveyRequest")
     patch_survey["minProperties"] = 1
 

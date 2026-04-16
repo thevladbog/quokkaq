@@ -402,8 +402,6 @@ components:
       properties:
         accessToken:
           type: string
-        refreshToken:
-          type: string
       type: object
     handlers.RegisterUserRequest:
       properties:
@@ -593,6 +591,14 @@ components:
       - ticketId
       - surveyId
       - answers
+    handlers.patchCompanySlugRequest:
+      properties:
+        slug:
+          example: acme-corp
+          type: string
+      type: object
+      required:
+      - slug
     handlers.patchSurveyRequest:
       properties:
         completionMessage:
@@ -696,11 +702,15 @@ components:
         code:
           type: string
       type: object
+      required:
+      - code
     handlers.tenantHintRequest:
       properties:
         email:
           type: string
       type: object
+      required:
+      - email
     models.Booking:
       properties:
         code:
@@ -1773,12 +1783,10 @@ components:
         issuerUrl:
           type: string
         samlIdpMetadataUrl:
-          description: IdP metadata URL for SAML
           type: string
         scopes:
           type: string
         ssoProtocol:
-          description: oidc | saml
           type: string
       type: object
     services.CompanySSOPatch:
@@ -1797,12 +1805,11 @@ components:
         issuerUrl:
           type: string
         samlIdpMetadataUrl:
-          description: IdP metadata URL for SAML
           type: string
         scopes:
           type: string
         ssoProtocol:
-          description: oidc | saml
+          description: '"oidc" | "saml"'
           type: string
       type: object
     services.EmployeeRadarResponse:
@@ -2375,6 +2382,16 @@ paths:
       summary: Resolve next login step from email (tenant hint)
       tags:
       - auth
+  /auth/logout:
+    post:
+      description: Clears HttpOnly session cookies set by login and refresh. Does not require a JSON body.
+      operationId: authLogout
+      responses:
+        '204':
+          description: No Content
+      summary: Log out (clear session cookies)
+      tags:
+      - auth
   /auth/me:
     get:
       description: Returns the currently authenticated user's information
@@ -2404,7 +2421,7 @@ paths:
       - auth
   /auth/refresh:
     post:
-      description: 'Exchanges a valid refresh JWT for new access and refresh tokens. Send the refresh token as `Authorization: Bearer <refresh>`.'
+      description: 'Exchanges a valid refresh JWT for a new access JWT. The refresh token is read from HttpOnly session cookies when present; otherwise send `Authorization: Bearer <refresh>`. Rotated refresh tokens are returned only via `Set-Cookie`, not in the JSON body.'
       operationId: authRefresh
       responses:
         '200':
@@ -2463,6 +2480,63 @@ paths:
       summary: Reset Password
       tags:
       - auth
+  /auth/saml/acs:
+    post:
+      operationId: authSAMLACS
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              properties:
+                RelayState:
+                  description: Relay state from SP-initiated login
+                  type: string
+                  x-formData-name: RelayState
+                SAMLResponse:
+                  description: SAML Response (Base64)
+                  type: string
+                  x-formData-name: SAMLResponse
+              required:
+              - SAMLResponse
+              type: object
+      responses:
+        '302':
+          description: Redirect to app with one-time code
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad request
+      summary: SAML Assertion Consumer Service (POST from IdP)
+      tags:
+      - auth
+  /auth/saml/metadata:
+    get:
+      operationId: authSAMLMetadata
+      parameters:
+      - description: Tenant slug
+        in: query
+        name: tenant
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/xml:
+              schema:
+                type: string
+          description: SP metadata XML
+        '404':
+          content:
+            application/xml:
+              schema:
+                type: string
+          description: Not found
+      summary: SAML SP metadata XML (register at IdP)
+      tags:
+      - auth
   /auth/signup:
     post:
       description: Register a new user and organization with trial subscription
@@ -2513,10 +2587,9 @@ paths:
         required: true
         schema:
           type: string
-      - description: UI locale for post-SSO redirects (en or ru)
+      - description: UI locale for post-SSO redirects (en|ru)
         in: query
         name: locale
-        required: false
         schema:
           type: string
       responses:
@@ -2525,46 +2598,22 @@ paths:
       summary: Start SSO (OIDC or SAML — redirect to IdP)
       tags:
       - auth
-  /auth/saml/metadata:
-    get:
-      operationId: authSAMLMetadata
-      parameters:
-      - description: Tenant slug
-        in: query
-        name: tenant
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: SAML metadata XML
-        '404':
-          content:
-            application/json:
-              schema:
-                type: string
-          description: Not found
-      summary: SAML SP metadata XML (register at IdP)
-      tags:
-      - auth
-  /auth/saml/acs:
-    post:
-      operationId: authSAMLACS
-      responses:
-        '302':
-          description: Redirect to app with one-time code
-        '400':
-          content:
-            application/json:
-              schema:
-                type: string
-          description: Bad request
-      summary: SAML Assertion Consumer Service (POST from IdP)
-      tags:
-      - auth
   /auth/sso/callback:
     get:
       operationId: authSSOCallback
+      parameters:
+      - description: Authorization code from IdP
+        in: query
+        name: code
+        required: true
+        schema:
+          type: string
+      - description: OAuth state
+        in: query
+        name: state
+        required: true
+        schema:
+          type: string
       responses:
         '302':
           description: Redirect to app
@@ -3196,8 +3245,8 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-        description: Slug
+              $ref: '#/components/schemas/handlers.patchCompanySlugRequest'
+        description: New slug
         required: true
         x-originalParamName: body
       responses:
@@ -3224,7 +3273,7 @@ paths:
           description: OK
       security:
       - BearerAuth: []
-      summary: Get SSO OIDC settings
+      summary: Get SSO settings (OIDC or SAML)
       tags:
       - companies
     patch:
@@ -3242,7 +3291,7 @@ paths:
           description: No Content
       security:
       - BearerAuth: []
-      summary: Update SSO OIDC settings
+      summary: Update SSO settings (OIDC or SAML)
       tags:
       - companies
   /counters:

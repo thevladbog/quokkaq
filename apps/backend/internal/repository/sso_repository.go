@@ -63,20 +63,46 @@ func (r *ssoRepository) FindCompaniesByEmailDomain(domain string) ([]models.Comp
 	if err != nil {
 		return nil, nil, err
 	}
-	var outCompanies []models.Company
-	var outConns []models.CompanySSOConnection
+	type match struct {
+		conn models.CompanySSOConnection
+	}
+	var matches []match
 	for i := range conns {
 		c := &conns[i]
 		for _, dom := range c.EmailDomains {
 			if strings.EqualFold(strings.TrimSpace(dom), d) {
-				var comp models.Company
-				if err := database.DB.Where("id = ?", c.CompanyID).First(&comp).Error; err != nil {
-					continue
-				}
-				outCompanies = append(outCompanies, comp)
-				outConns = append(outConns, *c)
+				matches = append(matches, match{conn: *c})
 				break
 			}
+		}
+	}
+	if len(matches) == 0 {
+		return nil, nil, nil
+	}
+	seen := make(map[string]struct{}, len(matches))
+	var ids []string
+	for _, m := range matches {
+		if _, ok := seen[m.conn.CompanyID]; ok {
+			continue
+		}
+		seen[m.conn.CompanyID] = struct{}{}
+		ids = append(ids, m.conn.CompanyID)
+	}
+
+	var companies []models.Company
+	if err := database.DB.Where("id IN ?", ids).Find(&companies).Error; err != nil {
+		return nil, nil, err
+	}
+	byID := make(map[string]models.Company, len(companies))
+	for i := range companies {
+		byID[companies[i].ID] = companies[i]
+	}
+	outCompanies := make([]models.Company, 0, len(matches))
+	outConns := make([]models.CompanySSOConnection, 0, len(matches))
+	for _, m := range matches {
+		if comp, ok := byID[m.conn.CompanyID]; ok {
+			outCompanies = append(outCompanies, comp)
+			outConns = append(outConns, m.conn)
 		}
 	}
 	return outCompanies, outConns, nil

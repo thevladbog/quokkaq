@@ -66,6 +66,10 @@ func loadKey() ([]byte, error) {
 		// Dev fallback: derive from JWT_SECRET so local SSO config works without extra key.
 		s = strings.TrimSpace(os.Getenv("JWT_SECRET"))
 		if s == "" {
+			app := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV")))
+			if app == "production" {
+				return nil, errors.New("SSO_SECRETS_ENCRYPTION_KEY or JWT_SECRET must be set when APP_ENV=production")
+			}
 			s = "default_secret_please_change"
 		}
 	}

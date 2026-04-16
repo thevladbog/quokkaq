@@ -994,6 +994,7 @@ func RunVersionedMigrations(models ...interface{}) error {
 				base = "tenant"
 			}
 			var slug string
+			found := false
 			for attempt := 0; attempt < 50; attempt++ {
 				if attempt == 0 {
 					slug = base
@@ -1005,8 +1006,12 @@ func RunVersionedMigrations(models ...interface{}) error {
 					return err
 				}
 				if n == 0 {
+					found = true
 					break
 				}
+			}
+			if !found {
+				return fmt.Errorf("unable to generate unique company slug after 50 attempts for company id %s", c.ID)
 			}
 			if err := db.Model(c).Update("slug", slug).Error; err != nil {
 				return err

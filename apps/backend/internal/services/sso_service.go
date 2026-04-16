@@ -200,7 +200,11 @@ func (s *SSOService) LoginContextByOpaqueToken(raw string) (*PublicTenantRespons
 		if strings.EqualFold(strings.TrimSpace(conn.SSOProtocol), "saml") {
 			sso = strings.TrimSpace(conn.SAMLIDPMetadataURL) != ""
 		} else {
-			sso = strings.TrimSpace(conn.IssuerURL) != ""
+			sso = strings.TrimSpace(conn.IssuerURL) != "" && strings.TrimSpace(conn.ClientID) != ""
+			if sso {
+				sec, decErr := ssocrypto.DecryptAES256GCM(conn.ClientSecretEncrypted)
+				sso = decErr == nil && len(sec) > 0
+			}
 		}
 	}
 	return &PublicTenantResponse{
@@ -223,14 +227,21 @@ func (s *SSOService) BeginAuthorize(ctx context.Context, w http.ResponseWriter, 
 		return err
 	}
 	conn, err := s.ssoRepo.GetConnectionByCompanyID(c.ID)
-	if err != nil || !conn.Enabled {
+	if err != nil {
 		http.Error(w, "SSO not configured", http.StatusBadRequest)
 		return err
+	}
+	if !conn.Enabled {
+		http.Error(w, "SSO not configured", http.StatusBadRequest)
+		return errors.New("SSO not configured")
 	}
 	secret, err := ssocrypto.DecryptAES256GCM(conn.ClientSecretEncrypted)
 	if err != nil || len(secret) == 0 {
 		http.Error(w, "SSO not configured", http.StatusBadRequest)
-		return err
+		if err != nil {
+			return fmt.Errorf("SSO client secret: %w", err)
+		}
+		return errors.New("SSO not configured")
 	}
 
 	provider, err := oidc.NewProvider(ctx, strings.TrimSpace(conn.IssuerURL))
@@ -428,9 +439,15 @@ func (s *SSOService) HandleCallback(ctx context.Context, w http.ResponseWriter, 
 		http.Error(w, "invalid claims", http.StatusBadRequest)
 		return
 	}
-	if claims.Nonce != "" && claims.Nonce != payload.Nonce {
-		http.Error(w, "nonce mismatch", http.StatusBadRequest)
-		return
+	if strings.TrimSpace(payload.Nonce) != "" {
+		if strings.TrimSpace(claims.Nonce) == "" {
+			http.Error(w, "missing nonce in id_token", http.StatusBadRequest)
+			return
+		}
+		if claims.Nonce != payload.Nonce {
+			http.Error(w, "nonce mismatch", http.StatusBadRequest)
+			return
+		}
 	}
 	emailVerified := claims.EmailVerified != nil && *claims.EmailVerified
 	if !emailVerified && claims.Email != "" {
@@ -479,12 +496,16 @@ func firstAllowedFrontendLocale() string {
 }
 
 func (s *SSOService) resolveSSOUser(ctx context.Context, company *models.Company, conn *models.CompanySSOConnection, iss, sub, email, name string, emailVerified bool) (*models.User, error) {
-	if ext, err := s.ssoRepo.FindExternalIdentity(iss, sub); err == nil {
+	if ext, err := s.ssoRepo.FindExternalIdentity(iss, sub); err == nil && ext.CompanyID == company.ID {
 		u, err := s.userRepo.FindByID(ext.UserID)
 		if err != nil {
 			return nil, err
 		}
-		return u, nil
+		ok, _ := s.userRepo.HasCompanyAccess(u.ID, company.ID)
+		if ok {
+			return u, nil
+		}
+		// Identity row exists but user lost access, or stale link — fall through.
 	}
 	if email == "" || !emailVerified {
 		return nil, ErrSSOEmailRequired
@@ -550,7 +571,7 @@ func (s *SSOService) resolveSSOUser(ctx context.Context, company *models.Company
 			Issuer:    iss,
 			Subject:   sub,
 		}
-		return s.ssoRepo.CreateExternalIdentity(ext)
+		return tx.Create(ext).Error
 	})
 	if err != nil {
 		return nil, err

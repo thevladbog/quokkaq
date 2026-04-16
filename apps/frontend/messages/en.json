@@ -1416,6 +1416,8 @@
     "passwordStepDescription": "Enter your password for {org}",
     "combinedLoginLink": "Sign in with email and password on one screen",
     "ssoCallbackError": "Single sign-on could not be completed. Try again or use your password.",
+    "ssoCallbackErrorMissingCode": "The SSO callback is missing a one-time code. Start sign-in again from the login page.",
+    "ssoCallbackErrorExchangeFailed": "We could not exchange the SSO code for a session. Try again or use your password.",
     "ssoCallbackWorking": "Completing sign-in…",
     "ssoError": {
       "no_tenant_access": "You do not have access to this organization. Ask your administrator to grant access.",

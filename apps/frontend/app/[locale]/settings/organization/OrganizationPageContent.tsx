@@ -23,7 +23,7 @@ import {
   Settings,
   Shield
 } from 'lucide-react';
-import { useRouter } from '@/src/i18n/navigation';
+import { Link, useRouter } from '@/src/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { companiesApiExt } from '@/lib/api';
@@ -406,20 +406,25 @@ export function OrganizationPageContent() {
           </CardContent>
         </Card>
 
-        <Card
-          className='cursor-pointer transition-shadow hover:shadow-lg'
-          onClick={() => router.push('/settings/organization/login')}
+        <Link
+          href='/settings/organization/login'
+          className='focus-visible:ring-ring block rounded-lg focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none'
+          aria-label={t('quickLinks.login')}
         >
-          <CardHeader>
-            <CardTitle className='flex items-center gap-2 text-lg'>
-              <Shield className='h-5 w-5' />
-              {t('quickLinks.login')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className='text-sm text-gray-600'>{t('quickLinks.loginDesc')}</p>
-          </CardContent>
-        </Card>
+          <Card className='h-full cursor-pointer transition-shadow hover:shadow-lg'>
+            <CardHeader>
+              <CardTitle className='flex items-center gap-2 text-lg'>
+                <Shield className='h-5 w-5' />
+                {t('quickLinks.login')}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className='text-sm text-gray-600'>
+                {t('quickLinks.loginDesc')}
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
     </div>
   );

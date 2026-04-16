@@ -563,7 +563,6 @@ export interface HandlersPlatformUpdateSubscriptionPlanBody {
 
 export interface HandlersRefreshResponse {
   accessToken?: string;
-  refreshToken?: string;
 }
 
 export interface HandlersRegisterUserRequest {
@@ -902,6 +901,10 @@ export interface HandlersGuestSurveySubmitRequest {
   ticketId: string;
 }
 
+export interface HandlersPatchCompanySlugRequest {
+  slug: string;
+}
+
 export type HandlersPatchSurveyRequestCompletionMessage = { [key: string]: unknown };
 
 export type HandlersPatchSurveyRequestDisplayTheme = { [key: string]: unknown };
@@ -984,11 +987,11 @@ export interface HandlersSetupFirstAdminRequest {
 }
 
 export interface HandlersSsoExchangeRequest {
-  code?: string;
+  code: string;
 }
 
 export interface HandlersTenantHintRequest {
-  email?: string;
+  email: string;
 }
 
 export interface ModelsCatalogItemCreateRequest {
@@ -1222,10 +1225,8 @@ export interface ServicesCompanySSOGetResponse {
   emailDomains?: string[];
   enabled?: boolean;
   issuerUrl?: string;
-  /** IdP metadata URL for SAML */
   samlIdpMetadataUrl?: string;
   scopes?: string;
-  /** oidc | saml */
   ssoProtocol?: string;
 }
 
@@ -1236,10 +1237,9 @@ export interface ServicesCompanySSOPatch {
   emailDomains?: string[];
   enabled?: boolean;
   issuerUrl?: string;
-  /** IdP metadata URL for SAML */
   samlIdpMetadataUrl?: string;
   scopes?: string;
-  /** oidc | saml */
+  /** "oidc" | "saml" */
   ssoProtocol?: string;
 }
 

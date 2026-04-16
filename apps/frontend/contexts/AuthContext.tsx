@@ -63,12 +63,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isClient, setIsClient] = useState(false);
   const pathname = usePathname();
   const loginFetchOwnsSessionRef = useRef(false);
+  /** Bumped when login() runs or on logout so stale `/auth/me` probes cannot clobber a newer session. */
+  const sessionProbeGenRef = useRef(0);
 
   useEffect(() => {
     setIsClient(true);
   }, []);
 
   const logout = useCallback(() => {
+    sessionProbeGenRef.current++;
     setToken(null);
     setUser(null);
     setIsLoading(false);
@@ -94,6 +97,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (typeof window === 'undefined') {
         return Promise.resolve();
       }
+      sessionProbeGenRef.current++;
+      const loginGen = sessionProbeGenRef.current;
       loginFetchOwnsSessionRef.current = true;
       setIsLoading(true);
       if (legacyAccessToken) {
@@ -102,11 +107,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setToken(SESSION_MARKER);
       return fetchCurrentUser()
         .then((userData) => {
+          if (loginGen !== sessionProbeGenRef.current) {
+            return;
+          }
           setUser(userData);
           setIsLoading(false);
         })
         .catch((error) => {
           logger.error('Failed to fetch user after login:', error);
+          if (loginGen !== sessionProbeGenRef.current) {
+            return;
+          }
           setToken(null);
           setUser(null);
           localStorage.removeItem('access_token');
@@ -144,18 +155,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(true);
 
     let cancelled = false;
+    const myGen = ++sessionProbeGenRef.current;
     const run = async () => {
       try {
         const userData = await fetchCurrentUser();
-        if (!cancelled) {
-          setUser(userData);
-          setToken(SESSION_MARKER);
+        if (cancelled || myGen !== sessionProbeGenRef.current) {
+          return;
         }
+        setUser(userData);
+        setToken(SESSION_MARKER);
       } catch {
-        if (!cancelled) {
-          setUser(null);
-          setToken(null);
+        if (cancelled || myGen !== sessionProbeGenRef.current) {
+          return;
         }
+        setUser(null);
+        setToken(null);
       } finally {
         if (!cancelled) {
           setIsLoading(false);

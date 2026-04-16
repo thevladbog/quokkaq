@@ -15,6 +15,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"quokkaq-go-backend/internal/models"
@@ -24,6 +25,58 @@ import (
 	"github.com/crewjam/saml"
 	"github.com/crewjam/saml/samlsp"
 )
+
+const samlIDPMetaTTL = 15 * time.Minute
+
+var (
+	samlIDPMetaMu sync.RWMutex
+	samlIDPMeta   = make(map[string]samlIDPMetaCacheEntry)
+)
+
+type samlIDPMetaCacheEntry struct {
+	entity    *saml.EntityDescriptor
+	fetchedAt time.Time
+}
+
+func samlIDPMetaCacheKey(companyID, metadataURL string) string {
+	return companyID + "\x00" + strings.TrimSpace(metadataURL)
+}
+
+// getOrFetchIDPMetadata returns IdP metadata, using a short-lived in-process cache so ACS/metadata
+// handlers do not depend on remote IdP availability on every request. Stale entries are reused
+// when a scheduled refresh fails.
+func getOrFetchIDPMetadata(companyID string, idpURL *url.URL, httpClient *http.Client) (*saml.EntityDescriptor, error) {
+	key := samlIDPMetaCacheKey(companyID, idpURL.String())
+	now := time.Now()
+
+	samlIDPMetaMu.RLock()
+	cached, hit := samlIDPMeta[key]
+	samlIDPMetaMu.RUnlock()
+	if hit && cached.entity != nil && now.Sub(cached.fetchedAt) < samlIDPMetaTTL {
+		return cached.entity, nil
+	}
+
+	var stale *saml.EntityDescriptor
+	if hit && cached.entity != nil {
+		stale = cached.entity
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	entity, err := samlsp.FetchMetadata(ctx, httpClient, *idpURL)
+	if err != nil {
+		if stale != nil {
+			log.Printf("saml idp metadata refresh failed (using cached copy): %v", err)
+			return stale, nil
+		}
+		return nil, err
+	}
+
+	samlIDPMetaMu.Lock()
+	samlIDPMeta[key] = samlIDPMetaCacheEntry{entity: entity, fetchedAt: now}
+	samlIDPMetaMu.Unlock()
+	return entity, nil
+}
 
 type samlRelayPayload struct {
 	CompanyID string `json:"companyId"`
@@ -106,9 +159,8 @@ func (s *SSOService) buildSAMLServiceProvider(c *models.Company, conn *models.Co
 	if err != nil || idpURL.String() == "" {
 		return nil, errors.New("invalid SAML IdP metadata URL")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-	defer cancel()
-	entity, err := samlsp.FetchMetadata(ctx, http.DefaultClient, *idpURL)
+	httpClient := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12}}}
+	entity, err := getOrFetchIDPMetadata(c.ID, idpURL, httpClient)
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +169,7 @@ func (s *SSOService) buildSAMLServiceProvider(c *models.Company, conn *models.Co
 		EntityID:          metaBase.String(),
 		Key:               key,
 		Certificate:       cert,
-		HTTPClient:        &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12}}},
+		HTTPClient:        httpClient,
 		MetadataURL:       *metaBase,
 		AcsURL:            *acs,
 		IDPMetadata:       entity,
@@ -216,6 +268,18 @@ func (s *SSOService) HandleSAMLACS(ctx context.Context, w http.ResponseWriter, r
 	conn, err := s.ssoRepo.GetConnectionByCompanyID(c.ID)
 	if err != nil {
 		http.Error(w, "SSO not found", http.StatusBadRequest)
+		return
+	}
+	if !conn.Enabled {
+		http.Error(w, "SSO disabled", http.StatusConflict)
+		return
+	}
+	if !strings.EqualFold(strings.TrimSpace(conn.SSOProtocol), "saml") {
+		http.Error(w, "SSO mode is not SAML", http.StatusConflict)
+		return
+	}
+	if strings.TrimSpace(conn.SAMLIDPMetadataURL) == "" {
+		http.Error(w, "SAML not configured", http.StatusBadRequest)
 		return
 	}
 	sp, err := s.buildSAMLServiceProvider(c, conn)

@@ -47,6 +47,14 @@
     {
       "path": ".*/internal/handlers/auth_handler\\.go",
       "rules": ["G117"]
+    },
+    {
+      "path": ".*/internal/handlers/sso_handler\\.go",
+      "rules": ["G117"]
+    },
+    {
+      "path": ".*/internal/pkg/authcookie/.*",
+      "rules": ["G124"]
     }
   ]
 }

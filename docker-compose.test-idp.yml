@@ -21,9 +21,13 @@ services:
       - "127.0.0.1:8080:8080"
     volumes:
       - ./tools/test-idp/keycloak/import:/opt/keycloak/data/import:ro
-    # Image has bash but not curl; port open is enough for compose --wait.
+    # Management health (KC_HEALTH_ENABLED); waits until Keycloak is ready, not only TCP on 8080.
     healthcheck:
-      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080'"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl -sf http://127.0.0.1:9000/health/ready >/dev/null || exit 1"
+        ]
       interval: 10s
       timeout: 5s
       retries: 24

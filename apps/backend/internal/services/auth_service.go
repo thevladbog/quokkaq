@@ -27,6 +27,16 @@ var ErrInvalidCompanySlug = errors.New("invalid company slug")
 // ErrCompanySlugTaken is returned when optional companySlug is already in use.
 var ErrCompanySlugTaken = errors.New("company slug already taken")
 
+func isUniqueConstraintViolation(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "duplicate key") ||
+		strings.Contains(msg, "unique constraint") ||
+		strings.Contains(msg, "23505")
+}
+
 // TokenPair holds short-lived access and long-lived refresh JWTs.
 type TokenPair struct {
 	AccessToken  string
@@ -292,6 +302,9 @@ func (s *authService) Signup(name, email, password, companyName, planCode string
 		company.Slug = slug
 
 		if err := tx.Create(company).Error; err != nil {
+			if isUniqueConstraintViolation(err) {
+				return ErrCompanySlugTaken
+			}
 			return fmt.Errorf("failed to create company: %w", err)
 		}
 

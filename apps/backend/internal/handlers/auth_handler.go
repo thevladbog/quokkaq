@@ -33,9 +33,9 @@ type LoginResponse struct {
 }
 
 // RefreshResponse is the body of POST /auth/refresh.
+// Refresh tokens are rotated via HttpOnly cookies only; the JSON body exposes the new access JWT.
 type RefreshResponse struct {
-	AccessToken  string `json:"accessToken"`
-	RefreshToken string `json:"refreshToken"`
+	AccessToken string `json:"accessToken"`
 }
 
 type ForgotPasswordRequest struct {
@@ -96,7 +96,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 // Refresh godoc
 // @ID           authRefresh
 // @Summary      Refresh tokens
-// @Description  Exchanges a valid refresh JWT for new access and refresh tokens. Send the refresh token as `Authorization: Bearer <refresh>`.
+// @Description  Exchanges a valid refresh JWT for a new access JWT. The refresh token is read from HttpOnly session cookies when present; otherwise send `Authorization: Bearer <refresh>`. Rotated refresh tokens are returned only via `Set-Cookie`, not in the JSON body.
 // @Tags         auth
 // @Produce      json
 // @Security     BearerAuth
@@ -129,15 +129,16 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	authcookie.WriteSessionCookies(w, r, pair)
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(RefreshResponse{
-		AccessToken:  pair.AccessToken,
-		RefreshToken: pair.RefreshToken,
+		AccessToken: pair.AccessToken,
 	}); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 	}
 }
 
 // Logout godoc
+// @ID           authLogout
 // @Summary      Log out (clear session cookies)
+// @Description  Clears HttpOnly session cookies set by login and refresh. Does not require a JSON body.
 // @Tags         auth
 // @Success      204
 // @Router       /auth/logout [post]

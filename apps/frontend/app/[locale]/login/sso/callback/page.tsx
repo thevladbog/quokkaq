@@ -43,11 +43,15 @@ export default function SSOLoginCallbackPage() {
   }, [code, login, router]);
 
   if (error) {
+    const message =
+      error === 'missing_code'
+        ? t('ssoCallbackErrorMissingCode')
+        : error === 'exchange_failed'
+          ? t('ssoCallbackErrorExchangeFailed')
+          : t('ssoCallbackError');
     return (
       <div className='flex min-h-dvh flex-col items-center justify-center gap-4 p-6'>
-        <p className='text-destructive text-center text-sm'>
-          {t('ssoCallbackError')}
-        </p>
+        <p className='text-destructive text-center text-sm'>{message}</p>
       </div>
     );
   }

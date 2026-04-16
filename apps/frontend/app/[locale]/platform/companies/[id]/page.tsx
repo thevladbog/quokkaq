@@ -507,7 +507,7 @@ function PlatformLoginPolicySection({
   const save = useMutation({
     mutationFn: () =>
       patchPlatformCompaniesId(companyId, {
-        slug: slug.trim() || undefined,
+        slug: slug.trim(),
         strictPublicTenantResolve: strict,
         opaqueLoginLinksOnly: opaque,
         ssoJitProvisioning: jit
