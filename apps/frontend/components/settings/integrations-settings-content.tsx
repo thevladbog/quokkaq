@@ -28,6 +28,7 @@ import {
   getCompaniesMeSSOGetQueryKey
 } from '@/lib/api/generated/auth';
 import { CalendarIntegrationsPanel } from '@/components/admin/units/calendar-integration-settings';
+import { resolveUnitFilterFromQuery } from '@/lib/integrations-unit-filter';
 import { OrganizationTenantSlugCard } from '@/components/organization/organization-tenant-slug-card';
 import { OrganizationSsoSettingsCard } from '@/components/organization/organization-sso-settings-card';
 
@@ -76,9 +77,10 @@ export function IntegrationsSettingsContent() {
 
   /** Optional filter: `?unit=` from URL (e.g. deep link from a unit page). */
   const filterUnitId = useMemo(() => {
-    const uq = searchParams.get('unit');
-    if (uq && unitOptions.some((u) => u.id === uq)) return uq;
-    return null;
+    return resolveUnitFilterFromQuery(
+      searchParams.get('unit'),
+      unitOptions.map((u) => u.id)
+    );
   }, [searchParams, unitOptions]);
 
   const setFilterUnitId = (value: string) => {

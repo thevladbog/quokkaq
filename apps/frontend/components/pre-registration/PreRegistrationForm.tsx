@@ -29,11 +29,10 @@ import {
   usePostUnitsUnitIdPreRegistrations,
   usePutUnitsUnitIdPreRegistrationsId
 } from '@/lib/api/generated/pre-registrations';
-import type { ModelsPreRegCalendarSlotItem } from '@/lib/api/generated/pre-registrations';
-
-function slotRowKey(item: ModelsPreRegCalendarSlotItem, idx: number) {
-  return `${item.calendarIntegrationId ?? ''}|${item.externalEventHref ?? ''}|${idx}`;
-}
+import {
+  formatCalendarSlotLabel,
+  preRegCalendarSlotRowKey
+} from '@/lib/pre-registration-calendar-slots';
 
 interface PreRegistrationFormProps {
   unitId: string;
@@ -384,8 +383,16 @@ export function PreRegistrationForm({
 
   const slotOptionsForUi = useCalendarUi
     ? calItems.map((item, idx) => ({
-        key: slotRowKey(item, idx),
-        value: slotRowKey(item, idx),
+        key: preRegCalendarSlotRowKey(
+          item.calendarIntegrationId,
+          item.externalEventHref,
+          idx
+        ),
+        value: preRegCalendarSlotRowKey(
+          item.calendarIntegrationId,
+          item.externalEventHref,
+          idx
+        ),
         label: item.time ?? '',
         time: item.time ?? '',
         eTag: item.eTag,
@@ -401,18 +408,6 @@ export function PreRegistrationForm({
       }));
 
   const isPending = createPostMutation.isPending || updateMutation.isPending;
-
-  const slotLabel = (item: ModelsPreRegCalendarSlotItem) => {
-    const timeStr = item.time ?? '';
-    const sameTime = calItems.filter((c) => c.time === item.time);
-    if (sameTime.length > 1) {
-      if (item.integrationLabel?.trim()) {
-        return `${timeStr} (${item.integrationLabel.trim()})`;
-      }
-      return `${timeStr} (#${(item.calendarIntegrationId ?? '').slice(0, 6)})`;
-    }
-    return timeStr;
-  };
 
   return (
     <form onSubmit={handleSubmit} className='space-y-4'>
@@ -494,7 +489,14 @@ export function PreRegistrationForm({
                     const idx = calItems.findIndex(
                       (i) => i.externalEventHref === externalHref
                     );
-                    if (idx >= 0) return slotRowKey(calItems[idx]!, idx);
+                    if (idx >= 0) {
+                      const row = calItems[idx]!;
+                      return preRegCalendarSlotRowKey(
+                        row.calendarIntegrationId,
+                        row.externalEventHref,
+                        idx
+                      );
+                    }
                     return externalHref;
                   })()
                 : time
@@ -502,7 +504,12 @@ export function PreRegistrationForm({
             onValueChange={(v) => {
               if (useCalendarUi) {
                 const idx = calItems.findIndex(
-                  (i, j) => slotRowKey(i, j) === v
+                  (i, j) =>
+                    preRegCalendarSlotRowKey(
+                      i.calendarIntegrationId,
+                      i.externalEventHref,
+                      j
+                    ) === v
                 );
                 if (idx >= 0) {
                   const row = calItems[idx];
@@ -547,7 +554,9 @@ export function PreRegistrationForm({
                 <>
                   {slotOptionsForUi.map((opt, oidx) => (
                     <SelectItem key={opt.key} value={opt.value}>
-                      {useCalendarUi ? slotLabel(calItems[oidx]!) : opt.label}
+                      {useCalendarUi
+                        ? formatCalendarSlotLabel(calItems[oidx]!, calItems)
+                        : opt.label}
                     </SelectItem>
                   ))}
                   {initialData &&

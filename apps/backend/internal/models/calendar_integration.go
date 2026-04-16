@@ -1,6 +1,11 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+)
 
 // CalendarIntegrationKind identifies the provider implementation (extensible).
 const CalendarIntegrationKindYandexCalDAV = "yandex_caldav"
@@ -25,6 +30,14 @@ type UnitCalendarIntegration struct {
 	UpdatedAt            time.Time  `gorm:"autoUpdateTime" json:"updatedAt"`
 
 	Unit Unit `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-" swaggerignore:"true"`
+}
+
+// BeforeCreate assigns a UUID when ID is empty (PostgreSQL can also use gen_random_uuid() default).
+func (u *UnitCalendarIntegration) BeforeCreate(_ *gorm.DB) error {
+	if u.ID == "" {
+		u.ID = uuid.New().String()
+	}
+	return nil
 }
 
 // CalendarExternalSlot is a cached row for one VEVENT (identified by href) imported from CalDAV.
