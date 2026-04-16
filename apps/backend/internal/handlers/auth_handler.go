@@ -127,6 +127,10 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 
 	pair, err := h.service.Refresh(refresh)
 	if err != nil {
+		if errors.Is(err, services.ErrUserInactive) {
+			http.Error(w, err.Error(), http.StatusForbidden)
+			return
+		}
 		http.Error(w, "Invalid or expired refresh token", http.StatusUnauthorized)
 		return
 	}

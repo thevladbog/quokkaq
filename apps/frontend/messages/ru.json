@@ -2372,6 +2372,7 @@
       "samlIdpMetadataHint": "HTTPS URL метаданных SAML IdP (например federation metadata Azure AD).",
       "redirectUriLabel": "Redirect URI (в IdP)",
       "copy": "Копировать",
+      "copyLink": "Копировать ссылку",
       "copied": "Скопировано",
       "copyFailed": "Не удалось скопировать",
       "enabledLabel": "Включить SSO",

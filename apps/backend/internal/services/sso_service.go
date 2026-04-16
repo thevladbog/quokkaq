@@ -76,10 +76,10 @@ func NewSSOService(
 	}
 }
 
-// apiPublicURL is the browser-reachable origin of the Go API (OIDC redirect_uri, SAML ACS/entity).
+// APIPublicURL is the browser-reachable origin of the Go API (OIDC redirect_uri, SAML ACS/entity).
 // Do not fall back to APP_BASE_URL: in local dev it is usually the Next app (e.g. :3000), which would
 // break SSO redirect registration against the IdP (must match the server that serves /auth/sso/callback).
-func apiPublicURL() string {
+func APIPublicURL() string {
 	u := strings.TrimSpace(os.Getenv("API_PUBLIC_URL"))
 	if u == "" {
 		u = "http://localhost:3001"
@@ -87,7 +87,8 @@ func apiPublicURL() string {
 	return strings.TrimRight(u, "/")
 }
 
-func publicAppURL() string {
+// PublicAppURL is the browser-facing app origin (PUBLIC_APP_URL / APP_BASE_URL).
+func PublicAppURL() string {
 	u := strings.TrimSpace(os.Getenv("PUBLIC_APP_URL"))
 	if u == "" {
 		u = strings.TrimSpace(os.Getenv("APP_BASE_URL"))
@@ -256,7 +257,7 @@ func (s *SSOService) BeginAuthorize(ctx context.Context, w http.ResponseWriter, 
 	oauth2Config := oauth2.Config{
 		ClientID:     conn.ClientID,
 		ClientSecret: string(secret),
-		RedirectURL:  apiPublicURL() + "/auth/sso/callback",
+		RedirectURL:  APIPublicURL() + "/auth/sso/callback",
 		Endpoint:     provider.Endpoint(),
 		Scopes:       splitScopes(conn.Scopes),
 	}
@@ -354,7 +355,7 @@ func effectiveLoginRedirectLocale(uiLocaleFromFlow string) string {
 
 func loginPageSSOErrorURL(code, uiLocaleFromFlow string) string {
 	locale := effectiveLoginRedirectLocale(uiLocaleFromFlow)
-	base := strings.TrimRight(publicAppURL(), "/")
+	base := strings.TrimRight(PublicAppURL(), "/")
 	q := url.Values{}
 	q.Set("sso_error", code)
 	return base + "/" + locale + "/login?" + q.Encode()
@@ -362,7 +363,7 @@ func loginPageSSOErrorURL(code, uiLocaleFromFlow string) string {
 
 func loginSSOCallbackSuccessURL(finishCode, uiLocaleFromFlow string) string {
 	loc := effectiveLoginRedirectLocale(uiLocaleFromFlow)
-	base := strings.TrimRight(publicAppURL(), "/")
+	base := strings.TrimRight(PublicAppURL(), "/")
 	return base + "/" + loc + "/login/sso/callback?code=" + finishCode
 }
 
@@ -405,7 +406,7 @@ func (s *SSOService) HandleCallback(ctx context.Context, w http.ResponseWriter, 
 	oauth2Config := oauth2.Config{
 		ClientID:     conn.ClientID,
 		ClientSecret: string(secret),
-		RedirectURL:  apiPublicURL() + "/auth/sso/callback",
+		RedirectURL:  APIPublicURL() + "/auth/sso/callback",
 		Endpoint:     provider.Endpoint(),
 		Scopes:       splitScopes(conn.Scopes),
 	}

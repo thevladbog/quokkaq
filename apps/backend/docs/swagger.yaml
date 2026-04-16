@@ -542,6 +542,12 @@ components:
           $ref: '#/components/schemas/models.Company'
         features:
           $ref: '#/components/schemas/handlers.FeaturesFlags'
+        publicApiUrl:
+          example: https://api.example.com
+          type: string
+        publicAppUrl:
+          example: https://app.example.com
+          type: string
       type: object
     handlers.createSurveyRequest:
       properties:

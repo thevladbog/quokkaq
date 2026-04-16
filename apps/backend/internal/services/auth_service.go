@@ -31,7 +31,8 @@ var ErrCompanySlugTaken = errors.New("company slug already taken")
 // ErrUserInactive is returned when issuing tokens for a disabled user account.
 var ErrUserInactive = errors.New("user account is inactive")
 
-func isUniqueConstraintViolation(err error) bool {
+// IsUniqueConstraintViolation reports Postgres unique violations (23505) and similar driver errors.
+func IsUniqueConstraintViolation(err error) bool {
 	if err == nil {
 		return false
 	}
@@ -149,6 +150,9 @@ func (s *authService) generateRefreshToken(userID string) (string, error) {
 }
 
 func (s *authService) generateTokenPair(user *models.User) (*TokenPair, error) {
+	if !user.IsActive {
+		return nil, ErrUserInactive
+	}
 	access, err := s.generateAccessToken(user)
 	if err != nil {
 		return nil, err
@@ -164,9 +168,6 @@ func (s *authService) IssueTokenPairForUserID(userID string) (*TokenPair, error)
 	user, err := s.userRepo.FindByID(userID)
 	if err != nil {
 		return nil, err
-	}
-	if !user.IsActive {
-		return nil, ErrUserInactive
 	}
 	return s.generateTokenPair(user)
 }
@@ -338,7 +339,7 @@ func (s *authService) Signup(name, email, password, companyName, planCode string
 		company.Slug = slug
 
 		if err := tx.Create(company).Error; err != nil {
-			if isUniqueConstraintViolation(err) {
+			if IsUniqueConstraintViolation(err) {
 				return ErrCompanySlugTaken
 			}
 			return fmt.Errorf("failed to create company: %w", err)

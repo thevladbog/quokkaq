@@ -139,7 +139,7 @@ func (s *SSOService) buildSAMLServiceProvider(c *models.Company, conn *models.Co
 	if err != nil {
 		return nil, err
 	}
-	metaBase, err := url.Parse(apiPublicURL() + "/auth/saml/metadata")
+	metaBase, err := url.Parse(APIPublicURL() + "/auth/saml/metadata")
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +147,7 @@ func (s *SSOService) buildSAMLServiceProvider(c *models.Company, conn *models.Co
 	q.Set("tenant", c.Slug)
 	metaBase.RawQuery = q.Encode()
 
-	acs, err := url.Parse(apiPublicURL() + "/auth/saml/acs")
+	acs, err := url.Parse(APIPublicURL() + "/auth/saml/acs")
 	if err != nil {
 		return nil, err
 	}

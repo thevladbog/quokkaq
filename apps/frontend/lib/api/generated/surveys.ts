@@ -831,6 +831,8 @@ export interface ModelsCompany {
 export interface HandlersCompanyMeResponse {
   company?: ModelsCompany;
   features?: HandlersFeaturesFlags;
+  publicApiUrl?: string;
+  publicAppUrl?: string;
 }
 
 export type HandlersCreateSurveyRequestCompletionMessage = { [key: string]: unknown };

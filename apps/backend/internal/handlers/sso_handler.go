@@ -5,7 +5,6 @@ import (
 	"errors"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -319,6 +318,10 @@ func (h *CompanySSOHTTP) PatchCompanySlug(w http.ResponseWriter, r *http.Request
 		return
 	}
 	if err := h.companyRepo.Update(c); err != nil {
+		if services.IsUniqueConstraintViolation(err) {
+			http.Error(w, "slug already taken", http.StatusBadRequest)
+			return
+		}
 		http.Error(w, "save failed", http.StatusInternalServerError)
 		return
 	}
@@ -349,13 +352,10 @@ func (h *CompanySSOHTTP) CreateOpaqueLoginLink(w http.ResponseWriter, r *http.Re
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	app := strings.TrimRight(strings.TrimSpace(os.Getenv("PUBLIC_APP_URL")), "/")
-	if app == "" {
-		app = "http://localhost:3000"
-	}
+	app := services.PublicAppURL()
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]string{
 		"token":      raw,
-		"exampleUrl": app + "/en/login?login_token=" + raw,
+		"exampleUrl": app + "/login?login_token=" + raw,
 	})
 }

@@ -25,7 +25,7 @@ import {
   FormMessage
 } from '@/components/ui/form';
 import { Link } from '@/src/i18n/navigation';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { AlertCircle, Copy, KeyRound, Link2, Shield } from 'lucide-react';
 import {
@@ -49,14 +49,65 @@ import {
   type ServicesCompanySSOPatch
 } from '@/lib/api/generated/auth';
 
-function apiPublicBase(): string {
+/** Matches backend `API_PUBLIC_URL` when provided by GET /companies/me. */
+function resolvePublicApiBase(serverUrl?: string | null): string {
+  const trimmed = serverUrl?.trim();
+  if (trimmed) {
+    return trimmed.replace(/\/$/, '');
+  }
   const u = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '');
   return u && u.length > 0 ? u : 'http://localhost:3001';
 }
 
-function appPublicBase(): string {
+/** Matches backend `PUBLIC_APP_URL` / `APP_BASE_URL` when provided by GET /companies/me. */
+function resolvePublicAppBase(serverUrl?: string | null): string {
+  const trimmed = serverUrl?.trim();
+  if (trimmed) {
+    return trimmed.replace(/\/$/, '');
+  }
   const u = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '');
   return u && u.length > 0 ? u : 'http://localhost:3000';
+}
+
+const RESERVED_TENANT_SLUGS = new Set([
+  'www',
+  'api',
+  'admin',
+  'login',
+  'auth',
+  'static',
+  'health',
+  'swagger',
+  'docs',
+  'ws',
+  'system',
+  'en',
+  'ru',
+  't'
+]);
+
+/** Mirrors `tenantslug.Normalize` for client-side validation. */
+function normalizeTenantSlug(raw: string): string {
+  const s = raw.trim().toLowerCase();
+  let out = '';
+  let prevDash = false;
+  for (const ch of s) {
+    const code = ch.codePointAt(0)!;
+    if ((code >= 97 && code <= 122) || (code >= 48 && code <= 57)) {
+      out += ch;
+      prevDash = false;
+    } else if (ch === ' ' || ch === '-' || ch === '_') {
+      if (out.length > 0 && !prevDash) {
+        out += '-';
+        prevDash = true;
+      }
+    }
+  }
+  out = out.replace(/^-+|-+$/g, '');
+  while (out.includes('--')) {
+    out = out.replace(/--/g, '-');
+  }
+  return out;
 }
 
 function isValidHttpUrl(raw: string): boolean {
@@ -82,8 +133,32 @@ function parseEmailDomains(emailDomainsStr: string): string[] {
   return out;
 }
 
+const slugPartRe = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+
 const slugFormSchema = z.object({
-  slug: z.string()
+  slug: z.string().superRefine((val, ctx) => {
+    const n = normalizeTenantSlug(val);
+    if (n.length < 3 || n.length > 63) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'slug length must be between 3 and 63'
+      });
+      return;
+    }
+    if (!slugPartRe.test(n)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'invalid slug format'
+      });
+      return;
+    }
+    if (RESERVED_TENANT_SLUGS.has(n)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'slug is reserved'
+      });
+    }
+  })
 });
 
 type SlugFormValues = z.infer<typeof slugFormSchema>;
@@ -190,11 +265,19 @@ function buildSsoPatchBody(values: SsoFormValues): ServicesCompanySSOPatch {
 type LoginFormProps = {
   company: Company;
   sso: ServicesCompanySSOGetResponse;
+  /** Canonical API origin from GET /companies/me (falls back to NEXT_PUBLIC_API_URL). */
+  publicApiUrl?: string | null;
+  /** Canonical app origin from GET /companies/me (falls back to NEXT_PUBLIC_APP_URL). */
+  publicAppUrl?: string | null;
 };
 
-function OrganizationLoginSecurityForm({ company, sso }: LoginFormProps) {
+function OrganizationLoginSecurityForm({
+  company,
+  sso,
+  publicApiUrl,
+  publicAppUrl
+}: LoginFormProps) {
   const t = useTranslations('organization.loginSecurity');
-  const locale = useLocale();
   const qc = useQueryClient();
 
   const hasPersistedSlug = Boolean((company.slug ?? '').trim());
@@ -240,21 +323,21 @@ function OrganizationLoginSecurityForm({ company, sso }: LoginFormProps) {
   } | null>(null);
 
   const oidcRedirectUri = useMemo(
-    () => `${apiPublicBase()}/auth/sso/callback`,
-    []
+    () => `${resolvePublicApiBase(publicApiUrl)}/auth/sso/callback`,
+    [publicApiUrl]
   );
 
   const samlAcsUrl = useMemo(() => {
     const slug = (company.slug ?? '').trim();
     if (!slug) return '';
-    return `${apiPublicBase()}/auth/saml/acs?tenant=${encodeURIComponent(slug)}`;
-  }, [company.slug]);
+    return `${resolvePublicApiBase(publicApiUrl)}/auth/saml/acs?tenant=${encodeURIComponent(slug)}`;
+  }, [company.slug, publicApiUrl]);
 
   const samlSpMetadataUrl = useMemo(() => {
     const slug = (company.slug ?? '').trim();
     if (!slug) return '';
-    return `${apiPublicBase()}/auth/saml/metadata?tenant=${encodeURIComponent(slug)}`;
-  }, [company.slug]);
+    return `${resolvePublicApiBase(publicApiUrl)}/auth/saml/metadata?tenant=${encodeURIComponent(slug)}`;
+  }, [company.slug, publicApiUrl]);
 
   const copyText = async (text: string, okMsg: string) => {
     try {
@@ -308,7 +391,7 @@ function OrganizationLoginSecurityForm({ company, sso }: LoginFormProps) {
       const token = data.token ?? '';
       const example =
         data.exampleUrl ??
-        `${appPublicBase()}/${locale}/login?login_token=${encodeURIComponent(token)}`;
+        `${resolvePublicAppBase(publicAppUrl)}/login?login_token=${encodeURIComponent(token)}`;
       return { token, exampleUrl: example };
     },
     onSuccess: (data) => {
@@ -319,7 +402,7 @@ function OrganizationLoginSecurityForm({ company, sso }: LoginFormProps) {
   });
 
   const onSubmitSlug = slugForm.handleSubmit((values) => {
-    patchSlug.mutate(values.slug.trim());
+    patchSlug.mutate(normalizeTenantSlug(values.slug));
   });
 
   const onSubmitSso = ssoForm.handleSubmit((values) => {
@@ -670,6 +753,7 @@ function OrganizationLoginSecurityForm({ company, sso }: LoginFormProps) {
                   type='button'
                   variant='outline'
                   size='sm'
+                  aria-label={t('copyLink')}
                   onClick={() =>
                     void copyText(opaqueLink.exampleUrl, t('copied'))
                   }
@@ -726,6 +810,11 @@ export function OrganizationLoginSecurityContent() {
   }
 
   return (
-    <OrganizationLoginSecurityForm company={company} sso={ssoQ.data.data} />
+    <OrganizationLoginSecurityForm
+      company={company}
+      sso={ssoQ.data.data}
+      publicApiUrl={companyMe.data?.publicApiUrl}
+      publicAppUrl={companyMe.data?.publicAppUrl}
+    />
   );
 }
