@@ -4,11 +4,14 @@
 // the cookie while typical cross-site POSTs (e.g. evil.com → our API) do not. For defense in depth
 // on state-changing endpoints, prefer JSON APIs with Content-Type: application/json (browsers send
 // preflight for cross-origin non-simple requests) and keep mutations behind authenticated routes.
+//
+// Cookies use Secure=true so they are only sent over HTTPS (or over http://localhost and
+// http://127.0.0.1, which browsers treat as secure contexts for cookies). Plain-HTTP deployments
+// on non-local hosts are not supported for session cookies.
 package authcookie
 
 import (
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -27,29 +30,18 @@ const AccessMaxAge = 24 * time.Hour
 // RefreshMaxAge matches refresh JWT lifetime (see auth_service generateRefreshToken).
 const RefreshMaxAge = 30 * 24 * time.Hour
 
-func secureFlag(r *http.Request) bool {
-	if strings.EqualFold(strings.TrimSpace(os.Getenv("AUTH_COOKIE_INSECURE")), "true") {
-		return false
-	}
-	if r.TLS != nil {
-		return true
-	}
-	return strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
-}
-
 // WriteSessionCookies sets HttpOnly cookies for access and refresh tokens.
-func WriteSessionCookies(w http.ResponseWriter, r *http.Request, pair *services.TokenPair) {
+func WriteSessionCookies(w http.ResponseWriter, _ *http.Request, pair *services.TokenPair) {
 	if pair == nil {
 		return
 	}
-	sec := secureFlag(r)
 	http.SetCookie(w, &http.Cookie{
 		Name:     AccessCookieName,
 		Value:    pair.AccessToken,
 		Path:     cookiePath,
 		MaxAge:   int(AccessMaxAge.Seconds()),
 		HttpOnly: true,
-		Secure:   sec,
+		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 	})
 	http.SetCookie(w, &http.Cookie{
@@ -58,14 +50,13 @@ func WriteSessionCookies(w http.ResponseWriter, r *http.Request, pair *services.
 		Path:     cookiePath,
 		MaxAge:   int(RefreshMaxAge.Seconds()),
 		HttpOnly: true,
-		Secure:   sec,
+		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 	})
 }
 
 // ClearSessionCookies clears auth cookies (e.g. logout).
-func ClearSessionCookies(w http.ResponseWriter, r *http.Request) {
-	sec := secureFlag(r)
+func ClearSessionCookies(w http.ResponseWriter, _ *http.Request) {
 	clear := func(name string) {
 		http.SetCookie(w, &http.Cookie{
 			Name:     name,
@@ -73,7 +64,7 @@ func ClearSessionCookies(w http.ResponseWriter, r *http.Request) {
 			Path:     cookiePath,
 			MaxAge:   -1,
 			HttpOnly: true,
-			Secure:   sec,
+			Secure:   true,
 			SameSite: http.SameSiteLaxMode,
 		})
 	}

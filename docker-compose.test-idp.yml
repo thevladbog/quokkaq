@@ -21,13 +21,15 @@ services:
       - "127.0.0.1:8080:8080"
     volumes:
       - ./tools/test-idp/keycloak/import:/opt/keycloak/data/import:ro
-    # Management health (KC_HEALTH_ENABLED); waits until Keycloak is ready, not only TCP on 8080.
+    # Readiness on management port 9000 (KC_HEALTH_ENABLED). Official Keycloak images omit curl;
+    # use bash /dev/tcp + HEAD (see https://www.keycloak.org/observability/health ).
     healthcheck:
       test:
-        [
-          "CMD-SHELL",
-          "curl -sf http://127.0.0.1:9000/health/ready >/dev/null || exit 1"
-        ]
+        - CMD-SHELL
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/9000 &&
+          printf 'HEAD /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 &&
+          head -1 <&3 | grep -qE 'HTTP/1.[01] 200'
       interval: 10s
       timeout: 5s
       retries: 24

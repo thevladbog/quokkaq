@@ -33,6 +33,10 @@
       "rules": ["G705"]
     },
     {
+      "path": ".*/internal/services/saml_flow\\.go",
+      "rules": ["G705"]
+    },
+    {
       "path": ".*/internal/handlers/upload_handler\\.go",
       "rules": ["G120"]
     },
@@ -51,10 +55,6 @@
     {
       "path": ".*/internal/handlers/sso_handler\\.go",
       "rules": ["G117"]
-    },
-    {
-      "path": ".*/internal/pkg/authcookie/.*",
-      "rules": ["G124"]
     }
   ]
 }
