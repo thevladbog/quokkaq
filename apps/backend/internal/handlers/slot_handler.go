@@ -69,6 +69,7 @@ func (h *SlotHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 // @Failure      400    {string}  string "Bad Request"
 // @Failure      401    {string}  string "Unauthorized"
 // @Failure      403    {string}  string "Forbidden"
+// @Failure      409    {string}  string "Conflict"
 // @Failure      500    {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/slots/config [put]
 func (h *SlotHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
@@ -126,6 +127,7 @@ func (h *SlotHandler) GetCapacities(w http.ResponseWriter, r *http.Request) {
 // @Failure      400         {string}  string "Bad Request"
 // @Failure      401         {string}  string "Unauthorized"
 // @Failure      403         {string}  string "Forbidden"
+// @Failure      409         {string}  string "Conflict"
 // @Failure      500         {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/slots/capacities [put]
 func (h *SlotHandler) UpdateCapacities(w http.ResponseWriter, r *http.Request) {
@@ -164,6 +166,7 @@ func (h *SlotHandler) UpdateCapacities(w http.ResponseWriter, r *http.Request) {
 // @Failure      400    {string}  string "Bad Request"
 // @Failure      401    {string}  string "Unauthorized"
 // @Failure      403    {string}  string "Forbidden"
+// @Failure      409    {string}  string "Conflict"
 // @Failure      500    {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/slots/generate [post]
 func (h *SlotHandler) Generate(w http.ResponseWriter, r *http.Request) {
@@ -233,6 +236,7 @@ func (h *SlotHandler) GetDay(w http.ResponseWriter, r *http.Request) {
 // @Failure      400    {string}  string "Bad Request"
 // @Failure      401    {string}  string "Unauthorized"
 // @Failure      403    {string}  string "Forbidden"
+// @Failure      409    {string}  string "Conflict"
 // @Failure      500    {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/slots/day/{date} [put]
 func (h *SlotHandler) UpdateDay(w http.ResponseWriter, r *http.Request) {

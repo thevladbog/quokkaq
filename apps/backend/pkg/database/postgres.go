@@ -1084,6 +1084,17 @@ func RunVersionedMigrations(models ...interface{}) error {
 		return fmt.Errorf("failed to run v1.2.4_calendar_multi_per_unit migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.2.5_services_calendar_slot_key_unique", func(db *gorm.DB) error {
+		return db.Exec(`
+			CREATE UNIQUE INDEX IF NOT EXISTS idx_services_unit_calendar_slot_key_uq
+			ON services (unit_id, calendar_slot_key)
+			WHERE calendar_slot_key IS NOT NULL AND btrim(calendar_slot_key) <> ''
+		`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.2.5_services_calendar_slot_key_unique migration: %w", err)
+	}
+
 	fmt.Println("All migrations completed successfully")
 	return nil
 }

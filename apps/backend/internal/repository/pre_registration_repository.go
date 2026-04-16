@@ -3,6 +3,8 @@ package repository
 import (
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/pkg/database"
+
+	"gorm.io/gorm"
 )
 
 type PreRegistrationRepository struct{}
@@ -50,7 +52,14 @@ func (r *PreRegistrationRepository) GetByTicketID(ticketID string) (*models.PreR
 }
 
 func (r *PreRegistrationRepository) DeleteByID(id string) error {
-	return database.DB.Delete(&models.PreRegistration{}, "id = ?", id).Error
+	result := database.DB.Delete(&models.PreRegistration{}, "id = ?", id)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 func (r *PreRegistrationRepository) CountByServiceDateAndTime(serviceID, date, time string) (int64, error) {

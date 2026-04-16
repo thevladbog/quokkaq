@@ -4,9 +4,14 @@ package caldavclient
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"io"
+	"mime"
 	"net/http"
 	"net/url"
+	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,25 +22,41 @@ import (
 
 // Client is a thin wrapper with Yandex-friendly helpers.
 type Client struct {
-	caldav *caldav.Client
-	base   *url.URL
-	user   string
-	pass   string
+	caldav     *caldav.Client
+	httpClient *http.Client
+	base       *url.URL
+	user       string
+	pass       string
 }
 
-// NewYandexClient creates a CalDAV client for caldav.yandex.ru with app password.
-func NewYandexClient(username, appPassword string) (*Client, error) {
-	baseURL := "https://caldav.yandex.ru"
+// NewYandexClient creates a CalDAV client against baseURL (typically https://caldav.yandex.ru) with app password.
+func NewYandexClient(baseURL, username, appPassword string) (*Client, error) {
+	baseURL = strings.TrimSpace(baseURL)
+	if baseURL == "" {
+		baseURL = "https://caldav.yandex.ru"
+	}
 	u, err := url.Parse(baseURL)
 	if err != nil {
 		return nil, err
 	}
-	hc := webdav.HTTPClientWithBasicAuth(http.DefaultClient, username, appPassword)
-	cl, err := caldav.NewClient(hc, baseURL)
+	if u.Scheme != "https" {
+		return nil, fmt.Errorf("caldav: base URL must use https")
+	}
+	if strings.TrimSpace(u.Hostname()) == "" {
+		return nil, fmt.Errorf("caldav: base URL must include a host")
+	}
+	endpoint := strings.TrimRight(u.String(), "/")
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	hc := webdav.HTTPClientWithBasicAuth(httpClient, username, appPassword)
+	cl, err := caldav.NewClient(hc, endpoint)
 	if err != nil {
 		return nil, err
 	}
-	return &Client{caldav: cl, base: u, user: username, pass: appPassword}, nil
+	baseNorm, err := url.Parse(endpoint)
+	if err != nil {
+		return nil, err
+	}
+	return &Client{caldav: cl, httpClient: httpClient, base: baseNorm, user: username, pass: appPassword}, nil
 }
 
 // PrincipalPath returns the standard Yandex principal URL path.
@@ -79,44 +100,140 @@ func (c *Client) QueryVEvents(ctx context.Context, calendarPath string, start, e
 	return c.caldav.QueryCalendar(ctx, calendarPath, &q)
 }
 
+// ErrNotFound is returned when the CalDAV resource responds with HTTP 404.
+var ErrNotFound = errors.New("caldav: calendar object not found")
+
 // GetEvent fetches a single calendar object by href path.
 func (c *Client) GetEvent(ctx context.Context, hrefPath string) (*caldav.CalendarObject, error) {
-	return c.caldav.GetCalendarObject(ctx, hrefPath)
+	target, err := c.resolveCalDAVResourceURL(hrefPath)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.SetBasicAuth(c.user, c.pass)
+	req.Header.Set("Accept", ical.MIMEType)
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, ErrNotFound
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("caldav: GET %s: %s", hrefPath, resp.Status)
+	}
+	mediaType, _, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
+	if err != nil {
+		return nil, err
+	}
+	if !strings.EqualFold(mediaType, ical.MIMEType) {
+		return nil, fmt.Errorf("caldav: expected Content-Type %q, got %q", ical.MIMEType, mediaType)
+	}
+	cal, err := ical.NewDecoder(resp.Body).Decode()
+	if err != nil {
+		return nil, err
+	}
+	co := &caldav.CalendarObject{
+		Path: resp.Request.URL.Path,
+		Data: cal,
+	}
+	if etag := resp.Header.Get("ETag"); etag != "" {
+		uq, err := strconv.Unquote(etag)
+		if err != nil {
+			return nil, err
+		}
+		co.ETag = uq
+	}
+	return co, nil
+}
+
+// resolveCalDAVResourceURL builds the HTTPS URL for a CalDAV resource path and rejects values
+// that could turn the request into SSRF or a non-CalDAV target (absolute URLs, traversal, etc.).
+func (c *Client) resolveCalDAVResourceURL(hrefPath string) (*url.URL, error) {
+	hrefPath = strings.TrimSpace(hrefPath)
+	if hrefPath == "" {
+		return nil, fmt.Errorf("caldav: empty href")
+	}
+	if strings.ContainsAny(hrefPath, "\r\n") {
+		return nil, fmt.Errorf("caldav: invalid href")
+	}
+	// Block absolute and scheme-relative URLs so user data cannot redirect the request off-site.
+	if strings.Contains(hrefPath, "://") || strings.HasPrefix(hrefPath, "//") {
+		return nil, fmt.Errorf("caldav: href must be a path, not a full URL")
+	}
+	p := hrefPath
+	if !strings.HasPrefix(p, "/") {
+		p = "/" + p
+	}
+	p = path.Clean(p)
+	if !strings.HasPrefix(p, "/") || strings.Contains(p, "..") {
+		return nil, fmt.Errorf("caldav: invalid path")
+	}
+	baseStr := strings.TrimRight(c.base.String(), "/")
+	fullURL := baseStr + p
+	u, err := url.Parse(fullURL)
+	if err != nil {
+		return nil, err
+	}
+	if u.Scheme != "https" {
+		return nil, fmt.Errorf("caldav: only https is allowed")
+	}
+	wantHost := strings.ToLower(strings.TrimSpace(c.base.Hostname()))
+	if strings.ToLower(u.Hostname()) != wantHost {
+		return nil, fmt.Errorf("caldav: unexpected host %q", u.Hostname())
+	}
+	return u, nil
 }
 
 // PutCalendar replaces the entire calendar resource (PUT). If etag is non-empty, sends If-Match.
-func (c *Client) PutCalendar(ctx context.Context, hrefPath, etag string, cal *ical.Calendar) error {
+// On success, returns the new entity tag from the response ETag header when the server sends one.
+func (c *Client) PutCalendar(ctx context.Context, hrefPath, etag string, cal *ical.Calendar) (newETag string, err error) {
 	var buf bytes.Buffer
 	if err := ical.NewEncoder(&buf).Encode(cal); err != nil {
-		return err
+		return "", err
 	}
-	base := strings.TrimRight(c.base.String(), "/")
-	path := hrefPath
-	if !strings.HasPrefix(path, "/") {
-		path = "/" + path
-	}
-	fullURL := base + path
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, fullURL, &buf)
+	target, err := c.resolveCalDAVResourceURL(hrefPath)
 	if err != nil {
-		return err
+		return "", err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, target.String(), &buf)
+	if err != nil {
+		return "", err
 	}
 	req.SetBasicAuth(c.user, c.pass)
 	req.Header.Set("Content-Type", ical.MIMEType)
 	if etag != "" {
 		req.Header.Set("If-Match", etag)
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return err
+		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
 	if resp.StatusCode == http.StatusPreconditionFailed {
-		return ErrPreconditionFailed
+		return "", ErrPreconditionFailed
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("caldav: PUT %s: %s", hrefPath, resp.Status)
+		return "", fmt.Errorf("caldav: PUT %s: %s", hrefPath, resp.Status)
 	}
-	return nil
+	raw := resp.Header.Get("ETag")
+	if raw == "" {
+		return "", nil
+	}
+	if uq, uerr := strconv.Unquote(raw); uerr == nil {
+		return uq, nil
+	}
+	return strings.Trim(raw, `"`), nil
 }
 
 // ErrPreconditionFailed is returned when If-Match ETag does not match (slot taken).

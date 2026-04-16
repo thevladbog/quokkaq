@@ -436,6 +436,8 @@ function ServiceForm({
       const restrictedPayload = isLeafNow
         ? (formValues.restrictedServiceZoneId ?? null)
         : null;
+      const payloadCalendarSlotKey =
+        formValues.calendarSlotKey === '' ? null : formValues.calendarSlotKey;
       if (editingService) {
         await updateServiceMutation.mutateAsync({
           id: editingService.id,
@@ -447,7 +449,8 @@ function ServiceForm({
             editingService.offerIdentification ??
             false,
           isLeaf: formValues.isLeaf ?? editingService.isLeaf ?? false,
-          restrictedServiceZoneId: restrictedPayload
+          restrictedServiceZoneId: restrictedPayload,
+          calendarSlotKey: payloadCalendarSlotKey
         });
       } else {
         if (!formValues.name) return;
@@ -458,7 +461,8 @@ function ServiceForm({
           prebook: formValues.prebook ?? false,
           offerIdentification: formValues.offerIdentification ?? false,
           isLeaf: formValues.isLeaf ?? false,
-          restrictedServiceZoneId: restrictedPayload
+          restrictedServiceZoneId: restrictedPayload,
+          calendarSlotKey: payloadCalendarSlotKey
         });
       }
       onSaved();
@@ -576,7 +580,9 @@ function ServiceForm({
           name='calendarSlotKey'
           value={formValues.calendarSlotKey || ''}
           onChange={handleInputChange}
-          placeholder='e.g. Returns-Desk-A'
+          placeholder={t('services.calendar_slot_placeholder', {
+            defaultValue: 'e.g. Returns-Desk-A'
+          })}
         />
         <p className='text-muted-foreground text-xs'>
           {t('services.calendar_slot_key_hint', {

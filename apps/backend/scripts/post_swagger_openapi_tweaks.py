@@ -531,6 +531,15 @@ def apply_openapi_tweaks(doc: dict[str, Any]) -> None:
     if isinstance(cfg, dict):
         cfg["required"] = ["kiosk"]
 
+    # Calendar integration bodies: bool `enabled` cannot use binding:"required" (false is zero),
+    # but OpenAPI should still list it so clients send explicit true/false.
+    create_cal = _schema(comp, "services.CreateCalendarIntegrationRequest")
+    _merge_schema_required(create_cal, ["enabled"])
+    update_cal = _schema(comp, "services.UpdateCalendarIntegrationRequest")
+    _merge_schema_required(update_cal, ["enabled"])
+    upsert_cal = _schema(comp, "services.UpsertIntegrationRequest")
+    _merge_schema_required(upsert_cal, ["enabled"])
+
 
 def _patch_create_ticket_request(components: dict[str, Any]) -> None:
     """Model POST /units/{unitId}/tickets body as oneOf: anonymous | staff | kiosk."""

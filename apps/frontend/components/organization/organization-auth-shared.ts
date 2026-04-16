@@ -4,14 +4,34 @@ import type {
   ServicesCompanySSOPatch
 } from '@/lib/api/generated/auth';
 
+function resolveEnvOrDevFallback(
+  envValue: string | undefined,
+  devFallback: string,
+  envName: string
+): string {
+  const u = envValue?.replace(/\/$/, '');
+  if (u && u.length > 0) {
+    return u;
+  }
+  if (process.env.NODE_ENV === 'production') {
+    const msg = `${envName} must be set in production; refusing localhost fallback`;
+    console.error(`[organization-auth-shared] ${msg}`);
+    throw new Error(msg);
+  }
+  return devFallback;
+}
+
 /** Matches backend `API_PUBLIC_URL` when provided by GET /companies/me. */
 export function resolvePublicApiBase(serverUrl?: string | null): string {
   const trimmed = serverUrl?.trim();
   if (trimmed) {
     return trimmed.replace(/\/$/, '');
   }
-  const u = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '');
-  return u && u.length > 0 ? u : 'http://localhost:3001';
+  return resolveEnvOrDevFallback(
+    process.env.NEXT_PUBLIC_API_URL,
+    'http://localhost:3001',
+    'NEXT_PUBLIC_API_URL'
+  );
 }
 
 /** Matches backend `PUBLIC_APP_URL` / `APP_BASE_URL` when provided by GET /companies/me. */
@@ -20,8 +40,11 @@ export function resolvePublicAppBase(serverUrl?: string | null): string {
   if (trimmed) {
     return trimmed.replace(/\/$/, '');
   }
-  const u = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '');
-  return u && u.length > 0 ? u : 'http://localhost:3000';
+  return resolveEnvOrDevFallback(
+    process.env.NEXT_PUBLIC_APP_URL,
+    'http://localhost:3000',
+    'NEXT_PUBLIC_APP_URL'
+  );
 }
 
 export const RESERVED_TENANT_SLUGS = new Set([
@@ -215,8 +238,13 @@ export function buildSsoPatchBody(
     if (values.clientSecret.trim() !== '') {
       body.clientSecret = values.clientSecret.trim();
     }
+    body.samlIdpMetadataUrl = '';
   } else {
     body.samlIdpMetadataUrl = values.samlIdpMetadataUrl.trim() || undefined;
+    body.issuerUrl = '';
+    body.clientId = '';
+    body.clientSecret = '';
+    body.scopes = '';
   }
   return body;
 }

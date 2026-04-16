@@ -261,6 +261,8 @@ export function PreRegistrationForm({
             queryKey: ['pre-registrations', unitId]
           });
           onSuccess();
+        } else {
+          toast.error(t('update_error'));
         }
       },
       onError: () => toast.error(t('update_error'))
@@ -358,6 +360,8 @@ export function PreRegistrationForm({
       (i) => i.externalEventHref === externalHref
     );
 
+    const bookingCalendarSlot = useCalendarUi && Boolean(externalHref);
+
     createPostMutation.mutate({
       unitId,
       data: {
@@ -370,10 +374,14 @@ export function PreRegistrationForm({
         comment,
         externalEventHref: externalHref,
         externalEventEtag: externalEtag,
-        calendarIntegrationId:
-          createRow?.calendarIntegrationId ??
-          unitCalIntegrations[0]?.id ??
-          effectiveCalendarIntegrationId
+        ...(bookingCalendarSlot
+          ? {
+              calendarIntegrationId:
+                createRow?.calendarIntegrationId ??
+                unitCalIntegrations[0]?.id ??
+                effectiveCalendarIntegrationId
+            }
+          : {})
       }
     });
   };
@@ -395,7 +403,7 @@ export function PreRegistrationForm({
         ),
         label: item.time ?? '',
         time: item.time ?? '',
-        eTag: item.eTag,
+        externalEventEtag: item.externalEventEtag,
         href: item.externalEventHref,
         integrationLabel: item.integrationLabel
       }))
@@ -404,7 +412,7 @@ export function PreRegistrationForm({
         value: slot,
         label: slot,
         time: slot,
-        eTag: undefined as string | undefined
+        externalEventEtag: undefined as string | undefined
       }));
 
   const isPending = createPostMutation.isPending || updateMutation.isPending;
@@ -514,7 +522,7 @@ export function PreRegistrationForm({
                 if (idx >= 0) {
                   const row = calItems[idx];
                   setExternalHref(row?.externalEventHref);
-                  setExternalEtag(row?.eTag);
+                  setExternalEtag(row?.externalEventEtag);
                   setTime(row?.time ?? '');
                 } else if (v) {
                   setExternalHref(v);

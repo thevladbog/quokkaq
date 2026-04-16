@@ -109,13 +109,8 @@ export function IntegrationsSettingsContent() {
     );
   }
 
-  if (ssoQ.isError || ssoQ.data?.status !== 200 || !ssoQ.data.data) {
-    return (
-      <Alert variant='destructive'>
-        <AlertDescription>{t('ssoLoadError')}</AlertDescription>
-      </Alert>
-    );
-  }
+  const ssoLoadFailed =
+    ssoQ.isError || ssoQ.data?.status !== 200 || !ssoQ.data.data;
 
   return (
     <Tabs value={activeTab} onValueChange={setTab} className='w-full'>
@@ -180,12 +175,19 @@ export function IntegrationsSettingsContent() {
       </TabsContent>
 
       <TabsContent value='auth' className='space-y-6'>
+        {ssoLoadFailed && (
+          <Alert variant='destructive'>
+            <AlertDescription>{t('ssoLoadError')}</AlertDescription>
+          </Alert>
+        )}
         <OrganizationTenantSlugCard company={company} />
-        <OrganizationSsoSettingsCard
-          company={company}
-          sso={ssoQ.data.data}
-          publicApiUrl={companyMe.data?.publicApiUrl}
-        />
+        {!ssoLoadFailed && (
+          <OrganizationSsoSettingsCard
+            company={company}
+            sso={ssoQ.data.data}
+            publicApiUrl={companyMe.data?.publicApiUrl}
+          />
+        )}
       </TabsContent>
     </Tabs>
   );

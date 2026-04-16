@@ -1728,7 +1728,7 @@
                     "calendarIntegrationId": {
                         "type": "string"
                     },
-                    "eTag": {
+                    "externalEventEtag": {
                         "type": "string"
                     },
                     "externalEventHref": {
@@ -1901,6 +1901,10 @@
                     },
                     "status": {
                         "description": "Status optional; only \"canceled\" is accepted to cancel an active pre-registration.",
+                        "enum": [
+                            "canceled"
+                        ],
+                        "example": "canceled",
                         "type": "string"
                     },
                     "time": {
@@ -1926,7 +1930,7 @@
                         "type": "string"
                     },
                     "calendarSlotKey": {
-                        "description": "CalendarSlotKey optional unique label segment in [QQ] SUMMARY when names collide (calendar integration).",
+                        "description": "CalendarSlotKey optional label segment in [QQ] SUMMARY when names collide (calendar integration).\nWhen non-empty (after trim), it must be unique per unit — enforced by DB partial unique index and create/update validation.",
                         "type": "string"
                     },
                     "children": {
@@ -2880,6 +2884,13 @@
                         "type": "string"
                     }
                 },
+                "required": [
+                    "appPassword",
+                    "calendarPath",
+                    "unitId",
+                    "username",
+                    "enabled"
+                ],
                 "type": "object"
             },
             "services.EmployeeRadarResponse": {
@@ -3443,6 +3454,11 @@
                         "type": "string"
                     }
                 },
+                "required": [
+                    "calendarPath",
+                    "username",
+                    "enabled"
+                ],
                 "type": "object"
             },
             "services.UpsertIntegrationRequest": {
@@ -3469,6 +3485,11 @@
                         "type": "string"
                     }
                 },
+                "required": [
+                    "calendarPath",
+                    "username",
+                    "enabled"
+                ],
                 "type": "object"
             },
             "services.UtilizationPoint": {
@@ -5137,6 +5158,7 @@
         },
         "/companies/me/calendar-integrations": {
             "get": {
+                "operationId": "calendarIntegrationListMine",
                 "responses": {
                     "200": {
                         "content": {
@@ -5163,6 +5185,7 @@
                 ]
             },
             "post": {
+                "operationId": "calendarIntegrationCreateMine",
                 "requestBody": {
                     "content": {
                         "application/json": {
@@ -5200,6 +5223,7 @@
         },
         "/companies/me/calendar-integrations/{integrationId}": {
             "delete": {
+                "operationId": "calendarIntegrationDeleteMine",
                 "parameters": [
                     {
                         "description": "Integration ID",
@@ -5227,6 +5251,7 @@
                 ]
             },
             "put": {
+                "operationId": "calendarIntegrationPutMine",
                 "parameters": [
                     {
                         "description": "Integration ID",
@@ -10569,6 +10594,7 @@
         },
         "/units/{unitId}/calendar-integration": {
             "get": {
+                "operationId": "calendarIntegrationGet",
                 "parameters": [
                     {
                         "description": "Unit ID",
@@ -10603,6 +10629,7 @@
                 ]
             },
             "put": {
+                "operationId": "calendarIntegrationPut",
                 "parameters": [
                     {
                         "description": "Unit ID",
@@ -12747,6 +12774,8 @@
         },
         "/units/{unitId}/pre-registrations/calendar-slots": {
             "get": {
+                "description": "Returns CalDAV slot rows (href, etag, time) for a service and date; requires Bearer auth and unit membership. Empty array when no integration or no slots.",
+                "operationId": "GetCalendarSlotsByUnit",
                 "parameters": [
                     {
                         "description": "Unit ID",
@@ -12767,7 +12796,7 @@
                         }
                     },
                     {
-                        "description": "Date YYYY-MM-DD",
+                        "description": "Date (YYYY-MM-DD)",
                         "in": "query",
                         "name": "date",
                         "required": true,
@@ -12789,8 +12818,53 @@
                             }
                         },
                         "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
                     }
                 },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "summary": "List calendar-backed slots with CalDAV hrefs (when integration enabled)",
                 "tags": [
                     "pre-registrations"
@@ -13093,6 +13167,16 @@
                             }
                         },
                         "description": "Not Found"
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Conflict (calendar slot)"
                     },
                     "500": {
                         "content": {
@@ -13737,6 +13821,16 @@
                         },
                         "description": "Forbidden"
                     },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Conflict"
+                    },
                     "500": {
                         "content": {
                             "application/json": {
@@ -13890,6 +13984,16 @@
                             }
                         },
                         "description": "Forbidden"
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Conflict"
                     },
                     "500": {
                         "content": {
@@ -14073,6 +14177,16 @@
                         },
                         "description": "Forbidden"
                     },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Conflict"
+                    },
                     "500": {
                         "content": {
                             "application/json": {
@@ -14161,6 +14275,16 @@
                             }
                         },
                         "description": "Forbidden"
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Conflict"
                     },
                     "500": {
                         "content": {

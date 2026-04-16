@@ -420,7 +420,8 @@
       "loading": "Loading services...",
       "unsaved_changes": "You have unsaved changes",
       "unsaved_discard_confirm": "You have unsaved changes. Discard them and continue?",
-      "delete_confirm": "Are you sure you want to delete this service?"
+      "delete_confirm": "Are you sure you want to delete this service?",
+      "calendar_slot_placeholder": "e.g. Returns-Desk-A"
     },
     "users": {
       "title": "Users & Roles",
@@ -826,6 +827,8 @@
       "capacities_save_error": "Failed to save capacities",
       "configuration_title": "Slot Configuration",
       "configuration_desc": "Set working hours and interval for appointment slots.",
+      "calendar_readonly_title": "Capacity is managed in the calendar",
+      "calendar_readonly_desc": "This unit uses Yandex Calendar (CalDAV) for slot capacity. Weekly capacity, generation, and day overrides are read-only here; edit events in the connected calendar.",
       "start_time": "Start Time",
       "end_time": "End Time",
       "interval_minutes": "Interval (minutes)",

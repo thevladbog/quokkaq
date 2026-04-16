@@ -437,10 +437,18 @@ func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID 
 
 	if s.calendar != nil && preReg != nil && preReg.ExternalEventHref != nil && *preReg.ExternalEventHref != "" {
 		integ, err := s.calendar.ResolveIntegrationForRelease(preReg)
-		if err == nil && integ != nil && integ.Enabled {
+		if err != nil {
+			s.log.Warn("calendar resolve integration for ticket format",
+				"err", err,
+				"preRegistrationId", preReg.ID,
+				"externalEventHref", *preReg.ExternalEventHref,
+			)
+		} else if integ != nil && integ.Enabled {
 			svc, err := s.serviceRepo.FindByID(serviceID)
 			if err == nil {
-				if err := s.calendar.ApplyTicketFormat(context.Background(), integ, svc, preReg, ticket); err != nil {
+				calCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				if err := s.calendar.ApplyTicketFormat(calCtx, integ, svc, preReg, ticket); err != nil {
 					s.log.Warn("calendar ticket format", "err", err)
 				}
 			}

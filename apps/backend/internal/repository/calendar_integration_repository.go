@@ -1,7 +1,6 @@
 package repository
 
 import (
-	"errors"
 	"time"
 
 	"quokkaq-go-backend/internal/calendar/summary"
@@ -9,6 +8,7 @@ import (
 	"quokkaq-go-backend/pkg/database"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type CalendarIntegrationRepository struct{}
@@ -110,36 +110,30 @@ func (r *CalendarIntegrationRepository) UpdateSyncMeta(id string, lastSyncAt tim
 
 func (r *CalendarIntegrationRepository) UpsertExternalSlot(row *models.CalendarExternalSlot) error {
 	row.LastSeenAt = time.Now().UTC()
-	var existing models.CalendarExternalSlot
-	err := database.DB.Where("integration_id = ? AND href = ?", row.IntegrationID, row.Href).First(&existing).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return database.DB.Create(row).Error
-	}
-	if err != nil {
-		return err
-	}
-	row.ID = existing.ID
-	return database.DB.Save(row).Error
+	return database.DB.Clauses(clause.OnConflict{
+		Columns: []clause.Column{
+			{Name: "integration_id"},
+			{Name: "href"},
+		},
+		DoUpdates: clause.AssignmentColumns([]string{
+			"unit_id",
+			"i_cal_uid",
+			"recurrence_id",
+			"e_tag",
+			"start_utc",
+			"end_utc",
+			"summary",
+			"parsed_state",
+			"service_id",
+			"pre_reg_id",
+			"last_seen_at",
+		}),
+	}).Create(row).Error
 }
 
 // DeleteSlotsNotSeenSince removes slot rows for an integration older than t (stale sync).
 func (r *CalendarIntegrationRepository) DeleteSlotsNotSeenSince(integrationID string, t time.Time) error {
 	return database.DB.Where("integration_id = ? AND last_seen_at < ?", integrationID, t).Delete(&models.CalendarExternalSlot{}).Error
-}
-
-func (r *CalendarIntegrationRepository) ListExternalSlotsForServiceDate(unitID, serviceID, localDate string, loc *time.Location) ([]models.CalendarExternalSlot, error) {
-	// localDate YYYY-MM-DD — compare start_utc in that local day
-	startDay, err := time.ParseInLocation("2006-01-02", localDate, loc)
-	if err != nil {
-		return nil, err
-	}
-	endDay := startDay.Add(24 * time.Hour)
-	var rows []models.CalendarExternalSlot
-	err = database.DB.Where("unit_id = ? AND service_id = ? AND start_utc >= ? AND start_utc < ? AND parsed_state = ?",
-		unitID, serviceID, startDay.UTC(), endDay.UTC(), summary.StateFree).
-		Order("start_utc").
-		Find(&rows).Error
-	return rows, err
 }
 
 // ListExternalSlotsForIntegrationServiceDate filters by integration and interprets localDate in loc (integration TZ).

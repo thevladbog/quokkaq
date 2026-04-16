@@ -21,6 +21,8 @@ type ServiceRepository interface {
 	FindMapByIDs(ids []string) (map[string]*models.Service, error)
 	// CountByUnitAndIDs returns how many of the given service IDs belong to the unit (distinct rows).
 	CountByUnitAndIDs(unitID string, ids []string) (int64, error)
+	// CountByUnitAndCalendarSlotKey counts services with the same non-empty calendar_slot_key in the unit, optionally excluding one id.
+	CountByUnitAndCalendarSlotKey(unitID, calendarSlotKey string, excludeServiceID string) (int64, error)
 	Update(service *models.Service) error
 	Delete(id string) error
 }
@@ -137,6 +139,20 @@ func (r *serviceRepository) CountByUnitAndIDs(unitID string, ids []string) (int6
 	err := r.db.Model(&models.Service{}).
 		Where("unit_id = ? AND id IN ?", unitID, ids).
 		Count(&n).Error
+	return n, err
+}
+
+func (r *serviceRepository) CountByUnitAndCalendarSlotKey(unitID, calendarSlotKey string, excludeServiceID string) (int64, error) {
+	if unitID == "" || calendarSlotKey == "" {
+		return 0, nil
+	}
+	q := r.db.Model(&models.Service{}).
+		Where("unit_id = ? AND calendar_slot_key = ?", unitID, calendarSlotKey)
+	if excludeServiceID != "" {
+		q = q.Where("id <> ?", excludeServiceID)
+	}
+	var n int64
+	err := q.Count(&n).Error
 	return n, err
 }
 

@@ -173,17 +173,8 @@ export function SlotConfiguration({ unitId }: SlotConfigurationProps) {
     <div className='space-y-6'>
       {readOnlyCapacity && (
         <Alert>
-          <AlertTitle>
-            {t('calendar_readonly_title', {
-              defaultValue: 'Capacity is managed in the calendar'
-            })}
-          </AlertTitle>
-          <AlertDescription>
-            {t('calendar_readonly_desc', {
-              defaultValue:
-                'This unit uses Yandex Calendar (CalDAV) for slot capacity. Weekly capacity, generation, and day overrides are read-only here; edit events in the connected calendar.'
-            })}
-          </AlertDescription>
+          <AlertTitle>{t('calendar_readonly_title')}</AlertTitle>
+          <AlertDescription>{t('calendar_readonly_desc')}</AlertDescription>
         </Alert>
       )}
       {config && (

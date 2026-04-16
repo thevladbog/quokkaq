@@ -17,6 +17,7 @@ import (
 	"quokkaq-go-backend/internal/repository"
 
 	"github.com/emersion/go-ical"
+	"github.com/emersion/go-webdav/caldav"
 	"gorm.io/gorm"
 )
 
@@ -67,7 +68,7 @@ func (s *CalendarIntegrationService) clientForIntegration(integ *models.UnitCale
 	if err != nil {
 		return nil, err
 	}
-	return caldavclient.NewYandexClient(integ.Username, string(raw))
+	return caldavclient.NewYandexClient(strings.TrimSpace(integ.CaldavBaseURL), integ.Username, string(raw))
 }
 
 // GetIntegration returns the first integration row for a unit (legacy), or nil if none.
@@ -185,7 +186,10 @@ func (s *CalendarIntegrationService) rowToPublic(row *models.UnitCalendarIntegra
 }
 
 // GetPublic returns the first integration's public data (legacy GET /units/{id}/calendar-integration).
-func (s *CalendarIntegrationService) GetPublic(unitID string) (*CalendarIntegrationPublic, error) {
+func (s *CalendarIntegrationService) GetPublic(unitID, companyID string) (*CalendarIntegrationPublic, error) {
+	if err := s.VerifyUnitBelongsToCompany(unitID, companyID); err != nil {
+		return nil, err
+	}
 	row, err := s.repo.GetFirstByUnitID(unitID)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return &CalendarIntegrationPublic{ReadOnlyCapacity: false}, nil
@@ -241,14 +245,14 @@ func (s *CalendarIntegrationService) VerifyUnitBelongsToCompany(unitID, companyI
 
 // CreateCalendarIntegrationRequest is POST /companies/me/calendar-integrations body.
 type CreateCalendarIntegrationRequest struct {
-	UnitID            string `json:"unitId"`
+	UnitID            string `json:"unitId" binding:"required"`
 	Kind              string `json:"kind"`
 	DisplayName       string `json:"displayName,omitempty"`
 	Enabled           bool   `json:"enabled"`
 	CaldavBaseURL     string `json:"caldavBaseUrl"`
-	CalendarPath      string `json:"calendarPath"`
-	Username          string `json:"username"`
-	AppPassword       string `json:"appPassword,omitempty"`
+	CalendarPath      string `json:"calendarPath" binding:"required"`
+	Username          string `json:"username" binding:"required"`
+	AppPassword       string `json:"appPassword" binding:"required"`
 	Timezone          string `json:"timezone"`
 	AdminNotifyEmails string `json:"adminNotifyEmails,omitempty"`
 }
@@ -308,8 +312,8 @@ type UpdateCalendarIntegrationRequest struct {
 	DisplayName       string `json:"displayName,omitempty"`
 	Enabled           bool   `json:"enabled"`
 	CaldavBaseURL     string `json:"caldavBaseUrl"`
-	CalendarPath      string `json:"calendarPath"`
-	Username          string `json:"username"`
+	CalendarPath      string `json:"calendarPath" binding:"required"`
+	Username          string `json:"username" binding:"required"`
 	AppPassword       string `json:"appPassword,omitempty"`
 	Timezone          string `json:"timezone"`
 	AdminNotifyEmails string `json:"adminNotifyEmails,omitempty"`
@@ -373,15 +377,18 @@ func (s *CalendarIntegrationService) DeleteIntegration(companyID, integrationID 
 type UpsertIntegrationRequest struct {
 	Enabled           bool   `json:"enabled"`
 	CaldavBaseURL     string `json:"caldavBaseUrl"`
-	CalendarPath      string `json:"calendarPath"`
-	Username          string `json:"username"`
+	CalendarPath      string `json:"calendarPath" binding:"required"`
+	Username          string `json:"username" binding:"required"`
 	AppPassword       string `json:"appPassword,omitempty"`
 	Timezone          string `json:"timezone"`
 	AdminNotifyEmails string `json:"adminNotifyEmails,omitempty"`
 }
 
 // Upsert saves integration for legacy PUT /units/{unitId}/calendar-integration (updates oldest row or creates).
-func (s *CalendarIntegrationService) UpsertIntegration(unitID string, req *UpsertIntegrationRequest) (*CalendarIntegrationPublic, error) {
+func (s *CalendarIntegrationService) UpsertIntegration(unitID, companyID string, req *UpsertIntegrationRequest) (*CalendarIntegrationPublic, error) {
+	if err := s.VerifyUnitBelongsToCompany(unitID, companyID); err != nil {
+		return nil, err
+	}
 	existing, err := s.repo.GetFirstByUnitID(unitID)
 	hasExisting := err == nil
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -438,17 +445,20 @@ func (s *CalendarIntegrationService) UpsertIntegration(unitID string, req *Upser
 			return nil, err
 		}
 	}
-	return s.GetPublic(unitID)
+	return s.GetPublic(unitID, companyID)
 }
 
 // SyncIntegration pulls CalDAV events for one integration id.
 func (s *CalendarIntegrationService) SyncIntegration(ctx context.Context, integrationID string) error {
 	integ, err := s.repo.GetByID(integrationID)
-	if errors.Is(err, gorm.ErrRecordNotFound) || !integ.Enabled {
-		return nil
-	}
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
 		return err
+	}
+	if !integ.Enabled {
+		return nil
 	}
 	unitID := integ.UnitID
 	client, err := s.clientForIntegration(integ)
@@ -566,7 +576,13 @@ func (s *CalendarIntegrationService) SyncIntegration(ctx context.Context, integr
 		if gerr == nil && co != nil {
 			continue
 		}
-		_ = s.raiseOrphanIncident(unitID, integ, pr, href)
+		if errors.Is(gerr, caldavclient.ErrNotFound) {
+			_ = s.raiseOrphanIncident(unitID, integ, pr, href)
+			continue
+		}
+		if gerr != nil {
+			log.Printf("calendar sync orphan check: get %s: %v", href, gerr)
+		}
 	}
 
 	_ = s.repo.UpdateSyncMeta(integ.ID, time.Now().UTC(), "")
@@ -650,7 +666,7 @@ func (s *CalendarIntegrationService) ListCalendarSlots(unitID, serviceID, date s
 			out = append(out, models.PreRegCalendarSlotItem{
 				Time:                  t,
 				ExternalEventHref:     r.Href,
-				ETag:                  r.ETag,
+				ExternalEventEtag:     r.ETag,
 				CalendarIntegrationID: integ.ID,
 				IntegrationLabel:      label,
 			})
@@ -659,50 +675,77 @@ func (s *CalendarIntegrationService) ListCalendarSlots(unitID, serviceID, date s
 	return out, nil
 }
 
-// ValidateAndApplyBooked updates the calendar to [Забронирован] after DB row is created.
-func (s *CalendarIntegrationService) ValidateAndApplyBooked(ctx context.Context, integ *models.UnitCalendarIntegration, svc *models.Service, href, etag string, pr *models.PreRegistration) (newETag string, err error) {
-	client, err := s.clientForIntegration(integ)
-	if err != nil {
-		return "", err
-	}
+// validateCalendarSlotEligibilityForPreReg performs the same read-only checks used before a booking PUT:
+// load the event, ensure the summary is still Free, and when the client sends an ETag it must match the server.
+func (s *CalendarIntegrationService) validateCalendarSlotEligibilityForPreReg(ctx context.Context, client *caldavclient.Client, href, clientEtag string) (*caldav.CalendarObject, string, error) {
 	co, err := client.GetEvent(ctx, href)
 	if err != nil {
-		return "", err
+		return nil, "", err
 	}
 	if co == nil || co.Data == nil {
-		return "", ErrCalendarValidationFailed
+		return nil, "", ErrCalendarValidationFailed
 	}
 	evs := co.Data.Events()
 	if len(evs) == 0 {
-		return "", ErrCalendarValidationFailed
+		return nil, "", ErrCalendarValidationFailed
 	}
 	sum, _ := evs[0].Props.Text(ical.PropSummary)
 	p := summary.Parse(sum)
 	if p.State != summary.StateFree {
-		return "", ErrCalendarSlotNotFree
+		return nil, "", ErrCalendarSlotNotFree
 	}
+	ct := strings.TrimSpace(clientEtag)
+	if ct != "" && ct != strings.TrimSpace(co.ETag) {
+		return nil, "", ErrCalendarSlotTaken
+	}
+	useETag := ct
+	if useETag == "" {
+		useETag = co.ETag
+	}
+	return co, useETag, nil
+}
+
+// applyBookedFromValidatedEvent applies [Забронирован] to an event that already passed validateCalendarSlotEligibilityForPreReg.
+func (s *CalendarIntegrationService) applyBookedFromValidatedEvent(ctx context.Context, client *caldavclient.Client, svc *models.Service, href string, co *caldav.CalendarObject, etagForPut string, pr *models.PreRegistration) (newETag string, err error) {
 	lbl := summary.ServiceLabelForService(svc.Name, svc.CalendarSlotKey)
 	booked := summary.FormatBooked(lbl)
 	desc := s.bookingDescription(pr)
 	if err := icalpatch.ApplySummaryDescription(co.Data, booked, desc); err != nil {
 		return "", err
 	}
-	useETag := etag
-	if useETag == "" {
-		useETag = co.ETag
-	}
-	err = client.PutCalendar(ctx, href, useETag, co.Data)
+	putETag, err := client.PutCalendar(ctx, href, etagForPut, co.Data)
 	if err != nil {
 		if errors.Is(err, caldavclient.ErrPreconditionFailed) {
 			return "", ErrCalendarSlotTaken
 		}
 		return "", err
 	}
-	co2, err := client.GetEvent(ctx, href)
+	if putETag != "" {
+		return putETag, nil
+	}
+	co2, gerr := client.GetEvent(ctx, href)
+	if gerr != nil {
+		// PUT succeeded; do not fail the booking if read-after-write fails (sync can refresh ETag).
+		return "", nil
+	}
+	if co2 != nil {
+		return co2.ETag, nil
+	}
+	return "", nil
+}
+
+// ValidateAndApplyBooked validates the CalDAV slot (free + etag), then updates the calendar to [Забронирован].
+// Callers must persist the pre-registration row only after this succeeds (create/reschedule); no DB write should occur before eligibility passes.
+func (s *CalendarIntegrationService) ValidateAndApplyBooked(ctx context.Context, integ *models.UnitCalendarIntegration, svc *models.Service, href, etag string, pr *models.PreRegistration) (newETag string, err error) {
+	client, err := s.clientForIntegration(integ)
 	if err != nil {
 		return "", err
 	}
-	return co2.ETag, nil
+	co, etagForPut, err := s.validateCalendarSlotEligibilityForPreReg(ctx, client, href, etag)
+	if err != nil {
+		return "", err
+	}
+	return s.applyBookedFromValidatedEvent(ctx, client, svc, href, co, etagForPut, pr)
 }
 
 func (s *CalendarIntegrationService) bookingDescription(pr *models.PreRegistration) string {
@@ -731,7 +774,8 @@ func (s *CalendarIntegrationService) ApplyTicketFormat(ctx context.Context, inte
 	if err := icalpatch.ApplySummaryDescription(co.Data, title, desc); err != nil {
 		return err
 	}
-	return client.PutCalendar(ctx, *pr.ExternalEventHref, co.ETag, co.Data)
+	_, err = client.PutCalendar(ctx, *pr.ExternalEventHref, co.ETag, co.Data)
+	return err
 }
 
 // ReleaseFreeSlot resets event to free template (cancel / admin fix).
@@ -742,6 +786,9 @@ func (s *CalendarIntegrationService) ReleaseFreeSlot(ctx context.Context, integ 
 	}
 	co, err := client.GetEvent(ctx, href)
 	if err != nil {
+		if errors.Is(err, caldavclient.ErrNotFound) {
+			return nil
+		}
 		log.Printf("calendar ReleaseFreeSlot: get %s: %v (treating as done)", href, err)
 		return nil
 	}
@@ -750,5 +797,6 @@ func (s *CalendarIntegrationService) ReleaseFreeSlot(ctx context.Context, integ 
 	if err := icalpatch.ApplySummaryDescription(co.Data, free, ""); err != nil {
 		return err
 	}
-	return client.PutCalendar(ctx, href, co.ETag, co.Data)
+	_, err = client.PutCalendar(ctx, href, co.ETag, co.Data)
+	return err
 }

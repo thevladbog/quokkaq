@@ -14,11 +14,13 @@ func ApplySummaryDescription(cal *ical.Calendar, summary, description string) er
 		return fmt.Errorf("icalpatch: no VEVENT in calendar resource")
 	}
 	e := evs[0]
-	e.Props.SetText(ical.PropSummary, strings.TrimSpace(summary))
-	if strings.TrimSpace(description) == "" {
+	trimmedSummary := strings.TrimSpace(summary)
+	trimmedDescription := strings.TrimSpace(description)
+	e.Props.SetText(ical.PropSummary, trimmedSummary)
+	if trimmedDescription == "" {
 		e.Props.Del(ical.PropDescription)
 	} else {
-		e.Props.SetText(ical.PropDescription, description)
+		e.Props.SetText(ical.PropDescription, trimmedDescription)
 	}
 	return nil
 }

@@ -5,12 +5,14 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"strings"
 
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
 
 	"github.com/go-chi/chi/v5"
+	"gorm.io/gorm"
 )
 
 type CalendarIntegrationHandler struct {
@@ -41,7 +43,71 @@ func (h *CalendarIntegrationHandler) resolveCompanyID(w http.ResponseWriter, r *
 	return companyID, true
 }
 
+const (
+	calendarIntMsgInternal     = "Internal server error"
+	calendarIntMsgInvalidJSON  = "Invalid request body"
+	calendarIntMsgBadRequest   = "Bad request"
+	calendarIntMsgForbidden    = "Forbidden"
+	calendarIntMsgNotFound     = "Not found"
+	calendarIntMsgCannotDelete = "Cannot delete integration"
+)
+
+func logCalendarIntegration(op string, err error) {
+	log.Printf("calendar integration handler %s: %v", op, err)
+}
+
+func writeJSONDecodeError(w http.ResponseWriter, op string, err error) {
+	logCalendarIntegration(op+": json decode", err)
+	http.Error(w, calendarIntMsgInvalidJSON, http.StatusBadRequest)
+}
+
+// respondCalendarIntegrationError maps service/repository errors to safe HTTP responses and logs details.
+func respondCalendarIntegrationError(w http.ResponseWriter, op string, err error) {
+	logCalendarIntegration(op, err)
+	switch {
+	case errors.Is(err, services.ErrCalendarIntegrationLimit):
+		http.Error(w, services.ErrCalendarIntegrationLimit.Error(), http.StatusConflict)
+	case errors.Is(err, services.ErrCalendarIntegrationKindUnknown):
+		http.Error(w, services.ErrCalendarIntegrationKindUnknown.Error(), http.StatusBadRequest)
+	case errors.Is(err, gorm.ErrRecordNotFound):
+		http.Error(w, calendarIntMsgNotFound, http.StatusNotFound)
+	case isCalendarUnitCompanyMismatch(err):
+		http.Error(w, calendarIntMsgForbidden, http.StatusForbidden)
+	case isCalendarAppPasswordRequired(err):
+		http.Error(w, calendarIntMsgBadRequest, http.StatusBadRequest)
+	default:
+		http.Error(w, calendarIntMsgInternal, http.StatusInternalServerError)
+	}
+}
+
+func respondCalendarIntegrationDeleteError(w http.ResponseWriter, op string, err error) {
+	logCalendarIntegration(op, err)
+	switch {
+	case errors.Is(err, gorm.ErrRecordNotFound):
+		http.Error(w, calendarIntMsgNotFound, http.StatusNotFound)
+	case isCalendarUnitCompanyMismatch(err):
+		http.Error(w, calendarIntMsgForbidden, http.StatusForbidden)
+	case isCalendarCannotDeleteWithPreRegs(err):
+		http.Error(w, calendarIntMsgCannotDelete, http.StatusBadRequest)
+	default:
+		http.Error(w, calendarIntMsgInternal, http.StatusInternalServerError)
+	}
+}
+
+func isCalendarUnitCompanyMismatch(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "unit does not belong to company")
+}
+
+func isCalendarAppPasswordRequired(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "app password is required")
+}
+
+func isCalendarCannotDeleteWithPreRegs(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "cannot delete calendar integration")
+}
+
 // Get godoc
+// @ID           calendarIntegrationGet
 // @Summary      Get calendar integration settings for a unit (legacy: first integration)
 // @Tags         calendar-integration
 // @Produce      json
@@ -50,16 +116,21 @@ func (h *CalendarIntegrationHandler) resolveCompanyID(w http.ResponseWriter, r *
 // @Success      200 {object} services.CalendarIntegrationPublic
 // @Router       /units/{unitId}/calendar-integration [get]
 func (h *CalendarIntegrationHandler) Get(w http.ResponseWriter, r *http.Request) {
+	companyID, ok := h.resolveCompanyID(w, r)
+	if !ok {
+		return
+	}
 	unitID := chi.URLParam(r, "unitId")
-	pub, err := h.svc.GetPublic(unitID)
+	pub, err := h.svc.GetPublic(unitID, companyID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondCalendarIntegrationError(w, "Get", err)
 		return
 	}
 	RespondJSON(w, pub)
 }
 
 // Put godoc
+// @ID           calendarIntegrationPut
 // @Summary      Create or update calendar integration for a unit (legacy)
 // @Tags         calendar-integration
 // @Accept       json
@@ -70,21 +141,26 @@ func (h *CalendarIntegrationHandler) Get(w http.ResponseWriter, r *http.Request)
 // @Success      200 {object} services.CalendarIntegrationPublic
 // @Router       /units/{unitId}/calendar-integration [put]
 func (h *CalendarIntegrationHandler) Put(w http.ResponseWriter, r *http.Request) {
+	companyID, ok := h.resolveCompanyID(w, r)
+	if !ok {
+		return
+	}
 	var req services.UpsertIntegrationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeJSONDecodeError(w, "Put", err)
 		return
 	}
 	unitID := chi.URLParam(r, "unitId")
-	pub, err := h.svc.UpsertIntegration(unitID, &req)
+	pub, err := h.svc.UpsertIntegration(unitID, companyID, &req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondCalendarIntegrationError(w, "Put", err)
 		return
 	}
 	RespondJSON(w, pub)
 }
 
 // ListMine godoc
+// @ID           calendarIntegrationListMine
 // @Summary      List calendar integrations for current company
 // @Tags         calendar-integration
 // @Produce      json
@@ -98,7 +174,7 @@ func (h *CalendarIntegrationHandler) ListMine(w http.ResponseWriter, r *http.Req
 	}
 	list, err := h.svc.ListPublicForCompany(companyID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondCalendarIntegrationError(w, "ListMine", err)
 		return
 	}
 	if list == nil {
@@ -108,6 +184,7 @@ func (h *CalendarIntegrationHandler) ListMine(w http.ResponseWriter, r *http.Req
 }
 
 // CreateMine godoc
+// @ID           calendarIntegrationCreateMine
 // @Summary      Create a calendar integration for a unit in the company
 // @Tags         calendar-integration
 // @Accept       json
@@ -123,22 +200,19 @@ func (h *CalendarIntegrationHandler) CreateMine(w http.ResponseWriter, r *http.R
 	}
 	var req services.CreateCalendarIntegrationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeJSONDecodeError(w, "CreateMine", err)
 		return
 	}
 	pub, err := h.svc.CreateIntegration(companyID, &req)
 	if err != nil {
-		if errors.Is(err, services.ErrCalendarIntegrationLimit) {
-			http.Error(w, err.Error(), http.StatusConflict)
-			return
-		}
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondCalendarIntegrationError(w, "CreateMine", err)
 		return
 	}
 	RespondJSON(w, pub)
 }
 
 // PutMine godoc
+// @ID           calendarIntegrationPutMine
 // @Summary      Update a calendar integration
 // @Tags         calendar-integration
 // @Accept       json
@@ -156,18 +230,19 @@ func (h *CalendarIntegrationHandler) PutMine(w http.ResponseWriter, r *http.Requ
 	integrationID := chi.URLParam(r, "integrationId")
 	var req services.UpdateCalendarIntegrationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeJSONDecodeError(w, "PutMine", err)
 		return
 	}
 	pub, err := h.svc.UpdateIntegration(companyID, integrationID, &req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondCalendarIntegrationError(w, "PutMine", err)
 		return
 	}
 	RespondJSON(w, pub)
 }
 
 // DeleteMine godoc
+// @ID           calendarIntegrationDeleteMine
 // @Summary      Delete a calendar integration
 // @Tags         calendar-integration
 // @Security     BearerAuth
@@ -181,7 +256,7 @@ func (h *CalendarIntegrationHandler) DeleteMine(w http.ResponseWriter, r *http.R
 	}
 	integrationID := chi.URLParam(r, "integrationId")
 	if err := h.svc.DeleteIntegration(companyID, integrationID); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		respondCalendarIntegrationDeleteError(w, "DeleteMine", err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

@@ -20,7 +20,8 @@ type Service struct {
 	Duration        *int    `json:"duration,omitempty"`       // In seconds
 	MaxWaitingTime  *int    `json:"maxWaitingTime,omitempty"` // In seconds
 	Prebook         bool    `gorm:"default:false" json:"prebook"`
-	// CalendarSlotKey optional unique label segment in [QQ] SUMMARY when names collide (calendar integration).
+	// CalendarSlotKey optional label segment in [QQ] SUMMARY when names collide (calendar integration).
+	// When non-empty (after trim), it must be unique per unit — enforced by DB partial unique index and create/update validation.
 	CalendarSlotKey     *string `json:"calendarSlotKey,omitempty" gorm:"column:calendar_slot_key"`
 	OfferIdentification bool    `gorm:"default:false" json:"offerIdentification"`
 	IsLeaf              bool    `gorm:"default:false" json:"isLeaf"`

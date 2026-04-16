@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"log"
 	"math/big"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
@@ -24,6 +25,9 @@ var (
 	ErrPreRegistrationTooLate           = errors.New("too late to redeem ticket")
 	ErrPreRegistrationCannotCancel      = errors.New("pre-registration cannot be canceled in current status")
 	ErrPreRegistrationCanceledImmutable = errors.New("canceled pre-registration cannot be updated")
+	// ErrPreRegistrationCancelPersistAfterCalendarRelease is returned when ReleaseFreeSlot succeeded but persisting the canceled row failed.
+	// The calendar may already show the slot as free while the DB still references the old external event — ops should reconcile.
+	ErrPreRegistrationCancelPersistAfterCalendarRelease = errors.New("pre-registration cancel could not be persisted after the calendar slot was released")
 )
 
 // preRegCalendarSync abstracts CalDAV operations for pre-registration cancel/reschedule.
@@ -71,7 +75,10 @@ func (s *PreRegistrationService) GetByID(id string) (*models.PreRegistration, er
 	return s.repo.GetByID(id)
 }
 
-// Create persists a pre-registration. When calendar integration is enabled for the unit, externalHref/externalETag must be supplied.
+// Create persists a pre-registration. When calendar integration applies, CalDAV eligibility and booking
+// (ValidateAndApplyBooked: GET, slot must be Free, ETag must match when supplied, then PUT to booked)
+// run before any INSERT — same helper chain as reschedule. If the INSERT fails after a successful PUT,
+// the calendar slot is released via ReleaseFreeSlot (no row is left without a matching undo path).
 func (s *PreRegistrationService) Create(ctx context.Context, preReg *models.PreRegistration, externalHref, externalETag, calendarIntegrationID string) error {
 	code, err := s.generateUniqueCode(preReg.Date)
 	if err != nil {
@@ -99,12 +106,8 @@ func (s *PreRegistrationService) Create(ctx context.Context, preReg *models.PreR
 				if err != nil {
 					return err
 				}
-				if err := s.repo.Create(preReg); err != nil {
-					return err
-				}
 				newETag, err := s.calendar.ValidateAndApplyBooked(ctx, integ, svc, externalHref, externalETag, preReg)
 				if err != nil {
-					_ = s.repo.DeleteByID(preReg.ID)
 					return err
 				}
 				h := externalHref
@@ -112,7 +115,11 @@ func (s *PreRegistrationService) Create(ctx context.Context, preReg *models.PreR
 				preReg.ExternalEventETag = &newETag
 				iid := integ.ID
 				preReg.CalendarIntegrationID = &iid
-				return s.repo.Update(preReg)
+				if err := s.repo.Create(preReg); err != nil {
+					relErr := s.calendar.ReleaseFreeSlot(ctx, integ, svc, externalHref, newETag)
+					return errors.Join(err, relErr)
+				}
+				return nil
 			}
 		}
 	}
@@ -131,6 +138,7 @@ func (s *PreRegistrationService) Update(ctx context.Context, previous *models.Pr
 			return ErrPreRegistrationCannotCancel
 		}
 		next.Status = "canceled"
+		calendarReleased := false
 		if s.calendar != nil && previous.ExternalEventHref != nil && strings.TrimSpace(*previous.ExternalEventHref) != "" {
 			integ, err := s.calendar.ResolveIntegrationForRelease(previous)
 			if err != nil {
@@ -148,67 +156,116 @@ func (s *PreRegistrationService) Update(ctx context.Context, previous *models.Pr
 				if err := s.calendar.ReleaseFreeSlot(ctx, integ, svc, *previous.ExternalEventHref, etag); err != nil {
 					return err
 				}
+				calendarReleased = true
 			}
 		}
 		next.ExternalEventHref = nil
 		next.ExternalEventETag = nil
 		next.CalendarIntegrationID = nil
-		return s.repo.Update(next)
+		if err := s.repo.Update(next); err != nil {
+			if calendarReleased {
+				href := ""
+				if previous.ExternalEventHref != nil {
+					href = *previous.ExternalEventHref
+				}
+				log.Printf("pre-registration cancel: database update failed after CalDAV ReleaseFreeSlot (reconcile DB vs calendar): preRegID=%s unitID=%s externalEventHref=%s err=%v",
+					previous.ID, previous.UnitID, href, err)
+				return fmt.Errorf("%w: %w", ErrPreRegistrationCancelPersistAfterCalendarRelease, err)
+			}
+			return err
+		}
+		return nil
 	}
 
 	slotChanged := previous.Date != next.Date || previous.Time != next.Time || previous.ServiceID != next.ServiceID
 	if slotChanged && previous.Status == "created" &&
 		previous.ExternalEventHref != nil && strings.TrimSpace(*previous.ExternalEventHref) != "" && s.calendar != nil {
+
+		newHref := ""
+		newETag := ""
+		newIntegID := ""
+		if req != nil {
+			newHref = strings.TrimSpace(req.ExternalEventHref)
+			newETag = strings.TrimSpace(req.ExternalEventEtag)
+			newIntegID = strings.TrimSpace(req.CalendarIntegrationID)
+		}
+
+		if newHref != "" {
+			newSvc, err := s.serviceRepo.FindByID(next.ServiceID)
+			if err != nil {
+				return err
+			}
+			integNew, err := s.calendar.ResolveIntegrationForPreReg(next.UnitID, newIntegID)
+			if err != nil {
+				return err
+			}
+			if integNew == nil || !integNew.Enabled {
+				return fmt.Errorf("calendar integration is not available for reschedule")
+			}
+			bookedETag, err := s.calendar.ValidateAndApplyBooked(ctx, integNew, newSvc, newHref, newETag, next)
+			if err != nil {
+				return err
+			}
+
+			hrefCopy := newHref
+			next.ExternalEventHref = &hrefCopy
+			next.ExternalEventETag = &bookedETag
+			iid := integNew.ID
+			next.CalendarIntegrationID = &iid
+
+			if err := s.repo.Update(next); err != nil {
+				relErr := s.calendar.ReleaseFreeSlot(ctx, integNew, newSvc, newHref, bookedETag)
+				return errors.Join(err, relErr)
+			}
+
+			integOld, err := s.calendar.ResolveIntegrationForRelease(previous)
+			if err != nil {
+				log.Printf("pre-registration reschedule: resolve old integration for release: %v", err)
+				return nil
+			}
+			if integOld != nil && integOld.Enabled {
+				oldSvc, err := s.serviceRepo.FindByID(previous.ServiceID)
+				if err != nil {
+					log.Printf("pre-registration reschedule: load old service for calendar release: %v", err)
+					return nil
+				}
+				oldEtag := ""
+				if previous.ExternalEventETag != nil {
+					oldEtag = *previous.ExternalEventETag
+				}
+				if err := s.calendar.ReleaseFreeSlot(ctx, integOld, oldSvc, *previous.ExternalEventHref, oldEtag); err != nil {
+					log.Printf("pre-registration reschedule: release old calendar slot failed (retry/async cleanup recommended): href=%s err=%v", *previous.ExternalEventHref, err)
+				}
+			}
+			return nil
+		}
+
+		next.ExternalEventHref = nil
+		next.ExternalEventETag = nil
+		next.CalendarIntegrationID = nil
+		if err := s.repo.Update(next); err != nil {
+			return err
+		}
 		integOld, err := s.calendar.ResolveIntegrationForRelease(previous)
 		if err != nil {
-			return err
+			log.Printf("pre-registration reschedule (no new href): resolve old integration: %v", err)
+			return nil
 		}
 		if integOld != nil && integOld.Enabled {
 			oldSvc, err := s.serviceRepo.FindByID(previous.ServiceID)
 			if err != nil {
-				return err
+				log.Printf("pre-registration reschedule (no new href): load old service: %v", err)
+				return nil
 			}
-			etag := ""
+			oldEtag := ""
 			if previous.ExternalEventETag != nil {
-				etag = *previous.ExternalEventETag
+				oldEtag = *previous.ExternalEventETag
 			}
-			if err := s.calendar.ReleaseFreeSlot(ctx, integOld, oldSvc, *previous.ExternalEventHref, etag); err != nil {
-				return err
-			}
-			next.ExternalEventHref = nil
-			next.ExternalEventETag = nil
-			next.CalendarIntegrationID = nil
-
-			newHref := ""
-			newETag := ""
-			newIntegID := ""
-			if req != nil {
-				newHref = strings.TrimSpace(req.ExternalEventHref)
-				newETag = strings.TrimSpace(req.ExternalEventEtag)
-				newIntegID = strings.TrimSpace(req.CalendarIntegrationID)
-			}
-			if newHref != "" {
-				newSvc, err := s.serviceRepo.FindByID(next.ServiceID)
-				if err != nil {
-					return err
-				}
-				integNew, err := s.calendar.ResolveIntegrationForPreReg(next.UnitID, newIntegID)
-				if err != nil {
-					return err
-				}
-				if integNew == nil || !integNew.Enabled {
-					return fmt.Errorf("calendar integration is not available for reschedule")
-				}
-				newETag2, err := s.calendar.ValidateAndApplyBooked(ctx, integNew, newSvc, newHref, newETag, next)
-				if err != nil {
-					return err
-				}
-				next.ExternalEventHref = &newHref
-				next.ExternalEventETag = &newETag2
-				iid := integNew.ID
-				next.CalendarIntegrationID = &iid
+			if err := s.calendar.ReleaseFreeSlot(ctx, integOld, oldSvc, *previous.ExternalEventHref, oldEtag); err != nil {
+				log.Printf("pre-registration reschedule (no new href): release old calendar slot failed (retry/async cleanup recommended): href=%s err=%v", *previous.ExternalEventHref, err)
 			}
 		}
+		return nil
 	}
 
 	return s.repo.Update(next)

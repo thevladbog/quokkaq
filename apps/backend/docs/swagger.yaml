@@ -1149,7 +1149,7 @@ components:
       properties:
         calendarIntegrationId:
           type: string
-        eTag:
+        externalEventEtag:
           type: string
         externalEventHref:
           type: string
@@ -1266,6 +1266,9 @@ components:
           type: string
         status:
           description: Status optional; only "canceled" is accepted to cancel an active pre-registration.
+          enum:
+          - canceled
+          example: canceled
           type: string
         time:
           type: string
@@ -1282,7 +1285,9 @@ components:
         backgroundColor:
           type: string
         calendarSlotKey:
-          description: CalendarSlotKey optional unique label segment in [QQ] SUMMARY when names collide (calendar integration).
+          description: 'CalendarSlotKey optional label segment in [QQ] SUMMARY when names collide (calendar integration).
+
+            When non-empty (after trim), it must be unique per unit — enforced by DB partial unique index and create/update validation.'
           type: string
         children:
           items:
@@ -1922,6 +1927,12 @@ components:
           type: string
         username:
           type: string
+      required:
+      - appPassword
+      - calendarPath
+      - unitId
+      - username
+      - enabled
       type: object
     services.EmployeeRadarResponse:
       properties:
@@ -2291,6 +2302,10 @@ components:
           type: string
         username:
           type: string
+      required:
+      - calendarPath
+      - username
+      - enabled
       type: object
     services.UpsertIntegrationRequest:
       properties:
@@ -2308,6 +2323,10 @@ components:
           type: string
         username:
           type: string
+      required:
+      - calendarPath
+      - username
+      - enabled
       type: object
     services.UtilizationPoint:
       properties:
@@ -3393,6 +3412,7 @@ paths:
       - companies
   /companies/me/calendar-integrations:
     get:
+      operationId: calendarIntegrationListMine
       responses:
         '200':
           content:
@@ -3408,6 +3428,7 @@ paths:
       tags:
       - calendar-integration
     post:
+      operationId: calendarIntegrationCreateMine
       requestBody:
         content:
           application/json:
@@ -3430,6 +3451,7 @@ paths:
       - calendar-integration
   /companies/me/calendar-integrations/{integrationId}:
     delete:
+      operationId: calendarIntegrationDeleteMine
       parameters:
       - description: Integration ID
         in: path
@@ -3446,6 +3468,7 @@ paths:
       tags:
       - calendar-integration
     put:
+      operationId: calendarIntegrationPutMine
       parameters:
       - description: Integration ID
         in: path
@@ -6655,6 +6678,7 @@ paths:
       - bookings
   /units/{unitId}/calendar-integration:
     get:
+      operationId: calendarIntegrationGet
       parameters:
       - description: Unit ID
         in: path
@@ -6675,6 +6699,7 @@ paths:
       tags:
       - calendar-integration
     put:
+      operationId: calendarIntegrationPut
       parameters:
       - description: Unit ID
         in: path
@@ -8036,6 +8061,12 @@ paths:
               schema:
                 type: string
           description: Not Found
+        '409':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Conflict (calendar slot)
         '500':
           content:
             application/json:
@@ -8049,6 +8080,8 @@ paths:
       - pre-registrations
   /units/{unitId}/pre-registrations/calendar-slots:
     get:
+      description: Returns CalDAV slot rows (href, etag, time) for a service and date; requires Bearer auth and unit membership. Empty array when no integration or no slots.
+      operationId: GetCalendarSlotsByUnit
       parameters:
       - description: Unit ID
         in: path
@@ -8062,7 +8095,7 @@ paths:
         required: true
         schema:
           type: string
-      - description: Date YYYY-MM-DD
+      - description: Date (YYYY-MM-DD)
         in: query
         name: date
         required: true
@@ -8077,6 +8110,32 @@ paths:
                   $ref: '#/components/schemas/models.PreRegCalendarSlotItem'
                 type: array
           description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad Request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
       summary: List calendar-backed slots with CalDAV hrefs (when integration enabled)
       tags:
       - pre-registrations
@@ -8594,6 +8653,12 @@ paths:
               schema:
                 type: string
           description: Forbidden
+        '409':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Conflict
         '500':
           content:
             application/json:
@@ -8687,6 +8752,12 @@ paths:
               schema:
                 type: string
           description: Forbidden
+        '409':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Conflict
         '500':
           content:
             application/json:
@@ -8798,6 +8869,12 @@ paths:
               schema:
                 type: string
           description: Forbidden
+        '409':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Conflict
         '500':
           content:
             application/json:
@@ -8852,6 +8929,12 @@ paths:
               schema:
                 type: string
           description: Forbidden
+        '409':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Conflict
         '500':
           content:
             application/json:

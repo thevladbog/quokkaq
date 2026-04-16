@@ -81,7 +81,7 @@ type PreRegistrationUpdateRequest struct {
 	CustomerPhone     string `json:"customerPhone"`
 	Comment           string `json:"comment,omitempty"`
 	// Status optional; only "canceled" is accepted to cancel an active pre-registration.
-	Status string `json:"status,omitempty"`
+	Status string `json:"status,omitempty" enums:"canceled" example:"canceled"`
 	// When rescheduling with calendar integration, provide the new CalDAV slot (same as create).
 	ExternalEventHref     string `json:"externalEventHref,omitempty"`
 	ExternalEventEtag     string `json:"externalEventEtag,omitempty"`
@@ -104,7 +104,7 @@ type PreRegistrationRedeemResponse struct {
 type PreRegCalendarSlotItem struct {
 	Time                  string `json:"time"`
 	ExternalEventHref     string `json:"externalEventHref"`
-	ETag                  string `json:"eTag,omitempty"`
+	ExternalEventEtag     string `json:"externalEventEtag,omitempty"`
 	CalendarIntegrationID string `json:"calendarIntegrationId"`
 	IntegrationLabel      string `json:"integrationLabel,omitempty"`
 }
