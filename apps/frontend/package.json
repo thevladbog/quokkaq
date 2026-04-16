@@ -19,7 +19,7 @@
     "@formatjs/intl-localematcher": "^0.8.3",
     "@hookform/resolvers": "^5.2.2",
     "@lexical/rich-text": "^0.35.0",
-    "@mdxeditor/editor": "^3.54.0",
+    "@mdxeditor/editor": "^3.54.1",
     "@mdxeditor/gurx": "^1.2.4",
     "@quokkaq/kiosk-lib": "workspace:*",
     "@quokkaq/shared-types": "workspace:*",
