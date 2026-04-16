@@ -28,8 +28,16 @@ import {
   publicTenantBySlug,
   useAuthAccessibleCompanies,
   type authAccessibleCompaniesResponse,
+  type AuthSSOAuthorizeLocale,
   type HandlersAccessibleCompanyItem
 } from '@/lib/api/generated/auth';
+
+function toAuthSSOAuthorizeLocale(
+  loc: string
+): AuthSSOAuthorizeLocale | undefined {
+  if (loc === 'en' || loc === 'ru') return loc;
+  return undefined;
+}
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
@@ -188,7 +196,11 @@ export default function LoginPage() {
       return;
     }
     window.location.href =
-      '/api' + getAuthSSOAuthorizeUrl({ tenant: effectiveSlug, locale });
+      '/api' +
+      getAuthSSOAuthorizeUrl({
+        tenant: effectiveSlug,
+        locale: toAuthSSOAuthorizeLocale(locale)
+      });
   };
 
   const backToEmailStep = () => {

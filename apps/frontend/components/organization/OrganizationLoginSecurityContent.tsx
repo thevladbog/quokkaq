@@ -33,6 +33,7 @@ import {
   companiesMeSSOPatch,
   companiesMeSlugPatch,
   getCompaniesMeSSOGetQueryKey,
+  type HandlersLoginLinkResponse,
   type ServicesCompanySSOGetResponse,
   type ServicesCompanySSOPatch
 } from '@/lib/api/generated/auth';
@@ -139,7 +140,7 @@ function OrganizationLoginSecurityForm({ company, sso }: LoginFormProps) {
       if (res.status !== 200 || !res.data) {
         throw new Error(t('linkError'));
       }
-      const data = res.data as Record<string, string>;
+      const data: HandlersLoginLinkResponse = res.data;
       const token = data.token ?? '';
       const example =
         data.exampleUrl ??

@@ -2190,6 +2190,19 @@ components:
             $ref: '#/components/schemas/services.UtilizationPoint'
           type: array
       type: object
+    handlers.LoginLinkResponse:
+      type: object
+      required:
+      - token
+      - exampleUrl
+      properties:
+        token:
+          type: string
+          description: Opaque tenant login token for strict-tenant links
+        exampleUrl:
+          type: string
+          format: uri
+          description: Example full login URL including the token query parameter
     handlers.CreateTicketRequestAnonymous:
       type: object
       properties:
@@ -2231,19 +2244,6 @@ components:
       - visitorPhone
       - visitorLocale
       additionalProperties: false
-    handlers.LoginLinkResponse:
-      type: object
-      required:
-      - token
-      - exampleUrl
-      properties:
-        token:
-          type: string
-          description: Opaque tenant login token for strict-tenant links
-        exampleUrl:
-          type: string
-          format: uri
-          description: Example full login URL including the token query parameter
   securitySchemes:
     BearerAuth:
       in: header
