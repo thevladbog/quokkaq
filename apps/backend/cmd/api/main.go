@@ -108,6 +108,7 @@ func main() {
 			&models.UnitOperationalState{},
 			&models.StatisticsDailyBucket{},
 			&models.StatisticsSurveyDaily{},
+			&models.SupportReport{},
 		)
 		if err != nil {
 			log.Fatalf("Failed to run migrations: %v", err)
@@ -231,6 +232,11 @@ func main() {
 	surveyHandler := handlers.NewSurveyHandler(surveyService, storageService)
 	guestSurveyHandler := handlers.NewGuestSurveyHandler(surveyService)
 	usageHandler := handlers.NewUsageHandler(quotaService, userRepo)
+
+	supportReportRepo := repository.NewSupportReportRepository()
+	planeClient := services.NewPlaneClientFromEnv()
+	supportReportService := services.NewSupportReportService(supportReportRepo, planeClient, userRepo)
+	supportReportHandler := handlers.NewSupportReportHandler(supportReportService)
 
 	var paymentProvider services.PaymentProvider
 	stripeKey := strings.TrimSpace(os.Getenv("STRIPE_SECRET_KEY"))
@@ -626,6 +632,13 @@ func main() {
 	r.Route("/usage-metrics", func(r chi.Router) {
 		r.Use(authmiddleware.JWTAuth)
 		r.Get("/me", usageHandler.GetMyUsageMetrics)
+	})
+
+	r.Route("/support", func(r chi.Router) {
+		r.Use(authmiddleware.JWTAuth)
+		r.Post("/reports", supportReportHandler.Create)
+		r.Get("/reports", supportReportHandler.List)
+		r.Get("/reports/{id}", supportReportHandler.GetByID)
 	})
 
 	r.Route("/subscriptions", func(r chi.Router) {

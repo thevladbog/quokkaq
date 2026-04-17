@@ -1634,76 +1634,44 @@ export interface HandlersLoginLinkResponse {
   exampleUrl: string;
 }
 
-export type GetCalendarSlotsByUnitParams = {
-/**
- * Service ID
- */
-serviceId: string;
-/**
- * Date (YYYY-MM-DD)
- */
-date: string;
-};
-
-export type GetUnitsUnitIdPreRegistrationsSlotsParams = {
-/**
- * Service ID
- */
-serviceId: string;
-/**
- * Date (YYYY-MM-DD)
- */
-date: string;
-};
-
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
 
 /**
- * Returns all pre-registrations associated with the unit (authenticated unit member).
- * @summary List pre-registrations for a unit
+ * Returns the current user's reports; tenant admins see all reports. Refreshes Plane status when older than a short interval.
+ * @summary List support reports visible to the user
  */
-export type getUnitsUnitIdPreRegistrationsResponse200 = {
-  data: ModelsPreRegistration[]
+export type listSupportReportsResponse200 = {
+  data: ModelsSupportReport[]
   status: 200
 }
 
-export type getUnitsUnitIdPreRegistrationsResponse401 = {
+export type listSupportReportsResponse401 = {
   data: string
   status: 401
 }
 
-export type getUnitsUnitIdPreRegistrationsResponse403 = {
-  data: string
-  status: 403
-}
-
-export type getUnitsUnitIdPreRegistrationsResponse500 = {
-  data: string
-  status: 500
-}
-
-export type getUnitsUnitIdPreRegistrationsResponseSuccess = (getUnitsUnitIdPreRegistrationsResponse200) & {
+export type listSupportReportsResponseSuccess = (listSupportReportsResponse200) & {
   headers: Headers;
 };
-export type getUnitsUnitIdPreRegistrationsResponseError = (getUnitsUnitIdPreRegistrationsResponse401 | getUnitsUnitIdPreRegistrationsResponse403 | getUnitsUnitIdPreRegistrationsResponse500) & {
+export type listSupportReportsResponseError = (listSupportReportsResponse401) & {
   headers: Headers;
 };
 
-export type getUnitsUnitIdPreRegistrationsResponse = (getUnitsUnitIdPreRegistrationsResponseSuccess | getUnitsUnitIdPreRegistrationsResponseError)
+export type listSupportReportsResponse = (listSupportReportsResponseSuccess | listSupportReportsResponseError)
 
-export const getGetUnitsUnitIdPreRegistrationsUrl = (unitId: string,) => {
-
-
+export const getListSupportReportsUrl = () => {
 
 
-  return `/units/${unitId}/pre-registrations`
+
+
+  return `/support/reports`
 }
 
-export const getUnitsUnitIdPreRegistrations = async (unitId: string, options?: RequestInit): Promise<getUnitsUnitIdPreRegistrationsResponse> => {
+export const listSupportReports = async ( options?: RequestInit): Promise<listSupportReportsResponse> => {
 
-  return orvalMutator<getUnitsUnitIdPreRegistrationsResponse>(getGetUnitsUnitIdPreRegistrationsUrl(unitId),
+  return orvalMutator<listSupportReportsResponse>(getListSupportReportsUrl(),
   {
     ...options,
     method: 'GET'
@@ -1716,69 +1684,69 @@ export const getUnitsUnitIdPreRegistrations = async (unitId: string, options?: R
 
 
 
-export const getGetUnitsUnitIdPreRegistrationsQueryKey = (unitId: string,) => {
+export const getListSupportReportsQueryKey = () => {
     return [
-    `/units/${unitId}/pre-registrations`
+    `/support/reports`
     ] as const;
     }
 
 
-export const getGetUnitsUnitIdPreRegistrationsQueryOptions = <TData = Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrations>>, TError = string>(unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrations>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export const getListSupportReportsQueryOptions = <TData = Awaited<ReturnType<typeof listSupportReports>>, TError = string>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReports>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetUnitsUnitIdPreRegistrationsQueryKey(unitId);
+  const queryKey =  queryOptions?.queryKey ?? getListSupportReportsQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrations>>> = ({ signal }) => getUnitsUnitIdPreRegistrations(unitId, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSupportReports>>> = ({ signal }) => listSupportReports({ signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrations>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSupportReports>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type GetUnitsUnitIdPreRegistrationsQueryResult = NonNullable<Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrations>>>
-export type GetUnitsUnitIdPreRegistrationsQueryError = string
+export type ListSupportReportsQueryResult = NonNullable<Awaited<ReturnType<typeof listSupportReports>>>
+export type ListSupportReportsQueryError = string
 
 
-export function useGetUnitsUnitIdPreRegistrations<TData = Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrations>>, TError = string>(
- unitId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrations>>, TError, TData>> & Pick<
+export function useListSupportReports<TData = Awaited<ReturnType<typeof listSupportReports>>, TError = string>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReports>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrations>>,
+          Awaited<ReturnType<typeof listSupportReports>>,
           TError,
-          Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrations>>
+          Awaited<ReturnType<typeof listSupportReports>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitsUnitIdPreRegistrations<TData = Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrations>>, TError = string>(
- unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrations>>, TError, TData>> & Pick<
+export function useListSupportReports<TData = Awaited<ReturnType<typeof listSupportReports>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReports>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrations>>,
+          Awaited<ReturnType<typeof listSupportReports>>,
           TError,
-          Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrations>>
+          Awaited<ReturnType<typeof listSupportReports>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitsUnitIdPreRegistrations<TData = Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrations>>, TError = string>(
- unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrations>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useListSupportReports<TData = Awaited<ReturnType<typeof listSupportReports>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReports>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary List pre-registrations for a unit
+ * @summary List support reports visible to the user
  */
 
-export function useGetUnitsUnitIdPreRegistrations<TData = Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrations>>, TError = string>(
- unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrations>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useListSupportReports<TData = Awaited<ReturnType<typeof listSupportReports>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReports>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetUnitsUnitIdPreRegistrationsQueryOptions(unitId,options)
+  const queryOptions = getListSupportReportsQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -1792,77 +1760,71 @@ export function useGetUnitsUnitIdPreRegistrations<TData = Awaited<ReturnType<typ
 
 
 /**
- * Creates a new pre-registration for the unit; unitId is taken from the path.
- * @summary Create a pre-registration
+ * Creates a work item in the configured Plane project and stores a row in QuokkaQ. Requires Plane env vars on the server.
+ * @summary Create a support report (Plane work item)
  */
-export type postUnitsUnitIdPreRegistrationsResponse200 = {
-  data: ModelsPreRegistration
-  status: 200
+export type createSupportReportResponse201 = {
+  data: ModelsSupportReport
+  status: 201
 }
 
-export type postUnitsUnitIdPreRegistrationsResponse400 = {
+export type createSupportReportResponse400 = {
   data: string
   status: 400
 }
 
-export type postUnitsUnitIdPreRegistrationsResponse401 = {
+export type createSupportReportResponse401 = {
   data: string
   status: 401
 }
 
-export type postUnitsUnitIdPreRegistrationsResponse403 = {
+export type createSupportReportResponse502 = {
   data: string
-  status: 403
+  status: 502
 }
 
-export type postUnitsUnitIdPreRegistrationsResponse409 = {
+export type createSupportReportResponse503 = {
   data: string
-  status: 409
+  status: 503
 }
 
-export type postUnitsUnitIdPreRegistrationsResponse500 = {
-  data: string
-  status: 500
-}
-
-export type postUnitsUnitIdPreRegistrationsResponseSuccess = (postUnitsUnitIdPreRegistrationsResponse200) & {
+export type createSupportReportResponseSuccess = (createSupportReportResponse201) & {
   headers: Headers;
 };
-export type postUnitsUnitIdPreRegistrationsResponseError = (postUnitsUnitIdPreRegistrationsResponse400 | postUnitsUnitIdPreRegistrationsResponse401 | postUnitsUnitIdPreRegistrationsResponse403 | postUnitsUnitIdPreRegistrationsResponse409 | postUnitsUnitIdPreRegistrationsResponse500) & {
+export type createSupportReportResponseError = (createSupportReportResponse400 | createSupportReportResponse401 | createSupportReportResponse502 | createSupportReportResponse503) & {
   headers: Headers;
 };
 
-export type postUnitsUnitIdPreRegistrationsResponse = (postUnitsUnitIdPreRegistrationsResponseSuccess | postUnitsUnitIdPreRegistrationsResponseError)
+export type createSupportReportResponse = (createSupportReportResponseSuccess | createSupportReportResponseError)
 
-export const getPostUnitsUnitIdPreRegistrationsUrl = (unitId: string,) => {
-
-
+export const getCreateSupportReportUrl = () => {
 
 
-  return `/units/${unitId}/pre-registrations`
+
+
+  return `/support/reports`
 }
 
-export const postUnitsUnitIdPreRegistrations = async (unitId: string,
-    modelsPreRegistrationCreateRequest: ModelsPreRegistrationCreateRequest, options?: RequestInit): Promise<postUnitsUnitIdPreRegistrationsResponse> => {
+export const createSupportReport = async (handlersCreateSupportReportRequest: HandlersCreateSupportReportRequest, options?: RequestInit): Promise<createSupportReportResponse> => {
 
-  return orvalMutator<postUnitsUnitIdPreRegistrationsResponse>(getPostUnitsUnitIdPreRegistrationsUrl(unitId),
+  return orvalMutator<createSupportReportResponse>(getCreateSupportReportUrl(),
   {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(
-      modelsPreRegistrationCreateRequest,)
+      handlersCreateSupportReportRequest,)
   }
 );}
 
 
 
 
-export const getPostUnitsUnitIdPreRegistrationsMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrations>>, TError,{unitId: string;data: ModelsPreRegistrationCreateRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrations>>, TError,{unitId: string;data: ModelsPreRegistrationCreateRequest}, TContext> => {
+export const getCreateSupportReportMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSupportReport>>, TError,{data: HandlersCreateSupportReportRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof createSupportReport>>, TError,{data: HandlersCreateSupportReportRequest}, TContext> => {
 
-const mutationKey = ['postUnitsUnitIdPreRegistrations'];
+const mutationKey = ['createSupportReport'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -1872,10 +1834,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrations>>, {unitId: string;data: ModelsPreRegistrationCreateRequest}> = (props) => {
-          const {unitId,data} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createSupportReport>>, {data: HandlersCreateSupportReportRequest}> = (props) => {
+          const {data} = props ?? {};
 
-          return  postUnitsUnitIdPreRegistrations(unitId,data,requestOptions)
+          return  createSupportReport(data,requestOptions)
         }
 
 
@@ -1885,630 +1847,145 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PostUnitsUnitIdPreRegistrationsMutationResult = NonNullable<Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrations>>>
-    export type PostUnitsUnitIdPreRegistrationsMutationBody = ModelsPreRegistrationCreateRequest
-    export type PostUnitsUnitIdPreRegistrationsMutationError = string
+    export type CreateSupportReportMutationResult = NonNullable<Awaited<ReturnType<typeof createSupportReport>>>
+    export type CreateSupportReportMutationBody = HandlersCreateSupportReportRequest
+    export type CreateSupportReportMutationError = string
 
     /**
- * @summary Create a pre-registration
+ * @summary Create a support report (Plane work item)
  */
-export const usePostUnitsUnitIdPreRegistrations = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrations>>, TError,{unitId: string;data: ModelsPreRegistrationCreateRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const useCreateSupportReport = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSupportReport>>, TError,{data: HandlersCreateSupportReportRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrations>>,
+        Awaited<ReturnType<typeof createSupportReport>>,
         TError,
-        {unitId: string;data: ModelsPreRegistrationCreateRequest},
+        {data: HandlersCreateSupportReportRequest},
         TContext
       > => {
-      return useMutation(getPostUnitsUnitIdPreRegistrationsMutationOptions(options), queryClient);
+      return useMutation(getCreateSupportReportMutationOptions(options), queryClient);
     }
 
 /**
- * Returns CalDAV slot rows (href, etag, time) for a service and date; requires Bearer auth and unit membership. Empty array when no integration or no slots.
- * @summary List calendar-backed slots with CalDAV hrefs (when integration enabled)
+ * Returns a report if the current user is the author or a tenant admin. Refreshes Plane status when integration is enabled.
+ * @summary Get one support report by id
  */
-export type getCalendarSlotsByUnitResponse200 = {
-  data: ModelsPreRegCalendarSlotItem[]
+export type getSupportReportByIDResponse200 = {
+  data: ModelsSupportReport
   status: 200
 }
 
-export type getCalendarSlotsByUnitResponse400 = {
-  data: string
-  status: 400
-}
-
-export type getCalendarSlotsByUnitResponse401 = {
+export type getSupportReportByIDResponse401 = {
   data: string
   status: 401
 }
 
-export type getCalendarSlotsByUnitResponse403 = {
+export type getSupportReportByIDResponse403 = {
   data: string
   status: 403
 }
 
-export type getCalendarSlotsByUnitResponse500 = {
-  data: string
-  status: 500
-}
-
-export type getCalendarSlotsByUnitResponseSuccess = (getCalendarSlotsByUnitResponse200) & {
-  headers: Headers;
-};
-export type getCalendarSlotsByUnitResponseError = (getCalendarSlotsByUnitResponse400 | getCalendarSlotsByUnitResponse401 | getCalendarSlotsByUnitResponse403 | getCalendarSlotsByUnitResponse500) & {
-  headers: Headers;
-};
-
-export type getCalendarSlotsByUnitResponse = (getCalendarSlotsByUnitResponseSuccess | getCalendarSlotsByUnitResponseError)
-
-export const getGetCalendarSlotsByUnitUrl = (unitId: string,
-    params: GetCalendarSlotsByUnitParams,) => {
-  const normalizedParams = new URLSearchParams();
-
-  Object.entries(params || {}).forEach(([key, value]) => {
-
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : value.toString())
-    }
-  });
-
-  const stringifiedParams = normalizedParams.toString();
-
-  return stringifiedParams.length > 0 ? `/units/${unitId}/pre-registrations/calendar-slots?${stringifiedParams}` : `/units/${unitId}/pre-registrations/calendar-slots`
-}
-
-export const getCalendarSlotsByUnit = async (unitId: string,
-    params: GetCalendarSlotsByUnitParams, options?: RequestInit): Promise<getCalendarSlotsByUnitResponse> => {
-
-  return orvalMutator<getCalendarSlotsByUnitResponse>(getGetCalendarSlotsByUnitUrl(unitId,params),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getGetCalendarSlotsByUnitQueryKey = (unitId: string,
-    params?: GetCalendarSlotsByUnitParams,) => {
-    return [
-    `/units/${unitId}/pre-registrations/calendar-slots`, ...(params ? [params] : [])
-    ] as const;
-    }
-
-
-export const getGetCalendarSlotsByUnitQueryOptions = <TData = Awaited<ReturnType<typeof getCalendarSlotsByUnit>>, TError = string>(unitId: string,
-    params: GetCalendarSlotsByUnitParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCalendarSlotsByUnit>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetCalendarSlotsByUnitQueryKey(unitId,params);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCalendarSlotsByUnit>>> = ({ signal }) => getCalendarSlotsByUnit(unitId,params, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCalendarSlotsByUnit>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type GetCalendarSlotsByUnitQueryResult = NonNullable<Awaited<ReturnType<typeof getCalendarSlotsByUnit>>>
-export type GetCalendarSlotsByUnitQueryError = string
-
-
-export function useGetCalendarSlotsByUnit<TData = Awaited<ReturnType<typeof getCalendarSlotsByUnit>>, TError = string>(
- unitId: string,
-    params: GetCalendarSlotsByUnitParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCalendarSlotsByUnit>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getCalendarSlotsByUnit>>,
-          TError,
-          Awaited<ReturnType<typeof getCalendarSlotsByUnit>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetCalendarSlotsByUnit<TData = Awaited<ReturnType<typeof getCalendarSlotsByUnit>>, TError = string>(
- unitId: string,
-    params: GetCalendarSlotsByUnitParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCalendarSlotsByUnit>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getCalendarSlotsByUnit>>,
-          TError,
-          Awaited<ReturnType<typeof getCalendarSlotsByUnit>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetCalendarSlotsByUnit<TData = Awaited<ReturnType<typeof getCalendarSlotsByUnit>>, TError = string>(
- unitId: string,
-    params: GetCalendarSlotsByUnitParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCalendarSlotsByUnit>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List calendar-backed slots with CalDAV hrefs (when integration enabled)
- */
-
-export function useGetCalendarSlotsByUnit<TData = Awaited<ReturnType<typeof getCalendarSlotsByUnit>>, TError = string>(
- unitId: string,
-    params: GetCalendarSlotsByUnitParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCalendarSlotsByUnit>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getGetCalendarSlotsByUnitQueryOptions(unitId,params,options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-
-
-
-
-
-
-/**
- * Validates the code, creates a ticket, and marks the pre-registration redeemed. Invalid codes return HTTP 200 with success=false and a message; server errors use 5xx.
- * @summary Redeem a pre-registration code (kiosk)
- */
-export type postUnitsUnitIdPreRegistrationsRedeemResponse200 = {
-  data: ModelsPreRegistrationRedeemResponse
-  status: 200
-}
-
-export type postUnitsUnitIdPreRegistrationsRedeemResponse400 = {
-  data: string
-  status: 400
-}
-
-export type postUnitsUnitIdPreRegistrationsRedeemResponse500 = {
-  data: string
-  status: 500
-}
-
-export type postUnitsUnitIdPreRegistrationsRedeemResponseSuccess = (postUnitsUnitIdPreRegistrationsRedeemResponse200) & {
-  headers: Headers;
-};
-export type postUnitsUnitIdPreRegistrationsRedeemResponseError = (postUnitsUnitIdPreRegistrationsRedeemResponse400 | postUnitsUnitIdPreRegistrationsRedeemResponse500) & {
-  headers: Headers;
-};
-
-export type postUnitsUnitIdPreRegistrationsRedeemResponse = (postUnitsUnitIdPreRegistrationsRedeemResponseSuccess | postUnitsUnitIdPreRegistrationsRedeemResponseError)
-
-export const getPostUnitsUnitIdPreRegistrationsRedeemUrl = (unitId: string,) => {
-
-
-
-
-  return `/units/${unitId}/pre-registrations/redeem`
-}
-
-export const postUnitsUnitIdPreRegistrationsRedeem = async (unitId: string,
-    modelsPreRegistrationCodeRequest: ModelsPreRegistrationCodeRequest, options?: RequestInit): Promise<postUnitsUnitIdPreRegistrationsRedeemResponse> => {
-
-  return orvalMutator<postUnitsUnitIdPreRegistrationsRedeemResponse>(getPostUnitsUnitIdPreRegistrationsRedeemUrl(unitId),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(
-      modelsPreRegistrationCodeRequest,)
-  }
-);}
-
-
-
-
-export const getPostUnitsUnitIdPreRegistrationsRedeemMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrationsRedeem>>, TError,{unitId: string;data: ModelsPreRegistrationCodeRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrationsRedeem>>, TError,{unitId: string;data: ModelsPreRegistrationCodeRequest}, TContext> => {
-
-const mutationKey = ['postUnitsUnitIdPreRegistrationsRedeem'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrationsRedeem>>, {unitId: string;data: ModelsPreRegistrationCodeRequest}> = (props) => {
-          const {unitId,data} = props ?? {};
-
-          return  postUnitsUnitIdPreRegistrationsRedeem(unitId,data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type PostUnitsUnitIdPreRegistrationsRedeemMutationResult = NonNullable<Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrationsRedeem>>>
-    export type PostUnitsUnitIdPreRegistrationsRedeemMutationBody = ModelsPreRegistrationCodeRequest
-    export type PostUnitsUnitIdPreRegistrationsRedeemMutationError = string
-
-    /**
- * @summary Redeem a pre-registration code (kiosk)
- */
-export const usePostUnitsUnitIdPreRegistrationsRedeem = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrationsRedeem>>, TError,{unitId: string;data: ModelsPreRegistrationCodeRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrationsRedeem>>,
-        TError,
-        {unitId: string;data: ModelsPreRegistrationCodeRequest},
-        TContext
-      > => {
-      return useMutation(getPostUnitsUnitIdPreRegistrationsRedeemMutationOptions(options), queryClient);
-    }
-
-/**
- * Returns HH:MM slot strings; uses CalDAV when integration is enabled.
- * @summary Get available time slots for pre-registration
- */
-export type getUnitsUnitIdPreRegistrationsSlotsResponse200 = {
-  data: string[]
-  status: 200
-}
-
-export type getUnitsUnitIdPreRegistrationsSlotsResponse400 = {
-  data: string
-  status: 400
-}
-
-export type getUnitsUnitIdPreRegistrationsSlotsResponse500 = {
-  data: string
-  status: 500
-}
-
-export type getUnitsUnitIdPreRegistrationsSlotsResponseSuccess = (getUnitsUnitIdPreRegistrationsSlotsResponse200) & {
-  headers: Headers;
-};
-export type getUnitsUnitIdPreRegistrationsSlotsResponseError = (getUnitsUnitIdPreRegistrationsSlotsResponse400 | getUnitsUnitIdPreRegistrationsSlotsResponse500) & {
-  headers: Headers;
-};
-
-export type getUnitsUnitIdPreRegistrationsSlotsResponse = (getUnitsUnitIdPreRegistrationsSlotsResponseSuccess | getUnitsUnitIdPreRegistrationsSlotsResponseError)
-
-export const getGetUnitsUnitIdPreRegistrationsSlotsUrl = (unitId: string,
-    params: GetUnitsUnitIdPreRegistrationsSlotsParams,) => {
-  const normalizedParams = new URLSearchParams();
-
-  Object.entries(params || {}).forEach(([key, value]) => {
-
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : value.toString())
-    }
-  });
-
-  const stringifiedParams = normalizedParams.toString();
-
-  return stringifiedParams.length > 0 ? `/units/${unitId}/pre-registrations/slots?${stringifiedParams}` : `/units/${unitId}/pre-registrations/slots`
-}
-
-export const getUnitsUnitIdPreRegistrationsSlots = async (unitId: string,
-    params: GetUnitsUnitIdPreRegistrationsSlotsParams, options?: RequestInit): Promise<getUnitsUnitIdPreRegistrationsSlotsResponse> => {
-
-  return orvalMutator<getUnitsUnitIdPreRegistrationsSlotsResponse>(getGetUnitsUnitIdPreRegistrationsSlotsUrl(unitId,params),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getGetUnitsUnitIdPreRegistrationsSlotsQueryKey = (unitId: string,
-    params?: GetUnitsUnitIdPreRegistrationsSlotsParams,) => {
-    return [
-    `/units/${unitId}/pre-registrations/slots`, ...(params ? [params] : [])
-    ] as const;
-    }
-
-
-export const getGetUnitsUnitIdPreRegistrationsSlotsQueryOptions = <TData = Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsSlots>>, TError = string>(unitId: string,
-    params: GetUnitsUnitIdPreRegistrationsSlotsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsSlots>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetUnitsUnitIdPreRegistrationsSlotsQueryKey(unitId,params);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsSlots>>> = ({ signal }) => getUnitsUnitIdPreRegistrationsSlots(unitId,params, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsSlots>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type GetUnitsUnitIdPreRegistrationsSlotsQueryResult = NonNullable<Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsSlots>>>
-export type GetUnitsUnitIdPreRegistrationsSlotsQueryError = string
-
-
-export function useGetUnitsUnitIdPreRegistrationsSlots<TData = Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsSlots>>, TError = string>(
- unitId: string,
-    params: GetUnitsUnitIdPreRegistrationsSlotsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsSlots>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsSlots>>,
-          TError,
-          Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsSlots>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitsUnitIdPreRegistrationsSlots<TData = Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsSlots>>, TError = string>(
- unitId: string,
-    params: GetUnitsUnitIdPreRegistrationsSlotsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsSlots>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsSlots>>,
-          TError,
-          Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsSlots>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitsUnitIdPreRegistrationsSlots<TData = Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsSlots>>, TError = string>(
- unitId: string,
-    params: GetUnitsUnitIdPreRegistrationsSlotsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsSlots>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get available time slots for pre-registration
- */
-
-export function useGetUnitsUnitIdPreRegistrationsSlots<TData = Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsSlots>>, TError = string>(
- unitId: string,
-    params: GetUnitsUnitIdPreRegistrationsSlotsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdPreRegistrationsSlots>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getGetUnitsUnitIdPreRegistrationsSlotsQueryOptions(unitId,params,options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-
-
-
-
-
-
-/**
- * Looks up a pre-registration by code for the unit context; returns the record when valid.
- * @summary Validate a pre-registration code (kiosk)
- */
-export type postUnitsUnitIdPreRegistrationsValidateResponse200 = {
-  data: ModelsPreRegistration
-  status: 200
-}
-
-export type postUnitsUnitIdPreRegistrationsValidateResponse400 = {
-  data: string
-  status: 400
-}
-
-export type postUnitsUnitIdPreRegistrationsValidateResponse404 = {
+export type getSupportReportByIDResponse404 = {
   data: string
   status: 404
 }
 
-export type postUnitsUnitIdPreRegistrationsValidateResponse500 = {
-  data: string
-  status: 500
-}
-
-export type postUnitsUnitIdPreRegistrationsValidateResponseSuccess = (postUnitsUnitIdPreRegistrationsValidateResponse200) & {
+export type getSupportReportByIDResponseSuccess = (getSupportReportByIDResponse200) & {
   headers: Headers;
 };
-export type postUnitsUnitIdPreRegistrationsValidateResponseError = (postUnitsUnitIdPreRegistrationsValidateResponse400 | postUnitsUnitIdPreRegistrationsValidateResponse404 | postUnitsUnitIdPreRegistrationsValidateResponse500) & {
+export type getSupportReportByIDResponseError = (getSupportReportByIDResponse401 | getSupportReportByIDResponse403 | getSupportReportByIDResponse404) & {
   headers: Headers;
 };
 
-export type postUnitsUnitIdPreRegistrationsValidateResponse = (postUnitsUnitIdPreRegistrationsValidateResponseSuccess | postUnitsUnitIdPreRegistrationsValidateResponseError)
+export type getSupportReportByIDResponse = (getSupportReportByIDResponseSuccess | getSupportReportByIDResponseError)
 
-export const getPostUnitsUnitIdPreRegistrationsValidateUrl = (unitId: string,) => {
-
-
+export const getGetSupportReportByIDUrl = (id: string,) => {
 
 
-  return `/units/${unitId}/pre-registrations/validate`
+
+
+  return `/support/reports/${id}`
 }
 
-export const postUnitsUnitIdPreRegistrationsValidate = async (unitId: string,
-    modelsPreRegistrationCodeRequest: ModelsPreRegistrationCodeRequest, options?: RequestInit): Promise<postUnitsUnitIdPreRegistrationsValidateResponse> => {
+export const getSupportReportByID = async (id: string, options?: RequestInit): Promise<getSupportReportByIDResponse> => {
 
-  return orvalMutator<postUnitsUnitIdPreRegistrationsValidateResponse>(getPostUnitsUnitIdPreRegistrationsValidateUrl(unitId),
+  return orvalMutator<getSupportReportByIDResponse>(getGetSupportReportByIDUrl(id),
   {
     ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(
-      modelsPreRegistrationCodeRequest,)
+    method: 'GET'
+
+
   }
 );}
 
 
 
 
-export const getPostUnitsUnitIdPreRegistrationsValidateMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrationsValidate>>, TError,{unitId: string;data: ModelsPreRegistrationCodeRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrationsValidate>>, TError,{unitId: string;data: ModelsPreRegistrationCodeRequest}, TContext> => {
 
-const mutationKey = ['postUnitsUnitIdPreRegistrationsValidate'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrationsValidate>>, {unitId: string;data: ModelsPreRegistrationCodeRequest}> = (props) => {
-          const {unitId,data} = props ?? {};
-
-          return  postUnitsUnitIdPreRegistrationsValidate(unitId,data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type PostUnitsUnitIdPreRegistrationsValidateMutationResult = NonNullable<Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrationsValidate>>>
-    export type PostUnitsUnitIdPreRegistrationsValidateMutationBody = ModelsPreRegistrationCodeRequest
-    export type PostUnitsUnitIdPreRegistrationsValidateMutationError = string
-
-    /**
- * @summary Validate a pre-registration code (kiosk)
- */
-export const usePostUnitsUnitIdPreRegistrationsValidate = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrationsValidate>>, TError,{unitId: string;data: ModelsPreRegistrationCodeRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof postUnitsUnitIdPreRegistrationsValidate>>,
-        TError,
-        {unitId: string;data: ModelsPreRegistrationCodeRequest},
-        TContext
-      > => {
-      return useMutation(getPostUnitsUnitIdPreRegistrationsValidateMutationOptions(options), queryClient);
+export const getGetSupportReportByIDQueryKey = (id: string,) => {
+    return [
+    `/support/reports/${id}`
+    ] as const;
     }
 
+
+export const getGetSupportReportByIDQueryOptions = <TData = Awaited<ReturnType<typeof getSupportReportByID>>, TError = string>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSupportReportByID>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSupportReportByIDQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSupportReportByID>>> = ({ signal }) => getSupportReportByID(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSupportReportByID>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetSupportReportByIDQueryResult = NonNullable<Awaited<ReturnType<typeof getSupportReportByID>>>
+export type GetSupportReportByIDQueryError = string
+
+
+export function useGetSupportReportByID<TData = Awaited<ReturnType<typeof getSupportReportByID>>, TError = string>(
+ id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSupportReportByID>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getSupportReportByID>>,
+          TError,
+          Awaited<ReturnType<typeof getSupportReportByID>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetSupportReportByID<TData = Awaited<ReturnType<typeof getSupportReportByID>>, TError = string>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSupportReportByID>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getSupportReportByID>>,
+          TError,
+          Awaited<ReturnType<typeof getSupportReportByID>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetSupportReportByID<TData = Awaited<ReturnType<typeof getSupportReportByID>>, TError = string>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSupportReportByID>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * Updates editable fields on an existing pre-registration for the unit.
- * @summary Update a pre-registration
+ * @summary Get one support report by id
  */
-export type putUnitsUnitIdPreRegistrationsIdResponse200 = {
-  data: ModelsPreRegistration
-  status: 200
+
+export function useGetSupportReportByID<TData = Awaited<ReturnType<typeof getSupportReportByID>>, TError = string>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSupportReportByID>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetSupportReportByIDQueryOptions(id,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
 }
-
-export type putUnitsUnitIdPreRegistrationsIdResponse400 = {
-  data: string
-  status: 400
-}
-
-export type putUnitsUnitIdPreRegistrationsIdResponse401 = {
-  data: string
-  status: 401
-}
-
-export type putUnitsUnitIdPreRegistrationsIdResponse403 = {
-  data: string
-  status: 403
-}
-
-export type putUnitsUnitIdPreRegistrationsIdResponse404 = {
-  data: string
-  status: 404
-}
-
-export type putUnitsUnitIdPreRegistrationsIdResponse409 = {
-  data: string
-  status: 409
-}
-
-export type putUnitsUnitIdPreRegistrationsIdResponse500 = {
-  data: string
-  status: 500
-}
-
-export type putUnitsUnitIdPreRegistrationsIdResponseSuccess = (putUnitsUnitIdPreRegistrationsIdResponse200) & {
-  headers: Headers;
-};
-export type putUnitsUnitIdPreRegistrationsIdResponseError = (putUnitsUnitIdPreRegistrationsIdResponse400 | putUnitsUnitIdPreRegistrationsIdResponse401 | putUnitsUnitIdPreRegistrationsIdResponse403 | putUnitsUnitIdPreRegistrationsIdResponse404 | putUnitsUnitIdPreRegistrationsIdResponse409 | putUnitsUnitIdPreRegistrationsIdResponse500) & {
-  headers: Headers;
-};
-
-export type putUnitsUnitIdPreRegistrationsIdResponse = (putUnitsUnitIdPreRegistrationsIdResponseSuccess | putUnitsUnitIdPreRegistrationsIdResponseError)
-
-export const getPutUnitsUnitIdPreRegistrationsIdUrl = (unitId: string,
-    id: string,) => {
-
-
-
-
-  return `/units/${unitId}/pre-registrations/${id}`
-}
-
-export const putUnitsUnitIdPreRegistrationsId = async (unitId: string,
-    id: string,
-    modelsPreRegistrationUpdateRequest: ModelsPreRegistrationUpdateRequest, options?: RequestInit): Promise<putUnitsUnitIdPreRegistrationsIdResponse> => {
-
-  return orvalMutator<putUnitsUnitIdPreRegistrationsIdResponse>(getPutUnitsUnitIdPreRegistrationsIdUrl(unitId,id),
-  {
-    ...options,
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(
-      modelsPreRegistrationUpdateRequest,)
-  }
-);}
-
-
-
-
-export const getPutUnitsUnitIdPreRegistrationsIdMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putUnitsUnitIdPreRegistrationsId>>, TError,{unitId: string;id: string;data: ModelsPreRegistrationUpdateRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof putUnitsUnitIdPreRegistrationsId>>, TError,{unitId: string;id: string;data: ModelsPreRegistrationUpdateRequest}, TContext> => {
-
-const mutationKey = ['putUnitsUnitIdPreRegistrationsId'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putUnitsUnitIdPreRegistrationsId>>, {unitId: string;id: string;data: ModelsPreRegistrationUpdateRequest}> = (props) => {
-          const {unitId,id,data} = props ?? {};
-
-          return  putUnitsUnitIdPreRegistrationsId(unitId,id,data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type PutUnitsUnitIdPreRegistrationsIdMutationResult = NonNullable<Awaited<ReturnType<typeof putUnitsUnitIdPreRegistrationsId>>>
-    export type PutUnitsUnitIdPreRegistrationsIdMutationBody = ModelsPreRegistrationUpdateRequest
-    export type PutUnitsUnitIdPreRegistrationsIdMutationError = string
-
-    /**
- * @summary Update a pre-registration
- */
-export const usePutUnitsUnitIdPreRegistrationsId = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putUnitsUnitIdPreRegistrationsId>>, TError,{unitId: string;id: string;data: ModelsPreRegistrationUpdateRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof putUnitsUnitIdPreRegistrationsId>>,
-        TError,
-        {unitId: string;id: string;data: ModelsPreRegistrationUpdateRequest},
-        TContext
-      > => {
-      return useMutation(getPutUnitsUnitIdPreRegistrationsIdMutationOptions(options), queryClient);
-    }

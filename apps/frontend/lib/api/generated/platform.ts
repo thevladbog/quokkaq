@@ -870,6 +870,16 @@ export interface HandlersCompanyMeResponse {
   publicAppUrl?: string;
 }
 
+export type HandlersCreateSupportReportRequestDiagnostics = { [key: string]: unknown };
+
+export interface HandlersCreateSupportReportRequest {
+  description?: string;
+  diagnostics?: HandlersCreateSupportReportRequestDiagnostics;
+  title?: string;
+  traceId?: string;
+  unitId?: string;
+}
+
 export type HandlersCreateSurveyRequestCompletionMessage = { [key: string]: unknown };
 
 export type HandlersCreateSurveyRequestDisplayTheme = { [key: string]: unknown };
@@ -1183,6 +1193,23 @@ export interface ModelsPreRegistrationUpdateRequest {
 
 export interface ModelsSlotSuccessResponse {
   success?: boolean;
+}
+
+export type ModelsSupportReportDiagnostics = { [key: string]: unknown };
+
+export interface ModelsSupportReport {
+  createdAt?: string;
+  createdByUserId?: string;
+  diagnostics?: ModelsSupportReportDiagnostics;
+  id?: string;
+  lastSyncedAt?: string;
+  planeSequenceId?: number;
+  planeStatus?: string;
+  planeWorkItemId?: string;
+  title?: string;
+  traceId?: string;
+  unitId?: string;
+  updatedAt?: string;
 }
 
 /**

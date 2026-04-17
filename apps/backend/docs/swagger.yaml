@@ -592,6 +592,19 @@ components:
           example: https://app.example.com
           type: string
       type: object
+    handlers.createSupportReportRequest:
+      properties:
+        description:
+          type: string
+        diagnostics:
+          type: object
+        title:
+          type: string
+        traceId:
+          type: string
+        unitId:
+          type: string
+      type: object
     handlers.createSurveyRequest:
       properties:
         completionMessage:
@@ -1526,6 +1539,33 @@ components:
         price:
           description: price in minor units (cents/kopeks)
           type: integer
+        updatedAt:
+          type: string
+      type: object
+    models.SupportReport:
+      properties:
+        createdAt:
+          type: string
+        createdByUserId:
+          type: string
+        diagnostics:
+          type: object
+        id:
+          type: string
+        lastSyncedAt:
+          type: string
+        planeSequenceId:
+          type: integer
+        planeStatus:
+          type: string
+        planeWorkItemId:
+          type: string
+        title:
+          type: string
+        traceId:
+          type: string
+        unitId:
+          type: string
         updatedAt:
           type: string
       type: object
@@ -6305,6 +6345,118 @@ paths:
       summary: Get Available Subscription Plans
       tags:
       - subscriptions
+  /support/reports:
+    get:
+      description: Returns the current user's reports; tenant admins see all reports. Refreshes Plane status when older than a short interval.
+      operationId: listSupportReports
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/models.SupportReport'
+                type: array
+          description: OK
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+      security:
+      - BearerAuth: []
+      summary: List support reports visible to the user
+      tags:
+      - support
+    post:
+      description: Creates a work item in the configured Plane project and stores a row in QuokkaQ. Requires Plane env vars on the server.
+      operationId: createSupportReport
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/handlers.createSupportReportRequest'
+        description: Report payload
+        required: true
+        x-originalParamName: body
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.SupportReport'
+          description: Created
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '502':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Plane request failed
+        '503':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Plane not configured
+      security:
+      - BearerAuth: []
+      summary: Create a support report (Plane work item)
+      tags:
+      - support
+  /support/reports/{id}:
+    get:
+      description: Returns a report if the current user is the author or a tenant admin. Refreshes Plane status when integration is enabled.
+      operationId: getSupportReportByID
+      parameters:
+      - description: Report id
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.SupportReport'
+          description: OK
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Not found
+      security:
+      - BearerAuth: []
+      summary: Get one support report by id
+      tags:
+      - support
   /system/setup:
     post:
       description: Creates the first administrator if the system is not initialized

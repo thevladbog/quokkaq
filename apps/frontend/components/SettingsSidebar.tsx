@@ -25,7 +25,8 @@ import {
   Monitor,
   Plug,
   UserRound,
-  Activity
+  Activity,
+  Bug
 } from 'lucide-react';
 import Image from 'next/image';
 import { Link, usePathname, useRouter } from '@/src/i18n/navigation';
@@ -40,6 +41,7 @@ export default function SettingsSidebar() {
   const tOrg = useTranslations('organization');
   const tPricing = useTranslations('pricing');
   const tNav = useTranslations('nav');
+  const tStaffSupport = useTranslations('staff.support');
 
   const isActive = (path: string) => pathname === path;
   /** True only for real subpaths (e.g. /settings/units/foo), not sibling routes like /settings/units-archive. */
@@ -98,6 +100,12 @@ export default function SettingsSidebar() {
       active:
         isActive('/settings/integrations') ||
         isActiveSub('/settings/integrations')
+    },
+    {
+      icon: Bug,
+      label: tStaffSupport('sidebarSupport'),
+      href: '/staff/support',
+      active: isActive('/staff/support') || isActiveSub('/staff/support')
     },
     {
       icon: Monitor,
