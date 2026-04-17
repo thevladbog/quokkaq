@@ -378,6 +378,9 @@ func main() {
 		})
 	})
 
+	// Google Calendar OAuth browser callback (must match GOOGLE_CALENDAR_OAUTH_REDIRECT_URL path on API origin, not under /auth).
+	r.With(authmiddleware.SSOCallbackRateLimit).Get("/calendar-integrations/google/oauth/callback", calendarIntegrationHandler.GoogleOAuthCallback)
+
 	r.Route("/system", func(r chi.Router) {
 		r.Get("/status", userHandler.GetSystemStatus)
 		r.Post("/setup", userHandler.SetupFirstAdmin)
@@ -604,6 +607,9 @@ func main() {
 			r.Patch("/me/slug", companySSOHTTP.PatchCompanySlug)
 			r.Post("/me/login-links", companySSOHTTP.CreateOpaqueLoginLink)
 			r.Get("/me/calendar-integrations", calendarIntegrationHandler.ListMine)
+			r.Post("/me/calendar-integrations/google/oauth/start", calendarIntegrationHandler.GoogleOAuthStart)
+			r.Post("/me/calendar-integrations/google/oauth/list-calendars", calendarIntegrationHandler.GooglePickListCalendars)
+			r.Post("/me/calendar-integrations/google/oauth/complete", calendarIntegrationHandler.GooglePickComplete)
 			r.Post("/me/calendar-integrations", calendarIntegrationHandler.CreateMine)
 			r.Put("/me/calendar-integrations/{integrationId}", calendarIntegrationHandler.PutMine)
 			r.Delete("/me/calendar-integrations/{integrationId}", calendarIntegrationHandler.DeleteMine)

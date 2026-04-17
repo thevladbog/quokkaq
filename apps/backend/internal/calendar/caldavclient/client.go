@@ -19,6 +19,9 @@ import (
 	"github.com/emersion/go-ical"
 	"github.com/emersion/go-webdav"
 	"github.com/emersion/go-webdav/caldav"
+	"golang.org/x/oauth2"
+
+	"quokkaq-go-backend/internal/models"
 )
 
 // caldavSafeResourcePath matches normalized CalDAV resource paths (RFC 3986 "pchar"
@@ -49,11 +52,12 @@ func parseETag(raw string) string {
 
 // Client is a thin wrapper with Yandex-friendly helpers.
 type Client struct {
-	caldav     *caldav.Client
-	httpClient *http.Client
-	base       *url.URL
-	user       string
-	pass       string
+	caldav       *caldav.Client
+	httpClient   *http.Client
+	base         *url.URL
+	user         string
+	pass         string
+	useBasicAuth bool // false: rely on oauth2 transport (Google Bearer)
 }
 
 // NewYandexClient creates a CalDAV client against baseURL (typically https://caldav.yandex.ru) with app password.
@@ -88,7 +92,47 @@ func NewYandexClient(baseURL, username, appPassword string) (*Client, error) {
 		next = http.DefaultTransport
 	}
 	httpClient.Transport = &caldavBoundRoundTripper{base: baseNorm, next: next}
-	return &Client{caldav: cl, httpClient: httpClient, base: baseNorm, user: username, pass: appPassword}, nil
+	return &Client{
+		caldav:       cl,
+		httpClient:   httpClient,
+		base:         baseNorm,
+		user:         username,
+		pass:         appPassword,
+		useBasicAuth: true,
+	}, nil
+}
+
+// NewGoogleCalDAVClient builds a CalDAV client for Google Calendar (OAuth2 bearer on apidata.googleusercontent.com).
+func NewGoogleCalDAVClient(ctx context.Context, ts oauth2.TokenSource) (*Client, error) {
+	if ts == nil {
+		return nil, fmt.Errorf("caldav: token source required for Google")
+	}
+	endpoint := strings.TrimRight(models.GoogleCalDAVBaseURL, "/")
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return nil, err
+	}
+	if !strings.EqualFold(u.Scheme, "https") || strings.TrimSpace(u.Hostname()) == "" {
+		return nil, fmt.Errorf("caldav: invalid Google CalDAV base URL")
+	}
+	baseNorm := u
+	httpClient := oauth2.NewClient(ctx, ts)
+	httpClient.Timeout = 30 * time.Second
+	next := httpClient.Transport
+	if next == nil {
+		next = http.DefaultTransport
+	}
+	httpClient.Transport = &caldavBoundRoundTripper{base: baseNorm, next: next}
+	cl, err := caldav.NewClient(httpClient, endpoint)
+	if err != nil {
+		return nil, err
+	}
+	return &Client{
+		caldav:       cl,
+		httpClient:   httpClient,
+		base:         baseNorm,
+		useBasicAuth: false,
+	}, nil
 }
 
 // caldavBoundRoundTripper rejects outbound requests whose URL is not the same
@@ -198,7 +242,9 @@ func (c *Client) GetEvent(ctx context.Context, hrefPath string) (*caldav.Calenda
 	if err != nil {
 		return nil, err
 	}
-	req.SetBasicAuth(c.user, c.pass)
+	if c.useBasicAuth {
+		req.SetBasicAuth(c.user, c.pass)
+	}
 	req.Header.Set("Accept", ical.MIMEType)
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -301,7 +347,9 @@ func (c *Client) PutCalendar(ctx context.Context, hrefPath, etag string, cal *ic
 	if err != nil {
 		return "", err
 	}
-	req.SetBasicAuth(c.user, c.pass)
+	if c.useBasicAuth {
+		req.SetBasicAuth(c.user, c.pass)
+	}
 	req.Header.Set("Content-Type", ical.MIMEType)
 	if etag != "" {
 		req.Header.Set("If-Match", etag)

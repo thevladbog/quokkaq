@@ -1,9 +1,10 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2, Plus, Save, Trash2 } from 'lucide-react';
+import { CalendarDays, Globe, Loader2, Plus, Save, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Combobox } from '@/components/ui/combobox';
@@ -42,6 +43,12 @@ import {
   AlertDialogTitle
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
 import PermissionGuard from '@/components/auth/permission-guard';
 import { buildIanaTimezoneComboboxOptions } from '@/lib/iana-timezone-combobox-options';
 import {
@@ -57,8 +64,10 @@ import {
   type ServicesCreateCalendarIntegrationRequest,
   type ServicesUpdateCalendarIntegrationRequest
 } from '@/lib/api/generated/calendar-integration';
+import { authenticatedApiFetch } from '@/lib/authenticated-api-fetch';
 
 export const CALENDAR_KIND_YANDEX_CALDAV = 'yandex_caldav';
+export const CALENDAR_KIND_GOOGLE_CALDAV = 'google_caldav';
 
 const DEFAULT_CALDAV = 'https://caldav.yandex.ru';
 
@@ -86,6 +95,7 @@ function CalendarIntegrationCardForm({
   const tUnits = useTranslations('admin.units');
   const queryClient = useQueryClient();
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const isGoogle = pub.kind === CALENDAR_KIND_GOOGLE_CALDAV;
 
   const [enabled, setEnabled] = useState(pub.enabled ?? false);
   const [displayName, setDisplayName] = useState(() => pub.displayName ?? '');
@@ -130,6 +140,18 @@ function CalendarIntegrationCardForm({
   });
 
   const payload = useMemo((): ServicesUpdateCalendarIntegrationRequest => {
+    if (isGoogle) {
+      const body: ServicesUpdateCalendarIntegrationRequest = {
+        enabled,
+        displayName: displayName.trim() || undefined,
+        caldavBaseUrl: pub.caldavBaseUrl?.trim() || '',
+        calendarPath: pub.calendarPath?.trim() || '',
+        username: pub.username?.trim() || '',
+        timezone: timezone.trim(),
+        adminNotifyEmails: adminNotifyEmails.trim()
+      };
+      return body;
+    }
     const body: ServicesUpdateCalendarIntegrationRequest = {
       enabled,
       displayName: displayName.trim() || undefined,
@@ -144,6 +166,10 @@ function CalendarIntegrationCardForm({
     }
     return body;
   }, [
+    isGoogle,
+    pub.caldavBaseUrl,
+    pub.calendarPath,
+    pub.username,
     enabled,
     displayName,
     caldavBaseUrl,
@@ -155,7 +181,7 @@ function CalendarIntegrationCardForm({
   ]);
 
   const handleSave = () => {
-    if (enabled) {
+    if (!isGoogle && enabled) {
       if (!calendarPath.trim() || !username.trim()) {
         toast.error(t('required_fields'));
         return;
@@ -173,7 +199,9 @@ function CalendarIntegrationCardForm({
   const kindLabel =
     pub.kind === CALENDAR_KIND_YANDEX_CALDAV
       ? t('kind_yandex')
-      : (pub.kind ?? '');
+      : pub.kind === CALENDAR_KIND_GOOGLE_CALDAV
+        ? t('kind_google')
+        : (pub.kind ?? '');
 
   return (
     <div className='space-y-4'>
@@ -187,6 +215,12 @@ function CalendarIntegrationCardForm({
       </div>
 
       <p className='text-muted-foreground text-xs'>{t('unit_readonly_hint')}</p>
+
+      {isGoogle ? (
+        <p className='text-muted-foreground text-xs'>
+          {t('google_readonly_hint')}
+        </p>
+      ) : null}
 
       <div className='space-y-2'>
         <Label htmlFor={`dn-${pub.id}`}>{t('display_name')}</Label>
@@ -208,44 +242,59 @@ function CalendarIntegrationCardForm({
       </div>
 
       <div className='grid gap-4 sm:grid-cols-2'>
-        <div className='space-y-2 sm:col-span-2'>
-          <Label htmlFor={`caldav-url-${pub.id}`}>{t('caldav_base_url')}</Label>
-          <Input
-            id={`caldav-url-${pub.id}`}
-            value={caldavBaseUrl}
-            onChange={(e) => setCaldavBaseUrl(e.target.value)}
-            placeholder={DEFAULT_CALDAV}
-          />
-        </div>
-        <div className='space-y-2 sm:col-span-2'>
-          <Label htmlFor={`cal-path-${pub.id}`}>{t('calendar_path')}</Label>
-          <Input
-            id={`cal-path-${pub.id}`}
-            value={calendarPath}
-            onChange={(e) => setCalendarPath(e.target.value)}
-            placeholder='/calendars/username/events/'
-          />
-        </div>
-        <div className='space-y-2'>
-          <Label htmlFor={`cal-user-${pub.id}`}>{t('username')}</Label>
-          <Input
-            id={`cal-user-${pub.id}`}
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            autoComplete='off'
-          />
-        </div>
-        <div className='space-y-2'>
-          <Label htmlFor={`cal-pass-${pub.id}`}>{t('app_password')}</Label>
-          <Input
-            id={`cal-pass-${pub.id}`}
-            type='password'
-            value={appPassword}
-            onChange={(e) => setAppPassword(e.target.value)}
-            autoComplete='new-password'
-            placeholder='••••••••'
-          />
-        </div>
+        {!isGoogle ? (
+          <>
+            <div className='space-y-2 sm:col-span-2'>
+              <Label htmlFor={`caldav-url-${pub.id}`}>
+                {t('caldav_base_url')}
+              </Label>
+              <Input
+                id={`caldav-url-${pub.id}`}
+                value={caldavBaseUrl}
+                onChange={(e) => setCaldavBaseUrl(e.target.value)}
+                placeholder={DEFAULT_CALDAV}
+              />
+            </div>
+            <div className='space-y-2 sm:col-span-2'>
+              <Label htmlFor={`cal-path-${pub.id}`}>{t('calendar_path')}</Label>
+              <Input
+                id={`cal-path-${pub.id}`}
+                value={calendarPath}
+                onChange={(e) => setCalendarPath(e.target.value)}
+                placeholder='/calendars/username/events/'
+              />
+            </div>
+            <div className='space-y-2'>
+              <Label htmlFor={`cal-user-${pub.id}`}>{t('username')}</Label>
+              <Input
+                id={`cal-user-${pub.id}`}
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                autoComplete='off'
+              />
+            </div>
+            <div className='space-y-2'>
+              <Label htmlFor={`cal-pass-${pub.id}`}>{t('app_password')}</Label>
+              <Input
+                id={`cal-pass-${pub.id}`}
+                type='password'
+                value={appPassword}
+                onChange={(e) => setAppPassword(e.target.value)}
+                autoComplete='new-password'
+                placeholder='••••••••'
+              />
+            </div>
+          </>
+        ) : (
+          <div className='text-muted-foreground space-y-1 text-sm sm:col-span-2'>
+            <p>
+              <span className='text-foreground font-medium'>
+                {t('google_account_label')}
+              </span>{' '}
+              {pub.username || '—'}
+            </p>
+          </div>
+        )}
         <div className='space-y-2 sm:col-span-2'>
           <Label htmlFor={`cal-tz-${pub.id}`}>{t('timezone')}</Label>
           <Combobox
@@ -440,7 +489,7 @@ function CreateCalendarIntegrationDialog({
         <DialogHeader>
           <DialogTitle>{tInt('add_calendar')}</DialogTitle>
           <DialogDescription>
-            {t('create_dialog_description')}
+            <span className='block'>{t('create_dialog_description')}</span>
           </DialogDescription>
         </DialogHeader>
 
@@ -567,6 +616,124 @@ function CreateCalendarIntegrationDialog({
   );
 }
 
+function GoogleConnectCalendarDialog({
+  open,
+  onOpenChange,
+  units,
+  integrations,
+  defaultUnitId,
+  returnPath
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  units: UnitOption[];
+  integrations: ServicesCalendarIntegrationPublic[];
+  defaultUnitId?: string;
+  returnPath: string;
+}) {
+  const t = useTranslations('admin.calendar_integration');
+  const tInt = useTranslations('admin.integrations');
+  const [unitId, setUnitId] = useState(
+    () => defaultUnitId ?? units[0]?.id ?? ''
+  );
+  const [busy, setBusy] = useState(false);
+
+  const countForUnit = useMemo(() => {
+    if (!unitId) return 0;
+    return integrations.filter(
+      (i: ServicesCalendarIntegrationPublic) => i.unitId === unitId
+    ).length;
+  }, [integrations, unitId]);
+
+  const atLimit = countForUnit >= 4;
+
+  const startGoogle = async () => {
+    if (!unitId) {
+      toast.error(tInt('select_unit_error'));
+      return;
+    }
+    if (atLimit) {
+      toast.error(t('limit_error'));
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await authenticatedApiFetch(
+        '/companies/me/calendar-integrations/google/oauth/start',
+        {
+          method: 'POST',
+          body: JSON.stringify({ unitId, returnPath })
+        }
+      );
+      if (res.status === 503) {
+        toast.error(t('google_connect_unavailable'));
+        return;
+      }
+      if (!res.ok) {
+        toast.error(t('google_connect_error'));
+        return;
+      }
+      const data = (await res.json()) as { url?: string };
+      if (!data.url) {
+        toast.error(t('google_connect_error'));
+        return;
+      }
+      window.location.href = data.url;
+    } catch (e) {
+      console.error('startGoogle', e);
+      toast.error(t('google_connect_error'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className='sm:max-w-md'>
+        <DialogHeader>
+          <DialogTitle>{t('google_connect_dialog_title')}</DialogTitle>
+          <DialogDescription className='space-y-2'>
+            <span className='block'>{t('google_connect_dialog_desc')}</span>
+            <span className='block'>{t('create_dialog_google_note')}</span>
+          </DialogDescription>
+        </DialogHeader>
+        <div className='space-y-4 py-2'>
+          <div className='space-y-2'>
+            <Label>{t('google_select_unit')}</Label>
+            <Select value={unitId} onValueChange={setUnitId}>
+              <SelectTrigger>
+                <SelectValue placeholder={tInt('unit_placeholder')} />
+              </SelectTrigger>
+              <SelectContent>
+                {units.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>
+                    {u.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {atLimit ? (
+              <p className='text-destructive text-sm'>{t('limit_error')}</p>
+            ) : null}
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant='outline' onClick={() => onOpenChange(false)}>
+            {t('cancel')}
+          </Button>
+          <Button
+            onClick={() => void startGoogle()}
+            disabled={busy || atLimit || units.length === 0}
+          >
+            {busy && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
+            {t('google_connect_submit')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export interface CalendarIntegrationsPanelProps {
   /** When set, only show integrations for this unit (e.g. URL filter). */
   filterUnitId?: string | null;
@@ -579,11 +746,20 @@ export function CalendarIntegrationsPanel({
 }: CalendarIntegrationsPanelProps) {
   const t = useTranslations('admin.integrations');
   const tCal = useTranslations('admin.calendar_integration');
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const listQuery = useCalendarIntegrationListMine({
     query: { staleTime: 30_000 }
   });
   const [createOpen, setCreateOpen] = useState(false);
   const [createDialogKey, setCreateDialogKey] = useState(0);
+  const [googleOpen, setGoogleOpen] = useState(false);
+  const [googleDialogKey, setGoogleDialogKey] = useState(0);
+
+  const oauthReturnPath = useMemo(() => {
+    const s = searchParams.toString();
+    return s ? `${pathname}?${s}` : pathname;
+  }, [pathname, searchParams]);
 
   const rawList = useMemo(() => {
     return listQuery.data?.status === 200 ? (listQuery.data.data ?? []) : [];
@@ -610,7 +786,11 @@ export function CalendarIntegrationsPanel({
 
   const triggerTitle = (row: ServicesCalendarIntegrationPublic) => {
     const unit = row.unitName ?? row.unitId ?? '';
-    const label = row.displayName?.trim() || tCal('kind_yandex');
+    const kindFallback =
+      row.kind === CALENDAR_KIND_GOOGLE_CALDAV
+        ? tCal('kind_google')
+        : tCal('kind_yandex');
+    const label = row.displayName?.trim() || kindFallback;
     return `${unit} — ${label}`;
   };
 
@@ -634,18 +814,58 @@ export function CalendarIntegrationsPanel({
         <p className='text-muted-foreground text-sm'>
           {t('calendars_list_hint')}
         </p>
-        <Button
-          type='button'
-          size='sm'
-          onClick={() => {
-            setCreateDialogKey((k) => k + 1);
-            setCreateOpen(true);
-          }}
-          disabled={unitOptions.length === 0}
-        >
-          <Plus className='mr-2 h-4 w-4' />
-          {t('add_calendar')}
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type='button'
+              size='sm'
+              disabled={unitOptions.length === 0}
+              aria-label={tCal('add_menu_aria')}
+              aria-haspopup='menu'
+            >
+              <Plus className='mr-2 h-4 w-4' />
+              {t('add_calendar')}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align='end' className='min-w-[14rem]'>
+            <DropdownMenuItem
+              className='cursor-pointer gap-2'
+              onSelect={() => {
+                setGoogleDialogKey((k) => k + 1);
+                setGoogleOpen(true);
+              }}
+            >
+              <Globe
+                className='text-muted-foreground size-4 shrink-0'
+                aria-hidden
+              />
+              <span className='flex flex-col gap-0.5'>
+                <span>{tCal('add_menu_google')}</span>
+                <span className='text-muted-foreground text-xs font-normal'>
+                  {tCal('add_menu_google_hint')}
+                </span>
+              </span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className='cursor-pointer gap-2'
+              onSelect={() => {
+                setCreateDialogKey((k) => k + 1);
+                setCreateOpen(true);
+              }}
+            >
+              <CalendarDays
+                className='text-muted-foreground size-4 shrink-0'
+                aria-hidden
+              />
+              <span className='flex flex-col gap-0.5'>
+                <span>{tCal('add_menu_yandex')}</span>
+                <span className='text-muted-foreground text-xs font-normal'>
+                  {tCal('add_menu_yandex_hint')}
+                </span>
+              </span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {sorted.length === 0 ? (
@@ -684,12 +904,22 @@ export function CalendarIntegrationsPanel({
       )}
 
       <CreateCalendarIntegrationDialog
-        key={createDialogKey}
+        key={`cal-yandex-${createDialogKey}`}
         open={createOpen}
         onOpenChange={setCreateOpen}
         units={unitOptions}
         integrations={rawList}
         defaultUnitId={filterUnitId ?? undefined}
+      />
+
+      <GoogleConnectCalendarDialog
+        key={`cal-google-${googleDialogKey}`}
+        open={googleOpen}
+        onOpenChange={setGoogleOpen}
+        units={unitOptions}
+        integrations={rawList}
+        defaultUnitId={filterUnitId ?? undefined}
+        returnPath={oauthReturnPath}
       />
     </div>
   );

@@ -1,0 +1,21 @@
+# Novelty: cat GIF on new/reopened PRs — https://github.com/marketplace/actions/action-cats
+name: Cats 😺
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+
+permissions:
+  pull-requests: write
+
+jobs:
+  aCatForCreatingThePullRequest:
+    name: A cat for your effort!
+    runs-on: ubuntu-latest
+    steps:
+      # Pinned to tag 1.0.2 commit (supply-chain); see https://github.com/ruairidhwm/action-cats
+      - uses: ruairidhwm/action-cats@309530f7a011f12e0359514d2c1bb9cef114dd41
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

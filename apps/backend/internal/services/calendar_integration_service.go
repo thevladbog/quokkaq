@@ -18,6 +18,7 @@ import (
 
 	"github.com/emersion/go-ical"
 	"github.com/emersion/go-webdav/caldav"
+	"golang.org/x/oauth2"
 	"gorm.io/gorm"
 )
 
@@ -35,7 +36,9 @@ var (
 	ErrCalendarIntegrationKindUnknown = errors.New("unsupported calendar integration kind")
 	ErrCalendarUnitCompanyMismatch    = errors.New("unit does not belong to company")
 	ErrCalendarAppPasswordRequired    = errors.New("app password is required for new calendar integration")
-	ErrCalendarEnabledRequired        = errors.New("enabled is required")
+	// ErrCalendarGoogleCalDAVIdentityImmutable is returned on PUT when the client tries to change CalDAV identity fields for google_caldav.
+	ErrCalendarGoogleCalDAVIdentityImmutable = errors.New("caldav base URL, calendar path, and username cannot be changed for Google Calendar connections")
+	ErrCalendarEnabledRequired               = errors.New("enabled is required")
 	// ErrCalendarIntegrationBlockedByActivePreRegistrations is returned when delete or disable would strand active bookings.
 	ErrCalendarIntegrationBlockedByActivePreRegistrations = errors.New("active pre-registrations still reference this calendar integration")
 )
@@ -65,15 +68,33 @@ func NewCalendarIntegrationService(
 	}
 }
 
-func (s *CalendarIntegrationService) clientForIntegration(integ *models.UnitCalendarIntegration) (*caldavclient.Client, error) {
-	if integ.Kind != "" && integ.Kind != models.CalendarIntegrationKindYandexCalDAV {
+func (s *CalendarIntegrationService) clientForIntegration(ctx context.Context, integ *models.UnitCalendarIntegration) (*caldavclient.Client, error) {
+	kind := strings.TrimSpace(integ.Kind)
+	if kind == "" {
+		kind = models.CalendarIntegrationKindYandexCalDAV
+	}
+	switch kind {
+	case models.CalendarIntegrationKindYandexCalDAV:
+		raw, err := ssocrypto.DecryptAES256GCM(integ.AppPasswordEncrypted)
+		if err != nil {
+			return nil, err
+		}
+		return caldavclient.NewYandexClient(strings.TrimSpace(integ.CaldavBaseURL), integ.Username, string(raw))
+	case models.CalendarIntegrationKindGoogleCalDAV:
+		raw, err := ssocrypto.DecryptAES256GCM(integ.AppPasswordEncrypted)
+		if err != nil {
+			return nil, err
+		}
+		cfg := googleCalendarOAuthConfig()
+		if cfg == nil {
+			return nil, ErrGoogleCalendarOAuthNotConfigured
+		}
+		rt := strings.TrimSpace(string(raw))
+		ts := cfg.TokenSource(ctx, &oauth2.Token{RefreshToken: rt})
+		return caldavclient.NewGoogleCalDAVClient(ctx, ts)
+	default:
 		return nil, ErrCalendarIntegrationKindUnknown
 	}
-	raw, err := ssocrypto.DecryptAES256GCM(integ.AppPasswordEncrypted)
-	if err != nil {
-		return nil, err
-	}
-	return caldavclient.NewYandexClient(strings.TrimSpace(integ.CaldavBaseURL), integ.Username, string(raw))
 }
 
 // GetIntegration returns the first integration row for a unit (legacy), or nil if none.
@@ -163,7 +184,7 @@ type CalendarIntegrationPublic struct {
 }
 
 func (s *CalendarIntegrationService) rowToPublic(row *models.UnitCalendarIntegration, unitName string) *CalendarIntegrationPublic {
-	kind := row.Kind
+	kind := strings.TrimSpace(row.Kind)
 	if kind == "" {
 		kind = models.CalendarIntegrationKindYandexCalDAV
 	}
@@ -310,6 +331,63 @@ func (s *CalendarIntegrationService) CreateIntegration(companyID string, req *Cr
 	return s.GetPublicByID(row.ID)
 }
 
+// CreateGoogleIntegration persists a google_caldav row after OAuth (refresh token encrypted like Yandex app password).
+func (s *CalendarIntegrationService) CreateGoogleIntegration(companyID, unitID, refreshToken, email, calendarID string) (*CalendarIntegrationPublic, error) {
+	if err := s.VerifyUnitBelongsToCompany(unitID, companyID); err != nil {
+		return nil, err
+	}
+	n, err := s.repo.CountByUnitID(unitID)
+	if err != nil {
+		return nil, err
+	}
+	if n >= MaxCalendarIntegrationsPerUnit {
+		return nil, ErrCalendarIntegrationLimit
+	}
+	rt := strings.TrimSpace(refreshToken)
+	if rt == "" {
+		return nil, ErrGoogleCalendarOAuthNoRefreshToken
+	}
+	email = strings.TrimSpace(email)
+	if email == "" {
+		return nil, ErrGoogleCalendarOAuthUserinfo
+	}
+	calID := strings.TrimSpace(calendarID)
+	if calID == "" {
+		calID = email
+	}
+	calPath, err := models.GoogleCalDAVEventsCollectionPath(calID)
+	if err != nil {
+		return nil, err
+	}
+	u, err := s.unitRepo.FindByIDLight(unitID)
+	if err != nil {
+		return nil, err
+	}
+	tz := strings.TrimSpace(u.Timezone)
+	if tz == "" {
+		tz = "Europe/Moscow"
+	}
+	enc, encErr := ssocrypto.EncryptAES256GCM([]byte(rt))
+	if encErr != nil {
+		return nil, encErr
+	}
+	row := models.UnitCalendarIntegration{
+		UnitID:               unitID,
+		Kind:                 models.CalendarIntegrationKindGoogleCalDAV,
+		DisplayName:          fmt.Sprintf("Google (%s)", email),
+		Enabled:              true,
+		CaldavBaseURL:        models.GoogleCalDAVBaseURL,
+		CalendarPath:         calPath,
+		Username:             email,
+		AppPasswordEncrypted: enc,
+		Timezone:             tz,
+	}
+	if err := s.repo.CreateIntegration(&row); err != nil {
+		return nil, err
+	}
+	return s.GetPublicByID(row.ID)
+}
+
 // UpdateCalendarIntegrationRequest is PUT body (unitId changes not allowed in MVP).
 type UpdateCalendarIntegrationRequest struct {
 	DisplayName       string `json:"displayName,omitempty"`
@@ -343,25 +421,52 @@ func (s *CalendarIntegrationService) UpdateIntegration(companyID, integrationID 
 			return nil, fmt.Errorf("%w: cannot disable while %d active pre-registrations still reference it", ErrCalendarIntegrationBlockedByActivePreRegistrations, n)
 		}
 	}
-	row.DisplayName = strings.TrimSpace(req.DisplayName)
-	row.Enabled = *req.Enabled
-	row.CaldavBaseURL = req.CaldavBaseURL
-	row.CalendarPath = strings.TrimSpace(req.CalendarPath)
-	row.Username = strings.TrimSpace(req.Username)
-	row.Timezone = req.Timezone
-	row.AdminNotifyEmails = req.AdminNotifyEmails
-	if row.CaldavBaseURL == "" {
-		row.CaldavBaseURL = "https://caldav.yandex.ru"
+	kind := strings.TrimSpace(row.Kind)
+	if kind == "" {
+		kind = models.CalendarIntegrationKindYandexCalDAV
 	}
-	if row.Timezone == "" {
-		row.Timezone = "Europe/Moscow"
-	}
-	if strings.TrimSpace(req.AppPassword) != "" {
-		enc, encErr := ssocrypto.EncryptAES256GCM([]byte(strings.TrimSpace(req.AppPassword)))
-		if encErr != nil {
-			return nil, encErr
+	if kind == models.CalendarIntegrationKindGoogleCalDAV {
+		reqBase := strings.TrimSpace(req.CaldavBaseURL)
+		if reqBase != "" && reqBase != row.CaldavBaseURL {
+			return nil, ErrCalendarGoogleCalDAVIdentityImmutable
 		}
-		row.AppPasswordEncrypted = enc
+		reqPath := strings.TrimSpace(req.CalendarPath)
+		if reqPath != "" && reqPath != row.CalendarPath {
+			return nil, ErrCalendarGoogleCalDAVIdentityImmutable
+		}
+		reqUser := strings.TrimSpace(req.Username)
+		if reqUser != "" && reqUser != row.Username {
+			return nil, ErrCalendarGoogleCalDAVIdentityImmutable
+		}
+		row.DisplayName = strings.TrimSpace(req.DisplayName)
+		row.Enabled = *req.Enabled
+		row.Timezone = req.Timezone
+		row.AdminNotifyEmails = req.AdminNotifyEmails
+		row.CaldavBaseURL = models.GoogleCalDAVBaseURL
+		if row.Timezone == "" {
+			row.Timezone = "Europe/Moscow"
+		}
+	} else {
+		row.DisplayName = strings.TrimSpace(req.DisplayName)
+		row.Enabled = *req.Enabled
+		row.CaldavBaseURL = req.CaldavBaseURL
+		row.CalendarPath = strings.TrimSpace(req.CalendarPath)
+		row.Username = strings.TrimSpace(req.Username)
+		row.Timezone = req.Timezone
+		row.AdminNotifyEmails = req.AdminNotifyEmails
+		if row.CaldavBaseURL == "" {
+			row.CaldavBaseURL = "https://caldav.yandex.ru"
+		}
+		if row.Timezone == "" {
+			row.Timezone = "Europe/Moscow"
+		}
+		if strings.TrimSpace(req.AppPassword) != "" {
+			enc, encErr := ssocrypto.EncryptAES256GCM([]byte(strings.TrimSpace(req.AppPassword)))
+			if encErr != nil {
+				return nil, encErr
+			}
+			row.AppPasswordEncrypted = enc
+		}
 	}
 	if err := s.repo.UpdateIntegration(row); err != nil {
 		return nil, err
@@ -479,7 +584,7 @@ func (s *CalendarIntegrationService) SyncIntegration(ctx context.Context, integr
 		return nil
 	}
 	unitID := integ.UnitID
-	client, err := s.clientForIntegration(integ)
+	client, err := s.clientForIntegration(ctx, integ)
 	if err != nil {
 		_ = s.markSyncError(integ.ID, err.Error())
 		return err
@@ -755,7 +860,7 @@ func (s *CalendarIntegrationService) applyBookedFromValidatedEvent(ctx context.C
 // ValidateAndApplyBooked validates the CalDAV slot (free + etag), then updates the calendar to [Забронирован].
 // Callers must persist the pre-registration row only after this succeeds (create/reschedule); no DB write should occur before eligibility passes.
 func (s *CalendarIntegrationService) ValidateAndApplyBooked(ctx context.Context, integ *models.UnitCalendarIntegration, svc *models.Service, href, etag string, pr *models.PreRegistration) (newETag string, err error) {
-	client, err := s.clientForIntegration(integ)
+	client, err := s.clientForIntegration(ctx, integ)
 	if err != nil {
 		return "", err
 	}
@@ -778,7 +883,7 @@ func (s *CalendarIntegrationService) ApplyTicketFormat(ctx context.Context, inte
 	if pr.ExternalEventHref == nil || *pr.ExternalEventHref == "" {
 		return nil
 	}
-	client, err := s.clientForIntegration(integ)
+	client, err := s.clientForIntegration(ctx, integ)
 	if err != nil {
 		return err
 	}
@@ -798,7 +903,7 @@ func (s *CalendarIntegrationService) ApplyTicketFormat(ctx context.Context, inte
 
 // ReleaseFreeSlot resets event to free template (cancel / admin fix).
 func (s *CalendarIntegrationService) ReleaseFreeSlot(ctx context.Context, integ *models.UnitCalendarIntegration, svc *models.Service, href, etag string) error {
-	client, err := s.clientForIntegration(integ)
+	client, err := s.clientForIntegration(ctx, integ)
 	if err != nil {
 		return err
 	}

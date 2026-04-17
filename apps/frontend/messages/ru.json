@@ -517,8 +517,8 @@
       "filter_all_units": "Все подразделения",
       "filter_unit_hint": "Сужает список ниже. У каждого подключения по-прежнему своё подразделение.",
       "add_calendar": "Добавить календарь",
-      "calendar_list_empty": "Пока нет подключений к календарю. Добавьте, чтобы импортировать слоты из Яндекс.Календаря (CalDAV).",
-      "calendars_list_hint": "До четырёх подключений CalDAV на подразделение. Откройте строку, чтобы изменить или удалить.",
+      "calendar_list_empty": "Пока нет подключений к календарю. Добавьте Google или Яндекс (CalDAV), чтобы импортировать слоты.",
+      "calendars_list_hint": "До четырёх подключений к календарю на подразделение (Google или Яндекс CalDAV). Откройте строку, чтобы изменить или удалить.",
       "select_unit_error": "Выберите подразделение."
     },
     "desktop_terminals": {
@@ -950,7 +950,44 @@
       "create_success": "Подключение к календарю создано",
       "create_error": "Не удалось создать подключение",
       "limit_error": "У этого подразделения уже максимум четыре подключения к календарю.",
-      "create_submit": "Создать"
+      "create_submit": "Создать",
+      "create_dialog_google_note": "Google Календарь: нажмите «Подключить Google Календарь», войдите в Google, затем выберите, какой календарь подключить.",
+      "kind_google": "Google Календарь",
+      "google_readonly_hint": "URL CalDAV и доступ через Google задаются при подключении и здесь не меняются.",
+      "google_account_label": "Аккаунт",
+      "add_menu_aria": "Добавить календарь: выбрать тип подключения",
+      "add_menu_google": "Google Календарь",
+      "add_menu_google_hint": "Вход через Google, затем выбор календаря",
+      "add_menu_yandex": "Яндекс.Календарь (CalDAV)",
+      "add_menu_yandex_hint": "Логин и пароль приложения",
+      "google_connect": "Подключить Google Календарь",
+      "google_connect_dialog_title": "Подключение Google Календаря",
+      "google_connect_dialog_desc": "Вы перейдёте на страницу входа Google. После согласия можно выбрать календарь для этого подразделения.",
+      "google_select_unit": "Подразделение",
+      "google_connect_submit": "Продолжить с Google",
+      "google_connect_error": "Не удалось начать подключение Google",
+      "google_connect_unavailable": "Подключение Google на сервере не настроено (OAuth).",
+      "google_oauth_success_toast": "Календарь Google подключён",
+      "google_oauth_error_toast": "Не удалось подключить Google Календарь",
+      "google_oauth_err_no_refresh": "Google не выдал ключ обновления. Попробуйте ещё раз и подтвердите доступ.",
+      "google_oauth_err_not_configured": "Интеграция Google не настроена на сервере.",
+      "google_oauth_err_userinfo": "Не удалось получить email из Google.",
+      "google_oauth_err_limit": "У подразделения уже максимум четырёх календарей.",
+      "google_oauth_err_forbidden": "Нет доступа к этому подразделению.",
+      "google_oauth_err_create_failed": "Не удалось сохранить подключение.",
+      "google_oauth_err_pick_save": "Не удалось сохранить сессию входа. Попробуйте ещё раз.",
+      "google_pick_dialog_title": "Выберите календарь Google",
+      "google_pick_dialog_desc": "Укажите календарь для этого подразделения. В списке только календари, в которые у вас есть право записи.",
+      "google_pick_loading": "Загружаем список календарей…",
+      "google_pick_empty": "Для этого аккаунта не найдено календарей с правом записи.",
+      "google_pick_label": "Календарь",
+      "google_pick_placeholder": "Выберите календарь",
+      "google_pick_primary_badge": "основной",
+      "google_pick_connect": "Подключить выбранный календарь",
+      "google_pick_success": "Календарь Google подключён",
+      "google_pick_error": "Не удалось завершить подключение календаря.",
+      "google_pick_session_expired": "Сессия выбора календаря истекла. Начните подключение Google заново.",
+      "google_pick_select_calendar": "Сначала выберите календарь."
     }
   },
   "staff": {
@@ -2243,10 +2280,16 @@
     },
     "ticket": "Ваш талон - QuokkaQ",
     "statistics": "Статистика - QuokkaQ",
+    "help": "Справка - QuokkaQ",
     "platform": {
       "root": "Платформа - QuokkaQ"
     },
     "workstations": "Рабочие места - QuokkaQ"
+  },
+  "wiki": {
+    "homeLink": "Главная справки",
+    "fallbackTitle": "Перевод",
+    "fallbackNotice": "Эта страница пока недоступна на выбранном языке. Ниже показана английская версия."
   },
   "workstations": {
     "title": "Рабочие места",

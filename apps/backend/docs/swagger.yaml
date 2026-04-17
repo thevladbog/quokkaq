@@ -118,6 +118,49 @@ components:
         email:
           type: string
       type: object
+    handlers.GoogleCalendarOAuthStartRequest:
+      properties:
+        returnPath:
+          type: string
+        unitId:
+          type: string
+      required:
+      - returnPath
+      - unitId
+      type: object
+    handlers.GoogleCalendarOAuthStartResponse:
+      properties:
+        url:
+          type: string
+      required:
+      - url
+      type: object
+    handlers.GoogleCalendarPickCompleteRequest:
+      properties:
+        calendarId:
+          type: string
+        pickToken:
+          type: string
+      required:
+      - calendarId
+      - pickToken
+      type: object
+    handlers.GoogleCalendarPickListRequest:
+      properties:
+        pickToken:
+          type: string
+      required:
+      - pickToken
+      type: object
+    handlers.GoogleCalendarPickListResponse:
+      properties:
+        calendars:
+          items:
+            $ref: '#/components/schemas/services.GoogleCalendarPickOption'
+          type: array
+      required:
+      - calendars
+      type: object
     handlers.InvoiceDraftCreateBody:
       properties:
         allowStripePaymentLink:
@@ -1949,6 +1992,15 @@ components:
         userId:
           type: string
       type: object
+    services.GoogleCalendarPickOption:
+      properties:
+        id:
+          type: string
+        primary:
+          type: boolean
+        summary:
+          type: string
+      type: object
     services.GuestSurveySession:
       properties:
         activeSurveySubmitted:
@@ -2990,6 +3042,33 @@ paths:
       summary: Update a booking
       tags:
       - bookings
+  /calendar-integrations/google/oauth/callback:
+    get:
+      operationId: calendarIntegrationGoogleOAuthCallback
+      parameters:
+      - description: Authorization code from Google
+        in: query
+        name: code
+        required: true
+        schema:
+          type: string
+      - description: OAuth state (PKCE session key)
+        in: query
+        name: state
+        required: true
+        schema:
+          type: string
+      responses:
+        '302':
+          description: 'Found — redirect only (no JSON body). Success: Location to return path with google_calendar_pick. Failures: Location to return path with google_calendar=error and reason (or equivalent query parameters).'
+          headers:
+            Location:
+              description: Where the browser should navigate next (success or error redirect target).
+              schema:
+                type: string
+      summary: Google Calendar OAuth callback (browser redirect)
+      tags:
+      - calendar-integration
   /companies/{companyId}/usage-metrics:
     get:
       description: Returns current resource usage and limits for the company
@@ -3660,6 +3739,195 @@ paths:
       security:
       - BearerAuth: []
       summary: Update a calendar integration
+      tags:
+      - calendar-integration
+  /companies/me/calendar-integrations/google/oauth/complete:
+    post:
+      operationId: calendarIntegrationGooglePickComplete
+      parameters:
+      - description: Optional company selector for admins with multiple companies
+        in: header
+        name: X-Company-Id
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/handlers.GoogleCalendarPickCompleteRequest'
+        description: Payload
+        required: true
+        x-originalParamName: body
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/services.CalendarIntegrationPublic'
+          description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad Request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Not Found
+        '409':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Conflict
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
+        '503':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Service Unavailable
+      security:
+      - BearerAuth: []
+      summary: Complete Google calendar pick and create google_caldav integration
+      tags:
+      - calendar-integration
+  /companies/me/calendar-integrations/google/oauth/list-calendars:
+    post:
+      operationId: calendarIntegrationGooglePickListCalendars
+      parameters:
+      - description: Optional company selector for admins with multiple companies
+        in: header
+        name: X-Company-Id
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/handlers.GoogleCalendarPickListRequest'
+        description: Payload
+        required: true
+        x-originalParamName: body
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/handlers.GoogleCalendarPickListResponse'
+          description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad Request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
+        '503':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Service Unavailable
+      security:
+      - BearerAuth: []
+      summary: List writable Google calendars for a post-OAuth pick session
+      tags:
+      - calendar-integration
+  /companies/me/calendar-integrations/google/oauth/start:
+    post:
+      operationId: calendarIntegrationGoogleOAuthStart
+      parameters:
+      - description: Optional company selector for admins with multiple companies
+        in: header
+        name: X-Company-Id
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/handlers.GoogleCalendarOAuthStartRequest'
+        description: Payload
+        required: true
+        x-originalParamName: body
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/handlers.GoogleCalendarOAuthStartResponse'
+          description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad Request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
+        '409':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Conflict
+        '503':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Service Unavailable
+      security:
+      - BearerAuth: []
+      summary: Start Google Calendar OAuth (returns authorize URL)
       tags:
       - calendar-integration
   /companies/me/complete-onboarding:

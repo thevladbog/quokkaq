@@ -115,3 +115,13 @@ const KeyPrefix = "quokkaq:sso:"
 func KeyOAuthState(state string) string { return KeyPrefix + "oauth:" + state }
 func KeyExchange(code string) string    { return KeyPrefix + "xc:" + code }
 func KeySAMLRelay(relay string) string  { return KeyPrefix + "saml:relay:" + relay }
+
+// KeyGoogleCalendarOAuthState stores PKCE + unit scope for Google Calendar OAuth (admin flow).
+func KeyGoogleCalendarOAuthState(state string) string {
+	return KeyPrefix + "gcal-oauth:" + state
+}
+
+// KeyGoogleCalendarPickSession stores refresh token + scope until the user picks a calendar (short TTL).
+func KeyGoogleCalendarPickSession(token string) string {
+	return KeyPrefix + "gcal-pick:" + token
+}
