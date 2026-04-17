@@ -77,6 +77,8 @@ func NewYandexTrackerClientFromEnv() *YandexTrackerClient {
 	if v := strings.TrimSpace(os.Getenv("YANDEX_TRACKER_USE_CLOUD_ORG_ID")); v != "" {
 		if b, err := strconv.ParseBool(v); err == nil {
 			useCloud = b
+		} else {
+			log.Printf("Yandex Tracker: invalid bool for YANDEX_TRACKER_USE_CLOUD_ORG_ID=%q: %v (defaulting useCloud=false)", v, err)
 		}
 	}
 	var iam *yandexTrackerIAM
@@ -93,6 +95,38 @@ func NewYandexTrackerClientFromEnv() *YandexTrackerClient {
 		httpClient:    &http.Client{Timeout: 45 * time.Second},
 		iam:           iam,
 	}
+}
+
+// trackerAPIRequestURL joins an absolute path (must start with "/") to the configured API base
+// and verifies the resolved URL still targets the same host as the base (SSRF / gosec G704 guard).
+func (c *YandexTrackerClient) trackerAPIRequestURL(absPath string) (string, error) {
+	base := strings.TrimSpace(c.baseURL)
+	if base == "" {
+		return "", fmt.Errorf("yandex tracker: empty base URL")
+	}
+	baseURL, err := url.Parse(base)
+	if err != nil {
+		return "", fmt.Errorf("yandex tracker: parse base URL: %w", err)
+	}
+	if baseURL.Scheme != "http" && baseURL.Scheme != "https" {
+		return "", fmt.Errorf("yandex tracker: base URL must use http or https")
+	}
+	if strings.TrimSpace(baseURL.Host) == "" {
+		return "", fmt.Errorf("yandex tracker: base URL must include a host")
+	}
+	ap := absPath
+	if !strings.HasPrefix(ap, "/") {
+		ap = "/" + ap
+	}
+	fullStr := strings.TrimRight(base, "/") + ap
+	fullURL, err := url.Parse(fullStr)
+	if err != nil {
+		return "", fmt.Errorf("yandex tracker: parse request URL: %w", err)
+	}
+	if !strings.EqualFold(strings.TrimSpace(fullURL.Host), strings.TrimSpace(baseURL.Host)) {
+		return "", fmt.Errorf("yandex tracker: request host %q does not match API base host %q", fullURL.Host, baseURL.Host)
+	}
+	return fullURL.String(), nil
 }
 
 func (c *YandexTrackerClient) yandexTrackerIntegrationReady() (ok bool, reason string) {
@@ -234,7 +268,10 @@ func (c *YandexTrackerClient) CreateWorkItem(ctx context.Context, externalID, ti
 	if !c.Enabled() {
 		return "", nil, "", fmt.Errorf("yandex tracker integration is not configured")
 	}
-	u := c.baseURL + "/v3/issues/"
+	u, err := c.trackerAPIRequestURL("/v3/issues/")
+	if err != nil {
+		return "", nil, "", err
+	}
 	payload := map[string]interface{}{
 		"queue":       c.queueKey,
 		"summary":     title,
@@ -292,7 +329,10 @@ func (c *YandexTrackerClient) issueGETBytes(ctx context.Context, workItemID stri
 	if workItemID == "" {
 		return nil, fmt.Errorf("yandex tracker: empty issue id or key")
 	}
-	u := c.baseURL + "/v3/issues/" + url.PathEscape(workItemID)
+	u, err := c.trackerAPIRequestURL("/v3/issues/" + url.PathEscape(workItemID))
+	if err != nil {
+		return nil, err
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, err
@@ -344,15 +384,21 @@ func (c *YandexTrackerClient) PatchIssueAPIAccessToTicket(ctx context.Context, w
 	payload := map[string]interface{}{
 		yandexTrackerFieldAPIAccessToTicket: strings.TrimSpace(csv),
 	}
-	if ver, ok := meta["version"]; ok && ver != nil {
-		payload["version"] = ver
-	}
 	buf, err := json.Marshal(payload)
 	if err != nil {
 		return err
 	}
 	workItemID = strings.TrimSpace(workItemID)
-	u := c.baseURL + "/v3/issues/" + url.PathEscape(workItemID)
+	u, err := c.trackerAPIRequestURL("/v3/issues/" + url.PathEscape(workItemID))
+	if err != nil {
+		return err
+	}
+	if ver, ok := meta["version"]; ok {
+		u, err = yandexTrackerAppendIssueVersionQuery(u, ver)
+		if err != nil {
+			return err
+		}
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, u, bytes.NewReader(buf))
 	if err != nil {
 		return err
@@ -372,6 +418,50 @@ func (c *YandexTrackerClient) PatchIssueAPIAccessToTicket(ctx context.Context, w
 		return newYandexTrackerHTTPError(res.StatusCode, respBody)
 	}
 	return nil
+}
+
+// yandexTrackerVersionQueryValue formats issue "version" for use as a query parameter (Tracker optimistic locking).
+func yandexTrackerVersionQueryValue(ver interface{}) (string, bool) {
+	if ver == nil {
+		return "", false
+	}
+	switch v := ver.(type) {
+	case float64:
+		if v < 0 {
+			return "", false
+		}
+		if v == float64(int64(v)) {
+			return strconv.FormatInt(int64(v), 10), true
+		}
+		return strconv.FormatFloat(v, 'f', -1, 64), true
+	case string:
+		s := strings.TrimSpace(v)
+		if s == "" {
+			return "", false
+		}
+		return s, true
+	default:
+		s := strings.TrimSpace(fmt.Sprint(v))
+		if s == "" {
+			return "", false
+		}
+		return s, true
+	}
+}
+
+func yandexTrackerAppendIssueVersionQuery(u string, ver interface{}) (string, error) {
+	vs, ok := yandexTrackerVersionQueryValue(ver)
+	if !ok {
+		return u, nil
+	}
+	pu, err := url.Parse(u)
+	if err != nil {
+		return "", fmt.Errorf("yandex tracker: parse issue patch URL: %w", err)
+	}
+	q := pu.Query()
+	q.Set("version", vs)
+	pu.RawQuery = q.Encode()
+	return pu.String(), nil
 }
 
 func decodeYandexCommentID(raw json.RawMessage) string {
@@ -431,7 +521,10 @@ func (c *YandexTrackerClient) ListComments(ctx context.Context, workItemID strin
 	suffixes := []string{"/comments?expand=all", "/comments"}
 	var body []byte
 	for i, sfx := range suffixes {
-		u := c.baseURL + pathBase + sfx
+		u, err := c.trackerAPIRequestURL(pathBase + sfx)
+		if err != nil {
+			return nil, err
+		}
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 		if err != nil {
 			return nil, err
@@ -444,13 +537,21 @@ func (c *YandexTrackerClient) ListComments(ctx context.Context, workItemID strin
 		if err != nil {
 			return nil, err
 		}
-		b, _ := io.ReadAll(io.LimitReader(res.Body, 4<<20))
-		_ = res.Body.Close()
+		b, readErr := io.ReadAll(io.LimitReader(res.Body, 4<<20))
+		closeErr := res.Body.Close()
+		if readErr != nil {
+			return nil, fmt.Errorf("yandex tracker list comments read body: %w", readErr)
+		}
+		if closeErr != nil {
+			return nil, fmt.Errorf("yandex tracker list comments close body: %w", closeErr)
+		}
 		if res.StatusCode >= 200 && res.StatusCode < 300 {
 			body = b
 			break
 		}
-		if res.StatusCode == http.StatusBadRequest && i == 0 && len(suffixes) > 1 {
+		retryExpand := i == 0 && len(suffixes) > 1 &&
+			(res.StatusCode == http.StatusBadRequest || res.StatusCode == http.StatusNotFound || res.StatusCode == 422)
+		if retryExpand {
 			continue
 		}
 		return nil, newYandexTrackerHTTPError(res.StatusCode, b)
@@ -472,7 +573,9 @@ func (c *YandexTrackerClient) ListComments(ctx context.Context, workItemID strin
 	out := make([]YandexTrackerIssueComment, 0, len(rawItems))
 	for _, raw := range rawItems {
 		var w ytCommentWire
-		_ = json.Unmarshal(raw, &w)
+		if err := json.Unmarshal(raw, &w); err != nil {
+			continue
+		}
 		author := ""
 		if w.CreatedBy != nil {
 			author = strings.TrimSpace(w.CreatedBy.Display)
@@ -481,7 +584,7 @@ func (c *YandexTrackerClient) ListComments(ctx context.Context, workItemID strin
 		if transport == "" {
 			transport = strings.TrimSpace(w.TransportType)
 		}
-		c := YandexTrackerIssueComment{
+		commentItem := YandexTrackerIssueComment{
 			ID:            decodeYandexCommentID(w.IDRaw),
 			Text:          w.Text,
 			LongText:      w.LongText,
@@ -491,8 +594,8 @@ func (c *YandexTrackerClient) ListComments(ctx context.Context, workItemID strin
 			TransportType: transport,
 			AuthorDisplay: author,
 		}
-		yandexAugmentCommentFromRawJSON(raw, &c)
-		out = append(out, c)
+		yandexAugmentCommentFromRawJSON(raw, &commentItem)
+		out = append(out, commentItem)
 	}
 	return out, nil
 }
@@ -506,13 +609,17 @@ func (c *YandexTrackerClient) AddComment(ctx context.Context, workItemID, text s
 	if workItemID == "" {
 		return fmt.Errorf("yandex tracker: empty issue id or key for comment")
 	}
-	u := c.baseURL + "/v3/issues/" + url.PathEscape(workItemID) + "/comments"
+	u, err := c.trackerAPIRequestURL("/v3/issues/" + url.PathEscape(workItemID) + "/comments")
+	if err != nil {
+		return err
+	}
 	payload := map[string]string{"text": text}
 	buf, err := json.Marshal(payload)
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewReader(buf))
+	// gosec G704: u from trackerAPIRequestURL — host locked to YANDEX_TRACKER_API_BASE; workItemID is path-escaped only.
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewReader(buf)) // #nosec G704
 	if err != nil {
 		return err
 	}
@@ -521,7 +628,7 @@ func (c *YandexTrackerClient) AddComment(ctx context.Context, workItemID, text s
 		return err
 	}
 	c.setOrgHeader(req)
-	res, err := c.httpClient.Do(req)
+	res, err := c.httpClient.Do(req) // #nosec G704
 	if err != nil {
 		return err
 	}

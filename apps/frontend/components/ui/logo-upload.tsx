@@ -82,7 +82,11 @@ export function LogoUpload({
         throw new Error('Upload failed');
       }
 
-      onLogoUploaded(res.data.url);
+      const url = res.data.url;
+      if (!url) {
+        throw new Error('Upload failed');
+      }
+      onLogoUploaded(url);
       toast.success(t('logoSuccess'));
     } catch (error) {
       logger.error('Upload error:', error);

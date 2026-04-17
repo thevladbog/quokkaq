@@ -477,7 +477,9 @@ func (s *SupportReportService) AddSupportReportShare(ctx context.Context, viewer
 		return nil, fmt.Errorf("%w: %v", ErrSupportReportPersistence, err)
 	}
 	if err := s.syncYandexAPIAccessToTicket(ctx, row); err != nil {
-		_ = s.shareRepo.DeleteByReportAndUser(reportID, targetUserID)
+		if rbErr := s.shareRepo.DeleteByReportAndUser(reportID, targetUserID); rbErr != nil {
+			log.Printf("ERROR support report: rollback share after Tracker sync failed reportID=%s targetUserID=%s rollbackErr=%v syncErr=%v", reportID, targetUserID, rbErr, err)
+		}
 		return nil, err
 	}
 	return s.ListSupportReportShares(ctx, viewerID, reportID)
@@ -526,7 +528,9 @@ func (s *SupportReportService) RemoveSupportReportShare(ctx context.Context, vie
 		return nil, err
 	}
 	if err := s.syncYandexAPIAccessToTicket(ctx, row); err != nil {
-		_ = s.shareRepo.Create(&backup)
+		if rbErr := s.shareRepo.Create(&backup); rbErr != nil {
+			log.Printf("ERROR support report: rollback share delete after Tracker sync failed reportID=%s sharedWithUserID=%s rollbackErr=%v syncErr=%v", reportID, sharedWithUserID, rbErr, err)
+		}
 		return nil, err
 	}
 	return s.ListSupportReportShares(ctx, viewerID, reportID)

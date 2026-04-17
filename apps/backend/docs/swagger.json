@@ -10550,6 +10550,16 @@
                         },
                         "description": "Not found"
                     },
+                    "413": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Payload too large"
+                    },
                     "501": {
                         "content": {
                             "application/json": {

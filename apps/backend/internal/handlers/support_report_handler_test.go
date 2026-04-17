@@ -52,6 +52,10 @@ func (stubSupportReportRepo) DeleteByID(string) error {
 
 type stubSupportUserRepo struct{ testsupport.PanicUserRepo }
 
+func (stubSupportUserRepo) FindByID(id string) (*models.User, error) {
+	return &models.User{ID: id, Name: "Report Author"}, nil
+}
+
 func (stubSupportUserRepo) IsAdmin(string) (bool, error) {
 	return false, nil
 }

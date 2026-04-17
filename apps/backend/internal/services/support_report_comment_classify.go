@@ -81,7 +81,7 @@ func sanitizeSupportCommentDisplay(s string) string {
 	if s == "" {
 		return ""
 	}
-	s = html.UnescapeString(s)
+	// Do not html.UnescapeString here: mergeTrackerCommentBody → stripHTMLToPlain already unescapes HTML bodies.
 	s = strings.ReplaceAll(s, "\u00a0", " ")
 	s = strings.ReplaceAll(s, "\u2007", " ")
 	s = strings.ReplaceAll(s, "\u202f", " ")

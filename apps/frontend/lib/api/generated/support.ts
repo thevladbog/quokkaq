@@ -2251,6 +2251,11 @@ export type postSupportReportCommentResponse404 = {
   status: 404
 }
 
+export type postSupportReportCommentResponse413 = {
+  data: string
+  status: 413
+}
+
 export type postSupportReportCommentResponse501 = {
   data: string
   status: 501
@@ -2264,7 +2269,7 @@ export type postSupportReportCommentResponse502 = {
 export type postSupportReportCommentResponseSuccess = (postSupportReportCommentResponse204) & {
   headers: Headers;
 };
-export type postSupportReportCommentResponseError = (postSupportReportCommentResponse400 | postSupportReportCommentResponse401 | postSupportReportCommentResponse403 | postSupportReportCommentResponse404 | postSupportReportCommentResponse501 | postSupportReportCommentResponse502) & {
+export type postSupportReportCommentResponseError = (postSupportReportCommentResponse400 | postSupportReportCommentResponse401 | postSupportReportCommentResponse403 | postSupportReportCommentResponse404 | postSupportReportCommentResponse413 | postSupportReportCommentResponse501 | postSupportReportCommentResponse502) & {
   headers: Headers;
 };
 

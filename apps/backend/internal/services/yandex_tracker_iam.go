@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -44,29 +45,31 @@ func (i *yandexTrackerIAM) bearerToken(ctx context.Context) (string, error) {
 		return i.token, nil
 	}
 
+	callCtx, cancel := context.WithTimeout(ctx, yandexIAMExchangeTimeout)
+	defer cancel()
+
 	if i.sdk == nil {
 		creds, err := credentials.ServiceAccountKeyFile(i.keyPath)
 		if err != nil {
 			return "", fmt.Errorf("yandex tracker IAM: load service account key: %w", err)
 		}
-		sdk, err := ycsdk.Build(context.Background(), options.WithCredentials(creds))
+		sdk, err := ycsdk.Build(callCtx, options.WithCredentials(creds))
 		if err != nil {
 			return "", fmt.Errorf("yandex tracker IAM: build yandex cloud sdk: %w", err)
 		}
 		i.sdk = sdk
 	}
 
-	callCtx, cancel := context.WithTimeout(ctx, yandexIAMExchangeTimeout)
-	defer cancel()
-
-	tok, err := i.sdk.CreateIAMToken(callCtx)
+	tokResp, err := i.sdk.CreateIAMToken(callCtx)
 	if err != nil {
 		return "", fmt.Errorf("yandex tracker IAM: CreateIAMToken: %w", err)
 	}
-	i.token = tok.GetIamToken()
-	i.expires = tok.GetExpiresAt()
-	if i.token == "" {
+	token := strings.TrimSpace(tokResp.GetIamToken())
+	exp := tokResp.GetExpiresAt()
+	if token == "" {
 		return "", fmt.Errorf("yandex tracker IAM: empty token from CreateIAMToken")
 	}
+	i.token = token
+	i.expires = exp
 	return i.token, nil
 }

@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 import { Copy, KeyRound } from 'lucide-react';
 import {
   companiesMeLoginLinkPost,
-  type HandlersLoginLinkResponse
+  type CompaniesMeLoginLinkPost200
 } from '@/lib/api/generated/auth';
 import { resolvePublicAppBase } from '@/components/organization/organization-auth-shared';
 
@@ -39,7 +39,7 @@ export function OrganizationOpaqueLoginLinkCard({
       if (res.status !== 200 || !res.data) {
         throw new Error(t('linkError'));
       }
-      const data: HandlersLoginLinkResponse = res.data;
+      const data: CompaniesMeLoginLinkPost200 = res.data;
       const token = data.token ?? '';
       const example =
         data.exampleUrl ??

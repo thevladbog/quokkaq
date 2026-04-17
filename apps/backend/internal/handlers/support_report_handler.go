@@ -584,6 +584,7 @@ func (h *SupportReportHandler) ListComments(w http.ResponseWriter, r *http.Reque
 // @Failure      401   {string}  string  "Unauthorized"
 // @Failure      403   {string}  string  "Forbidden"
 // @Failure      404   {string}  string  "Not found"
+// @Failure      413   {string}  string  "Payload too large"
 // @Failure      502   {string}  string  "Upstream ticket request failed"
 // @Failure      501   {string}  string  "Not implemented for this ticket backend"
 // @Router       /support/reports/{id}/comments [post]
@@ -601,6 +602,10 @@ func (h *SupportReportHandler) PostComment(w http.ResponseWriter, r *http.Reques
 	}
 	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<20))
 	if err != nil {
+		if maxBytesReaderExceeded(err) {
+			http.Error(w, "Request entity too large", http.StatusRequestEntityTooLarge)
+			return
+		}
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}

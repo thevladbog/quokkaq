@@ -773,7 +773,10 @@ export const ticketsApi = {
     }
     if (transferData.toServiceId) body.toServiceId = transferData.toServiceId;
     if (transferData.operatorComment !== undefined) {
-      body.operatorComment = transferData.operatorComment;
+      body.operatorComment =
+        transferData.operatorComment === null
+          ? undefined
+          : transferData.operatorComment;
     }
     const res = await orvalTc.postTicketsIdTransfer(id, body);
     return TicketModelSchema.parse(res.data);
@@ -786,7 +789,7 @@ export const ticketsApi = {
 
   updateOperatorComment: async (id: string, operatorComment: string | null) => {
     const res = await orvalTc.patchTicketsIdOperatorComment(id, {
-      operatorComment
+      operatorComment: operatorComment ?? ''
     });
     return TicketModelSchema.parse(res.data);
   },
