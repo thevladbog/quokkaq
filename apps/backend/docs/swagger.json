@@ -196,6 +196,10 @@
                         "type": "string"
                     }
                 },
+                "required": [
+                    "returnPath",
+                    "unitId"
+                ],
                 "type": "object"
             },
             "handlers.GoogleCalendarOAuthStartResponse": {
@@ -204,6 +208,9 @@
                         "type": "string"
                     }
                 },
+                "required": [
+                    "url"
+                ],
                 "type": "object"
             },
             "handlers.GoogleCalendarPickCompleteRequest": {
@@ -215,6 +222,10 @@
                         "type": "string"
                     }
                 },
+                "required": [
+                    "calendarId",
+                    "pickToken"
+                ],
                 "type": "object"
             },
             "handlers.GoogleCalendarPickListRequest": {
@@ -223,6 +234,9 @@
                         "type": "string"
                     }
                 },
+                "required": [
+                    "pickToken"
+                ],
                 "type": "object"
             },
             "handlers.GoogleCalendarPickListResponse": {
@@ -234,6 +248,9 @@
                         "type": "array"
                     }
                 },
+                "required": [
+                    "calendars"
+                ],
                 "type": "object"
             },
             "handlers.InvoiceDraftCreateBody": {
@@ -4602,17 +4619,19 @@
                 "operationId": "calendarIntegrationGoogleOAuthCallback",
                 "parameters": [
                     {
-                        "description": "Authorization code",
+                        "description": "Authorization code from Google",
                         "in": "query",
                         "name": "code",
+                        "required": true,
                         "schema": {
                             "type": "string"
                         }
                     },
                     {
-                        "description": "OAuth state",
+                        "description": "OAuth state (PKCE session key)",
                         "in": "query",
                         "name": "state",
+                        "required": true,
                         "schema": {
                             "type": "string"
                         }
@@ -4620,7 +4639,42 @@
                 ],
                 "responses": {
                     "302": {
-                        "description": "Found"
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "302 Found — successful flows redirect via Location to the return path with google_calendar_pick; failures redirect to the return path with google_calendar=error and reason=… (or equivalent error query parameters) so UIs and monitoring can read the outcome.",
+                        "headers": {
+                            "Location": {
+                                "description": "Where the browser should navigate next (success or error redirect target).",
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad request — invalid or missing parameters, or invalid/expired OAuth state (may still be returned as a redirect with error query parameters)."
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal or downstream failure while completing OAuth (may still be returned as a redirect with error query parameters)."
                     }
                 },
                 "summary": "Google Calendar OAuth callback (browser redirect)",

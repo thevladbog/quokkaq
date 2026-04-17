@@ -358,21 +358,21 @@ export interface HandlersForgotPasswordRequest {
 }
 
 export interface HandlersGoogleCalendarOAuthStartRequest {
-  returnPath?: string;
-  unitId?: string;
+  returnPath: string;
+  unitId: string;
 }
 
 export interface HandlersGoogleCalendarOAuthStartResponse {
-  url?: string;
+  url: string;
 }
 
 export interface HandlersGoogleCalendarPickCompleteRequest {
-  calendarId?: string;
-  pickToken?: string;
+  calendarId: string;
+  pickToken: string;
 }
 
 export interface HandlersGoogleCalendarPickListRequest {
-  pickToken?: string;
+  pickToken: string;
 }
 
 export interface ServicesGoogleCalendarPickOption {
@@ -382,7 +382,7 @@ export interface ServicesGoogleCalendarPickOption {
 }
 
 export interface HandlersGoogleCalendarPickListResponse {
-  calendars?: ServicesGoogleCalendarPickOption[];
+  calendars: ServicesGoogleCalendarPickOption[];
 }
 
 export interface HandlersInvoiceDraftLineInput {

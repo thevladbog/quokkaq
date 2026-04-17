@@ -367,21 +367,21 @@ export interface HandlersForgotPasswordRequest {
 }
 
 export interface HandlersGoogleCalendarOAuthStartRequest {
-  returnPath?: string;
-  unitId?: string;
+  returnPath: string;
+  unitId: string;
 }
 
 export interface HandlersGoogleCalendarOAuthStartResponse {
-  url?: string;
+  url: string;
 }
 
 export interface HandlersGoogleCalendarPickCompleteRequest {
-  calendarId?: string;
-  pickToken?: string;
+  calendarId: string;
+  pickToken: string;
 }
 
 export interface HandlersGoogleCalendarPickListRequest {
-  pickToken?: string;
+  pickToken: string;
 }
 
 export interface ServicesGoogleCalendarPickOption {
@@ -391,7 +391,7 @@ export interface ServicesGoogleCalendarPickOption {
 }
 
 export interface HandlersGoogleCalendarPickListResponse {
-  calendars?: ServicesGoogleCalendarPickOption[];
+  calendars: ServicesGoogleCalendarPickOption[];
 }
 
 export interface HandlersInvoiceDraftLineInput {
@@ -1609,13 +1609,13 @@ export interface HandlersLoginLinkResponse {
 
 export type CalendarIntegrationGoogleOAuthCallbackParams = {
 /**
- * Authorization code
+ * Authorization code from Google
  */
-code?: string;
+code: string;
 /**
- * OAuth state
+ * OAuth state (PKCE session key)
  */
-state?: string;
+state: string;
 };
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
@@ -1626,18 +1626,28 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
  * @summary Google Calendar OAuth callback (browser redirect)
  */
 export type calendarIntegrationGoogleOAuthCallbackResponse302 = {
-  data: void
+  data: string
   status: 302
 }
 
+export type calendarIntegrationGoogleOAuthCallbackResponse400 = {
+  data: string
+  status: 400
+}
+
+export type calendarIntegrationGoogleOAuthCallbackResponse500 = {
+  data: string
+  status: 500
+}
+
 ;
-export type calendarIntegrationGoogleOAuthCallbackResponseError = (calendarIntegrationGoogleOAuthCallbackResponse302) & {
+export type calendarIntegrationGoogleOAuthCallbackResponseError = (calendarIntegrationGoogleOAuthCallbackResponse302 | calendarIntegrationGoogleOAuthCallbackResponse400 | calendarIntegrationGoogleOAuthCallbackResponse500) & {
   headers: Headers;
 };
 
 export type calendarIntegrationGoogleOAuthCallbackResponse = (calendarIntegrationGoogleOAuthCallbackResponseError)
 
-export const getCalendarIntegrationGoogleOAuthCallbackUrl = (params?: CalendarIntegrationGoogleOAuthCallbackParams,) => {
+export const getCalendarIntegrationGoogleOAuthCallbackUrl = (params: CalendarIntegrationGoogleOAuthCallbackParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -1652,7 +1662,7 @@ export const getCalendarIntegrationGoogleOAuthCallbackUrl = (params?: CalendarIn
   return stringifiedParams.length > 0 ? `/calendar-integrations/google/oauth/callback?${stringifiedParams}` : `/calendar-integrations/google/oauth/callback`
 }
 
-export const calendarIntegrationGoogleOAuthCallback = async (params?: CalendarIntegrationGoogleOAuthCallbackParams, options?: RequestInit): Promise<calendarIntegrationGoogleOAuthCallbackResponse> => {
+export const calendarIntegrationGoogleOAuthCallback = async (params: CalendarIntegrationGoogleOAuthCallbackParams, options?: RequestInit): Promise<calendarIntegrationGoogleOAuthCallbackResponse> => {
 
   return orvalMutator<calendarIntegrationGoogleOAuthCallbackResponse>(getCalendarIntegrationGoogleOAuthCallbackUrl(params),
   {
@@ -1674,7 +1684,7 @@ export const getCalendarIntegrationGoogleOAuthCallbackQueryKey = (params?: Calen
     }
 
 
-export const getCalendarIntegrationGoogleOAuthCallbackQueryOptions = <TData = Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>, TError = void>(params?: CalendarIntegrationGoogleOAuthCallbackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export const getCalendarIntegrationGoogleOAuthCallbackQueryOptions = <TData = Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>, TError = string>(params: CalendarIntegrationGoogleOAuthCallbackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -1693,11 +1703,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type CalendarIntegrationGoogleOAuthCallbackQueryResult = NonNullable<Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>>
-export type CalendarIntegrationGoogleOAuthCallbackQueryError = void
+export type CalendarIntegrationGoogleOAuthCallbackQueryError = string
 
 
-export function useCalendarIntegrationGoogleOAuthCallback<TData = Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>, TError = void>(
- params: undefined |  CalendarIntegrationGoogleOAuthCallbackParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>, TError, TData>> & Pick<
+export function useCalendarIntegrationGoogleOAuthCallback<TData = Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>, TError = string>(
+ params: CalendarIntegrationGoogleOAuthCallbackParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>,
           TError,
@@ -1706,8 +1716,8 @@ export function useCalendarIntegrationGoogleOAuthCallback<TData = Awaited<Return
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useCalendarIntegrationGoogleOAuthCallback<TData = Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>, TError = void>(
- params?: CalendarIntegrationGoogleOAuthCallbackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>, TError, TData>> & Pick<
+export function useCalendarIntegrationGoogleOAuthCallback<TData = Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>, TError = string>(
+ params: CalendarIntegrationGoogleOAuthCallbackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>,
           TError,
@@ -1716,16 +1726,16 @@ export function useCalendarIntegrationGoogleOAuthCallback<TData = Awaited<Return
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useCalendarIntegrationGoogleOAuthCallback<TData = Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>, TError = void>(
- params?: CalendarIntegrationGoogleOAuthCallbackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useCalendarIntegrationGoogleOAuthCallback<TData = Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>, TError = string>(
+ params: CalendarIntegrationGoogleOAuthCallbackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Google Calendar OAuth callback (browser redirect)
  */
 
-export function useCalendarIntegrationGoogleOAuthCallback<TData = Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>, TError = void>(
- params?: CalendarIntegrationGoogleOAuthCallbackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useCalendarIntegrationGoogleOAuthCallback<TData = Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>, TError = string>(
+ params: CalendarIntegrationGoogleOAuthCallbackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 

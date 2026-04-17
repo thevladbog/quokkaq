@@ -29,6 +29,10 @@
       "rules": ["G101"]
     },
     {
+      "path": ".*/internal/services/google_calendar_oauth\\.go",
+      "rules": ["G101"]
+    },
+    {
       "path": ".*/internal/handlers/helpers\\.go",
       "rules": ["G705"]
     },

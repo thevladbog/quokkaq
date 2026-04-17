@@ -1,6 +1,6 @@
 # QuokkaQ wiki (operator / in-product help)
 
-This tree is **operational documentation** for people using QuokkaQ (admins, staff). Developer and infrastructure docs stay in the repo root `README.md`, `SETUP.md`, and [`apps/backend/docs/`](../apps/backend/docs/).
+This tree is **operational documentation** for people using QuokkaQ (admins, staff). Developer and infrastructure docs stay in the repo root `README.md`, `SETUP.md`, and [`apps/backend/docs/`](../../apps/backend/docs/).
 
 ## Supported locales
 

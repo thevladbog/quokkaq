@@ -680,6 +680,9 @@ function GoogleConnectCalendarDialog({
         return;
       }
       window.location.href = data.url;
+    } catch (e) {
+      console.error('startGoogle', e);
+      toast.error(t('google_connect_error'));
     } finally {
       setBusy(false);
     }

@@ -36,7 +36,9 @@ var (
 	ErrCalendarIntegrationKindUnknown = errors.New("unsupported calendar integration kind")
 	ErrCalendarUnitCompanyMismatch    = errors.New("unit does not belong to company")
 	ErrCalendarAppPasswordRequired    = errors.New("app password is required for new calendar integration")
-	ErrCalendarEnabledRequired        = errors.New("enabled is required")
+	// ErrCalendarGoogleCalDAVIdentityImmutable is returned on PUT when the client tries to change CalDAV identity fields for google_caldav.
+	ErrCalendarGoogleCalDAVIdentityImmutable = errors.New("caldav base URL, calendar path, and username cannot be changed for Google Calendar connections")
+	ErrCalendarEnabledRequired               = errors.New("enabled is required")
 	// ErrCalendarIntegrationBlockedByActivePreRegistrations is returned when delete or disable would strand active bookings.
 	ErrCalendarIntegrationBlockedByActivePreRegistrations = errors.New("active pre-registrations still reference this calendar integration")
 )
@@ -343,7 +345,7 @@ func (s *CalendarIntegrationService) CreateGoogleIntegration(companyID, unitID, 
 	}
 	rt := strings.TrimSpace(refreshToken)
 	if rt == "" {
-		return nil, ErrCalendarAppPasswordRequired
+		return nil, ErrGoogleCalendarOAuthNoRefreshToken
 	}
 	email = strings.TrimSpace(email)
 	if email == "" {
@@ -352,6 +354,10 @@ func (s *CalendarIntegrationService) CreateGoogleIntegration(companyID, unitID, 
 	calID := strings.TrimSpace(calendarID)
 	if calID == "" {
 		calID = email
+	}
+	calPath, err := models.GoogleCalDAVEventsCollectionPath(calID)
+	if err != nil {
+		return nil, err
 	}
 	enc, encErr := ssocrypto.EncryptAES256GCM([]byte(rt))
 	if encErr != nil {
@@ -363,7 +369,7 @@ func (s *CalendarIntegrationService) CreateGoogleIntegration(companyID, unitID, 
 		DisplayName:          fmt.Sprintf("Google (%s)", email),
 		Enabled:              true,
 		CaldavBaseURL:        models.GoogleCalDAVBaseURL,
-		CalendarPath:         models.GoogleCalDAVEventsCollectionPath(calID),
+		CalendarPath:         calPath,
 		Username:             email,
 		AppPasswordEncrypted: enc,
 		Timezone:             "Europe/Moscow",
@@ -412,6 +418,18 @@ func (s *CalendarIntegrationService) UpdateIntegration(companyID, integrationID 
 		kind = models.CalendarIntegrationKindYandexCalDAV
 	}
 	if kind == models.CalendarIntegrationKindGoogleCalDAV {
+		reqBase := strings.TrimSpace(req.CaldavBaseURL)
+		if reqBase != "" && reqBase != row.CaldavBaseURL {
+			return nil, ErrCalendarGoogleCalDAVIdentityImmutable
+		}
+		reqPath := strings.TrimSpace(req.CalendarPath)
+		if reqPath != "" && reqPath != row.CalendarPath {
+			return nil, ErrCalendarGoogleCalDAVIdentityImmutable
+		}
+		reqUser := strings.TrimSpace(req.Username)
+		if reqUser != "" && reqUser != row.Username {
+			return nil, ErrCalendarGoogleCalDAVIdentityImmutable
+		}
 		row.DisplayName = strings.TrimSpace(req.DisplayName)
 		row.Enabled = *req.Enabled
 		row.Timezone = req.Timezone

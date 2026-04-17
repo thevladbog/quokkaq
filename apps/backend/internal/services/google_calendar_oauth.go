@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -17,7 +18,6 @@ import (
 
 	"quokkaq-go-backend/internal/sso/redisstore"
 
-	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/oauth2"
 )
@@ -38,7 +38,11 @@ var (
 	ErrGoogleCalendarOAuthRedisUnavailable = errors.New("redis not configured")
 	// ErrGoogleCalendarPickInvalid is returned when the pick-token session is missing or expired.
 	ErrGoogleCalendarPickInvalid = errors.New("invalid or expired calendar selection session")
+	// ErrGoogleCalendarOAuthSessionSaveFailed is returned when Redis cannot persist OAuth state or the post-login pick session.
+	ErrGoogleCalendarOAuthSessionSaveFailed = errors.New("could not persist google calendar oauth session")
 )
+
+var googleOAuthHTTPClient = &http.Client{Timeout: 15 * time.Second}
 
 // GoogleCalendarOAuthStatePayload is stored in Redis for the Google OAuth redirect chain.
 type GoogleCalendarOAuthStatePayload struct {
@@ -89,12 +93,37 @@ func googleCalendarOAuthConfig() *oauth2.Config {
 	}
 }
 
-func randomStateHex(n int) string {
+func randomStateHex(n int) (string, error) {
 	b := make([]byte, n)
 	if _, err := rand.Read(b); err != nil {
-		return strings.ReplaceAll(uuid.New().String(), "-", "")
+		return "", fmt.Errorf("crypto/rand: %w", err)
 	}
-	return hex.EncodeToString(b)
+	return hex.EncodeToString(b), nil
+}
+
+// revokeGoogleRefreshToken best-effort revokes a refresh token at Google's revoke endpoint (RFC 7009-style).
+func revokeGoogleRefreshToken(ctx context.Context, refreshToken string) {
+	rt := strings.TrimSpace(refreshToken)
+	if rt == "" {
+		return
+	}
+	form := url.Values{}
+	form.Set("token", rt)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://oauth2.googleapis.com/revoke", strings.NewReader(form.Encode()))
+	if err != nil {
+		log.Printf("google calendar oauth: revoke build request: %v", err)
+		return
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	resp, err := googleOAuthHTTPClient.Do(req)
+	if err != nil {
+		log.Printf("google calendar oauth: revoke request failed: %v", err)
+		return
+	}
+	defer func() { _, _ = io.Copy(io.Discard, resp.Body); _ = resp.Body.Close() }()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		log.Printf("google calendar oauth: revoke non-2xx: %s", resp.Status)
+	}
 }
 
 // SanitizeInternalReturnPath validates a same-origin path for post-OAuth browser redirect.
@@ -150,7 +179,10 @@ func (s *CalendarIntegrationService) StartGoogleCalendarOAuth(ctx context.Contex
 	if rdb == nil {
 		return "", ErrGoogleCalendarOAuthRedisUnavailable
 	}
-	state := randomStateHex(24)
+	state, err := randomStateHex(24)
+	if err != nil {
+		return "", err
+	}
 	verifier := oauth2.GenerateVerifier()
 	payload := GoogleCalendarOAuthStatePayload{
 		CompanyID:    companyID,
@@ -159,7 +191,8 @@ func (s *CalendarIntegrationService) StartGoogleCalendarOAuth(ctx context.Contex
 		ReturnPath:   retPath,
 	}
 	if err := redisstore.SetJSON(ctx, redisstore.KeyGoogleCalendarOAuthState(state), payload, 15*time.Minute); err != nil {
-		return "", err
+		log.Printf("google calendar oauth: oauth state save failed companyId=%s unitId=%s err=%v", companyID, unitID, err)
+		return "", fmt.Errorf("%w: %v", ErrGoogleCalendarOAuthSessionSaveFailed, err)
 	}
 	opts := []oauth2.AuthCodeOption{
 		oauth2.AccessTypeOffline,
@@ -209,7 +242,10 @@ func (s *CalendarIntegrationService) CompleteGoogleCalendarOAuth(ctx context.Con
 	if retPath == "" {
 		retPath = "/settings/integrations"
 	}
-	pickToken := randomStateHex(32)
+	pickToken, err := randomStateHex(32)
+	if err != nil {
+		return "", failureReturnPath, err
+	}
 	pick := GoogleCalendarPickPayload{
 		CompanyID:    payload.CompanyID,
 		UnitID:       payload.UnitID,
@@ -218,7 +254,11 @@ func (s *CalendarIntegrationService) CompleteGoogleCalendarOAuth(ctx context.Con
 		Email:        email,
 	}
 	if err := redisstore.SetJSON(ctx, redisstore.KeyGoogleCalendarPickSession(pickToken), pick, 15*time.Minute); err != nil {
-		return "", failureReturnPath, err
+		rtLen := len(strings.TrimSpace(tok.RefreshToken))
+		log.Printf("google calendar oauth: CRITICAL pick session save failed companyId=%s unitId=%s pickTokenLen=%d refreshTokenLen=%d err=%v",
+			pick.CompanyID, pick.UnitID, len(pickToken), rtLen, err)
+		revokeGoogleRefreshToken(ctx, tok.RefreshToken)
+		return "", failureReturnPath, fmt.Errorf("%w: %v", ErrGoogleCalendarOAuthSessionSaveFailed, err)
 	}
 	base := strings.TrimRight(PublicAppURL(), "/")
 	out, err := url.Parse(base + retPath)
@@ -311,7 +351,7 @@ func googleUserinfoEmail(ctx context.Context, accessToken string) (string, error
 		return "", err
 	}
 	req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(accessToken))
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := googleOAuthHTTPClient.Do(req)
 	if err != nil {
 		return "", err
 	}

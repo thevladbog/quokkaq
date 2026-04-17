@@ -365,7 +365,6 @@ func main() {
 		r.With(authmiddleware.SSOPublicRateLimit).Post("/saml/acs", ssoHandler.SAMLACS)
 		// Callback uses SSOCallbackRateLimit (softer than SSOPublicRateLimit): IdP redirect chains can hit this route more often than typical API calls. See middleware/sso_ratelimit.go.
 		r.With(authmiddleware.SSOCallbackRateLimit).Get("/sso/callback", ssoHandler.SSOCallback)
-		r.With(authmiddleware.SSOCallbackRateLimit).Get("/calendar-integrations/google/oauth/callback", calendarIntegrationHandler.GoogleOAuthCallback)
 		r.With(authmiddleware.SSOPublicRateLimit).Post("/sso/exchange", ssoHandler.SSOExchange)
 		r.Post("/refresh", authHandler.Refresh)
 		r.Post("/forgot-password", authHandler.RequestPasswordReset)
@@ -378,6 +377,9 @@ func main() {
 			r.Get("/accessible-companies", authHandler.ListAccessibleCompanies)
 		})
 	})
+
+	// Google Calendar OAuth browser callback (must match GOOGLE_CALENDAR_OAUTH_REDIRECT_URL path on API origin, not under /auth).
+	r.With(authmiddleware.SSOCallbackRateLimit).Get("/calendar-integrations/google/oauth/callback", calendarIntegrationHandler.GoogleOAuthCallback)
 
 	r.Route("/system", func(r chi.Router) {
 		r.Get("/status", userHandler.GetSystemStatus)

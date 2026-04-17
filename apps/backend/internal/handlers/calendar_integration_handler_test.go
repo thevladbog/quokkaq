@@ -300,7 +300,10 @@ func TestCalendarIntegrationHandler_GooglePickComplete_OK(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&pub); err != nil {
 		t.Fatal(err)
 	}
-	wantPath := models.GoogleCalDAVEventsCollectionPath(calID)
+	wantPath, err := models.GoogleCalDAVEventsCollectionPath(calID)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if pub.CalendarPath != wantPath {
 		t.Fatalf("calendarPath %q want %q", pub.CalendarPath, wantPath)
 	}

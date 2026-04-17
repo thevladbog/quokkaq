@@ -165,7 +165,10 @@ func TestCompleteGoogleCalendarPick_secondCallInvalidatesSession(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantPath := models.GoogleCalDAVEventsCollectionPath(calID)
+	wantPath, errPath := models.GoogleCalDAVEventsCollectionPath(calID)
+	if errPath != nil {
+		t.Fatal(errPath)
+	}
 	if pub.CalendarPath != wantPath {
 		t.Fatalf("calendar path %q want %q", pub.CalendarPath, wantPath)
 	}

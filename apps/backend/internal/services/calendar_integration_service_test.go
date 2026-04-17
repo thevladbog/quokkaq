@@ -400,7 +400,10 @@ func TestCalendarIntegrationService_CreateGoogleIntegration(t *testing.T) {
 	if pub.CaldavBaseURL != models.GoogleCalDAVBaseURL {
 		t.Fatalf("base url: %s", pub.CaldavBaseURL)
 	}
-	wantPath := models.GoogleCalDAVEventsCollectionPath("user@gmail.com")
+	wantPath, errPath := models.GoogleCalDAVEventsCollectionPath("user@gmail.com")
+	if errPath != nil {
+		t.Fatal(errPath)
+	}
 	if pub.CalendarPath != wantPath {
 		t.Fatalf("calendar path: %q want %q", pub.CalendarPath, wantPath)
 	}
@@ -427,13 +430,16 @@ func TestCalendarIntegrationService_CreateGoogleIntegration_secondaryCalendarID(
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantPath := models.GoogleCalDAVEventsCollectionPath(calID)
+	wantPath, errPath := models.GoogleCalDAVEventsCollectionPath(calID)
+	if errPath != nil {
+		t.Fatal(errPath)
+	}
 	if pub.CalendarPath != wantPath {
 		t.Fatalf("calendar path: %q want %q", pub.CalendarPath, wantPath)
 	}
 }
 
-func TestCalendarIntegrationService_UpdateIntegration_GooglePreservesCalDAVIdentity(t *testing.T) {
+func TestCalendarIntegrationService_UpdateIntegration_GoogleRejectsImmutableCalDAVFields(t *testing.T) {
 	defer setupCalendarIntegrationServiceTestDB(t)()
 	svc := newTestCalendarService()
 	if err := database.DB.Create(&models.Unit{
@@ -450,8 +456,7 @@ func TestCalendarIntegrationService_UpdateIntegration_GooglePreservesCalDAVIdent
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantPath := pub.CalendarPath
-	up, err := svc.UpdateIntegration("co-g2", pub.ID, &UpdateCalendarIntegrationRequest{
+	_, err = svc.UpdateIntegration("co-g2", pub.ID, &UpdateCalendarIntegrationRequest{
 		DisplayName:   "Renamed",
 		Enabled:       boolPtr(true),
 		CaldavBaseURL: "https://evil.example",
@@ -459,19 +464,21 @@ func TestCalendarIntegrationService_UpdateIntegration_GooglePreservesCalDAVIdent
 		Username:      "hacker@evil.com",
 		Timezone:      "Europe/London",
 	})
+	if !errors.Is(err, ErrCalendarGoogleCalDAVIdentityImmutable) {
+		t.Fatalf("update: want ErrCalendarGoogleCalDAVIdentityImmutable, got %v", err)
+	}
+	up, err := svc.UpdateIntegration("co-g2", pub.ID, &UpdateCalendarIntegrationRequest{
+		DisplayName:   "Renamed OK",
+		Enabled:       boolPtr(true),
+		CaldavBaseURL: models.GoogleCalDAVBaseURL,
+		CalendarPath:  pub.CalendarPath,
+		Username:      pub.Username,
+		Timezone:      "Europe/London",
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if up.CaldavBaseURL != models.GoogleCalDAVBaseURL {
-		t.Fatalf("caldav base: %s", up.CaldavBaseURL)
-	}
-	if up.CalendarPath != wantPath {
-		t.Fatalf("calendar path changed: %q want %q", up.CalendarPath, wantPath)
-	}
-	if up.Username != "user@gmail.com" {
-		t.Fatalf("username changed: %s", up.Username)
-	}
-	if up.DisplayName != "Renamed" {
+	if up.DisplayName != "Renamed OK" {
 		t.Fatalf("display name: %s", up.DisplayName)
 	}
 	if up.Timezone != "Europe/London" {

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"log"
 	"net/http"
-	"strings"
 
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/repository"
@@ -76,6 +75,8 @@ func respondCalendarIntegrationError(w http.ResponseWriter, op string, err error
 		http.Error(w, calendarIntMsgForbidden, http.StatusForbidden)
 	case errors.Is(err, services.ErrCalendarAppPasswordRequired):
 		http.Error(w, calendarIntMsgBadRequest, http.StatusBadRequest)
+	case errors.Is(err, services.ErrCalendarGoogleCalDAVIdentityImmutable):
+		http.Error(w, services.ErrCalendarGoogleCalDAVIdentityImmutable.Error(), http.StatusBadRequest)
 	case errors.Is(err, services.ErrCalendarEnabledRequired):
 		http.Error(w, services.ErrCalendarEnabledRequired.Error(), http.StatusBadRequest)
 	case errors.Is(err, services.ErrCalendarIntegrationBlockedByActivePreRegistrations):
@@ -305,13 +306,13 @@ func (h *CalendarIntegrationHandler) DeleteMine(w http.ResponseWriter, r *http.R
 
 // GoogleCalendarOAuthStartRequest is POST /companies/me/calendar-integrations/google/oauth/start body.
 type GoogleCalendarOAuthStartRequest struct {
-	UnitID     string `json:"unitId"`
-	ReturnPath string `json:"returnPath,omitempty"`
+	UnitID     string `json:"unitId" binding:"required"`
+	ReturnPath string `json:"returnPath" binding:"required"`
 }
 
 // GoogleCalendarOAuthStartResponse returns the browser redirect URL for Google consent.
 type GoogleCalendarOAuthStartResponse struct {
-	URL string `json:"url"`
+	URL string `json:"url" binding:"required"`
 }
 
 func respondGoogleOAuthStartError(w http.ResponseWriter, op string, err error) {
@@ -323,6 +324,8 @@ func respondGoogleOAuthStartError(w http.ResponseWriter, op string, err error) {
 		http.Error(w, services.ErrGoogleCalendarOAuthUnitIDRequired.Error(), http.StatusBadRequest)
 	case errors.Is(err, services.ErrGoogleCalendarOAuthRedisUnavailable):
 		http.Error(w, services.ErrGoogleCalendarOAuthRedisUnavailable.Error(), http.StatusServiceUnavailable)
+	case errors.Is(err, services.ErrGoogleCalendarOAuthSessionSaveFailed):
+		http.Error(w, services.ErrGoogleCalendarOAuthSessionSaveFailed.Error(), http.StatusServiceUnavailable)
 	case errors.Is(err, services.ErrCalendarIntegrationLimit):
 		http.Error(w, services.ErrCalendarIntegrationLimit.Error(), http.StatusConflict)
 	case errors.Is(err, services.ErrCalendarUnitCompanyMismatch):
@@ -346,10 +349,9 @@ func googleOAuthCallbackFailureReason(err error) string {
 		return "forbidden"
 	case errors.Is(err, services.ErrCalendarAppPasswordRequired):
 		return "create_failed"
+	case errors.Is(err, services.ErrGoogleCalendarOAuthSessionSaveFailed):
+		return "pick_save"
 	default:
-		if strings.Contains(strings.ToLower(err.Error()), "redis") {
-			return "pick_save"
-		}
 		return "oauth_failed"
 	}
 }
@@ -392,9 +394,12 @@ func (h *CalendarIntegrationHandler) GoogleOAuthStart(w http.ResponseWriter, r *
 // @ID           calendarIntegrationGoogleOAuthCallback
 // @Summary      Google Calendar OAuth callback (browser redirect)
 // @Tags         calendar-integration
-// @Param        code query string false "Authorization code"
-// @Param        state query string false "OAuth state"
-// @Success      302
+// @Param        code   query string true "Authorization code from Google"
+// @Param        state  query string true "OAuth state (PKCE session key)"
+// @Success      302 {string} string "302 Found — successful flows redirect via Location to the return path with google_calendar_pick; failures redirect to the return path with google_calendar=error and reason=… (or equivalent error query parameters) so UIs and monitoring can read the outcome."
+// @Header       302 {string} Location "Where the browser should navigate next (success or error redirect target)."
+// @Failure      400 {string} string "Bad request — invalid or missing parameters, or invalid/expired OAuth state (may still be returned as a redirect with error query parameters)."
+// @Failure      500 {string} string "Internal or downstream failure while completing OAuth (may still be returned as a redirect with error query parameters)."
 // @Router       /calendar-integrations/google/oauth/callback [get]
 func (h *CalendarIntegrationHandler) GoogleOAuthCallback(w http.ResponseWriter, r *http.Request) {
 	okURL, failPath, err := h.svc.CompleteGoogleCalendarOAuth(r.Context(), r.URL.Query().Get("code"), r.URL.Query().Get("state"))
@@ -408,18 +413,18 @@ func (h *CalendarIntegrationHandler) GoogleOAuthCallback(w http.ResponseWriter, 
 
 // GoogleCalendarPickListRequest is POST .../google/oauth/list-calendars body.
 type GoogleCalendarPickListRequest struct {
-	PickToken string `json:"pickToken"`
+	PickToken string `json:"pickToken" binding:"required"`
 }
 
 // GoogleCalendarPickListResponse is POST .../google/oauth/list-calendars response.
 type GoogleCalendarPickListResponse struct {
-	Calendars []services.GoogleCalendarPickOption `json:"calendars"`
+	Calendars []services.GoogleCalendarPickOption `json:"calendars" binding:"required"`
 }
 
 // GoogleCalendarPickCompleteRequest is POST .../google/oauth/complete body.
 type GoogleCalendarPickCompleteRequest struct {
-	PickToken  string `json:"pickToken"`
-	CalendarID string `json:"calendarId"`
+	PickToken  string `json:"pickToken" binding:"required"`
+	CalendarID string `json:"calendarId" binding:"required"`
 }
 
 // GooglePickListCalendars godoc
