@@ -1630,18 +1630,8 @@ export type calendarIntegrationGoogleOAuthCallbackResponse302 = {
   status: 302
 }
 
-export type calendarIntegrationGoogleOAuthCallbackResponse400 = {
-  data: string
-  status: 400
-}
-
-export type calendarIntegrationGoogleOAuthCallbackResponse500 = {
-  data: string
-  status: 500
-}
-
 ;
-export type calendarIntegrationGoogleOAuthCallbackResponseError = (calendarIntegrationGoogleOAuthCallbackResponse302 | calendarIntegrationGoogleOAuthCallbackResponse400 | calendarIntegrationGoogleOAuthCallbackResponse500) & {
+export type calendarIntegrationGoogleOAuthCallbackResponseError = (calendarIntegrationGoogleOAuthCallbackResponse302) & {
   headers: Headers;
 };
 

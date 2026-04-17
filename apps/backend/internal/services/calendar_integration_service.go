@@ -359,6 +359,14 @@ func (s *CalendarIntegrationService) CreateGoogleIntegration(companyID, unitID, 
 	if err != nil {
 		return nil, err
 	}
+	u, err := s.unitRepo.FindByIDLight(unitID)
+	if err != nil {
+		return nil, err
+	}
+	tz := strings.TrimSpace(u.Timezone)
+	if tz == "" {
+		tz = "Europe/Moscow"
+	}
 	enc, encErr := ssocrypto.EncryptAES256GCM([]byte(rt))
 	if encErr != nil {
 		return nil, encErr
@@ -372,7 +380,7 @@ func (s *CalendarIntegrationService) CreateGoogleIntegration(companyID, unitID, 
 		CalendarPath:         calPath,
 		Username:             email,
 		AppPasswordEncrypted: enc,
-		Timezone:             "Europe/Moscow",
+		Timezone:             tz,
 	}
 	if err := s.repo.CreateIntegration(&row); err != nil {
 		return nil, err

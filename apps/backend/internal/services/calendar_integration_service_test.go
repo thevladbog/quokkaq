@@ -410,6 +410,9 @@ func TestCalendarIntegrationService_CreateGoogleIntegration(t *testing.T) {
 	if pub.Username != "user@gmail.com" {
 		t.Fatalf("username: %s", pub.Username)
 	}
+	if pub.Timezone != "UTC" {
+		t.Fatalf("timezone: want unit timezone UTC, got %s", pub.Timezone)
+	}
 }
 
 func TestCalendarIntegrationService_CreateGoogleIntegration_secondaryCalendarID(t *testing.T) {
@@ -436,6 +439,9 @@ func TestCalendarIntegrationService_CreateGoogleIntegration_secondaryCalendarID(
 	}
 	if pub.CalendarPath != wantPath {
 		t.Fatalf("calendar path: %q want %q", pub.CalendarPath, wantPath)
+	}
+	if pub.Timezone != "UTC" {
+		t.Fatalf("timezone: want unit timezone UTC, got %s", pub.Timezone)
 	}
 }
 

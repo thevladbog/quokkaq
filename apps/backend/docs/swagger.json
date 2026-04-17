@@ -4646,7 +4646,7 @@
                                 }
                             }
                         },
-                        "description": "302 Found — successful flows redirect via Location to the return path with google_calendar_pick; failures redirect to the return path with google_calendar=error and reason=… (or equivalent error query parameters) so UIs and monitoring can read the outcome.",
+                        "description": "302 Found — this handler always responds with a redirect. Success: Location points to the return path with google_calendar_pick. Any failure (invalid code/state, expired state, token exchange, Redis, etc.) is expressed via Location to the return path with google_calendar=error and reason=… (or equivalent query parameters), not via non-302 HTTP statuses.",
                         "headers": {
                             "Location": {
                                 "description": "Where the browser should navigate next (success or error redirect target).",
@@ -4655,26 +4655,6 @@
                                 }
                             }
                         }
-                    },
-                    "400": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "string"
-                                }
-                            }
-                        },
-                        "description": "Bad request — invalid or missing parameters, or invalid/expired OAuth state (may still be returned as a redirect with error query parameters)."
-                    },
-                    "500": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "string"
-                                }
-                            }
-                        },
-                        "description": "Internal or downstream failure while completing OAuth (may still be returned as a redirect with error query parameters)."
                     }
                 },
                 "summary": "Google Calendar OAuth callback (browser redirect)",

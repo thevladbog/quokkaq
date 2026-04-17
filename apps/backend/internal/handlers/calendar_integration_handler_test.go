@@ -220,6 +220,48 @@ func TestCalendarIntegrationHandler_GooglePickListCalendars_CompanyResolveForbid
 	}
 }
 
+func TestCalendarIntegrationHandler_GoogleOAuthStart_InvalidReturnPath(t *testing.T) {
+	defer setupCalendarHandlerTestSQLite(t)()
+	if err := database.DB.Create(&models.Unit{
+		ID:        "unit-go-badpath",
+		CompanyID: "co-go",
+		Code:      "gob",
+		Kind:      models.UnitKindSubdivision,
+		Name:      "U",
+		Timezone:  "UTC",
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	prevC, prevS, prevR := os.Getenv("GOOGLE_CALENDAR_OAUTH_CLIENT_ID"), os.Getenv("GOOGLE_CALENDAR_OAUTH_CLIENT_SECRET"), os.Getenv("GOOGLE_CALENDAR_OAUTH_REDIRECT_URL")
+	t.Cleanup(func() {
+		restore := func(k, v string) {
+			if v == "" {
+				_ = os.Unsetenv(k)
+			} else {
+				_ = os.Setenv(k, v)
+			}
+		}
+		restore("GOOGLE_CALENDAR_OAUTH_CLIENT_ID", prevC)
+		restore("GOOGLE_CALENDAR_OAUTH_CLIENT_SECRET", prevS)
+		restore("GOOGLE_CALENDAR_OAUTH_REDIRECT_URL", prevR)
+	})
+	_ = os.Setenv("GOOGLE_CALENDAR_OAUTH_CLIENT_ID", "test-client-id")
+	_ = os.Setenv("GOOGLE_CALENDAR_OAUTH_CLIENT_SECRET", "test-secret")
+	_ = os.Setenv("GOOGLE_CALENDAR_OAUTH_REDIRECT_URL", "https://app.example/oauth/callback")
+
+	svc := newHandlerTestCalendarService()
+	h := NewCalendarIntegrationHandler(svc, stubCalendarUserRepo{CompanyID: "co-go"})
+	raw, _ := json.Marshal(map[string]string{"unitId": "unit-go-badpath", "returnPath": "//evil"})
+	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(raw))
+	req.Header.Set("Content-Type", "application/json")
+	req = reqWithUserID(req, "admin-1")
+	w := httptest.NewRecorder()
+	h.GoogleOAuthStart(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status %d body %q", w.Code, w.Body.String())
+	}
+}
+
 func TestCalendarIntegrationHandler_GooglePickListCalendars_ServiceUnavailableNoGoogleOAuth(t *testing.T) {
 	defer setupCalendarHandlerTestSQLite(t)()
 	setupPickTestRedis(t)

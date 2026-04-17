@@ -1,6 +1,9 @@
 package services
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 func TestSanitizeInternalReturnPath(t *testing.T) {
 	t.Parallel()
@@ -13,15 +16,15 @@ func TestSanitizeInternalReturnPath(t *testing.T) {
 		t.Fatalf("ok path: got %q err %v", got, err)
 	}
 	_, err = SanitizeInternalReturnPath("//evil")
-	if err == nil {
-		t.Fatal("want error for //")
+	if err == nil || !errors.Is(err, ErrGoogleCalendarOAuthInvalidReturnPath) {
+		t.Fatalf("want ErrGoogleCalendarOAuthInvalidReturnPath for //, got %v", err)
 	}
 	_, err = SanitizeInternalReturnPath("https://evil.example/phish")
-	if err == nil {
-		t.Fatal("want error for absolute URL")
+	if err == nil || !errors.Is(err, ErrGoogleCalendarOAuthInvalidReturnPath) {
+		t.Fatalf("want ErrGoogleCalendarOAuthInvalidReturnPath for absolute URL, got %v", err)
 	}
 	_, err = SanitizeInternalReturnPath("/../etc/passwd")
-	if err == nil {
-		t.Fatal("want error for traversal")
+	if err == nil || !errors.Is(err, ErrGoogleCalendarOAuthInvalidReturnPath) {
+		t.Fatalf("want ErrGoogleCalendarOAuthInvalidReturnPath for traversal, got %v", err)
 	}
 }

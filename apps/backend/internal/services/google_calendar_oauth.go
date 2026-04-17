@@ -40,6 +40,8 @@ var (
 	ErrGoogleCalendarPickInvalid = errors.New("invalid or expired calendar selection session")
 	// ErrGoogleCalendarOAuthSessionSaveFailed is returned when Redis cannot persist OAuth state or the post-login pick session.
 	ErrGoogleCalendarOAuthSessionSaveFailed = errors.New("could not persist google calendar oauth session")
+	// ErrGoogleCalendarOAuthInvalidReturnPath is returned when returnPath is not a safe same-origin path.
+	ErrGoogleCalendarOAuthInvalidReturnPath = errors.New("invalid return path")
 )
 
 var googleOAuthHTTPClient = &http.Client{Timeout: 15 * time.Second}
@@ -133,20 +135,20 @@ func SanitizeInternalReturnPath(p string) (string, error) {
 		return "/settings/integrations", nil
 	}
 	if !strings.HasPrefix(p, "/") || strings.HasPrefix(p, "//") {
-		return "", fmt.Errorf("invalid return path")
+		return "", fmt.Errorf("%w", ErrGoogleCalendarOAuthInvalidReturnPath)
 	}
 	if strings.Contains(p, "://") {
-		return "", fmt.Errorf("invalid return path")
+		return "", fmt.Errorf("%w", ErrGoogleCalendarOAuthInvalidReturnPath)
 	}
 	if strings.Contains(p, "..") {
-		return "", fmt.Errorf("invalid return path")
+		return "", fmt.Errorf("%w", ErrGoogleCalendarOAuthInvalidReturnPath)
 	}
 	clean := path.Clean(p)
 	if clean == "." || strings.HasPrefix(clean, "/..") {
-		return "", fmt.Errorf("invalid return path")
+		return "", fmt.Errorf("%w", ErrGoogleCalendarOAuthInvalidReturnPath)
 	}
 	if len(clean) > 512 {
-		return "", fmt.Errorf("invalid return path")
+		return "", fmt.Errorf("%w", ErrGoogleCalendarOAuthInvalidReturnPath)
 	}
 	return clean, nil
 }
