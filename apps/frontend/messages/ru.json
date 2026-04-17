@@ -1218,6 +1218,7 @@
       "detailUpdated": "Обновлено",
       "detailLastSync": "Последняя синхронизация",
       "detailCopy": "Копировать",
+      "detailCopyFailed": "Не удалось скопировать",
       "detailCopied": "Скопировано",
       "detailLoadError": "Не удалось загрузить обращение",
       "detailForbidden": "Нет доступа к этому обращению",

@@ -88,7 +88,7 @@ func (c *PlaneClient) CreateWorkItem(ctx context.Context, externalID, title, des
 	if err != nil {
 		return "", nil, "", err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	body, _ := io.ReadAll(io.LimitReader(res.Body, 2<<20))
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
 		return "", nil, "", fmt.Errorf("plane POST work-items: status %d: %s", res.StatusCode, strings.TrimSpace(string(body)))
@@ -122,7 +122,7 @@ func (c *PlaneClient) GetWorkItem(ctx context.Context, workItemID string) (seque
 	if err != nil {
 		return nil, "", err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	body, _ := io.ReadAll(io.LimitReader(res.Body, 2<<20))
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
 		return nil, "", fmt.Errorf("plane GET work-item: status %d: %s", res.StatusCode, strings.TrimSpace(string(body)))

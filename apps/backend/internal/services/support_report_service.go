@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"strings"
 	"time"
 
@@ -35,7 +36,11 @@ type CreateReportInput struct {
 	UnitID      *string
 }
 
-// Create persists a report and creates the Plane work item.
+// Create persists a report after creating the Plane work item.
+//
+// Ordering: Plane CreateWorkItem runs before repo.Create. If the DB insert fails, a Plane work
+// item may exist without a matching support_reports row. Mitigation (persist-first, compensation,
+// or pending state) is deferred; operators can reconcile manually in Plane if needed.
 func (s *SupportReportService) Create(ctx context.Context, userID string, in CreateReportInput) (*models.SupportReport, error) {
 	if s.plane == nil || !s.plane.Enabled() {
 		return nil, ErrPlaneNotConfigured
@@ -105,7 +110,9 @@ func (s *SupportReportService) List(ctx context.Context, userID string) ([]model
 		}
 		rows[i].PlaneStatus = st
 		rows[i].LastSyncedAt = &now
-		_ = s.repo.Update(&rows[i])
+		if err := s.repo.Update(&rows[i]); err != nil {
+			log.Printf("support report: List sync: update id=%s: %v", rows[i].ID, err)
+		}
 	}
 	return rows, nil
 }
@@ -132,7 +139,9 @@ func (s *SupportReportService) GetByID(ctx context.Context, userID, reportID str
 			row.PlaneStatus = st
 			now := time.Now().UTC()
 			row.LastSyncedAt = &now
-			_ = s.repo.Update(row)
+			if err := s.repo.Update(row); err != nil {
+				log.Printf("support report: GetByID sync: update id=%s: %v", row.ID, err)
+			}
 		}
 	}
 	return row, nil

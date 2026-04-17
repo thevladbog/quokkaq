@@ -23,6 +23,7 @@ import {
   useCreateSupportReport
 } from '@/lib/api/generated/support';
 import { useActiveUnit } from '@/contexts/ActiveUnitContext';
+import { ApiHttpError } from '@/lib/api-errors';
 
 export type SupportReportDialogProps = {
   /** Custom trigger (e.g. floating action button). Defaults to secondary “Report issue” button. */
@@ -42,21 +43,25 @@ export default function SupportReportDialog({
   const mutation = useCreateSupportReport({
     mutation: {
       onSuccess: (res) => {
-        if (res.status === 201) {
-          toast.success(t('success'));
-          setOpen(false);
-          setTitle('');
-          setDescription('');
-          void queryClient.invalidateQueries({
-            queryKey: getListSupportReportsQueryKey()
-          });
-        } else if (res.status === 503) {
-          toast.error(t('planeUnavailable'));
-        } else {
+        if (res.status !== 201) {
           toast.error(t('error'));
+          return;
         }
+        toast.success(t('success'));
+        setOpen(false);
+        setTitle('');
+        setDescription('');
+        void queryClient.invalidateQueries({
+          queryKey: getListSupportReportsQueryKey()
+        });
       },
-      onError: () => toast.error(t('error'))
+      onError: (err) => {
+        if (err instanceof ApiHttpError && err.status === 503) {
+          toast.error(t('planeUnavailable'));
+          return;
+        }
+        toast.error(t('error'));
+      }
     }
   });
 

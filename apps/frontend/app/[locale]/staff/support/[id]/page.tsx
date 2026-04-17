@@ -13,6 +13,7 @@ import {
   CardTitle
 } from '@/components/ui/card';
 import { useGetSupportReportByID } from '@/lib/api/generated/support';
+import { ApiHttpError } from '@/lib/api-errors';
 import { toast } from 'sonner';
 
 function formatDate(iso: string | undefined) {
@@ -41,7 +42,7 @@ export default function StaffSupportDetailPage({
       await navigator.clipboard.writeText(value);
       toast.success(t('detailCopied'));
     } catch {
-      toast.error(t('detailCopy'));
+      toast.error(t('detailCopyFailed'));
     }
   };
 
@@ -54,6 +55,29 @@ export default function StaffSupportDetailPage({
   }
 
   if (q.isError) {
+    const err = q.error;
+    if (err instanceof ApiHttpError) {
+      if (err.status === 404) {
+        return (
+          <div className='container mx-auto max-w-2xl p-4 md:p-6'>
+            <p className='text-muted-foreground'>{t('detailNotFound')}</p>
+            <Button variant='outline' className='mt-4' asChild>
+              <Link href='/staff/support'>{t('myReports')}</Link>
+            </Button>
+          </div>
+        );
+      }
+      if (err.status === 403) {
+        return (
+          <div className='container mx-auto max-w-2xl p-4 md:p-6'>
+            <p className='text-destructive'>{t('detailForbidden')}</p>
+            <Button variant='outline' className='mt-4' asChild>
+              <Link href='/staff/support'>{t('myReports')}</Link>
+            </Button>
+          </div>
+        );
+      }
+    }
     return (
       <div className='container mx-auto max-w-2xl p-4 md:p-6'>
         <p className='text-destructive'>{t('detailLoadError')}</p>
@@ -65,27 +89,7 @@ export default function StaffSupportDetailPage({
   }
 
   const res = q.data;
-  if (!res || res.status === 404) {
-    return (
-      <div className='container mx-auto max-w-2xl p-4 md:p-6'>
-        <p className='text-muted-foreground'>{t('detailNotFound')}</p>
-        <Button variant='outline' className='mt-4' asChild>
-          <Link href='/staff/support'>{t('myReports')}</Link>
-        </Button>
-      </div>
-    );
-  }
-  if (res.status === 403) {
-    return (
-      <div className='container mx-auto max-w-2xl p-4 md:p-6'>
-        <p className='text-destructive'>{t('detailForbidden')}</p>
-        <Button variant='outline' className='mt-4' asChild>
-          <Link href='/staff/support'>{t('myReports')}</Link>
-        </Button>
-      </div>
-    );
-  }
-  if (res.status !== 200) {
+  if (!res || res.status !== 200 || res.data == null) {
     return (
       <div className='container mx-auto max-w-2xl p-4 md:p-6'>
         <p className='text-destructive'>{t('detailLoadError')}</p>

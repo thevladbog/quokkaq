@@ -138,3 +138,54 @@ func TestSupportReportHandler_GetByID_NotFound(t *testing.T) {
 		t.Fatalf("GetByID: want %d, got %d", http.StatusNotFound, rr.Code)
 	}
 }
+
+func TestSupportReportHandler_Create_InvalidJSON(t *testing.T) {
+	t.Parallel()
+	h := newTestSupportReportHandler(stubSupportReportRepo{})
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/support/reports",
+		bytes.NewReader([]byte(`{"title":`)),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	req = reqWithUserID(req, "user-1")
+	rr := httptest.NewRecorder()
+	h.Create(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("Create: want %d, got %d body=%q", http.StatusBadRequest, rr.Code, rr.Body.String())
+	}
+}
+
+func TestSupportReportHandler_Create_BodyTooLarge(t *testing.T) {
+	t.Parallel()
+	h := newTestSupportReportHandler(stubSupportReportRepo{})
+	large := bytes.Repeat([]byte("a"), (1<<20)+1)
+	req := httptest.NewRequest(http.MethodPost, "/support/reports", bytes.NewReader(large))
+	req.Header.Set("Content-Type", "application/json")
+	req = reqWithUserID(req, "user-1")
+	rr := httptest.NewRecorder()
+	h.Create(rr, req)
+	if rr.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("Create: want %d, got %d", http.StatusRequestEntityTooLarge, rr.Code)
+	}
+}
+
+func TestSupportReportHandler_GetByID_Forbidden(t *testing.T) {
+	t.Parallel()
+	otherUserRow := &models.SupportReport{
+		ID:              "rep-1",
+		CreatedByUserID: "other-user",
+		PlaneWorkItemID: "pw-1",
+		Title:           "t",
+	}
+	h := newTestSupportReportHandler(stubSupportReportRepo{findRes: otherUserRow})
+	r := chi.NewRouter()
+	r.Get("/support/reports/{id}", h.GetByID)
+	req := httptest.NewRequest(http.MethodGet, "/support/reports/rep-1", nil)
+	req = reqWithUserID(req, "user-1")
+	rr := httptest.NewRecorder()
+	r.ServeHTTP(rr, req)
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("GetByID: want %d, got %d body=%q", http.StatusForbidden, rr.Code, rr.Body.String())
+	}
+}

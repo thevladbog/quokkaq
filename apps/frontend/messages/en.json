@@ -1218,6 +1218,7 @@
       "detailUpdated": "Updated",
       "detailLastSync": "Last synced",
       "detailCopy": "Copy",
+      "detailCopyFailed": "Could not copy",
       "detailCopied": "Copied",
       "detailLoadError": "Could not load request",
       "detailForbidden": "You do not have access to this request",

@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 
 	"quokkaq-go-backend/internal/middleware"
@@ -12,6 +13,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"gorm.io/gorm"
 )
+
+// maxSupportReportCreateBodyBytes caps JSON body for POST /support/reports (text + diagnostics).
+const maxSupportReportCreateBodyBytes = 1 << 20 // 1 MiB
 
 // SupportReportHandler exposes support / Plane report APIs.
 type SupportReportHandler struct {
@@ -53,8 +57,18 @@ func (h *SupportReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
+	limited := http.MaxBytesReader(w, r.Body, maxSupportReportCreateBodyBytes)
+	body, err := io.ReadAll(limited)
+	if err != nil {
+		if maxBytesReaderExceeded(err) {
+			http.Error(w, "Request entity too large", http.StatusRequestEntityTooLarge)
+			return
+		}
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
 	var req createSupportReportRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.Unmarshal(body, &req); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
