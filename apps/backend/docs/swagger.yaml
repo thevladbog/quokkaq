@@ -3060,11 +3060,7 @@ paths:
           type: string
       responses:
         '302':
-          content:
-            application/json:
-              schema:
-                type: string
-          description: '302 Found — this handler always responds with a redirect. Success: Location points to the return path with google_calendar_pick. Any failure (invalid code/state, expired state, token exchange, Redis, etc.) is expressed via Location to the return path with google_calendar=error and reason=… (or equivalent query parameters), not via non-302 HTTP statuses.'
+          description: 'Found — redirect only (no JSON body). Success: Location to return path with google_calendar_pick. Failures: Location to return path with google_calendar=error and reason (or equivalent query parameters).'
           headers:
             Location:
               description: Where the browser should navigate next (success or error redirect target).

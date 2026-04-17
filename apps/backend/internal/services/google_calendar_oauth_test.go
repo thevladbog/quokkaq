@@ -15,6 +15,10 @@ func TestSanitizeInternalReturnPath(t *testing.T) {
 	if err != nil || got != "/ru/settings/integrations" {
 		t.Fatalf("ok path: got %q err %v", got, err)
 	}
+	got, err = SanitizeInternalReturnPath("/ru/settings/integrations?foo=..bar")
+	if err != nil || got != "/ru/settings/integrations?foo=..bar" {
+		t.Fatalf("query may contain ..: got %q err %v", got, err)
+	}
 	_, err = SanitizeInternalReturnPath("//evil")
 	if err == nil || !errors.Is(err, ErrGoogleCalendarOAuthInvalidReturnPath) {
 		t.Fatalf("want ErrGoogleCalendarOAuthInvalidReturnPath for //, got %v", err)

@@ -398,7 +398,7 @@ func (h *CalendarIntegrationHandler) GoogleOAuthStart(w http.ResponseWriter, r *
 // @Tags         calendar-integration
 // @Param        code   query string true "Authorization code from Google"
 // @Param        state  query string true "OAuth state (PKCE session key)"
-// @Success      302 {string} string "302 Found — this handler always responds with a redirect. Success: Location points to the return path with google_calendar_pick. Any failure (invalid code/state, expired state, token exchange, Redis, etc.) is expressed via Location to the return path with google_calendar=error and reason=… (or equivalent query parameters), not via non-302 HTTP statuses."
+// @Success      302 "Found — redirect only (no JSON body). Success: Location to return path with google_calendar_pick. Failures: Location to return path with google_calendar=error and reason (or equivalent query parameters)."
 // @Header       302 {string} Location "Where the browser should navigate next (success or error redirect target)."
 // @Router       /calendar-integrations/google/oauth/callback [get]
 func (h *CalendarIntegrationHandler) GoogleOAuthCallback(w http.ResponseWriter, r *http.Request) {

@@ -488,9 +488,8 @@ function CreateCalendarIntegrationDialog({
       <DialogContent className='max-h-[90vh] overflow-y-auto sm:max-w-lg'>
         <DialogHeader>
           <DialogTitle>{tInt('add_calendar')}</DialogTitle>
-          <DialogDescription className='space-y-2'>
+          <DialogDescription>
             <span className='block'>{t('create_dialog_description')}</span>
-            <span className='block'>{t('create_dialog_google_note')}</span>
           </DialogDescription>
         </DialogHeader>
 
@@ -693,8 +692,9 @@ function GoogleConnectCalendarDialog({
       <DialogContent className='sm:max-w-md'>
         <DialogHeader>
           <DialogTitle>{t('google_connect_dialog_title')}</DialogTitle>
-          <DialogDescription>
-            {t('google_connect_dialog_desc')}
+          <DialogDescription className='space-y-2'>
+            <span className='block'>{t('google_connect_dialog_desc')}</span>
+            <span className='block'>{t('create_dialog_google_note')}</span>
           </DialogDescription>
         </DialogHeader>
         <div className='space-y-4 py-2'>

@@ -2,7 +2,9 @@ package services
 
 import (
 	"context"
+	"net/http"
 	"strings"
+	"time"
 
 	"golang.org/x/oauth2"
 	"google.golang.org/api/calendar/v3"
@@ -19,7 +21,8 @@ func listWritableGoogleCalendarsFromRefresh(ctx context.Context, refreshToken st
 		return nil, ErrGoogleCalendarOAuthNoRefreshToken
 	}
 	ts := cfg.TokenSource(ctx, &oauth2.Token{RefreshToken: rt})
-	svc, err := calendar.NewService(ctx, option.WithTokenSource(ts))
+	hc := &http.Client{Timeout: 30 * time.Second}
+	svc, err := calendar.NewService(ctx, option.WithTokenSource(ts), option.WithHTTPClient(hc))
 	if err != nil {
 		return nil, err
 	}

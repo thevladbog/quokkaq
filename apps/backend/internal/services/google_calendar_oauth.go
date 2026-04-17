@@ -129,28 +129,52 @@ func revokeGoogleRefreshToken(ctx context.Context, refreshToken string) {
 }
 
 // SanitizeInternalReturnPath validates a same-origin path for post-OAuth browser redirect.
+// Query and fragment may contain arbitrary characters (e.g. ".." inside a query value); only the path is cleaned and checked for traversal.
 func SanitizeInternalReturnPath(p string) (string, error) {
 	p = strings.TrimSpace(p)
 	if p == "" {
 		return "/settings/integrations", nil
 	}
-	if !strings.HasPrefix(p, "/") || strings.HasPrefix(p, "//") {
+	u, err := url.Parse(p)
+	if err != nil {
 		return "", fmt.Errorf("%w", ErrGoogleCalendarOAuthInvalidReturnPath)
 	}
-	if strings.Contains(p, "://") {
+	if u.Scheme != "" || u.Host != "" {
 		return "", fmt.Errorf("%w", ErrGoogleCalendarOAuthInvalidReturnPath)
 	}
-	if strings.Contains(p, "..") {
+	if u.User != nil {
 		return "", fmt.Errorf("%w", ErrGoogleCalendarOAuthInvalidReturnPath)
 	}
-	clean := path.Clean(p)
-	if clean == "." || strings.HasPrefix(clean, "/..") {
+	pathPart := u.Path
+	if pathPart == "" {
 		return "", fmt.Errorf("%w", ErrGoogleCalendarOAuthInvalidReturnPath)
 	}
-	if len(clean) > 512 {
+	if !strings.HasPrefix(pathPart, "/") || strings.HasPrefix(pathPart, "//") {
 		return "", fmt.Errorf("%w", ErrGoogleCalendarOAuthInvalidReturnPath)
 	}
-	return clean, nil
+	if strings.Contains(pathPart, "://") {
+		return "", fmt.Errorf("%w", ErrGoogleCalendarOAuthInvalidReturnPath)
+	}
+	for _, seg := range strings.Split(strings.TrimPrefix(pathPart, "/"), "/") {
+		if seg == ".." {
+			return "", fmt.Errorf("%w", ErrGoogleCalendarOAuthInvalidReturnPath)
+		}
+	}
+	cleanPath := path.Clean(pathPart)
+	if cleanPath == "." || !strings.HasPrefix(cleanPath, "/") || strings.HasPrefix(cleanPath, "/..") {
+		return "", fmt.Errorf("%w", ErrGoogleCalendarOAuthInvalidReturnPath)
+	}
+	out := cleanPath
+	if u.RawQuery != "" {
+		out += "?" + u.RawQuery
+	}
+	if u.Fragment != "" {
+		out += "#" + u.Fragment
+	}
+	if len(out) > 512 {
+		return "", fmt.Errorf("%w", ErrGoogleCalendarOAuthInvalidReturnPath)
+	}
+	return out, nil
 }
 
 // StartGoogleCalendarOAuth builds the Google authorize URL and stores PKCE state in Redis.
