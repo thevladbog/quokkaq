@@ -80,7 +80,7 @@ func newPlaneHTTPClientFromEnv() *http.Client {
 	t := base.Clone()
 	if skipVerify {
 		// Explicit opt-in for private Plane hosts (corporate CA / self-signed). Prefer installing the CA on the API server.
-		t.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec
+		t.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} // #nosec G402 -- gated by PLANE_TLS_INSECURE_SKIP_VERIFY
 	}
 	return &http.Client{Timeout: timeout, Transport: t}
 }
