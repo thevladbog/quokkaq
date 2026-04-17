@@ -6,25 +6,10 @@ import { Bug } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import SupportReportDialog from '@/components/staff/SupportReportDialog';
-
-function pathWithoutLocale(pathname: string): string {
-  return pathname.replace(/^\/[a-z]{2}\//, '/').replace(/^\/[a-z]{2}$/, '/');
-}
-
-function shouldShowOperationalSupportFab(normalized: string): boolean {
-  if (normalized.startsWith('/settings')) return false;
-  if (normalized.startsWith('/platform')) return false;
-  if (normalized.startsWith('/staff')) return true;
-  if (normalized.startsWith('/supervisor')) return true;
-  if (normalized === '/statistics' || normalized.startsWith('/statistics/'))
-    return true;
-  if (normalized.startsWith('/pre-registrations')) return true;
-  if (normalized.startsWith('/journal')) return true;
-  if (normalized.startsWith('/clients')) return true;
-  if (normalized === '/onboarding' || normalized.startsWith('/onboarding/'))
-    return true;
-  return false;
-}
+import {
+  pathWithoutLocale,
+  shouldShowOperationalSupportFab
+} from '@/lib/operational-support-fab-path';
 
 export default function OperationalSupportFab() {
   const pathname = usePathname();
