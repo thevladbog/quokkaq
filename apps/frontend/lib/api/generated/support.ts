@@ -317,35 +317,12 @@ export interface HandlersCreateInvitationRequest {
   templateId?: string;
 }
 
-export interface HandlersCreateTicketRequestAnonymous {
-  /** @minLength 1 */
+export interface HandlersCreateTicketRequest {
+  clientId?: string;
   serviceId: string;
+  visitorLocale?: string;
+  visitorPhone?: string;
 }
-
-export interface HandlersCreateTicketRequestStaff {
-  /** @minLength 1 */
-  serviceId: string;
-  /** @minLength 1 */
-  clientId: string;
-}
-
-export type HandlersCreateTicketRequestKioskVisitorLocale = typeof HandlersCreateTicketRequestKioskVisitorLocale[keyof typeof HandlersCreateTicketRequestKioskVisitorLocale];
-
-
-export const HandlersCreateTicketRequestKioskVisitorLocale = {
-  en: 'en',
-  ru: 'ru',
-} as const;
-
-export interface HandlersCreateTicketRequestKiosk {
-  /** @minLength 1 */
-  serviceId: string;
-  /** @minLength 1 */
-  visitorPhone: string;
-  visitorLocale: HandlersCreateTicketRequestKioskVisitorLocale;
-}
-
-export type HandlersCreateTicketRequest = HandlersCreateTicketRequestAnonymous | HandlersCreateTicketRequestStaff | HandlersCreateTicketRequestKiosk;
 
 export interface HandlersDaDataFindPartyByInnRequest {
   inn: string;
@@ -454,8 +431,7 @@ export interface HandlersLoginSessionResponse {
 }
 
 export interface HandlersOperatorCommentPatchDTO {
-  /** @nullable */
-  operatorComment: string | null;
+  operatorComment: string;
 }
 
 export type HandlersPatchPlatformCompanyBodyBillingAddress = { [key: string]: unknown };
@@ -515,11 +491,11 @@ export interface HandlersPatchUnitClientRequest {
 export type HandlersPatchUnitKioskConfigRequestConfigKiosk = { [key: string]: unknown };
 
 export type HandlersPatchUnitKioskConfigRequestConfig = {
-  kiosk: HandlersPatchUnitKioskConfigRequestConfigKiosk;
+  kiosk?: HandlersPatchUnitKioskConfigRequestConfigKiosk;
 };
 
 export interface HandlersPatchUnitKioskConfigRequest {
-  config: HandlersPatchUnitKioskConfigRequestConfig;
+  config?: HandlersPatchUnitKioskConfigRequestConfig;
 }
 
 export interface HandlersPeriodResponse {
@@ -615,8 +591,7 @@ export interface HandlersSignupRequest {
 }
 
 export interface HandlersTransferRequest {
-  /** @nullable */
-  operatorComment?: string | null;
+  operatorComment?: string;
   toCounterId?: string;
   toServiceId?: string;
   toServiceZoneId?: string;
@@ -633,15 +608,15 @@ export interface HandlersUpdateStatusRequest {
 }
 
 export interface HandlersUploadLogoResponse {
-  url: string;
+  url?: string;
 }
 
 export interface HandlersUploadSurveyCompletionImageResponse {
-  url: string;
+  url?: string;
 }
 
 export interface HandlersUploadSurveyIdleMediaResponse {
-  url: string;
+  url?: string;
 }
 
 export interface HandlersUsageMetricInfoResponse {
@@ -661,6 +636,10 @@ export type HandlersYooKassaWebhookNotificationObject = { [key: string]: unknown
 export interface HandlersYooKassaWebhookNotification {
   event?: string;
   object?: HandlersYooKassaWebhookNotificationObject;
+}
+
+export interface HandlersAddSupportReportShareRequest {
+  userId?: string;
 }
 
 /**
@@ -892,12 +871,11 @@ export interface HandlersCreateSurveyRequest {
   completionMessage?: HandlersCreateSurveyRequestCompletionMessage;
   displayTheme?: HandlersCreateSurveyRequestDisplayTheme;
   idleScreen?: HandlersCreateSurveyRequestIdleScreen;
-  questions: HandlersCreateSurveyRequestQuestions;
-  title: string;
+  questions?: HandlersCreateSurveyRequestQuestions;
+  title?: string;
 }
 
 export interface HandlersCreateVisitorTagDefinitionRequest {
-  /** @pattern ^#[0-9A-Fa-f]{6}$ */
   color: string;
   label: string;
   sortOrder?: number;
@@ -917,13 +895,13 @@ export interface HandlersEmergencyUnlockBody {
 export type HandlersGuestSurveySubmitRequestAnswers = { [key: string]: unknown };
 
 export interface HandlersGuestSurveySubmitRequest {
-  answers: HandlersGuestSurveySubmitRequestAnswers;
-  surveyId: string;
-  ticketId: string;
+  answers?: HandlersGuestSurveySubmitRequestAnswers;
+  surveyId?: string;
+  ticketId?: string;
 }
 
 export interface HandlersPatchCompanySlugRequest {
-  slug: string;
+  slug?: string;
 }
 
 export type HandlersPatchSurveyRequestCompletionMessage = { [key: string]: unknown };
@@ -943,7 +921,6 @@ export interface HandlersPatchSurveyRequest {
 }
 
 export interface HandlersPatchVisitorTagDefinitionRequest {
-  /** @pattern ^#[0-9A-Fa-f]{6}$ */
   color?: string;
   label?: string;
   sortOrder?: number;
@@ -996,6 +973,10 @@ export interface HandlersPlatformListResponseModelsSubscription {
   total?: number;
 }
 
+export interface HandlersPostSupportReportCommentRequest {
+  text?: string;
+}
+
 export interface HandlersPutVisitorTagsRequest {
   operatorComment: string;
   tagDefinitionIds: string[];
@@ -1008,11 +989,11 @@ export interface HandlersSetupFirstAdminRequest {
 }
 
 export interface HandlersSsoExchangeRequest {
-  code: string;
+  code?: string;
 }
 
 export interface HandlersTenantHintRequest {
-  email: string;
+  email?: string;
 }
 
 export interface ModelsCatalogItemCreateRequest {
@@ -1199,13 +1180,19 @@ export type ModelsSupportReportDiagnostics = { [key: string]: unknown };
 
 export interface ModelsSupportReport {
   createdAt?: string;
+  /** CreatedByName is the submitting user's display name (User.Name); not persisted, filled on read APIs such as GetByID. */
+  createdByName?: string;
   createdByUserId?: string;
+  description?: string;
   diagnostics?: ModelsSupportReportDiagnostics;
   id?: string;
   lastSyncedAt?: string;
+  markedIrrelevantAt?: string;
+  markedIrrelevantByUserId?: string;
   planeSequenceId?: number;
   planeStatus?: string;
   planeWorkItemId?: string;
+  ticketBackend?: string;
   title?: string;
   traceId?: string;
   unitId?: string;
@@ -1286,6 +1273,12 @@ export interface ModelsWeeklySlotCapacity {
   updatedAt?: string;
 }
 
+export interface RepositorySupportReportShareCandidate {
+  email?: string;
+  name?: string;
+  userId?: string;
+}
+
 export interface ServicesCalendarIntegrationPublic {
   adminNotifyEmails?: string;
   caldavBaseUrl?: string;
@@ -1303,14 +1296,6 @@ export interface ServicesCalendarIntegrationPublic {
   username?: string;
 }
 
-export type ServicesCompanySSOGetResponseSsoProtocol = typeof ServicesCompanySSOGetResponseSsoProtocol[keyof typeof ServicesCompanySSOGetResponseSsoProtocol];
-
-
-export const ServicesCompanySSOGetResponseSsoProtocol = {
-  oidc: 'oidc',
-  saml: 'saml',
-} as const;
-
 export interface ServicesCompanySSOGetResponse {
   clientId?: string;
   clientSecretSet?: boolean;
@@ -1319,19 +1304,8 @@ export interface ServicesCompanySSOGetResponse {
   issuerUrl?: string;
   samlIdpMetadataUrl?: string;
   scopes?: string;
-  ssoProtocol?: ServicesCompanySSOGetResponseSsoProtocol;
+  ssoProtocol?: string;
 }
-
-/**
- * "oidc" | "saml"
- */
-export type ServicesCompanySSOPatchSsoProtocol = typeof ServicesCompanySSOPatchSsoProtocol[keyof typeof ServicesCompanySSOPatchSsoProtocol];
-
-
-export const ServicesCompanySSOPatchSsoProtocol = {
-  oidc: 'oidc',
-  saml: 'saml',
-} as const;
 
 export interface ServicesCompanySSOPatch {
   clientId?: string;
@@ -1343,7 +1317,7 @@ export interface ServicesCompanySSOPatch {
   samlIdpMetadataUrl?: string;
   scopes?: string;
   /** "oidc" | "saml" */
-  ssoProtocol?: ServicesCompanySSOPatchSsoProtocol;
+  ssoProtocol?: string;
 }
 
 export interface ServicesCreateCalendarIntegrationRequest {
@@ -1504,6 +1478,22 @@ export interface ServicesSlaSummaryResponse {
   withinPct?: number;
 }
 
+export interface ServicesSupportReportCommentItem {
+  author?: string;
+  createdAt?: string;
+  displayText?: string;
+  id?: string;
+  kind?: string;
+  text?: string;
+}
+
+export interface ServicesSupportReportShareListItem {
+  createdAt?: string;
+  displayName?: string;
+  grantedByUserId?: string;
+  userId?: string;
+}
+
 export interface ServicesSurveyScorePoint {
   avgScoreNative?: number;
   avgScoreNorm5?: number;
@@ -1520,22 +1510,10 @@ export interface ServicesSurveyScoresResponse {
   points?: ServicesSurveyScorePoint[];
 }
 
-/**
- * sso | password | choose_slug
- */
-export type ServicesTenantHintResponseNext = typeof ServicesTenantHintResponseNext[keyof typeof ServicesTenantHintResponseNext];
-
-
-export const ServicesTenantHintResponseNext = {
-  sso: 'sso',
-  password: 'password',
-  choose_slug: 'choose_slug',
-} as const;
-
 export interface ServicesTenantHintResponse {
   displayName?: string;
   /** sso | password | choose_slug */
-  next?: ServicesTenantHintResponseNext;
+  next?: string;
   ssoAvailable?: boolean;
   tenantSlug?: string;
 }
@@ -1627,19 +1605,26 @@ export interface ServicesUtilizationResponse {
   points?: ServicesUtilizationPoint[];
 }
 
-export interface HandlersLoginLinkResponse {
-  /** Opaque tenant login token for strict-tenant links */
-  token: string;
-  /** Example full login URL including the token query parameter */
-  exampleUrl: string;
-}
+export type ListSupportReportCommentsParams = {
+/**
+ * staff or applicant
+ */
+audience?: string;
+};
+
+export type ListSupportReportShareCandidatesParams = {
+/**
+ * Search by name or email
+ */
+q?: string;
+};
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
 
 /**
- * Returns the current user's reports; tenant admins see all reports. Refreshes Plane status when older than a short interval.
+ * Returns the current user's reports; tenant admins see all reports. Refreshes external ticket status when older than a short interval.
  * @summary List support reports visible to the user
  */
 export type listSupportReportsResponse200 = {
@@ -1765,8 +1750,8 @@ export function useListSupportReports<TData = Awaited<ReturnType<typeof listSupp
 
 
 /**
- * Creates a work item in the configured Plane project and stores a row in QuokkaQ. Requires Plane env vars on the server.
- * @summary Create a support report (Plane work item)
+ * Creates a ticket in the configured backend (Plane or Yandex Tracker per SUPPORT_REPORT_PLATFORM) and stores a row in QuokkaQ.
+ * @summary Create a support report (external ticket)
  */
 export type createSupportReportResponse201 = {
   data: ModelsSupportReport
@@ -1867,7 +1852,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type CreateSupportReportMutationError = string
 
     /**
- * @summary Create a support report (Plane work item)
+ * @summary Create a support report (external ticket)
  */
 export const useCreateSupportReport = <TError = string,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSupportReport>>, TError,{data: HandlersCreateSupportReportRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
@@ -1881,7 +1866,7 @@ export const useCreateSupportReport = <TError = string,
     }
 
 /**
- * Returns a report if the current user is the author or a tenant admin. Refreshes Plane status when integration is enabled.
+ * Returns a report if the current user is the author, a tenant admin, or has been granted a share. Refreshes external status when the row's backend client is enabled.
  * @summary Get one support report by id
  */
 export type getSupportReportByIDResponse200 = {
@@ -2009,3 +1994,913 @@ export function useGetSupportReportByID<TData = Awaited<ReturnType<typeof getSup
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+
+
+
+
+
+
+/**
+ * Yandex Tracker only. audience=staff (default) for full timeline; audience=applicant for public/email only (report author only).
+ * @summary List comments on the external support ticket
+ */
+export type listSupportReportCommentsResponse200 = {
+  data: ServicesSupportReportCommentItem[]
+  status: 200
+}
+
+export type listSupportReportCommentsResponse400 = {
+  data: string
+  status: 400
+}
+
+export type listSupportReportCommentsResponse401 = {
+  data: string
+  status: 401
+}
+
+export type listSupportReportCommentsResponse403 = {
+  data: string
+  status: 403
+}
+
+export type listSupportReportCommentsResponse404 = {
+  data: string
+  status: 404
+}
+
+export type listSupportReportCommentsResponse501 = {
+  data: string
+  status: 501
+}
+
+export type listSupportReportCommentsResponseSuccess = (listSupportReportCommentsResponse200) & {
+  headers: Headers;
+};
+export type listSupportReportCommentsResponseError = (listSupportReportCommentsResponse400 | listSupportReportCommentsResponse401 | listSupportReportCommentsResponse403 | listSupportReportCommentsResponse404 | listSupportReportCommentsResponse501) & {
+  headers: Headers;
+};
+
+export type listSupportReportCommentsResponse = (listSupportReportCommentsResponseSuccess | listSupportReportCommentsResponseError)
+
+export const getListSupportReportCommentsUrl = (id: string,
+    params?: ListSupportReportCommentsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/support/reports/${id}/comments?${stringifiedParams}` : `/support/reports/${id}/comments`
+}
+
+export const listSupportReportComments = async (id: string,
+    params?: ListSupportReportCommentsParams, options?: RequestInit): Promise<listSupportReportCommentsResponse> => {
+
+  return orvalMutator<listSupportReportCommentsResponse>(getListSupportReportCommentsUrl(id,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListSupportReportCommentsQueryKey = (id: string,
+    params?: ListSupportReportCommentsParams,) => {
+    return [
+    `/support/reports/${id}/comments`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListSupportReportCommentsQueryOptions = <TData = Awaited<ReturnType<typeof listSupportReportComments>>, TError = string>(id: string,
+    params?: ListSupportReportCommentsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReportComments>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListSupportReportCommentsQueryKey(id,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSupportReportComments>>> = ({ signal }) => listSupportReportComments(id,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSupportReportComments>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListSupportReportCommentsQueryResult = NonNullable<Awaited<ReturnType<typeof listSupportReportComments>>>
+export type ListSupportReportCommentsQueryError = string
+
+
+export function useListSupportReportComments<TData = Awaited<ReturnType<typeof listSupportReportComments>>, TError = string>(
+ id: string,
+    params: undefined |  ListSupportReportCommentsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReportComments>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listSupportReportComments>>,
+          TError,
+          Awaited<ReturnType<typeof listSupportReportComments>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListSupportReportComments<TData = Awaited<ReturnType<typeof listSupportReportComments>>, TError = string>(
+ id: string,
+    params?: ListSupportReportCommentsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReportComments>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listSupportReportComments>>,
+          TError,
+          Awaited<ReturnType<typeof listSupportReportComments>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListSupportReportComments<TData = Awaited<ReturnType<typeof listSupportReportComments>>, TError = string>(
+ id: string,
+    params?: ListSupportReportCommentsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReportComments>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List comments on the external support ticket
+ */
+
+export function useListSupportReportComments<TData = Awaited<ReturnType<typeof listSupportReportComments>>, TError = string>(
+ id: string,
+    params?: ListSupportReportCommentsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReportComments>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListSupportReportCommentsQueryOptions(id,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * Yandex Tracker only. Comment text is sent to Tracker as-is; public visibility for the requester is determined in Tracker.
+ * @summary Add a comment on the external support ticket
+ */
+export type postSupportReportCommentResponse204 = {
+  data: void
+  status: 204
+}
+
+export type postSupportReportCommentResponse400 = {
+  data: string
+  status: 400
+}
+
+export type postSupportReportCommentResponse401 = {
+  data: string
+  status: 401
+}
+
+export type postSupportReportCommentResponse403 = {
+  data: string
+  status: 403
+}
+
+export type postSupportReportCommentResponse404 = {
+  data: string
+  status: 404
+}
+
+export type postSupportReportCommentResponse501 = {
+  data: string
+  status: 501
+}
+
+export type postSupportReportCommentResponse502 = {
+  data: string
+  status: 502
+}
+
+export type postSupportReportCommentResponseSuccess = (postSupportReportCommentResponse204) & {
+  headers: Headers;
+};
+export type postSupportReportCommentResponseError = (postSupportReportCommentResponse400 | postSupportReportCommentResponse401 | postSupportReportCommentResponse403 | postSupportReportCommentResponse404 | postSupportReportCommentResponse501 | postSupportReportCommentResponse502) & {
+  headers: Headers;
+};
+
+export type postSupportReportCommentResponse = (postSupportReportCommentResponseSuccess | postSupportReportCommentResponseError)
+
+export const getPostSupportReportCommentUrl = (id: string,) => {
+
+
+
+
+  return `/support/reports/${id}/comments`
+}
+
+export const postSupportReportComment = async (id: string,
+    handlersPostSupportReportCommentRequest: HandlersPostSupportReportCommentRequest, options?: RequestInit): Promise<postSupportReportCommentResponse> => {
+
+  return orvalMutator<postSupportReportCommentResponse>(getPostSupportReportCommentUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersPostSupportReportCommentRequest,)
+  }
+);}
+
+
+
+
+export const getPostSupportReportCommentMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postSupportReportComment>>, TError,{id: string;data: HandlersPostSupportReportCommentRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof postSupportReportComment>>, TError,{id: string;data: HandlersPostSupportReportCommentRequest}, TContext> => {
+
+const mutationKey = ['postSupportReportComment'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postSupportReportComment>>, {id: string;data: HandlersPostSupportReportCommentRequest}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  postSupportReportComment(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostSupportReportCommentMutationResult = NonNullable<Awaited<ReturnType<typeof postSupportReportComment>>>
+    export type PostSupportReportCommentMutationBody = HandlersPostSupportReportCommentRequest
+    export type PostSupportReportCommentMutationError = string
+
+    /**
+ * @summary Add a comment on the external support ticket
+ */
+export const usePostSupportReportComment = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postSupportReportComment>>, TError,{id: string;data: HandlersPostSupportReportCommentRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postSupportReportComment>>,
+        TError,
+        {id: string;data: HandlersPostSupportReportCommentRequest},
+        TContext
+      > => {
+      return useMutation(getPostSupportReportCommentMutationOptions(options), queryClient);
+    }
+
+/**
+ * Author or tenant admin: posts a cancel comment on the external ticket when the backend client is enabled, then stores markedIrrelevantAt on the report. Idempotent if already marked.
+ * @summary Mark support report as not relevant
+ */
+export type markSupportReportIrrelevantResponse200 = {
+  data: ModelsSupportReport
+  status: 200
+}
+
+export type markSupportReportIrrelevantResponse401 = {
+  data: string
+  status: 401
+}
+
+export type markSupportReportIrrelevantResponse403 = {
+  data: string
+  status: 403
+}
+
+export type markSupportReportIrrelevantResponse404 = {
+  data: string
+  status: 404
+}
+
+export type markSupportReportIrrelevantResponse500 = {
+  data: string
+  status: 500
+}
+
+export type markSupportReportIrrelevantResponse502 = {
+  data: string
+  status: 502
+}
+
+export type markSupportReportIrrelevantResponseSuccess = (markSupportReportIrrelevantResponse200) & {
+  headers: Headers;
+};
+export type markSupportReportIrrelevantResponseError = (markSupportReportIrrelevantResponse401 | markSupportReportIrrelevantResponse403 | markSupportReportIrrelevantResponse404 | markSupportReportIrrelevantResponse500 | markSupportReportIrrelevantResponse502) & {
+  headers: Headers;
+};
+
+export type markSupportReportIrrelevantResponse = (markSupportReportIrrelevantResponseSuccess | markSupportReportIrrelevantResponseError)
+
+export const getMarkSupportReportIrrelevantUrl = (id: string,) => {
+
+
+
+
+  return `/support/reports/${id}/mark-irrelevant`
+}
+
+export const markSupportReportIrrelevant = async (id: string, options?: RequestInit): Promise<markSupportReportIrrelevantResponse> => {
+
+  return orvalMutator<markSupportReportIrrelevantResponse>(getMarkSupportReportIrrelevantUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getMarkSupportReportIrrelevantMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markSupportReportIrrelevant>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof markSupportReportIrrelevant>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['markSupportReportIrrelevant'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof markSupportReportIrrelevant>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  markSupportReportIrrelevant(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MarkSupportReportIrrelevantMutationResult = NonNullable<Awaited<ReturnType<typeof markSupportReportIrrelevant>>>
+
+    export type MarkSupportReportIrrelevantMutationError = string
+
+    /**
+ * @summary Mark support report as not relevant
+ */
+export const useMarkSupportReportIrrelevant = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markSupportReportIrrelevant>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof markSupportReportIrrelevant>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getMarkSupportReportIrrelevantMutationOptions(options), queryClient);
+    }
+
+/**
+ * Author or tenant admin only. Yandex Tracker reports only. Same company as the report author; roles admin/staff/supervisor/operator. Query q must be at least 2 characters.
+ * @summary Search users who may receive a share for this report
+ */
+export type listSupportReportShareCandidatesResponse200 = {
+  data: RepositorySupportReportShareCandidate[]
+  status: 200
+}
+
+export type listSupportReportShareCandidatesResponse400 = {
+  data: string
+  status: 400
+}
+
+export type listSupportReportShareCandidatesResponse401 = {
+  data: string
+  status: 401
+}
+
+export type listSupportReportShareCandidatesResponse403 = {
+  data: string
+  status: 403
+}
+
+export type listSupportReportShareCandidatesResponse404 = {
+  data: string
+  status: 404
+}
+
+export type listSupportReportShareCandidatesResponse501 = {
+  data: string
+  status: 501
+}
+
+export type listSupportReportShareCandidatesResponseSuccess = (listSupportReportShareCandidatesResponse200) & {
+  headers: Headers;
+};
+export type listSupportReportShareCandidatesResponseError = (listSupportReportShareCandidatesResponse400 | listSupportReportShareCandidatesResponse401 | listSupportReportShareCandidatesResponse403 | listSupportReportShareCandidatesResponse404 | listSupportReportShareCandidatesResponse501) & {
+  headers: Headers;
+};
+
+export type listSupportReportShareCandidatesResponse = (listSupportReportShareCandidatesResponseSuccess | listSupportReportShareCandidatesResponseError)
+
+export const getListSupportReportShareCandidatesUrl = (id: string,
+    params?: ListSupportReportShareCandidatesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/support/reports/${id}/share-candidates?${stringifiedParams}` : `/support/reports/${id}/share-candidates`
+}
+
+export const listSupportReportShareCandidates = async (id: string,
+    params?: ListSupportReportShareCandidatesParams, options?: RequestInit): Promise<listSupportReportShareCandidatesResponse> => {
+
+  return orvalMutator<listSupportReportShareCandidatesResponse>(getListSupportReportShareCandidatesUrl(id,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListSupportReportShareCandidatesQueryKey = (id: string,
+    params?: ListSupportReportShareCandidatesParams,) => {
+    return [
+    `/support/reports/${id}/share-candidates`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListSupportReportShareCandidatesQueryOptions = <TData = Awaited<ReturnType<typeof listSupportReportShareCandidates>>, TError = string>(id: string,
+    params?: ListSupportReportShareCandidatesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReportShareCandidates>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListSupportReportShareCandidatesQueryKey(id,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSupportReportShareCandidates>>> = ({ signal }) => listSupportReportShareCandidates(id,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSupportReportShareCandidates>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListSupportReportShareCandidatesQueryResult = NonNullable<Awaited<ReturnType<typeof listSupportReportShareCandidates>>>
+export type ListSupportReportShareCandidatesQueryError = string
+
+
+export function useListSupportReportShareCandidates<TData = Awaited<ReturnType<typeof listSupportReportShareCandidates>>, TError = string>(
+ id: string,
+    params: undefined |  ListSupportReportShareCandidatesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReportShareCandidates>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listSupportReportShareCandidates>>,
+          TError,
+          Awaited<ReturnType<typeof listSupportReportShareCandidates>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListSupportReportShareCandidates<TData = Awaited<ReturnType<typeof listSupportReportShareCandidates>>, TError = string>(
+ id: string,
+    params?: ListSupportReportShareCandidatesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReportShareCandidates>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listSupportReportShareCandidates>>,
+          TError,
+          Awaited<ReturnType<typeof listSupportReportShareCandidates>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListSupportReportShareCandidates<TData = Awaited<ReturnType<typeof listSupportReportShareCandidates>>, TError = string>(
+ id: string,
+    params?: ListSupportReportShareCandidatesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReportShareCandidates>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Search users who may receive a share for this report
+ */
+
+export function useListSupportReportShareCandidates<TData = Awaited<ReturnType<typeof listSupportReportShareCandidates>>, TError = string>(
+ id: string,
+    params?: ListSupportReportShareCandidatesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReportShareCandidates>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListSupportReportShareCandidatesQueryOptions(id,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * Author or tenant admin only. Yandex Tracker reports only.
+ * @summary List users this report is shared with
+ */
+export type listSupportReportSharesResponse200 = {
+  data: ServicesSupportReportShareListItem[]
+  status: 200
+}
+
+export type listSupportReportSharesResponse401 = {
+  data: string
+  status: 401
+}
+
+export type listSupportReportSharesResponse403 = {
+  data: string
+  status: 403
+}
+
+export type listSupportReportSharesResponse404 = {
+  data: string
+  status: 404
+}
+
+export type listSupportReportSharesResponse501 = {
+  data: string
+  status: 501
+}
+
+export type listSupportReportSharesResponseSuccess = (listSupportReportSharesResponse200) & {
+  headers: Headers;
+};
+export type listSupportReportSharesResponseError = (listSupportReportSharesResponse401 | listSupportReportSharesResponse403 | listSupportReportSharesResponse404 | listSupportReportSharesResponse501) & {
+  headers: Headers;
+};
+
+export type listSupportReportSharesResponse = (listSupportReportSharesResponseSuccess | listSupportReportSharesResponseError)
+
+export const getListSupportReportSharesUrl = (id: string,) => {
+
+
+
+
+  return `/support/reports/${id}/shares`
+}
+
+export const listSupportReportShares = async (id: string, options?: RequestInit): Promise<listSupportReportSharesResponse> => {
+
+  return orvalMutator<listSupportReportSharesResponse>(getListSupportReportSharesUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListSupportReportSharesQueryKey = (id: string,) => {
+    return [
+    `/support/reports/${id}/shares`
+    ] as const;
+    }
+
+
+export const getListSupportReportSharesQueryOptions = <TData = Awaited<ReturnType<typeof listSupportReportShares>>, TError = string>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReportShares>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListSupportReportSharesQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSupportReportShares>>> = ({ signal }) => listSupportReportShares(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSupportReportShares>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListSupportReportSharesQueryResult = NonNullable<Awaited<ReturnType<typeof listSupportReportShares>>>
+export type ListSupportReportSharesQueryError = string
+
+
+export function useListSupportReportShares<TData = Awaited<ReturnType<typeof listSupportReportShares>>, TError = string>(
+ id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReportShares>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listSupportReportShares>>,
+          TError,
+          Awaited<ReturnType<typeof listSupportReportShares>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListSupportReportShares<TData = Awaited<ReturnType<typeof listSupportReportShares>>, TError = string>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReportShares>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listSupportReportShares>>,
+          TError,
+          Awaited<ReturnType<typeof listSupportReportShares>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListSupportReportShares<TData = Awaited<ReturnType<typeof listSupportReportShares>>, TError = string>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReportShares>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List users this report is shared with
+ */
+
+export function useListSupportReportShares<TData = Awaited<ReturnType<typeof listSupportReportShares>>, TError = string>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSupportReportShares>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListSupportReportSharesQueryOptions(id,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * Author or tenant admin only. Target must be in the author's company and have support roles. Syncs Yandex Tracker apiAccessToTheTicket.
+ * @summary Share a support report with another user
+ */
+export type addSupportReportShareResponse200 = {
+  data: ServicesSupportReportShareListItem[]
+  status: 200
+}
+
+export type addSupportReportShareResponse400 = {
+  data: string
+  status: 400
+}
+
+export type addSupportReportShareResponse401 = {
+  data: string
+  status: 401
+}
+
+export type addSupportReportShareResponse403 = {
+  data: string
+  status: 403
+}
+
+export type addSupportReportShareResponse404 = {
+  data: string
+  status: 404
+}
+
+export type addSupportReportShareResponse501 = {
+  data: string
+  status: 501
+}
+
+export type addSupportReportShareResponse502 = {
+  data: string
+  status: 502
+}
+
+export type addSupportReportShareResponseSuccess = (addSupportReportShareResponse200) & {
+  headers: Headers;
+};
+export type addSupportReportShareResponseError = (addSupportReportShareResponse400 | addSupportReportShareResponse401 | addSupportReportShareResponse403 | addSupportReportShareResponse404 | addSupportReportShareResponse501 | addSupportReportShareResponse502) & {
+  headers: Headers;
+};
+
+export type addSupportReportShareResponse = (addSupportReportShareResponseSuccess | addSupportReportShareResponseError)
+
+export const getAddSupportReportShareUrl = (id: string,) => {
+
+
+
+
+  return `/support/reports/${id}/shares`
+}
+
+export const addSupportReportShare = async (id: string,
+    handlersAddSupportReportShareRequest: HandlersAddSupportReportShareRequest, options?: RequestInit): Promise<addSupportReportShareResponse> => {
+
+  return orvalMutator<addSupportReportShareResponse>(getAddSupportReportShareUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersAddSupportReportShareRequest,)
+  }
+);}
+
+
+
+
+export const getAddSupportReportShareMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addSupportReportShare>>, TError,{id: string;data: HandlersAddSupportReportShareRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof addSupportReportShare>>, TError,{id: string;data: HandlersAddSupportReportShareRequest}, TContext> => {
+
+const mutationKey = ['addSupportReportShare'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof addSupportReportShare>>, {id: string;data: HandlersAddSupportReportShareRequest}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  addSupportReportShare(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AddSupportReportShareMutationResult = NonNullable<Awaited<ReturnType<typeof addSupportReportShare>>>
+    export type AddSupportReportShareMutationBody = HandlersAddSupportReportShareRequest
+    export type AddSupportReportShareMutationError = string
+
+    /**
+ * @summary Share a support report with another user
+ */
+export const useAddSupportReportShare = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addSupportReportShare>>, TError,{id: string;data: HandlersAddSupportReportShareRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof addSupportReportShare>>,
+        TError,
+        {id: string;data: HandlersAddSupportReportShareRequest},
+        TContext
+      > => {
+      return useMutation(getAddSupportReportShareMutationOptions(options), queryClient);
+    }
+
+/**
+ * Author or tenant admin only. Syncs Yandex Tracker apiAccessToTheTicket.
+ * @summary Revoke a support report share
+ */
+export type removeSupportReportShareResponse200 = {
+  data: ServicesSupportReportShareListItem[]
+  status: 200
+}
+
+export type removeSupportReportShareResponse401 = {
+  data: string
+  status: 401
+}
+
+export type removeSupportReportShareResponse403 = {
+  data: string
+  status: 403
+}
+
+export type removeSupportReportShareResponse404 = {
+  data: string
+  status: 404
+}
+
+export type removeSupportReportShareResponse501 = {
+  data: string
+  status: 501
+}
+
+export type removeSupportReportShareResponse502 = {
+  data: string
+  status: 502
+}
+
+export type removeSupportReportShareResponseSuccess = (removeSupportReportShareResponse200) & {
+  headers: Headers;
+};
+export type removeSupportReportShareResponseError = (removeSupportReportShareResponse401 | removeSupportReportShareResponse403 | removeSupportReportShareResponse404 | removeSupportReportShareResponse501 | removeSupportReportShareResponse502) & {
+  headers: Headers;
+};
+
+export type removeSupportReportShareResponse = (removeSupportReportShareResponseSuccess | removeSupportReportShareResponseError)
+
+export const getRemoveSupportReportShareUrl = (id: string,
+    sharedWithUserId: string,) => {
+
+
+
+
+  return `/support/reports/${id}/shares/${sharedWithUserId}`
+}
+
+export const removeSupportReportShare = async (id: string,
+    sharedWithUserId: string, options?: RequestInit): Promise<removeSupportReportShareResponse> => {
+
+  return orvalMutator<removeSupportReportShareResponse>(getRemoveSupportReportShareUrl(id,sharedWithUserId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getRemoveSupportReportShareMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeSupportReportShare>>, TError,{id: string;sharedWithUserId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof removeSupportReportShare>>, TError,{id: string;sharedWithUserId: string}, TContext> => {
+
+const mutationKey = ['removeSupportReportShare'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof removeSupportReportShare>>, {id: string;sharedWithUserId: string}> = (props) => {
+          const {id,sharedWithUserId} = props ?? {};
+
+          return  removeSupportReportShare(id,sharedWithUserId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RemoveSupportReportShareMutationResult = NonNullable<Awaited<ReturnType<typeof removeSupportReportShare>>>
+
+    export type RemoveSupportReportShareMutationError = string
+
+    /**
+ * @summary Revoke a support report share
+ */
+export const useRemoveSupportReportShare = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeSupportReportShare>>, TError,{id: string;sharedWithUserId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof removeSupportReportShare>>,
+        TError,
+        {id: string;sharedWithUserId: string},
+        TContext
+      > => {
+      return useMutation(getRemoveSupportReportShareMutationOptions(options), queryClient);
+    }

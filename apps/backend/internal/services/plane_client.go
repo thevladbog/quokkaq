@@ -102,10 +102,48 @@ func NewPlaneClientFromEnv() *PlaneClient {
 	}
 }
 
-// Enabled is true when all required settings are non-empty.
+func planeGloballyDisabledViaEnv() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("PLANE_ENABLED"))) {
+	case "false", "0", "no":
+		return true
+	default:
+		return false
+	}
+}
+
+// Enabled is true when all required settings are non-empty and PLANE_ENABLED is not explicitly false.
 func (c *PlaneClient) Enabled() bool {
-	return c != nil && c.baseURL != "" && c.apiKey != "" && c.workspaceSlug != "" &&
+	if c == nil || planeGloballyDisabledViaEnv() {
+		return false
+	}
+	return c.baseURL != "" && c.apiKey != "" && c.workspaceSlug != "" &&
 		(strings.TrimSpace(c.projectID) != "" || strings.TrimSpace(c.projectRef) != "")
+}
+
+// IntegrationDisabledReason explains why Enabled() is false; empty when enabled.
+func (c *PlaneClient) IntegrationDisabledReason() string {
+	if c == nil {
+		return "internal: Plane client is nil"
+	}
+	if c.Enabled() {
+		return ""
+	}
+	if planeGloballyDisabledViaEnv() {
+		return "PLANE_ENABLED is false (set SUPPORT_REPORT_PLATFORM=yandex_tracker or turn Plane on for plane)"
+	}
+	if strings.TrimSpace(c.baseURL) == "" {
+		return "PLANE_BASE_URL is missing or empty"
+	}
+	if strings.TrimSpace(c.apiKey) == "" {
+		return "PLANE_API_KEY is missing or empty"
+	}
+	if strings.TrimSpace(c.workspaceSlug) == "" {
+		return "PLANE_WORKSPACE_SLUG is missing or empty"
+	}
+	if strings.TrimSpace(c.projectID) == "" && strings.TrimSpace(c.projectRef) == "" {
+		return "set PLANE_PROJECT_ID or PLANE_PROJECT_IDENTIFIER (or PLANE_PROJECT_SLUG)"
+	}
+	return "Plane is not fully configured"
 }
 
 // effectiveProjectID returns the project UUID for .../projects/{uuid}/work-items/ URLs.
@@ -217,7 +255,8 @@ func planeStateName(raw json.RawMessage) string {
 }
 
 // CreateWorkItem creates a work item and returns Plane id, human sequence id, and state label if present.
-func (c *PlaneClient) CreateWorkItem(ctx context.Context, externalID, title, descriptionHTML string) (workItemID string, sequenceID *int, stateName string, err error) {
+// extras is unused for Plane (reserved for SupportReportTicketClient parity with Yandex Tracker).
+func (c *PlaneClient) CreateWorkItem(ctx context.Context, externalID, title, descriptionHTML string, _ SupportReportTicketCreateExtras) (workItemID string, sequenceID *int, stateName string, err error) {
 	if !c.Enabled() {
 		return "", nil, "", fmt.Errorf("plane integration is not configured")
 	}
@@ -301,30 +340,8 @@ func (c *PlaneClient) GetWorkItem(ctx context.Context, workItemID string) (seque
 	return sequenceID, planeStateName(out.State), nil
 }
 
-// DeleteWorkItem removes a work item in Plane (best-effort cleanup after local DB failures).
-func (c *PlaneClient) DeleteWorkItem(ctx context.Context, workItemID string) error {
-	if !c.Enabled() {
-		return fmt.Errorf("plane integration is not configured")
-	}
-	projectUUID, err := c.effectiveProjectID(ctx)
-	if err != nil {
-		return err
-	}
-	u := fmt.Sprintf("%s/api/v1/workspaces/%s/projects/%s/work-items/%s/", c.baseURL, c.workspaceSlug, projectUUID, workItemID)
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, u, nil)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("X-API-Key", c.apiKey)
-	res, err := c.httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = res.Body.Close() }()
-	body, _ := io.ReadAll(io.LimitReader(res.Body, 2<<20))
-	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return newPlaneHTTPError(res.StatusCode, body)
-	}
+// AddComment is not implemented for Plane (no stable comment API in this integration).
+func (c *PlaneClient) AddComment(context.Context, string, string) error {
 	return nil
 }
 

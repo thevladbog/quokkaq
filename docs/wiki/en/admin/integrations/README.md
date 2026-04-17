@@ -9,4 +9,5 @@ Connect external services used by your organization.
 
 ## Support and tickets
 
-- **[Plane (self-hosted)](plane.md)** — deploying Plane and environment variables for QuokkaQ support reports.
+- **[Yandex Tracker](yandex-tracker.md)** — OAuth or IAM, organization id, queue key for QuokkaQ support reports.
+- **[Plane (self-hosted)](plane.md)** — deploying Plane and environment variables for QuokkaQ support reports (optional; can be disabled via env).

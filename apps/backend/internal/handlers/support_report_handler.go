@@ -10,6 +10,7 @@ import (
 
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/models"
+	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
 
 	"github.com/go-chi/chi/v5"
@@ -20,7 +21,7 @@ import (
 // MaxSupportReportCreateBodyBytes caps JSON body for POST /support/reports (text + diagnostics).
 const MaxSupportReportCreateBodyBytes = 1 << 20 // 1 MiB
 
-// SupportReportHandler exposes support / Plane report APIs.
+// SupportReportHandler exposes support report APIs (Plane or Yandex Tracker).
 type SupportReportHandler struct {
 	svc *services.SupportReportService
 }
@@ -43,8 +44,8 @@ type createSupportReportRequest struct {
 
 // Create godoc
 // @ID           createSupportReport
-// @Summary      Create a support report (Plane work item)
-// @Description  Creates a work item in the configured Plane project and stores a row in QuokkaQ. Requires Plane env vars on the server.
+// @Summary      Create a support report (external ticket)
+// @Description  Creates a ticket in the configured backend (Plane or Yandex Tracker per SUPPORT_REPORT_PLATFORM) and stores a row in QuokkaQ.
 // @Tags         support
 // @Accept       json
 // @Produce      json
@@ -54,8 +55,8 @@ type createSupportReportRequest struct {
 // @Failure      401   {string}  string  "Unauthorized"
 // @Failure      413   {string}  string  "Payload too large"
 // @Failure      500   {string}  string  "Internal server error"
-// @Failure      503   {string}  string  "Plane not configured or Plane returned 503 (unavailable)"
-// @Failure      502   {string}  string  "Plane request failed"
+// @Failure      503   {string}  string  "Integration not configured or upstream unavailable"
+// @Failure      502   {string}  string  "Upstream ticket request failed"
 // @Router       /support/reports [post]
 // @Security     BearerAuth
 func (h *SupportReportHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -94,8 +95,12 @@ func (h *SupportReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 		UnitID:      req.UnitID,
 	})
 	if err != nil {
-		if errors.Is(err, services.ErrPlaneNotConfigured) {
-			http.Error(w, "Plane integration is not configured", http.StatusServiceUnavailable)
+		if errors.Is(err, services.ErrSupportTicketIntegrationNotConfigured) || errors.Is(err, services.ErrPlaneNotConfigured) {
+			msg := "Support ticket integration is not configured"
+			if hint := strings.TrimSpace(services.SupportTicketCreateEnvHint()); hint != "" {
+				msg = msg + ". " + hint
+			}
+			http.Error(w, msg, http.StatusServiceUnavailable)
 			return
 		}
 		if errors.Is(err, services.ErrSupportReportInvalidTitle) || errors.Is(err, services.ErrSupportReportInvalidDescription) || errors.Is(err, services.ErrSupportReportInvalidUnit) {
@@ -107,13 +112,12 @@ func (h *SupportReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Failed to save support report", http.StatusInternalServerError)
 			return
 		}
-		var planeHTTP *services.PlaneHTTPError
-		if errors.As(err, &planeHTTP) && planeHTTP.HTTPStatus == http.StatusServiceUnavailable {
-			log.Printf("support report Create: Plane unavailable: %v", err)
-			http.Error(w, "Plane is temporarily unavailable", http.StatusServiceUnavailable)
+		if st, ok := services.TicketIntegrationHTTPStatus(err); ok && st == http.StatusServiceUnavailable {
+			log.Printf("support report Create: upstream unavailable: %v", err)
+			http.Error(w, "External ticketing service is temporarily unavailable", http.StatusServiceUnavailable)
 			return
 		}
-		http.Error(w, "Failed to create Plane work item", http.StatusBadGateway)
+		http.Error(w, "Failed to create external support ticket", http.StatusBadGateway)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -124,7 +128,7 @@ func (h *SupportReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 // List godoc
 // @ID           listSupportReports
 // @Summary      List support reports visible to the user
-// @Description  Returns the current user's reports; tenant admins see all reports. Refreshes Plane status when older than a short interval.
+// @Description  Returns the current user's reports; tenant admins see all reports. Refreshes external ticket status when older than a short interval.
 // @Tags         support
 // @Produce      json
 // @Success      200  {array}   models.SupportReport
@@ -154,7 +158,7 @@ func (h *SupportReportHandler) List(w http.ResponseWriter, r *http.Request) {
 // GetByID godoc
 // @ID           getSupportReportByID
 // @Summary      Get one support report by id
-// @Description  Returns a report if the current user is the author or a tenant admin. Refreshes Plane status when integration is enabled.
+// @Description  Returns a report if the current user is the author, a tenant admin, or has been granted a share. Refreshes external status when the row's backend client is enabled.
 // @Tags         support
 // @Produce      json
 // @Param        id   path      string  true  "Report id"
@@ -192,4 +196,449 @@ func (h *SupportReportHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(row)
+}
+
+// MarkIrrelevant godoc
+// @ID           markSupportReportIrrelevant
+// @Summary      Mark support report as not relevant
+// @Description  Author or tenant admin: posts a cancel comment on the external ticket when the backend client is enabled, then stores markedIrrelevantAt on the report. Idempotent if already marked.
+// @Tags         support
+// @Produce      json
+// @Param        id   path      string  true  "Report id"
+// @Success      200  {object}  models.SupportReport
+// @Failure      401  {string}  string  "Unauthorized"
+// @Failure      403  {string}  string  "Forbidden"
+// @Failure      404  {string}  string  "Not found"
+// @Failure      502  {string}  string  "Failed to post comment on external ticket"
+// @Failure      500  {string}  string  "Internal server error"
+// @Router       /support/reports/{id}/mark-irrelevant [post]
+// @Security     BearerAuth
+func (h *SupportReportHandler) MarkIrrelevant(w http.ResponseWriter, r *http.Request) {
+	uid, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok || uid == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+	row, err := h.svc.MarkIrrelevant(r.Context(), uid, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "Not found", http.StatusNotFound)
+			return
+		}
+		if errors.Is(err, services.ErrSupportReportForbidden) {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+		if errors.Is(err, services.ErrSupportReportPersistence) {
+			log.Printf("support report MarkIrrelevant: %v", err)
+			http.Error(w, "Failed to save support report", http.StatusInternalServerError)
+			return
+		}
+		if _, ok := services.TicketIntegrationHTTPStatus(err); ok {
+			http.Error(w, "Failed to post comment on external ticket", http.StatusBadGateway)
+			return
+		}
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(row)
+}
+
+type addSupportReportShareRequest struct {
+	UserID string `json:"userId"`
+}
+
+// ListShareCandidates godoc
+// @ID           listSupportReportShareCandidates
+// @Summary      Search users who may receive a share for this report
+// @Description  Author or tenant admin only. Yandex Tracker reports only. Same company as the report author; roles admin/staff/supervisor/operator. Query q must be at least 2 characters.
+// @Tags         support
+// @Produce      json
+// @Param        id   path      string  true   "Report id"
+// @Param        q    query     string  false  "Search by name or email"
+// @Success      200  {array}   repository.SupportReportShareCandidate
+// @Failure      400  {string}  string  "Bad request"
+// @Failure      401  {string}  string  "Unauthorized"
+// @Failure      403  {string}  string  "Forbidden"
+// @Failure      404  {string}  string  "Not found"
+// @Failure      501  {string}  string  "Not implemented for this ticket backend"
+// @Router       /support/reports/{id}/share-candidates [get]
+// @Security     BearerAuth
+func (h *SupportReportHandler) ListShareCandidates(w http.ResponseWriter, r *http.Request) {
+	uid, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok || uid == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	rows, err := h.svc.ListSupportReportShareCandidates(r.Context(), uid, id, q)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "Not found", http.StatusNotFound)
+			return
+		}
+		if errors.Is(err, services.ErrSupportReportForbidden) {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+		if errors.Is(err, services.ErrSupportReportSharesYandexOnly) {
+			http.Error(w, "Support report sharing is only available for Yandex Tracker tickets", http.StatusNotImplemented)
+			return
+		}
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if rows == nil {
+		rows = []repository.SupportReportShareCandidate{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(rows)
+}
+
+// ListShares godoc
+// @ID           listSupportReportShares
+// @Summary      List users this report is shared with
+// @Description  Author or tenant admin only. Yandex Tracker reports only.
+// @Tags         support
+// @Produce      json
+// @Param        id   path      string  true  "Report id"
+// @Success      200  {array}   services.SupportReportShareListItem
+// @Failure      401  {string}  string  "Unauthorized"
+// @Failure      403  {string}  string  "Forbidden"
+// @Failure      404  {string}  string  "Not found"
+// @Failure      501  {string}  string  "Not implemented for this ticket backend"
+// @Router       /support/reports/{id}/shares [get]
+// @Security     BearerAuth
+func (h *SupportReportHandler) ListShares(w http.ResponseWriter, r *http.Request) {
+	uid, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok || uid == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+	rows, err := h.svc.ListSupportReportShares(r.Context(), uid, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "Not found", http.StatusNotFound)
+			return
+		}
+		if errors.Is(err, services.ErrSupportReportForbidden) {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+		if errors.Is(err, services.ErrSupportReportSharesYandexOnly) {
+			http.Error(w, "Support report sharing is only available for Yandex Tracker tickets", http.StatusNotImplemented)
+			return
+		}
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if rows == nil {
+		rows = []services.SupportReportShareListItem{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(rows)
+}
+
+// AddShare godoc
+// @ID           addSupportReportShare
+// @Summary      Share a support report with another user
+// @Description  Author or tenant admin only. Target must be in the author's company and have support roles. Syncs Yandex Tracker apiAccessToTheTicket.
+// @Tags         support
+// @Accept       json
+// @Produce      json
+// @Param        id    path      string                        true  "Report id"
+// @Param        body  body      addSupportReportShareRequest  true  "Target user id"
+// @Success      200   {array}   services.SupportReportShareListItem
+// @Failure      400   {string}  string  "Bad request"
+// @Failure      401   {string}  string  "Unauthorized"
+// @Failure      403   {string}  string  "Forbidden"
+// @Failure      404   {string}  string  "Not found"
+// @Failure      502   {string}  string  "Upstream ticket update failed"
+// @Failure      501   {string}  string  "Not implemented for this ticket backend"
+// @Router       /support/reports/{id}/shares [post]
+// @Security     BearerAuth
+func (h *SupportReportHandler) AddShare(w http.ResponseWriter, r *http.Request) {
+	uid, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok || uid == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<14))
+	if err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	var req addSupportReportShareRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+	rows, err := h.svc.AddSupportReportShare(r.Context(), uid, id, req.UserID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "Not found", http.StatusNotFound)
+			return
+		}
+		if errors.Is(err, services.ErrSupportReportForbidden) {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+		if errors.Is(err, services.ErrSupportReportSharesYandexOnly) {
+			http.Error(w, "Support report sharing is only available for Yandex Tracker tickets", http.StatusNotImplemented)
+			return
+		}
+		if errors.Is(err, services.ErrSupportReportShareInvalidTarget) || errors.Is(err, services.ErrSupportReportShareSelf) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if errors.Is(err, services.ErrSupportReportPersistence) {
+			log.Printf("support report AddShare: %v", err)
+			http.Error(w, "Failed to save share", http.StatusInternalServerError)
+			return
+		}
+		if _, ok := services.TicketIntegrationHTTPStatus(err); ok {
+			http.Error(w, "Failed to update external ticket", http.StatusBadGateway)
+			return
+		}
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if rows == nil {
+		rows = []services.SupportReportShareListItem{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(rows)
+}
+
+// RemoveShare godoc
+// @ID           removeSupportReportShare
+// @Summary      Revoke a support report share
+// @Description  Author or tenant admin only. Syncs Yandex Tracker apiAccessToTheTicket.
+// @Tags         support
+// @Produce      json
+// @Param        id                path      string  true  "Report id"
+// @Param        sharedWithUserId  path      string  true  "User id to unshare"
+// @Success      200               {array}   services.SupportReportShareListItem
+// @Failure      401               {string}  string  "Unauthorized"
+// @Failure      403               {string}  string  "Forbidden"
+// @Failure      404               {string}  string  "Not found"
+// @Failure      502               {string}  string  "Upstream ticket update failed"
+// @Failure      501               {string}  string  "Not implemented for this ticket backend"
+// @Router       /support/reports/{id}/shares/{sharedWithUserId} [delete]
+// @Security     BearerAuth
+func (h *SupportReportHandler) RemoveShare(w http.ResponseWriter, r *http.Request) {
+	uid, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok || uid == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	id := chi.URLParam(r, "id")
+	target := strings.TrimSpace(chi.URLParam(r, "sharedWithUserId"))
+	if id == "" || target == "" {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+	rows, err := h.svc.RemoveSupportReportShare(r.Context(), uid, id, target)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "Not found", http.StatusNotFound)
+			return
+		}
+		if errors.Is(err, services.ErrSupportReportForbidden) {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+		if errors.Is(err, services.ErrSupportReportSharesYandexOnly) {
+			http.Error(w, "Support report sharing is only available for Yandex Tracker tickets", http.StatusNotImplemented)
+			return
+		}
+		if errors.Is(err, services.ErrSupportReportShareInvalidTarget) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if errors.Is(err, services.ErrSupportReportPersistence) {
+			log.Printf("support report RemoveShare: %v", err)
+			http.Error(w, "Failed to update share", http.StatusInternalServerError)
+			return
+		}
+		if _, ok := services.TicketIntegrationHTTPStatus(err); ok {
+			http.Error(w, "Failed to update external ticket", http.StatusBadGateway)
+			return
+		}
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if rows == nil {
+		rows = []services.SupportReportShareListItem{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(rows)
+}
+
+type postSupportReportCommentRequest struct {
+	Text string `json:"text"`
+}
+
+// ListComments godoc
+// @ID           listSupportReportComments
+// @Summary      List comments on the external support ticket
+// @Description  Yandex Tracker only. audience=staff (default) for full timeline; audience=applicant for public/email only (report author only).
+// @Tags         support
+// @Produce      json
+// @Param        id        path      string  true   "Report id"
+// @Param        audience  query     string  false  "staff or applicant"
+// @Success      200       {array}   services.SupportReportCommentItem
+// @Failure      400       {string}  string  "Bad request"
+// @Failure      401       {string}  string  "Unauthorized"
+// @Failure      403       {string}  string  "Forbidden"
+// @Failure      404       {string}  string  "Not found"
+// @Failure      501       {string}  string  "Not implemented for this ticket backend"
+// @Router       /support/reports/{id}/comments [get]
+// @Security     BearerAuth
+func (h *SupportReportHandler) ListComments(w http.ResponseWriter, r *http.Request) {
+	uid, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok || uid == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+	audience := strings.TrimSpace(r.URL.Query().Get("audience"))
+	rows, err := h.svc.ListSupportReportComments(r.Context(), uid, id, audience)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "Not found", http.StatusNotFound)
+			return
+		}
+		if errors.Is(err, services.ErrSupportReportForbidden) {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+		if errors.Is(err, services.ErrSupportReportInvalidAudience) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if errors.Is(err, services.ErrSupportReportCommentsYandexOnly) {
+			http.Error(w, "Support report comments are only available for Yandex Tracker tickets", http.StatusNotImplemented)
+			return
+		}
+		if errors.Is(err, services.ErrSupportTicketIntegrationNotConfigured) {
+			http.Error(w, "Support ticket integration is not configured", http.StatusServiceUnavailable)
+			return
+		}
+		if _, stOK := services.TicketIntegrationHTTPStatus(err); stOK {
+			http.Error(w, "Failed to load comments from external ticket", http.StatusBadGateway)
+			return
+		}
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if rows == nil {
+		rows = []services.SupportReportCommentItem{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(rows)
+}
+
+// PostComment godoc
+// @ID           postSupportReportComment
+// @Summary      Add a comment on the external support ticket
+// @Description  Yandex Tracker only. Comment text is sent to Tracker as-is; public visibility for the requester is determined in Tracker.
+// @Tags         support
+// @Accept       json
+// @Produce      json
+// @Param        id    path      string                           true  "Report id"
+// @Param        body  body      postSupportReportCommentRequest  true  "Comment body"
+// @Success      204   "No content"
+// @Failure      400   {string}  string  "Bad request"
+// @Failure      401   {string}  string  "Unauthorized"
+// @Failure      403   {string}  string  "Forbidden"
+// @Failure      404   {string}  string  "Not found"
+// @Failure      502   {string}  string  "Upstream ticket request failed"
+// @Failure      501   {string}  string  "Not implemented for this ticket backend"
+// @Router       /support/reports/{id}/comments [post]
+// @Security     BearerAuth
+func (h *SupportReportHandler) PostComment(w http.ResponseWriter, r *http.Request) {
+	uid, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok || uid == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<20))
+	if err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	var req postSupportReportCommentRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+	err = h.svc.PostSupportReportComment(r.Context(), uid, id, services.PostSupportReportCommentInput{
+		Text: req.Text,
+	})
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "Not found", http.StatusNotFound)
+			return
+		}
+		if errors.Is(err, services.ErrSupportReportForbidden) {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+		if errors.Is(err, services.ErrSupportReportInvalidDescription) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if errors.Is(err, services.ErrSupportReportCommentsYandexOnly) {
+			http.Error(w, "Support report comments are only available for Yandex Tracker tickets", http.StatusNotImplemented)
+			return
+		}
+		if errors.Is(err, services.ErrSupportTicketIntegrationNotConfigured) {
+			http.Error(w, "Support ticket integration is not configured", http.StatusServiceUnavailable)
+			return
+		}
+		if _, stOK := services.TicketIntegrationHTTPStatus(err); stOK {
+			http.Error(w, "Failed to post comment on external ticket", http.StatusBadGateway)
+			return
+		}
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

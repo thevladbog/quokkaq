@@ -37,6 +37,8 @@ type UserRepository interface {
 	EnsureRoleExists(name string) (*models.Role, error)
 	EnsureRoleExistsTx(tx *gorm.DB, name string) (*models.Role, error)
 	IsAdmin(userID string) (bool, error)
+	// ListUserIDsByRoleNames returns distinct user ids that have at least one of the given role names.
+	ListUserIDsByRoleNames(roleNames []string) ([]string, error)
 	// HasSupportReportAccess is true for roles that may use /support/reports (admin, staff, supervisor, operator).
 	HasSupportReportAccess(userID string) (bool, error)
 	IsPlatformAdmin(userID string) (bool, error)
@@ -51,6 +53,9 @@ type UserRepository interface {
 	ListAccessibleCompanies(userID string, q string) ([]AccessibleCompanySummary, error)
 	// GetFirstUserUnit returns the first user_units row joined to units for the user (same shape as legacy usage handler query).
 	GetFirstUserUnit(userID string) (UserUnitResult, error)
+	// ListSupportReportShareCandidates lists users in the same company with support roles (admin, staff, supervisor, operator), matching name/email.
+	// reportID and authorUserID exclude users who already have access as author or an existing share row.
+	ListSupportReportShareCandidates(companyID, reportID, authorUserID, q string, limit int) ([]SupportReportShareCandidate, error)
 	// ResolveJournalActorDisplayNames returns a display label per user id (non-empty trimmed name, else email). Omitted ids are not in the map.
 	ResolveJournalActorDisplayNames(userIDs []string) (map[string]string, error)
 	// ShiftJournalSeesAllActivity is true when the user may list all ticket history in the unit (not restricted to own actions).
@@ -211,6 +216,21 @@ func (r *userRepository) IsAdmin(userID string) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+func (r *userRepository) ListUserIDsByRoleNames(roleNames []string) ([]string, error) {
+	if len(roleNames) == 0 {
+		return nil, nil
+	}
+	var ids []string
+	err := r.db.Model(&models.User{}).
+		Select("DISTINCT users.id").
+		Joins("JOIN user_roles ON user_roles.user_id = users.id").
+		Joins("JOIN roles ON roles.id = user_roles.role_id").
+		Where("roles.name IN ?", roleNames).
+		Order("users.id").
+		Pluck("users.id", &ids).Error
+	return ids, err
 }
 
 func (r *userRepository) HasSupportReportAccess(userID string) (bool, error) {
@@ -436,4 +456,50 @@ WHERE uu.user_id = ? AND uu.unit_id IN (SELECT id FROM branch)
 		return false, err
 	}
 	return n > 0, nil
+}
+
+func escapeSQLLikePattern(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `%`, `\%`)
+	s = strings.ReplaceAll(s, `_`, `\_`)
+	return s
+}
+
+func (r *userRepository) ListSupportReportShareCandidates(companyID, reportID, authorUserID, q string, limit int) ([]SupportReportShareCandidate, error) {
+	if strings.TrimSpace(companyID) == "" {
+		return nil, nil
+	}
+	q = strings.TrimSpace(q)
+	if len(q) < 2 {
+		return []SupportReportShareCandidate{}, nil
+	}
+	if limit <= 0 || limit > 50 {
+		limit = 50
+	}
+	term := "%" + escapeSQLLikePattern(q) + "%"
+	var out []SupportReportShareCandidate
+	err := r.db.Raw(`
+SELECT u.id AS user_id,
+       COALESCE(NULLIF(TRIM(u.name), ''), '') AS name,
+       COALESCE(TRIM(u.email), '') AS email
+FROM users u
+INNER JOIN user_units uu ON uu.user_id = u.id
+INNER JOIN units un ON un.id = uu.unit_id AND un.company_id = ?
+WHERE EXISTS (
+  SELECT 1 FROM user_roles ur
+  INNER JOIN roles ro ON ro.id = ur.role_id
+  WHERE ur.user_id = u.id
+    AND ro.name IN ('admin','staff','supervisor','operator')
+)
+AND u.id <> ?
+AND NOT EXISTS (
+  SELECT 1 FROM support_report_shares srs
+  WHERE srs.support_report_id = ? AND srs.shared_with_user_id = u.id
+)
+AND (u.name ILIKE ? ESCAPE '\' OR u.email ILIKE ? ESCAPE '\')
+GROUP BY u.id, u.name, u.email
+ORDER BY name ASC NULLS LAST, u.id ASC
+LIMIT ?
+`, companyID, authorUserID, reportID, term, term, limit).Scan(&out).Error
+	return out, err
 }

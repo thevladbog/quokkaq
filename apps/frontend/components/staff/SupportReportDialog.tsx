@@ -58,7 +58,7 @@ export default function SupportReportDialog({
       },
       onError: (err) => {
         if (isApiHttpError(err) && err.status === 503) {
-          toast.error(t('planeUnavailable'));
+          toast.error(t('integrationUnavailable'));
           return;
         }
         toast.error(t('error'));

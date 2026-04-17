@@ -317,35 +317,12 @@ export interface HandlersCreateInvitationRequest {
   templateId?: string;
 }
 
-export interface HandlersCreateTicketRequestAnonymous {
-  /** @minLength 1 */
+export interface HandlersCreateTicketRequest {
+  clientId?: string;
   serviceId: string;
+  visitorLocale?: string;
+  visitorPhone?: string;
 }
-
-export interface HandlersCreateTicketRequestStaff {
-  /** @minLength 1 */
-  serviceId: string;
-  /** @minLength 1 */
-  clientId: string;
-}
-
-export type HandlersCreateTicketRequestKioskVisitorLocale = typeof HandlersCreateTicketRequestKioskVisitorLocale[keyof typeof HandlersCreateTicketRequestKioskVisitorLocale];
-
-
-export const HandlersCreateTicketRequestKioskVisitorLocale = {
-  en: 'en',
-  ru: 'ru',
-} as const;
-
-export interface HandlersCreateTicketRequestKiosk {
-  /** @minLength 1 */
-  serviceId: string;
-  /** @minLength 1 */
-  visitorPhone: string;
-  visitorLocale: HandlersCreateTicketRequestKioskVisitorLocale;
-}
-
-export type HandlersCreateTicketRequest = HandlersCreateTicketRequestAnonymous | HandlersCreateTicketRequestStaff | HandlersCreateTicketRequestKiosk;
 
 export interface HandlersDaDataFindPartyByInnRequest {
   inn: string;
@@ -454,8 +431,7 @@ export interface HandlersLoginSessionResponse {
 }
 
 export interface HandlersOperatorCommentPatchDTO {
-  /** @nullable */
-  operatorComment: string | null;
+  operatorComment: string;
 }
 
 export type HandlersPatchPlatformCompanyBodyBillingAddress = { [key: string]: unknown };
@@ -515,11 +491,11 @@ export interface HandlersPatchUnitClientRequest {
 export type HandlersPatchUnitKioskConfigRequestConfigKiosk = { [key: string]: unknown };
 
 export type HandlersPatchUnitKioskConfigRequestConfig = {
-  kiosk: HandlersPatchUnitKioskConfigRequestConfigKiosk;
+  kiosk?: HandlersPatchUnitKioskConfigRequestConfigKiosk;
 };
 
 export interface HandlersPatchUnitKioskConfigRequest {
-  config: HandlersPatchUnitKioskConfigRequestConfig;
+  config?: HandlersPatchUnitKioskConfigRequestConfig;
 }
 
 export interface HandlersPeriodResponse {
@@ -615,8 +591,7 @@ export interface HandlersSignupRequest {
 }
 
 export interface HandlersTransferRequest {
-  /** @nullable */
-  operatorComment?: string | null;
+  operatorComment?: string;
   toCounterId?: string;
   toServiceId?: string;
   toServiceZoneId?: string;
@@ -633,15 +608,15 @@ export interface HandlersUpdateStatusRequest {
 }
 
 export interface HandlersUploadLogoResponse {
-  url: string;
+  url?: string;
 }
 
 export interface HandlersUploadSurveyCompletionImageResponse {
-  url: string;
+  url?: string;
 }
 
 export interface HandlersUploadSurveyIdleMediaResponse {
-  url: string;
+  url?: string;
 }
 
 export interface HandlersUsageMetricInfoResponse {
@@ -661,6 +636,10 @@ export type HandlersYooKassaWebhookNotificationObject = { [key: string]: unknown
 export interface HandlersYooKassaWebhookNotification {
   event?: string;
   object?: HandlersYooKassaWebhookNotificationObject;
+}
+
+export interface HandlersAddSupportReportShareRequest {
+  userId?: string;
 }
 
 /**
@@ -892,12 +871,11 @@ export interface HandlersCreateSurveyRequest {
   completionMessage?: HandlersCreateSurveyRequestCompletionMessage;
   displayTheme?: HandlersCreateSurveyRequestDisplayTheme;
   idleScreen?: HandlersCreateSurveyRequestIdleScreen;
-  questions: HandlersCreateSurveyRequestQuestions;
-  title: string;
+  questions?: HandlersCreateSurveyRequestQuestions;
+  title?: string;
 }
 
 export interface HandlersCreateVisitorTagDefinitionRequest {
-  /** @pattern ^#[0-9A-Fa-f]{6}$ */
   color: string;
   label: string;
   sortOrder?: number;
@@ -917,13 +895,13 @@ export interface HandlersEmergencyUnlockBody {
 export type HandlersGuestSurveySubmitRequestAnswers = { [key: string]: unknown };
 
 export interface HandlersGuestSurveySubmitRequest {
-  answers: HandlersGuestSurveySubmitRequestAnswers;
-  surveyId: string;
-  ticketId: string;
+  answers?: HandlersGuestSurveySubmitRequestAnswers;
+  surveyId?: string;
+  ticketId?: string;
 }
 
 export interface HandlersPatchCompanySlugRequest {
-  slug: string;
+  slug?: string;
 }
 
 export type HandlersPatchSurveyRequestCompletionMessage = { [key: string]: unknown };
@@ -943,7 +921,6 @@ export interface HandlersPatchSurveyRequest {
 }
 
 export interface HandlersPatchVisitorTagDefinitionRequest {
-  /** @pattern ^#[0-9A-Fa-f]{6}$ */
   color?: string;
   label?: string;
   sortOrder?: number;
@@ -996,6 +973,10 @@ export interface HandlersPlatformListResponseModelsSubscription {
   total?: number;
 }
 
+export interface HandlersPostSupportReportCommentRequest {
+  text?: string;
+}
+
 export interface HandlersPutVisitorTagsRequest {
   operatorComment: string;
   tagDefinitionIds: string[];
@@ -1008,11 +989,11 @@ export interface HandlersSetupFirstAdminRequest {
 }
 
 export interface HandlersSsoExchangeRequest {
-  code: string;
+  code?: string;
 }
 
 export interface HandlersTenantHintRequest {
-  email: string;
+  email?: string;
 }
 
 export interface ModelsCatalogItemCreateRequest {
@@ -1199,13 +1180,19 @@ export type ModelsSupportReportDiagnostics = { [key: string]: unknown };
 
 export interface ModelsSupportReport {
   createdAt?: string;
+  /** CreatedByName is the submitting user's display name (User.Name); not persisted, filled on read APIs such as GetByID. */
+  createdByName?: string;
   createdByUserId?: string;
+  description?: string;
   diagnostics?: ModelsSupportReportDiagnostics;
   id?: string;
   lastSyncedAt?: string;
+  markedIrrelevantAt?: string;
+  markedIrrelevantByUserId?: string;
   planeSequenceId?: number;
   planeStatus?: string;
   planeWorkItemId?: string;
+  ticketBackend?: string;
   title?: string;
   traceId?: string;
   unitId?: string;
@@ -1286,6 +1273,12 @@ export interface ModelsWeeklySlotCapacity {
   updatedAt?: string;
 }
 
+export interface RepositorySupportReportShareCandidate {
+  email?: string;
+  name?: string;
+  userId?: string;
+}
+
 export interface ServicesCalendarIntegrationPublic {
   adminNotifyEmails?: string;
   caldavBaseUrl?: string;
@@ -1303,14 +1296,6 @@ export interface ServicesCalendarIntegrationPublic {
   username?: string;
 }
 
-export type ServicesCompanySSOGetResponseSsoProtocol = typeof ServicesCompanySSOGetResponseSsoProtocol[keyof typeof ServicesCompanySSOGetResponseSsoProtocol];
-
-
-export const ServicesCompanySSOGetResponseSsoProtocol = {
-  oidc: 'oidc',
-  saml: 'saml',
-} as const;
-
 export interface ServicesCompanySSOGetResponse {
   clientId?: string;
   clientSecretSet?: boolean;
@@ -1319,19 +1304,8 @@ export interface ServicesCompanySSOGetResponse {
   issuerUrl?: string;
   samlIdpMetadataUrl?: string;
   scopes?: string;
-  ssoProtocol?: ServicesCompanySSOGetResponseSsoProtocol;
+  ssoProtocol?: string;
 }
-
-/**
- * "oidc" | "saml"
- */
-export type ServicesCompanySSOPatchSsoProtocol = typeof ServicesCompanySSOPatchSsoProtocol[keyof typeof ServicesCompanySSOPatchSsoProtocol];
-
-
-export const ServicesCompanySSOPatchSsoProtocol = {
-  oidc: 'oidc',
-  saml: 'saml',
-} as const;
 
 export interface ServicesCompanySSOPatch {
   clientId?: string;
@@ -1343,7 +1317,7 @@ export interface ServicesCompanySSOPatch {
   samlIdpMetadataUrl?: string;
   scopes?: string;
   /** "oidc" | "saml" */
-  ssoProtocol?: ServicesCompanySSOPatchSsoProtocol;
+  ssoProtocol?: string;
 }
 
 export interface ServicesCreateCalendarIntegrationRequest {
@@ -1504,6 +1478,22 @@ export interface ServicesSlaSummaryResponse {
   withinPct?: number;
 }
 
+export interface ServicesSupportReportCommentItem {
+  author?: string;
+  createdAt?: string;
+  displayText?: string;
+  id?: string;
+  kind?: string;
+  text?: string;
+}
+
+export interface ServicesSupportReportShareListItem {
+  createdAt?: string;
+  displayName?: string;
+  grantedByUserId?: string;
+  userId?: string;
+}
+
 export interface ServicesSurveyScorePoint {
   avgScoreNative?: number;
   avgScoreNorm5?: number;
@@ -1520,22 +1510,10 @@ export interface ServicesSurveyScoresResponse {
   points?: ServicesSurveyScorePoint[];
 }
 
-/**
- * sso | password | choose_slug
- */
-export type ServicesTenantHintResponseNext = typeof ServicesTenantHintResponseNext[keyof typeof ServicesTenantHintResponseNext];
-
-
-export const ServicesTenantHintResponseNext = {
-  sso: 'sso',
-  password: 'password',
-  choose_slug: 'choose_slug',
-} as const;
-
 export interface ServicesTenantHintResponse {
   displayName?: string;
   /** sso | password | choose_slug */
-  next?: ServicesTenantHintResponseNext;
+  next?: string;
   ssoAvailable?: boolean;
   tenantSlug?: string;
 }
@@ -1625,13 +1603,6 @@ export interface ServicesUtilizationResponse {
   computedAt?: string;
   granularity?: string;
   points?: ServicesUtilizationPoint[];
-}
-
-export interface HandlersLoginLinkResponse {
-  /** Opaque tenant login token for strict-tenant links */
-  token: string;
-  /** Example full login URL including the token query parameter */
-  exampleUrl: string;
 }
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
@@ -1747,96 +1718,6 @@ export const usePostServices = <TError = string,
         TContext
       > => {
       return useMutation(getPostServicesMutationOptions(options), queryClient);
-    }
-
-/**
- * Deletes a service by its ID
- * @summary Delete a service
- */
-export type deleteServicesIdResponse204 = {
-  data: void
-  status: 204
-}
-
-export type deleteServicesIdResponse500 = {
-  data: string
-  status: 500
-}
-
-export type deleteServicesIdResponseSuccess = (deleteServicesIdResponse204) & {
-  headers: Headers;
-};
-export type deleteServicesIdResponseError = (deleteServicesIdResponse500) & {
-  headers: Headers;
-};
-
-export type deleteServicesIdResponse = (deleteServicesIdResponseSuccess | deleteServicesIdResponseError)
-
-export const getDeleteServicesIdUrl = (id: string,) => {
-
-
-
-
-  return `/services/${id}`
-}
-
-export const deleteServicesId = async (id: string, options?: RequestInit): Promise<deleteServicesIdResponse> => {
-
-  return orvalMutator<deleteServicesIdResponse>(getDeleteServicesIdUrl(id),
-  {
-    ...options,
-    method: 'DELETE'
-
-
-  }
-);}
-
-
-
-
-export const getDeleteServicesIdMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteServicesId>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof deleteServicesId>>, TError,{id: string}, TContext> => {
-
-const mutationKey = ['deleteServicesId'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteServicesId>>, {id: string}> = (props) => {
-          const {id} = props ?? {};
-
-          return  deleteServicesId(id,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type DeleteServicesIdMutationResult = NonNullable<Awaited<ReturnType<typeof deleteServicesId>>>
-
-    export type DeleteServicesIdMutationError = string
-
-    /**
- * @summary Delete a service
- */
-export const useDeleteServicesId = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteServicesId>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof deleteServicesId>>,
-        TError,
-        {id: string},
-        TContext
-      > => {
-      return useMutation(getDeleteServicesIdMutationOptions(options), queryClient);
     }
 
 /**
@@ -2065,6 +1946,96 @@ export const usePutServicesId = <TError = string,
         TContext
       > => {
       return useMutation(getPutServicesIdMutationOptions(options), queryClient);
+    }
+
+/**
+ * Deletes a service by its ID
+ * @summary Delete a service
+ */
+export type deleteServicesIdResponse204 = {
+  data: void
+  status: 204
+}
+
+export type deleteServicesIdResponse500 = {
+  data: string
+  status: 500
+}
+
+export type deleteServicesIdResponseSuccess = (deleteServicesIdResponse204) & {
+  headers: Headers;
+};
+export type deleteServicesIdResponseError = (deleteServicesIdResponse500) & {
+  headers: Headers;
+};
+
+export type deleteServicesIdResponse = (deleteServicesIdResponseSuccess | deleteServicesIdResponseError)
+
+export const getDeleteServicesIdUrl = (id: string,) => {
+
+
+
+
+  return `/services/${id}`
+}
+
+export const deleteServicesId = async (id: string, options?: RequestInit): Promise<deleteServicesIdResponse> => {
+
+  return orvalMutator<deleteServicesIdResponse>(getDeleteServicesIdUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteServicesIdMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteServicesId>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteServicesId>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['deleteServicesId'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteServicesId>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteServicesId(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteServicesIdMutationResult = NonNullable<Awaited<ReturnType<typeof deleteServicesId>>>
+
+    export type DeleteServicesIdMutationError = string
+
+    /**
+ * @summary Delete a service
+ */
+export const useDeleteServicesId = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteServicesId>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteServicesId>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getDeleteServicesIdMutationOptions(options), queryClient);
     }
 
 /**

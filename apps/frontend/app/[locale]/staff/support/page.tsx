@@ -1,7 +1,7 @@
 'use client';
 
 import { Loader2 } from 'lucide-react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { Link } from '@/src/i18n/navigation';
 import { Button } from '@/components/ui/button';
 import {
@@ -22,16 +22,41 @@ import {
 import SupportReportDialog from '@/components/staff/SupportReportDialog';
 import { useListSupportReports } from '@/lib/api/generated/support';
 
-function formatDate(iso: string | undefined) {
+const SUPPORT_LIST_DESCRIPTION_MAX_CHARS = 100;
+
+function formatSupportListDate(
+  locale: string,
+  iso: string | undefined,
+  options: Intl.DateTimeFormatOptions
+): string {
   if (!iso) return '—';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleString();
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  try {
+    return new Intl.DateTimeFormat(locale, options).format(d);
+  } catch {
+    return d.toISOString();
+  }
+}
+
+function descriptionListPreview(
+  raw: string | undefined,
+  maxChars: number
+): string {
+  const line = (raw ?? '').replace(/\s+/g, ' ').trim();
+  if (!line) return '—';
+  if (line.length <= maxChars) return line;
+  return `${line.slice(0, maxChars)}…`;
 }
 
 export default function StaffSupportPage() {
   const t = useTranslations('staff.support');
+  const locale = useLocale();
   const listQ = useListSupportReports();
+  const dateTimeOpts: Intl.DateTimeFormatOptions = {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  };
 
   const rows = listQ.data?.status === 200 ? (listQ.data.data ?? []) : [];
 
@@ -76,8 +101,11 @@ export default function StaffSupportPage() {
                 <TableRow>
                   <TableHead className='w-16'>{t('colSeq')}</TableHead>
                   <TableHead>{t('colTitle')}</TableHead>
+                  <TableHead className='max-w-[11rem] min-w-0 sm:max-w-[18rem]'>
+                    {t('colDescription')}
+                  </TableHead>
                   <TableHead>{t('colStatus')}</TableHead>
-                  <TableHead className='text-right'>
+                  <TableHead className='text-right whitespace-nowrap'>
                     {t('colCreated')}
                   </TableHead>
                 </TableRow>
@@ -95,10 +123,30 @@ export default function StaffSupportPage() {
                       >
                         {r.title}
                       </Link>
+                      {r.markedIrrelevantAt ? (
+                        <span className='text-muted-foreground ml-2 text-xs font-normal'>
+                          ({t('badgeIrrelevant')})
+                        </span>
+                      ) : null}
+                    </TableCell>
+                    <TableCell
+                      className='text-muted-foreground max-w-[11rem] min-w-0 text-sm sm:max-w-[18rem]'
+                      title={
+                        r.description?.trim()
+                          ? r.description.replace(/\s+/g, ' ').trim()
+                          : undefined
+                      }
+                    >
+                      <span className='block truncate'>
+                        {descriptionListPreview(
+                          r.description,
+                          SUPPORT_LIST_DESCRIPTION_MAX_CHARS
+                        )}
+                      </span>
                     </TableCell>
                     <TableCell>{r.planeStatus?.trim() || '—'}</TableCell>
-                    <TableCell className='text-muted-foreground text-right text-sm'>
-                      {formatDate(r.createdAt)}
+                    <TableCell className='text-muted-foreground text-right text-sm whitespace-nowrap'>
+                      {formatSupportListDate(locale, r.createdAt, dateTimeOpts)}
                     </TableCell>
                   </TableRow>
                 ))}

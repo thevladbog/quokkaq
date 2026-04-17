@@ -41,7 +41,12 @@ func (r *supportReportRepository) ListForUser(userID string, all bool) ([]models
 	var rows []models.SupportReport
 	q := r.db.Model(&models.SupportReport{}).Order("created_at DESC").Limit(500)
 	if !all {
-		q = q.Where("created_by_user_id = ?", userID)
+		q = q.Where("created_by_user_id = ? OR id IN (?)",
+			userID,
+			r.db.Model(&models.SupportReportShare{}).
+				Select("support_report_id").
+				Where("shared_with_user_id = ?", userID),
+		)
 	}
 	if err := q.Find(&rows).Error; err != nil {
 		return nil, err

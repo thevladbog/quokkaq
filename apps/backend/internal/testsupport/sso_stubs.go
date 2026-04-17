@@ -74,6 +74,7 @@ func (PanicUserRepo) Count() (int64, error)                                     
 func (PanicUserRepo) EnsureRoleExists(string) (*models.Role, error)             { panic("unexpected") }
 func (PanicUserRepo) EnsureRoleExistsTx(*gorm.DB, string) (*models.Role, error) { panic("unexpected") }
 func (PanicUserRepo) IsAdmin(string) (bool, error)                              { panic("unexpected") }
+func (PanicUserRepo) ListUserIDsByRoleNames([]string) ([]string, error)         { panic("unexpected") }
 func (PanicUserRepo) HasSupportReportAccess(string) (bool, error)               { panic("unexpected") }
 func (PanicUserRepo) IsPlatformAdmin(string) (bool, error)                      { panic("unexpected") }
 func (PanicUserRepo) IsAdminOrHasUnitAccess(string, string) (bool, error)       { panic("unexpected") }
@@ -87,6 +88,9 @@ func (PanicUserRepo) ListAccessibleCompanies(string, string) ([]repository.Acces
 	panic("unexpected")
 }
 func (PanicUserRepo) GetFirstUserUnit(string) (repository.UserUnitResult, error) {
+	panic("unexpected")
+}
+func (PanicUserRepo) ListSupportReportShareCandidates(string, string, string, string, int) ([]repository.SupportReportShareCandidate, error) {
 	panic("unexpected")
 }
 func (PanicUserRepo) ResolveJournalActorDisplayNames([]string) (map[string]string, error) {

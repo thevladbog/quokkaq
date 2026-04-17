@@ -60,14 +60,24 @@ func (stubSupportUserRepo) HasSupportReportAccess(string) (bool, error) {
 	return true, nil
 }
 
+func (stubSupportUserRepo) ListUserIDsByRoleNames([]string) ([]string, error) {
+	return nil, nil
+}
+
 func newTestSupportReportHandler(repo repository.SupportReportRepository) *SupportReportHandler {
-	svc := services.NewSupportReportService(repo, nil, stubSupportUserRepo{})
+	svc := services.NewSupportReportService(repo, nil, nil, nil, services.SupportReportPlatformNone, stubSupportUserRepo{}, nil)
 	return NewSupportReportHandler(svc)
 }
 
-func newTestSupportReportHandlerWithPlane(repo repository.SupportReportRepository, plane services.SupportReportPlaneClient) *SupportReportHandler {
-	svc := services.NewSupportReportService(repo, plane, stubSupportUserRepo{})
+func newTestSupportReportHandlerWithPlane(repo repository.SupportReportRepository, plane services.SupportReportTicketClient) *SupportReportHandler {
+	svc := services.NewSupportReportService(repo, nil, plane, nil, models.TicketBackendPlane, stubSupportUserRepo{}, nil)
 	return NewSupportReportHandler(svc)
+}
+
+type stubSupportUserRepoAdmin struct{ stubSupportUserRepo }
+
+func (stubSupportUserRepoAdmin) IsAdmin(string) (bool, error) {
+	return true, nil
 }
 
 type memSupportReportRepo struct {
@@ -134,11 +144,12 @@ type testPlaneStub struct {
 	wid       string
 	seq       int
 	state     string
+	addCalls  int
 }
 
 func (t *testPlaneStub) Enabled() bool { return true }
 
-func (t *testPlaneStub) CreateWorkItem(_ context.Context, _, _, _ string) (string, *int, string, error) {
+func (t *testPlaneStub) CreateWorkItem(_ context.Context, _, _, _ string, _ services.SupportReportTicketCreateExtras) (string, *int, string, error) {
 	if t.createErr != nil {
 		return "", nil, "", t.createErr
 	}
@@ -162,7 +173,8 @@ func (t *testPlaneStub) GetWorkItem(context.Context, string) (*int, string, erro
 	return nil, "", nil
 }
 
-func (t *testPlaneStub) DeleteWorkItem(context.Context, string) error {
+func (t *testPlaneStub) AddComment(_ context.Context, _, _ string) error {
+	t.addCalls++
 	return nil
 }
 
@@ -322,7 +334,10 @@ func TestSupportReportHandler_Create_201(t *testing.T) {
 		t.Fatal(err)
 	}
 	if out.PlaneWorkItemID == "" || out.TraceID == "" {
-		t.Fatalf("expected plane id and trace id, got %+v", out)
+		t.Fatalf("expected external id and trace id, got %+v", out)
+	}
+	if out.TicketBackend != models.TicketBackendPlane {
+		t.Fatalf("ticketBackend: want %q, got %q", models.TicketBackendPlane, out.TicketBackend)
 	}
 	if out.Title != "hello" {
 		t.Fatalf("title: want hello, got %q", out.Title)
@@ -439,5 +454,136 @@ func TestSupportReportHandler_GetByID_OK_Author(t *testing.T) {
 	}
 	if got.ID != "r-own" || got.Title != "mine" {
 		t.Fatalf("unexpected body: %+v", got)
+	}
+}
+
+func TestSupportReportHandler_MarkIrrelevant_Author_OK(t *testing.T) {
+	t.Parallel()
+	stub := &testPlaneStub{}
+	mem := newMemSupportReportRepo()
+	now := time.Now().UTC()
+	_ = mem.Create(&models.SupportReport{
+		ID:              "r1",
+		CreatedByUserID: "user-1",
+		Title:           "t",
+		PlaneWorkItemID: "wi-1",
+		TicketBackend:   models.TicketBackendPlane,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	})
+	svc := services.NewSupportReportService(mem, nil, stub, nil, models.TicketBackendPlane, stubSupportUserRepo{}, nil)
+	h := NewSupportReportHandler(svc)
+	r := chi.NewRouter()
+	r.Post("/support/reports/{id}/mark-irrelevant", h.MarkIrrelevant)
+	req := httptest.NewRequest(http.MethodPost, "/support/reports/r1/mark-irrelevant", nil)
+	req = reqWithUserID(req, "user-1")
+	rr := httptest.NewRecorder()
+	r.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("MarkIrrelevant: want %d, got %d body=%q", http.StatusOK, rr.Code, rr.Body.String())
+	}
+	if stub.addCalls != 1 {
+		t.Fatalf("AddComment calls: want 1, got %d", stub.addCalls)
+	}
+	row, err := mem.FindByID("r1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if row.MarkedIrrelevantAt == nil || row.MarkedIrrelevantByUserID != "user-1" {
+		t.Fatalf("expected marked irrelevant by author, got %+v", row)
+	}
+}
+
+func TestSupportReportHandler_MarkIrrelevant_Idempotent(t *testing.T) {
+	t.Parallel()
+	stub := &testPlaneStub{}
+	mem := newMemSupportReportRepo()
+	now := time.Now().UTC()
+	marked := now.Add(-time.Hour)
+	_ = mem.Create(&models.SupportReport{
+		ID:                       "r1",
+		CreatedByUserID:          "user-1",
+		Title:                    "t",
+		PlaneWorkItemID:          "wi-1",
+		TicketBackend:            models.TicketBackendPlane,
+		MarkedIrrelevantAt:       &marked,
+		MarkedIrrelevantByUserID: "user-1",
+		CreatedAt:                now,
+		UpdatedAt:                now,
+	})
+	svc := services.NewSupportReportService(mem, nil, stub, nil, models.TicketBackendPlane, stubSupportUserRepo{}, nil)
+	h := NewSupportReportHandler(svc)
+	r := chi.NewRouter()
+	r.Post("/support/reports/{id}/mark-irrelevant", h.MarkIrrelevant)
+	req := httptest.NewRequest(http.MethodPost, "/support/reports/r1/mark-irrelevant", nil)
+	req = reqWithUserID(req, "user-1")
+	rr := httptest.NewRecorder()
+	r.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("MarkIrrelevant: want %d, got %d", http.StatusOK, rr.Code)
+	}
+	if stub.addCalls != 0 {
+		t.Fatalf("AddComment on idempotent path: want 0, got %d", stub.addCalls)
+	}
+}
+
+func TestSupportReportHandler_MarkIrrelevant_Forbidden(t *testing.T) {
+	t.Parallel()
+	stub := &testPlaneStub{}
+	mem := newMemSupportReportRepo()
+	now := time.Now().UTC()
+	_ = mem.Create(&models.SupportReport{
+		ID:              "r1",
+		CreatedByUserID: "user-1",
+		Title:           "t",
+		PlaneWorkItemID: "wi-1",
+		TicketBackend:   models.TicketBackendPlane,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	})
+	svc := services.NewSupportReportService(mem, nil, stub, nil, models.TicketBackendPlane, stubSupportUserRepo{}, nil)
+	h := NewSupportReportHandler(svc)
+	r := chi.NewRouter()
+	r.Post("/support/reports/{id}/mark-irrelevant", h.MarkIrrelevant)
+	req := httptest.NewRequest(http.MethodPost, "/support/reports/r1/mark-irrelevant", nil)
+	req = reqWithUserID(req, "user-2")
+	rr := httptest.NewRecorder()
+	r.ServeHTTP(rr, req)
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("MarkIrrelevant: want %d, got %d", http.StatusForbidden, rr.Code)
+	}
+}
+
+func TestSupportReportHandler_MarkIrrelevant_Admin_OK(t *testing.T) {
+	t.Parallel()
+	stub := &testPlaneStub{}
+	mem := newMemSupportReportRepo()
+	now := time.Now().UTC()
+	_ = mem.Create(&models.SupportReport{
+		ID:              "r1",
+		CreatedByUserID: "user-1",
+		Title:           "t",
+		PlaneWorkItemID: "wi-1",
+		TicketBackend:   models.TicketBackendPlane,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	})
+	svc := services.NewSupportReportService(mem, nil, stub, nil, models.TicketBackendPlane, stubSupportUserRepoAdmin{}, nil)
+	h := NewSupportReportHandler(svc)
+	r := chi.NewRouter()
+	r.Post("/support/reports/{id}/mark-irrelevant", h.MarkIrrelevant)
+	req := httptest.NewRequest(http.MethodPost, "/support/reports/r1/mark-irrelevant", nil)
+	req = reqWithUserID(req, "admin-1")
+	rr := httptest.NewRecorder()
+	r.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("MarkIrrelevant: want %d, got %d body=%q", http.StatusOK, rr.Code, rr.Body.String())
+	}
+	row, err := mem.FindByID("r1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if row.MarkedIrrelevantByUserID != "admin-1" {
+		t.Fatalf("marked by admin: got %q", row.MarkedIrrelevantByUserID)
 	}
 }

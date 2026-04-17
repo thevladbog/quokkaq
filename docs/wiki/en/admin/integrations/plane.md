@@ -4,6 +4,11 @@
 
 Official Plane docs: [developers.plane.so](https://developers.plane.so/) (self-hosting, REST API).
 
+## Enabling and disabling in QuokkaQ
+
+- Plane support remains in the codebase. To **turn Plane off** while keeping variables on disk, set `PLANE_ENABLED=false` or choose another backend with `SUPPORT_REPORT_PLATFORM` (see [Yandex Tracker](yandex-tracker.md)).
+- To use Plane for new reports, set `SUPPORT_REPORT_PLATFORM=plane`, `PLANE_ENABLED=true`, and fill in the `PLANE_*` variables below.
+
 ## Role in QuokkaQ
 
 - The user submits a **report** from the QuokkaQ UI.

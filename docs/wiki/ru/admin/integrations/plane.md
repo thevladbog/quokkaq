@@ -4,6 +4,11 @@
 
 Официальная документация Plane: [developers.plane.so](https://developers.plane.so/) (self-hosting, REST API).
 
+## Включение и отключение в QuokkaQ
+
+- Интеграция с Plane остаётся в коде. Чтобы **отключить Plane**, оставив переменные в окружении, задайте `PLANE_ENABLED=false` или выберите другой бэкенд через `SUPPORT_REPORT_PLATFORM` (см. [Яндекс.Трекер](yandex-tracker.md)).
+- Чтобы новые обращения создавались в Plane: `SUPPORT_REPORT_PLATFORM=plane`, `PLANE_ENABLED=true` и заполненные переменные `PLANE_*` ниже.
+
 ## Назначение в QuokkaQ
 
 - Пользователь отправляет **репорт** из интерфейса QuokkaQ.
