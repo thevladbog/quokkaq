@@ -1095,6 +1095,31 @@ func RunVersionedMigrations(models ...interface{}) error {
 		return fmt.Errorf("failed to run v1.2.5_services_calendar_slot_key_unique migration: %w", err)
 	}
 
+	// SupportReport was added to v1.0.0_core_tables model list after many DBs already applied it — create table explicitly.
+	err = manager.RunMigration("v1.2.6_support_reports", func(db *gorm.DB) error {
+		return db.AutoMigrate(&dbmodels.SupportReport{})
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.2.6_support_reports migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.2.7_support_report_ticket_backend", func(db *gorm.DB) error {
+		return db.AutoMigrate(&dbmodels.SupportReport{})
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.2.7_support_report_ticket_backend migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.2.8_support_report_shares_and_description", func(db *gorm.DB) error {
+		if err := db.AutoMigrate(&dbmodels.SupportReport{}); err != nil {
+			return err
+		}
+		return db.AutoMigrate(&dbmodels.SupportReportShare{})
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.2.8_support_report_shares_and_description migration: %w", err)
+	}
+
 	fmt.Println("All migrations completed successfully")
 	return nil
 }

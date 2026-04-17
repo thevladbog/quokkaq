@@ -3,6 +3,7 @@
 import { ComponentType, ReactNode } from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import AppSidebar from '@/components/AppSidebar';
+import OperationalSupportFab from '@/components/staff/OperationalSupportFab';
 import ProtectedRoute from '@/components/ProtectedRoute';
 
 interface ProtectedSidebarLayoutProps {
@@ -35,6 +36,7 @@ const ProtectedSidebarLayout = ({
         <SidebarInset>
           <div className='p-4 md:p-8'>{children}</div>
         </SidebarInset>
+        <OperationalSupportFab />
       </SidebarProvider>
     </ProtectedRoute>
   );

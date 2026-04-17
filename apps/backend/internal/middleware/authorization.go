@@ -24,6 +24,34 @@ func RespondRepoFindError(w http.ResponseWriter, err error, op string) bool {
 	return true
 }
 
+// RequireSupportReportAccess allows only user JWTs (not kiosk/terminal) with admin, staff, supervisor, or operator role.
+func RequireSupportReportAccess(userRepo repository.UserRepository) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if tokenType, _ := r.Context().Value(TokenTypeKey).(string); tokenType == "terminal" {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+			userID, ok := GetUserIDFromContext(r.Context())
+			if !ok {
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				return
+			}
+			allowed, err := userRepo.HasSupportReportAccess(userID)
+			if err != nil {
+				log.Printf("RequireSupportReportAccess: userID=%s: %v", userID, err)
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+			if !allowed {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 // RequireAdmin allows only users with the "admin" role.
 func RequireAdmin(userRepo repository.UserRepository) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {

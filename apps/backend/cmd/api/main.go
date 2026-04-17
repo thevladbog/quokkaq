@@ -108,6 +108,7 @@ func main() {
 			&models.UnitOperationalState{},
 			&models.StatisticsDailyBucket{},
 			&models.StatisticsSurveyDaily{},
+			&models.SupportReport{},
 		)
 		if err != nil {
 			log.Fatalf("Failed to run migrations: %v", err)
@@ -231,6 +232,14 @@ func main() {
 	surveyHandler := handlers.NewSurveyHandler(surveyService, storageService)
 	guestSurveyHandler := handlers.NewGuestSurveyHandler(surveyService)
 	usageHandler := handlers.NewUsageHandler(quotaService, userRepo)
+
+	supportReportRepo := repository.NewSupportReportRepository()
+	supportReportShareRepo := repository.NewSupportReportShareRepository()
+	planeClient := services.NewPlaneClientFromEnv()
+	trackerClient := services.NewYandexTrackerClientFromEnv()
+	supportReportCreatePlatform := services.ParseSupportReportCreatePlatform()
+	supportReportService := services.NewSupportReportService(supportReportRepo, supportReportShareRepo, planeClient, trackerClient, supportReportCreatePlatform, userRepo, companyRepo)
+	supportReportHandler := handlers.NewSupportReportHandler(supportReportService)
 
 	var paymentProvider services.PaymentProvider
 	stripeKey := strings.TrimSpace(os.Getenv("STRIPE_SECRET_KEY"))
@@ -626,6 +635,21 @@ func main() {
 	r.Route("/usage-metrics", func(r chi.Router) {
 		r.Use(authmiddleware.JWTAuth)
 		r.Get("/me", usageHandler.GetMyUsageMetrics)
+	})
+
+	r.Route("/support", func(r chi.Router) {
+		r.Use(authmiddleware.JWTAuth)
+		r.Use(authmiddleware.RequireSupportReportAccess(userRepo))
+		r.Post("/reports", supportReportHandler.Create)
+		r.Get("/reports", supportReportHandler.List)
+		r.Get("/reports/{id}/share-candidates", supportReportHandler.ListShareCandidates)
+		r.Get("/reports/{id}/shares", supportReportHandler.ListShares)
+		r.Post("/reports/{id}/shares", supportReportHandler.AddShare)
+		r.Delete("/reports/{id}/shares/{sharedWithUserId}", supportReportHandler.RemoveShare)
+		r.Get("/reports/{id}/comments", supportReportHandler.ListComments)
+		r.Post("/reports/{id}/comments", supportReportHandler.PostComment)
+		r.Get("/reports/{id}", supportReportHandler.GetByID)
+		r.Post("/reports/{id}/mark-irrelevant", supportReportHandler.MarkIrrelevant)
 	})
 
 	r.Route("/subscriptions", func(r chi.Router) {

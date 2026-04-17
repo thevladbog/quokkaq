@@ -663,6 +663,10 @@ export interface HandlersYooKassaWebhookNotification {
   object?: HandlersYooKassaWebhookNotificationObject;
 }
 
+export interface HandlersAddSupportReportShareRequest {
+  userId?: string;
+}
+
 /**
  * feature flags
  */
@@ -870,6 +874,16 @@ export interface HandlersCompanyMeResponse {
   publicAppUrl?: string;
 }
 
+export type HandlersCreateSupportReportRequestDiagnostics = { [key: string]: unknown };
+
+export interface HandlersCreateSupportReportRequest {
+  description?: string;
+  diagnostics?: HandlersCreateSupportReportRequestDiagnostics;
+  title?: string;
+  traceId?: string;
+  unitId?: string;
+}
+
 export type HandlersCreateSurveyRequestCompletionMessage = { [key: string]: unknown };
 
 export type HandlersCreateSurveyRequestDisplayTheme = { [key: string]: unknown };
@@ -984,6 +998,10 @@ export interface HandlersPlatformListResponseModelsSubscription {
   limit?: number;
   offset?: number;
   total?: number;
+}
+
+export interface HandlersPostSupportReportCommentRequest {
+  text?: string;
 }
 
 export interface HandlersPutVisitorTagsRequest {
@@ -1185,6 +1203,29 @@ export interface ModelsSlotSuccessResponse {
   success?: boolean;
 }
 
+export type ModelsSupportReportDiagnostics = { [key: string]: unknown };
+
+export interface ModelsSupportReport {
+  createdAt?: string;
+  /** CreatedByName is the submitting user's display name (User.Name); not persisted, filled on read APIs such as GetByID. */
+  createdByName?: string;
+  createdByUserId?: string;
+  description?: string;
+  diagnostics?: ModelsSupportReportDiagnostics;
+  id?: string;
+  lastSyncedAt?: string;
+  markedIrrelevantAt?: string;
+  markedIrrelevantByUserId?: string;
+  planeSequenceId?: number;
+  planeStatus?: string;
+  planeWorkItemId?: string;
+  ticketBackend?: string;
+  title?: string;
+  traceId?: string;
+  unitId?: string;
+  updatedAt?: string;
+}
+
 /**
  * CompletionMessage optional per-locale Markdown shown after survey submit (e.g. {"en":"...","ru":"..."}).
  */
@@ -1257,6 +1298,12 @@ export interface ModelsWeeklySlotCapacity {
   startTime?: string;
   unitId?: string;
   updatedAt?: string;
+}
+
+export interface RepositorySupportReportShareCandidate {
+  email?: string;
+  name?: string;
+  userId?: string;
 }
 
 export interface ServicesCalendarIntegrationPublic {
@@ -1475,6 +1522,22 @@ export interface ServicesSlaSummaryResponse {
   slaWaitMet?: number;
   slaWaitTotal?: number;
   withinPct?: number;
+}
+
+export interface ServicesSupportReportCommentItem {
+  author?: string;
+  createdAt?: string;
+  displayText?: string;
+  id?: string;
+  kind?: string;
+  text?: string;
+}
+
+export interface ServicesSupportReportShareListItem {
+  createdAt?: string;
+  displayName?: string;
+  grantedByUserId?: string;
+  userId?: string;
 }
 
 export interface ServicesSurveyScorePoint {

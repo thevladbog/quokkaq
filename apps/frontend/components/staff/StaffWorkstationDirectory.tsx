@@ -23,8 +23,9 @@ import { Input } from '@/components/ui/input';
 import { countersApi, shiftApi } from '@/lib/api';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useTranslations } from 'next-intl';
-import { useRouter } from '@/src/i18n/navigation';
+import { Link, useRouter } from '@/src/i18n/navigation';
 import { Loader2, Search, User as UserIcon } from 'lucide-react';
+import SupportReportDialog from '@/components/staff/SupportReportDialog';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
@@ -43,6 +44,7 @@ export default function StaffWorkstationDirectory({ restrictUnitId }: Props) {
   const router = useRouter();
   const t = useTranslations('staff.directory');
   const tStaff = useTranslations('staff');
+  const tSupport = useTranslations('staff.support');
 
   const [zoneFilter, setZoneFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<
@@ -241,13 +243,21 @@ export default function StaffWorkstationDirectory({ restrictUnitId }: Props) {
       </aside>
 
       <div className='min-w-0 flex-1 space-y-4'>
-        <div>
-          <h1 className='text-3xl font-bold tracking-tight'>
-            {t('pageTitle')}
-          </h1>
-          <p className='text-muted-foreground mt-1 text-sm'>
-            {t('pageSubtitle')}
-          </p>
+        <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
+          <div>
+            <h1 className='text-3xl font-bold tracking-tight'>
+              {t('pageTitle')}
+            </h1>
+            <p className='text-muted-foreground mt-1 text-sm'>
+              {t('pageSubtitle')}
+            </p>
+          </div>
+          <div className='flex flex-wrap items-center gap-2'>
+            <SupportReportDialog />
+            <Button variant='outline' size='sm' asChild>
+              <Link href='/staff/support'>{tSupport('myReports')}</Link>
+            </Button>
+          </div>
         </div>
 
         <div className='grid grid-cols-1 gap-3 sm:grid-cols-3'>

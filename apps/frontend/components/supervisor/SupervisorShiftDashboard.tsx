@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { Ticket, Service } from '@/lib/api';
 import { useTranslations } from 'next-intl';
-import { Loader2, AlertTriangle } from 'lucide-react';
+import { Loader2, AlertTriangle, Bug } from 'lucide-react';
+import { Link } from '@/src/i18n/navigation';
 import { SupervisorKpiRow } from './SupervisorKpiRow';
 import { SupervisorQueueStrip } from './SupervisorQueueStrip';
 import {
@@ -69,6 +70,7 @@ export function SupervisorShiftDashboard({
   activityQueryEnabled: boolean;
 }) {
   const t = useTranslations('supervisor.dashboardUi');
+  const tStaffSupport = useTranslations('staff.support');
   const totalCounters = counters?.length ?? 0;
 
   return (
@@ -86,6 +88,12 @@ export function SupervisorShiftDashboard({
             <p className='text-muted-foreground'>{unitName ?? '…'}</p>
           </div>
           <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end'>
+            <Button variant='outline' size='sm' asChild className='shrink-0'>
+              <Link href='/staff/support'>
+                <Bug className='mr-2 h-4 w-4' aria-hidden />
+                {tStaffSupport('sidebarSupport')}
+              </Link>
+            </Button>
             <TabsList className='grid w-full grid-cols-3 sm:inline-flex sm:w-auto'>
               <TabsTrigger value='live'>{t('viewLive')}</TabsTrigger>
               <TabsTrigger value='list'>{t('viewListGlobal')}</TabsTrigger>

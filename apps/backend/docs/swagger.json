@@ -883,6 +883,14 @@
                 },
                 "type": "object"
             },
+            "handlers.addSupportReportShareRequest": {
+                "properties": {
+                    "userId": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "handlers.companyMeResponse": {
                 "properties": {
                     "company": {
@@ -897,6 +905,26 @@
                     },
                     "publicAppUrl": {
                         "example": "https://app.example.com",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "handlers.createSupportReportRequest": {
+                "properties": {
+                    "description": {
+                        "type": "string"
+                    },
+                    "diagnostics": {
+                        "type": "object"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "traceId": {
+                        "type": "string"
+                    },
+                    "unitId": {
                         "type": "string"
                     }
                 },
@@ -1104,6 +1132,14 @@
                     },
                     "total": {
                         "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "handlers.postSupportReportCommentRequest": {
+                "properties": {
+                    "text": {
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -2290,6 +2326,67 @@
                 },
                 "type": "object"
             },
+            "models.SupportReport": {
+                "properties": {
+                    "createdAt": {
+                        "format": "date-time",
+                        "type": "string"
+                    },
+                    "createdByName": {
+                        "description": "CreatedByName is the submitting user's display name (User.Name); not persisted, filled on read APIs such as GetByID.",
+                        "type": "string"
+                    },
+                    "createdByUserId": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "diagnostics": {
+                        "type": "object"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "lastSyncedAt": {
+                        "format": "date-time",
+                        "type": "string"
+                    },
+                    "markedIrrelevantAt": {
+                        "format": "date-time",
+                        "type": "string"
+                    },
+                    "markedIrrelevantByUserId": {
+                        "type": "string"
+                    },
+                    "planeSequenceId": {
+                        "type": "integer"
+                    },
+                    "planeStatus": {
+                        "type": "string"
+                    },
+                    "planeWorkItemId": {
+                        "type": "string"
+                    },
+                    "ticketBackend": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "traceId": {
+                        "type": "string"
+                    },
+                    "unitId": {
+                        "type": "string"
+                    },
+                    "updatedAt": {
+                        "format": "date-time",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "models.SurveyDefinition": {
                 "properties": {
                     "companyId": {
@@ -2791,6 +2888,20 @@
                         "type": "string"
                     },
                     "updatedAt": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "repository.SupportReportShareCandidate": {
+                "properties": {
+                    "email": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "userId": {
                         "type": "string"
                     }
                 },
@@ -3301,6 +3412,48 @@
                     },
                     "withinPct": {
                         "type": "number"
+                    }
+                },
+                "type": "object"
+            },
+            "services.SupportReportCommentItem": {
+                "properties": {
+                    "author": {
+                        "type": "string"
+                    },
+                    "createdAt": {
+                        "format": "date-time",
+                        "type": "string"
+                    },
+                    "displayText": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "kind": {
+                        "type": "string"
+                    },
+                    "text": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "services.SupportReportShareListItem": {
+                "properties": {
+                    "createdAt": {
+                        "format": "date-time",
+                        "type": "string"
+                    },
+                    "displayName": {
+                        "type": "string"
+                    },
+                    "grantedByUserId": {
+                        "type": "string"
+                    },
+                    "userId": {
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -10002,6 +10155,980 @@
                 "summary": "Cancel Subscription",
                 "tags": [
                     "subscriptions"
+                ]
+            }
+        },
+        "/support/reports": {
+            "get": {
+                "description": "Returns the current user's reports; tenant admins see all reports. Refreshes external ticket status when older than a short interval.",
+                "operationId": "listSupportReports",
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/models.SupportReport"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List support reports visible to the user",
+                "tags": [
+                    "support"
+                ]
+            },
+            "post": {
+                "description": "Creates a ticket in the configured backend (Plane or Yandex Tracker per SUPPORT_REPORT_PLATFORM) and stores a row in QuokkaQ.",
+                "operationId": "createSupportReport",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.createSupportReportRequest"
+                            }
+                        }
+                    },
+                    "description": "Report payload",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/models.SupportReport"
+                                }
+                            }
+                        },
+                        "description": "Created"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "413": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Payload too large"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    },
+                    "502": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Upstream ticket request failed"
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Integration not configured or upstream unavailable"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Create a support report (external ticket)",
+                "tags": [
+                    "support"
+                ]
+            }
+        },
+        "/support/reports/{id}": {
+            "get": {
+                "description": "Returns a report if the current user is the author, a tenant admin, or has been granted a share. Refreshes external status when the row's backend client is enabled.",
+                "operationId": "getSupportReportByID",
+                "parameters": [
+                    {
+                        "description": "Report id",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/models.SupportReport"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get one support report by id",
+                "tags": [
+                    "support"
+                ]
+            }
+        },
+        "/support/reports/{id}/comments": {
+            "get": {
+                "description": "Yandex Tracker only. audience=staff (default) for full timeline; audience=applicant for public/email only (report author only).",
+                "operationId": "listSupportReportComments",
+                "parameters": [
+                    {
+                        "description": "Report id",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "staff or applicant",
+                        "in": "query",
+                        "name": "audience",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/services.SupportReportCommentItem"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Not found"
+                    },
+                    "501": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Not implemented for this ticket backend"
+                    },
+                    "502": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Upstream ticket request failed"
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "External ticketing service temporarily unavailable"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List comments on the external support ticket",
+                "tags": [
+                    "support"
+                ]
+            },
+            "post": {
+                "description": "Yandex Tracker only. Comment text is sent to Tracker as-is; public visibility for the requester is determined in Tracker.",
+                "operationId": "postSupportReportComment",
+                "parameters": [
+                    {
+                        "description": "Report id",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.postSupportReportCommentRequest"
+                            }
+                        }
+                    },
+                    "description": "Comment body",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "204": {
+                        "description": "No content"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Not found"
+                    },
+                    "413": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Payload too large"
+                    },
+                    "501": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Not implemented for this ticket backend"
+                    },
+                    "502": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Upstream ticket request failed"
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "External ticketing service temporarily unavailable"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Add a comment on the external support ticket",
+                "tags": [
+                    "support"
+                ]
+            }
+        },
+        "/support/reports/{id}/mark-irrelevant": {
+            "post": {
+                "description": "Author or tenant admin: posts a cancel comment on the external ticket when the backend client is enabled, then stores markedIrrelevantAt on the report. Idempotent if already marked.",
+                "operationId": "markSupportReportIrrelevant",
+                "parameters": [
+                    {
+                        "description": "Report id",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/models.SupportReport"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    },
+                    "502": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Failed to post comment on external ticket"
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "External ticketing service temporarily unavailable"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Mark support report as not relevant",
+                "tags": [
+                    "support"
+                ]
+            }
+        },
+        "/support/reports/{id}/share-candidates": {
+            "get": {
+                "description": "Author or tenant admin only. Yandex Tracker reports only. Same company as the report author; roles admin/staff/supervisor/operator. Query q must be at least 2 characters.",
+                "operationId": "listSupportReportShareCandidates",
+                "parameters": [
+                    {
+                        "description": "Report id",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Search by name or email",
+                        "in": "query",
+                        "name": "q",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/repository.SupportReportShareCandidate"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Not found"
+                    },
+                    "501": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Not implemented for this ticket backend"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Search users who may receive a share for this report",
+                "tags": [
+                    "support"
+                ]
+            }
+        },
+        "/support/reports/{id}/shares": {
+            "get": {
+                "description": "Author or tenant admin only. Yandex Tracker reports only.",
+                "operationId": "listSupportReportShares",
+                "parameters": [
+                    {
+                        "description": "Report id",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/services.SupportReportShareListItem"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Not found"
+                    },
+                    "501": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Not implemented for this ticket backend"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List users this report is shared with",
+                "tags": [
+                    "support"
+                ]
+            },
+            "post": {
+                "description": "Author or tenant admin only. Target must be in the author's company and have support roles. Syncs Yandex Tracker apiAccessToTheTicket.",
+                "operationId": "addSupportReportShare",
+                "parameters": [
+                    {
+                        "description": "Report id",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.addSupportReportShareRequest"
+                            }
+                        }
+                    },
+                    "description": "Target user id",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/services.SupportReportShareListItem"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Not found"
+                    },
+                    "501": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Not implemented for this ticket backend"
+                    },
+                    "502": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Upstream ticket update failed"
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "External ticketing service temporarily unavailable"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Share a support report with another user",
+                "tags": [
+                    "support"
+                ]
+            }
+        },
+        "/support/reports/{id}/shares/{sharedWithUserId}": {
+            "delete": {
+                "description": "Author or tenant admin only. Syncs Yandex Tracker apiAccessToTheTicket.",
+                "operationId": "removeSupportReportShare",
+                "parameters": [
+                    {
+                        "description": "Report id",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "User id to unshare",
+                        "in": "path",
+                        "name": "sharedWithUserId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/services.SupportReportShareListItem"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Not found"
+                    },
+                    "501": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Not implemented for this ticket backend"
+                    },
+                    "502": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Upstream ticket update failed"
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "External ticketing service temporarily unavailable"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Revoke a support report share",
+                "tags": [
+                    "support"
                 ]
             }
         },

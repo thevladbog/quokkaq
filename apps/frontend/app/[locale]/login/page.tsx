@@ -28,7 +28,7 @@ import {
   publicTenantBySlug,
   useAuthAccessibleCompanies,
   type authAccessibleCompaniesResponse,
-  type AuthSSOAuthorizeLocale,
+  type AuthSSOAuthorizeParams,
   type HandlersAccessibleCompanyItem
 } from '@/lib/api/generated/auth';
 import { Loader2 } from 'lucide-react';
@@ -38,7 +38,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 
 function toAuthSSOAuthorizeLocale(
   loc: string
-): AuthSSOAuthorizeLocale | undefined {
+): AuthSSOAuthorizeParams['locale'] {
   if (loc === 'en' || loc === 'ru') return loc;
   return undefined;
 }

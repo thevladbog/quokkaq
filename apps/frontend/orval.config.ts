@@ -195,5 +195,18 @@ export default defineConfig({
       ...reactQueryOutput,
       target: './lib/api/generated/pre-registrations.ts'
     }
+  },
+  quokkaqSupport: {
+    input: {
+      target: '../backend/docs/swagger.json',
+      filters: {
+        mode: 'include',
+        tags: ['support']
+      }
+    },
+    output: {
+      ...reactQueryOutput,
+      target: './lib/api/generated/support.ts'
+    }
   }
 });
