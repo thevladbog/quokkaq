@@ -17,6 +17,7 @@ import (
 	"quokkaq-go-backend/internal/services/billing"
 	"quokkaq-go-backend/internal/ws"
 	"quokkaq-go-backend/pkg/database"
+	"quokkaq-go-backend/pkg/telemetry"
 	"runtime"
 	"strconv"
 	"strings"
@@ -27,6 +28,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 // @title           QuokkaQ Go Backend API
@@ -49,6 +51,9 @@ import (
 // @name Authorization
 func main() {
 	config.Load()
+	if err := telemetry.Init(context.Background()); err != nil {
+		log.Printf("telemetry init: %v", err)
+	}
 	database.Connect()
 
 	runAutoMigrate := true
@@ -285,6 +290,11 @@ func main() {
 	dadataHandler := handlers.NewDaDataHandler()
 
 	r := chi.NewRouter()
+	otelOp := strings.TrimSpace(os.Getenv("OTEL_SERVICE_NAME"))
+	if otelOp == "" {
+		otelOp = "quokkaq-api"
+	}
+	r.Use(otelhttp.NewMiddleware(otelOp))
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(authmiddleware.LocaleMiddleware)
@@ -757,6 +767,11 @@ func main() {
 		defer cancel()
 		if err := srv.Shutdown(ctx); err != nil {
 			log.Printf("Server shutdown: %v", err)
+		}
+		otelCtx, otelCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer otelCancel()
+		if err := telemetry.Shutdown(otelCtx); err != nil {
+			log.Printf("telemetry shutdown: %v", err)
 		}
 	}
 }
