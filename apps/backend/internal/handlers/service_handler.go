@@ -33,6 +33,7 @@ func NewServiceHandler(service services.ServiceService, userRepo repository.User
 // @Failure      400  {string}  string "Bad Request"
 // @Failure      401  {string}  string "Unauthorized"
 // @Failure      403  {string}  string "Forbidden"
+// @Failure      409  {string}  string "Conflict (duplicate calendar slot key for unit)"
 // @Failure      500  {string}  string "Internal Server Error"
 // @Router       /services [post]
 func (h *ServiceHandler) CreateService(w http.ResponseWriter, r *http.Request) {
@@ -61,6 +62,10 @@ func (h *ServiceHandler) CreateService(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.service.CreateService(&service); err != nil {
+		if errors.Is(err, services.ErrDuplicateCalendarSlotKey) {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -132,6 +137,10 @@ func (h *ServiceHandler) UpdateService(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.service.UpdateService(&service); err != nil {
 		if errors.Is(err, services.ErrServiceUnitImmutable) {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
+		if errors.Is(err, services.ErrDuplicateCalendarSlotKey) {
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}

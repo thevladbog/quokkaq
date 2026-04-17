@@ -77,6 +77,7 @@ func (h *PreRegistrationHandler) GetByUnit(w http.ResponseWriter, r *http.Reques
 // @Failure      400    {string}  string "Bad Request"
 // @Failure      401    {string}  string "Unauthorized"
 // @Failure      403    {string}  string "Forbidden"
+// @Failure      409    {string}  string "Conflict (calendar slot taken or not free)"
 // @Failure      500    {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/pre-registrations [post]
 func (h *PreRegistrationHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -104,7 +105,11 @@ func (h *PreRegistrationHandler) Create(w http.ResponseWriter, r *http.Request) 
 		Comment:           req.Comment,
 	}
 
-	if err := h.service.Create(&preReg); err != nil {
+	if err := h.service.Create(r.Context(), &preReg, req.ExternalEventHref, req.ExternalEventEtag, req.CalendarIntegrationID); err != nil {
+		if errors.Is(err, services.ErrCalendarSlotTaken) || errors.Is(err, services.ErrCalendarSlotNotFree) {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -126,6 +131,7 @@ func (h *PreRegistrationHandler) Create(w http.ResponseWriter, r *http.Request) 
 // @Failure      401    {string}  string "Unauthorized"
 // @Failure      403    {string}  string "Forbidden"
 // @Failure      404    {string}  string "Not Found"
+// @Failure      409    {string}  string "Conflict (calendar slot)"
 // @Failure      500    {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/pre-registrations/{id} [put]
 func (h *PreRegistrationHandler) Update(w http.ResponseWriter, r *http.Request) {
@@ -136,11 +142,21 @@ func (h *PreRegistrationHandler) Update(w http.ResponseWriter, r *http.Request) 
 	}
 
 	id := chi.URLParam(r, "id")
+	unitID := chi.URLParam(r, "unitId")
 
 	// Get existing pre-registration
 	existing, err := h.service.GetByID(id)
 	if err != nil {
 		http.Error(w, "Pre-registration not found", http.StatusNotFound)
+		return
+	}
+	if existing.UnitID != unitID {
+		http.Error(w, "Pre-registration not found", http.StatusNotFound)
+		return
+	}
+
+	if st := strings.TrimSpace(updateData.Status); st != "" && st != "canceled" {
+		http.Error(w, `only "canceled" is allowed for status`, http.StatusBadRequest)
 		return
 	}
 
@@ -150,6 +166,8 @@ func (h *PreRegistrationHandler) Update(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	previous := models.ClonePreRegistration(existing)
+
 	// Update only editable fields
 	existing.ServiceID = updateData.ServiceID
 	existing.Date = updateData.Date
@@ -158,17 +176,70 @@ func (h *PreRegistrationHandler) Update(w http.ResponseWriter, r *http.Request) 
 	existing.CustomerLastName = ln
 	existing.CustomerPhone = normalizedPhone
 	existing.Comment = updateData.Comment
+	if strings.TrimSpace(updateData.Status) == "canceled" {
+		existing.Status = "canceled"
+	}
 
-	if err := h.service.Update(existing); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	if err := h.service.Update(r.Context(), previous, existing, &updateData); err != nil {
+		switch {
+		case errors.Is(err, services.ErrPreRegistrationScheduleImmutableWhenConsumed):
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		case errors.Is(err, services.ErrPreRegistrationCannotCancel),
+			errors.Is(err, services.ErrPreRegistrationCanceledImmutable):
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		case errors.Is(err, services.ErrCalendarSlotTaken),
+			errors.Is(err, services.ErrCalendarSlotNotFree):
+			http.Error(w, err.Error(), http.StatusConflict)
+		case errors.Is(err, services.ErrPreRegistrationCancelPersistAfterCalendarRelease):
+			// Calendar already released; DB update failed — client sees 500 with detail for ops/support.
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		default:
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 		return
 	}
 	RespondJSON(w, existing)
 }
 
+// GetCalendarSlots godoc
+// @ID           GetCalendarSlotsByUnit
+// @Summary      List calendar-backed slots with CalDAV hrefs (when integration enabled)
+// @Description  Returns CalDAV slot rows (href, etag, time) for a service and date; requires Bearer auth and unit membership. Empty array when no integration or no slots.
+// @Tags         pre-registrations
+// @Produce      json
+// @Security     BearerAuth
+// @Param        unitId    path      string  true  "Unit ID"
+// @Param        serviceId query     string  true  "Service ID"
+// @Param        date      query     string  true  "Date (YYYY-MM-DD)"
+// @Success      200       {array}   models.PreRegCalendarSlotItem
+// @Failure      400       {string}  string "Bad Request"
+// @Failure      401       {string}  string "Unauthorized"
+// @Failure      403       {string}  string "Forbidden"
+// @Failure      500       {string}  string "Internal Server Error"
+// @Router       /units/{unitId}/pre-registrations/calendar-slots [get]
+func (h *PreRegistrationHandler) GetCalendarSlots(w http.ResponseWriter, r *http.Request) {
+	unitID := chi.URLParam(r, "unitId")
+	serviceID := r.URL.Query().Get("serviceId")
+	date := r.URL.Query().Get("date")
+	if serviceID == "" || date == "" {
+		http.Error(w, "serviceId and date are required", http.StatusBadRequest)
+		return
+	}
+	items, err := h.service.ListCalendarSlotItems(unitID, serviceID, date)
+	if err != nil {
+		log.Printf("pre-registration calendar-slots: ListCalendarSlotItems unitID=%s serviceID=%s date=%s err=%v", unitID, serviceID, date, err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	if items == nil {
+		items = []models.PreRegCalendarSlotItem{}
+	}
+	RespondJSON(w, items)
+}
+
 // GetAvailableSlots godoc
 // @Summary      Get available time slots for pre-registration
-// @Description  Returns HH:MM slot strings for a service on a given date, accounting for capacity and existing bookings.
+// @Description  Returns HH:MM slot strings; uses CalDAV when integration is enabled.
 // @Tags         pre-registrations
 // @Produce      json
 // @Param        unitId    path      string  true  "Unit ID"

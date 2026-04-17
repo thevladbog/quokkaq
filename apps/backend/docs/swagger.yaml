@@ -1145,8 +1145,23 @@ components:
         updatedAt:
           type: string
       type: object
+    models.PreRegCalendarSlotItem:
+      properties:
+        calendarIntegrationId:
+          type: string
+        externalEventEtag:
+          type: string
+        externalEventHref:
+          type: string
+        integrationLabel:
+          type: string
+        time:
+          type: string
+      type: object
     models.PreRegistration:
       properties:
+        calendarIntegrationId:
+          type: string
         code:
           description: 6-digit unique code
           type: string
@@ -1162,6 +1177,11 @@ components:
           type: string
         date:
           description: YYYY-MM-DD
+          type: string
+        externalEventEtag:
+          type: string
+        externalEventHref:
+          description: 'Calendar (CalDAV) mirror: booking is tied to a specific event resource.'
           type: string
         id:
           type: string
@@ -1191,6 +1211,9 @@ components:
       type: object
     models.PreRegistrationCreateRequest:
       properties:
+        calendarIntegrationId:
+          description: CalendarIntegrationID identifies which calendar connection to use when the unit has multiple.
+          type: string
         comment:
           type: string
         customerFirstName:
@@ -1200,6 +1223,11 @@ components:
         customerPhone:
           type: string
         date:
+          type: string
+        externalEventEtag:
+          type: string
+        externalEventHref:
+          description: ExternalEventHref is required for units with calendar integration (identifies the CalDAV resource).
           type: string
         serviceId:
           type: string
@@ -1217,6 +1245,8 @@ components:
       type: object
     models.PreRegistrationUpdateRequest:
       properties:
+        calendarIntegrationId:
+          type: string
         comment:
           type: string
         customerFirstName:
@@ -1227,7 +1257,18 @@ components:
           type: string
         date:
           type: string
+        externalEventEtag:
+          type: string
+        externalEventHref:
+          description: When rescheduling with calendar integration, provide the new CalDAV slot (same as create).
+          type: string
         serviceId:
+          type: string
+        status:
+          description: Status optional; only "canceled" is accepted to cancel an active pre-registration.
+          enum:
+          - canceled
+          example: canceled
           type: string
         time:
           type: string
@@ -1242,6 +1283,11 @@ components:
     models.Service:
       properties:
         backgroundColor:
+          type: string
+        calendarSlotKey:
+          description: 'CalendarSlotKey optional label segment in [QQ] SUMMARY when names collide (calendar integration).
+
+            When non-empty (after trim), it must be unique per unit — enforced by DB partial unique index and create/update validation.'
           type: string
         children:
           items:
@@ -1778,6 +1824,37 @@ components:
         updatedAt:
           type: string
       type: object
+    services.CalendarIntegrationPublic:
+      properties:
+        adminNotifyEmails:
+          type: string
+        caldavBaseUrl:
+          type: string
+        calendarPath:
+          type: string
+        displayName:
+          type: string
+        enabled:
+          type: boolean
+        id:
+          type: string
+        kind:
+          type: string
+        lastSyncAt:
+          type: string
+        lastSyncError:
+          type: string
+        readOnlyCapacity:
+          type: boolean
+        timezone:
+          type: string
+        unitId:
+          type: string
+        unitName:
+          type: string
+        username:
+          type: string
+      type: object
     services.CompanySSOGetResponse:
       properties:
         clientId:
@@ -1827,6 +1904,35 @@ components:
           enum:
           - oidc
           - saml
+      type: object
+    services.CreateCalendarIntegrationRequest:
+      properties:
+        adminNotifyEmails:
+          type: string
+        appPassword:
+          type: string
+        caldavBaseUrl:
+          type: string
+        calendarPath:
+          type: string
+        displayName:
+          type: string
+        enabled:
+          type: boolean
+        kind:
+          type: string
+        timezone:
+          type: string
+        unitId:
+          type: string
+        username:
+          type: string
+      required:
+      - appPassword
+      - calendarPath
+      - enabled
+      - unitId
+      - username
       type: object
     services.EmployeeRadarResponse:
       properties:
@@ -2177,6 +2283,50 @@ components:
           type: array
         nextCursor:
           type: string
+      type: object
+    services.UpdateCalendarIntegrationRequest:
+      properties:
+        adminNotifyEmails:
+          type: string
+        appPassword:
+          type: string
+        caldavBaseUrl:
+          type: string
+        calendarPath:
+          type: string
+        displayName:
+          type: string
+        enabled:
+          type: boolean
+        timezone:
+          type: string
+        username:
+          type: string
+      required:
+      - calendarPath
+      - enabled
+      - username
+      type: object
+    services.UpsertIntegrationRequest:
+      properties:
+        adminNotifyEmails:
+          type: string
+        appPassword:
+          type: string
+        caldavBaseUrl:
+          type: string
+        calendarPath:
+          type: string
+        enabled:
+          type: boolean
+        timezone:
+          type: string
+        username:
+          type: string
+      required:
+      - calendarPath
+      - enabled
+      - username
       type: object
     services.UtilizationPoint:
       properties:
@@ -3260,6 +3410,258 @@ paths:
       summary: Update current user's company (tenant admin)
       tags:
       - companies
+  /companies/me/calendar-integrations:
+    get:
+      operationId: calendarIntegrationListMine
+      parameters:
+      - description: Optional company selector for admins with multiple companies
+        in: header
+        name: X-Company-Id
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/services.CalendarIntegrationPublic'
+                type: array
+          description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad Request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Not Found
+        '409':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Conflict
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: List calendar integrations for current company
+      tags:
+      - calendar-integration
+    post:
+      operationId: calendarIntegrationCreateMine
+      parameters:
+      - description: Optional company selector for admins with multiple companies
+        in: header
+        name: X-Company-Id
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/services.CreateCalendarIntegrationRequest'
+        description: Payload
+        required: true
+        x-originalParamName: body
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/services.CalendarIntegrationPublic'
+          description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad Request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Not Found
+        '409':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Conflict
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: Create a calendar integration for a unit in the company
+      tags:
+      - calendar-integration
+  /companies/me/calendar-integrations/{integrationId}:
+    delete:
+      operationId: calendarIntegrationDeleteMine
+      parameters:
+      - description: Optional company selector for admins with multiple companies
+        in: header
+        name: X-Company-Id
+        schema:
+          type: string
+      - description: Integration ID
+        in: path
+        name: integrationId
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: No Content
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad Request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Not Found
+        '409':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Conflict
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: Delete a calendar integration
+      tags:
+      - calendar-integration
+    put:
+      operationId: calendarIntegrationPutMine
+      parameters:
+      - description: Optional company selector for admins with multiple companies
+        in: header
+        name: X-Company-Id
+        schema:
+          type: string
+      - description: Integration ID
+        in: path
+        name: integrationId
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/services.UpdateCalendarIntegrationRequest'
+        description: Payload
+        required: true
+        x-originalParamName: body
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/services.CalendarIntegrationPublic'
+          description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad Request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Not Found
+        '409':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Conflict
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: Update a calendar integration
+      tags:
+      - calendar-integration
   /companies/me/complete-onboarding:
     post:
       description: Marks onboarding as complete for the user's company
@@ -5334,6 +5736,12 @@ paths:
               schema:
                 type: string
           description: Forbidden
+        '409':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Conflict (duplicate calendar slot key for unit)
         '500':
           content:
             application/json:
@@ -6440,6 +6848,139 @@ paths:
       summary: Get bookings by unit
       tags:
       - bookings
+  /units/{unitId}/calendar-integration:
+    get:
+      operationId: calendarIntegrationGet
+      parameters:
+      - description: Optional company selector for admins with multiple companies
+        in: header
+        name: X-Company-Id
+        schema:
+          type: string
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/services.CalendarIntegrationPublic'
+          description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad Request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Not Found
+        '409':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Conflict
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: 'Get calendar integration settings for a unit (legacy: first integration)'
+      tags:
+      - calendar-integration
+    put:
+      operationId: calendarIntegrationPut
+      parameters:
+      - description: Optional company selector for admins with multiple companies
+        in: header
+        name: X-Company-Id
+        schema:
+          type: string
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/services.UpsertIntegrationRequest'
+        description: Settings
+        required: true
+        x-originalParamName: body
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/services.CalendarIntegrationPublic'
+          description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad Request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Not Found
+        '409':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Conflict
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: Create or update calendar integration for a unit (legacy)
+      tags:
+      - calendar-integration
   /units/{unitId}/call-next:
     post:
       description: Calls the next waiting ticket for a unit. Request body is required and must include counterId. Optional serviceIds (or legacy serviceId) limit the queue; omit or empty filter means all services in the unit.
@@ -7708,6 +8249,12 @@ paths:
               schema:
                 type: string
           description: Forbidden
+        '409':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Conflict (calendar slot taken or not free)
         '500':
           content:
             application/json:
@@ -7774,6 +8321,12 @@ paths:
               schema:
                 type: string
           description: Not Found
+        '409':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Conflict (calendar slot)
         '500':
           content:
             application/json:
@@ -7783,6 +8336,67 @@ paths:
       security:
       - BearerAuth: []
       summary: Update a pre-registration
+      tags:
+      - pre-registrations
+  /units/{unitId}/pre-registrations/calendar-slots:
+    get:
+      description: Returns CalDAV slot rows (href, etag, time) for a service and date; requires Bearer auth and unit membership. Empty array when no integration or no slots.
+      operationId: GetCalendarSlotsByUnit
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        schema:
+          type: string
+      - description: Service ID
+        in: query
+        name: serviceId
+        required: true
+        schema:
+          type: string
+      - description: Date (YYYY-MM-DD)
+        in: query
+        name: date
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/models.PreRegCalendarSlotItem'
+                type: array
+          description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad Request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: List calendar-backed slots with CalDAV hrefs (when integration enabled)
       tags:
       - pre-registrations
   /units/{unitId}/pre-registrations/redeem:
@@ -7827,7 +8441,7 @@ paths:
       - pre-registrations
   /units/{unitId}/pre-registrations/slots:
     get:
-      description: Returns HH:MM slot strings for a service on a given date, accounting for capacity and existing bookings.
+      description: Returns HH:MM slot strings; uses CalDAV when integration is enabled.
       parameters:
       - description: Unit ID
         in: path
@@ -8299,6 +8913,12 @@ paths:
               schema:
                 type: string
           description: Forbidden
+        '409':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Conflict
         '500':
           content:
             application/json:
@@ -8392,6 +9012,12 @@ paths:
               schema:
                 type: string
           description: Forbidden
+        '409':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Conflict
         '500':
           content:
             application/json:
@@ -8503,6 +9129,12 @@ paths:
               schema:
                 type: string
           description: Forbidden
+        '409':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Conflict
         '500':
           content:
             application/json:
@@ -8557,6 +9189,12 @@ paths:
               schema:
                 type: string
           description: Forbidden
+        '409':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Conflict
         '500':
           content:
             application/json:

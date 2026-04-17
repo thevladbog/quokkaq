@@ -531,6 +531,18 @@ def apply_openapi_tweaks(doc: dict[str, Any]) -> None:
     if isinstance(cfg, dict):
         cfg["required"] = ["kiosk"]
 
+    # Calendar integration bodies: document `enabled` as required when the property exists in
+    # swag output; fail fast if kin/swag drops the field (schema drift).
+    _merge_schema_required_if_prop_present(
+        comp, "services.CreateCalendarIntegrationRequest", "enabled"
+    )
+    _merge_schema_required_if_prop_present(
+        comp, "services.UpdateCalendarIntegrationRequest", "enabled"
+    )
+    _merge_schema_required_if_prop_present(
+        comp, "services.UpsertIntegrationRequest", "enabled"
+    )
+
 
 def _patch_create_ticket_request(components: dict[str, Any]) -> None:
     """Model POST /units/{unitId}/tickets body as oneOf: anonymous | staff | kiosk."""

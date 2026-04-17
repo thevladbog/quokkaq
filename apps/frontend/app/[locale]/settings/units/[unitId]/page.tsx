@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useState } from 'react';
+import { use, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
@@ -16,6 +16,7 @@ import {
   CardTitle
 } from '@/components/ui/card';
 import { Combobox } from '@/components/ui/combobox';
+import { buildIanaTimezoneComboboxOptions } from '@/lib/iana-timezone-combobox-options';
 import { getGetUnitsIdQueryKey } from '@/lib/api/generated/units';
 import { unitsApi } from '@/lib/api';
 import { useUpdateUnit } from '@/lib/hooks';
@@ -26,6 +27,7 @@ import { WorkplaceParentBanner } from '@/components/admin/units/workplace-parent
 import { AdScreenSettings } from '@/components/admin/units/ad-screen-settings';
 import { UnitServicesManager } from '@/components/admin/units/unit-services-manager';
 import { KioskSettings } from '@/components/admin/units/kiosk-settings';
+import { Link } from '@/src/i18n/navigation';
 import { SlotConfiguration } from '@/components/admin/units/slot-configuration';
 import { UnitVisitorTagsSettings } from '@/components/admin/units/unit-visitor-tags-settings';
 import { UnitGuestSurveySettings } from '@/components/admin/units/unit-guest-survey-settings';
@@ -67,6 +69,11 @@ export default function UnitPage({ params }: UnitPageProps) {
   }
 
   const updateUnitMutation = useUpdateUnit();
+
+  const timezoneOptions = useMemo(
+    () => buildIanaTimezoneComboboxOptions(unitTimezone),
+    [unitTimezone]
+  );
 
   const handleSaveGeneral = () => {
     updateUnitMutation.mutate(
@@ -503,10 +510,7 @@ export default function UnitPage({ params }: UnitPageProps) {
                 <div className='space-y-2'>
                   <Label htmlFor='timezone'>{t('units.timezone')}</Label>
                   <Combobox
-                    options={Intl.supportedValuesOf('timeZone').map((tz) => ({
-                      value: tz,
-                      label: tz
-                    }))}
+                    options={timezoneOptions}
                     value={unitTimezone}
                     onChange={setUnitTimezone}
                     placeholder={t('units.select_timezone', {
@@ -537,7 +541,25 @@ export default function UnitPage({ params }: UnitPageProps) {
             unitId={unitId}
             fallback={<div>{t('access_denied')}</div>}
           >
-            <SlotConfiguration unitId={unitId} />
+            <div className='space-y-8'>
+              <Alert>
+                <AlertTitle>
+                  {t('integrations.calendar_relocated_title')}
+                </AlertTitle>
+                <AlertDescription className='space-y-2'>
+                  <p>{t('integrations.calendar_relocated_hint')}</p>
+                  <p>
+                    <Link
+                      href={`/settings/integrations?tab=calendars&unit=${unitId}`}
+                      className='text-primary font-medium underline'
+                    >
+                      {t('integrations.calendar_relocated_link')}
+                    </Link>
+                  </p>
+                </AlertDescription>
+              </Alert>
+              <SlotConfiguration unitId={unitId} />
+            </div>
           </PermissionGuard>
         </TabsContent>
 

@@ -420,7 +420,8 @@
       "loading": "Loading services...",
       "unsaved_changes": "You have unsaved changes",
       "unsaved_discard_confirm": "You have unsaved changes. Discard them and continue?",
-      "delete_confirm": "Are you sure you want to delete this service?"
+      "delete_confirm": "Are you sure you want to delete this service?",
+      "calendar_slot_placeholder": "e.g. Returns-Desk-A"
     },
     "users": {
       "title": "Users & Roles",
@@ -490,7 +491,35 @@
       "pre_registrations": "Pre-registrations",
       "desktop_terminals": "Desktop terminals",
       "operations": "Operations",
-      "settings": "Settings"
+      "settings": "Settings",
+      "integrations": "Integrations"
+    },
+    "integrations": {
+      "title": "Integrations",
+      "description": "Connect external services: calendars, authentication, and more.",
+      "tab_calendars": "Calendars",
+      "tab_authentication": "Authentication",
+      "calendars_title": "Calendar integration",
+      "calendars_description": "Import slot capacity from Yandex Calendar (CalDAV) for pre-registration. Settings apply per unit.",
+      "unit_label": "Unit",
+      "unit_placeholder": "Select a unit",
+      "units_loading": "Loading units…",
+      "no_units": "No units available.",
+      "calendar_no_access": "You do not have permission to manage settings for this unit.",
+      "loadError": "Could not load organization.",
+      "ssoLoadError": "Could not load SSO settings.",
+      "sso_loading": "Loading SSO settings…",
+      "calendar_relocated_title": "Calendar integration",
+      "calendar_relocated_hint": "Yandex Calendar (CalDAV) for this unit is configured under Integrations → Calendars (select this unit).",
+      "calendar_relocated_link": "Open Integrations — Calendars",
+      "filter_unit_label": "Filter by unit",
+      "filter_unit_placeholder": "All units",
+      "filter_all_units": "All units",
+      "filter_unit_hint": "Narrows the list below. Each calendar connection still belongs to one unit.",
+      "add_calendar": "Add calendar",
+      "calendar_list_empty": "No calendar connections yet. Add one to import slots from Yandex Calendar (CalDAV).",
+      "calendars_list_hint": "Up to four CalDAV connections per unit. Open a row to edit or remove.",
+      "select_unit_error": "Select a unit."
     },
     "desktop_terminals": {
       "title": "Desktop terminals",
@@ -799,6 +828,8 @@
       "capacities_save_error": "Failed to save capacities",
       "configuration_title": "Slot Configuration",
       "configuration_desc": "Set working hours and interval for appointment slots.",
+      "calendar_readonly_title": "Capacity is managed in the calendar",
+      "calendar_readonly_desc": "This unit uses Yandex Calendar (CalDAV) for slot capacity. Weekly capacity, generation, and day overrides are read-only here; edit events in the connected calendar.",
       "start_time": "Start Time",
       "end_time": "End Time",
       "interval_minutes": "Interval (minutes)",
@@ -869,7 +900,57 @@
         "created": "Created",
         "ticket_issued": "Ticket Issued",
         "canceled": "Canceled"
-      }
+      },
+      "cancel": "Cancel booking",
+      "cancel_confirm_title": "Cancel this pre-registration?",
+      "cancel_confirm_desc": "The calendar slot will be freed if it was linked to Yandex Calendar.",
+      "cancel_success": "Pre-registration canceled",
+      "cancel_error": "Could not cancel pre-registration",
+      "cancel_dialog_confirm": "Yes, cancel",
+      "pick_calendar_slot": "Select a calendar slot",
+      "reschedule_pick_calendar_slot": "Pick a new calendar slot for the new date or time",
+      "reschedule_calendar_unavailable": "No slots available to reschedule; try another day or turn off calendar integration temporarily",
+      "select_calendar_connection": "Calendar connection"
+    },
+    "calendar_integration": {
+      "title": "Yandex Calendar (CalDAV)",
+      "description": "Connect a Yandex account with an app password. Slot capacity for pre-registration is imported from this calendar; weekly slot settings become read-only while enabled.",
+      "enabled": "Enable calendar integration",
+      "caldav_base_url": "CalDAV base URL",
+      "calendar_path": "Calendar path (e.g. /calendars/…/events/)",
+      "username": "Yandex login",
+      "app_password": "App password (leave blank to keep)",
+      "timezone": "Timezone",
+      "timezone_hint": "IANA name (e.g. Europe/Moscow) for interpreting calendar slot times.",
+      "timezone_no_match": "No matching timezone.",
+      "admin_emails": "Admin emails for sync issues (comma-separated)",
+      "last_sync": "Last sync",
+      "last_error": "Last error",
+      "save": "Save",
+      "save_success": "Calendar settings saved",
+      "save_error": "Failed to save calendar settings",
+      "required_fields": "Calendar path and Yandex username are required",
+      "load_error": "Could not load calendar integration settings.",
+      "no_data": "No calendar integration data.",
+      "unit_label": "Unit",
+      "display_name": "Label (optional)",
+      "display_name_placeholder": "e.g. Front desk calendar",
+      "unit_readonly_hint": "The unit for this connection is set when the calendar is created and cannot be changed here.",
+      "delete": "Remove",
+      "delete_success": "Calendar connection removed",
+      "delete_error": "Could not remove this calendar connection",
+      "delete_confirm_title": "Remove this calendar connection?",
+      "delete_confirm_desc": "Pre-registrations that reference this connection may need to be canceled first.",
+      "cancel": "Cancel",
+      "create_dialog_description": "Choose the unit and enter CalDAV credentials. You can add several calendars per unit (up to four).",
+      "kind_label": "Type",
+      "kind_yandex": "Yandex Calendar (CalDAV)",
+      "required_fields_create": "Calendar path, Yandex login, and app password are required when the calendar is enabled.",
+      "app_password_new": "App password",
+      "create_success": "Calendar connection created",
+      "create_error": "Could not create calendar connection",
+      "limit_error": "This unit already has the maximum of four calendar connections.",
+      "create_submit": "Create"
     }
   },
   "staff": {
@@ -2135,7 +2216,8 @@
       "preRegistrations": "Pre-registrations - Admin - QuokkaQ",
       "users": "Users & Roles - Admin - QuokkaQ",
       "desktopTerminals": "Desktop terminals - Admin - QuokkaQ",
-      "operations": "Operations - Admin - QuokkaQ"
+      "operations": "Operations - Admin - QuokkaQ",
+      "integrations": "Integrations - Admin - QuokkaQ"
     },
     "settings": {
       "title": "Settings - QuokkaQ"
@@ -2341,11 +2423,13 @@
       "units": "Units",
       "unitsDesc": "Manage branches and departments",
       "login": "Login & SSO",
-      "loginDesc": "Tenant slug, OIDC, and staff login links"
+      "loginDesc": "Tenant slug, OIDC, and staff login links",
+      "integrations": "Integrations",
+      "integrationsDesc": "Calendars (CalDAV), authentication (SSO), tenant slug. Opaque staff links: Organization → Login & SSO"
     },
     "loginSecurity": {
       "pageTitle": "Login & SSO",
-      "pageDescription": "Configure your organization slug, single sign-on (OpenID Connect or SAML 2.0), and optional opaque login links.",
+      "pageDescription": "Generate opaque staff login links. Tenant slug and SSO are configured under Settings → Integrations → Authentication.",
       "backToOrganization": "Organization settings",
       "loading": "Loading…",
       "loadErrorTitle": "Could not load",
@@ -2398,7 +2482,10 @@
       "linkCreated": "Link generated",
       "linkError": "Could not generate link",
       "validationInvalidUrl": "Enter a valid http(s) URL.",
-      "opaqueHint": "Example URL (token expires; treat as sensitive):"
+      "opaqueHint": "Example URL (token expires; treat as sensitive):",
+      "authMovedTitle": "Slug and SSO settings moved",
+      "authMovedDescription": "Organization slug and single sign-on (OIDC / SAML) are now configured in Settings → Integrations.",
+      "authMovedLink": "Open Integrations — Authentication"
     },
     "billing": {
       "title": "Billing & Subscription",

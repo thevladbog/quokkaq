@@ -299,7 +299,8 @@ function buildInitialFormValues(
       offerIdentification: editingService.offerIdentification ?? false,
       isLeaf: editingService.isLeaf ?? false,
       parentId: editingService.parentId ?? '',
-      restrictedServiceZoneId: editingService.restrictedServiceZoneId ?? null
+      restrictedServiceZoneId: editingService.restrictedServiceZoneId ?? null,
+      calendarSlotKey: editingService.calendarSlotKey ?? ''
     };
   }
   if (isCreating) {
@@ -320,7 +321,8 @@ function buildInitialFormValues(
       offerIdentification: false,
       isLeaf: false,
       parentId: '',
-      restrictedServiceZoneId: null
+      restrictedServiceZoneId: null,
+      calendarSlotKey: ''
     };
   }
   return {};
@@ -344,7 +346,8 @@ function snapshotServiceFormValues(v: Partial<Service>): string {
     offerIdentification: !!v.offerIdentification,
     isLeaf: !!v.isLeaf,
     parentId: v.parentId ?? '',
-    restrictedServiceZoneId: v.restrictedServiceZoneId ?? null
+    restrictedServiceZoneId: v.restrictedServiceZoneId ?? null,
+    calendarSlotKey: v.calendarSlotKey ?? ''
   });
 }
 
@@ -433,6 +436,8 @@ function ServiceForm({
       const restrictedPayload = isLeafNow
         ? (formValues.restrictedServiceZoneId ?? null)
         : null;
+      const payloadCalendarSlotKey =
+        formValues.calendarSlotKey === '' ? null : formValues.calendarSlotKey;
       if (editingService) {
         await updateServiceMutation.mutateAsync({
           id: editingService.id,
@@ -444,7 +449,8 @@ function ServiceForm({
             editingService.offerIdentification ??
             false,
           isLeaf: formValues.isLeaf ?? editingService.isLeaf ?? false,
-          restrictedServiceZoneId: restrictedPayload
+          restrictedServiceZoneId: restrictedPayload,
+          calendarSlotKey: payloadCalendarSlotKey
         });
       } else {
         if (!formValues.name) return;
@@ -455,7 +461,8 @@ function ServiceForm({
           prebook: formValues.prebook ?? false,
           offerIdentification: formValues.offerIdentification ?? false,
           isLeaf: formValues.isLeaf ?? false,
-          restrictedServiceZoneId: restrictedPayload
+          restrictedServiceZoneId: restrictedPayload,
+          calendarSlotKey: payloadCalendarSlotKey
         });
       }
       onSaved();
@@ -560,6 +567,29 @@ function ServiceForm({
           value={formValues.prefix || ''}
           onChange={handleInputChange}
         />
+      </div>
+
+      <div className='space-y-2'>
+        <Label htmlFor='calendarSlotKey'>
+          {t('services.calendar_slot_key', {
+            defaultValue: 'Calendar slot label (optional)'
+          })}
+        </Label>
+        <Input
+          id='calendarSlotKey'
+          name='calendarSlotKey'
+          value={formValues.calendarSlotKey || ''}
+          onChange={handleInputChange}
+          placeholder={t('services.calendar_slot_placeholder', {
+            defaultValue: 'e.g. Returns-Desk-A'
+          })}
+        />
+        <p className='text-muted-foreground text-xs'>
+          {t('services.calendar_slot_key_hint', {
+            defaultValue:
+              'Used in Yandex calendar event titles when two services share the same display name.'
+          })}
+        </p>
       </div>
 
       <div className='space-y-2'>

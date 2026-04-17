@@ -1,0 +1,219 @@
+import { z } from 'zod';
+import {
+  normalizeTenantSlug,
+  RESERVED_TENANT_SLUGS,
+  TENANT_SLUG_MAX_LEN,
+  TENANT_SLUG_MIN_LEN,
+  TENANT_SLUG_PART_RE
+} from '@quokkaq/shared-types';
+import type {
+  ServicesCompanySSOGetResponse,
+  ServicesCompanySSOPatch
+} from '@/lib/api/generated/auth';
+
+export {
+  normalizeTenantSlug,
+  RESERVED_TENANT_SLUGS
+} from '@quokkaq/shared-types';
+
+function resolveEnvOrDevFallback(
+  envValue: string | undefined,
+  devFallback: string,
+  envName: string
+): string {
+  const u = envValue?.replace(/\/$/, '');
+  if (u && u.length > 0) {
+    return u;
+  }
+  if (process.env.NODE_ENV === 'production') {
+    const msg = `${envName} must be set in production; refusing localhost fallback`;
+    console.error(`[organization-auth-shared] ${msg}`);
+    throw new Error(msg);
+  }
+  return devFallback;
+}
+
+/** Matches backend `API_PUBLIC_URL` when provided by GET /companies/me. */
+export function resolvePublicApiBase(serverUrl?: string | null): string {
+  const trimmed = serverUrl?.trim();
+  if (trimmed) {
+    return trimmed.replace(/\/$/, '');
+  }
+  return resolveEnvOrDevFallback(
+    process.env.NEXT_PUBLIC_API_URL,
+    'http://localhost:3001',
+    'NEXT_PUBLIC_API_URL'
+  );
+}
+
+/** Matches backend `PUBLIC_APP_URL` / `APP_BASE_URL` when provided by GET /companies/me. */
+export function resolvePublicAppBase(serverUrl?: string | null): string {
+  const trimmed = serverUrl?.trim();
+  if (trimmed) {
+    return trimmed.replace(/\/$/, '');
+  }
+  return resolveEnvOrDevFallback(
+    process.env.NEXT_PUBLIC_APP_URL,
+    'http://localhost:3000',
+    'NEXT_PUBLIC_APP_URL'
+  );
+}
+
+export function isValidHttpUrl(raw: string): boolean {
+  const s = raw.trim();
+  if (!s) return true;
+  try {
+    const u = new URL(s);
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+export function parseEmailDomains(emailDomainsStr: string): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of emailDomainsStr.split(/[,;\s]+/)) {
+    const x = raw.trim().toLowerCase();
+    if (!x || seen.has(x)) continue;
+    seen.add(x);
+    out.push(x);
+  }
+  return out;
+}
+
+export const slugFormSchema = z.object({
+  slug: z.string().superRefine((val, ctx) => {
+    const n = normalizeTenantSlug(val);
+    if (n.length < TENANT_SLUG_MIN_LEN || n.length > TENANT_SLUG_MAX_LEN) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'slug length must be between 3 and 63'
+      });
+      return;
+    }
+    if (!TENANT_SLUG_PART_RE.test(n)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'invalid slug format'
+      });
+      return;
+    }
+    if (RESERVED_TENANT_SLUGS.has(n)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'slug is reserved'
+      });
+    }
+  })
+});
+
+export type SlugFormValues = z.infer<typeof slugFormSchema>;
+
+export type SsoSchemaOpts = {
+  hasPersistedSlug: boolean;
+  invalidUrl: string;
+  samlNeedsSlug: string;
+};
+
+export function createSsoFormSchema(opts: SsoSchemaOpts) {
+  return z
+    .object({
+      enabled: z.boolean(),
+      protocol: z.enum(['oidc', 'saml']),
+      issuerUrl: z.string(),
+      clientId: z.string(),
+      clientSecret: z.string(),
+      scopes: z.string(),
+      samlIdpMetadataUrl: z.string(),
+      emailDomainsStr: z.string()
+    })
+    .superRefine((data, ctx) => {
+      if (data.protocol === 'saml' && !opts.hasPersistedSlug) {
+        ctx.addIssue({
+          code: 'custom',
+          message: opts.samlNeedsSlug,
+          path: ['protocol']
+        });
+      }
+      if (data.protocol === 'oidc') {
+        const issuer = data.issuerUrl.trim();
+        if (issuer && !isValidHttpUrl(issuer)) {
+          ctx.addIssue({
+            code: 'custom',
+            message: opts.invalidUrl,
+            path: ['issuerUrl']
+          });
+        }
+      }
+      if (data.protocol === 'saml') {
+        const meta = data.samlIdpMetadataUrl.trim();
+        if (meta && !isValidHttpUrl(meta)) {
+          ctx.addIssue({
+            code: 'custom',
+            message: opts.invalidUrl,
+            path: ['samlIdpMetadataUrl']
+          });
+        }
+      }
+    });
+}
+
+export type SsoFormValues = z.infer<ReturnType<typeof createSsoFormSchema>>;
+
+export function ssoDefaultsFromServer(
+  sso: ServicesCompanySSOGetResponse
+): SsoFormValues {
+  return {
+    enabled: !!sso.enabled,
+    protocol: sso.ssoProtocol === 'saml' ? 'saml' : 'oidc',
+    issuerUrl: sso.issuerUrl ?? '',
+    clientId: sso.clientId ?? '',
+    clientSecret: '',
+    scopes: sso.scopes ?? 'openid email profile',
+    samlIdpMetadataUrl: sso.samlIdpMetadataUrl ?? '',
+    emailDomainsStr: (sso.emailDomains ?? []).join(', ')
+  };
+}
+
+export function ssoServerFingerprint(
+  sso: ServicesCompanySSOGetResponse
+): string {
+  return JSON.stringify({
+    enabled: sso.enabled,
+    ssoProtocol: sso.ssoProtocol,
+    issuerUrl: sso.issuerUrl ?? '',
+    clientId: sso.clientId ?? '',
+    samlIdpMetadataUrl: sso.samlIdpMetadataUrl ?? '',
+    scopes: sso.scopes ?? '',
+    emailDomains: sso.emailDomains ?? [],
+    clientSecretSet: sso.clientSecretSet
+  });
+}
+
+export function buildSsoPatchBody(
+  values: SsoFormValues
+): ServicesCompanySSOPatch {
+  const domains = parseEmailDomains(values.emailDomainsStr);
+  const body: ServicesCompanySSOPatch = {
+    enabled: values.enabled,
+    ssoProtocol: values.protocol,
+    emailDomains: domains.length > 0 ? domains : undefined
+  };
+  if (values.protocol === 'oidc') {
+    body.issuerUrl = values.issuerUrl.trim() || undefined;
+    body.clientId = values.clientId.trim() || undefined;
+    body.scopes = values.scopes.trim() || undefined;
+    if (values.clientSecret.trim() !== '') {
+      body.clientSecret = values.clientSecret.trim();
+    }
+    body.samlIdpMetadataUrl = '';
+  } else {
+    body.samlIdpMetadataUrl = values.samlIdpMetadataUrl.trim() || undefined;
+    body.issuerUrl = '';
+    body.clientId = '';
+    body.clientSecret = '';
+    body.scopes = '';
+  }
+  return body;
+}

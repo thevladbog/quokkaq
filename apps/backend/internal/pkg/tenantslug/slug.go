@@ -9,6 +9,7 @@ import (
 var slugPart = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 
 // Reserved slugs must not be used as tenant identifiers (routing, infra).
+// TypeScript mirror: packages/shared-types/src/tenant-slug.ts — keep lists and Normalize in sync.
 var reserved = map[string]struct{}{
 	"www": {}, "api": {}, "admin": {}, "login": {}, "auth": {}, "static": {},
 	"health": {}, "swagger": {}, "docs": {}, "ws": {}, "system": {},

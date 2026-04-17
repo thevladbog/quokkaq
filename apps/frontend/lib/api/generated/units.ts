@@ -132,6 +132,9 @@ export interface ModelsUnitOperationsPublic {
 
 export interface ModelsService {
   backgroundColor?: string;
+  /** CalendarSlotKey optional label segment in [QQ] SUMMARY when names collide (calendar integration).
+  When non-empty (after trim), it must be unique per unit — enforced by DB partial unique index and create/update validation. */
+  calendarSlotKey?: string;
   children?: ModelsService[];
   description?: string;
   descriptionEn?: string;
@@ -163,6 +166,7 @@ export interface ModelsService {
 }
 
 export interface ModelsPreRegistration {
+  calendarIntegrationId?: string;
   /** 6-digit unique code */
   code?: string;
   comment?: string;
@@ -172,6 +176,9 @@ export interface ModelsPreRegistration {
   customerPhone?: string;
   /** YYYY-MM-DD */
   date?: string;
+  externalEventEtag?: string;
+  /** Calendar (CalDAV) mirror: booking is tied to a specific event resource. */
+  externalEventHref?: string;
   id?: string;
   service?: ModelsService;
   serviceId?: string;
@@ -1114,16 +1121,29 @@ export interface ModelsMessageTemplate {
   updatedAt?: string;
 }
 
+export interface ModelsPreRegCalendarSlotItem {
+  calendarIntegrationId?: string;
+  externalEventEtag?: string;
+  externalEventHref?: string;
+  integrationLabel?: string;
+  time?: string;
+}
+
 export interface ModelsPreRegistrationCodeRequest {
   code?: string;
 }
 
 export interface ModelsPreRegistrationCreateRequest {
+  /** CalendarIntegrationID identifies which calendar connection to use when the unit has multiple. */
+  calendarIntegrationId?: string;
   comment?: string;
   customerFirstName?: string;
   customerLastName?: string;
   customerPhone?: string;
   date?: string;
+  externalEventEtag?: string;
+  /** ExternalEventHref is required for units with calendar integration (identifies the CalDAV resource). */
+  externalEventHref?: string;
   serviceId?: string;
   time?: string;
 }
@@ -1134,13 +1154,29 @@ export interface ModelsPreRegistrationRedeemResponse {
   ticket?: ModelsTicket;
 }
 
+/**
+ * Status optional; only "canceled" is accepted to cancel an active pre-registration.
+ */
+export type ModelsPreRegistrationUpdateRequestStatus = typeof ModelsPreRegistrationUpdateRequestStatus[keyof typeof ModelsPreRegistrationUpdateRequestStatus];
+
+
+export const ModelsPreRegistrationUpdateRequestStatus = {
+  canceled: 'canceled',
+} as const;
+
 export interface ModelsPreRegistrationUpdateRequest {
+  calendarIntegrationId?: string;
   comment?: string;
   customerFirstName?: string;
   customerLastName?: string;
   customerPhone?: string;
   date?: string;
+  externalEventEtag?: string;
+  /** When rescheduling with calendar integration, provide the new CalDAV slot (same as create). */
+  externalEventHref?: string;
   serviceId?: string;
+  /** Status optional; only "canceled" is accepted to cancel an active pre-registration. */
+  status?: ModelsPreRegistrationUpdateRequestStatus;
   time?: string;
 }
 
@@ -1222,6 +1258,23 @@ export interface ModelsWeeklySlotCapacity {
   updatedAt?: string;
 }
 
+export interface ServicesCalendarIntegrationPublic {
+  adminNotifyEmails?: string;
+  caldavBaseUrl?: string;
+  calendarPath?: string;
+  displayName?: string;
+  enabled?: boolean;
+  id?: string;
+  kind?: string;
+  lastSyncAt?: string;
+  lastSyncError?: string;
+  readOnlyCapacity?: boolean;
+  timezone?: string;
+  unitId?: string;
+  unitName?: string;
+  username?: string;
+}
+
 export type ServicesCompanySSOGetResponseSsoProtocol = typeof ServicesCompanySSOGetResponseSsoProtocol[keyof typeof ServicesCompanySSOGetResponseSsoProtocol];
 
 
@@ -1263,6 +1316,19 @@ export interface ServicesCompanySSOPatch {
   scopes?: string;
   /** "oidc" | "saml" */
   ssoProtocol?: ServicesCompanySSOPatchSsoProtocol;
+}
+
+export interface ServicesCreateCalendarIntegrationRequest {
+  adminNotifyEmails?: string;
+  appPassword: string;
+  caldavBaseUrl?: string;
+  calendarPath: string;
+  displayName?: string;
+  enabled: boolean;
+  kind?: string;
+  timezone?: string;
+  unitId: string;
+  username: string;
 }
 
 export interface ServicesEmployeeRadarResponse {
@@ -1497,6 +1563,27 @@ export interface ServicesUnitClientHistoryListResponse {
 export interface ServicesUnitClientListResponse {
   items?: ModelsUnitClient[];
   nextCursor?: string;
+}
+
+export interface ServicesUpdateCalendarIntegrationRequest {
+  adminNotifyEmails?: string;
+  appPassword?: string;
+  caldavBaseUrl?: string;
+  calendarPath: string;
+  displayName?: string;
+  enabled: boolean;
+  timezone?: string;
+  username: string;
+}
+
+export interface ServicesUpsertIntegrationRequest {
+  adminNotifyEmails?: string;
+  appPassword?: string;
+  caldavBaseUrl?: string;
+  calendarPath: string;
+  enabled: boolean;
+  timezone?: string;
+  username: string;
 }
 
 export interface ServicesUtilizationPoint {

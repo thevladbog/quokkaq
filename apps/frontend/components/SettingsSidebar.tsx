@@ -23,6 +23,7 @@ import {
   Mail,
   MessageSquare,
   Monitor,
+  Plug,
   UserRound,
   Activity
 } from 'lucide-react';
@@ -89,6 +90,14 @@ export default function SettingsSidebar() {
       label: tAdmin('navigation.templates'),
       href: '/settings/templates',
       active: isActive('/settings/templates')
+    },
+    {
+      icon: Plug,
+      label: tAdmin('navigation.integrations'),
+      href: '/settings/integrations',
+      active:
+        isActive('/settings/integrations') ||
+        isActiveSub('/settings/integrations')
     },
     {
       icon: Monitor,

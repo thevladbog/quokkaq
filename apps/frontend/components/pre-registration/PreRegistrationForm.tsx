@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,16 @@ import {
   PreRegistration,
   Service
 } from '@/lib/api';
+import { useCalendarIntegrationListMine } from '@/lib/api/generated/calendar-integration';
+import {
+  useGetCalendarSlotsByUnit,
+  usePostUnitsUnitIdPreRegistrations,
+  usePutUnitsUnitIdPreRegistrationsId
+} from '@/lib/api/generated/pre-registrations';
+import {
+  formatCalendarSlotLabel,
+  preRegCalendarSlotRowKey
+} from '@/lib/pre-registration-calendar-slots';
 
 interface PreRegistrationFormProps {
   unitId: string;
@@ -45,6 +55,13 @@ export function PreRegistrationForm({
   const [serviceId, setServiceId] = useState(initialData?.serviceId || '');
   const [date, setDate] = useState(initialData?.date || '');
   const [time, setTime] = useState(initialData?.time || '');
+  /** CalDAV resource when booking against imported calendar slots */
+  const [externalHref, setExternalHref] = useState<string | undefined>(
+    initialData?.externalEventHref
+  );
+  const [externalEtag, setExternalEtag] = useState<string | undefined>(
+    initialData?.externalEventEtag
+  );
   const [customerFirstName, setCustomerFirstName] = useState(
     initialData?.customerFirstName || ''
   );
@@ -56,7 +73,11 @@ export function PreRegistrationForm({
   );
   const [comment, setComment] = useState(initialData?.comment || '');
 
-  // Helper function to get localized service name with hierarchy
+  /** When several calendars per unit, the user picks which connection to load slots from. */
+  const [userCalendarPick, setUserCalendarPick] = useState<string | undefined>(
+    undefined
+  );
+
   const getLocalizedServiceName = (
     service: Service,
     servicesList?: Service[]
@@ -71,14 +92,12 @@ export function PreRegistrationForm({
       return s.name;
     };
 
-    // Build hierarchy path
     const buildPath = (s: Service): string[] => {
       const path: string[] = [];
       let current: Service | null = s;
 
       while (current) {
         path.unshift(getName(current));
-        // Try to get parent from parent field or find by parentId
         if (current.parent) {
           current = current.parent ?? null;
         } else if (current.parentId && allServices.length > 0) {
@@ -97,66 +116,159 @@ export function PreRegistrationForm({
     return path.join(' → ');
   };
 
-  // Fetch services
   const { data: services } = useQuery({
     queryKey: ['unit-services', unitId],
     queryFn: () => unitsApi.getServices(unitId)
   });
 
-  // Fetch available slots when service and date are selected
-  const { data: availableSlots, isLoading: isSlotsLoading } = useQuery({
+  const companyCalQuery = useCalendarIntegrationListMine({
+    query: { staleTime: 60_000 }
+  });
+
+  const unitCalIntegrations = useMemo(() => {
+    const list =
+      companyCalQuery.data?.status === 200
+        ? (companyCalQuery.data.data ?? [])
+        : [];
+    return list.filter((i) => i.unitId === unitId && i.enabled === true);
+  }, [companyCalQuery.data, unitId]);
+
+  const calendarEnabled = unitCalIntegrations.length > 0;
+
+  const effectiveCalendarIntegrationId = useMemo(() => {
+    if (unitCalIntegrations.length === 0) return undefined;
+    if (unitCalIntegrations.length === 1) return unitCalIntegrations[0].id;
+    return userCalendarPick ?? initialData?.calendarIntegrationId;
+  }, [
+    unitCalIntegrations,
+    userCalendarPick,
+    initialData?.calendarIntegrationId
+  ]);
+
+  const hadExternalSlot = Boolean(
+    initialData?.externalEventHref &&
+    initialData.externalEventHref.trim() !== ''
+  );
+
+  const calSlotsEnabled = Boolean(
+    serviceId &&
+    date &&
+    calendarEnabled &&
+    (unitCalIntegrations.length <= 1 || !!effectiveCalendarIntegrationId)
+  );
+
+  const calSlotsQuery = useGetCalendarSlotsByUnit(
+    unitId,
+    { serviceId, date },
+    {
+      query: {
+        enabled: calSlotsEnabled
+      }
+    }
+  );
+
+  const calItemsRaw = useMemo(() => {
+    if (calSlotsQuery.data?.status !== 200) return [];
+    return calSlotsQuery.data.data ?? [];
+  }, [calSlotsQuery.data]);
+
+  const calItems = useMemo(() => {
+    if (unitCalIntegrations.length <= 1) return calItemsRaw;
+    if (!effectiveCalendarIntegrationId) return [];
+    return calItemsRaw.filter(
+      (i) => i.calendarIntegrationId === effectiveCalendarIntegrationId
+    );
+  }, [calItemsRaw, unitCalIntegrations.length, effectiveCalendarIntegrationId]);
+
+  const calFailedOrEmpty =
+    calendarEnabled &&
+    !!serviceId &&
+    !!date &&
+    (calSlotsQuery.isError ||
+      (calSlotsQuery.data?.status === 200 && calItems.length === 0));
+
+  const waitingForCalendarSlots =
+    calendarEnabled &&
+    calSlotsQuery.isPending &&
+    !calFailedOrEmpty &&
+    (!initialData || hadExternalSlot);
+
+  const useCalendarUi =
+    calendarEnabled &&
+    !!serviceId &&
+    !!date &&
+    calItems.length > 0 &&
+    !calFailedOrEmpty &&
+    (!initialData || hadExternalSlot);
+
+  const legacySlotsEnabled =
+    !!serviceId &&
+    !!date &&
+    !useCalendarUi &&
+    (!calendarEnabled || calFailedOrEmpty || !hadExternalSlot) &&
+    !waitingForCalendarSlots;
+
+  const legacySlotsQuery = useQuery({
     queryKey: ['available-slots', unitId, serviceId, date],
     queryFn: () =>
       preRegistrationsApi.getAvailableSlots(unitId, serviceId, date),
-    enabled: !!serviceId && !!date
+    enabled: legacySlotsEnabled
   });
 
-  // Clear time when date changes (unless it's the initial load with data)
+  const calPending =
+    calendarEnabled &&
+    !!serviceId &&
+    !!date &&
+    calSlotsQuery.isPending &&
+    (!initialData || hadExternalSlot);
+
+  const availableSlots = legacySlotsQuery.data;
+
   const handleDateChange = (newDate: string) => {
     setDate(newDate);
-    if (newDate && newDate !== initialData?.date) {
+    if (newDate !== initialData?.date) {
+      setExternalHref(undefined);
+      setExternalEtag(undefined);
+    }
+    if (!newDate) {
+      setTime('');
+      return;
+    }
+    if (newDate !== initialData?.date) {
       setTime('');
     }
   };
 
-  const createMutation = useMutation({
-    mutationFn: (data: {
-      serviceId: string;
-      date: string;
-      time: string;
-      customerFirstName: string;
-      customerLastName: string;
-      customerPhone: string;
-      comment?: string;
-    }) => preRegistrationsApi.create(unitId, data),
-    onSuccess: () => {
-      toast.success(t('create_success'));
-      queryClient.invalidateQueries({
-        queryKey: ['pre-registrations', unitId]
-      });
-      onSuccess();
-    },
-    onError: () => toast.error(t('create_error'))
+  const createPostMutation = usePostUnitsUnitIdPreRegistrations({
+    mutation: {
+      onSuccess: (res) => {
+        if (res.status === 200) {
+          toast.success(t('create_success'));
+          queryClient.invalidateQueries({
+            queryKey: ['pre-registrations', unitId]
+          });
+          onSuccess();
+        }
+      },
+      onError: () => toast.error(t('create_error'))
+    }
   });
 
-  const updateMutation = useMutation({
-    mutationFn: (data: {
-      serviceId: string;
-      date: string;
-      time: string;
-      customerFirstName: string;
-      customerLastName: string;
-      customerPhone: string;
-      comment?: string;
-    }) => preRegistrationsApi.update(unitId, initialData!.id, data),
-    onSuccess: () => {
-      toast.success(t('update_success'));
-      queryClient.invalidateQueries({
-        queryKey: ['pre-registrations', unitId]
-      });
-      onSuccess();
-    },
-    onError: () => toast.error(t('update_error'))
+  const updateMutation = usePutUnitsUnitIdPreRegistrationsId({
+    mutation: {
+      onSuccess: (res) => {
+        if (res.status === 200) {
+          toast.success(t('update_success'));
+          queryClient.invalidateQueries({
+            queryKey: ['pre-registrations', unitId]
+          });
+          onSuccess();
+        } else {
+          toast.error(t('update_error'));
+        }
+      },
+      onError: () => toast.error(t('update_error'))
+    }
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -164,31 +276,148 @@ export function PreRegistrationForm({
     const trimmedFirstName = customerFirstName.trim();
     const trimmedLastName = customerLastName.trim();
     if (!trimmedFirstName && !trimmedLastName) {
-      toast.error(
-        t('name_required', { defaultValue: 'Enter first or last name' })
-      );
+      toast.error(t('name_required'));
       return;
     }
     setCustomerFirstName(trimmedFirstName);
     setCustomerLastName(trimmedLastName);
-    const data = {
-      serviceId,
-      date,
-      time,
-      customerFirstName: trimmedFirstName,
-      customerLastName: trimmedLastName,
-      customerPhone,
-      comment
-    };
+
+    const resolvedTime = time;
+    if (!resolvedTime) {
+      toast.error(t('select_time'));
+      return;
+    }
 
     if (initialData) {
-      updateMutation.mutate(data);
-    } else {
-      createMutation.mutate(data);
+      const slotChanged =
+        date !== initialData.date ||
+        time !== initialData.time ||
+        serviceId !== initialData.serviceId;
+      const hadCalendarBinding = Boolean(
+        initialData.externalEventHref &&
+        initialData.externalEventHref.trim() !== ''
+      );
+
+      if (
+        slotChanged &&
+        hadCalendarBinding &&
+        calendarEnabled &&
+        useCalendarUi &&
+        !externalHref?.trim()
+      ) {
+        toast.error(t('reschedule_pick_calendar_slot'));
+        return;
+      }
+      if (
+        slotChanged &&
+        hadCalendarBinding &&
+        calendarEnabled &&
+        !useCalendarUi &&
+        !legacySlotsQuery.isLoading &&
+        (!availableSlots || availableSlots.length === 0)
+      ) {
+        toast.error(t('reschedule_calendar_unavailable'));
+        return;
+      }
+
+      if (!initialData?.id) return;
+      const payload = {
+        serviceId,
+        date,
+        time: resolvedTime,
+        customerFirstName: trimmedFirstName,
+        customerLastName: trimmedLastName,
+        customerPhone,
+        comment,
+        externalEventHref: undefined as string | undefined,
+        externalEventEtag: undefined as string | undefined,
+        calendarIntegrationId: undefined as string | undefined
+      };
+      if (useCalendarUi && externalHref?.trim()) {
+        payload.externalEventHref = externalHref;
+        if (externalEtag) {
+          payload.externalEventEtag = externalEtag;
+        }
+        const row = calItems.find((i) => i.externalEventHref === externalHref);
+        if (row?.calendarIntegrationId) {
+          payload.calendarIntegrationId = row.calendarIntegrationId;
+        } else if (initialData.calendarIntegrationId) {
+          payload.calendarIntegrationId = initialData.calendarIntegrationId;
+        }
+      }
+      updateMutation.mutate({
+        unitId,
+        id: initialData.id,
+        data: payload
+      });
+      return;
     }
+
+    if (useCalendarUi && !externalHref) {
+      toast.error(t('pick_calendar_slot'));
+      return;
+    }
+
+    const createRow = calItems.find(
+      (i) => i.externalEventHref === externalHref
+    );
+
+    const bookingCalendarSlot = useCalendarUi && Boolean(externalHref);
+
+    createPostMutation.mutate({
+      unitId,
+      data: {
+        serviceId,
+        date,
+        time: resolvedTime,
+        customerFirstName: trimmedFirstName,
+        customerLastName: trimmedLastName,
+        customerPhone,
+        comment,
+        externalEventHref: externalHref,
+        externalEventEtag: externalEtag,
+        ...(bookingCalendarSlot
+          ? {
+              calendarIntegrationId:
+                createRow?.calendarIntegrationId ??
+                unitCalIntegrations[0]?.id ??
+                effectiveCalendarIntegrationId
+            }
+          : {})
+      }
+    });
   };
 
-  const isPending = createMutation.isPending || updateMutation.isPending;
+  const isSlotsLoading =
+    calPending || (legacySlotsEnabled && legacySlotsQuery.isLoading);
+
+  const slotOptionsForUi = useCalendarUi
+    ? calItems.map((item, idx) => ({
+        key: preRegCalendarSlotRowKey(
+          item.calendarIntegrationId,
+          item.externalEventHref,
+          idx
+        ),
+        value: preRegCalendarSlotRowKey(
+          item.calendarIntegrationId,
+          item.externalEventHref,
+          idx
+        ),
+        label: item.time ?? '',
+        time: item.time ?? '',
+        externalEventEtag: item.externalEventEtag,
+        href: item.externalEventHref,
+        integrationLabel: item.integrationLabel
+      }))
+    : (availableSlots ?? []).map((slot) => ({
+        key: slot,
+        value: slot,
+        label: slot,
+        time: slot,
+        externalEventEtag: undefined as string | undefined
+      }));
+
+  const isPending = createPostMutation.isPending || updateMutation.isPending;
 
   return (
     <form onSubmit={handleSubmit} className='space-y-4'>
@@ -196,7 +425,12 @@ export function PreRegistrationForm({
         <Label htmlFor='service'>{t('service')}</Label>
         <Select
           value={serviceId}
-          onValueChange={setServiceId}
+          onValueChange={(v) => {
+            setServiceId(v);
+            setTime('');
+            setExternalHref(undefined);
+            setExternalEtag(undefined);
+          }}
           disabled={!!initialData}
         >
           <SelectTrigger>
@@ -214,6 +448,37 @@ export function PreRegistrationForm({
         </Select>
       </div>
 
+      {calendarEnabled && unitCalIntegrations.length > 1 ? (
+        <div className='space-y-2'>
+          <Label htmlFor='cal-int-pick'>
+            {t('select_calendar_connection')}
+          </Label>
+          <Select
+            value={effectiveCalendarIntegrationId ?? ''}
+            onValueChange={(v) => {
+              setUserCalendarPick(v || undefined);
+              setTime('');
+              setExternalHref(undefined);
+              setExternalEtag(undefined);
+            }}
+          >
+            <SelectTrigger id='cal-int-pick'>
+              <SelectValue placeholder={t('select_calendar_connection')} />
+            </SelectTrigger>
+            <SelectContent>
+              {unitCalIntegrations.map((i) => (
+                <SelectItem key={i.id} value={i.id!}>
+                  {i.displayName?.trim() ||
+                    i.unitName ||
+                    i.kind ||
+                    i.id?.slice(0, 8)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ) : null}
+
       <div className='grid grid-cols-2 gap-4'>
         <div className='space-y-2'>
           <Label htmlFor='date'>{t('date')}</Label>
@@ -227,9 +492,56 @@ export function PreRegistrationForm({
         <div className='space-y-2'>
           <Label htmlFor='time'>{t('time')}</Label>
           <Select
-            value={time}
-            onValueChange={setTime}
-            disabled={!date || (!availableSlots?.length && !initialData)}
+            value={
+              useCalendarUi
+                ? (() => {
+                    if (!externalHref) return '';
+                    const idx = calItems.findIndex(
+                      (i) => i.externalEventHref === externalHref
+                    );
+                    if (idx >= 0) {
+                      const row = calItems[idx]!;
+                      return preRegCalendarSlotRowKey(
+                        row.calendarIntegrationId,
+                        row.externalEventHref,
+                        idx
+                      );
+                    }
+                    return externalHref;
+                  })()
+                : time
+            }
+            onValueChange={(v) => {
+              if (useCalendarUi) {
+                const idx = calItems.findIndex(
+                  (i, j) =>
+                    preRegCalendarSlotRowKey(
+                      i.calendarIntegrationId,
+                      i.externalEventHref,
+                      j
+                    ) === v
+                );
+                if (idx >= 0) {
+                  const row = calItems[idx];
+                  setExternalHref(row?.externalEventHref);
+                  setExternalEtag(row?.externalEventEtag);
+                  setTime(row?.time ?? '');
+                } else if (v) {
+                  setExternalHref(v);
+                  setExternalEtag(initialData?.externalEventEtag);
+                  setTime(initialData?.time ?? '');
+                }
+              } else {
+                setTime(v);
+                setExternalHref(undefined);
+                setExternalEtag(undefined);
+              }
+            }}
+            disabled={
+              !date ||
+              isSlotsLoading ||
+              (!useCalendarUi && !availableSlots?.length && !calPending)
+            }
           >
             <SelectTrigger>
               <SelectValue placeholder={t('select_time')} />
@@ -239,22 +551,40 @@ export function PreRegistrationForm({
                 <div className='flex justify-center p-2'>
                   <Loader2 className='h-4 w-4 animate-spin' />
                 </div>
-              ) : availableSlots?.length === 0 &&
-                (!initialData || !availableSlots.includes(initialData.time)) ? (
+              ) : slotOptionsForUi.length === 0 &&
+                (!initialData ||
+                  (initialData &&
+                    !slotOptionsForUi.some(
+                      (o) => o.time === initialData.time
+                    ))) ? (
                 <div className='text-muted-foreground p-2 text-sm'>
                   {t('no_slots')}
                 </div>
               ) : (
                 <>
-                  {availableSlots?.map((slot) => (
-                    <SelectItem key={slot} value={slot}>
-                      {slot}
+                  {slotOptionsForUi.map((opt, oidx) => (
+                    <SelectItem key={opt.key} value={opt.value}>
+                      {useCalendarUi
+                        ? formatCalendarSlotLabel(calItems[oidx]!, calItems)
+                        : opt.label}
                     </SelectItem>
                   ))}
-                  {/* If editing and current time is not in available slots (e.g. fully booked but this one is ours), add it */}
                   {initialData &&
+                    useCalendarUi &&
+                    externalHref &&
+                    !slotOptionsForUi.some(
+                      (o) => 'href' in o && o.href === externalHref
+                    ) && (
+                      <SelectItem value={externalHref}>
+                        {initialData.time}
+                      </SelectItem>
+                    )}
+                  {initialData &&
+                    !useCalendarUi &&
                     date === initialData.date &&
-                    !availableSlots?.includes(initialData.time) && (
+                    !slotOptionsForUi.some(
+                      (o) => o.time === initialData.time
+                    ) && (
                       <SelectItem value={initialData.time}>
                         {initialData.time}
                       </SelectItem>

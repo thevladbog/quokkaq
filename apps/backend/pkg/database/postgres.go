@@ -1042,6 +1042,59 @@ func RunVersionedMigrations(models ...interface{}) error {
 		return fmt.Errorf("failed to run v1.2.2_sso_saml_protocol migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.2.3_calendar_integration", func(db *gorm.DB) error {
+		if err := db.AutoMigrate(
+			&dbmodels.UnitCalendarIntegration{},
+			&dbmodels.CalendarExternalSlot{},
+			&dbmodels.CalendarSyncIncident{},
+		); err != nil {
+			return err
+		}
+		return db.AutoMigrate(&dbmodels.PreRegistration{}, &dbmodels.Service{})
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.2.3_calendar_integration migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.2.4_calendar_multi_per_unit", func(db *gorm.DB) error {
+		// Drop unique index on unit_id (GORM name may vary; drop known patterns).
+		if err := db.Exec(`
+			DROP INDEX IF EXISTS uni_unit_calendar_integrations_unit_id;
+			DROP INDEX IF EXISTS idx_unit_calendar_integrations_unit_id;
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			ALTER TABLE unit_calendar_integrations
+			ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'yandex_caldav';
+			ALTER TABLE unit_calendar_integrations
+			ADD COLUMN IF NOT EXISTS display_name TEXT NOT NULL DEFAULT '';
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			CREATE INDEX IF NOT EXISTS idx_unit_calendar_integrations_unit_id
+			ON unit_calendar_integrations (unit_id);
+		`).Error; err != nil {
+			return err
+		}
+		return db.AutoMigrate(&dbmodels.UnitCalendarIntegration{})
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.2.4_calendar_multi_per_unit migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.2.5_services_calendar_slot_key_unique", func(db *gorm.DB) error {
+		return db.Exec(`
+			CREATE UNIQUE INDEX IF NOT EXISTS idx_services_unit_calendar_slot_key_uq
+			ON services (unit_id, calendar_slot_key)
+			WHERE calendar_slot_key IS NOT NULL AND btrim(calendar_slot_key) <> ''
+		`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.2.5_services_calendar_slot_key_unique migration: %w", err)
+	}
+
 	fmt.Println("All migrations completed successfully")
 	return nil
 }

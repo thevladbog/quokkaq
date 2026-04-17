@@ -91,6 +91,7 @@ INSERT INTO tickets (
 		nil,
 		nil,
 		nil,
+		nil,
 		hub,
 		noopJobEnqueuer{},
 	)

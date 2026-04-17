@@ -10,11 +10,28 @@ import (
 )
 
 type SlotHandler struct {
-	service *services.SlotService
+	service  *services.SlotService
+	calendar *services.CalendarIntegrationService
 }
 
-func NewSlotHandler(service *services.SlotService) *SlotHandler {
-	return &SlotHandler{service: service}
+func NewSlotHandler(service *services.SlotService, calendar *services.CalendarIntegrationService) *SlotHandler {
+	return &SlotHandler{service: service, calendar: calendar}
+}
+
+func (h *SlotHandler) rejectIfCalendarReadOnly(w http.ResponseWriter, unitID string) bool {
+	if h.calendar == nil {
+		return false
+	}
+	ro, err := h.calendar.HasEnabledCalendarIntegration(unitID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return true
+	}
+	if ro {
+		http.Error(w, "slot capacity is managed by calendar integration", http.StatusConflict)
+		return true
+	}
+	return false
 }
 
 // GetConfig godoc
@@ -52,6 +69,7 @@ func (h *SlotHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 // @Failure      400    {string}  string "Bad Request"
 // @Failure      401    {string}  string "Unauthorized"
 // @Failure      403    {string}  string "Forbidden"
+// @Failure      409    {string}  string "Conflict"
 // @Failure      500    {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/slots/config [put]
 func (h *SlotHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
@@ -62,6 +80,9 @@ func (h *SlotHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	unitID := chi.URLParam(r, "unitId")
+	if h.rejectIfCalendarReadOnly(w, unitID) {
+		return
+	}
 	config.UnitID = unitID
 
 	if err := h.service.UpdateConfig(&config); err != nil {
@@ -106,6 +127,7 @@ func (h *SlotHandler) GetCapacities(w http.ResponseWriter, r *http.Request) {
 // @Failure      400         {string}  string "Bad Request"
 // @Failure      401         {string}  string "Unauthorized"
 // @Failure      403         {string}  string "Forbidden"
+// @Failure      409         {string}  string "Conflict"
 // @Failure      500         {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/slots/capacities [put]
 func (h *SlotHandler) UpdateCapacities(w http.ResponseWriter, r *http.Request) {
@@ -116,6 +138,9 @@ func (h *SlotHandler) UpdateCapacities(w http.ResponseWriter, r *http.Request) {
 	}
 
 	unitID := chi.URLParam(r, "unitId")
+	if h.rejectIfCalendarReadOnly(w, unitID) {
+		return
+	}
 	// Ensure all capacities have the correct UnitID
 	for i := range capacities {
 		capacities[i].UnitID = unitID
@@ -141,6 +166,7 @@ func (h *SlotHandler) UpdateCapacities(w http.ResponseWriter, r *http.Request) {
 // @Failure      400    {string}  string "Bad Request"
 // @Failure      401    {string}  string "Unauthorized"
 // @Failure      403    {string}  string "Forbidden"
+// @Failure      409    {string}  string "Conflict"
 // @Failure      500    {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/slots/generate [post]
 func (h *SlotHandler) Generate(w http.ResponseWriter, r *http.Request) {
@@ -151,6 +177,9 @@ func (h *SlotHandler) Generate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	unitID := chi.URLParam(r, "unitId")
+	if h.rejectIfCalendarReadOnly(w, unitID) {
+		return
+	}
 	if err := h.service.GenerateSlots(unitID, req.From, req.To); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -207,6 +236,7 @@ func (h *SlotHandler) GetDay(w http.ResponseWriter, r *http.Request) {
 // @Failure      400    {string}  string "Bad Request"
 // @Failure      401    {string}  string "Unauthorized"
 // @Failure      403    {string}  string "Forbidden"
+// @Failure      409    {string}  string "Conflict"
 // @Failure      500    {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/slots/day/{date} [put]
 func (h *SlotHandler) UpdateDay(w http.ResponseWriter, r *http.Request) {
@@ -218,6 +248,10 @@ func (h *SlotHandler) UpdateDay(w http.ResponseWriter, r *http.Request) {
 
 	unitID := chi.URLParam(r, "unitId")
 	date := chi.URLParam(r, "date")
+
+	if h.rejectIfCalendarReadOnly(w, unitID) {
+		return
+	}
 
 	if err := h.service.UpdateDaySlots(unitID, date, req); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

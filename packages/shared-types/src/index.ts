@@ -1,5 +1,15 @@
 import { z } from 'zod';
 
+export {
+  TENANT_SLUG_MIN_LEN,
+  TENANT_SLUG_MAX_LEN,
+  RESERVED_TENANT_SLUGS,
+  normalizeTenantSlug,
+  isReservedTenantSlug,
+  TENANT_SLUG_PART_RE,
+  isValidTenantSlug
+} from './tenant-slug';
+
 // ==========================
 // Zod Schemas
 // ==========================
@@ -75,6 +85,8 @@ export type ServiceModel = {
   gridRowSpan?: number | null;
   gridColSpan?: number | null;
   restrictedServiceZoneId?: string | null;
+  /** Optional label for [QQ] calendar SUMMARY when service names collide (Yandex CalDAV). */
+  calendarSlotKey?: string | null;
 };
 
 export const ServiceModelSchema: z.ZodType<ServiceModel> = z.object({
@@ -106,7 +118,8 @@ export const ServiceModelSchema: z.ZodType<ServiceModel> = z.object({
   gridCol: z.number().nullable().optional(),
   gridRowSpan: z.number().nullable().optional(),
   gridColSpan: z.number().nullable().optional(),
-  restrictedServiceZoneId: z.string().nullable().optional()
+  restrictedServiceZoneId: z.string().nullable().optional(),
+  calendarSlotKey: z.string().nullable().optional()
 });
 
 export const UnitKindSchema = z.enum(['subdivision', 'service_zone']);
@@ -693,6 +706,9 @@ export interface PreRegistration {
   status: string;
   ticketId?: string;
   createdAt: string;
+  externalEventHref?: string;
+  externalEventEtag?: string;
+  calendarIntegrationId?: string;
   service?: Service;
   ticket?: Ticket;
 }
