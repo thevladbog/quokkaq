@@ -3,7 +3,7 @@
 import { use } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { Link, useRouter } from '@/src/i18n/navigation';
+import { Link } from '@/src/i18n/navigation';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -15,6 +15,17 @@ import {
 import { useGetSupportReportByID } from '@/lib/api/generated/support';
 import { isApiHttpError } from '@/lib/api-errors';
 import { toast } from 'sonner';
+
+function shouldRetrySupportReportDetail(
+  failureCount: number,
+  err: unknown
+): boolean {
+  if (isApiHttpError(err)) {
+    const s = err.status;
+    if (s >= 400 && s < 500) return false;
+  }
+  return failureCount < 3;
+}
 
 function formatDate(iso: string | undefined) {
   if (!iso) return '—';
@@ -30,9 +41,11 @@ export default function StaffSupportDetailPage({
 }) {
   const { id } = use(params);
   const t = useTranslations('staff.support');
-  const router = useRouter();
   const q = useGetSupportReportByID(id, {
-    query: { enabled: Boolean(id) }
+    query: {
+      enabled: Boolean(id),
+      retry: shouldRetrySupportReportDetail
+    }
   });
 
   const copy = async (value: string) => {
@@ -115,8 +128,8 @@ export default function StaffSupportDetailPage({
           <Button variant='outline' asChild>
             <Link href='/staff/support'>{t('myReports')}</Link>
           </Button>
-          <Button variant='outline' onClick={() => router.push('/staff')}>
-            {t('backToStaff')}
+          <Button variant='outline' asChild>
+            <Link href='/staff'>{t('backToStaff')}</Link>
           </Button>
         </div>
       </div>

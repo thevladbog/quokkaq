@@ -162,6 +162,10 @@ func (t *testPlaneStub) GetWorkItem(context.Context, string) (*int, string, erro
 	return nil, "", nil
 }
 
+func (t *testPlaneStub) DeleteWorkItem(context.Context, string) error {
+	return nil
+}
+
 func TestSupportReportHandler_Create_Unauthorized(t *testing.T) {
 	t.Parallel()
 	h := newTestSupportReportHandler(stubSupportReportRepo{})
@@ -269,7 +273,7 @@ func TestSupportReportHandler_Create_InvalidJSON(t *testing.T) {
 func TestSupportReportHandler_Create_BodyTooLarge(t *testing.T) {
 	t.Parallel()
 	h := newTestSupportReportHandler(stubSupportReportRepo{})
-	large := bytes.Repeat([]byte("a"), (1<<20)+1)
+	large := bytes.Repeat([]byte("a"), MaxSupportReportCreateBodyBytes+1)
 	req := httptest.NewRequest(http.MethodPost, "/support/reports", bytes.NewReader(large))
 	req.Header.Set("Content-Type", "application/json")
 	req = reqWithUserID(req, "user-1")
@@ -337,6 +341,30 @@ func TestSupportReportHandler_Create_PlaneErrorDeletesRow(t *testing.T) {
 	h.Create(rr, req)
 	if rr.Code != http.StatusBadGateway {
 		t.Fatalf("Create: want %d, got %d body=%q", http.StatusBadGateway, rr.Code, rr.Body.String())
+	}
+	mem.mu.Lock()
+	n := len(mem.m)
+	mem.mu.Unlock()
+	if n != 0 {
+		t.Fatalf("expected DB row removed after Plane failure, got %d rows", n)
+	}
+}
+
+func TestSupportReportHandler_Create_Plane503ServiceUnavailable(t *testing.T) {
+	t.Parallel()
+	mem := newMemSupportReportRepo()
+	h := newTestSupportReportHandlerWithPlane(mem, &testPlaneStub{createErr: &services.PlaneHTTPError{
+		HTTPStatus: http.StatusServiceUnavailable,
+		Body:       "no available server",
+	}})
+	body := `{"title":"t","description":"d"}`
+	req := httptest.NewRequest(http.MethodPost, "/support/reports", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req = reqWithUserID(req, "user-1")
+	rr := httptest.NewRecorder()
+	h.Create(rr, req)
+	if rr.Code != http.StatusServiceUnavailable {
+		t.Fatalf("Create: want %d, got %d body=%q", http.StatusServiceUnavailable, rr.Code, rr.Body.String())
 	}
 	mem.mu.Lock()
 	n := len(mem.m)

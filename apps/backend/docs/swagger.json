@@ -920,10 +920,6 @@
                         "type": "string"
                     }
                 },
-                "required": [
-                    "description",
-                    "title"
-                ],
                 "type": "object"
             },
             "handlers.createSurveyRequest": {
@@ -10100,6 +10096,16 @@
                             }
                         },
                         "description": "Unauthorized"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
                     }
                 },
                 "security": [
@@ -10158,6 +10164,26 @@
                         },
                         "description": "Unauthorized"
                     },
+                    "413": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Payload too large"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    },
                     "502": {
                         "content": {
                             "application/json": {
@@ -10176,7 +10202,7 @@
                                 }
                             }
                         },
-                        "description": "Plane not configured"
+                        "description": "Plane not configured or Plane returned 503 (unavailable)"
                     }
                 },
                 "security": [
@@ -10245,6 +10271,16 @@
                             }
                         },
                         "description": "Not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
                     }
                 },
                 "security": [

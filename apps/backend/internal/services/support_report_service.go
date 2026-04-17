@@ -8,9 +8,11 @@ import (
 	"log"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
+	"golang.org/x/sync/errgroup"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
 )
@@ -19,7 +21,12 @@ const supportReportSyncMinInterval = 2 * time.Minute
 
 const maxPlaneRefreshPerList = 10
 
+const maxConcurrentPlaneListRefresh = 4
+
 const planeGetWorkItemTimeout = 8 * time.Second
+
+// supportReportOrphanCreated counts rows where Plane work item was created but persisting PlaneWorkItemID to DB failed (see Create orphan cleanup).
+var supportReportOrphanCreated atomic.Int64
 
 // SupportReportPlaneClient is the subset of Plane REST behavior used by support reports.
 // *PlaneClient implements it; tests may use stubs.
@@ -27,6 +34,7 @@ type SupportReportPlaneClient interface {
 	Enabled() bool
 	CreateWorkItem(ctx context.Context, externalID, title, descriptionHTML string) (workItemID string, sequenceID *int, stateName string, err error)
 	GetWorkItem(ctx context.Context, workItemID string) (sequenceID *int, stateName string, err error)
+	DeleteWorkItem(ctx context.Context, workItemID string) error
 }
 
 // SupportReportService creates support reports and syncs status from Plane.
@@ -105,7 +113,19 @@ func (s *SupportReportService) Create(ctx context.Context, userID string, in Cre
 	row.LastSyncedAt = &now
 
 	if err := s.repo.Update(row); err != nil {
-		log.Printf("support report: DB update after Plane success (possible orphan work item in Plane) id=%s planeWorkItemID=%s: %v", row.ID, planeID, err)
+		n := supportReportOrphanCreated.Add(1)
+		log.Printf("metric support_report_orphan_created=%d: DB update after Plane success failed id=%s planeWorkItemID=%s: %v", n, row.ID, planeID, err)
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+		if delErr := s.repo.DeleteByID(row.ID); delErr != nil {
+			log.Printf("support report: orphan cleanup DeleteByID id=%s: %v", row.ID, delErr)
+		} else if s.plane != nil {
+			if derr := s.plane.DeleteWorkItem(cleanupCtx, planeID); derr != nil {
+				log.Printf("support report: orphan cleanup Plane DeleteWorkItem planeWorkItemID=%s: %v", planeID, derr)
+			} else {
+				log.Printf("support report: orphan cleanup removed Plane work item planeWorkItemID=%s", planeID)
+			}
+		}
+		cancel()
 		return nil, fmt.Errorf("%w: %v", ErrSupportReportPersistence, err)
 	}
 	return row, nil
@@ -167,24 +187,31 @@ func (s *SupportReportService) List(ctx context.Context, userID string) ([]model
 	if len(candidates) > maxPlaneRefreshPerList {
 		candidates = candidates[:maxPlaneRefreshPerList]
 	}
+	g, syncCtx := errgroup.WithContext(ctx)
+	g.SetLimit(maxConcurrentPlaneListRefresh)
 	for _, c := range candidates {
-		i := c.idx
-		syncCtx, cancel := context.WithTimeout(ctx, planeGetWorkItemTimeout)
-		seq, st, err := s.plane.GetWorkItem(syncCtx, rows[i].PlaneWorkItemID)
-		cancel()
-		if err != nil {
-			log.Printf("support report: List sync GetWorkItem id=%s planeWorkItemID=%s: %v", rows[i].ID, rows[i].PlaneWorkItemID, err)
-			continue
-		}
-		if seq != nil {
-			rows[i].PlaneSequenceID = seq
-		}
-		rows[i].PlaneStatus = st
-		rows[i].LastSyncedAt = &now
-		if err := s.repo.Update(&rows[i]); err != nil {
-			log.Printf("support report: List sync: update id=%s: %v", rows[i].ID, err)
-		}
+		c := c
+		g.Go(func() error {
+			i := c.idx
+			callCtx, cancel := context.WithTimeout(syncCtx, planeGetWorkItemTimeout)
+			seq, st, err := s.plane.GetWorkItem(callCtx, rows[i].PlaneWorkItemID)
+			cancel()
+			if err != nil {
+				log.Printf("support report: List sync GetWorkItem id=%s planeWorkItemID=%s: %v", rows[i].ID, rows[i].PlaneWorkItemID, err)
+				return nil
+			}
+			if seq != nil {
+				rows[i].PlaneSequenceID = seq
+			}
+			rows[i].PlaneStatus = st
+			rows[i].LastSyncedAt = &now
+			if err := s.repo.Update(&rows[i]); err != nil {
+				log.Printf("support report: List sync: update id=%s: %v", rows[i].ID, err)
+			}
+			return nil
+		})
 	}
+	_ = g.Wait()
 	return rows, nil
 }
 

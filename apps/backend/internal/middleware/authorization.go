@@ -39,6 +39,7 @@ func RequireSupportReportAccess(userRepo repository.UserRepository) func(http.Ha
 			}
 			allowed, err := userRepo.HasSupportReportAccess(userID)
 			if err != nil {
+				log.Printf("RequireSupportReportAccess: userID=%s: %v", userID, err)
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}

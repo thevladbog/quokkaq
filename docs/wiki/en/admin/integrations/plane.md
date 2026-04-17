@@ -44,6 +44,7 @@ Set these backend environment variables:
 | `PLANE_API_KEY` | Secret key (`X-API-Key`). |
 | `PLANE_WORKSPACE_SLUG` | Workspace slug. |
 | `PLANE_PROJECT_ID` | Project UUID in Plane (from project settings or API). |
+| `PLANE_TLS_INSECURE_SKIP_VERIFY` | Optional. If `true`, the QuokkaQ→Plane HTTP client **skips TLS certificate verification** (private CA / self-signed hosts only). Prefer **installing your root CA** on the API server instead of disabling verification in production. |
 
 If integration is not needed yet, you can omit these variables — report endpoints will return a clear error when Plane is unavailable.
 
@@ -67,6 +68,7 @@ Expect **201** and JSON containing the created work item `id`.
 |--------|----------------|
 | `401` / `403` from Plane | API key validity, expiry, scopes for the project. |
 | `404` on `.../work-items/` | Wrong `workspace_slug` or `project_id` (UUID). |
+| `x509: certificate signed by unknown authority` | Plane uses TLS from a private CA: trust that CA on the API host/container, or temporarily set `PLANE_TLS_INSECURE_SKIP_VERIFY=true` (non-prod only, use consciously). |
 | QuokkaQ cannot reach Plane | Firewall, DNS, TLS; from the API server run `curl` to `PLANE_BASE_URL`. |
 | Timeouts | Increase Plane host resources; check network latency. |
 

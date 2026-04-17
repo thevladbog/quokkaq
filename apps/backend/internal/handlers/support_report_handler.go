@@ -17,8 +17,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// maxSupportReportCreateBodyBytes caps JSON body for POST /support/reports (text + diagnostics).
-const maxSupportReportCreateBodyBytes = 1 << 20 // 1 MiB
+// MaxSupportReportCreateBodyBytes caps JSON body for POST /support/reports (text + diagnostics).
+const MaxSupportReportCreateBodyBytes = 1 << 20 // 1 MiB
 
 // SupportReportHandler exposes support / Plane report APIs.
 type SupportReportHandler struct {
@@ -34,8 +34,8 @@ func NewSupportReportHandler(svc *services.SupportReportService) *SupportReportH
 // traceId is optional; when omitted or blank the server assigns a UUID.
 // diagnostics is optional; when omitted the server stores an empty object.
 type createSupportReportRequest struct {
-	Title       string          `json:"title" binding:"required"`
-	Description string          `json:"description" binding:"required"`
+	Title       string          `json:"title"`
+	Description string          `json:"description"`
 	TraceID     string          `json:"traceId,omitempty"`
 	Diagnostics json.RawMessage `json:"diagnostics,omitempty" swaggertype:"object"`
 	UnitID      *string         `json:"unitId"`
@@ -52,7 +52,9 @@ type createSupportReportRequest struct {
 // @Success      201   {object}  models.SupportReport
 // @Failure      400   {string}  string  "Bad request"
 // @Failure      401   {string}  string  "Unauthorized"
-// @Failure      503   {string}  string  "Plane not configured"
+// @Failure      413   {string}  string  "Payload too large"
+// @Failure      500   {string}  string  "Internal server error"
+// @Failure      503   {string}  string  "Plane not configured or Plane returned 503 (unavailable)"
 // @Failure      502   {string}  string  "Plane request failed"
 // @Router       /support/reports [post]
 // @Security     BearerAuth
@@ -62,7 +64,7 @@ func (h *SupportReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	limited := http.MaxBytesReader(w, r.Body, maxSupportReportCreateBodyBytes)
+	limited := http.MaxBytesReader(w, r.Body, MaxSupportReportCreateBodyBytes)
 	body, err := io.ReadAll(limited)
 	if err != nil {
 		if maxBytesReaderExceeded(err) {
@@ -105,6 +107,12 @@ func (h *SupportReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Failed to save support report", http.StatusInternalServerError)
 			return
 		}
+		var planeHTTP *services.PlaneHTTPError
+		if errors.As(err, &planeHTTP) && planeHTTP.HTTPStatus == http.StatusServiceUnavailable {
+			log.Printf("support report Create: Plane unavailable: %v", err)
+			http.Error(w, "Plane is temporarily unavailable", http.StatusServiceUnavailable)
+			return
+		}
 		http.Error(w, "Failed to create Plane work item", http.StatusBadGateway)
 		return
 	}
@@ -121,6 +129,7 @@ func (h *SupportReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 // @Produce      json
 // @Success      200  {array}   models.SupportReport
 // @Failure      401  {string}  string  "Unauthorized"
+// @Failure      500  {string}  string  "Internal server error"
 // @Router       /support/reports [get]
 // @Security     BearerAuth
 func (h *SupportReportHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -153,6 +162,7 @@ func (h *SupportReportHandler) List(w http.ResponseWriter, r *http.Request) {
 // @Failure      401  {string}  string  "Unauthorized"
 // @Failure      403  {string}  string  "Forbidden"
 // @Failure      404  {string}  string  "Not found"
+// @Failure      500  {string}  string  "Internal server error"
 // @Router       /support/reports/{id} [get]
 // @Security     BearerAuth
 func (h *SupportReportHandler) GetByID(w http.ResponseWriter, r *http.Request) {

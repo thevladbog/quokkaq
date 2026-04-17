@@ -44,6 +44,7 @@
 | `PLANE_API_KEY` | Секретный ключ (`X-API-Key`). |
 | `PLANE_WORKSPACE_SLUG` | Slug workspace. |
 | `PLANE_PROJECT_ID` | UUID проекта в Plane (из настроек проекта или API). |
+| `PLANE_TLS_INSECURE_SKIP_VERIFY` | Необязательно. Если `true`, клиент QuokkaQ к Plane **не проверяет** TLS-сертификат (только для стендов с корпоративным/самоподписанным CA). В проде надёжнее **добавить корневой CA в доверенные** на сервере API, а не отключать проверку. |
 
 Если интеграция временно не нужна, переменные можно не задавать — эндпоинты репортов вернут понятную ошибку о недоступности Plane.
 
@@ -67,6 +68,7 @@ curl -sS -X POST \
 |--------|-------------|
 | `401` / `403` от Plane | Проверить API key, срок действия, scope на проект. |
 | `404` на `.../work-items/` | Неверны `workspace_slug` или `project_id` (UUID). |
+| `x509: certificate signed by unknown authority` | Сервер Plane с TLS от внутреннего CA: установить CA в ОС/контейнере API или временно `PLANE_TLS_INSECURE_SKIP_VERIFY=true` (только осознанно для непрода). |
 | QuokkaQ не достучаться до Plane | Firewall, DNS, TLS; с сервера API выполнить `curl` к `PLANE_BASE_URL`. |
 | Таймауты | Увеличить ресурсы хоста Plane, проверить сетевую задержку. |
 
