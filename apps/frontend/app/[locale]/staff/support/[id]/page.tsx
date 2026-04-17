@@ -18,11 +18,9 @@ import { toast } from 'sonner';
 
 function formatDate(iso: string | undefined) {
   if (!iso) return '—';
-  try {
-    return new Date(iso).toLocaleString();
-  } catch {
-    return iso;
-  }
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleString();
 }
 
 export default function StaffSupportDetailPage({
@@ -42,7 +40,7 @@ export default function StaffSupportDetailPage({
       await navigator.clipboard.writeText(value);
       toast.success(t('detailCopied'));
     } catch {
-      toast.error(t('detailCopyFailed'));
+      toast.error(t('detailCopyError'));
     }
   };
 

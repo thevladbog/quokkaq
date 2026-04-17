@@ -20,7 +20,8 @@ import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import {
   getListSupportReportsQueryKey,
-  useCreateSupportReport
+  useCreateSupportReport,
+  type HandlersCreateSupportReportRequestDiagnostics
 } from '@/lib/api/generated/support';
 import { useActiveUnit } from '@/contexts/ActiveUnitContext';
 import { ApiHttpError } from '@/lib/api-errors';
@@ -66,18 +67,20 @@ export default function SupportReportDialog({
   });
 
   const submit = () => {
-    const diag =
+    const diagnostics: HandlersCreateSupportReportRequestDiagnostics =
       typeof window !== 'undefined'
         ? {
-            href: window.location.href,
+            origin: window.location.origin,
+            pathname: window.location.pathname,
             userAgent: window.navigator.userAgent
           }
-        : undefined;
+        : {};
     mutation.mutate({
       data: {
         title: title.trim(),
         description: description.trim(),
-        diagnostics: diag,
+        traceId: '',
+        diagnostics,
         unitId: activeUnitId ?? undefined
       }
     });

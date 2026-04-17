@@ -47,6 +47,10 @@ func (stubSupportUserRepo) IsAdmin(string) (bool, error) {
 	return false, nil
 }
 
+func (stubSupportUserRepo) HasSupportReportAccess(string) (bool, error) {
+	return true, nil
+}
+
 func newTestSupportReportHandler(repo repository.SupportReportRepository) *SupportReportHandler {
 	svc := services.NewSupportReportService(repo, nil, stubSupportUserRepo{})
 	return NewSupportReportHandler(svc)

@@ -920,6 +920,12 @@
                         "type": "string"
                     }
                 },
+                "required": [
+                    "description",
+                    "diagnostics",
+                    "title",
+                    "traceId"
+                ],
                 "type": "object"
             },
             "handlers.createSurveyRequest": {
@@ -2313,6 +2319,7 @@
             "models.SupportReport": {
                 "properties": {
                     "createdAt": {
+                        "format": "date-time",
                         "type": "string"
                     },
                     "createdByUserId": {
@@ -2325,6 +2332,7 @@
                         "type": "string"
                     },
                     "lastSyncedAt": {
+                        "format": "date-time",
                         "type": "string"
                     },
                     "planeSequenceId": {
@@ -2346,6 +2354,7 @@
                         "type": "string"
                     },
                     "updatedAt": {
+                        "format": "date-time",
                         "type": "string"
                     }
                 },

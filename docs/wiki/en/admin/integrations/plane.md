@@ -56,7 +56,7 @@ curl -sS -X POST \
   "${PLANE_BASE_URL}/api/v1/workspaces/${PLANE_WORKSPACE_SLUG}/projects/${PLANE_PROJECT_ID}/work-items/" \
   -H "X-API-Key: ${PLANE_API_KEY}" \
   -H "Content-Type: application/json" \
-  -d '{"name":"QuokkaQ connectivity test","description_html":"<p>ok</p>"}'
+  -d '{"name":"QuokkaQ connectivity test","description_html":"<p>ok</p>","external_id":"quokkaq-connectivity-test","external_source":"quokkaq"}'
 ```
 
 Expect **201** and JSON containing the created work item `id`.

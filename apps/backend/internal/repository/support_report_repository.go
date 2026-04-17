@@ -38,7 +38,7 @@ func (r *supportReportRepository) FindByID(id string) (*models.SupportReport, er
 
 func (r *supportReportRepository) ListForUser(userID string, all bool) ([]models.SupportReport, error) {
 	var rows []models.SupportReport
-	q := r.db.Model(&models.SupportReport{}).Order("created_at DESC")
+	q := r.db.Model(&models.SupportReport{}).Order("created_at DESC").Limit(500)
 	if !all {
 		q = q.Where("created_by_user_id = ?", userID)
 	}

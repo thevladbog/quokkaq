@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log"
 	"net/http"
 
 	"quokkaq-go-backend/internal/middleware"
@@ -29,10 +30,10 @@ func NewSupportReportHandler(svc *services.SupportReportService) *SupportReportH
 
 // createSupportReportRequest is the JSON body for POST /support/reports.
 type createSupportReportRequest struct {
-	Title       string          `json:"title"`
-	Description string          `json:"description"`
-	TraceID     string          `json:"traceId"`
-	Diagnostics json.RawMessage `json:"diagnostics" swaggertype:"object"`
+	Title       string          `json:"title" binding:"required"`
+	Description string          `json:"description" binding:"required"`
+	TraceID     string          `json:"traceId" binding:"required"`
+	Diagnostics json.RawMessage `json:"diagnostics" binding:"required" swaggertype:"object"`
 	UnitID      *string         `json:"unitId"`
 }
 
@@ -72,6 +73,9 @@ func (h *SupportReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
+	if len(req.Diagnostics) == 0 {
+		req.Diagnostics = json.RawMessage(`{}`)
+	}
 	row, err := h.svc.Create(r.Context(), uid, services.CreateReportInput{
 		Title:       req.Title,
 		Description: req.Description,
@@ -84,8 +88,13 @@ func (h *SupportReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Plane integration is not configured", http.StatusServiceUnavailable)
 			return
 		}
-		if errors.Is(err, services.ErrSupportReportInvalidTitle) || errors.Is(err, services.ErrSupportReportInvalidDescription) {
+		if errors.Is(err, services.ErrSupportReportInvalidTitle) || errors.Is(err, services.ErrSupportReportInvalidDescription) || errors.Is(err, services.ErrSupportReportInvalidUnit) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if errors.Is(err, services.ErrSupportReportPersistence) {
+			log.Printf("support report Create: %v", err)
+			http.Error(w, "Failed to save support report", http.StatusInternalServerError)
 			return
 		}
 		http.Error(w, "Failed to create Plane work item", http.StatusBadGateway)

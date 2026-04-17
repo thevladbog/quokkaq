@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
+	"sort"
 	"strings"
 	"time"
 
@@ -14,6 +16,10 @@ import (
 )
 
 const supportReportSyncMinInterval = 2 * time.Minute
+
+const maxPlaneRefreshPerList = 10
+
+const planeGetWorkItemTimeout = 8 * time.Second
 
 // SupportReportService creates support reports and syncs status from Plane.
 type SupportReportService struct {
@@ -36,11 +42,7 @@ type CreateReportInput struct {
 	UnitID      *string
 }
 
-// Create persists a report after creating the Plane work item.
-//
-// Ordering: Plane CreateWorkItem runs before repo.Create. If the DB insert fails, a Plane work
-// item may exist without a matching support_reports row. Mitigation (persist-first, compensation,
-// or pending state) is deferred; operators can reconcile manually in Plane if needed.
+// Create persists a report: insert a pending row first, then Plane work item, then update with Plane fields.
 func (s *SupportReportService) Create(ctx context.Context, userID string, in CreateReportInput) (*models.SupportReport, error) {
 	if s.plane == nil || !s.plane.Enabled() {
 		return nil, ErrPlaneNotConfigured
@@ -54,18 +56,35 @@ func (s *SupportReportService) Create(ctx context.Context, userID string, in Cre
 		return nil, ErrSupportReportInvalidDescription
 	}
 
+	unitID, err := s.resolveUnitIDForCreate(userID, in.UnitID)
+	if err != nil {
+		return nil, err
+	}
+
+	var diagPtr *json.RawMessage
+	if len(in.Diagnostics) > 0 {
+		raw := json.RawMessage(append(json.RawMessage(nil), in.Diagnostics...))
+		diagPtr = &raw
+	}
+
 	row := &models.SupportReport{
 		ID:              uuid.New().String(),
 		CreatedByUserID: userID,
 		Title:           title,
 		TraceID:         strings.TrimSpace(in.TraceID),
-		Diagnostics:     in.Diagnostics,
-		UnitID:          in.UnitID,
+		Diagnostics:     diagPtr,
+		UnitID:          unitID,
+		PlaneWorkItemID: "",
+	}
+
+	if err := s.repo.Create(row); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrSupportReportPersistence, err)
 	}
 
 	html := BuildSupportDescriptionHTML(desc, in.Diagnostics, row.TraceID)
 	planeID, seq, stateName, err := s.plane.CreateWorkItem(ctx, row.ID, title, html)
 	if err != nil {
+		log.Printf("support report: Plane CreateWorkItem failed after DB insert id=%s: %v", row.ID, err)
 		return nil, err
 	}
 	row.PlaneWorkItemID = planeID
@@ -74,10 +93,29 @@ func (s *SupportReportService) Create(ctx context.Context, userID string, in Cre
 	now := time.Now().UTC()
 	row.LastSyncedAt = &now
 
-	if err := s.repo.Create(row); err != nil {
-		return nil, err
+	if err := s.repo.Update(row); err != nil {
+		log.Printf("support report: DB update after Plane success (possible orphan work item in Plane) id=%s planeWorkItemID=%s: %v", row.ID, planeID, err)
+		return nil, fmt.Errorf("%w: %v", ErrSupportReportPersistence, err)
 	}
 	return row, nil
+}
+
+func (s *SupportReportService) resolveUnitIDForCreate(userID string, unitID *string) (*string, error) {
+	if unitID == nil {
+		return nil, nil
+	}
+	u := strings.TrimSpace(*unitID)
+	if u == "" {
+		return nil, nil
+	}
+	ok, err := s.userRepo.IsAdminOrHasUnitAccess(userID, u)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, ErrSupportReportInvalidUnit
+	}
+	return &u, nil
 }
 
 // List returns reports visible to the user (all if admin).
@@ -94,6 +132,11 @@ func (s *SupportReportService) List(ctx context.Context, userID string) ([]model
 		return rows, nil
 	}
 	now := time.Now().UTC()
+	type cand struct {
+		idx int
+		ts  time.Time
+	}
+	var candidates []cand
 	for i := range rows {
 		if rows[i].PlaneWorkItemID == "" {
 			continue
@@ -101,8 +144,25 @@ func (s *SupportReportService) List(ctx context.Context, userID string) ([]model
 		if rows[i].LastSyncedAt != nil && now.Sub(*rows[i].LastSyncedAt) < supportReportSyncMinInterval {
 			continue
 		}
-		seq, st, err := s.plane.GetWorkItem(ctx, rows[i].PlaneWorkItemID)
+		var ts time.Time
+		if rows[i].LastSyncedAt != nil {
+			ts = *rows[i].LastSyncedAt
+		}
+		candidates = append(candidates, cand{i, ts})
+	}
+	sort.Slice(candidates, func(a, b int) bool {
+		return candidates[a].ts.Before(candidates[b].ts)
+	})
+	if len(candidates) > maxPlaneRefreshPerList {
+		candidates = candidates[:maxPlaneRefreshPerList]
+	}
+	for _, c := range candidates {
+		i := c.idx
+		syncCtx, cancel := context.WithTimeout(ctx, planeGetWorkItemTimeout)
+		seq, st, err := s.plane.GetWorkItem(syncCtx, rows[i].PlaneWorkItemID)
+		cancel()
 		if err != nil {
+			log.Printf("support report: List sync GetWorkItem id=%s planeWorkItemID=%s: %v", rows[i].ID, rows[i].PlaneWorkItemID, err)
 			continue
 		}
 		if seq != nil {
@@ -131,8 +191,12 @@ func (s *SupportReportService) GetByID(ctx context.Context, userID, reportID str
 		return nil, ErrSupportReportForbidden
 	}
 	if s.plane != nil && s.plane.Enabled() && row.PlaneWorkItemID != "" {
-		seq, st, err := s.plane.GetWorkItem(ctx, row.PlaneWorkItemID)
-		if err == nil {
+		syncCtx, cancel := context.WithTimeout(ctx, planeGetWorkItemTimeout)
+		seq, st, err := s.plane.GetWorkItem(syncCtx, row.PlaneWorkItemID)
+		cancel()
+		if err != nil {
+			log.Printf("support report: GetByID sync GetWorkItem id=%s planeWorkItemID=%s: %v", row.ID, row.PlaneWorkItemID, err)
+		} else {
 			if seq != nil {
 				row.PlaneSequenceID = seq
 			}
@@ -152,5 +216,8 @@ var (
 	ErrPlaneNotConfigured              = errors.New("plane integration is not configured")
 	ErrSupportReportInvalidTitle       = errors.New("invalid title")
 	ErrSupportReportInvalidDescription = errors.New("invalid description")
+	ErrSupportReportInvalidUnit        = errors.New("invalid unit")
 	ErrSupportReportForbidden          = errors.New("forbidden")
+	// ErrSupportReportPersistence wraps DB errors after Plane calls (possible orphan work item in Plane).
+	ErrSupportReportPersistence = errors.New("support report persistence failed")
 )

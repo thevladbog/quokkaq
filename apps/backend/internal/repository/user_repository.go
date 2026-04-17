@@ -37,6 +37,8 @@ type UserRepository interface {
 	EnsureRoleExists(name string) (*models.Role, error)
 	EnsureRoleExistsTx(tx *gorm.DB, name string) (*models.Role, error)
 	IsAdmin(userID string) (bool, error)
+	// HasSupportReportAccess is true for roles that may use /support/reports (admin, staff, supervisor, operator).
+	HasSupportReportAccess(userID string) (bool, error)
 	IsPlatformAdmin(userID string) (bool, error)
 	IsAdminOrHasUnitAccess(userID, unitID string) (bool, error)
 	HasCompanyAccess(userID, companyID string) (bool, error)
@@ -205,6 +207,23 @@ func (r *userRepository) IsAdmin(userID string) (bool, error) {
 	}
 	for _, ur := range user.Roles {
 		if ur.Role.Name == "admin" {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (r *userRepository) HasSupportReportAccess(userID string) (bool, error) {
+	user, err := r.FindByID(userID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
+		return false, err
+	}
+	for _, ur := range user.Roles {
+		switch ur.Role.Name {
+		case "admin", "staff", "supervisor", "operator":
 			return true, nil
 		}
 	}

@@ -636,6 +636,7 @@ func main() {
 
 	r.Route("/support", func(r chi.Router) {
 		r.Use(authmiddleware.JWTAuth)
+		r.Use(authmiddleware.RequireSupportReportAccess(userRepo))
 		r.Post("/reports", supportReportHandler.Create)
 		r.Get("/reports", supportReportHandler.List)
 		r.Get("/reports/{id}", supportReportHandler.GetByID)

@@ -604,6 +604,11 @@ components:
           type: string
         unitId:
           type: string
+      required:
+      - description
+      - diagnostics
+      - title
+      - traceId
       type: object
     handlers.createSurveyRequest:
       properties:
@@ -1545,6 +1550,7 @@ components:
     models.SupportReport:
       properties:
         createdAt:
+          format: date-time
           type: string
         createdByUserId:
           type: string
@@ -1553,6 +1559,7 @@ components:
         id:
           type: string
         lastSyncedAt:
+          format: date-time
           type: string
         planeSequenceId:
           type: integer
@@ -1567,6 +1574,7 @@ components:
         unitId:
           type: string
         updatedAt:
+          format: date-time
           type: string
       type: object
     models.SurveyDefinition:

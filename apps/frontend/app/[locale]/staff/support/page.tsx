@@ -2,7 +2,7 @@
 
 import { Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { Link, useRouter } from '@/src/i18n/navigation';
+import { Link } from '@/src/i18n/navigation';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -24,16 +24,13 @@ import { useListSupportReports } from '@/lib/api/generated/support';
 
 function formatDate(iso: string | undefined) {
   if (!iso) return '—';
-  try {
-    return new Date(iso).toLocaleString();
-  } catch {
-    return iso;
-  }
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleString();
 }
 
 export default function StaffSupportPage() {
   const t = useTranslations('staff.support');
-  const router = useRouter();
   const listQ = useListSupportReports();
 
   const rows = listQ.data?.status === 200 ? (listQ.data.data ?? []) : [];
@@ -87,15 +84,18 @@ export default function StaffSupportPage() {
               </TableHeader>
               <TableBody>
                 {rows.map((r) => (
-                  <TableRow
-                    key={r.id}
-                    className='hover:bg-muted/50 cursor-pointer'
-                    onClick={() => router.push(`/staff/support/${r.id}`)}
-                  >
+                  <TableRow key={r.id} className='hover:bg-muted/50'>
                     <TableCell className='text-muted-foreground tabular-nums'>
                       {r.planeSequenceId ?? '—'}
                     </TableCell>
-                    <TableCell className='font-medium'>{r.title}</TableCell>
+                    <TableCell className='font-medium'>
+                      <Link
+                        href={`/staff/support/${r.id}`}
+                        className='text-primary hover:underline'
+                      >
+                        {r.title}
+                      </Link>
+                    </TableCell>
                     <TableCell>{r.planeStatus?.trim() || '—'}</TableCell>
                     <TableCell className='text-muted-foreground text-right text-sm'>
                       {formatDate(r.createdAt)}

@@ -97,7 +97,8 @@ const AppSidebar = () => {
       label: tNav('staff', { defaultValue: 'Staff' }),
       href: '/staff',
       active:
-        pathname.startsWith('/staff') && !pathname.startsWith('/staff/support'),
+        (pathname === '/staff' || pathname.startsWith('/staff/')) &&
+        !pathname.startsWith('/staff/support'),
       roles: ['admin', 'staff', 'operator'],
       requiredPermission: 'ACCESS_STAFF_PANEL'
     },

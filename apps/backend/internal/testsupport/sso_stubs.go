@@ -74,6 +74,7 @@ func (PanicUserRepo) Count() (int64, error)                                     
 func (PanicUserRepo) EnsureRoleExists(string) (*models.Role, error)             { panic("unexpected") }
 func (PanicUserRepo) EnsureRoleExistsTx(*gorm.DB, string) (*models.Role, error) { panic("unexpected") }
 func (PanicUserRepo) IsAdmin(string) (bool, error)                              { panic("unexpected") }
+func (PanicUserRepo) HasSupportReportAccess(string) (bool, error)               { panic("unexpected") }
 func (PanicUserRepo) IsPlatformAdmin(string) (bool, error)                      { panic("unexpected") }
 func (PanicUserRepo) IsAdminOrHasUnitAccess(string, string) (bool, error)       { panic("unexpected") }
 func (PanicUserRepo) HasCompanyAccess(string, string) (bool, error)             { panic("unexpected") }
