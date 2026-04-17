@@ -900,9 +900,9 @@ export interface HandlersCompanyMeResponse {
 export type HandlersCreateSupportReportRequestDiagnostics = { [key: string]: unknown };
 
 export interface HandlersCreateSupportReportRequest {
-  description: string;
+  description?: string;
   diagnostics?: HandlersCreateSupportReportRequestDiagnostics;
-  title: string;
+  title?: string;
   traceId?: string;
   unitId?: string;
 }

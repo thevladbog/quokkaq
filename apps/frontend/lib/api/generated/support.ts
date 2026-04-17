@@ -873,9 +873,9 @@ export interface HandlersCompanyMeResponse {
 export type HandlersCreateSupportReportRequestDiagnostics = { [key: string]: unknown };
 
 export interface HandlersCreateSupportReportRequest {
-  description: string;
+  description?: string;
   diagnostics?: HandlersCreateSupportReportRequestDiagnostics;
-  title: string;
+  title?: string;
   traceId?: string;
   unitId?: string;
 }
@@ -1652,10 +1652,15 @@ export type listSupportReportsResponse401 = {
   status: 401
 }
 
+export type listSupportReportsResponse500 = {
+  data: string
+  status: 500
+}
+
 export type listSupportReportsResponseSuccess = (listSupportReportsResponse200) & {
   headers: Headers;
 };
-export type listSupportReportsResponseError = (listSupportReportsResponse401) & {
+export type listSupportReportsResponseError = (listSupportReportsResponse401 | listSupportReportsResponse500) & {
   headers: Headers;
 };
 
@@ -1778,6 +1783,16 @@ export type createSupportReportResponse401 = {
   status: 401
 }
 
+export type createSupportReportResponse413 = {
+  data: string
+  status: 413
+}
+
+export type createSupportReportResponse500 = {
+  data: string
+  status: 500
+}
+
 export type createSupportReportResponse502 = {
   data: string
   status: 502
@@ -1791,7 +1806,7 @@ export type createSupportReportResponse503 = {
 export type createSupportReportResponseSuccess = (createSupportReportResponse201) & {
   headers: Headers;
 };
-export type createSupportReportResponseError = (createSupportReportResponse400 | createSupportReportResponse401 | createSupportReportResponse502 | createSupportReportResponse503) & {
+export type createSupportReportResponseError = (createSupportReportResponse400 | createSupportReportResponse401 | createSupportReportResponse413 | createSupportReportResponse500 | createSupportReportResponse502 | createSupportReportResponse503) & {
   headers: Headers;
 };
 
@@ -1889,10 +1904,15 @@ export type getSupportReportByIDResponse404 = {
   status: 404
 }
 
+export type getSupportReportByIDResponse500 = {
+  data: string
+  status: 500
+}
+
 export type getSupportReportByIDResponseSuccess = (getSupportReportByIDResponse200) & {
   headers: Headers;
 };
-export type getSupportReportByIDResponseError = (getSupportReportByIDResponse401 | getSupportReportByIDResponse403 | getSupportReportByIDResponse404) & {
+export type getSupportReportByIDResponseError = (getSupportReportByIDResponse401 | getSupportReportByIDResponse403 | getSupportReportByIDResponse404 | getSupportReportByIDResponse500) & {
   headers: Headers;
 };
 
