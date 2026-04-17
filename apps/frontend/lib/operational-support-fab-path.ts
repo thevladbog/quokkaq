@@ -1,8 +1,6 @@
 /** Path helpers for the operational support FAB (locale strip + route allowlist). */
 
-export function pathWithoutLocale(pathname: string): string {
-  return pathname.replace(/^\/[a-z]{2}\//, '/').replace(/^\/[a-z]{2}$/, '/');
-}
+export { pathWithoutLocale } from '@/lib/i18n-path';
 
 export function shouldShowOperationalSupportFab(normalized: string): boolean {
   if (normalized.startsWith('/settings')) return false;

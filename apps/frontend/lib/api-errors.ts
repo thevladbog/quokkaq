@@ -21,6 +21,11 @@ export class ApiHttpError extends Error {
   }
 }
 
+/** Use when generated hooks default `TError` to `string` but the mutator throws ApiHttpError at runtime. */
+export function isApiHttpError(e: unknown): e is ApiHttpError {
+  return e instanceof ApiHttpError;
+}
+
 export function throwApiHttpErrorFromBody(
   status: number,
   errorData: string

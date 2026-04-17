@@ -8,6 +8,7 @@ import SettingsSidebar from '@/components/SettingsSidebar';
 import { usePathname } from 'next/navigation';
 import ProtectedSidebarLayout from '@/components/ProtectedSidebarLayout';
 import { platformRouteAllowsTenantAdmin } from '@/lib/platform-access';
+import { pathWithoutLocale as stripLocaleFromPath } from '@/lib/i18n-path';
 import Image from 'next/image';
 
 interface ConditionalLayoutProps {
@@ -18,7 +19,7 @@ const ConditionalLayout = ({ children }: ConditionalLayoutProps) => {
   const pathname = usePathname();
 
   const pathWithoutLocale = useMemo(
-    () => pathname.replace(/^\/[a-z]{2}\//, '/').replace(/^\/[a-z]{2}$/, '/'),
+    () => stripLocaleFromPath(pathname),
     [pathname]
   );
 

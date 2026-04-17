@@ -901,9 +901,9 @@ export type HandlersCreateSupportReportRequestDiagnostics = { [key: string]: unk
 
 export interface HandlersCreateSupportReportRequest {
   description: string;
-  diagnostics: HandlersCreateSupportReportRequestDiagnostics;
+  diagnostics?: HandlersCreateSupportReportRequestDiagnostics;
   title: string;
-  traceId: string;
+  traceId?: string;
   unitId?: string;
 }
 

@@ -2,10 +2,15 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"gorm.io/gorm"
@@ -41,6 +46,10 @@ func (stubSupportReportRepo) Update(*models.SupportReport) error {
 	panic("unexpected Update")
 }
 
+func (stubSupportReportRepo) DeleteByID(string) error {
+	panic("unexpected DeleteByID")
+}
+
 type stubSupportUserRepo struct{ testsupport.PanicUserRepo }
 
 func (stubSupportUserRepo) IsAdmin(string) (bool, error) {
@@ -54,6 +63,103 @@ func (stubSupportUserRepo) HasSupportReportAccess(string) (bool, error) {
 func newTestSupportReportHandler(repo repository.SupportReportRepository) *SupportReportHandler {
 	svc := services.NewSupportReportService(repo, nil, stubSupportUserRepo{})
 	return NewSupportReportHandler(svc)
+}
+
+func newTestSupportReportHandlerWithPlane(repo repository.SupportReportRepository, plane services.SupportReportPlaneClient) *SupportReportHandler {
+	svc := services.NewSupportReportService(repo, plane, stubSupportUserRepo{})
+	return NewSupportReportHandler(svc)
+}
+
+type memSupportReportRepo struct {
+	mu sync.Mutex
+	m  map[string]*models.SupportReport
+}
+
+func newMemSupportReportRepo() *memSupportReportRepo {
+	return &memSupportReportRepo{m: make(map[string]*models.SupportReport)}
+}
+
+func (m *memSupportReportRepo) Create(row *models.SupportReport) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	cp := *row
+	m.m[row.ID] = &cp
+	return nil
+}
+
+func (m *memSupportReportRepo) FindByID(id string) (*models.SupportReport, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	r, ok := m.m[id]
+	if !ok {
+		return nil, gorm.ErrRecordNotFound
+	}
+	cp := *r
+	return &cp, nil
+}
+
+func (m *memSupportReportRepo) ListForUser(userID string, all bool) ([]models.SupportReport, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var out []models.SupportReport
+	for _, row := range m.m {
+		if all || row.CreatedByUserID == userID {
+			cp := *row
+			out = append(out, cp)
+		}
+	}
+	return out, nil
+}
+
+func (m *memSupportReportRepo) Update(row *models.SupportReport) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.m[row.ID]; !ok {
+		return gorm.ErrRecordNotFound
+	}
+	cp := *row
+	m.m[row.ID] = &cp
+	return nil
+}
+
+func (m *memSupportReportRepo) DeleteByID(id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.m, id)
+	return nil
+}
+
+type testPlaneStub struct {
+	createErr error
+	wid       string
+	seq       int
+	state     string
+}
+
+func (t *testPlaneStub) Enabled() bool { return true }
+
+func (t *testPlaneStub) CreateWorkItem(_ context.Context, _, _, _ string) (string, *int, string, error) {
+	if t.createErr != nil {
+		return "", nil, "", t.createErr
+	}
+	wid := t.wid
+	if wid == "" {
+		wid = "plane-wi-1"
+	}
+	s := t.seq
+	if s == 0 {
+		s = 42
+	}
+	seq := s
+	st := t.state
+	if st == "" {
+		st = "Todo"
+	}
+	return wid, &seq, st, nil
+}
+
+func (t *testPlaneStub) GetWorkItem(context.Context, string) (*int, string, error) {
+	return nil, "", nil
 }
 
 func TestSupportReportHandler_Create_Unauthorized(t *testing.T) {
@@ -191,5 +297,119 @@ func TestSupportReportHandler_GetByID_Forbidden(t *testing.T) {
 	r.ServeHTTP(rr, req)
 	if rr.Code != http.StatusForbidden {
 		t.Fatalf("GetByID: want %d, got %d body=%q", http.StatusForbidden, rr.Code, rr.Body.String())
+	}
+}
+
+func TestSupportReportHandler_Create_201(t *testing.T) {
+	t.Parallel()
+	mem := newMemSupportReportRepo()
+	h := newTestSupportReportHandlerWithPlane(mem, &testPlaneStub{})
+	body := `{"title":"hello","description":"world","diagnostics":{"k":1}}`
+	req := httptest.NewRequest(http.MethodPost, "/support/reports", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req = reqWithUserID(req, "user-1")
+	rr := httptest.NewRecorder()
+	h.Create(rr, req)
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("Create: want %d, got %d body=%q", http.StatusCreated, rr.Code, rr.Body.String())
+	}
+	var out models.SupportReport
+	if err := json.NewDecoder(rr.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	if out.PlaneWorkItemID == "" || out.TraceID == "" {
+		t.Fatalf("expected plane id and trace id, got %+v", out)
+	}
+	if out.Title != "hello" {
+		t.Fatalf("title: want hello, got %q", out.Title)
+	}
+}
+
+func TestSupportReportHandler_Create_PlaneErrorDeletesRow(t *testing.T) {
+	t.Parallel()
+	mem := newMemSupportReportRepo()
+	h := newTestSupportReportHandlerWithPlane(mem, &testPlaneStub{createErr: errors.New("plane down")})
+	body := `{"title":"t","description":"d"}`
+	req := httptest.NewRequest(http.MethodPost, "/support/reports", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req = reqWithUserID(req, "user-1")
+	rr := httptest.NewRecorder()
+	h.Create(rr, req)
+	if rr.Code != http.StatusBadGateway {
+		t.Fatalf("Create: want %d, got %d body=%q", http.StatusBadGateway, rr.Code, rr.Body.String())
+	}
+	mem.mu.Lock()
+	n := len(mem.m)
+	mem.mu.Unlock()
+	if n != 0 {
+		t.Fatalf("expected DB row removed after Plane failure, got %d rows", n)
+	}
+}
+
+func TestSupportReportHandler_List_OK_WithRows(t *testing.T) {
+	t.Parallel()
+	now := time.Now().UTC()
+	mem := newMemSupportReportRepo()
+	_ = mem.Create(&models.SupportReport{
+		ID:              "r1",
+		CreatedByUserID: "user-1",
+		Title:           "a",
+		PlaneWorkItemID: "p1",
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	})
+	_ = mem.Create(&models.SupportReport{
+		ID:              "r2",
+		CreatedByUserID: "user-1",
+		Title:           "b",
+		PlaneWorkItemID: "p2",
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	})
+	h := newTestSupportReportHandler(mem)
+	req := httptest.NewRequest(http.MethodGet, "/support/reports", nil)
+	req = reqWithUserID(req, "user-1")
+	rr := httptest.NewRecorder()
+	h.List(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("List: want %d, got %d", http.StatusOK, rr.Code)
+	}
+	var out []models.SupportReport
+	if err := json.NewDecoder(rr.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	if len(out) != 2 {
+		t.Fatalf("List: want 2 rows, got %d", len(out))
+	}
+}
+
+func TestSupportReportHandler_GetByID_OK_Author(t *testing.T) {
+	t.Parallel()
+	now := time.Now().UTC()
+	mem := newMemSupportReportRepo()
+	_ = mem.Create(&models.SupportReport{
+		ID:              "r-own",
+		CreatedByUserID: "user-1",
+		Title:           "mine",
+		PlaneWorkItemID: "",
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	})
+	h := newTestSupportReportHandler(mem)
+	r := chi.NewRouter()
+	r.Get("/support/reports/{id}", h.GetByID)
+	req := httptest.NewRequest(http.MethodGet, "/support/reports/r-own", nil)
+	req = reqWithUserID(req, "user-1")
+	rr := httptest.NewRecorder()
+	r.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("GetByID: want %d, got %d body=%q", http.StatusOK, rr.Code, rr.Body.String())
+	}
+	var got models.SupportReport
+	if err := json.NewDecoder(rr.Body).Decode(&got); err != nil {
+		t.Fatal(err)
+	}
+	if got.ID != "r-own" || got.Title != "mine" {
+		t.Fatalf("unexpected body: %+v", got)
 	}
 }

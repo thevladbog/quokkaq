@@ -24,7 +24,7 @@ import {
   type HandlersCreateSupportReportRequestDiagnostics
 } from '@/lib/api/generated/support';
 import { useActiveUnit } from '@/contexts/ActiveUnitContext';
-import { ApiHttpError } from '@/lib/api-errors';
+import { isApiHttpError } from '@/lib/api-errors';
 
 export type SupportReportDialogProps = {
   /** Custom trigger (e.g. floating action button). Defaults to secondary “Report issue” button. */
@@ -57,7 +57,7 @@ export default function SupportReportDialog({
         });
       },
       onError: (err) => {
-        if (err instanceof ApiHttpError && err.status === 503) {
+        if (isApiHttpError(err) && err.status === 503) {
           toast.error(t('planeUnavailable'));
           return;
         }
@@ -75,11 +75,16 @@ export default function SupportReportDialog({
             userAgent: window.navigator.userAgent
           }
         : {};
+    const traceId =
+      typeof window !== 'undefined' &&
+      typeof window.crypto?.randomUUID === 'function'
+        ? window.crypto.randomUUID()
+        : `support-report-${Date.now()}`;
     mutation.mutate({
       data: {
         title: title.trim(),
         description: description.trim(),
-        traceId: '',
+        traceId,
         diagnostics,
         unitId: activeUnitId ?? undefined
       }

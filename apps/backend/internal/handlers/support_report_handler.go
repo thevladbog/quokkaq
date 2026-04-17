@@ -6,12 +6,14 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/services"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -29,11 +31,13 @@ func NewSupportReportHandler(svc *services.SupportReportService) *SupportReportH
 }
 
 // createSupportReportRequest is the JSON body for POST /support/reports.
+// traceId is optional; when omitted or blank the server assigns a UUID.
+// diagnostics is optional; when omitted the server stores an empty object.
 type createSupportReportRequest struct {
 	Title       string          `json:"title" binding:"required"`
 	Description string          `json:"description" binding:"required"`
-	TraceID     string          `json:"traceId" binding:"required"`
-	Diagnostics json.RawMessage `json:"diagnostics" binding:"required" swaggertype:"object"`
+	TraceID     string          `json:"traceId,omitempty"`
+	Diagnostics json.RawMessage `json:"diagnostics,omitempty" swaggertype:"object"`
 	UnitID      *string         `json:"unitId"`
 }
 
@@ -76,10 +80,14 @@ func (h *SupportReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if len(req.Diagnostics) == 0 {
 		req.Diagnostics = json.RawMessage(`{}`)
 	}
+	traceID := strings.TrimSpace(req.TraceID)
+	if traceID == "" {
+		traceID = uuid.New().String()
+	}
 	row, err := h.svc.Create(r.Context(), uid, services.CreateReportInput{
 		Title:       req.Title,
 		Description: req.Description,
-		TraceID:     req.TraceID,
+		TraceID:     traceID,
 		Diagnostics: req.Diagnostics,
 		UnitID:      req.UnitID,
 	})

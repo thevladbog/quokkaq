@@ -922,9 +922,7 @@
                 },
                 "required": [
                     "description",
-                    "diagnostics",
-                    "title",
-                    "traceId"
+                    "title"
                 ],
                 "type": "object"
             },

@@ -13,6 +13,7 @@ type SupportReportRepository interface {
 	FindByID(id string) (*models.SupportReport, error)
 	ListForUser(userID string, all bool) ([]models.SupportReport, error)
 	Update(r *models.SupportReport) error
+	DeleteByID(id string) error
 }
 
 type supportReportRepository struct {
@@ -50,4 +51,8 @@ func (r *supportReportRepository) ListForUser(userID string, all bool) ([]models
 
 func (r *supportReportRepository) Update(row *models.SupportReport) error {
 	return r.db.Save(row).Error
+}
+
+func (r *supportReportRepository) DeleteByID(id string) error {
+	return r.db.Delete(&models.SupportReport{}, "id = ?", id).Error
 }

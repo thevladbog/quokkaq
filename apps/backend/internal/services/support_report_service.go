@@ -21,15 +21,23 @@ const maxPlaneRefreshPerList = 10
 
 const planeGetWorkItemTimeout = 8 * time.Second
 
+// SupportReportPlaneClient is the subset of Plane REST behavior used by support reports.
+// *PlaneClient implements it; tests may use stubs.
+type SupportReportPlaneClient interface {
+	Enabled() bool
+	CreateWorkItem(ctx context.Context, externalID, title, descriptionHTML string) (workItemID string, sequenceID *int, stateName string, err error)
+	GetWorkItem(ctx context.Context, workItemID string) (sequenceID *int, stateName string, err error)
+}
+
 // SupportReportService creates support reports and syncs status from Plane.
 type SupportReportService struct {
 	repo     repository.SupportReportRepository
-	plane    *PlaneClient
+	plane    SupportReportPlaneClient
 	userRepo repository.UserRepository
 }
 
 // NewSupportReportService constructs SupportReportService.
-func NewSupportReportService(repo repository.SupportReportRepository, plane *PlaneClient, userRepo repository.UserRepository) *SupportReportService {
+func NewSupportReportService(repo repository.SupportReportRepository, plane SupportReportPlaneClient, userRepo repository.UserRepository) *SupportReportService {
 	return &SupportReportService{repo: repo, plane: plane, userRepo: userRepo}
 }
 
@@ -85,6 +93,9 @@ func (s *SupportReportService) Create(ctx context.Context, userID string, in Cre
 	planeID, seq, stateName, err := s.plane.CreateWorkItem(ctx, row.ID, title, html)
 	if err != nil {
 		log.Printf("support report: Plane CreateWorkItem failed after DB insert id=%s: %v", row.ID, err)
+		if delErr := s.repo.DeleteByID(row.ID); delErr != nil {
+			log.Printf("support report: cleanup DeleteByID after Plane failure id=%s: %v", row.ID, delErr)
+		}
 		return nil, err
 	}
 	row.PlaneWorkItemID = planeID

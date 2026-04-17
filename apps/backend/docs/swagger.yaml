@@ -606,9 +606,7 @@ components:
           type: string
       required:
       - description
-      - diagnostics
       - title
-      - traceId
       type: object
     handlers.createSurveyRequest:
       properties:

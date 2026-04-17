@@ -13,7 +13,7 @@ import {
   CardTitle
 } from '@/components/ui/card';
 import { useGetSupportReportByID } from '@/lib/api/generated/support';
-import { ApiHttpError } from '@/lib/api-errors';
+import { isApiHttpError } from '@/lib/api-errors';
 import { toast } from 'sonner';
 
 function formatDate(iso: string | undefined) {
@@ -54,7 +54,7 @@ export default function StaffSupportDetailPage({
 
   if (q.isError) {
     const err = q.error;
-    if (err instanceof ApiHttpError) {
+    if (isApiHttpError(err)) {
       if (err.status === 404) {
         return (
           <div className='container mx-auto max-w-2xl p-4 md:p-6'>
