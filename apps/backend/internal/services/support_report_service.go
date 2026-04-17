@@ -51,13 +51,33 @@ type SupportReportService struct {
 	createPlatform string
 	userRepo       repository.UserRepository
 	companyRepo    repository.CompanyRepository
+	// cancelComment is SUPPORT_REPORT_CANCEL_COMMENT (trimmed) or the default applicant-facing Russian line.
+	cancelComment string
+}
+
+// supportReportTrackerAccessPatcher is implemented by backends that sync Tracker-only fields (e.g. apiAccessToTheTicket).
+type supportReportTrackerAccessPatcher interface {
+	PatchIssueAPIAccessToTicket(ctx context.Context, issueKey, csv string) error
 }
 
 // NewSupportReportService constructs SupportReportService.
 // createPlatform is models.TicketBackendPlane, models.TicketBackendYandexTracker, or SupportReportPlatformNone.
 // companyRepo may be nil (Yandex Tracker company field on create will be left empty).
 func NewSupportReportService(repo repository.SupportReportRepository, shareRepo repository.SupportReportShareRepository, plane, tracker SupportReportTicketClient, createPlatform string, userRepo repository.UserRepository, companyRepo repository.CompanyRepository) *SupportReportService {
-	return &SupportReportService{repo: repo, shareRepo: shareRepo, plane: plane, tracker: tracker, createPlatform: createPlatform, userRepo: userRepo, companyRepo: companyRepo}
+	cc := strings.TrimSpace(os.Getenv("SUPPORT_REPORT_CANCEL_COMMENT"))
+	if cc == "" {
+		cc = "Спасибо, что написали нам. Это обращение закрыто в QuokkaQ. Если снова понадобится помощь — обращайтесь, мы на связи."
+	}
+	return &SupportReportService{
+		repo:           repo,
+		shareRepo:      shareRepo,
+		plane:          plane,
+		tracker:        tracker,
+		createPlatform: createPlatform,
+		userRepo:       userRepo,
+		companyRepo:    companyRepo,
+		cancelComment:  cc,
+	}
 }
 
 func normalizeTicketBackend(backend string) string {
@@ -291,15 +311,18 @@ func (s *SupportReportService) syncYandexAPIAccessToTicket(ctx context.Context, 
 	if ext == "" {
 		return nil
 	}
-	yt, ok := s.tracker.(*YandexTrackerClient)
-	if !ok || yt == nil || !yt.Enabled() {
+	if s.tracker == nil || !s.tracker.Enabled() {
+		return nil
+	}
+	patcher, ok := s.tracker.(supportReportTrackerAccessPatcher)
+	if !ok || patcher == nil {
 		return nil
 	}
 	csv, err := s.supportReportAPIAccessorUserIDsCSVForReport(row)
 	if err != nil {
 		return err
 	}
-	return yt.PatchIssueAPIAccessToTicket(ctx, ext, csv)
+	return patcher.PatchIssueAPIAccessToTicket(ctx, ext, csv)
 }
 
 func (s *SupportReportService) yandexTrackerReportGate(row *models.SupportReport, errNonYandex error) error {
@@ -337,7 +360,7 @@ func (s *SupportReportService) canManageSupportReportShares(viewerID string, row
 type SupportReportShareListItem struct {
 	UserID          string    `json:"userId"`
 	GrantedByUserID string    `json:"grantedByUserId"`
-	CreatedAt       time.Time `json:"createdAt"`
+	CreatedAt       time.Time `json:"createdAt" swaggertype:"string" format:"date-time"`
 	DisplayName     string    `json:"displayName,omitempty"`
 }
 
@@ -739,15 +762,15 @@ func (s *SupportReportService) MarkIrrelevant(ctx context.Context, userID, repor
 	if row.MarkedIrrelevantAt != nil {
 		return row, nil
 	}
-	comment := strings.TrimSpace(os.Getenv("SUPPORT_REPORT_CANCEL_COMMENT"))
-	if comment == "" {
-		// Applicant-facing line in the external ticket (Russian default; override via SUPPORT_REPORT_CANCEL_COMMENT).
-		comment = "Спасибо, что написали нам. Это обращение закрыто в QuokkaQ. Если снова понадобится помощь — обращайтесь, мы на связи."
-	}
+	comment := s.cancelComment
 	cli := s.clientForBackend(row.TicketBackend)
 	if cli != nil && cli.Enabled() && strings.TrimSpace(row.PlaneWorkItemID) != "" {
 		if err := cli.AddComment(ctx, strings.TrimSpace(row.PlaneWorkItemID), comment); err != nil {
-			return nil, err
+			if errors.Is(err, ErrPlaneCommentsUnsupported) {
+				log.Printf("support report: MarkIrrelevant skipping external cancel comment (backend does not support posting this comment) reportID=%s workItemID=%s", reportID, strings.TrimSpace(row.PlaneWorkItemID))
+			} else {
+				return nil, err
+			}
 		}
 	}
 	now := time.Now().UTC()

@@ -889,6 +889,9 @@
                         "type": "string"
                     }
                 },
+                "required": [
+                    "userId"
+                ],
                 "type": "object"
             },
             "handlers.companyMeResponse": {
@@ -928,6 +931,10 @@
                         "type": "string"
                     }
                 },
+                "required": [
+                    "description",
+                    "title"
+                ],
                 "type": "object"
             },
             "handlers.createSurveyRequest": {
@@ -1142,6 +1149,9 @@
                         "type": "string"
                     }
                 },
+                "required": [
+                    "text"
+                ],
                 "type": "object"
             },
             "handlers.putVisitorTagsRequest": {
@@ -3443,6 +3453,7 @@
             "services.SupportReportShareListItem": {
                 "properties": {
                     "createdAt": {
+                        "format": "date-time",
                         "type": "string"
                     },
                     "displayName": {

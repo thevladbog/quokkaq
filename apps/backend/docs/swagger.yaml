@@ -583,6 +583,8 @@ components:
       properties:
         userId:
           type: string
+      required:
+      - userId
       type: object
     handlers.companyMeResponse:
       properties:
@@ -609,6 +611,9 @@ components:
           type: string
         unitId:
           type: string
+      required:
+      - description
+      - title
       type: object
     handlers.createSurveyRequest:
       properties:
@@ -751,6 +756,8 @@ components:
       properties:
         text:
           type: string
+      required:
+      - text
       type: object
     handlers.putVisitorTagsRequest:
       properties:
@@ -2296,6 +2303,7 @@ components:
     services.SupportReportShareListItem:
       properties:
         createdAt:
+          format: date-time
           type: string
         displayName:
           type: string

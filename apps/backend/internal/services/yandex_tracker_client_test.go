@@ -21,6 +21,7 @@ func TestYandexTrackerClient_CreateWorkItem_ArrayResponse(t *testing.T) {
 	}))
 	defer srv.Close()
 
+	t.Setenv("YANDEX_TRACKER_SA_KEY_FILE", "")
 	t.Setenv("YANDEX_TRACKER_API_BASE", srv.URL)
 	t.Setenv("YANDEX_TRACKER_TOKEN", "test-token")
 	t.Setenv("YANDEX_TRACKER_ORG_ID", "1")
@@ -48,10 +49,12 @@ func TestYandexTrackerClient_CreateWorkItem_ObjectResponse(t *testing.T) {
 	}))
 	defer srv.Close()
 
+	t.Setenv("YANDEX_TRACKER_SA_KEY_FILE", "")
 	t.Setenv("YANDEX_TRACKER_API_BASE", srv.URL)
 	t.Setenv("YANDEX_TRACKER_TOKEN", "t")
 	t.Setenv("YANDEX_TRACKER_ORG_ID", "1")
 	t.Setenv("YANDEX_TRACKER_QUEUE", "FOO")
+	t.Setenv("YANDEX_TRACKER_USE_CLOUD_ORG_ID", "false")
 
 	c := NewYandexTrackerClientFromEnv()
 	id, _, st, err := c.CreateWorkItem(context.Background(), "", "t", "d", SupportReportTicketCreateExtras{})
@@ -73,10 +76,12 @@ func TestYandexTrackerClient_CreateWorkItem_SetsAPIAccessToTheTicket(t *testing.
 	}))
 	defer srv.Close()
 
+	t.Setenv("YANDEX_TRACKER_SA_KEY_FILE", "")
 	t.Setenv("YANDEX_TRACKER_API_BASE", srv.URL)
 	t.Setenv("YANDEX_TRACKER_TOKEN", "t")
 	t.Setenv("YANDEX_TRACKER_ORG_ID", "1")
 	t.Setenv("YANDEX_TRACKER_QUEUE", "Z")
+	t.Setenv("YANDEX_TRACKER_USE_CLOUD_ORG_ID", "false")
 
 	c := NewYandexTrackerClientFromEnv()
 	wantAccess := "author-uuid,admin-uuid"

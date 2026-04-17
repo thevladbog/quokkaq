@@ -13,11 +13,16 @@ import { Button } from '@/components/ui/button';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { Copy, KeyRound } from 'lucide-react';
-import {
-  companiesMeLoginLinkPost,
-  type CompaniesMeLoginLinkPost200
-} from '@/lib/api/generated/auth';
+import { companiesMeLoginLinkPost } from '@/lib/api/generated/auth';
 import { resolvePublicAppBase } from '@/components/organization/organization-auth-shared';
+
+/** Shape of `res.data` for a 200 from `companiesMeLoginLinkPost` (derived so Orval renames do not break imports). */
+type CompaniesMeLoginLinkData = NonNullable<
+  Extract<
+    Awaited<ReturnType<typeof companiesMeLoginLinkPost>>,
+    { status: 200 }
+  >['data']
+>;
 
 type OrganizationOpaqueLoginLinkCardProps = {
   publicAppUrl?: string | null;
@@ -39,7 +44,7 @@ export function OrganizationOpaqueLoginLinkCard({
       if (res.status !== 200 || !res.data) {
         throw new Error(t('linkError'));
       }
-      const data: CompaniesMeLoginLinkPost200 = res.data;
+      const data: CompaniesMeLoginLinkData = res.data;
       const token = data.token ?? '';
       const example =
         data.exampleUrl ??

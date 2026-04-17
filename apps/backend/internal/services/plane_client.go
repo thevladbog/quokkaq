@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html"
 	"io"
@@ -46,6 +47,9 @@ func newPlaneHTTPError(status int, body []byte) *PlaneHTTPError {
 	}
 }
 
+// ErrPlaneCommentsUnsupported is returned by PlaneClient.AddComment; Plane work-item comments are not implemented in this integration.
+var ErrPlaneCommentsUnsupported = errors.New("plane: work item comments are not supported in this integration")
+
 // PlaneClient calls the Plane REST API (self-hosted or cloud).
 type PlaneClient struct {
 	baseURL       string
@@ -80,8 +84,8 @@ func newPlaneHTTPClientFromEnv() *http.Client {
 	t := base.Clone()
 	if skipVerify {
 		// Explicit opt-in for private Plane hosts (corporate CA / self-signed). Prefer installing the CA on the API server.
-		t.TLSClientConfig = &tls.Config{ // #nosec G402 -- gated by PLANE_TLS_INSECURE_SKIP_VERIFY
-			InsecureSkipVerify: true,
+		t.TLSClientConfig = &tls.Config{
+			InsecureSkipVerify: true, // #nosec G402 -- gated by PLANE_TLS_INSECURE_SKIP_VERIFY (dev/private CA only)
 			MinVersion:         tls.VersionTLS12,
 		}
 	}
@@ -267,7 +271,7 @@ func (c *PlaneClient) CreateWorkItem(ctx context.Context, externalID, title, des
 	if err != nil {
 		return "", nil, "", err
 	}
-	u := fmt.Sprintf("%s/api/v1/workspaces/%s/projects/%s/work-items/", c.baseURL, c.workspaceSlug, projectUUID)
+	u := fmt.Sprintf("%s/api/v1/workspaces/%s/projects/%s/work-items/", c.baseURL, url.PathEscape(c.workspaceSlug), url.PathEscape(projectUUID))
 	payload := map[string]interface{}{
 		"name":             title,
 		"description_html": descriptionHTML,
@@ -317,7 +321,7 @@ func (c *PlaneClient) GetWorkItem(ctx context.Context, workItemID string) (seque
 	if err != nil {
 		return nil, "", err
 	}
-	u := fmt.Sprintf("%s/api/v1/workspaces/%s/projects/%s/work-items/%s/?expand=state", c.baseURL, c.workspaceSlug, projectUUID, workItemID)
+	u := fmt.Sprintf("%s/api/v1/workspaces/%s/projects/%s/work-items/%s/?expand=state", c.baseURL, url.PathEscape(c.workspaceSlug), url.PathEscape(projectUUID), url.PathEscape(workItemID))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, "", err
@@ -345,7 +349,7 @@ func (c *PlaneClient) GetWorkItem(ctx context.Context, workItemID string) (seque
 
 // AddComment is not implemented for Plane (no stable comment API in this integration).
 func (c *PlaneClient) AddComment(context.Context, string, string) error {
-	return nil
+	return ErrPlaneCommentsUnsupported
 }
 
 // BuildSupportDescriptionHTML escapes user text and appends optional diagnostics block.

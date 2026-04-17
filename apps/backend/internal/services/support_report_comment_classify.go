@@ -14,8 +14,8 @@ const (
 
 var (
 	// Optional backslashes before brackets (e.g. Markdown-escaped \[public\] in Tracker text).
-	reSupportCommentPublicPrefix = regexp.MustCompile(`(?i)^\s*\x{FEFF}?\s*\\*\[\\*public\\*\]\s*`)
-	reSupportCommentEmailPrefix  = regexp.MustCompile(`(?i)^\s*\x{FEFF}?\s*\\*\[\\*email\\*\]\s*`)
+	reSupportCommentPublicPrefix = regexp.MustCompile(`(?i)^\s*[\x{FEFF}\x{200B}\x{200C}\x{200D}]*\s*\\*\[\\*public\\*\]\s*`)
+	reSupportCommentEmailPrefix  = regexp.MustCompile(`(?i)^\s*[\x{FEFF}\x{200B}\x{200C}\x{200D}]*\s*\\*\[\\*email\\*\]\s*`)
 	reStripHTMLScript            = regexp.MustCompile(`(?is)<script[^>]*>.*?</script>`)
 	reStripHTMLStyle             = regexp.MustCompile(`(?is)<style[^>]*>.*?</style>`)
 	reStripHTMLBr                = regexp.MustCompile(`(?i)<br\s*/?>`)

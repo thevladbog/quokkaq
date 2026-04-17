@@ -179,7 +179,7 @@ func (t *testPlaneStub) GetWorkItem(context.Context, string) (*int, string, erro
 
 func (t *testPlaneStub) AddComment(_ context.Context, _, _ string) error {
 	t.addCalls++
-	return nil
+	return services.ErrPlaneCommentsUnsupported
 }
 
 func TestSupportReportHandler_Create_Unauthorized(t *testing.T) {

@@ -35,8 +35,8 @@ func NewSupportReportHandler(svc *services.SupportReportService) *SupportReportH
 // traceId is optional; when omitted or blank the server assigns a UUID.
 // diagnostics is optional; when omitted the server stores an empty object.
 type createSupportReportRequest struct {
-	Title       string          `json:"title"`
-	Description string          `json:"description"`
+	Title       string          `json:"title" binding:"required"`
+	Description string          `json:"description" binding:"required"`
 	TraceID     string          `json:"traceId,omitempty"`
 	Diagnostics json.RawMessage `json:"diagnostics,omitempty" swaggertype:"object"`
 	UnitID      *string         `json:"unitId"`
@@ -252,7 +252,7 @@ func (h *SupportReportHandler) MarkIrrelevant(w http.ResponseWriter, r *http.Req
 }
 
 type addSupportReportShareRequest struct {
-	UserID string `json:"userId"`
+	UserID string `json:"userId" binding:"required"`
 }
 
 // ListShareCandidates godoc
@@ -502,7 +502,7 @@ func (h *SupportReportHandler) RemoveShare(w http.ResponseWriter, r *http.Reques
 }
 
 type postSupportReportCommentRequest struct {
-	Text string `json:"text"`
+	Text string `json:"text" binding:"required"`
 }
 
 // ListComments godoc
