@@ -344,12 +344,35 @@ export interface HandlersCreateInvitationRequest {
   templateId?: string;
 }
 
-export interface HandlersCreateTicketRequest {
-  clientId?: string;
+export interface HandlersCreateTicketRequestAnonymous {
+  /** @minLength 1 */
   serviceId: string;
-  visitorLocale?: string;
-  visitorPhone?: string;
 }
+
+export interface HandlersCreateTicketRequestStaff {
+  /** @minLength 1 */
+  serviceId: string;
+  /** @minLength 1 */
+  clientId: string;
+}
+
+export type HandlersCreateTicketRequestKioskVisitorLocale = typeof HandlersCreateTicketRequestKioskVisitorLocale[keyof typeof HandlersCreateTicketRequestKioskVisitorLocale];
+
+
+export const HandlersCreateTicketRequestKioskVisitorLocale = {
+  en: 'en',
+  ru: 'ru',
+} as const;
+
+export interface HandlersCreateTicketRequestKiosk {
+  /** @minLength 1 */
+  serviceId: string;
+  /** @minLength 1 */
+  visitorPhone: string;
+  visitorLocale: HandlersCreateTicketRequestKioskVisitorLocale;
+}
+
+export type HandlersCreateTicketRequest = HandlersCreateTicketRequestAnonymous | HandlersCreateTicketRequestStaff | HandlersCreateTicketRequestKiosk;
 
 export interface HandlersDaDataFindPartyByInnRequest {
   inn: string;
@@ -458,7 +481,8 @@ export interface HandlersLoginSessionResponse {
 }
 
 export interface HandlersOperatorCommentPatchDTO {
-  operatorComment: string;
+  /** @nullable */
+  operatorComment: string | null;
 }
 
 export type HandlersPatchPlatformCompanyBodyBillingAddress = { [key: string]: unknown };
@@ -518,11 +542,11 @@ export interface HandlersPatchUnitClientRequest {
 export type HandlersPatchUnitKioskConfigRequestConfigKiosk = { [key: string]: unknown };
 
 export type HandlersPatchUnitKioskConfigRequestConfig = {
-  kiosk?: HandlersPatchUnitKioskConfigRequestConfigKiosk;
+  kiosk: HandlersPatchUnitKioskConfigRequestConfigKiosk;
 };
 
 export interface HandlersPatchUnitKioskConfigRequest {
-  config?: HandlersPatchUnitKioskConfigRequestConfig;
+  config: HandlersPatchUnitKioskConfigRequestConfig;
 }
 
 export interface HandlersPeriodResponse {
@@ -618,7 +642,8 @@ export interface HandlersSignupRequest {
 }
 
 export interface HandlersTransferRequest {
-  operatorComment?: string;
+  /** @nullable */
+  operatorComment?: string | null;
   toCounterId?: string;
   toServiceId?: string;
   toServiceZoneId?: string;
@@ -635,15 +660,15 @@ export interface HandlersUpdateStatusRequest {
 }
 
 export interface HandlersUploadLogoResponse {
-  url?: string;
+  url: string;
 }
 
 export interface HandlersUploadSurveyCompletionImageResponse {
-  url?: string;
+  url: string;
 }
 
 export interface HandlersUploadSurveyIdleMediaResponse {
-  url?: string;
+  url: string;
 }
 
 export interface HandlersUsageMetricInfoResponse {
@@ -898,11 +923,12 @@ export interface HandlersCreateSurveyRequest {
   completionMessage?: HandlersCreateSurveyRequestCompletionMessage;
   displayTheme?: HandlersCreateSurveyRequestDisplayTheme;
   idleScreen?: HandlersCreateSurveyRequestIdleScreen;
-  questions?: HandlersCreateSurveyRequestQuestions;
-  title?: string;
+  questions: HandlersCreateSurveyRequestQuestions;
+  title: string;
 }
 
 export interface HandlersCreateVisitorTagDefinitionRequest {
+  /** @pattern ^#[0-9A-Fa-f]{6}$ */
   color: string;
   label: string;
   sortOrder?: number;
@@ -922,13 +948,13 @@ export interface HandlersEmergencyUnlockBody {
 export type HandlersGuestSurveySubmitRequestAnswers = { [key: string]: unknown };
 
 export interface HandlersGuestSurveySubmitRequest {
-  answers?: HandlersGuestSurveySubmitRequestAnswers;
-  surveyId?: string;
-  ticketId?: string;
+  answers: HandlersGuestSurveySubmitRequestAnswers;
+  surveyId: string;
+  ticketId: string;
 }
 
 export interface HandlersPatchCompanySlugRequest {
-  slug?: string;
+  slug: string;
 }
 
 export type HandlersPatchSurveyRequestCompletionMessage = { [key: string]: unknown };
@@ -948,6 +974,7 @@ export interface HandlersPatchSurveyRequest {
 }
 
 export interface HandlersPatchVisitorTagDefinitionRequest {
+  /** @pattern ^#[0-9A-Fa-f]{6}$ */
   color?: string;
   label?: string;
   sortOrder?: number;
@@ -1016,11 +1043,11 @@ export interface HandlersSetupFirstAdminRequest {
 }
 
 export interface HandlersSsoExchangeRequest {
-  code?: string;
+  code: string;
 }
 
 export interface HandlersTenantHintRequest {
-  email?: string;
+  email: string;
 }
 
 export interface ModelsCatalogItemCreateRequest {
@@ -1323,6 +1350,14 @@ export interface ServicesCalendarIntegrationPublic {
   username?: string;
 }
 
+export type ServicesCompanySSOGetResponseSsoProtocol = typeof ServicesCompanySSOGetResponseSsoProtocol[keyof typeof ServicesCompanySSOGetResponseSsoProtocol];
+
+
+export const ServicesCompanySSOGetResponseSsoProtocol = {
+  oidc: 'oidc',
+  saml: 'saml',
+} as const;
+
 export interface ServicesCompanySSOGetResponse {
   clientId?: string;
   clientSecretSet?: boolean;
@@ -1331,8 +1366,19 @@ export interface ServicesCompanySSOGetResponse {
   issuerUrl?: string;
   samlIdpMetadataUrl?: string;
   scopes?: string;
-  ssoProtocol?: string;
+  ssoProtocol?: ServicesCompanySSOGetResponseSsoProtocol;
 }
+
+/**
+ * "oidc" | "saml"
+ */
+export type ServicesCompanySSOPatchSsoProtocol = typeof ServicesCompanySSOPatchSsoProtocol[keyof typeof ServicesCompanySSOPatchSsoProtocol];
+
+
+export const ServicesCompanySSOPatchSsoProtocol = {
+  oidc: 'oidc',
+  saml: 'saml',
+} as const;
 
 export interface ServicesCompanySSOPatch {
   clientId?: string;
@@ -1344,7 +1390,7 @@ export interface ServicesCompanySSOPatch {
   samlIdpMetadataUrl?: string;
   scopes?: string;
   /** "oidc" | "saml" */
-  ssoProtocol?: string;
+  ssoProtocol?: ServicesCompanySSOPatchSsoProtocol;
 }
 
 export interface ServicesCreateCalendarIntegrationRequest {
@@ -1537,10 +1583,22 @@ export interface ServicesSurveyScoresResponse {
   points?: ServicesSurveyScorePoint[];
 }
 
+/**
+ * sso | password | choose_slug
+ */
+export type ServicesTenantHintResponseNext = typeof ServicesTenantHintResponseNext[keyof typeof ServicesTenantHintResponseNext];
+
+
+export const ServicesTenantHintResponseNext = {
+  sso: 'sso',
+  password: 'password',
+  choose_slug: 'choose_slug',
+} as const;
+
 export interface ServicesTenantHintResponse {
   displayName?: string;
   /** sso | password | choose_slug */
-  next?: string;
+  next?: ServicesTenantHintResponseNext;
   ssoAvailable?: boolean;
   tenantSlug?: string;
 }
@@ -1630,6 +1688,13 @@ export interface ServicesUtilizationResponse {
   computedAt?: string;
   granularity?: string;
   points?: ServicesUtilizationPoint[];
+}
+
+export interface HandlersLoginLinkResponse {
+  /** Opaque tenant login token for strict-tenant links */
+  token: string;
+  /** Example full login URL including the token query parameter */
+  exampleUrl: string;
 }
 
 export type PatchUnitsUnitIdAdSettingsBody = { [key: string]: unknown };
@@ -1858,6 +1923,96 @@ export const usePostUnits = <TError = string,
     }
 
 /**
+ * Deletes a unit by its ID
+ * @summary Delete a unit
+ */
+export type deleteUnitsIdResponse204 = {
+  data: void
+  status: 204
+}
+
+export type deleteUnitsIdResponse500 = {
+  data: string
+  status: 500
+}
+
+export type deleteUnitsIdResponseSuccess = (deleteUnitsIdResponse204) & {
+  headers: Headers;
+};
+export type deleteUnitsIdResponseError = (deleteUnitsIdResponse500) & {
+  headers: Headers;
+};
+
+export type deleteUnitsIdResponse = (deleteUnitsIdResponseSuccess | deleteUnitsIdResponseError)
+
+export const getDeleteUnitsIdUrl = (id: string,) => {
+
+
+
+
+  return `/units/${id}`
+}
+
+export const deleteUnitsId = async (id: string, options?: RequestInit): Promise<deleteUnitsIdResponse> => {
+
+  return orvalMutator<deleteUnitsIdResponse>(getDeleteUnitsIdUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteUnitsIdMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteUnitsId>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteUnitsId>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['deleteUnitsId'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteUnitsId>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteUnitsId(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteUnitsIdMutationResult = NonNullable<Awaited<ReturnType<typeof deleteUnitsId>>>
+
+    export type DeleteUnitsIdMutationError = string
+
+    /**
+ * @summary Delete a unit
+ */
+export const useDeleteUnitsId = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteUnitsId>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteUnitsId>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getDeleteUnitsIdMutationOptions(options), queryClient);
+    }
+
+/**
  * Retrieves a specific unit by its ID
  * @summary Get a unit by ID
  */
@@ -1977,96 +2132,6 @@ export function useGetUnitsId<TData = Awaited<ReturnType<typeof getUnitsId>>, TE
 
 
 
-
-/**
- * Deletes a unit by its ID
- * @summary Delete a unit
- */
-export type deleteUnitsIdResponse204 = {
-  data: void
-  status: 204
-}
-
-export type deleteUnitsIdResponse500 = {
-  data: string
-  status: 500
-}
-
-export type deleteUnitsIdResponseSuccess = (deleteUnitsIdResponse204) & {
-  headers: Headers;
-};
-export type deleteUnitsIdResponseError = (deleteUnitsIdResponse500) & {
-  headers: Headers;
-};
-
-export type deleteUnitsIdResponse = (deleteUnitsIdResponseSuccess | deleteUnitsIdResponseError)
-
-export const getDeleteUnitsIdUrl = (id: string,) => {
-
-
-
-
-  return `/units/${id}`
-}
-
-export const deleteUnitsId = async (id: string, options?: RequestInit): Promise<deleteUnitsIdResponse> => {
-
-  return orvalMutator<deleteUnitsIdResponse>(getDeleteUnitsIdUrl(id),
-  {
-    ...options,
-    method: 'DELETE'
-
-
-  }
-);}
-
-
-
-
-export const getDeleteUnitsIdMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteUnitsId>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof deleteUnitsId>>, TError,{id: string}, TContext> => {
-
-const mutationKey = ['deleteUnitsId'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteUnitsId>>, {id: string}> = (props) => {
-          const {id} = props ?? {};
-
-          return  deleteUnitsId(id,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type DeleteUnitsIdMutationResult = NonNullable<Awaited<ReturnType<typeof deleteUnitsId>>>
-
-    export type DeleteUnitsIdMutationError = string
-
-    /**
- * @summary Delete a unit
- */
-export const useDeleteUnitsId = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteUnitsId>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof deleteUnitsId>>,
-        TError,
-        {id: string},
-        TContext
-      > => {
-      return useMutation(getDeleteUnitsIdMutationOptions(options), queryClient);
-    }
 
 /**
  * Updates an existing unit
