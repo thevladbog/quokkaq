@@ -862,6 +862,7 @@ CI автоматически:
 
 ## 📚 Дополнительные ресурсы
 
+- [Вики для операторов (исходники в Markdown)](docs/wiki/) — в приложении открывается как `/{locale}/help/...`
 - [Документация Frontend](apps/frontend/README.md)
 - [Документация Backend](apps/backend/README.md) | [Русская](apps/backend/README.ru.md)
 - [Документация Kiosk](apps/kiosk-desktop/README.md)

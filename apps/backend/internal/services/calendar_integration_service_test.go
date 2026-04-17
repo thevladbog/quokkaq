@@ -376,3 +376,105 @@ func TestCalendarIntegrationService_ResolveIntegrationForPreReg_ExplicitID(t *te
 		t.Fatal("expected error for wrong unit")
 	}
 }
+
+func TestCalendarIntegrationService_CreateGoogleIntegration(t *testing.T) {
+	defer setupCalendarIntegrationServiceTestDB(t)()
+	svc := newTestCalendarService()
+	if err := database.DB.Create(&models.Unit{
+		ID:        "unit-g",
+		CompanyID: "co-g",
+		Code:      "g",
+		Kind:      models.UnitKindSubdivision,
+		Name:      "G",
+		Timezone:  "UTC",
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	pub, err := svc.CreateGoogleIntegration("co-g", "unit-g", "refresh-token-xyz", "user@gmail.com", "user@gmail.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pub.Kind != models.CalendarIntegrationKindGoogleCalDAV {
+		t.Fatalf("kind: %s", pub.Kind)
+	}
+	if pub.CaldavBaseURL != models.GoogleCalDAVBaseURL {
+		t.Fatalf("base url: %s", pub.CaldavBaseURL)
+	}
+	wantPath := models.GoogleCalDAVEventsCollectionPath("user@gmail.com")
+	if pub.CalendarPath != wantPath {
+		t.Fatalf("calendar path: %q want %q", pub.CalendarPath, wantPath)
+	}
+	if pub.Username != "user@gmail.com" {
+		t.Fatalf("username: %s", pub.Username)
+	}
+}
+
+func TestCalendarIntegrationService_CreateGoogleIntegration_secondaryCalendarID(t *testing.T) {
+	defer setupCalendarIntegrationServiceTestDB(t)()
+	svc := newTestCalendarService()
+	if err := database.DB.Create(&models.Unit{
+		ID:        "unit-g3",
+		CompanyID: "co-g3",
+		Code:      "g3",
+		Kind:      models.UnitKindSubdivision,
+		Name:      "G3",
+		Timezone:  "UTC",
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	calID := "team.cal@group.calendar.google.com"
+	pub, err := svc.CreateGoogleIntegration("co-g3", "unit-g3", "refresh-token-sec", "user@gmail.com", calID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantPath := models.GoogleCalDAVEventsCollectionPath(calID)
+	if pub.CalendarPath != wantPath {
+		t.Fatalf("calendar path: %q want %q", pub.CalendarPath, wantPath)
+	}
+}
+
+func TestCalendarIntegrationService_UpdateIntegration_GooglePreservesCalDAVIdentity(t *testing.T) {
+	defer setupCalendarIntegrationServiceTestDB(t)()
+	svc := newTestCalendarService()
+	if err := database.DB.Create(&models.Unit{
+		ID:        "unit-g2",
+		CompanyID: "co-g2",
+		Code:      "g2",
+		Kind:      models.UnitKindSubdivision,
+		Name:      "G2",
+		Timezone:  "UTC",
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	pub, err := svc.CreateGoogleIntegration("co-g2", "unit-g2", "refresh-token-abc", "user@gmail.com", "user@gmail.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantPath := pub.CalendarPath
+	up, err := svc.UpdateIntegration("co-g2", pub.ID, &UpdateCalendarIntegrationRequest{
+		DisplayName:   "Renamed",
+		Enabled:       boolPtr(true),
+		CaldavBaseURL: "https://evil.example",
+		CalendarPath:  "/hacked/",
+		Username:      "hacker@evil.com",
+		Timezone:      "Europe/London",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if up.CaldavBaseURL != models.GoogleCalDAVBaseURL {
+		t.Fatalf("caldav base: %s", up.CaldavBaseURL)
+	}
+	if up.CalendarPath != wantPath {
+		t.Fatalf("calendar path changed: %q want %q", up.CalendarPath, wantPath)
+	}
+	if up.Username != "user@gmail.com" {
+		t.Fatalf("username changed: %s", up.Username)
+	}
+	if up.DisplayName != "Renamed" {
+		t.Fatalf("display name: %s", up.DisplayName)
+	}
+	if up.Timezone != "Europe/London" {
+		t.Fatalf("timezone: %s", up.Timezone)
+	}
+}

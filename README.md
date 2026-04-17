@@ -841,6 +841,7 @@ For complete license terms, see:
 
 ## 📚 Additional Resources
 
+- [Operator wiki (markdown source)](docs/wiki/) — in-app help is served from this tree under `/{locale}/help/...`
 - [Frontend Documentation](apps/frontend/README.md)
 - [Backend Documentation](apps/backend/README.md) | [Russian](apps/backend/README.ru.md)
 - [Kiosk Documentation](apps/kiosk-desktop/README.md)

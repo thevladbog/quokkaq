@@ -365,6 +365,7 @@ func main() {
 		r.With(authmiddleware.SSOPublicRateLimit).Post("/saml/acs", ssoHandler.SAMLACS)
 		// Callback uses SSOCallbackRateLimit (softer than SSOPublicRateLimit): IdP redirect chains can hit this route more often than typical API calls. See middleware/sso_ratelimit.go.
 		r.With(authmiddleware.SSOCallbackRateLimit).Get("/sso/callback", ssoHandler.SSOCallback)
+		r.With(authmiddleware.SSOCallbackRateLimit).Get("/calendar-integrations/google/oauth/callback", calendarIntegrationHandler.GoogleOAuthCallback)
 		r.With(authmiddleware.SSOPublicRateLimit).Post("/sso/exchange", ssoHandler.SSOExchange)
 		r.Post("/refresh", authHandler.Refresh)
 		r.Post("/forgot-password", authHandler.RequestPasswordReset)
@@ -604,6 +605,9 @@ func main() {
 			r.Patch("/me/slug", companySSOHTTP.PatchCompanySlug)
 			r.Post("/me/login-links", companySSOHTTP.CreateOpaqueLoginLink)
 			r.Get("/me/calendar-integrations", calendarIntegrationHandler.ListMine)
+			r.Post("/me/calendar-integrations/google/oauth/start", calendarIntegrationHandler.GoogleOAuthStart)
+			r.Post("/me/calendar-integrations/google/oauth/list-calendars", calendarIntegrationHandler.GooglePickListCalendars)
+			r.Post("/me/calendar-integrations/google/oauth/complete", calendarIntegrationHandler.GooglePickComplete)
 			r.Post("/me/calendar-integrations", calendarIntegrationHandler.CreateMine)
 			r.Put("/me/calendar-integrations/{integrationId}", calendarIntegrationHandler.PutMine)
 			r.Delete("/me/calendar-integrations/{integrationId}", calendarIntegrationHandler.DeleteMine)

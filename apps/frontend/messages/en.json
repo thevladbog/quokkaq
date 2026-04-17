@@ -517,8 +517,8 @@
       "filter_all_units": "All units",
       "filter_unit_hint": "Narrows the list below. Each calendar connection still belongs to one unit.",
       "add_calendar": "Add calendar",
-      "calendar_list_empty": "No calendar connections yet. Add one to import slots from Yandex Calendar (CalDAV).",
-      "calendars_list_hint": "Up to four CalDAV connections per unit. Open a row to edit or remove.",
+      "calendar_list_empty": "No calendar connections yet. Add Google or Yandex (CalDAV) to import slots.",
+      "calendars_list_hint": "Up to four calendar connections per unit (Google or Yandex CalDAV). Open a row to edit or remove.",
       "select_unit_error": "Select a unit."
     },
     "desktop_terminals": {
@@ -950,7 +950,44 @@
       "create_success": "Calendar connection created",
       "create_error": "Could not create calendar connection",
       "limit_error": "This unit already has the maximum of four calendar connections.",
-      "create_submit": "Create"
+      "create_submit": "Create",
+      "create_dialog_google_note": "Google Calendar: use “Connect Google Calendar” on this page, sign in with Google, then choose which calendar to connect.",
+      "kind_google": "Google Calendar (CalDAV)",
+      "google_readonly_hint": "CalDAV URL and Google sign-in are fixed when you connect and cannot be changed here.",
+      "google_account_label": "Account",
+      "add_menu_aria": "Add calendar: choose connection type",
+      "add_menu_google": "Google Calendar",
+      "add_menu_google_hint": "Google sign-in, then pick a calendar",
+      "add_menu_yandex": "Yandex Calendar (CalDAV)",
+      "add_menu_yandex_hint": "Login and app password",
+      "google_connect": "Connect Google Calendar",
+      "google_connect_dialog_title": "Connect Google Calendar",
+      "google_connect_dialog_desc": "You will be redirected to Google sign-in. After consent, you can choose which calendar to connect for this unit.",
+      "google_select_unit": "Unit",
+      "google_connect_submit": "Continue with Google",
+      "google_connect_error": "Could not start Google connection",
+      "google_connect_unavailable": "Google connection is not configured on the server (OAuth).",
+      "google_oauth_success_toast": "Google Calendar connected",
+      "google_oauth_error_toast": "Google Calendar connection failed",
+      "google_oauth_err_no_refresh": "Google did not return a refresh token. Try again and approve access.",
+      "google_oauth_err_not_configured": "Google integration is not configured on the server.",
+      "google_oauth_err_userinfo": "Could not read your email from Google.",
+      "google_oauth_err_limit": "This unit already has the maximum of four calendar connections.",
+      "google_oauth_err_forbidden": "You do not have access to this unit.",
+      "google_oauth_err_create_failed": "Could not save the connection.",
+      "google_oauth_err_pick_save": "Could not save the sign-in session. Try again, or check that Redis is available on the server.",
+      "google_pick_dialog_title": "Choose a Google calendar",
+      "google_pick_dialog_desc": "Pick the calendar this unit should use. Only calendars you can edit are listed.",
+      "google_pick_loading": "Loading your calendars…",
+      "google_pick_empty": "No writable calendars were returned for this account.",
+      "google_pick_label": "Calendar",
+      "google_pick_placeholder": "Select a calendar",
+      "google_pick_primary_badge": "primary",
+      "google_pick_connect": "Connect selected calendar",
+      "google_pick_success": "Google Calendar connected",
+      "google_pick_error": "Something went wrong while connecting the calendar.",
+      "google_pick_session_expired": "This sign-in session expired. Start Google connection again.",
+      "google_pick_select_calendar": "Select a calendar first."
     }
   },
   "staff": {
@@ -2243,10 +2280,16 @@
     },
     "ticket": "Your Ticket - QuokkaQ",
     "statistics": "Statistics - QuokkaQ",
+    "help": "Help - QuokkaQ",
     "platform": {
       "root": "Platform - QuokkaQ"
     },
     "workstations": "Workstations - QuokkaQ"
+  },
+  "wiki": {
+    "homeLink": "Help home",
+    "fallbackTitle": "Translation",
+    "fallbackNotice": "This page is not available in your selected language yet. The English version is shown below."
   },
   "workstations": {
     "title": "Workstations",

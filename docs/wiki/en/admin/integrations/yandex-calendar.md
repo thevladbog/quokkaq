@@ -1,0 +1,41 @@
+# Yandex Calendar (CalDAV)
+
+Connect **Yandex Calendar** using **CalDAV**. The integration is stored as **Yandex CalDAV** (`yandex_caldav`). You provide the calendar URL, your Yandex login, and a **Yandex app password** (not your normal account password).
+
+## Where to configure it
+
+1. Open **Settings** → **Integrations**.
+2. Open the **Calendars** tab.
+3. Use **Add calendar** → **Yandex Calendar (CalDAV)**.
+4. Choose the **unit**, then fill in CalDAV fields and save.
+
+## Required fields
+
+- **CalDAV base URL** — default is `https://caldav.yandex.ru` unless your tenant uses a different endpoint.
+- **Calendar path** — the collection path Yandex shows for your calendar, typically under `/calendars/.../events/.../`.
+- **Yandex login** — the account that owns the calendar.
+- **App password** — create one in Yandex ID security settings for “Mail / CalDAV” style access. Use that value here, not your main password.
+
+## Timezone
+
+Set an **IANA timezone** (for example `Europe/Moscow`) so slot times from the calendar are interpreted consistently.
+
+## Limits
+
+- Up to **four** calendar connections **per unit** (Google + Yandex share the same cap).
+
+## Security note
+
+App passwords are **encrypted at rest** on the server. They are not returned in API responses after creation.
+
+## Common issues
+
+| Symptom | What to try |
+|--------|----------------|
+| Cannot save / “app password required” | Enter a new app password when creating the integration, or provide one when enabling a disabled row that has no secret stored yet. |
+| Wrong path / sync errors | Double-check the CalDAV path from Yandex; it must point to the **events** collection for that calendar. |
+| Unit already has four calendars | Remove another integration or attach to a different unit. |
+
+## After connection
+
+You can update display name, enabled flag, timezone, notification emails, and rotate the app password from the integration card where the product exposes those fields.

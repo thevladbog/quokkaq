@@ -366,6 +366,34 @@ export interface HandlersForgotPasswordRequest {
   email?: string;
 }
 
+export interface HandlersGoogleCalendarOAuthStartRequest {
+  returnPath?: string;
+  unitId?: string;
+}
+
+export interface HandlersGoogleCalendarOAuthStartResponse {
+  url?: string;
+}
+
+export interface HandlersGoogleCalendarPickCompleteRequest {
+  calendarId?: string;
+  pickToken?: string;
+}
+
+export interface HandlersGoogleCalendarPickListRequest {
+  pickToken?: string;
+}
+
+export interface ServicesGoogleCalendarPickOption {
+  id?: string;
+  primary?: boolean;
+  summary?: string;
+}
+
+export interface HandlersGoogleCalendarPickListResponse {
+  calendars?: ServicesGoogleCalendarPickOption[];
+}
+
 export interface HandlersInvoiceDraftLineInput {
   catalogItemId?: string;
   descriptionPrint?: string;
@@ -1579,7 +1607,138 @@ export interface HandlersLoginLinkResponse {
   exampleUrl: string;
 }
 
+export type CalendarIntegrationGoogleOAuthCallbackParams = {
+/**
+ * Authorization code
+ */
+code?: string;
+/**
+ * OAuth state
+ */
+state?: string;
+};
+
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+
+
+/**
+ * @summary Google Calendar OAuth callback (browser redirect)
+ */
+export type calendarIntegrationGoogleOAuthCallbackResponse302 = {
+  data: void
+  status: 302
+}
+
+;
+export type calendarIntegrationGoogleOAuthCallbackResponseError = (calendarIntegrationGoogleOAuthCallbackResponse302) & {
+  headers: Headers;
+};
+
+export type calendarIntegrationGoogleOAuthCallbackResponse = (calendarIntegrationGoogleOAuthCallbackResponseError)
+
+export const getCalendarIntegrationGoogleOAuthCallbackUrl = (params?: CalendarIntegrationGoogleOAuthCallbackParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/calendar-integrations/google/oauth/callback?${stringifiedParams}` : `/calendar-integrations/google/oauth/callback`
+}
+
+export const calendarIntegrationGoogleOAuthCallback = async (params?: CalendarIntegrationGoogleOAuthCallbackParams, options?: RequestInit): Promise<calendarIntegrationGoogleOAuthCallbackResponse> => {
+
+  return orvalMutator<calendarIntegrationGoogleOAuthCallbackResponse>(getCalendarIntegrationGoogleOAuthCallbackUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getCalendarIntegrationGoogleOAuthCallbackQueryKey = (params?: CalendarIntegrationGoogleOAuthCallbackParams,) => {
+    return [
+    `/calendar-integrations/google/oauth/callback`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getCalendarIntegrationGoogleOAuthCallbackQueryOptions = <TData = Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>, TError = void>(params?: CalendarIntegrationGoogleOAuthCallbackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getCalendarIntegrationGoogleOAuthCallbackQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>> = ({ signal }) => calendarIntegrationGoogleOAuthCallback(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type CalendarIntegrationGoogleOAuthCallbackQueryResult = NonNullable<Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>>
+export type CalendarIntegrationGoogleOAuthCallbackQueryError = void
+
+
+export function useCalendarIntegrationGoogleOAuthCallback<TData = Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>, TError = void>(
+ params: undefined |  CalendarIntegrationGoogleOAuthCallbackParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>,
+          TError,
+          Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useCalendarIntegrationGoogleOAuthCallback<TData = Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>, TError = void>(
+ params?: CalendarIntegrationGoogleOAuthCallbackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>,
+          TError,
+          Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useCalendarIntegrationGoogleOAuthCallback<TData = Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>, TError = void>(
+ params?: CalendarIntegrationGoogleOAuthCallbackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Google Calendar OAuth callback (browser redirect)
+ */
+
+export function useCalendarIntegrationGoogleOAuthCallback<TData = Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>, TError = void>(
+ params?: CalendarIntegrationGoogleOAuthCallbackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthCallback>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getCalendarIntegrationGoogleOAuthCallbackQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
 
 
 
@@ -1841,6 +2000,346 @@ export const useCalendarIntegrationCreateMine = <TError = string,
         TContext
       > => {
       return useMutation(getCalendarIntegrationCreateMineMutationOptions(options), queryClient);
+    }
+
+/**
+ * @summary Complete Google calendar pick and create google_caldav integration
+ */
+export type calendarIntegrationGooglePickCompleteResponse200 = {
+  data: ServicesCalendarIntegrationPublic
+  status: 200
+}
+
+export type calendarIntegrationGooglePickCompleteResponse400 = {
+  data: string
+  status: 400
+}
+
+export type calendarIntegrationGooglePickCompleteResponse401 = {
+  data: string
+  status: 401
+}
+
+export type calendarIntegrationGooglePickCompleteResponse403 = {
+  data: string
+  status: 403
+}
+
+export type calendarIntegrationGooglePickCompleteResponse404 = {
+  data: string
+  status: 404
+}
+
+export type calendarIntegrationGooglePickCompleteResponse409 = {
+  data: string
+  status: 409
+}
+
+export type calendarIntegrationGooglePickCompleteResponse500 = {
+  data: string
+  status: 500
+}
+
+export type calendarIntegrationGooglePickCompleteResponse503 = {
+  data: string
+  status: 503
+}
+
+export type calendarIntegrationGooglePickCompleteResponseSuccess = (calendarIntegrationGooglePickCompleteResponse200) & {
+  headers: Headers;
+};
+export type calendarIntegrationGooglePickCompleteResponseError = (calendarIntegrationGooglePickCompleteResponse400 | calendarIntegrationGooglePickCompleteResponse401 | calendarIntegrationGooglePickCompleteResponse403 | calendarIntegrationGooglePickCompleteResponse404 | calendarIntegrationGooglePickCompleteResponse409 | calendarIntegrationGooglePickCompleteResponse500 | calendarIntegrationGooglePickCompleteResponse503) & {
+  headers: Headers;
+};
+
+export type calendarIntegrationGooglePickCompleteResponse = (calendarIntegrationGooglePickCompleteResponseSuccess | calendarIntegrationGooglePickCompleteResponseError)
+
+export const getCalendarIntegrationGooglePickCompleteUrl = () => {
+
+
+
+
+  return `/companies/me/calendar-integrations/google/oauth/complete`
+}
+
+export const calendarIntegrationGooglePickComplete = async (handlersGoogleCalendarPickCompleteRequest: HandlersGoogleCalendarPickCompleteRequest, options?: RequestInit): Promise<calendarIntegrationGooglePickCompleteResponse> => {
+
+  return orvalMutator<calendarIntegrationGooglePickCompleteResponse>(getCalendarIntegrationGooglePickCompleteUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersGoogleCalendarPickCompleteRequest,)
+  }
+);}
+
+
+
+
+export const getCalendarIntegrationGooglePickCompleteMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof calendarIntegrationGooglePickComplete>>, TError,{data: HandlersGoogleCalendarPickCompleteRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof calendarIntegrationGooglePickComplete>>, TError,{data: HandlersGoogleCalendarPickCompleteRequest}, TContext> => {
+
+const mutationKey = ['calendarIntegrationGooglePickComplete'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof calendarIntegrationGooglePickComplete>>, {data: HandlersGoogleCalendarPickCompleteRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  calendarIntegrationGooglePickComplete(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CalendarIntegrationGooglePickCompleteMutationResult = NonNullable<Awaited<ReturnType<typeof calendarIntegrationGooglePickComplete>>>
+    export type CalendarIntegrationGooglePickCompleteMutationBody = HandlersGoogleCalendarPickCompleteRequest
+    export type CalendarIntegrationGooglePickCompleteMutationError = string
+
+    /**
+ * @summary Complete Google calendar pick and create google_caldav integration
+ */
+export const useCalendarIntegrationGooglePickComplete = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof calendarIntegrationGooglePickComplete>>, TError,{data: HandlersGoogleCalendarPickCompleteRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof calendarIntegrationGooglePickComplete>>,
+        TError,
+        {data: HandlersGoogleCalendarPickCompleteRequest},
+        TContext
+      > => {
+      return useMutation(getCalendarIntegrationGooglePickCompleteMutationOptions(options), queryClient);
+    }
+
+/**
+ * @summary List writable Google calendars for a post-OAuth pick session
+ */
+export type calendarIntegrationGooglePickListCalendarsResponse200 = {
+  data: HandlersGoogleCalendarPickListResponse
+  status: 200
+}
+
+export type calendarIntegrationGooglePickListCalendarsResponse400 = {
+  data: string
+  status: 400
+}
+
+export type calendarIntegrationGooglePickListCalendarsResponse401 = {
+  data: string
+  status: 401
+}
+
+export type calendarIntegrationGooglePickListCalendarsResponse403 = {
+  data: string
+  status: 403
+}
+
+export type calendarIntegrationGooglePickListCalendarsResponse500 = {
+  data: string
+  status: 500
+}
+
+export type calendarIntegrationGooglePickListCalendarsResponse503 = {
+  data: string
+  status: 503
+}
+
+export type calendarIntegrationGooglePickListCalendarsResponseSuccess = (calendarIntegrationGooglePickListCalendarsResponse200) & {
+  headers: Headers;
+};
+export type calendarIntegrationGooglePickListCalendarsResponseError = (calendarIntegrationGooglePickListCalendarsResponse400 | calendarIntegrationGooglePickListCalendarsResponse401 | calendarIntegrationGooglePickListCalendarsResponse403 | calendarIntegrationGooglePickListCalendarsResponse500 | calendarIntegrationGooglePickListCalendarsResponse503) & {
+  headers: Headers;
+};
+
+export type calendarIntegrationGooglePickListCalendarsResponse = (calendarIntegrationGooglePickListCalendarsResponseSuccess | calendarIntegrationGooglePickListCalendarsResponseError)
+
+export const getCalendarIntegrationGooglePickListCalendarsUrl = () => {
+
+
+
+
+  return `/companies/me/calendar-integrations/google/oauth/list-calendars`
+}
+
+export const calendarIntegrationGooglePickListCalendars = async (handlersGoogleCalendarPickListRequest: HandlersGoogleCalendarPickListRequest, options?: RequestInit): Promise<calendarIntegrationGooglePickListCalendarsResponse> => {
+
+  return orvalMutator<calendarIntegrationGooglePickListCalendarsResponse>(getCalendarIntegrationGooglePickListCalendarsUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersGoogleCalendarPickListRequest,)
+  }
+);}
+
+
+
+
+export const getCalendarIntegrationGooglePickListCalendarsMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof calendarIntegrationGooglePickListCalendars>>, TError,{data: HandlersGoogleCalendarPickListRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof calendarIntegrationGooglePickListCalendars>>, TError,{data: HandlersGoogleCalendarPickListRequest}, TContext> => {
+
+const mutationKey = ['calendarIntegrationGooglePickListCalendars'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof calendarIntegrationGooglePickListCalendars>>, {data: HandlersGoogleCalendarPickListRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  calendarIntegrationGooglePickListCalendars(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CalendarIntegrationGooglePickListCalendarsMutationResult = NonNullable<Awaited<ReturnType<typeof calendarIntegrationGooglePickListCalendars>>>
+    export type CalendarIntegrationGooglePickListCalendarsMutationBody = HandlersGoogleCalendarPickListRequest
+    export type CalendarIntegrationGooglePickListCalendarsMutationError = string
+
+    /**
+ * @summary List writable Google calendars for a post-OAuth pick session
+ */
+export const useCalendarIntegrationGooglePickListCalendars = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof calendarIntegrationGooglePickListCalendars>>, TError,{data: HandlersGoogleCalendarPickListRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof calendarIntegrationGooglePickListCalendars>>,
+        TError,
+        {data: HandlersGoogleCalendarPickListRequest},
+        TContext
+      > => {
+      return useMutation(getCalendarIntegrationGooglePickListCalendarsMutationOptions(options), queryClient);
+    }
+
+/**
+ * @summary Start Google Calendar OAuth (returns authorize URL)
+ */
+export type calendarIntegrationGoogleOAuthStartResponse200 = {
+  data: HandlersGoogleCalendarOAuthStartResponse
+  status: 200
+}
+
+export type calendarIntegrationGoogleOAuthStartResponse400 = {
+  data: string
+  status: 400
+}
+
+export type calendarIntegrationGoogleOAuthStartResponse401 = {
+  data: string
+  status: 401
+}
+
+export type calendarIntegrationGoogleOAuthStartResponse403 = {
+  data: string
+  status: 403
+}
+
+export type calendarIntegrationGoogleOAuthStartResponse409 = {
+  data: string
+  status: 409
+}
+
+export type calendarIntegrationGoogleOAuthStartResponse503 = {
+  data: string
+  status: 503
+}
+
+export type calendarIntegrationGoogleOAuthStartResponseSuccess = (calendarIntegrationGoogleOAuthStartResponse200) & {
+  headers: Headers;
+};
+export type calendarIntegrationGoogleOAuthStartResponseError = (calendarIntegrationGoogleOAuthStartResponse400 | calendarIntegrationGoogleOAuthStartResponse401 | calendarIntegrationGoogleOAuthStartResponse403 | calendarIntegrationGoogleOAuthStartResponse409 | calendarIntegrationGoogleOAuthStartResponse503) & {
+  headers: Headers;
+};
+
+export type calendarIntegrationGoogleOAuthStartResponse = (calendarIntegrationGoogleOAuthStartResponseSuccess | calendarIntegrationGoogleOAuthStartResponseError)
+
+export const getCalendarIntegrationGoogleOAuthStartUrl = () => {
+
+
+
+
+  return `/companies/me/calendar-integrations/google/oauth/start`
+}
+
+export const calendarIntegrationGoogleOAuthStart = async (handlersGoogleCalendarOAuthStartRequest: HandlersGoogleCalendarOAuthStartRequest, options?: RequestInit): Promise<calendarIntegrationGoogleOAuthStartResponse> => {
+
+  return orvalMutator<calendarIntegrationGoogleOAuthStartResponse>(getCalendarIntegrationGoogleOAuthStartUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersGoogleCalendarOAuthStartRequest,)
+  }
+);}
+
+
+
+
+export const getCalendarIntegrationGoogleOAuthStartMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthStart>>, TError,{data: HandlersGoogleCalendarOAuthStartRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthStart>>, TError,{data: HandlersGoogleCalendarOAuthStartRequest}, TContext> => {
+
+const mutationKey = ['calendarIntegrationGoogleOAuthStart'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthStart>>, {data: HandlersGoogleCalendarOAuthStartRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  calendarIntegrationGoogleOAuthStart(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CalendarIntegrationGoogleOAuthStartMutationResult = NonNullable<Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthStart>>>
+    export type CalendarIntegrationGoogleOAuthStartMutationBody = HandlersGoogleCalendarOAuthStartRequest
+    export type CalendarIntegrationGoogleOAuthStartMutationError = string
+
+    /**
+ * @summary Start Google Calendar OAuth (returns authorize URL)
+ */
+export const useCalendarIntegrationGoogleOAuthStart = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthStart>>, TError,{data: HandlersGoogleCalendarOAuthStartRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof calendarIntegrationGoogleOAuthStart>>,
+        TError,
+        {data: HandlersGoogleCalendarOAuthStartRequest},
+        TContext
+      > => {
+      return useMutation(getCalendarIntegrationGoogleOAuthStartMutationOptions(options), queryClient);
     }
 
 /**

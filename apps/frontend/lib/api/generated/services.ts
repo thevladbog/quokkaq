@@ -366,6 +366,34 @@ export interface HandlersForgotPasswordRequest {
   email?: string;
 }
 
+export interface HandlersGoogleCalendarOAuthStartRequest {
+  returnPath?: string;
+  unitId?: string;
+}
+
+export interface HandlersGoogleCalendarOAuthStartResponse {
+  url?: string;
+}
+
+export interface HandlersGoogleCalendarPickCompleteRequest {
+  calendarId?: string;
+  pickToken?: string;
+}
+
+export interface HandlersGoogleCalendarPickListRequest {
+  pickToken?: string;
+}
+
+export interface ServicesGoogleCalendarPickOption {
+  id?: string;
+  primary?: boolean;
+  summary?: string;
+}
+
+export interface HandlersGoogleCalendarPickListResponse {
+  calendars?: ServicesGoogleCalendarPickOption[];
+}
+
 export interface HandlersInvoiceDraftLineInput {
   catalogItemId?: string;
   descriptionPrint?: string;

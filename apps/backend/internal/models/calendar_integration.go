@@ -1,6 +1,8 @@
 package models
 
 import (
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -8,7 +10,24 @@ import (
 )
 
 // CalendarIntegrationKind identifies the provider implementation (extensible).
-const CalendarIntegrationKindYandexCalDAV = "yandex_caldav"
+const (
+	CalendarIntegrationKindYandexCalDAV = "yandex_caldav"
+	CalendarIntegrationKindGoogleCalDAV = "google_caldav"
+)
+
+// GoogleCalDAVAPIHost is the HTTPS host for Google Calendar CalDAV v2.
+const GoogleCalDAVAPIHost = "apidata.googleusercontent.com"
+
+// GoogleCalDAVBaseURL is the origin used as CaldavBaseURL for google_caldav integrations.
+const GoogleCalDAVBaseURL = "https://" + GoogleCalDAVAPIHost
+
+// GoogleCalDAVEventsCollectionPath returns the calendar collection path for CalDAV v2
+// (see https://developers.google.com/calendar/caldav/v2/guide). calendarID is the Google
+// "Calendar ID" (primary calendar ID equals the account email).
+func GoogleCalDAVEventsCollectionPath(calendarID string) string {
+	cal := strings.TrimSpace(calendarID)
+	return "/caldav/v2/" + url.PathEscape(cal) + "/events"
+}
 
 // UnitCalendarIntegration stores CalDAV credentials and calendar path per unit.
 // Multiple rows per unit_id are allowed (max enforced in service). App password is encrypted (AES-GCM, same as SSO).

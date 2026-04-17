@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"strings"
 
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/repository"
@@ -79,6 +80,12 @@ func respondCalendarIntegrationError(w http.ResponseWriter, op string, err error
 		http.Error(w, services.ErrCalendarEnabledRequired.Error(), http.StatusBadRequest)
 	case errors.Is(err, services.ErrCalendarIntegrationBlockedByActivePreRegistrations):
 		http.Error(w, calendarIntMsgActivePreRegsBlock, http.StatusBadRequest)
+	case errors.Is(err, services.ErrGoogleCalendarOAuthNotConfigured):
+		http.Error(w, services.ErrGoogleCalendarOAuthNotConfigured.Error(), http.StatusServiceUnavailable)
+	case errors.Is(err, services.ErrGoogleCalendarOAuthNoRefreshToken):
+		http.Error(w, services.ErrGoogleCalendarOAuthNoRefreshToken.Error(), http.StatusBadRequest)
+	case errors.Is(err, services.ErrGoogleCalendarPickInvalid):
+		http.Error(w, services.ErrGoogleCalendarPickInvalid.Error(), http.StatusBadRequest)
 	default:
 		http.Error(w, calendarIntMsgInternal, http.StatusInternalServerError)
 	}
@@ -294,4 +301,196 @@ func (h *CalendarIntegrationHandler) DeleteMine(w http.ResponseWriter, r *http.R
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// GoogleCalendarOAuthStartRequest is POST /companies/me/calendar-integrations/google/oauth/start body.
+type GoogleCalendarOAuthStartRequest struct {
+	UnitID     string `json:"unitId"`
+	ReturnPath string `json:"returnPath,omitempty"`
+}
+
+// GoogleCalendarOAuthStartResponse returns the browser redirect URL for Google consent.
+type GoogleCalendarOAuthStartResponse struct {
+	URL string `json:"url"`
+}
+
+func respondGoogleOAuthStartError(w http.ResponseWriter, op string, err error) {
+	logCalendarIntegration(op, err)
+	switch {
+	case errors.Is(err, services.ErrGoogleCalendarOAuthNotConfigured):
+		http.Error(w, services.ErrGoogleCalendarOAuthNotConfigured.Error(), http.StatusServiceUnavailable)
+	case errors.Is(err, services.ErrGoogleCalendarOAuthUnitIDRequired):
+		http.Error(w, services.ErrGoogleCalendarOAuthUnitIDRequired.Error(), http.StatusBadRequest)
+	case errors.Is(err, services.ErrGoogleCalendarOAuthRedisUnavailable):
+		http.Error(w, services.ErrGoogleCalendarOAuthRedisUnavailable.Error(), http.StatusServiceUnavailable)
+	case errors.Is(err, services.ErrCalendarIntegrationLimit):
+		http.Error(w, services.ErrCalendarIntegrationLimit.Error(), http.StatusConflict)
+	case errors.Is(err, services.ErrCalendarUnitCompanyMismatch):
+		http.Error(w, calendarIntMsgForbidden, http.StatusForbidden)
+	default:
+		http.Error(w, calendarIntMsgInternal, http.StatusInternalServerError)
+	}
+}
+
+func googleOAuthCallbackFailureReason(err error) string {
+	switch {
+	case errors.Is(err, services.ErrGoogleCalendarOAuthNotConfigured):
+		return "not_configured"
+	case errors.Is(err, services.ErrGoogleCalendarOAuthNoRefreshToken):
+		return "no_refresh_token"
+	case errors.Is(err, services.ErrGoogleCalendarOAuthUserinfo):
+		return "userinfo"
+	case errors.Is(err, services.ErrCalendarIntegrationLimit):
+		return "limit"
+	case errors.Is(err, services.ErrCalendarUnitCompanyMismatch):
+		return "forbidden"
+	case errors.Is(err, services.ErrCalendarAppPasswordRequired):
+		return "create_failed"
+	default:
+		if strings.Contains(strings.ToLower(err.Error()), "redis") {
+			return "pick_save"
+		}
+		return "oauth_failed"
+	}
+}
+
+// GoogleOAuthStart godoc
+// @ID           calendarIntegrationGoogleOAuthStart
+// @Summary      Start Google Calendar OAuth (returns authorize URL)
+// @Tags         calendar-integration
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        X-Company-Id header string false "Optional company selector for admins with multiple companies"
+// @Param        body body GoogleCalendarOAuthStartRequest true "Payload"
+// @Success      200 {object} GoogleCalendarOAuthStartResponse
+// @Failure      400 {string} string "Bad Request"
+// @Failure      401 {string} string "Unauthorized"
+// @Failure      403 {string} string "Forbidden"
+// @Failure      409 {string} string "Conflict"
+// @Failure      503 {string} string "Service Unavailable"
+// @Router       /companies/me/calendar-integrations/google/oauth/start [post]
+func (h *CalendarIntegrationHandler) GoogleOAuthStart(w http.ResponseWriter, r *http.Request) {
+	companyID, ok := h.resolveCompanyID(w, r)
+	if !ok {
+		return
+	}
+	var req GoogleCalendarOAuthStartRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONDecodeError(w, "GoogleOAuthStart", err)
+		return
+	}
+	authURL, err := h.svc.StartGoogleCalendarOAuth(r.Context(), companyID, req.UnitID, req.ReturnPath)
+	if err != nil {
+		respondGoogleOAuthStartError(w, "GoogleOAuthStart", err)
+		return
+	}
+	RespondJSON(w, GoogleCalendarOAuthStartResponse{URL: authURL})
+}
+
+// GoogleOAuthCallback godoc
+// @ID           calendarIntegrationGoogleOAuthCallback
+// @Summary      Google Calendar OAuth callback (browser redirect)
+// @Tags         calendar-integration
+// @Param        code query string false "Authorization code"
+// @Param        state query string false "OAuth state"
+// @Success      302
+// @Router       /calendar-integrations/google/oauth/callback [get]
+func (h *CalendarIntegrationHandler) GoogleOAuthCallback(w http.ResponseWriter, r *http.Request) {
+	okURL, failPath, err := h.svc.CompleteGoogleCalendarOAuth(r.Context(), r.URL.Query().Get("code"), r.URL.Query().Get("state"))
+	if err != nil {
+		loc := services.GoogleCalendarOAuthFailureRedirect(failPath, googleOAuthCallbackFailureReason(err))
+		http.Redirect(w, r, loc, http.StatusFound)
+		return
+	}
+	http.Redirect(w, r, okURL, http.StatusFound)
+}
+
+// GoogleCalendarPickListRequest is POST .../google/oauth/list-calendars body.
+type GoogleCalendarPickListRequest struct {
+	PickToken string `json:"pickToken"`
+}
+
+// GoogleCalendarPickListResponse is POST .../google/oauth/list-calendars response.
+type GoogleCalendarPickListResponse struct {
+	Calendars []services.GoogleCalendarPickOption `json:"calendars"`
+}
+
+// GoogleCalendarPickCompleteRequest is POST .../google/oauth/complete body.
+type GoogleCalendarPickCompleteRequest struct {
+	PickToken  string `json:"pickToken"`
+	CalendarID string `json:"calendarId"`
+}
+
+// GooglePickListCalendars godoc
+// @ID           calendarIntegrationGooglePickListCalendars
+// @Summary      List writable Google calendars for a post-OAuth pick session
+// @Tags         calendar-integration
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        X-Company-Id header string false "Optional company selector for admins with multiple companies"
+// @Param        body body GoogleCalendarPickListRequest true "Payload"
+// @Success      200 {object} GoogleCalendarPickListResponse
+// @Failure      400 {string} string "Bad Request"
+// @Failure      401 {string} string "Unauthorized"
+// @Failure      403 {string} string "Forbidden"
+// @Failure      503 {string} string "Service Unavailable"
+// @Failure      500 {string} string "Internal Server Error"
+// @Router       /companies/me/calendar-integrations/google/oauth/list-calendars [post]
+func (h *CalendarIntegrationHandler) GooglePickListCalendars(w http.ResponseWriter, r *http.Request) {
+	companyID, ok := h.resolveCompanyID(w, r)
+	if !ok {
+		return
+	}
+	var req GoogleCalendarPickListRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONDecodeError(w, "GooglePickListCalendars", err)
+		return
+	}
+	cals, err := h.svc.ListGooglePickCalendars(r.Context(), companyID, req.PickToken)
+	if err != nil {
+		respondCalendarIntegrationError(w, "GooglePickListCalendars", err)
+		return
+	}
+	if cals == nil {
+		cals = []services.GoogleCalendarPickOption{}
+	}
+	RespondJSON(w, GoogleCalendarPickListResponse{Calendars: cals})
+}
+
+// GooglePickComplete godoc
+// @ID           calendarIntegrationGooglePickComplete
+// @Summary      Complete Google calendar pick and create google_caldav integration
+// @Tags         calendar-integration
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        X-Company-Id header string false "Optional company selector for admins with multiple companies"
+// @Param        body body GoogleCalendarPickCompleteRequest true "Payload"
+// @Success      200 {object} services.CalendarIntegrationPublic
+// @Failure      400 {string} string "Bad Request"
+// @Failure      401 {string} string "Unauthorized"
+// @Failure      403 {string} string "Forbidden"
+// @Failure      404 {string} string "Not Found"
+// @Failure      409 {string} string "Conflict"
+// @Failure      503 {string} string "Service Unavailable"
+// @Failure      500 {string} string "Internal Server Error"
+// @Router       /companies/me/calendar-integrations/google/oauth/complete [post]
+func (h *CalendarIntegrationHandler) GooglePickComplete(w http.ResponseWriter, r *http.Request) {
+	companyID, ok := h.resolveCompanyID(w, r)
+	if !ok {
+		return
+	}
+	var req GoogleCalendarPickCompleteRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONDecodeError(w, "GooglePickComplete", err)
+		return
+	}
+	out, err := h.svc.CompleteGoogleCalendarPick(r.Context(), companyID, req.PickToken, req.CalendarID)
+	if err != nil {
+		respondCalendarIntegrationError(w, "GooglePickComplete", err)
+		return
+	}
+	RespondJSON(w, out)
 }
