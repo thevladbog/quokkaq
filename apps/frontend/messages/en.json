@@ -15,6 +15,7 @@
     "audit_journal": "Audit log",
     "clients": "Clients",
     "statistics": "Statistics",
+    "support_requests": "Support requests",
     "login": "Login"
   },
   "clients": {
@@ -1186,6 +1187,7 @@
       "pageTitle": "Support requests",
       "pageSubtitle": "Your support tickets",
       "reportIssue": "Report an issue",
+      "fabAria": "Report an issue from this page",
       "myReports": "My requests",
       "titleLabel": "Subject",
       "titlePlaceholder": "Short summary of the issue",

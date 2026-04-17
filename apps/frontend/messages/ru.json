@@ -15,6 +15,7 @@
     "audit_journal": "Журнал аудита",
     "clients": "Клиенты",
     "statistics": "Статистика",
+    "support_requests": "Обращения",
     "login": "Войти"
   },
   "clients": {
@@ -1186,6 +1187,7 @@
       "pageTitle": "Обращения в поддержку",
       "pageSubtitle": "Ваши заявки в службу поддержки",
       "reportIssue": "Сообщить о проблеме",
+      "fabAria": "Сообщить о проблеме на этой странице",
       "myReports": "Мои обращения",
       "titleLabel": "Тема",
       "titlePlaceholder": "Кратко опишите проблему",

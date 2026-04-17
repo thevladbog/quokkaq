@@ -93,6 +93,17 @@ const ConditionalLayout = ({ children }: ConditionalLayoutProps) => {
     }
 
     if (
+      pathWithoutLocale === '/staff/support' ||
+      pathWithoutLocale.startsWith('/staff/support/')
+    ) {
+      return {
+        useSidebar: true,
+        protected: true,
+        roles: ['admin', 'staff', 'supervisor', 'operator']
+      };
+    }
+
+    if (
       pathWithoutLocale.startsWith('/staff') &&
       pathWithoutLocale !== '/staff'
     ) {

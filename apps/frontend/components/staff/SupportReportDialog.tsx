@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { ReactNode, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Bug } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -24,7 +24,14 @@ import {
 } from '@/lib/api/generated/support';
 import { useActiveUnit } from '@/contexts/ActiveUnitContext';
 
-export default function SupportReportDialog() {
+export type SupportReportDialogProps = {
+  /** Custom trigger (e.g. floating action button). Defaults to secondary “Report issue” button. */
+  trigger?: ReactNode;
+};
+
+export default function SupportReportDialog({
+  trigger
+}: SupportReportDialogProps) {
   const t = useTranslations('staff.support');
   const queryClient = useQueryClient();
   const { activeUnitId } = useActiveUnit();
@@ -74,10 +81,12 @@ export default function SupportReportDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button type='button' variant='secondary' size='sm'>
-          <Bug className='mr-2 h-4 w-4' aria-hidden />
-          {t('reportIssue')}
-        </Button>
+        {trigger ?? (
+          <Button type='button' variant='secondary' size='sm'>
+            <Bug className='mr-2 h-4 w-4' aria-hidden />
+            {t('reportIssue')}
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className='sm:max-w-lg'>
         <DialogHeader>
@@ -106,7 +115,7 @@ export default function SupportReportDialog() {
             />
           </div>
         </div>
-        <DialogFooter className='gap-2 sm:gap-0'>
+        <DialogFooter>
           <Button
             type='button'
             variant='outline'

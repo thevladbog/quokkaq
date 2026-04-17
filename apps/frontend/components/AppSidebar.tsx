@@ -24,7 +24,8 @@ import {
   Globe,
   Layers,
   Settings,
-  BarChart3
+  BarChart3,
+  Bug
 } from 'lucide-react';
 import Image from 'next/image';
 import { useAuthContext } from '@/contexts/AuthContext';
@@ -95,7 +96,8 @@ const AppSidebar = () => {
       icon: Users,
       label: tNav('staff', { defaultValue: 'Staff' }),
       href: '/staff',
-      active: pathname.startsWith('/staff'),
+      active:
+        pathname.startsWith('/staff') && !pathname.startsWith('/staff/support'),
       roles: ['admin', 'staff', 'operator'],
       requiredPermission: 'ACCESS_STAFF_PANEL'
     },
@@ -148,7 +150,14 @@ const AppSidebar = () => {
             roles: ['admin', 'staff', 'supervisor', 'operator'] as const
           }
         ]
-      : [])
+      : []),
+    {
+      icon: Bug,
+      label: tNav('support_requests', { defaultValue: 'Support requests' }),
+      href: '/staff/support',
+      active: pathname.startsWith('/staff/support'),
+      roles: ['admin', 'staff', 'supervisor', 'operator']
+    }
   ].filter((item) => {
     if (!isAuthenticated) return false;
     if (user?.roles?.includes('admin')) return true;
