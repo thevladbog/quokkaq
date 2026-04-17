@@ -28,6 +28,7 @@ jobs:
       NX_BASE: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha || github.event.before || 'origin/main' }}
       NX_HEAD: ${{ github.event.merge_group.head_sha || github.sha }}
     outputs:
+      web: ${{ steps.check.outputs.web }}
       frontend: ${{ steps.check.outputs.frontend }}
       backend: ${{ steps.check.outputs.backend }}
       kiosk: ${{ steps.check.outputs.kiosk }}
@@ -52,6 +53,12 @@ jobs:
         run: |
           AFFECTED="$(pnpm nx show projects --affected --base=$NX_BASE --head=$NX_HEAD)"
 
+          if echo "$AFFECTED" | grep -qE 'frontend|marketing|shared-types|ui-kit'; then
+            echo "web=true" >> $GITHUB_OUTPUT
+          else
+            echo "web=false" >> $GITHUB_OUTPUT
+          fi
+
           if echo "$AFFECTED" | grep -qE 'frontend|shared-types|ui-kit'; then
             echo "frontend=true" >> $GITHUB_OUTPUT
           else
@@ -74,7 +81,7 @@ jobs:
     name: Workspace (sherif)
     runs-on: ubuntu-latest
     needs: affected
-    if: ${{ needs.affected.outputs.frontend == 'true' || needs.affected.outputs.backend == 'true' || needs.affected.outputs.kiosk == 'true' }}
+    if: ${{ needs.affected.outputs.web == 'true' || needs.affected.outputs.backend == 'true' || needs.affected.outputs.kiosk == 'true' }}
     env:
       NX_BASE: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha || github.event.before || 'origin/main' }}
       NX_HEAD: ${{ github.event.merge_group.head_sha || github.sha }}
@@ -137,13 +144,14 @@ jobs:
           git diff --exit-code docs/docs.go docs/swagger.json docs/swagger.yaml
 
       - name: Orval client in sync with OpenAPI
+        if: needs.affected.outputs.frontend == 'true'
         run: pnpm nx run frontend:orval:check
 
   ci-frontend:
     name: Frontend (build, test, lint)
     runs-on: ubuntu-latest
     needs: affected
-    if: ${{ needs.affected.outputs.frontend == 'true' }}
+    if: ${{ needs.affected.outputs.web == 'true' }}
     permissions:
       contents: read
       checks: write
@@ -170,10 +178,18 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Prettier (frontend)
+        if: needs.affected.outputs.frontend == 'true'
         run: pnpm nx run frontend:format:check
 
       - name: Typecheck frontend (tsc --noEmit)
+        if: needs.affected.outputs.frontend == 'true'
         run: pnpm --dir apps/frontend exec tsc --noEmit
+
+      - name: Prettier (marketing)
+        run: pnpm nx run marketing:format:check
+
+      - name: Typecheck marketing (tsc --noEmit)
+        run: pnpm --dir apps/marketing exec tsc --noEmit
 
       - name: Build, test, lint (affected web stack)
         run: pnpm nx affected -t build,test,lint --base=$NX_BASE --head=$NX_HEAD --outputStyle=static --parallel=3 --exclude="$NX_EXCLUDE_WEB"
@@ -313,13 +329,14 @@ jobs:
     steps:
       - name: Verify required jobs
         env:
+          WEB: ${{ needs.affected.outputs.web }}
           FE: ${{ needs.affected.outputs.frontend }}
           BE: ${{ needs.affected.outputs.backend }}
           KIOSK: ${{ needs.affected.outputs.kiosk }}
         run: |
           set -euo pipefail
           any=false
-          [ "$FE" = "true" ] && any=true
+          [ "$WEB" = "true" ] && any=true
           [ "$BE" = "true" ] && any=true
           [ "$KIOSK" = "true" ] && any=true
 
@@ -338,7 +355,7 @@ jobs:
             [ "${{ needs.ci-openapi.result }}" = "success" ] || fail "Job ci-openapi did not succeed (${{ needs.ci-openapi.result }})."
           fi
 
-          if [ "$FE" = "true" ]; then
+          if [ "$WEB" = "true" ]; then
             [ "${{ needs.ci-frontend.result }}" = "success" ] || fail "Job ci-frontend did not succeed (${{ needs.ci-frontend.result }})."
           fi
 

@@ -17,6 +17,9 @@
       "es5-ext": "0.10.63",
       "follow-redirects": "1.16.0",
       "hono": ">=4.12.14"
+    },
+    "patchedDependencies": {
+      "next-themes@0.4.6": "patches/next-themes@0.4.6.patch"
     }
   },
   "scripts": {

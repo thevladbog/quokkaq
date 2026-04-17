@@ -1,0 +1,564 @@
+export const locales = ['en', 'ru'] as const;
+
+export type AppLocale = (typeof locales)[number];
+
+export function isAppLocale(value: string): value is AppLocale {
+  return (locales as readonly string[]).includes(value);
+}
+
+export type HomeMessages = {
+  /** Full headline for metadata / fallbacks */
+  title: string;
+  /** Hero H1: text before the orange accent */
+  titleBefore: string;
+  /** Hero H1: orange accent phrase (e.g. “one system.”) */
+  titleAccent: string;
+  description: string;
+  docsCta: string;
+  localeLabel: string;
+  themeUseLight: string;
+  themeUseDark: string;
+  logoAlt: string;
+  heroEyebrow: string;
+  secondaryCta: string;
+  pillarsHeading: string;
+  pillars: {
+    one: { title: string; body: string };
+    two: { title: string; body: string };
+    three: { title: string; body: string };
+  };
+  stats: {
+    heading: string;
+    industries: Array<{
+      label: string;
+      icon: 'healthcare' | 'publicSector' | 'retail' | 'services';
+    }>;
+  };
+  howItWorks: {
+    heading: string;
+    subheading: string;
+    steps: Array<{ title: string; body: string }>;
+  };
+  features: {
+    heading: string;
+    subheading: string;
+    items: Array<{ title: string; body: string }>;
+  };
+  interfaceShowcase: {
+    heading: string;
+    subheading: string;
+    items: Array<{ title: string; description: string }>;
+  };
+  useCases: {
+    heading: string;
+    subheading: string;
+    items: Array<{ title: string; body: string; industry: string }>;
+  };
+  pricing: {
+    heading: string;
+    subheading: string;
+    plans: Array<{
+      name: string;
+      price: string;
+      period: string;
+      description: string;
+      features: string[];
+      cta: string;
+      recommended?: boolean;
+    }>;
+  };
+  faq: {
+    heading: string;
+    items: Array<{ question: string; answer: string }>;
+  };
+  footer: {
+    title: string;
+    body: string;
+    cta: string;
+  };
+};
+
+export const messages: Record<AppLocale, { home: HomeMessages }> = {
+  en: {
+    home: {
+      title: 'Queue management for every branch—one system.',
+      titleBefore: 'Queue management for every branch—',
+      titleAccent: 'one system.',
+      description:
+        'Kiosks, counters, public screens, and live analytics—built for multi-unit operations.',
+      docsCta: 'Start 14-day trial →',
+      localeLabel: 'Language & theme',
+      themeUseLight: 'Use light theme',
+      themeUseDark: 'Use dark theme',
+      logoAlt: 'QuokkaQ',
+      heroEyebrow: '🙂 The friendliest QMS on the market',
+      secondaryCta: 'Book a Demo',
+      pillarsHeading: 'Why teams pick QuokkaQ',
+      pillars: {
+        one: {
+          title: 'Structured by design',
+          body: 'Enterprise spacing, typography, and states so every screen feels intentional — not improvised.'
+        },
+        two: {
+          title: 'Accessible by default',
+          body: 'Keyboard-first flows, visible focus, and contrast that still holds in dark mode.'
+        },
+        three: {
+          title: 'Ready to scale',
+          body: 'Same stack as your product web app: Next.js, strict TypeScript, and CI that catches regressions early.'
+        }
+      },
+      stats: {
+        heading:
+          'Trusted by teams who cannot afford a chaotic waiting room',
+        industries: [
+          { label: 'Healthcare', icon: 'healthcare' },
+          { label: 'Public Sector', icon: 'publicSector' },
+          { label: 'Retail', icon: 'retail' },
+          { label: 'Services', icon: 'services' }
+        ]
+      },
+      howItWorks: {
+        heading: 'How it works',
+        subheading: 'Three steps from ticket to insight',
+        steps: [
+          {
+            title: 'Take a ticket',
+            body: 'Guests join from kiosk or web; bookings and pre-registrations supported.'
+          },
+          {
+            title: 'Serve with clarity',
+            body: 'Staff call, transfer, and complete visits; visitor notes and tags stay auditable.'
+          },
+          {
+            title: 'Measure what matters',
+            body: 'SLA, volumes, surveys, and utilization—filtered by unit, zone, and operator where permitted.'
+          }
+        ]
+      },
+      features: {
+        heading: 'Everything you need to manage queues',
+        subheading: 'Built for real-world operations with every detail considered',
+        items: [
+          {
+            title: 'Multi-service queues',
+            body: 'Separate queues for different services with custom ticket prefixes, colors, and priority rules.'
+          },
+          {
+            title: 'Digital displays',
+            body: 'Large-screen TVs show current tickets, wait times, and announcements. Fully customizable layouts.'
+          },
+          {
+            title: 'Staff dashboard',
+            body: 'Call customers, transfer tickets between counters, pause service, and view queue analytics in one place.'
+          },
+          {
+            title: 'Mobile-friendly kiosks',
+            body: 'Responsive check-in interface works on tablets, phones, or dedicated kiosk hardware.'
+          },
+          {
+            title: 'Real-time sync',
+            body: 'All devices stay synchronized instantly. No refresh needed. Works offline with local caching.'
+          },
+          {
+            title: 'Detailed analytics',
+            body: 'Export reports on wait times, service duration, peak hours, staff performance, and customer patterns.'
+          }
+        ]
+      },
+      interfaceShowcase: {
+        heading: 'Designed for every role',
+        subheading: 'Consistent experience across customer kiosks, public displays, and staff tools',
+        items: [
+          {
+            title: 'Check-in Kiosk',
+            description: 'Large buttons, clear categories, instant ticket printing. Accessible for all ages.'
+          },
+          {
+            title: 'Public Display',
+            description: 'High-contrast design visible from distance. Shows current numbers and wait estimates.'
+          },
+          {
+            title: 'Staff Dashboard',
+            description: 'Dense information layout with keyboard shortcuts. Built for speed and efficiency.'
+          },
+          {
+            title: 'Admin Panel',
+            description: 'Configure services, manage locations, view analytics, and control system settings.'
+          }
+        ]
+      },
+      useCases: {
+        heading: 'Solutions for every industry',
+        subheading: 'Flexible queue management adapts to your specific needs',
+        items: [
+          {
+            title: 'Healthcare clinics',
+            body: 'Reduce lobby congestion. Patients check in digitally, receive wait time estimates, and get called when ready.',
+            industry: 'Healthcare'
+          },
+          {
+            title: 'Government offices',
+            body: 'Manage high volumes with multiple service types. Priority queues for urgent cases and appointments.',
+            industry: 'Public sector'
+          },
+          {
+            title: 'Retail & banking',
+            body: 'Smooth customer flow during peak hours. VIP queue support and service time tracking.',
+            industry: 'Finance'
+          },
+          {
+            title: 'Restaurants & cafes',
+            body: 'Digital waitlist with SMS or email alerts (additionally on request). Customers wait comfortably knowing their position.',
+            industry: 'Hospitality'
+          },
+          {
+            title: 'Service centers',
+            body: 'Route customers to specialized counters. Transfer tickets between staff without losing context.',
+            industry: 'Services'
+          },
+          {
+            title: 'Universities',
+            body: 'Manage student services across departments. Appointment slots mixed with walk-in queues.',
+            industry: 'Education'
+          }
+        ]
+      },
+      pricing: {
+        heading: 'Simple, transparent pricing',
+        subheading: 'Choose the plan that fits your operation',
+        plans: [
+          {
+            name: 'Starter',
+            price: '$49',
+            period: 'per location/month',
+            description: 'Perfect for single-location businesses starting with queue management',
+            features: [
+              'Up to 500 tickets/month',
+              '1 service queue',
+              '2 staff accounts',
+              'Basic analytics',
+              'Email support'
+            ],
+            cta: 'Start free trial'
+          },
+          {
+            name: 'Professional',
+            price: '$149',
+            period: 'per location/month',
+            description: 'Full-featured solution for growing businesses',
+            features: [
+              'Unlimited tickets',
+              'Up to 10 service queues',
+              'Unlimited staff accounts',
+              'Advanced analytics & exports',
+              'Priority support',
+              'Custom branding',
+              'API access'
+            ],
+            cta: 'Start free trial',
+            recommended: true
+          },
+          {
+            name: 'Enterprise',
+            price: 'Custom',
+            period: 'contact sales',
+            description: 'For organizations with multiple locations and custom requirements',
+            features: [
+              'Everything in Professional',
+              'Multi-location management',
+              'Dedicated support',
+              'Custom integrations',
+              'SLA guarantee',
+              'On-premise deployment option'
+            ],
+            cta: 'Contact sales'
+          }
+        ]
+      },
+      faq: {
+        heading: 'Frequently asked questions',
+        items: [
+          {
+            question: 'What hardware do I need?',
+            answer: 'QuokkaQ works on any modern device with a web browser. For kiosks, we recommend tablets (10" or larger). For displays, any TV or monitor with a browser. No special hardware required.'
+          },
+          {
+            question: 'Can customers get notifications?',
+            answer: 'SMS or email updates about queue position and estimated wait time are available additionally on request (not included in the current product). Today customers follow their place via displays and the digital waitlist in the browser.'
+          },
+          {
+            question: 'Does it work offline?',
+            answer: "The system requires internet connection for real-time sync across devices. Each device caches data locally, so brief connection drops won't interrupt service."
+          },
+          {
+            question: 'How long does setup take?',
+            answer: 'Most businesses are operational within 2-3 hours. This includes account setup, service configuration, staff training, and device installation.'
+          },
+          {
+            question: 'Can I customize ticket formats?',
+            answer: 'Yes. Each service queue can have custom ticket prefixes (letters), numbering rules, colors, and priority levels.'
+          },
+          {
+            question: 'Is there a free trial?',
+            answer: 'Yes. All paid plans include a 14-day free trial with full features. No credit card required to start.'
+          },
+          {
+            question: 'What about peak hours?',
+            answer: 'The system handles high volumes smoothly. Analytics help you identify peak times so you can schedule staff accordingly and adjust queue priorities dynamically.'
+          },
+          {
+            question: 'Can we integrate with existing systems?',
+            answer: 'Professional and Enterprise plans include API access for integration with appointment systems, CRMs, and other business tools.'
+          }
+        ]
+      },
+      footer: {
+        title: 'Ready to improve your queue management?',
+        body: 'Start with a free trial or explore the documentation to learn more about features and setup.',
+        cta: 'Start free trial'
+      }
+    }
+  },
+  ru: {
+    home: {
+      title: 'Управление очередями в каждом филиале — одна система.',
+      titleBefore: 'Управление очередями в каждом филиале — ',
+      titleAccent: 'одна система.',
+      description:
+        'Киоски, окна, публичные экраны и аналитика в реальном времени — для сетей и мультифилиальных операций.',
+      docsCta: 'Пробный период 14 дней →',
+      localeLabel: 'Язык и тема',
+      themeUseLight: 'Светлая тема',
+      themeUseDark: 'Тёмная тема',
+      logoAlt: 'QuokkaQ',
+      heroEyebrow: '🙂 Самая дружелюбная QMS на рынке',
+      secondaryCta: 'Заказать демо',
+      pillarsHeading: 'Почему команды выбирают QuokkaQ',
+      pillars: {
+        one: {
+          title: 'Структура важнее украшений',
+          body: 'Корпоративная сетка, типографика и состояния интерфейса — чтобы каждый экран выглядел собранно.'
+        },
+        two: {
+          title: 'Доступность с первого дня',
+          body: 'Клавиатура, focus-visible и контраст, который держится и в тёмной теме.'
+        },
+        three: {
+          title: 'Готово к росту',
+          body: 'Тот же стек, что и у веб-приложения: Next.js, строгий TypeScript и CI, который ловит регрессии рано.'
+        }
+      },
+      stats: {
+        heading:
+          'Нам доверяют команды, которым нельзя терпеть хаос в зале ожидания',
+        industries: [
+          { label: 'Здравоохранение', icon: 'healthcare' },
+          { label: 'Госсектор', icon: 'publicSector' },
+          { label: 'Розница', icon: 'retail' },
+          { label: 'Услуги', icon: 'services' }
+        ]
+      },
+      howItWorks: {
+        heading: 'Как это работает',
+        subheading: 'Три шага от талона к аналитике',
+        steps: [
+          {
+            title: 'Возьмите талон',
+            body: 'Гости подключаются с киоска или веба; поддерживаются записи и предварительная регистрация.'
+          },
+          {
+            title: 'Обслуживайте прозрачно',
+            body: 'Персонал вызывает, переводит и завершает визиты; заметки и метки остаются в аудите.'
+          },
+          {
+            title: 'Оценивайте важное',
+            body: 'SLA, объёмы, опросы и загрузка — с фильтрами по подразделению, зоне и оператору там, где это разрешено.'
+          }
+        ]
+      },
+      features: {
+        heading: 'Всё необходимое для управления очередями',
+        subheading: 'Создано для реальных операций с вниманием к каждой детали',
+        items: [
+          {
+            title: 'Множественные очереди',
+            body: 'Отдельные очереди для разных услуг с настраиваемыми префиксами талонов, цветами и правилами приоритета.'
+          },
+          {
+            title: 'Цифровые табло',
+            body: 'Большие экраны показывают текущие талоны, время ожидания и объявления. Полностью настраиваемые макеты.'
+          },
+          {
+            title: 'Панель персонала',
+            body: 'Вызывайте клиентов, переводите талоны между окнами, приостанавливайте обслуживание и просматривайте аналитику в одном месте.'
+          },
+          {
+            title: 'Мобильные киоски',
+            body: 'Адаптивный интерфейс регистрации работает на планшетах, телефонах или специализированном оборудовании киосков.'
+          },
+          {
+            title: 'Синхронизация в реальном времени',
+            body: 'Все устройства синхронизируются мгновенно. Обновление не требуется. Работает офлайн с локальным кэшированием.'
+          },
+          {
+            title: 'Детальная аналитика',
+            body: 'Экспортируйте отчёты по времени ожидания, длительности обслуживания, пиковым часам, производительности персонала и паттернам клиентов.'
+          }
+        ]
+      },
+      interfaceShowcase: {
+        heading: 'Создано для каждой роли',
+        subheading: 'Единообразный опыт на киосках для клиентов, публичных табло и инструментах персонала',
+        items: [
+          {
+            title: 'Киоск регистрации',
+            description: 'Крупные кнопки, чёткие категории, мгновенная печать талонов. Доступно для всех возрастов.'
+          },
+          {
+            title: 'Публичное табло',
+            description: 'Высококонтрастный дизайн, видимый издалека. Показывает текущие номера и оценку времени ожидания.'
+          },
+          {
+            title: 'Панель персонала',
+            description: 'Плотная компоновка информации с клавиатурными сокращениями. Создана для скорости и эффективности.'
+          },
+          {
+            title: 'Панель администратора',
+            description: 'Настройка услуг, управление точками, просмотр аналитики и контроль системных настроек.'
+          }
+        ]
+      },
+      useCases: {
+        heading: 'Решения для каждой отрасли',
+        subheading: 'Гибкое управление очередями адаптируется под ваши специфичные нужды',
+        items: [
+          {
+            title: 'Медицинские клиники',
+            body: 'Сокращайте скопление в холле. Пациенты регистрируются цифрово, получают оценку времени ожидания и их вызывают, когда готово.',
+            industry: 'Здравоохранение'
+          },
+          {
+            title: 'Государственные учреждения',
+            body: 'Управляйте высокими потоками с множественными типами услуг. Приоритетные очереди для срочных случаев и записей.',
+            industry: 'Госсектор'
+          },
+          {
+            title: 'Розница и банки',
+            body: 'Плавный поток клиентов в пиковые часы. Поддержка VIP-очередей и отслеживание времени обслуживания.',
+            industry: 'Финансы'
+          },
+          {
+            title: 'Рестораны и кафе',
+            body: 'Цифровой лист ожидания с уведомлениями по SMS или email (дополнительно по запросу). Клиенты ждут комфортно, зная свою позицию.',
+            industry: 'HoReCa'
+          },
+          {
+            title: 'Сервисные центры',
+            body: 'Направляйте клиентов к специализированным окнам. Передавайте талоны между сотрудниками без потери контекста.',
+            industry: 'Услуги'
+          },
+          {
+            title: 'Университеты',
+            body: 'Управляйте студенческими услугами через отделы. Слоты по записи смешаны с живыми очередями.',
+            industry: 'Образование'
+          }
+        ]
+      },
+      pricing: {
+        heading: 'Простое, прозрачное ценообразование',
+        subheading: 'Выберите план, подходящий вашим операциям',
+        plans: [
+          {
+            name: 'Стартовый',
+            price: '$49',
+            period: 'за точку/месяц',
+            description: 'Идеально для бизнеса с одной точкой, начинающего управление очередями',
+            features: [
+              'До 500 талонов/месяц',
+              '1 очередь услуг',
+              '2 аккаунта персонала',
+              'Базовая аналитика',
+              'Поддержка по email'
+            ],
+            cta: 'Начать пробный период'
+          },
+          {
+            name: 'Профессиональный',
+            price: '$149',
+            period: 'за точку/месяц',
+            description: 'Полнофункциональное решение для растущего бизнеса',
+            features: [
+              'Неограниченные талоны',
+              'До 10 очередей услуг',
+              'Неограниченные аккаунты персонала',
+              'Продвинутая аналитика и экспорт',
+              'Приоритетная поддержка',
+              'Кастомный брендинг',
+              'API-доступ'
+            ],
+            cta: 'Начать пробный период',
+            recommended: true
+          },
+          {
+            name: 'Корпоративный',
+            price: 'Индивидуально',
+            period: 'свяжитесь с отделом продаж',
+            description: 'Для организаций с множественными точками и кастомными требованиями',
+            features: [
+              'Всё из Профессионального',
+              'Управление множеством точек',
+              'Выделенная поддержка',
+              'Кастомные интеграции',
+              'Гарантия SLA',
+              'Опция локального развёртывания'
+            ],
+            cta: 'Связаться с отделом продаж'
+          }
+        ]
+      },
+      faq: {
+        heading: 'Часто задаваемые вопросы',
+        items: [
+          {
+            question: 'Какое оборудование требуется?',
+            answer: 'QuokkaQ работает на любом современном устройстве с веб-браузером. Для киосков рекомендуем планшеты (10" или больше). Для табло — любой телевизор или монитор с браузером. Специальное оборудование не требуется.'
+          },
+          {
+            question: 'Могут ли клиенты получать уведомления?',
+            answer: 'Уведомления по SMS или email о позиции в очереди и примерном времени ожидания доступны дополнительно по запросу (в стандартной версии продукта пока не реализовано). Сейчас клиенты отслеживают очередь через табло и цифровой лист ожидания в браузере.'
+          },
+          {
+            question: 'Работает ли офлайн?',
+            answer: 'Система требует интернет-соединения для синхронизации в реальном времени между устройствами. Каждое устройство кэширует данные локально, поэтому кратковременные отключения не прерывают обслуживание.'
+          },
+          {
+            question: 'Сколько времени занимает настройка?',
+            answer: 'Большинство бизнесов начинают работу в течение 2-3 часов. Это включает настройку аккаунта, конфигурацию услуг, обучение персонала и установку устройств.'
+          },
+          {
+            question: 'Можно ли настроить форматы талонов?',
+            answer: 'Да. Каждая очередь услуг может иметь кастомные префиксы талонов (буквы), правила нумерации, цвета и уровни приоритета.'
+          },
+          {
+            question: 'Есть ли бесплатный пробный период?',
+            answer: 'Да. Все платные планы включают 14-дневный пробный период с полным функционалом. Кредитная карта для старта не требуется.'
+          },
+          {
+            question: 'Как насчёт пиковых часов?',
+            answer: 'Система справляется с высокими нагрузками плавно. Аналитика помогает определить пиковые времена, чтобы вы могли планировать персонал соответственно и динамически настраивать приоритеты очередей.'
+          },
+          {
+            question: 'Можем ли мы интегрироваться с существующими системами?',
+            answer: 'Профессиональный и Корпоративный планы включают API-доступ для интеграции с системами записи, CRM и другими бизнес-инструментами.'
+          }
+        ]
+      },
+      footer: {
+        title: 'Готовы улучшить управление очередями?',
+        body: 'Начните с бесплатного пробного периода или изучите документацию, чтобы узнать больше о возможностях и настройке.',
+        cta: 'Начать пробный период'
+      }
+    }
+  }
+};
