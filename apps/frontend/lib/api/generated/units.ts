@@ -691,7 +691,7 @@ export interface HandlersYooKassaWebhookNotification {
 }
 
 export interface HandlersAddSupportReportShareRequest {
-  userId: string;
+  userId?: string;
 }
 
 /**
@@ -904,9 +904,9 @@ export interface HandlersCompanyMeResponse {
 export type HandlersCreateSupportReportRequestDiagnostics = { [key: string]: unknown };
 
 export interface HandlersCreateSupportReportRequest {
-  description: string;
+  description?: string;
   diagnostics?: HandlersCreateSupportReportRequestDiagnostics;
-  title: string;
+  title?: string;
   traceId?: string;
   unitId?: string;
 }
@@ -1028,7 +1028,7 @@ export interface HandlersPlatformListResponseModelsSubscription {
 }
 
 export interface HandlersPostSupportReportCommentRequest {
-  text: string;
+  text?: string;
 }
 
 export interface HandlersPutVisitorTagsRequest {

@@ -19,7 +19,7 @@ var (
 	reStripHTMLScript            = regexp.MustCompile(`(?is)<script[^>]*>.*?</script>`)
 	reStripHTMLStyle             = regexp.MustCompile(`(?is)<style[^>]*>.*?</style>`)
 	reStripHTMLBr                = regexp.MustCompile(`(?i)<br\s*/?>`)
-	reStripHTMLBlockClose        = regexp.MustCompile(`(?i)</(p|div|tr|h[1-6])\s*>`)
+	reStripHTMLBlockClose        = regexp.MustCompile(`(?i)</(p|div|tr|h[1-6]|li|td|th)\s*>`)
 	reStripHTMLTags              = regexp.MustCompile(`<[^>]+>`)
 	reStripHTMLSpaceBeforeNL     = regexp.MustCompile(`[ \t\f\v]+\n`)
 	reStripHTMLMultiNL           = regexp.MustCompile(`\n{3,}`)

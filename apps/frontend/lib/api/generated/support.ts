@@ -664,7 +664,7 @@ export interface HandlersYooKassaWebhookNotification {
 }
 
 export interface HandlersAddSupportReportShareRequest {
-  userId: string;
+  userId?: string;
 }
 
 /**
@@ -877,9 +877,9 @@ export interface HandlersCompanyMeResponse {
 export type HandlersCreateSupportReportRequestDiagnostics = { [key: string]: unknown };
 
 export interface HandlersCreateSupportReportRequest {
-  description: string;
+  description?: string;
   diagnostics?: HandlersCreateSupportReportRequestDiagnostics;
-  title: string;
+  title?: string;
   traceId?: string;
   unitId?: string;
 }
@@ -1001,7 +1001,7 @@ export interface HandlersPlatformListResponseModelsSubscription {
 }
 
 export interface HandlersPostSupportReportCommentRequest {
-  text: string;
+  text?: string;
 }
 
 export interface HandlersPutVisitorTagsRequest {
@@ -2100,10 +2100,20 @@ export type listSupportReportCommentsResponse501 = {
   status: 501
 }
 
+export type listSupportReportCommentsResponse502 = {
+  data: string
+  status: 502
+}
+
+export type listSupportReportCommentsResponse503 = {
+  data: string
+  status: 503
+}
+
 export type listSupportReportCommentsResponseSuccess = (listSupportReportCommentsResponse200) & {
   headers: Headers;
 };
-export type listSupportReportCommentsResponseError = (listSupportReportCommentsResponse400 | listSupportReportCommentsResponse401 | listSupportReportCommentsResponse403 | listSupportReportCommentsResponse404 | listSupportReportCommentsResponse501) & {
+export type listSupportReportCommentsResponseError = (listSupportReportCommentsResponse400 | listSupportReportCommentsResponse401 | listSupportReportCommentsResponse403 | listSupportReportCommentsResponse404 | listSupportReportCommentsResponse501 | listSupportReportCommentsResponse502 | listSupportReportCommentsResponse503) & {
   headers: Headers;
 };
 
@@ -2266,10 +2276,15 @@ export type postSupportReportCommentResponse502 = {
   status: 502
 }
 
+export type postSupportReportCommentResponse503 = {
+  data: string
+  status: 503
+}
+
 export type postSupportReportCommentResponseSuccess = (postSupportReportCommentResponse204) & {
   headers: Headers;
 };
-export type postSupportReportCommentResponseError = (postSupportReportCommentResponse400 | postSupportReportCommentResponse401 | postSupportReportCommentResponse403 | postSupportReportCommentResponse404 | postSupportReportCommentResponse413 | postSupportReportCommentResponse501 | postSupportReportCommentResponse502) & {
+export type postSupportReportCommentResponseError = (postSupportReportCommentResponse400 | postSupportReportCommentResponse401 | postSupportReportCommentResponse403 | postSupportReportCommentResponse404 | postSupportReportCommentResponse413 | postSupportReportCommentResponse501 | postSupportReportCommentResponse502 | postSupportReportCommentResponse503) & {
   headers: Headers;
 };
 
@@ -2378,10 +2393,15 @@ export type markSupportReportIrrelevantResponse502 = {
   status: 502
 }
 
+export type markSupportReportIrrelevantResponse503 = {
+  data: string
+  status: 503
+}
+
 export type markSupportReportIrrelevantResponseSuccess = (markSupportReportIrrelevantResponse200) & {
   headers: Headers;
 };
-export type markSupportReportIrrelevantResponseError = (markSupportReportIrrelevantResponse401 | markSupportReportIrrelevantResponse403 | markSupportReportIrrelevantResponse404 | markSupportReportIrrelevantResponse500 | markSupportReportIrrelevantResponse502) & {
+export type markSupportReportIrrelevantResponseError = (markSupportReportIrrelevantResponse401 | markSupportReportIrrelevantResponse403 | markSupportReportIrrelevantResponse404 | markSupportReportIrrelevantResponse500 | markSupportReportIrrelevantResponse502 | markSupportReportIrrelevantResponse503) & {
   headers: Headers;
 };
 
@@ -2785,10 +2805,15 @@ export type addSupportReportShareResponse502 = {
   status: 502
 }
 
+export type addSupportReportShareResponse503 = {
+  data: string
+  status: 503
+}
+
 export type addSupportReportShareResponseSuccess = (addSupportReportShareResponse200) & {
   headers: Headers;
 };
-export type addSupportReportShareResponseError = (addSupportReportShareResponse400 | addSupportReportShareResponse401 | addSupportReportShareResponse403 | addSupportReportShareResponse404 | addSupportReportShareResponse501 | addSupportReportShareResponse502) & {
+export type addSupportReportShareResponseError = (addSupportReportShareResponse400 | addSupportReportShareResponse401 | addSupportReportShareResponse403 | addSupportReportShareResponse404 | addSupportReportShareResponse501 | addSupportReportShareResponse502 | addSupportReportShareResponse503) & {
   headers: Headers;
 };
 
@@ -2897,10 +2922,15 @@ export type removeSupportReportShareResponse502 = {
   status: 502
 }
 
+export type removeSupportReportShareResponse503 = {
+  data: string
+  status: 503
+}
+
 export type removeSupportReportShareResponseSuccess = (removeSupportReportShareResponse200) & {
   headers: Headers;
 };
-export type removeSupportReportShareResponseError = (removeSupportReportShareResponse401 | removeSupportReportShareResponse403 | removeSupportReportShareResponse404 | removeSupportReportShareResponse501 | removeSupportReportShareResponse502) & {
+export type removeSupportReportShareResponseError = (removeSupportReportShareResponse401 | removeSupportReportShareResponse403 | removeSupportReportShareResponse404 | removeSupportReportShareResponse501 | removeSupportReportShareResponse502 | removeSupportReportShareResponse503) & {
   headers: Headers;
 };
 

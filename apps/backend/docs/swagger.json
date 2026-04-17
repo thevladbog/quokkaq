@@ -889,9 +889,6 @@
                         "type": "string"
                     }
                 },
-                "required": [
-                    "userId"
-                ],
                 "type": "object"
             },
             "handlers.companyMeResponse": {
@@ -931,10 +928,6 @@
                         "type": "string"
                     }
                 },
-                "required": [
-                    "description",
-                    "title"
-                ],
                 "type": "object"
             },
             "handlers.createSurveyRequest": {
@@ -1149,9 +1142,6 @@
                         "type": "string"
                     }
                 },
-                "required": [
-                    "text"
-                ],
                 "type": "object"
             },
             "handlers.putVisitorTagsRequest": {
@@ -10479,6 +10469,26 @@
                             }
                         },
                         "description": "Not implemented for this ticket backend"
+                    },
+                    "502": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Upstream ticket request failed"
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "External ticketing service temporarily unavailable"
                     }
                 },
                 "security": [
@@ -10590,6 +10600,16 @@
                             }
                         },
                         "description": "Upstream ticket request failed"
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "External ticketing service temporarily unavailable"
                     }
                 },
                 "security": [
@@ -10678,6 +10698,16 @@
                             }
                         },
                         "description": "Failed to post comment on external ticket"
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "External ticketing service temporarily unavailable"
                     }
                 },
                 "security": [
@@ -10969,6 +10999,16 @@
                             }
                         },
                         "description": "Upstream ticket update failed"
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "External ticketing service temporarily unavailable"
                     }
                 },
                 "security": [
@@ -11069,6 +11109,16 @@
                             }
                         },
                         "description": "Upstream ticket update failed"
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "External ticketing service temporarily unavailable"
                     }
                 },
                 "security": [

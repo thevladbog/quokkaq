@@ -35,8 +35,8 @@ func NewSupportReportHandler(svc *services.SupportReportService) *SupportReportH
 // traceId is optional; when omitted or blank the server assigns a UUID.
 // diagnostics is optional; when omitted the server stores an empty object.
 type createSupportReportRequest struct {
-	Title       string          `json:"title" binding:"required"`
-	Description string          `json:"description" binding:"required"`
+	Title       string          `json:"title"`
+	Description string          `json:"description"`
 	TraceID     string          `json:"traceId,omitempty"`
 	Diagnostics json.RawMessage `json:"diagnostics,omitempty" swaggertype:"object"`
 	UnitID      *string         `json:"unitId"`
@@ -80,6 +80,14 @@ func (h *SupportReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
+	if strings.TrimSpace(req.Title) == "" {
+		http.Error(w, services.ErrSupportReportInvalidTitle.Error(), http.StatusBadRequest)
+		return
+	}
+	if strings.TrimSpace(req.Description) == "" {
+		http.Error(w, services.ErrSupportReportInvalidDescription.Error(), http.StatusBadRequest)
+		return
+	}
 	if len(req.Diagnostics) == 0 {
 		req.Diagnostics = json.RawMessage(`{}`)
 	}
@@ -112,9 +120,8 @@ func (h *SupportReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Failed to save support report", http.StatusInternalServerError)
 			return
 		}
-		if st, ok := services.TicketIntegrationHTTPStatus(err); ok && st == http.StatusServiceUnavailable {
-			log.Printf("support report Create: upstream unavailable: %v", err)
-			http.Error(w, "External ticketing service is temporarily unavailable", http.StatusServiceUnavailable)
+		if _, ok := services.TicketIntegrationHTTPStatus(err); ok {
+			writeSupportReportUpstreamHTTPError(w, err, "support report Create: upstream ticket error: %v", "Failed to create external support ticket")
 			return
 		}
 		http.Error(w, "Failed to create external support ticket", http.StatusBadGateway)
@@ -210,6 +217,7 @@ func (h *SupportReportHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 // @Failure      403  {string}  string  "Forbidden"
 // @Failure      404  {string}  string  "Not found"
 // @Failure      502  {string}  string  "Failed to post comment on external ticket"
+// @Failure      503  {string}  string  "External ticketing service temporarily unavailable"
 // @Failure      500  {string}  string  "Internal server error"
 // @Router       /support/reports/{id}/mark-irrelevant [post]
 // @Security     BearerAuth
@@ -240,7 +248,7 @@ func (h *SupportReportHandler) MarkIrrelevant(w http.ResponseWriter, r *http.Req
 			return
 		}
 		if _, ok := services.TicketIntegrationHTTPStatus(err); ok {
-			http.Error(w, "Failed to post comment on external ticket", http.StatusBadGateway)
+			writeSupportReportUpstreamHTTPError(w, err, "support report MarkIrrelevant: upstream ticket error: %v", "Failed to post comment on external ticket")
 			return
 		}
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -252,7 +260,7 @@ func (h *SupportReportHandler) MarkIrrelevant(w http.ResponseWriter, r *http.Req
 }
 
 type addSupportReportShareRequest struct {
-	UserID string `json:"userId" binding:"required"`
+	UserID string `json:"userId"`
 }
 
 // ListShareCandidates godoc
@@ -373,6 +381,7 @@ func (h *SupportReportHandler) ListShares(w http.ResponseWriter, r *http.Request
 // @Failure      403   {string}  string  "Forbidden"
 // @Failure      404   {string}  string  "Not found"
 // @Failure      502   {string}  string  "Upstream ticket update failed"
+// @Failure      503   {string}  string  "External ticketing service temporarily unavailable"
 // @Failure      501   {string}  string  "Not implemented for this ticket backend"
 // @Router       /support/reports/{id}/shares [post]
 // @Security     BearerAuth
@@ -395,6 +404,10 @@ func (h *SupportReportHandler) AddShare(w http.ResponseWriter, r *http.Request) 
 	var req addSupportReportShareRequest
 	if err := json.Unmarshal(body, &req); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if strings.TrimSpace(req.UserID) == "" {
+		http.Error(w, services.ErrSupportReportShareInvalidTarget.Error(), http.StatusBadRequest)
 		return
 	}
 	rows, err := h.svc.AddSupportReportShare(r.Context(), uid, id, req.UserID)
@@ -421,7 +434,7 @@ func (h *SupportReportHandler) AddShare(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 		if _, ok := services.TicketIntegrationHTTPStatus(err); ok {
-			http.Error(w, "Failed to update external ticket", http.StatusBadGateway)
+			writeSupportReportUpstreamHTTPError(w, err, "support report AddShare: upstream ticket error: %v", "Failed to update external ticket")
 			return
 		}
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -448,6 +461,7 @@ func (h *SupportReportHandler) AddShare(w http.ResponseWriter, r *http.Request) 
 // @Failure      403               {string}  string  "Forbidden"
 // @Failure      404               {string}  string  "Not found"
 // @Failure      502               {string}  string  "Upstream ticket update failed"
+// @Failure      503               {string}  string  "External ticketing service temporarily unavailable"
 // @Failure      501               {string}  string  "Not implemented for this ticket backend"
 // @Router       /support/reports/{id}/shares/{sharedWithUserId} [delete]
 // @Security     BearerAuth
@@ -487,7 +501,7 @@ func (h *SupportReportHandler) RemoveShare(w http.ResponseWriter, r *http.Reques
 			return
 		}
 		if _, ok := services.TicketIntegrationHTTPStatus(err); ok {
-			http.Error(w, "Failed to update external ticket", http.StatusBadGateway)
+			writeSupportReportUpstreamHTTPError(w, err, "support report RemoveShare: upstream ticket error: %v", "Failed to update external ticket")
 			return
 		}
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -502,7 +516,7 @@ func (h *SupportReportHandler) RemoveShare(w http.ResponseWriter, r *http.Reques
 }
 
 type postSupportReportCommentRequest struct {
-	Text string `json:"text" binding:"required"`
+	Text string `json:"text"`
 }
 
 // ListComments godoc
@@ -518,6 +532,8 @@ type postSupportReportCommentRequest struct {
 // @Failure      401       {string}  string  "Unauthorized"
 // @Failure      403       {string}  string  "Forbidden"
 // @Failure      404       {string}  string  "Not found"
+// @Failure      502       {string}  string  "Upstream ticket request failed"
+// @Failure      503       {string}  string  "External ticketing service temporarily unavailable"
 // @Failure      501       {string}  string  "Not implemented for this ticket backend"
 // @Router       /support/reports/{id}/comments [get]
 // @Security     BearerAuth
@@ -556,7 +572,7 @@ func (h *SupportReportHandler) ListComments(w http.ResponseWriter, r *http.Reque
 			return
 		}
 		if _, stOK := services.TicketIntegrationHTTPStatus(err); stOK {
-			http.Error(w, "Failed to load comments from external ticket", http.StatusBadGateway)
+			writeSupportReportUpstreamHTTPError(w, err, "support report ListComments: upstream ticket error: %v", "Failed to load comments from external ticket")
 			return
 		}
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -586,6 +602,7 @@ func (h *SupportReportHandler) ListComments(w http.ResponseWriter, r *http.Reque
 // @Failure      404   {string}  string  "Not found"
 // @Failure      413   {string}  string  "Payload too large"
 // @Failure      502   {string}  string  "Upstream ticket request failed"
+// @Failure      503   {string}  string  "External ticketing service temporarily unavailable"
 // @Failure      501   {string}  string  "Not implemented for this ticket backend"
 // @Router       /support/reports/{id}/comments [post]
 // @Security     BearerAuth
@@ -614,6 +631,10 @@ func (h *SupportReportHandler) PostComment(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
+	if strings.TrimSpace(req.Text) == "" {
+		http.Error(w, services.ErrSupportReportInvalidDescription.Error(), http.StatusBadRequest)
+		return
+	}
 	err = h.svc.PostSupportReportComment(r.Context(), uid, id, services.PostSupportReportCommentInput{
 		Text: req.Text,
 	})
@@ -639,7 +660,7 @@ func (h *SupportReportHandler) PostComment(w http.ResponseWriter, r *http.Reques
 			return
 		}
 		if _, stOK := services.TicketIntegrationHTTPStatus(err); stOK {
-			http.Error(w, "Failed to post comment on external ticket", http.StatusBadGateway)
+			writeSupportReportUpstreamHTTPError(w, err, "support report PostComment: upstream ticket error: %v", "Failed to post comment on external ticket")
 			return
 		}
 		http.Error(w, "Internal server error", http.StatusInternalServerError)

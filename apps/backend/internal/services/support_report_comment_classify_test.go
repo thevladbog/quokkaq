@@ -1,6 +1,9 @@
 package services
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestClassifySupportReportCommentFromTracker_publicPrefixes(t *testing.T) {
 	cases := []struct {
@@ -99,5 +102,20 @@ func TestClassifySupportReportCommentFromTracker_sanitizesNbspEntities(t *testin
 	}
 	if d != "line one\nline two" {
 		t.Fatalf("display want %q got %q", "line one\nline two", d)
+	}
+}
+
+func TestClassifySupportReportCommentFromTracker_stripHTMLInsertsBreaksAfterLiTdTh(t *testing.T) {
+	k, d := ClassifySupportReportCommentFromTracker(YandexTrackerIssueComment{
+		TextHTML: "<ul><li>one</li><li>two</li></ul><table><tr><td>a</td><th>b</th></tr></table>",
+	})
+	if k != supportCommentKindInternal {
+		t.Fatalf("kind want internal got %q", k)
+	}
+	if !strings.Contains(d, "one") || !strings.Contains(d, "two") || !strings.Contains(d, "a") || !strings.Contains(d, "b") {
+		t.Fatalf("expected fragments in display: %q", d)
+	}
+	if strings.Contains(d, "<") {
+		t.Fatalf("expected tags stripped: %q", d)
 	}
 }

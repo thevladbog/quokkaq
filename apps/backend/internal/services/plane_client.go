@@ -10,6 +10,7 @@ import (
 	"html"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -49,6 +50,15 @@ func newPlaneHTTPError(status int, body []byte) *PlaneHTTPError {
 
 // ErrPlaneCommentsUnsupported is returned by PlaneClient.AddComment; Plane work-item comments are not implemented in this integration.
 var ErrPlaneCommentsUnsupported = errors.New("plane: work item comments are not supported in this integration")
+
+// ErrPlaneProjectRefNotFound is returned when listing projects (with pagination) finds no match for the configured ref.
+var ErrPlaneProjectRefNotFound = errors.New("plane: no project matches ref")
+
+// ErrPlaneProjectListPaginationLimit is returned when more project pages exist but resolution stops after planeProjectListMaxPages.
+var ErrPlaneProjectListPaginationLimit = errors.New("plane: project list pagination limit reached")
+
+// planeProjectListMaxPages caps GET .../projects/ pagination when resolving PLANE_PROJECT_IDENTIFIER (large workspaces should set PLANE_PROJECT_ID).
+var planeProjectListMaxPages = 50
 
 // PlaneClient calls the Plane REST API (self-hosted or cloud).
 type PlaneClient struct {
@@ -153,6 +163,38 @@ func (c *PlaneClient) IntegrationDisabledReason() string {
 	return "Plane is not fully configured"
 }
 
+func planeProjectResolveErrorShouldCache(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, ErrPlaneProjectListPaginationLimit) {
+		return false
+	}
+	var pe *PlaneHTTPError
+	if errors.As(err, &pe) {
+		if pe.HTTPStatus == http.StatusTooManyRequests {
+			return false
+		}
+		if pe.HTTPStatus >= 500 {
+			return false
+		}
+		if pe.HTTPStatus >= 400 {
+			return true
+		}
+	}
+	if errors.Is(err, ErrPlaneProjectRefNotFound) {
+		return true
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		return false
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+	return false
+}
+
 // effectiveProjectID returns the project UUID for .../projects/{uuid}/work-items/ URLs.
 func (c *PlaneClient) effectiveProjectID(ctx context.Context) (string, error) {
 	c.resolveMu.Lock()
@@ -173,7 +215,9 @@ func (c *PlaneClient) effectiveProjectID(ctx context.Context) (string, error) {
 	}
 	id, err := c.fetchProjectUUIDByRef(ctx, ref)
 	if err != nil {
-		c.resolveErr = err
+		if planeProjectResolveErrorShouldCache(err) {
+			c.resolveErr = err
+		}
 		return "", err
 	}
 	c.resolvedID = id
@@ -192,7 +236,7 @@ type planeProjectsListEnvelope struct {
 func (c *PlaneClient) fetchProjectUUIDByRef(ctx context.Context, ref string) (string, error) {
 	ref = strings.TrimSpace(ref)
 	cursor := ""
-	for page := 0; page < 50; page++ {
+	for page := 0; page < planeProjectListMaxPages; page++ {
 		u, err := url.Parse(fmt.Sprintf("%s/api/v1/workspaces/%s/projects/", c.baseURL, url.PathEscape(c.workspaceSlug)))
 		if err != nil {
 			return "", fmt.Errorf("plane list projects url: %w", err)
@@ -234,9 +278,13 @@ func (c *PlaneClient) fetchProjectUUIDByRef(ctx context.Context, ref string) (st
 		if !env.NextPageResults || env.NextCursor == nil || strings.TrimSpace(*env.NextCursor) == "" {
 			break
 		}
+		if page >= planeProjectListMaxPages-1 {
+			log.Printf("plane: project list pagination cap reached while resolving ref=%q (%d pages)", ref, planeProjectListMaxPages)
+			return "", fmt.Errorf("%w for ref %q (%d pages); set PLANE_PROJECT_ID to the project UUID", ErrPlaneProjectListPaginationLimit, ref, planeProjectListMaxPages)
+		}
 		cursor = strings.TrimSpace(*env.NextCursor)
 	}
-	return "", fmt.Errorf("plane: no project matches %q — set PLANE_PROJECT_ID to the project UUID, or PLANE_PROJECT_IDENTIFIER to the project's identifier (see GET /workspaces/.../projects/)", ref)
+	return "", fmt.Errorf("%w: ref %q — set PLANE_PROJECT_ID to the project UUID, or PLANE_PROJECT_IDENTIFIER to the project's identifier (see GET /workspaces/.../projects/)", ErrPlaneProjectRefNotFound, ref)
 }
 
 // planeWorkItemResponse is a subset of Plane JSON for create/get work item.
