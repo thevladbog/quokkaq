@@ -31,7 +31,12 @@ export async function fetchMarketingSubscriptionPlans(): Promise<
       return null;
     }
     return parsed.data
-      .filter((p) => p.isActive && p.code !== 'grandfathered')
+      .filter(
+        (p) =>
+          p.isActive !== false &&
+          p.isPublic !== false &&
+          p.code !== 'grandfathered'
+      )
       .sort(sortPublicSubscriptionPlans);
   } catch {
     return null;

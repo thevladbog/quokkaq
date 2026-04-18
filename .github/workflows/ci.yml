@@ -197,9 +197,11 @@ jobs:
         run: pnpm --dir apps/frontend exec tsc --noEmit
 
       - name: '💅 Prettier (marketing)'
+        if: needs.affected.outputs.marketing == 'true'
         run: pnpm nx run marketing:format:check
 
       - name: '🔷 Typecheck marketing (tsc --noEmit)'
+        if: needs.affected.outputs.marketing == 'true'
         run: pnpm --dir apps/marketing exec tsc --noEmit
 
       - name: '🏗️ Build, test, lint (affected web stack)'

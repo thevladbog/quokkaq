@@ -480,16 +480,25 @@ _PLAN_OBJECT_MAP_PROP_TYPES: dict[str, str] = {
     "limitsNegotiable": "boolean",
 }
 
+# Only subscription-plan-related schemas that expose json.RawMessage maps from the backend.
+_PLAN_MAP_SCHEMA_KEYS: tuple[str, ...] = (
+    "models.SubscriptionPlan",
+    "handlers.PlatformCreateSubscriptionPlanBody",
+    "handlers.PlatformUpdateSubscriptionPlanBody",
+)
+
 
 def _patch_plan_json_object_maps(components: dict[str, Any]) -> None:
-    """Add additionalProperties to limits/features/limitsNegotiable under components.schemas."""
+    """Add additionalProperties to limits/features/limitsNegotiable on known plan schemas only."""
     schemas = components.get("schemas")
     if not isinstance(schemas, dict):
         sys.exit(
             "post_swagger_openapi_tweaks: components.schemas missing "
             "(required for plan map additionalProperties patch)"
         )
-    for schema_name, schema in schemas.items():
+    patched = 0
+    for schema_key in _PLAN_MAP_SCHEMA_KEYS:
+        schema = schemas.get(schema_key)
         if not isinstance(schema, dict):
             continue
         props = schema.get("properties")
@@ -504,6 +513,13 @@ def _patch_plan_json_object_maps(components: dict[str, Any]) -> None:
             if "$ref" in prop:
                 continue
             prop["additionalProperties"] = {"type": value_type}
+            patched += 1
+    if patched == 0:
+        sys.exit(
+            "post_swagger_openapi_tweaks: no plan map object properties patched "
+            f"(expected inline type:object props {sorted(_PLAN_OBJECT_MAP_PROP_TYPES)} "
+            f"on at least one of {_PLAN_MAP_SCHEMA_KEYS}; swag/OpenAPI drift?)"
+        )
 
 
 def apply_openapi_tweaks(doc: dict[str, Any]) -> None:

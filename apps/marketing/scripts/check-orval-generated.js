@@ -29,6 +29,14 @@ if (untracked.error) {
   process.exit(1);
 }
 
+if (untracked.status !== 0 && untracked.status !== null) {
+  console.error(
+    untracked.stderr?.trim() ||
+      `git ls-files failed with status ${untracked.status}`
+  );
+  process.exit(1);
+}
+
 const untrackedList = untracked.stdout.trim();
 if (untrackedList) {
   console.error(

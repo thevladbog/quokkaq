@@ -30,7 +30,9 @@ export function LandingPricing({
 }: Props) {
   const intlLocale = intlLocaleFromAppLocale(locale);
   const labels = copy.pricingFromApi.rowLabels;
-  const apiPlans = plansFromApi ?? [];
+  const apiPlans = (plansFromApi ?? []).filter(
+    (p) => p.isPublic !== false && p.isActive !== false
+  );
   const useApi = apiPlans.length > 0;
   const contactHref = appBaseUrl
     ? `${appBaseUrl}/${locale}/contact`

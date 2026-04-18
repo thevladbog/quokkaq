@@ -69,31 +69,30 @@ export function MarketingThemeProvider({
     readStoredTheme()
   );
   const [mounted, setMounted] = React.useState(false);
+  const [resolvedTheme, setResolvedTheme] = React.useState<'light' | 'dark'>(
+    'light'
+  );
 
   React.useLayoutEffect(() => {
     setThemeState(readStoredTheme());
     setMounted(true);
   }, []);
 
-  const resolvedTheme = React.useMemo((): 'light' | 'dark' => {
-    if (typeof window === 'undefined') return 'light';
-    if (theme === 'light' || theme === 'dark') return theme;
-    const root = document.documentElement;
-    if (root.classList.contains('dark')) return 'dark';
-    if (root.classList.contains('light')) return 'light';
-    return systemPreference();
-  }, [theme]);
-
   React.useEffect(() => {
     if (typeof window === 'undefined') return;
-    applyDom(resolveTheme(theme));
+    const resolved = resolveTheme(theme);
+    applyDom(resolved);
+    setResolvedTheme(resolved);
   }, [theme]);
 
   React.useEffect(() => {
     if (!mounted) return;
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
     const onChange = () => {
-      if (theme === 'system') applyDom(systemPreference());
+      if (theme !== 'system') return;
+      const next = systemPreference();
+      setResolvedTheme(next);
+      applyDom(next);
     };
     mq.addEventListener('change', onChange);
     return () => mq.removeEventListener('change', onChange);
