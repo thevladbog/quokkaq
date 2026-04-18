@@ -166,6 +166,7 @@ export const useUnitServicesTree = (
 };
 
 // User-unit relationship hooks
+/** PATCH /users/{id}: only set keys you want to change. To clear the profile photo, send `photoUrl: ''` (JSON `null` is ignored like an omitted field). */
 export function useUpdateUser() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -178,7 +179,8 @@ export function useUpdateUser() {
         name?: string;
         email?: string;
         password?: string;
-        photoUrl?: string | null;
+        /** Omit to leave unchanged; use `''` to clear (not `null`). */
+        photoUrl?: string;
         roles?: string[];
       };
     }) => usersApi.update(userId, data),

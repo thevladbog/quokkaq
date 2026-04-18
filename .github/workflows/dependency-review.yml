@@ -18,3 +18,9 @@ jobs:
         with:
           comment-summary-in-pr: on-failure
           fail-on-severity: moderate
+          # GHSA-xgrm-4fwx-7qm8 (CVE-2026-33815): pgx memory-safety; OSV semver fixed >= 5.9.0.
+          # apps/backend uses github.com/jackc/pgx/v5 v5.9.1; govulncheck is clean. GitHub’s graph can
+          # still flag the advisory — allow this GHSA so PRs are not blocked on a resolved transitive dep.
+          # Revisit after advisory fully lists patched versions; then remove allow-ghsas.
+          allow-ghsas: GHSA-xgrm-4fwx-7qm8
+          show-patched-versions: true

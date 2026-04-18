@@ -23,6 +23,7 @@ handlers → services → repository → models (GORM)
 ```
 
 - Точка входа: `cmd/api/main.go`
+- **Миграции БД:** версионированные шаги в [`pkg/database/postgres.go`](pkg/database/postgres.go) через `RunMigration("v…", …)`. **Не менять уже существующие миграции** (тело уже применённых версий в БД не перезапускается) — только **добавлять новые** версии с новым ключом `vX.Y.Z_…` и нужной логикой/DDL.
 - Конфиг: `internal/config/`, примеры env — `.env.example`
 - Типичные переменные: `DATABASE_URL`, `PORT` (по умолчанию **3001**), `APP_BASE_URL` (URL фронта), AWS/MinIO, SMTP, Redis, `JWT_SECRET`, `CORS_ALLOWED_ORIGINS` (через запятую), `RUN_AUTO_MIGRATE` (`false` — отключить AutoMigrate при старте).
 
@@ -51,3 +52,8 @@ auth, users, units, tickets, services, counters, shifts, slots, bookings, pre-re
 ## Документация
 
 - Подробно: `README.md` (EN), `README.ru.md` (RU).
+
+## Зависимости и алерты
+
+- **pgx / CVE-2026-33815 (GHSA-xgrm-4fwx-7qm8):** в `go.mod` стоит `github.com/jackc/pgx/v5` **v5.9.1**; по OSV исправление с **v5.9.0**. Локально: `go run golang.org/x/vuln/cmd/govulncheck@latest ./...` в `apps/backend` — без находок. Если GitHub Dependency review всё ещё ругается, в [`.github/workflows/dependency-review.yml`](../../.github/workflows/dependency-review.yml) для этого GHSA задан `allow-ghsas` (см. комментарий в workflow); при обновлении данных GitHub правило можно убрать.
+- **Debricked (OpenText Core SCA):** опциональный CI — [`.github/workflows/debricked.yml`](../../.github/workflows/debricked.yml); нужен секрет репозитория `DEBRICKED_TOKEN`. Скан с корня монорепо (`debricked scan .`) подхватывает `pnpm-lock.yaml`, `apps/backend/go.mod` и др. Ложные срабатывания после апгрейда зависимости настраиваются в UI Debricked (automation rules / ignore / waiver), а не только в коде.
