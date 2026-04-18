@@ -93,7 +93,7 @@ export default function Home() {
 
   const menuItems = [
     {
-      href: '/settings',
+      href: '/settings/organization',
       title: t('admin'),
       description: t('admin_description', {
         defaultValue: 'Manage system settings and services'

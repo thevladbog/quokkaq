@@ -17,9 +17,7 @@ import {
   Building2,
   CreditCard,
   DollarSign,
-  Grid3X3,
   Home,
-  LayoutDashboard,
   Mail,
   MessageSquare,
   Monitor,
@@ -50,10 +48,14 @@ export default function SettingsSidebar() {
 
   const items = [
     {
-      icon: LayoutDashboard,
-      label: tAdmin('navigation.dashboard', { defaultValue: 'Dashboard' }),
-      href: '/settings',
-      active: isActive('/settings')
+      icon: Building2,
+      label: tOrg('title'),
+      href: '/settings/organization',
+      active:
+        pathname === '/settings/organization' ||
+        (pathname.startsWith('/settings/organization/') &&
+          !pathname.startsWith('/settings/organization/billing/') &&
+          pathname !== '/settings/organization/billing')
     },
     {
       icon: Building,
@@ -72,12 +74,6 @@ export default function SettingsSidebar() {
       label: tAdmin('navigation.operations'),
       href: '/settings/operations',
       active: isActive('/settings/operations')
-    },
-    {
-      icon: Grid3X3,
-      label: tAdmin('navigation.grid_configuration'),
-      href: '/settings/grid-configuration',
-      active: isActive('/settings/grid-configuration')
     },
     {
       icon: Mail,
@@ -112,16 +108,6 @@ export default function SettingsSidebar() {
       active: isActive('/settings/pricing')
     },
     {
-      icon: Building2,
-      label: tOrg('title'),
-      href: '/settings/organization',
-      active:
-        pathname === '/settings/organization' ||
-        (pathname.startsWith('/settings/organization/') &&
-          !pathname.startsWith('/settings/organization/billing/') &&
-          pathname !== '/settings/organization/billing')
-    },
-    {
       icon: CreditCard,
       label: tOrg('billing.title'),
       href: '/settings/organization/billing',
@@ -137,7 +123,7 @@ export default function SettingsSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size='lg' asChild>
-              <Link href='/settings'>
+              <Link href='/settings/organization'>
                 <div className='flex flex-col gap-0.5 group-data-[collapsible=icon]:hidden'>
                   <span className='text-muted-foreground text-xs font-medium tracking-wide uppercase'>
                     {tNav('settingsZone', { defaultValue: 'Settings' })}

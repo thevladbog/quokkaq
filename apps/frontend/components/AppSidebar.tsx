@@ -324,7 +324,7 @@ const AppSidebar = () => {
                             className='w-full justify-start'
                             asChild
                           >
-                            <Link href='/settings'>
+                            <Link href='/settings/organization'>
                               <Settings className='mr-2 h-4 w-4' />
                               {tProfile('openSystemSettings', {
                                 defaultValue: 'System settings'

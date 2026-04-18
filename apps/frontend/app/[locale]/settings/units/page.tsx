@@ -11,8 +11,7 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardHeader,
-  CardTitle
+  CardHeader
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,10 +32,11 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
-import { Link } from '@/src/i18n/navigation';
 import { formatApiToastErrorMessage } from '@/lib/format-api-toast-error';
 import { toast } from 'sonner';
 import type { UnitKind } from '@quokkaq/shared-types';
+import { buildUnitForest } from '@/lib/unit-tree';
+import { UnitTreeNavList } from '@/components/admin/units/unit-tree-nav';
 
 const PARENT_NONE = '__none__';
 
@@ -83,6 +83,8 @@ export default function UnitsIndexPage() {
       ),
     [units, companyId]
   );
+
+  const unitForest = useMemo(() => buildUnitForest(units), [units]);
 
   const resetCreateForm = () => {
     setNewUnitName('');
@@ -149,46 +151,20 @@ export default function UnitsIndexPage() {
         </PermissionGuard>
       </div>
 
-      <div className='grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3'>
-        {units.map((unit) => (
-          <Card key={unit.id}>
-            <CardHeader>
-              <CardTitle>{unit.name}</CardTitle>
-              <CardDescription>
-                {unit.code}
-                {' · '}
-                {unit.kind === 'subdivision'
-                  ? t('units.kind_subdivision')
-                  : unit.kind === 'service_zone'
-                    ? t('units.kind_service_zone')
-                    : unit.kind === 'workplace'
-                      ? t('units.kind_unknown', { kind: 'workplace' })
-                      : t('units.kind_unknown', {
-                          kind: String(unit.kind ?? '').trim() || '—'
-                        })}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button asChild variant='outline' className='w-full'>
-                <Link
-                  href={`/settings/units/${unit.id}`}
-                  aria-label={t('units.view_unit_settings_aria', {
-                    name: unit.name
-                  })}
-                >
-                  {t('general.view', { defaultValue: 'View Details' })}
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-        ))}
-
-        {units.length === 0 && (
-          <div className='text-muted-foreground col-span-full py-8 text-center'>
-            {t('units.no_units')}
-          </div>
-        )}
-      </div>
+      <Card>
+        <CardHeader>
+          <CardDescription>{t('units.tree_hint')}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {units.length === 0 ? (
+            <p className='text-muted-foreground py-6 text-center'>
+              {t('units.no_units')}
+            </p>
+          ) : (
+            <UnitTreeNavList nodes={unitForest} />
+          )}
+        </CardContent>
+      </Card>
 
       <Dialog
         open={createDialogOpen}

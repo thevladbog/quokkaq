@@ -1,22 +1,10 @@
-'use client';
+import { redirect } from '@/src/i18n/navigation';
 
-import ServiceGridEditor from '@/components/ServiceGridEditor';
-import { useTranslations } from 'next-intl';
-
-export default function GridConfigurationPage() {
-  const t = useTranslations('admin');
-
-  return (
-    <div className='space-y-6'>
-      <div className='flex items-center justify-between'>
-        <h1 className='text-3xl font-bold'>
-          {t('grid_configuration.title', {
-            defaultValue: 'Grid Configuration'
-          })}
-        </h1>
-      </div>
-
-      <ServiceGridEditor />
-    </div>
-  );
+export default async function GridConfigurationRedirectPage({
+  params
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  redirect({ href: '/settings/units', locale });
 }

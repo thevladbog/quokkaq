@@ -1,10 +1,9 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { normalizeChildUnitsQueryData } from '@/lib/child-units-query';
 import { useTranslations } from 'next-intl';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { FolderOpen, Plus, ExternalLink } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { Building2, FolderOpen, Plus, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,14 +13,6 @@ import {
   CardHeader,
   CardTitle
 } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
-} from '@/components/ui/table';
 import {
   Dialog,
   DialogContent,
@@ -33,8 +24,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { unitsApi } from '@/lib/api';
-import { useCreateUnit } from '@/lib/hooks';
+import { useCreateUnit, useUnits } from '@/lib/hooks';
 import { Link, useRouter } from '@/src/i18n/navigation';
 import PermissionGuard from '@/components/auth/permission-guard';
 import { formatApiToastErrorMessage } from '@/lib/format-api-toast-error';
@@ -43,9 +33,121 @@ import {
   childUnitsQueryKey,
   childSubdivisionsQueryKey
 } from '@/components/admin/units/unit-child-query-keys';
+import { buildDescendantForest, type UnitTreeNode } from '@/lib/unit-tree';
+import { unitKindBadgeClassName } from '@/components/admin/units/unit-kind-badge-styles';
+import { cn } from '@/lib/utils';
 import { z } from 'zod';
 
 type CreateKind = 'subdivision' | 'service_zone';
+
+function SubdivisionUnitsSubtree({
+  nodes,
+  depth,
+  subdivisionId
+}: {
+  nodes: UnitTreeNode[];
+  depth: number;
+  subdivisionId: string;
+}) {
+  const t = useTranslations('admin.units');
+  const router = useRouter();
+
+  return (
+    <ul
+      className={
+        depth > 0 ? 'border-muted space-y-4 border-l pl-4' : 'space-y-6'
+      }
+    >
+      {nodes.map(({ unit, children }) => (
+        <li key={unit.id}>
+          {unit.kind === 'service_zone' ? (
+            <section className='bg-muted/25 space-y-4 rounded-lg border p-4'>
+              <div className='flex flex-wrap items-start justify-between gap-3'>
+                <div className='flex min-w-0 items-center gap-2'>
+                  <FolderOpen
+                    className='text-muted-foreground h-5 w-5 shrink-0'
+                    aria-hidden
+                  />
+                  <span className='truncate font-semibold'>{unit.name}</span>
+                  <Badge
+                    variant='outline'
+                    className={cn(
+                      'shrink-0 text-xs',
+                      unitKindBadgeClassName('service_zone')
+                    )}
+                  >
+                    {t('kind_service_zone')}
+                  </Badge>
+                </div>
+                <Button
+                  variant='outline'
+                  size='sm'
+                  className='shrink-0'
+                  asChild
+                >
+                  <Link href={`/settings/units/${unit.id}`}>
+                    <ExternalLink className='mr-2 h-4 w-4' />
+                    {t('open_service_zone_page')}
+                  </Link>
+                </Button>
+              </div>
+              <UnitCountersSection
+                countersUnitId={unit.parentId ?? subdivisionId}
+                serviceZoneFilter={unit.id}
+                variant='embedded'
+                hideEmbeddedHeading
+              />
+              {children.length > 0 ? (
+                <SubdivisionUnitsSubtree
+                  nodes={children}
+                  depth={depth + 1}
+                  subdivisionId={subdivisionId}
+                />
+              ) : null}
+            </section>
+          ) : (
+            <section className='bg-card/50 space-y-3 rounded-lg border p-4'>
+              <div className='flex flex-wrap items-start justify-between gap-3'>
+                <div className='flex min-w-0 items-center gap-2'>
+                  <Building2
+                    className='text-muted-foreground h-5 w-5 shrink-0'
+                    aria-hidden
+                  />
+                  <span className='truncate font-semibold'>{unit.name}</span>
+                  <Badge
+                    variant='outline'
+                    className={cn(
+                      'shrink-0 text-xs',
+                      unitKindBadgeClassName('subdivision')
+                    )}
+                  >
+                    {t('kind_subdivision')}
+                  </Badge>
+                </div>
+                <Button
+                  variant='outline'
+                  size='sm'
+                  className='shrink-0'
+                  onClick={() => router.push(`/settings/units/${unit.id}`)}
+                >
+                  <ExternalLink className='mr-2 h-4 w-4' />
+                  {t('open_child_unit')}
+                </Button>
+              </div>
+              {children.length > 0 ? (
+                <SubdivisionUnitsSubtree
+                  nodes={children}
+                  depth={depth + 1}
+                  subdivisionId={subdivisionId}
+                />
+              ) : null}
+            </section>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 type Props = {
   subdivisionId: string;
@@ -61,39 +163,25 @@ export function SubdivisionStationsAndZonesPanel({
   const t = useTranslations('admin.units');
   const tCommon = useTranslations('common');
   const tAdminGeneral = useTranslations('admin.general');
-  const router = useRouter();
   const queryClient = useQueryClient();
   const createUnitMutation = useCreateUnit();
+
+  const {
+    data: allUnits = [],
+    isLoading: unitsLoading,
+    isError: unitsError,
+    error: unitsErr
+  } = useUnits();
+
+  const childForest = useMemo(
+    () => buildDescendantForest(subdivisionId, allUnits),
+    [subdivisionId, allUnits]
+  );
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [createKind, setCreateKind] = useState<CreateKind>('service_zone');
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
-
-  const {
-    data: children,
-    isLoading,
-    isError,
-    error
-  } = useQuery({
-    queryKey: childUnitsQueryKey(subdivisionId),
-    queryFn: () => unitsApi.getChildUnits(subdivisionId)
-  });
-
-  const childrenList = useMemo(
-    () => normalizeChildUnitsQueryData(children),
-    [children]
-  );
-
-  const serviceZones = useMemo(
-    () => childrenList.filter((u) => u.kind === 'service_zone'),
-    [childrenList]
-  );
-
-  const nestedSubdivisions = useMemo(
-    () => childrenList.filter((u) => u.kind === 'subdivision'),
-    [childrenList]
-  );
 
   const resetForm = () => {
     setName('');
@@ -171,9 +259,6 @@ export function SubdivisionStationsAndZonesPanel({
     }
   };
 
-  const kindLabel = (u: { kind?: string }) =>
-    u.kind === 'service_zone' ? t('kind_service_zone') : t('kind_subdivision');
-
   return (
     <>
       <Card>
@@ -194,6 +279,14 @@ export function SubdivisionStationsAndZonesPanel({
                 <Plus className='mr-2 h-4 w-4' />
                 {t('add_child_service_zone')}
               </Button>
+              <Button
+                size='sm'
+                variant='outline'
+                onClick={() => openDialog('subdivision')}
+              >
+                <Plus className='mr-2 h-4 w-4' />
+                {t('add_child_subdivision')}
+              </Button>
             </div>
           </PermissionGuard>
         </CardHeader>
@@ -210,128 +303,36 @@ export function SubdivisionStationsAndZonesPanel({
             />
           </section>
 
-          {isLoading ? (
+          {unitsLoading ? (
             <p className='text-muted-foreground text-sm'>
               {t('loading', { defaultValue: 'Loading...' })}
             </p>
-          ) : isError ? (
+          ) : unitsError ? (
             <p className='text-destructive text-sm' role='alert'>
               {t('children_load_error', {
-                message: formatApiToastErrorMessage(error, tCommon('error'))
+                message: formatApiToastErrorMessage(unitsErr, tCommon('error'))
               })}
             </p>
+          ) : childForest.length === 0 ? (
+            <p className='text-muted-foreground text-sm'>
+              {t('branch_children_empty')}
+            </p>
           ) : (
-            <>
-              {serviceZones.map((zone) => (
-                <section
-                  key={zone.id}
-                  className='bg-muted/25 space-y-4 rounded-lg border p-4'
-                >
-                  <div className='flex flex-wrap items-start justify-between gap-3'>
-                    <div className='flex min-w-0 items-center gap-2'>
-                      <FolderOpen
-                        className='text-muted-foreground h-5 w-5 shrink-0'
-                        aria-hidden
-                      />
-                      <span className='truncate font-semibold'>
-                        {zone.name}
-                      </span>
-                      <Badge variant='secondary' className='shrink-0 text-xs'>
-                        {t('kind_service_zone')}
-                      </Badge>
-                    </div>
-                    <Button
-                      variant='outline'
-                      size='sm'
-                      className='shrink-0'
-                      asChild
-                    >
-                      <Link href={`/settings/units/${zone.id}`}>
-                        <ExternalLink className='mr-2 h-4 w-4' />
-                        {t('open_service_zone_page')}
-                      </Link>
-                    </Button>
-                  </div>
-                  <UnitCountersSection
-                    countersUnitId={subdivisionId}
-                    serviceZoneFilter={zone.id}
-                    variant='embedded'
-                    hideEmbeddedHeading
-                  />
-                </section>
-              ))}
-
-              <section className='space-y-4'>
-                <div className='flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between'>
-                  <div>
-                    <h3 className='text-base font-semibold'>
-                      {t('nested_subdivisions_section_title')}
-                    </h3>
-                    <p className='text-muted-foreground mt-1 max-w-2xl text-sm'>
-                      {t('nested_subdivisions_section_description')}
-                    </p>
-                  </div>
-                  <PermissionGuard permissions={['UNIT_CREATE']}>
-                    <Button
-                      size='sm'
-                      variant='outline'
-                      onClick={() => openDialog('subdivision')}
-                      className='shrink-0'
-                    >
-                      <Plus className='mr-2 h-4 w-4' />
-                      {t('add_child_subdivision')}
-                    </Button>
-                  </PermissionGuard>
-                </div>
-                {nestedSubdivisions.length === 0 ? (
-                  <p className='text-muted-foreground text-sm'>
-                    {t('no_nested_subdivisions')}
-                  </p>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>{t('unit_name')}</TableHead>
-                        <TableHead>{t('code')}</TableHead>
-                        <TableHead>{t('kind_column')}</TableHead>
-                        <TableHead className='w-[200px]'>
-                          {t('child_unit_actions')}
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {nestedSubdivisions.map((u) => (
-                        <TableRow key={u.id}>
-                          <TableCell className='font-medium'>
-                            {u.name}
-                          </TableCell>
-                          <TableCell className='text-muted-foreground'>
-                            {u.code}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant='secondary' className='text-xs'>
-                              {kindLabel(u)}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              variant='outline'
-                              size='sm'
-                              onClick={() =>
-                                router.push(`/settings/units/${u.id}`)
-                              }
-                            >
-                              <ExternalLink className='mr-2 h-4 w-4' />
-                              {t('open_child_unit')}
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </section>
-            </>
+            <section className='space-y-4'>
+              <div>
+                <h3 className='text-base font-semibold'>
+                  {t('branch_tree_title')}
+                </h3>
+                <p className='text-muted-foreground mt-1 max-w-2xl text-sm'>
+                  {t('branch_tree_description')}
+                </p>
+              </div>
+              <SubdivisionUnitsSubtree
+                nodes={childForest}
+                depth={0}
+                subdivisionId={subdivisionId}
+              />
+            </section>
           )}
         </CardContent>
       </Card>

@@ -3,10 +3,9 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
-  LayoutDashboard,
   Building,
+  Building2,
   Users,
-  Grid3X3,
   Menu,
   Mail,
   MessageSquare,
@@ -22,21 +21,24 @@ interface AdminSidebarProps {
 export default function AdminSidebar({ className }: AdminSidebarProps) {
   const [isOpen, setIsOpen] = useState(false);
   const t = useTranslations('admin');
+  const tOrg = useTranslations('organization');
   const pathname = usePathname();
 
   const toggleSidebar = () => setIsOpen(!isOpen);
 
   const isActive = (path: string) => pathname.includes(path);
 
+  const organizationNavActive =
+    pathname === '/settings/organization' ||
+    (pathname.startsWith('/settings/organization/') &&
+      !pathname.startsWith('/settings/organization/billing'));
+
   const navItems = [
     {
-      icon: LayoutDashboard,
-      label: t('navigation.dashboard', { defaultValue: 'Dashboard' }),
-      href: '/settings',
-      active:
-        isActive('/settings') &&
-        !isActive('/units') &&
-        !isActive('/grid-configuration')
+      icon: Building2,
+      label: tOrg('title'),
+      href: '/settings/organization',
+      active: organizationNavActive
     },
     {
       icon: Building,
@@ -49,14 +51,6 @@ export default function AdminSidebar({ className }: AdminSidebarProps) {
       label: t('navigation.users', { defaultValue: 'Users' }),
       href: '/settings/users',
       active: isActive('/users')
-    },
-    {
-      icon: Grid3X3,
-      label: t('navigation.grid_configuration', {
-        defaultValue: 'Grid Configuration'
-      }),
-      href: '/settings/grid-configuration',
-      active: isActive('/grid-configuration')
     },
     {
       icon: Mail,

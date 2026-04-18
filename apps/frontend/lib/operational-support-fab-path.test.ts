@@ -30,6 +30,7 @@ describe('shouldShowOperationalSupportFab', () => {
     ['/onboarding', true],
     ['/onboarding/step', true],
     ['/settings', false],
+    ['/settings/organization', false],
     ['/settings/units', false],
     ['/platform', false],
     ['/platform/companies', false],
