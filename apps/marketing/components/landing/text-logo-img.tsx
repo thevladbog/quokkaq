@@ -18,6 +18,7 @@ export function TextLogoImg({
   alt = 'QuokkaQ'
 }: Props) {
   const src = locale === 'ru' ? '/logo-text-ru.svg' : '/logo-text.svg';
+  const imageClassName = [className, heightClass].filter(Boolean).join(' ');
 
   return (
     <Image
@@ -25,7 +26,7 @@ export function TextLogoImg({
       alt={alt}
       width={160}
       height={40}
-      className={heightClass ?? className}
+      className={imageClassName}
       unoptimized
     />
   );

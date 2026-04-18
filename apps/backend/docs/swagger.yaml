@@ -425,6 +425,8 @@ components:
           type: integer
         features:
           type: object
+          additionalProperties:
+            type: boolean
         interval:
           type: string
         isActive:
@@ -439,6 +441,8 @@ components:
           type: boolean
         limits:
           type: object
+          additionalProperties:
+            type: integer
         limitsNegotiable:
           type: object
           additionalProperties:
@@ -462,6 +466,8 @@ components:
           type: integer
         features:
           type: object
+          additionalProperties:
+            type: boolean
         interval:
           type: string
         isActive:
@@ -473,6 +479,8 @@ components:
           type: boolean
         limits:
           type: object
+          additionalProperties:
+            type: integer
         limitsNegotiable:
           type: object
           additionalProperties:
@@ -1578,6 +1586,8 @@ components:
         features:
           description: feature flags
           type: object
+          additionalProperties:
+            type: boolean
         id:
           type: string
         interval:
@@ -1593,6 +1603,8 @@ components:
         limits:
           description: quota limits
           type: object
+          additionalProperties:
+            type: integer
         limitsNegotiable:
           description: LimitsNegotiable maps limit keys to true when the catalog should show “by agreement” instead of a numeric cap.
           type: object

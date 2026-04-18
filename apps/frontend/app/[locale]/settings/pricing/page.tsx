@@ -241,14 +241,12 @@ async function PricingCardApi({
   const t = await getTranslations({ locale, namespace: 'pricing' });
   const popular = plan.isPromoted === true;
   const rows = buildPricingRowsFromApiPlan(plan);
-  const isCustomPricing = plan.code === 'enterprise';
   const showPaidPrice = plan.price > 0;
-  const salesOnly =
-    isCustomPricing || (showPaidPrice && plan.allowInstantPurchase === false);
+  const salesOnly = plan.allowInstantPurchase === false;
+  const showCustomPricingLabel = salesOnly && !showPaidPrice;
   const intervalLabel = plan.interval === 'year' ? t('perYear') : t('perMonth');
   const planTitle = subscriptionPlanDisplayName(plan, locale);
-  const enSplitCurrency =
-    locale.startsWith('en') && !isCustomPricing && plan.price > 0;
+  const enSplitCurrency = locale.startsWith('en') && showPaidPrice;
   const planHeading = enSplitCurrency
     ? `${planTitle}, ${(plan.currency ?? 'RUB').toUpperCase()}`
     : planTitle;
@@ -268,7 +266,7 @@ async function PricingCardApi({
       <CardHeader className='pt-8 pb-8 text-center'>
         <CardTitle className='mb-2 text-2xl font-bold'>{planHeading}</CardTitle>
         <div className='mt-6'>
-          {isCustomPricing ? (
+          {showCustomPricingLabel ? (
             <div className='text-3xl font-bold'>{t('customPricing')}</div>
           ) : (
             <div className='inline-flex max-w-full flex-nowrap items-baseline justify-center gap-x-2 leading-tight whitespace-nowrap'>

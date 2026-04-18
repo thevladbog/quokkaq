@@ -94,6 +94,8 @@ export type HomeMessages = {
       features: string[];
       cta: string;
       recommended?: boolean;
+      /** Custom / contact-sales tier: omit inline "/period" and show period as secondary line. */
+      isCustom?: boolean;
     }>;
   };
   /** Copy when rendering plans from GET /subscriptions/plans (Orval). */
@@ -338,6 +340,7 @@ export const messages: Record<AppLocale, { home: HomeMessages }> = {
             name: 'Enterprise',
             price: 'Custom',
             period: 'contact sales',
+            isCustom: true,
             description:
               'For organizations with multiple locations and custom requirements',
             features: [
@@ -630,6 +633,7 @@ export const messages: Record<AppLocale, { home: HomeMessages }> = {
             name: 'Корпоративный',
             price: 'Индивидуально',
             period: 'свяжитесь с отделом продаж',
+            isCustom: true,
             description:
               'Для организаций с множественными точками и кастомными требованиями',
             features: [

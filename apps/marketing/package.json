@@ -11,7 +11,8 @@
     "lint:fix": "eslint --fix",
     "format:fix": "prettier --write .",
     "format:check": "prettier --check .",
-    "orval": "orval --config orval.config.ts"
+    "orval": "orval --config orval.config.ts",
+    "orval:check": "orval --config orval.config.ts && node ./scripts/check-orval-generated.js"
   },
   "dependencies": {
     "@quokkaq/shared-types": "workspace:*",

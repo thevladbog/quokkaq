@@ -17,12 +17,13 @@ const pillSecondaryClass =
 
 export function LandingFooterCta({ locale, copy, appBaseUrl }: Props) {
   const year = new Date().getFullYear();
-  const trialHref = appBaseUrl
-    ? `${appBaseUrl}/${locale}/signup`
-    : `/${locale}/docs`;
   const salesHref = appBaseUrl
     ? `${appBaseUrl}/${locale}/contact`
     : 'mailto:sales@quokkaq.com';
+  /** Without app URL, keep the primary trial CTA (`copy.footer.cta`) on a conversion path — not docs. */
+  const trialHref = appBaseUrl
+    ? `${appBaseUrl}/${locale}/signup`
+    : `/${locale}#book-demo`;
   const privacyHref = `/${locale}/privacy`;
   const termsHref = `/${locale}/terms`;
 

@@ -2,7 +2,8 @@
 """Patch OpenAPI 3 artifacts after swag + kin-openapi conversion.
 
 Swag emits Swagger 2.0; swagger-to-openapi3 produces OAS 3.0.x. This script adds
-constraints kin/swag omit: minProperties on some PATCH bodies, hex pattern on tag colors.
+constraints kin/swag omit: minProperties on some PATCH bodies, hex pattern on tag colors,
+typed additionalProperties on subscription plan json.RawMessage maps (limits/features/limitsNegotiable).
 
 Run after: swag init … && go run ./cmd/swagger-to-openapi3
 Applies to: docs/swagger.json, docs/swagger.yaml (docs/docs.go uses //go:embed swagger.json).
@@ -471,6 +472,40 @@ def _patch_statistics_survey_scores_question_ids_param(doc: dict[str, Any]) -> N
             return
 
 
+# Subscription plan JSON maps: swag emits plain `type: object` for json.RawMessage fields.
+# Orval then infers opaque objects; additionalProperties yields Record<string, T>.
+_PLAN_OBJECT_MAP_PROP_TYPES: dict[str, str] = {
+    "limits": "integer",
+    "features": "boolean",
+    "limitsNegotiable": "boolean",
+}
+
+
+def _patch_plan_json_object_maps(components: dict[str, Any]) -> None:
+    """Add additionalProperties to limits/features/limitsNegotiable under components.schemas."""
+    schemas = components.get("schemas")
+    if not isinstance(schemas, dict):
+        sys.exit(
+            "post_swagger_openapi_tweaks: components.schemas missing "
+            "(required for plan map additionalProperties patch)"
+        )
+    for schema_name, schema in schemas.items():
+        if not isinstance(schema, dict):
+            continue
+        props = schema.get("properties")
+        if not isinstance(props, dict):
+            continue
+        for prop_name, value_type in _PLAN_OBJECT_MAP_PROP_TYPES.items():
+            prop = props.get(prop_name)
+            if not isinstance(prop, dict):
+                continue
+            if prop.get("type") != "object":
+                continue
+            if "$ref" in prop:
+                continue
+            prop["additionalProperties"] = {"type": value_type}
+
+
 def apply_openapi_tweaks(doc: dict[str, Any]) -> None:
     """Apply extra schema constraints by path under components.schemas.
 
@@ -480,6 +515,7 @@ def apply_openapi_tweaks(doc: dict[str, Any]) -> None:
     """
     comp = _components(doc)
 
+    _patch_plan_json_object_maps(comp)
     _patch_security_schemes_session_cookie(doc)
     _patch_saml_acs_request_body_required(doc)
     _patch_auth_redirect_302_headers(doc)

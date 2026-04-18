@@ -641,7 +641,10 @@
                         "type": "integer"
                     },
                     "features": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "boolean"
+                        }
                     },
                     "interval": {
                         "type": "string"
@@ -660,7 +663,10 @@
                         "type": "boolean"
                     },
                     "limits": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "integer"
+                        }
                     },
                     "limitsNegotiable": {
                         "type": "object",
@@ -695,7 +701,10 @@
                         "type": "integer"
                     },
                     "features": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "boolean"
+                        }
                     },
                     "interval": {
                         "type": "string"
@@ -711,7 +720,10 @@
                         "type": "boolean"
                     },
                     "limits": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "integer"
+                        }
                     },
                     "limitsNegotiable": {
                         "type": "object",
@@ -2357,7 +2369,10 @@
                     },
                     "features": {
                         "description": "feature flags",
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "boolean"
+                        }
                     },
                     "id": {
                         "type": "string"
@@ -2378,7 +2393,10 @@
                     },
                     "limits": {
                         "description": "quota limits",
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "integer"
+                        }
                     },
                     "limitsNegotiable": {
                         "description": "LimitsNegotiable maps limit keys to true when the catalog should show “by agreement” instead of a numeric cap.",

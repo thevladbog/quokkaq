@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { SubscriptionPlan } from '@quokkaq/shared-types';
 import {
+  formatPriceMinorUnits,
   formatPriceMinorUnitsAmountOnly,
   subscriptionPlanDisplayName
 } from '@quokkaq/subscription-pricing';
@@ -43,17 +44,6 @@ export function PlanSelector({
   const intlLocale = useMemo(() => intlLocaleFromAppLocale(locale), [locale]);
   const t = useTranslations('organization.billing.planSelector');
   const tBilling = useTranslations('organization.billing');
-
-  const formatPrice = (price: number, currency: string) => {
-    try {
-      return new Intl.NumberFormat(locale, {
-        style: 'currency',
-        currency
-      }).format(price / 100);
-    } catch {
-      return `${(price / 100).toFixed(2)} ${currency}`;
-    }
-  };
 
   const getFeaturesList = (features: Record<string, boolean> | undefined) => {
     if (!features) return [];
@@ -147,7 +137,11 @@ export function PlanSelector({
                             plan.currency,
                             intlLocale
                           )
-                        : formatPrice(plan.price, plan.currency)}
+                        : formatPriceMinorUnits(
+                            plan.price,
+                            plan.currency ?? 'RUB',
+                            intlLocale
+                          )}
                     </span>
                     <span className='shrink-0 text-gray-500'>
                       {plan.interval === 'month'

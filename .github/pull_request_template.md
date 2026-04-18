@@ -34,7 +34,7 @@ _(In this monorepo the app lives under `apps/frontend/`; use the same Nx targets
 - Changes under `apps/marketing/**/*.{ts,tsx,js,jsx,mjs,css,md,mdx}` → `pnpm nx run marketing:lint`
 - Same tree → `pnpm nx run marketing:format:check`
 - Full build → `pnpm nx run marketing:build`
-- If OpenAPI / generated client under `apps/marketing/lib/api/generated` is involved → `pnpm nx run marketing:orval:check`
+- If you changed the backend OpenAPI spec, the marketing Orval config (`apps/marketing/orval.config.ts` or related), or files under `apps/marketing/lib/api/generated` → run `pnpm nx run marketing:orval:check`. When the check reports drift, regenerate from the repo root with `pnpm --dir apps/marketing run orval` or `pnpm nx run marketing:orval`, then commit the updated generated files so CI passes.
 
 ## Notes
 

@@ -1197,6 +1197,7 @@ func RunVersionedMigrations(models ...interface{}) error {
 			UPDATE subscription_plans SET name_en = 'Professional' WHERE code = 'professional' AND name_en = '';
 			UPDATE subscription_plans SET name_en = 'Enterprise' WHERE code = 'enterprise' AND name_en = '';
 			UPDATE subscription_plans SET name_en = 'Grandfathered' WHERE code = 'grandfathered' AND name_en = '';
+			UPDATE subscription_plans SET name_en = name WHERE name_en = '' AND trim(name) <> '';
 		`).Error; err != nil {
 			return err
 		}
@@ -1240,6 +1241,16 @@ func RunVersionedMigrations(models ...interface{}) error {
 	})
 	if err != nil {
 		return fmt.Errorf("failed to run v1.2.14_subscription_plan_single_promoted migration: %w", err)
+	}
+
+	// Idempotent backfill for DBs that already ran v1.2.12 before name_en fallback was added there.
+	err = manager.RunMigration("v1.2.15_subscription_plan_name_en_fallback", func(db *gorm.DB) error {
+		return db.Exec(`
+			UPDATE subscription_plans SET name_en = name WHERE name_en = '' AND trim(name) <> '';
+		`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.2.15_subscription_plan_name_en_fallback migration: %w", err)
 	}
 
 	fmt.Println("All migrations completed successfully")

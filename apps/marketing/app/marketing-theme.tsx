@@ -29,6 +29,7 @@ export function resolveTheme(theme: ThemeSetting): 'light' | 'dark' {
 }
 
 function readStoredTheme(): ThemeSetting {
+  if (typeof window === 'undefined') return 'system';
   try {
     const raw = localStorage.getItem(MARKETING_THEME_STORAGE_KEY);
     if (raw === 'light' || raw === 'dark' || raw === 'system') return raw;
@@ -64,23 +65,28 @@ export function MarketingThemeProvider({
     />
   ));
 
-  const [theme, setThemeState] = React.useState<ThemeSetting>('system');
+  const [theme, setThemeState] =
+    React.useState<ThemeSetting>(() => readStoredTheme());
   const [mounted, setMounted] = React.useState(false);
 
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     setThemeState(readStoredTheme());
     setMounted(true);
   }, []);
 
-  const resolvedTheme = React.useMemo(
-    () => (mounted ? resolveTheme(theme) : 'light'),
-    [mounted, theme]
-  );
+  const resolvedTheme = React.useMemo((): 'light' | 'dark' => {
+    if (typeof window === 'undefined') return 'light';
+    if (theme === 'light' || theme === 'dark') return theme;
+    const root = document.documentElement;
+    if (root.classList.contains('dark')) return 'dark';
+    if (root.classList.contains('light')) return 'light';
+    return systemPreference();
+  }, [theme]);
 
   React.useEffect(() => {
-    if (!mounted) return;
+    if (typeof window === 'undefined') return;
     applyDom(resolveTheme(theme));
-  }, [mounted, theme]);
+  }, [theme]);
 
   React.useEffect(() => {
     if (!mounted) return;

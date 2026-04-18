@@ -198,7 +198,9 @@ export function LandingPricing({
                   </div>
                 );
               })
-            : copy.pricing.plans.map((plan, index) => (
+            : copy.pricing.plans.map((plan, index) => {
+                const isCustomFallback = plan.isCustom === true;
+                return (
                 <div
                   key={plan.name}
                   className={`landing-reveal relative flex flex-col rounded-2xl border-2 p-8 ${
@@ -226,13 +228,13 @@ export function LandingPricing({
                       <span className='font-display text-4xl font-bold tracking-tight text-[color:var(--color-text)] tabular-nums sm:text-5xl'>
                         {plan.price}
                       </span>
-                      {plan.price !== 'Custom' && (
+                      {!isCustomFallback && (
                         <span className='shrink-0 text-sm leading-none font-medium whitespace-nowrap text-[color:var(--color-text-muted)]'>
                           /{plan.period}
                         </span>
                       )}
                     </div>
-                    {plan.price === 'Custom' && (
+                    {isCustomFallback && (
                       <p className='text-sm text-[color:var(--color-text-muted)]'>
                         {plan.period}
                       </p>
@@ -278,7 +280,8 @@ export function LandingPricing({
                     {plan.cta}
                   </Link>
                 </div>
-              ))}
+                );
+              })}
         </div>
 
         <div className='landing-reveal relative mt-12 overflow-hidden rounded-2xl border-2 border-[color:var(--color-primary)]/35 bg-gradient-to-br from-[color:var(--color-primary)]/14 via-[color:var(--color-surface-elevated)] to-[color:var(--color-secondary)]/12 p-6 shadow-xl shadow-[color:var(--color-primary)]/15 sm:mt-16 sm:p-8'>

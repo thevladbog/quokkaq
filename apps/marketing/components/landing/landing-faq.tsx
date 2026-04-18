@@ -24,6 +24,7 @@ export function LandingFaq({ copy }: Props) {
         <div className='flex flex-col gap-4'>
           {copy.faq.items.map((item, index) => {
             const isOpen = openIndex === index;
+            const panelId = `faq-panel-${index}`;
             return (
               <div
                 key={item.question}
@@ -33,9 +34,11 @@ export function LandingFaq({ copy }: Props) {
                 }}
               >
                 <button
+                  type='button'
                   onClick={() => setOpenIndex(isOpen ? null : index)}
                   className='focus-ring flex w-full items-start gap-4 p-6 text-left transition hover:bg-[color:var(--color-surface-elevated)]'
                   aria-expanded={isOpen}
+                  aria-controls={panelId}
                 >
                   <span
                     className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition ${
@@ -66,6 +69,7 @@ export function LandingFaq({ copy }: Props) {
                 </button>
 
                 <div
+                  id={panelId}
                   className={`grid transition-all ${
                     isOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
                   }`}

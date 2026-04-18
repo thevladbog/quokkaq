@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo } from 'react';
 
 import type { AppLocale } from '@/src/messages';
 
@@ -102,24 +102,35 @@ function pickPalette(rng: () => number): TicketPalette {
   return TICKET_PALETTES[i]!;
 }
 
-function ticketFromStableSeed(id: number, locale: AppLocale): Ticket {
-  const rng = mulberry32(0x9e3779b9 ^ (id * 0x85ebca6b));
-  return {
-    id,
-    number: generateTicketNumber(rng, locale),
-    /** % по ширине вьюпорта; с translateX(-50%) держим якорь внутри полосы, без вылезания за край */
-    left: 12 + rng() * 76,
-    /** Phased + short jitter so the first tickets appear within ~1s, all started within ~4s (not 0–15s blank). */
-    delay: id * 0.12 + rng() * 0.85,
-    duration: 15 + rng() * 10,
-    palette: pickPalette(rng)
-  };
+/**
+ * PRNG draw count inside `generateTicketNumber` does not depend on locale (only
+ * alphabet choice uses the same number of `rng()` calls). Discarding any
+ * locale’s number advances the stream identically so layout matches the legacy
+ * `ticketFromStableSeed` ordering.
+ */
+function advanceRngPastTicketNumber(rng: () => number): void {
+  void generateTicketNumber(rng, 'en');
 }
 
-function generateInitialTickets(locale: AppLocale): Ticket[] {
-  return Array.from({ length: TICKET_COUNT }, (_, i) =>
-    ticketFromStableSeed(i, locale)
-  );
+function buildStableTicketLayouts(): Omit<Ticket, 'number'>[] {
+  return Array.from({ length: TICKET_COUNT }, (_, id) => {
+    const rng = mulberry32(0x9e3779b9 ^ (id * 0x85ebca6b));
+    advanceRngPastTicketNumber(rng);
+    return {
+      id,
+      /** % по ширине вьюпорта; с translateX(-50%) держим якорь внутри полосы, без вылезания за край */
+      left: 12 + rng() * 76,
+      /** Phased + short jitter so the first tickets appear within ~1s, all started within ~4s (not 0–15s blank). */
+      delay: id * 0.12 + rng() * 0.85,
+      duration: 15 + rng() * 10,
+      palette: pickPalette(rng)
+    };
+  });
+}
+
+function ticketNumberFromStableSeed(id: number, locale: AppLocale): string {
+  const rng = mulberry32(0x9e3779b9 ^ (id * 0x85ebca6b));
+  return generateTicketNumber(rng, locale);
 }
 
 type AnimationProps = {
@@ -127,7 +138,16 @@ type AnimationProps = {
 };
 
 export function LandingTicketsAnimation({ locale }: AnimationProps) {
-  const [tickets] = useState<Ticket[]>(() => generateInitialTickets(locale));
+  const ticketLayouts = useMemo(() => buildStableTicketLayouts(), []);
+
+  const tickets = useMemo(
+    (): Ticket[] =>
+      ticketLayouts.map((layout) => ({
+        ...layout,
+        number: ticketNumberFromStableSeed(layout.id, locale)
+      })),
+    [ticketLayouts, locale]
+  );
 
   return (
     <div
@@ -203,6 +223,7 @@ export function LandingTicketsAnimation({ locale }: AnimationProps) {
         @media (prefers-reduced-motion: reduce) {
           .ticket-fall,
           .ticket-card {
+            display: none !important;
             animation: none !important;
           }
         }

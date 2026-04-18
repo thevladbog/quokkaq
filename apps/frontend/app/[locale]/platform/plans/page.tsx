@@ -90,7 +90,8 @@ type PlanForm = {
   isPromoted: boolean;
   displayOrder: string;
   allowInstantPurchase: boolean;
-  limits: Record<PlanLimitKey, number>;
+  /** Raw input strings; validated to integers only on submit (see `parseLimitsFromForm`). */
+  limits: Record<PlanLimitKey, string>;
   limitsNegotiable: Record<PlanLimitKey, boolean>;
   features: Record<(typeof PLAN_FEATURE_KEYS)[number], boolean>;
 };
@@ -108,7 +109,9 @@ function emptyForm(): PlanForm {
     isPromoted: false,
     displayOrder: '1000',
     allowInstantPurchase: true,
-    limits: { ...DEFAULT_LIMITS },
+    limits: Object.fromEntries(
+      PLAN_LIMIT_KEYS.map((k) => [k, String(DEFAULT_LIMITS[k])])
+    ) as Record<PlanLimitKey, string>,
     limitsNegotiable: defaultNegotiableMap(),
     features: defaultFeatureMap()
   };
@@ -150,10 +153,12 @@ function formFromPlan(p: ModelsSubscriptionPlan, locale: string): PlanForm {
   const limSrc = p.limits as Record<string, unknown> | undefined;
   const featSrc = p.features as Record<string, unknown> | undefined;
   const negSrc = p.limitsNegotiable as Record<string, unknown> | undefined;
-  const limits = { ...DEFAULT_LIMITS };
-  for (const k of PLAN_LIMIT_KEYS) {
-    limits[k] = readLimit(limSrc, k, DEFAULT_LIMITS[k]);
-  }
+  const limits = Object.fromEntries(
+    PLAN_LIMIT_KEYS.map((k) => {
+      const n = readLimit(limSrc, k, DEFAULT_LIMITS[k]);
+      return [k, n === -1 ? '-1' : String(n)] as const;
+    })
+  ) as Record<PlanLimitKey, string>;
   const limitsNegotiable = defaultNegotiableMap();
   for (const k of PLAN_LIMIT_KEYS) {
     limitsNegotiable[k] = readNegotiable(negSrc, k);
@@ -189,10 +194,33 @@ function validateLimits(limits: Record<PlanLimitKey, number>): boolean {
   return true;
 }
 
-function parseDisplayOrder(raw: string): number | null {
-  const n = parseInt(raw.trim(), 10);
-  if (!Number.isFinite(n) || !Number.isInteger(n)) return null;
+/**
+ * Parse an integer only when the entire trimmed string is a valid integer
+ * (rejects `parseInt`-style partial matches like `12abc` or `1.9`).
+ */
+function parseStrictIntString(raw: string): number | null {
+  const s = raw.trim();
+  if (s === '') return null;
+  if (!/^-?\d+$/.test(s)) return null;
+  const n = Number(s);
+  if (!Number.isSafeInteger(n)) return null;
   return n;
+}
+
+function parseDisplayOrder(raw: string): number | null {
+  return parseStrictIntString(raw);
+}
+
+function parseLimitsFromForm(
+  limits: Record<PlanLimitKey, string>
+): Record<PlanLimitKey, number> | null {
+  const out = {} as Record<PlanLimitKey, number>;
+  for (const k of PLAN_LIMIT_KEYS) {
+    const n = parseStrictIntString(limits[k]);
+    if (n === null) return null;
+    out[k] = n;
+  }
+  return out;
 }
 
 type PlanRow = ModelsSubscriptionPlan & { id: string };
@@ -244,9 +272,11 @@ export default function PlatformPlansPage() {
     return Math.round(n);
   };
 
-  const limitsPayload = () =>
+  const limitsPayload = (
+    parsed: Record<PlanLimitKey, number>
+  ): HandlersPlatformCreateSubscriptionPlanBody['limits'] =>
     Object.fromEntries(
-      PLAN_LIMIT_KEYS.map((k) => [k, form.limits[k]])
+      PLAN_LIMIT_KEYS.map((k) => [k, parsed[k]])
     ) as HandlersPlatformCreateSubscriptionPlanBody['limits'];
 
   const featuresPayload = () =>
@@ -269,7 +299,8 @@ export default function PlatformPlansPage() {
       if (displayOrder === null) {
         throw new Error(INVALID_PLAN_DISPLAY_ORDER);
       }
-      if (!validateLimits(form.limits)) {
+      const parsedLimits = parseLimitsFromForm(form.limits);
+      if (parsedLimits === null || !validateLimits(parsedLimits)) {
         throw new Error(INVALID_PLAN_LIMITS);
       }
       return postPlatformSubscriptionPlans({
@@ -280,7 +311,7 @@ export default function PlatformPlansPage() {
         currency: form.currency || 'RUB',
         interval: form.interval,
         features: featuresPayload(),
-        limits: limitsPayload(),
+        limits: limitsPayload(parsedLimits),
         limitsNegotiable: limitsNegotiablePayload(),
         isActive: form.isActive,
         isPublic: form.isPublic,
@@ -325,7 +356,8 @@ export default function PlatformPlansPage() {
       if (displayOrder === null) {
         throw new Error(INVALID_PLAN_DISPLAY_ORDER);
       }
-      if (!validateLimits(form.limits)) {
+      const parsedLimits = parseLimitsFromForm(form.limits);
+      if (parsedLimits === null || !validateLimits(parsedLimits)) {
         throw new Error(INVALID_PLAN_LIMITS);
       }
       return putPlatformSubscriptionPlansId(editPlan.id, {
@@ -336,7 +368,7 @@ export default function PlatformPlansPage() {
         currency: form.currency || 'RUB',
         interval: form.interval,
         features: featuresPayload(),
-        limits: limitsPayload(),
+        limits: limitsPayload(parsedLimits),
         limitsNegotiable: limitsNegotiablePayload(),
         isActive: form.isActive,
         isPublic: form.isPublic,
@@ -491,8 +523,9 @@ export default function PlatformPlansPage() {
         <Label htmlFor={fid('displayOrder')}>{t('displayOrder')}</Label>
         <Input
           id={fid('displayOrder')}
-          type='number'
-          step={1}
+          type='text'
+          inputMode='numeric'
+          autoComplete='off'
           value={form.displayOrder}
           onChange={(e) =>
             setForm((f) => ({ ...f, displayOrder: e.target.value }))
@@ -523,7 +556,7 @@ export default function PlatformPlansPage() {
         <h3 className='mb-3 text-sm font-semibold'>{t('limitsSection')}</h3>
         <div className='grid gap-4'>
           {PLAN_LIMIT_KEYS.map((key) => {
-            const unlimited = form.limits[key] === -1;
+            const unlimited = form.limits[key] === '-1';
             const negotiable = form.limitsNegotiable[key];
             return (
               <div key={key} className='grid gap-2 sm:grid-cols-2 sm:items-end'>
@@ -546,7 +579,7 @@ export default function PlatformPlansPage() {
                             ...f,
                             limits: {
                               ...f.limits,
-                              [key]: c ? -1 : DEFAULT_LIMITS[key]
+                              [key]: c ? '-1' : String(DEFAULT_LIMITS[key])
                             },
                             limitsNegotiable: {
                               ...f.limitsNegotiable,
@@ -570,8 +603,8 @@ export default function PlatformPlansPage() {
                         onCheckedChange={(c) =>
                           setForm((f) => {
                             let nextLimits = f.limits[key];
-                            if (c && nextLimits === -1) {
-                              nextLimits = DEFAULT_LIMITS[key];
+                            if (c && nextLimits === '-1') {
+                              nextLimits = String(DEFAULT_LIMITS[key]);
                             }
                             return {
                               ...f,
@@ -602,24 +635,17 @@ export default function PlatformPlansPage() {
                   </Label>
                   <Input
                     id={fid(`limit-value-${key}`)}
-                    type='number'
-                    min={0}
-                    step={1}
+                    type='text'
+                    inputMode='numeric'
+                    autoComplete='off'
                     disabled={unlimited || negotiable}
-                    value={
-                      unlimited || negotiable ? '' : String(form.limits[key])
-                    }
-                    onChange={(e) => {
-                      const raw = e.target.value;
-                      const n = parseInt(raw, 10);
+                    value={unlimited || negotiable ? '' : form.limits[key]}
+                    onChange={(e) =>
                       setForm((f) => ({
                         ...f,
-                        limits: {
-                          ...f.limits,
-                          [key]: Number.isFinite(n) ? n : 0
-                        }
-                      }));
-                    }}
+                        limits: { ...f.limits, [key]: e.target.value }
+                      }))
+                    }
                   />
                 </div>
               </div>

@@ -13,7 +13,8 @@ export function subscriptionPlanDisplayName(
     typeof plan.nameEn === 'string' && plan.nameEn.trim() !== ''
       ? plan.nameEn.trim()
       : primary;
-  if (locale === 'en' || locale.startsWith('en-')) {
+  const normalized = locale?.toLowerCase() ?? '';
+  if (normalized === 'en' || normalized.startsWith('en-')) {
     return en;
   }
   return primary;
