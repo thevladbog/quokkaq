@@ -127,6 +127,10 @@ func (h *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "User not found", http.StatusNotFound)
 			return
 		}
+		if errors.Is(err, services.ErrUpdateUserEmptyInput) || errors.Is(err, services.ErrUpdateUserNameEmpty) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

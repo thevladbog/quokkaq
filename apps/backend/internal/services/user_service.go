@@ -14,6 +14,12 @@ import (
 	"gorm.io/gorm"
 )
 
+// Client validation errors for PATCH /users/{id} (map to HTTP 400).
+var (
+	ErrUpdateUserEmptyInput = errors.New("empty update")
+	ErrUpdateUserNameEmpty  = errors.New("name cannot be empty")
+)
+
 type UserService interface {
 	CreateUser(user *models.User) error
 	GetAllUsers(search string) ([]models.User, error)
@@ -81,7 +87,7 @@ func userHasAdminRole(u *models.User) bool {
 
 func (s *userService) UpdateUser(id string, input *models.UpdateUserInput) error {
 	if input == nil {
-		return errors.New("empty update")
+		return ErrUpdateUserEmptyInput
 	}
 	existing, err := s.repo.FindByID(id)
 	if err != nil {
@@ -90,7 +96,7 @@ func (s *userService) UpdateUser(id string, input *models.UpdateUserInput) error
 
 	if input.Name != nil {
 		if strings.TrimSpace(*input.Name) == "" {
-			return errors.New("name cannot be empty")
+			return ErrUpdateUserNameEmpty
 		}
 		existing.Name = strings.TrimSpace(*input.Name)
 	}

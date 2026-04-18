@@ -1289,6 +1289,23 @@ func RunVersionedMigrations(models ...interface{}) error {
 		return fmt.Errorf("failed to run v1.2.18_units_name_en migration: %w", err)
 	}
 
+	// Required for UserRepository.AssignUnit ON CONFLICT (user_id, unit_id); existing DBs may lack the index from GORM AutoMigrate.
+	err = manager.RunMigration("v1.2.19_user_units_unique_user_unit", func(db *gorm.DB) error {
+		if err := db.Exec(`
+			DELETE FROM user_units u1
+			USING user_units u2
+			WHERE u1.user_id = u2.user_id AND u1.unit_id = u2.unit_id AND u1.ctid < u2.ctid;
+		`).Error; err != nil {
+			return err
+		}
+		return db.Exec(`
+			CREATE UNIQUE INDEX IF NOT EXISTS ux_user_units_user_unit ON user_units (user_id, unit_id);
+		`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.2.19_user_units_unique_user_unit migration: %w", err)
+	}
+
 	fmt.Println("All migrations completed successfully")
 	return nil
 }
