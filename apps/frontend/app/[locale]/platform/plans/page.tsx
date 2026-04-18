@@ -39,7 +39,7 @@ import { Switch } from '@/components/ui/switch';
 import { Spinner } from '@/components/ui/spinner';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useLocale, useTranslations } from 'next-intl';
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 const INVALID_PLAN_PRICE = 'INVALID_PLAN_PRICE';
@@ -222,6 +222,20 @@ export default function PlatformPlansPage() {
   const [openCreate, setOpenCreate] = useState(false);
   const [editPlan, setEditPlan] = useState<PlanRow | null>(null);
   const [form, setForm] = useState<PlanForm>(emptyForm());
+  const fieldId = useId();
+  const fid = (suffix: string) => `${fieldId}-${suffix}`;
+
+  const planFormInlineErrorMessage = (err: unknown): string | null => {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (
+      msg === INVALID_PLAN_PRICE ||
+      msg === INVALID_PLAN_LIMITS ||
+      msg === INVALID_PLAN_DISPLAY_ORDER
+    ) {
+      return null;
+    }
+    return msg;
+  };
 
   const parsePriceMinor = (): number | null => {
     const cur = (form.currency || 'RUB').trim() || 'RUB';
@@ -364,15 +378,19 @@ export default function PlatformPlansPage() {
   const FormFields = (
     <>
       <div className='grid gap-2'>
-        <Label>{t('name', { defaultValue: 'Name' })}</Label>
+        <Label htmlFor={fid('name')}>
+          {t('name', { defaultValue: 'Name' })}
+        </Label>
         <Input
+          id={fid('name')}
           value={form.name}
           onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
         />
       </div>
       <div className='grid gap-2'>
-        <Label>{t('nameEn')}</Label>
+        <Label htmlFor={fid('nameEn')}>{t('nameEn')}</Label>
         <Input
+          id={fid('nameEn')}
           value={form.nameEn}
           onChange={(e) => setForm((f) => ({ ...f, nameEn: e.target.value }))}
           autoComplete='off'
@@ -380,15 +398,21 @@ export default function PlatformPlansPage() {
         <p className='text-muted-foreground text-xs'>{t('nameEnHint')}</p>
       </div>
       <div className='grid gap-2'>
-        <Label>{t('code', { defaultValue: 'Code' })}</Label>
+        <Label htmlFor={fid('code')}>
+          {t('code', { defaultValue: 'Code' })}
+        </Label>
         <Input
+          id={fid('code')}
           value={form.code}
           onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
         />
       </div>
       <div className='grid gap-2'>
-        <Label>{t('price', { defaultValue: 'Price' })}</Label>
+        <Label htmlFor={fid('price')}>
+          {t('price', { defaultValue: 'Price' })}
+        </Label>
         <Input
+          id={fid('price')}
           type='text'
           inputMode='decimal'
           autoComplete='off'
@@ -399,15 +423,21 @@ export default function PlatformPlansPage() {
         <p className='text-muted-foreground text-xs'>{t('priceHint')}</p>
       </div>
       <div className='grid gap-2'>
-        <Label>{t('currency', { defaultValue: 'Currency' })}</Label>
+        <Label htmlFor={fid('currency')}>
+          {t('currency', { defaultValue: 'Currency' })}
+        </Label>
         <Input
+          id={fid('currency')}
           value={form.currency}
           onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))}
         />
       </div>
       <div className='grid gap-2'>
-        <Label>{t('interval', { defaultValue: 'Interval' })}</Label>
+        <Label htmlFor={fid('interval')}>
+          {t('interval', { defaultValue: 'Interval' })}
+        </Label>
         <select
+          id={fid('interval')}
           className='border-input bg-background h-9 w-full rounded-md border px-2 text-sm'
           value={form.interval}
           onChange={(e) =>
@@ -424,19 +454,23 @@ export default function PlatformPlansPage() {
       <div className='flex flex-col gap-1'>
         <div className='flex items-center gap-2'>
           <Switch
+            id={fid('isActive')}
             checked={form.isActive}
             onCheckedChange={(v) => setForm((f) => ({ ...f, isActive: v }))}
           />
-          <Label>{t('active', { defaultValue: 'Active' })}</Label>
+          <Label htmlFor={fid('isActive')}>
+            {t('active', { defaultValue: 'Active' })}
+          </Label>
         </div>
       </div>
       <div className='flex flex-col gap-1'>
         <div className='flex items-center gap-2'>
           <Switch
+            id={fid('isPublic')}
             checked={form.isPublic}
             onCheckedChange={(v) => setForm((f) => ({ ...f, isPublic: v }))}
           />
-          <Label>{t('public')}</Label>
+          <Label htmlFor={fid('isPublic')}>{t('public')}</Label>
         </div>
         <p className='text-muted-foreground text-xs'>{t('publicHint')}</p>
       </div>
@@ -444,17 +478,19 @@ export default function PlatformPlansPage() {
       <div className='flex flex-col gap-1'>
         <div className='flex items-center gap-2'>
           <Switch
+            id={fid('isPromoted')}
             checked={form.isPromoted}
             onCheckedChange={(v) => setForm((f) => ({ ...f, isPromoted: v }))}
           />
-          <Label>{t('promoted')}</Label>
+          <Label htmlFor={fid('isPromoted')}>{t('promoted')}</Label>
         </div>
         <p className='text-muted-foreground text-xs'>{t('promotedHint')}</p>
       </div>
 
       <div className='grid gap-2'>
-        <Label>{t('displayOrder')}</Label>
+        <Label htmlFor={fid('displayOrder')}>{t('displayOrder')}</Label>
         <Input
+          id={fid('displayOrder')}
           type='number'
           step={1}
           value={form.displayOrder}
@@ -468,12 +504,15 @@ export default function PlatformPlansPage() {
       <div className='flex flex-col gap-1'>
         <div className='flex items-center gap-2'>
           <Switch
+            id={fid('allowInstantPurchase')}
             checked={form.allowInstantPurchase}
             onCheckedChange={(v) =>
               setForm((f) => ({ ...f, allowInstantPurchase: v }))
             }
           />
-          <Label>{t('allowInstantPurchase')}</Label>
+          <Label htmlFor={fid('allowInstantPurchase')}>
+            {t('allowInstantPurchase')}
+          </Label>
         </div>
         <p className='text-muted-foreground text-xs'>
           {t('allowInstantPurchaseHint')}
@@ -489,10 +528,17 @@ export default function PlatformPlansPage() {
             return (
               <div key={key} className='grid gap-2 sm:grid-cols-2 sm:items-end'>
                 <div className='flex flex-col gap-2'>
-                  <Label>{tLim(key as never)}</Label>
-                  <div className='flex flex-wrap items-center gap-x-4 gap-y-2'>
+                  <Label id={fid(`limit-heading-${key}`)}>
+                    {tLim(key as never)}
+                  </Label>
+                  <div
+                    className='flex flex-wrap items-center gap-x-4 gap-y-2'
+                    role='group'
+                    aria-labelledby={fid(`limit-heading-${key}`)}
+                  >
                     <div className='flex items-center gap-2'>
                       <Switch
+                        id={fid(`limit-unlimited-${key}`)}
                         checked={unlimited}
                         disabled={negotiable}
                         onCheckedChange={(c) =>
@@ -509,12 +555,16 @@ export default function PlatformPlansPage() {
                           }))
                         }
                       />
-                      <span className='text-muted-foreground text-sm'>
+                      <Label
+                        htmlFor={fid(`limit-unlimited-${key}`)}
+                        className='text-muted-foreground text-sm font-normal'
+                      >
                         {tLim('unlimited')}
-                      </span>
+                      </Label>
                     </div>
                     <div className='flex items-center gap-2'>
                       <Switch
+                        id={fid(`limit-negotiable-${key}`)}
                         checked={negotiable}
                         disabled={unlimited}
                         onCheckedChange={(c) =>
@@ -534,17 +584,24 @@ export default function PlatformPlansPage() {
                           })
                         }
                       />
-                      <span className='text-muted-foreground text-sm'>
+                      <Label
+                        htmlFor={fid(`limit-negotiable-${key}`)}
+                        className='text-muted-foreground text-sm font-normal'
+                      >
                         {t('limitNegotiable')}
-                      </span>
+                      </Label>
                     </div>
                   </div>
                 </div>
                 <div className='grid gap-1'>
-                  <Label className='text-muted-foreground sr-only sm:not-sr-only'>
+                  <Label
+                    htmlFor={fid(`limit-value-${key}`)}
+                    className='text-muted-foreground sr-only sm:not-sr-only'
+                  >
                     {t('limitValue')}
                   </Label>
                   <Input
+                    id={fid(`limit-value-${key}`)}
                     type='number'
                     min={0}
                     step={1}
@@ -577,7 +634,10 @@ export default function PlatformPlansPage() {
           {PLAN_FEATURE_KEYS.map((key) => (
             <div key={key} className='flex items-start justify-between gap-4'>
               <div className='min-w-0 flex-1'>
-                <Label className='block text-sm leading-snug font-normal'>
+                <Label
+                  htmlFor={fid(`feature-${key}`)}
+                  className='block text-sm leading-snug font-normal'
+                >
                   {tFeat(key as never)}
                 </Label>
                 {!BACKEND_ENFORCED_PLAN_FEATURES.has(key) ? (
@@ -587,6 +647,7 @@ export default function PlatformPlansPage() {
                 ) : null}
               </div>
               <Switch
+                id={fid(`feature-${key}`)}
                 className='mt-0.5 shrink-0'
                 checked={form.features[key]}
                 onCheckedChange={(v) =>
@@ -639,11 +700,14 @@ export default function PlatformPlansPage() {
                 {t('submit', { defaultValue: 'Save' })}
               </Button>
             </DialogFooter>
-            {createMut.isError && (
-              <p className='text-destructive text-sm'>
-                {(createMut.error as Error).message}
-              </p>
-            )}
+            {(() => {
+              const inline = createMut.isError
+                ? planFormInlineErrorMessage(createMut.error)
+                : null;
+              return inline ? (
+                <p className='text-destructive text-sm'>{inline}</p>
+              ) : null;
+            })()}
           </DialogContent>
         </Dialog>
       </div>
@@ -741,11 +805,14 @@ export default function PlatformPlansPage() {
               {t('submit', { defaultValue: 'Save' })}
             </Button>
           </DialogFooter>
-          {updateMut.isError && (
-            <p className='text-destructive text-sm'>
-              {(updateMut.error as Error).message}
-            </p>
-          )}
+          {(() => {
+            const inline = updateMut.isError
+              ? planFormInlineErrorMessage(updateMut.error)
+              : null;
+            return inline ? (
+              <p className='text-destructive text-sm'>{inline}</p>
+            ) : null;
+          })()}
         </DialogContent>
       </Dialog>
     </div>

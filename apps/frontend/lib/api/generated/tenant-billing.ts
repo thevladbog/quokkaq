@@ -2435,6 +2435,11 @@ export type createCheckoutResponse404 = {
   status: 404
 }
 
+export type createCheckoutResponse409 = {
+  data: string
+  status: 409
+}
+
 export type createCheckoutResponse500 = {
   data: string
   status: 500
@@ -2448,7 +2453,7 @@ export type createCheckoutResponse501 = {
 export type createCheckoutResponseSuccess = (createCheckoutResponse200) & {
   headers: Headers;
 };
-export type createCheckoutResponseError = (createCheckoutResponse400 | createCheckoutResponse401 | createCheckoutResponse403 | createCheckoutResponse404 | createCheckoutResponse500 | createCheckoutResponse501) & {
+export type createCheckoutResponseError = (createCheckoutResponse400 | createCheckoutResponse401 | createCheckoutResponse403 | createCheckoutResponse404 | createCheckoutResponse409 | createCheckoutResponse500 | createCheckoutResponse501) & {
   headers: Headers;
 };
 

@@ -870,6 +870,10 @@ func (h *PlatformHandler) CreateSubscriptionPlan(w http.ResponseWriter, r *http.
 		http.Error(w, "interval must be month or year", http.StatusBadRequest)
 		return
 	}
+	if body.Price < 0 {
+		http.Error(w, "price must be non-negative", http.StatusBadRequest)
+		return
+	}
 	isPublic := true
 	if body.IsPublic != nil {
 		isPublic = *body.IsPublic
@@ -985,6 +989,10 @@ func (h *PlatformHandler) UpdateSubscriptionPlan(w http.ResponseWriter, r *http.
 	}
 	if body.Interval != "month" && body.Interval != "year" {
 		http.Error(w, "interval must be month or year", http.StatusBadRequest)
+		return
+	}
+	if body.Price < 0 {
+		http.Error(w, "price must be non-negative", http.StatusBadRequest)
 		return
 	}
 	plan.Name = body.Name

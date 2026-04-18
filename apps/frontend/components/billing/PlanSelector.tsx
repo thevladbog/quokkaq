@@ -93,7 +93,16 @@ export function PlanSelector({
   return (
     <div className='grid gap-6 md:grid-cols-2 lg:grid-cols-3'>
       {plans
-        .filter((plan) => plan.code !== PLAN_CODES.GRANDFATHERED)
+        .filter((plan) => {
+          if (plan.code === PLAN_CODES.GRANDFATHERED) return false;
+          if (
+            plan.isPublic === false &&
+            (!currentPlanId || plan.id !== currentPlanId)
+          ) {
+            return false;
+          }
+          return true;
+        })
         .map((plan) => (
           <Card
             key={plan.id}
