@@ -81,7 +81,7 @@ func (r *unitRepository) FindByIDLight(id string) (*models.Unit, error) {
 func (r *unitRepository) Update(unit *models.Unit) error {
 	// Map-based Updates so nil pointers (e.g. name_en, parent_id) are written as SQL NULL.
 	// Save() can omit nil pointer fields on update.
-	return r.db.Model(&models.Unit{}).Where("id = ?", unit.ID).Updates(map[string]interface{}{
+	res := r.db.Model(&models.Unit{}).Where("id = ?", unit.ID).Updates(map[string]interface{}{
 		"company_id": unit.CompanyID,
 		"parent_id":  unit.ParentID,
 		"code":       unit.Code,
@@ -92,7 +92,14 @@ func (r *unitRepository) Update(unit *models.Unit) error {
 		"timezone":   unit.Timezone,
 		"config":     unit.Config,
 		"updated_at": time.Now(),
-	}).Error
+	})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 func (r *unitRepository) UpdateConfig(unitID string, config json.RawMessage) error {

@@ -30,7 +30,7 @@ describe('buildUnitForest', () => {
     const forest = buildUnitForest(units);
     expect(forest).toHaveLength(1);
     expect(forest[0].unit.id).toBe('a');
-    expect(forest[0].children.map((c) => c.unit.id).sort()).toEqual(['b', 'c']);
+    expect(forest[0].children.map((c) => c.unit.id)).toEqual(['b', 'c']);
     expect(forest[0].children[0].children).toEqual([]);
   });
 

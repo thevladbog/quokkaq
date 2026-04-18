@@ -30,6 +30,12 @@ func TestUnitDisplayName(t *testing.T) {
 			want:   "Branch EN",
 		},
 		{
+			name:   "en_GB uses NameEn",
+			unit:   &Unit{Name: "Филиал", NameEn: &en},
+			locale: "en_GB",
+			want:   "Branch EN",
+		},
+		{
 			name:   "ru uses Name",
 			unit:   &Unit{Name: "Филиал", NameEn: &en},
 			locale: "ru",

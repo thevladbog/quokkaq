@@ -103,7 +103,7 @@ func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 // UpdateUser godoc
 // @ID           updateUser
 // @Summary      Update a user
-// @Description  Updates an existing user
+// @Description  Partially updates an existing user — fields provided in the JSON body are merged into the existing user; omitted keys are left unchanged.
 // @Tags         users
 // @Accept       json
 // @Produce      json

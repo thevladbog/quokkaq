@@ -1329,6 +1329,7 @@ export interface ModelsUpdateUserInput {
   email?: string;
   name?: string;
   password?: string;
+  /** URL of the user's profile photo. Send an empty string to clear the photo; omit the field to leave the current value unchanged. */
   photoUrl?: string;
   roles?: string[];
 }

@@ -6,7 +6,8 @@ constraints kin/swag omit: minProperties on some PATCH bodies, hex pattern on ta
 typed additionalProperties on subscription plan json.RawMessage maps (limits/features/limitsNegotiable).
 
 Run after: swag init … && go run ./cmd/swagger-to-openapi3
-Applies to: docs/swagger.json, docs/swagger.yaml (docs/docs.go uses //go:embed swagger.json).
+Applies to: docs/swagger.json, docs/openapi.json (same patched document), docs/swagger.yaml
+(docs/docs.go uses //go:embed swagger.json).
 
 Requires PyYAML for swagger.yaml (CI installs it; locally: pip install pyyaml).
 """
@@ -522,6 +523,36 @@ def _patch_plan_json_object_maps(components: dict[str, Any]) -> None:
         )
 
 
+def _patch_models_update_user_input(components: dict[str, Any]) -> None:
+    """PATCH /users/{id} body: password write-only; clarify photoUrl; roles stay string[]."""
+    s = _schema(components, "models.UpdateUserInput")
+    props = s.get("properties")
+    if not isinstance(props, dict):
+        sys.exit(
+            "post_swagger_openapi_tweaks: models.UpdateUserInput.properties missing or not an object"
+        )
+    pwd = props.get("password")
+    if not isinstance(pwd, dict):
+        sys.exit("post_swagger_openapi_tweaks: models.UpdateUserInput.properties.password missing")
+    pwd["writeOnly"] = True
+    pwd["format"] = "password"
+    photo = props.get("photoUrl")
+    if not isinstance(photo, dict):
+        sys.exit("post_swagger_openapi_tweaks: models.UpdateUserInput.properties.photoUrl missing")
+    photo["description"] = (
+        "URL of the user's profile photo. Send an empty string to clear the photo; "
+        "omit the field to leave the current value unchanged."
+    )
+    roles = props.get("roles")
+    if isinstance(roles, dict):
+        items = roles.get("items")
+        if items is not None and not (isinstance(items, dict) and items.get("type") == "string"):
+            sys.exit(
+                "post_swagger_openapi_tweaks: models.UpdateUserInput.properties.roles.items "
+                "expected {type: string} (schema drift)"
+            )
+
+
 def apply_openapi_tweaks(doc: dict[str, Any]) -> None:
     """Apply extra schema constraints by path under components.schemas.
 
@@ -594,6 +625,8 @@ def apply_openapi_tweaks(doc: dict[str, Any]) -> None:
     _merge_schema_required_if_prop_present(
         comp, "services.UpsertIntegrationRequest", "enabled"
     )
+
+    _patch_models_update_user_input(comp)
 
 
 def _patch_create_ticket_request(components: dict[str, Any]) -> None:
@@ -683,6 +716,8 @@ def main() -> None:
         sys.exit("post_swagger_openapi_tweaks: swagger.json root must be an object")
     apply_openapi_tweaks(doc)
     _write_json(json_path, doc)
+    # Mirror for tooling and docs that expect the conventional openapi.json filename (byte-identical to swagger.json).
+    _write_json(DOCS / "openapi.json", doc)
 
     _patch_yaml(DOCS / "swagger.yaml")
 

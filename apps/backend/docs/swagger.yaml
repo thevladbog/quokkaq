@@ -1911,8 +1911,11 @@ components:
           type: string
         password:
           type: string
+          writeOnly: true
+          format: password
         photoUrl:
           type: string
+          description: URL of the user's profile photo. Send an empty string to clear the photo; omit the field to leave the current value unchanged.
         roles:
           items:
             type: string
@@ -11569,7 +11572,7 @@ paths:
       tags:
       - users
     patch:
-      description: Updates an existing user
+      description: Partially updates an existing user — fields provided in the JSON body are merged into the existing user; omitted keys are left unchanged.
       operationId: updateUser
       parameters:
       - description: User ID

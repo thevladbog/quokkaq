@@ -49,16 +49,19 @@ export default function SettingsSidebar() {
     return pathname !== path && pathname.startsWith(`${path}/`);
   };
 
+  /** Organization settings index and sub-routes except billing (billing has its own nav item). */
+  const isOrgActive = (p: string) =>
+    p === '/settings/organization' ||
+    (p.startsWith('/settings/organization/') &&
+      !p.startsWith('/settings/organization/billing/') &&
+      p !== '/settings/organization/billing');
+
   const items = [
     {
       icon: Building2,
       label: tOrg('title'),
       href: '/settings/organization',
-      active:
-        pathname === '/settings/organization' ||
-        (pathname.startsWith('/settings/organization/') &&
-          !pathname.startsWith('/settings/organization/billing/') &&
-          pathname !== '/settings/organization/billing')
+      active: isOrgActive(pathname)
     },
     {
       icon: Building,
