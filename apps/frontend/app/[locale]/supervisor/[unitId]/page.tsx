@@ -15,7 +15,7 @@ import {
   getGetUnitsUnitIdChildWorkplacesQueryKey
 } from '@/lib/api/generated/units';
 import { shiftApi, unitsApi, Ticket } from '@/lib/api';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
@@ -23,6 +23,7 @@ import { PreRegistrationDetailsModal } from '@/components/staff/PreRegistrationD
 import { SupervisorShiftDashboard } from '@/components/supervisor/SupervisorShiftDashboard';
 import type { ShiftCounterRow } from '@/components/supervisor/SupervisorWorkstationMonitoring';
 import { useSyncActiveUnit } from '@/contexts/ActiveUnitContext';
+import { getUnitDisplayName } from '@/lib/unit-display';
 
 export default function ShiftDashboardPage({
   params
@@ -31,6 +32,7 @@ export default function ShiftDashboardPage({
 }) {
   const { unitId } = use(params);
   const t = useTranslations('supervisor');
+  const locale = useLocale();
   const queryClient = useQueryClient();
   useSyncActiveUnit(unitId);
   const [showEODDialog, setShowEODDialog] = useState(false);
@@ -175,7 +177,7 @@ export default function ShiftDashboardPage({
   return (
     <>
       <SupervisorShiftDashboard
-        unitName={unit?.name}
+        unitName={unit ? getUnitDisplayName(unit, locale) : undefined}
         stats={stats}
         statsLoading={statsLoading}
         queue={queue}
@@ -190,7 +192,10 @@ export default function ShiftDashboardPage({
         serviceZoneMode={serviceZonePickerMode}
         workplaceZones={
           serviceZonePickerMode
-            ? (childWorkplaces ?? []).map((u) => ({ id: u.id, name: u.name }))
+            ? (childWorkplaces ?? []).map((u) => ({
+                id: u.id,
+                name: getUnitDisplayName(u, locale)
+              }))
             : undefined
         }
         workplacesLoading={Boolean(

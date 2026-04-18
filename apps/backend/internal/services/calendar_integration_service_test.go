@@ -33,6 +33,7 @@ CREATE TABLE units (
 	kind text NOT NULL DEFAULT 'subdivision',
 	sort_order integer NOT NULL DEFAULT 0,
 	name text NOT NULL,
+	name_en text,
 	timezone text NOT NULL,
 	config text,
 	created_at datetime,

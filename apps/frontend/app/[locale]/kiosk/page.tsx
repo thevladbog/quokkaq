@@ -10,6 +10,7 @@ import ThemeToggle from '@/components/ThemeToggle';
 import { KioskTopBar } from '@/components/kiosk/kiosk-top-bar';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { getUnitDisplayName } from '@/lib/unit-display';
 
 const KIOSK_BODY = '#fef8f3';
 const KIOSK_HEADER = '#fff9f4';
@@ -159,11 +160,13 @@ export default function KioskPage() {
                 type='button'
                 className={unitTileClassName}
                 onClick={() => handleUnitSelect(unit.id)}
-                aria-label={t('select_unit_aria', { unit: unit.name })}
+                aria-label={t('select_unit_aria', {
+                  unit: getUnitDisplayName(unit, locale)
+                })}
               >
                 <div className='flex flex-1 flex-col px-3 pt-4'>
                   <span className='text-kiosk-ink text-center text-lg font-bold sm:text-xl'>
-                    {unit.name}
+                    {getUnitDisplayName(unit, locale)}
                   </span>
                 </div>
                 <div className='px-3 pb-4 text-center'>

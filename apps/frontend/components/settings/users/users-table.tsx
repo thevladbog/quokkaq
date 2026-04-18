@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { BadgeCheck } from 'lucide-react';
 import type { Unit, User } from '@quokkaq/shared-types';
 import { unitKindBadgeClassName } from '@/components/admin/units/unit-kind-badge-styles';
@@ -16,6 +16,7 @@ import {
   TableRow
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import { getUnitDisplayName } from '@/lib/unit-display';
 
 const MAX_UNIT_TAGS = 4;
 
@@ -35,6 +36,7 @@ export function UsersTable({
   selectedUserId
 }: UsersTableProps) {
   const t = useTranslations('admin.users');
+  const locale = useLocale();
 
   const colNames = useMemo(
     () => ({
@@ -125,7 +127,13 @@ export function UsersTable({
                   {unitRows.slice(0, MAX_UNIT_TAGS).map((uu) => {
                     const u = unitsById.get(uu.unitId);
                     const label =
-                      u?.name ?? uu.unit?.name ?? uu.unitId.slice(0, 8);
+                      getUnitDisplayName(
+                        {
+                          name: u?.name ?? uu.unit?.name ?? '',
+                          nameEn: u?.nameEn ?? uu.unit?.nameEn
+                        },
+                        locale
+                      ) || uu.unitId.slice(0, 8);
                     const kind = u?.kind ?? uu.unit?.kind;
                     return (
                       <Badge

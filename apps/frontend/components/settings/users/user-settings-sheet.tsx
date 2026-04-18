@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import type { Unit, User } from '@quokkaq/shared-types';
 import { UserProfileFields } from '@/components/settings/users/user-profile-fields';
 import {
@@ -36,13 +36,14 @@ import {
 } from '@/lib/hooks';
 import { UNIT_PERMISSIONS } from '@/lib/unit-permissions';
 import { cn } from '@/lib/utils';
+import { getUnitDisplayName } from '@/lib/unit-display';
 
 interface SheetUserUnit {
   id: string;
   unitId: string;
   /** May be missing from API JSON */
   permissions?: string[] | null;
-  unit?: { id: string; name: string; code: string };
+  unit?: { id: string; name: string; code: string; nameEn?: string | null };
 }
 
 interface UserSettingsSheetBodyProps {
@@ -57,6 +58,7 @@ function UserSettingsSheetBody({
   units
 }: UserSettingsSheetBodyProps) {
   const t = useTranslations('admin.users');
+  const locale = useLocale();
   const { data: currentUser } = useCurrentUser();
   const [editName, setEditName] = useState(user.name);
   const [searchAvailable, setSearchAvailable] = useState('');
@@ -118,11 +120,17 @@ function UserSettingsSheetBody({
     const q = searchAvailable.toLowerCase();
     return availableUnits
       .filter((u) => !selectedUnitIds.has(u.id))
-      .filter(
-        (u) =>
-          u.name.toLowerCase().includes(q) || u.code.toLowerCase().includes(q)
-      );
-  }, [availableUnits, selectedUnitIds, searchAvailable]);
+      .filter((u) => {
+        const display = getUnitDisplayName(u, locale).toLowerCase();
+        const en = (u.nameEn ?? '').toLowerCase();
+        return (
+          display.includes(q) ||
+          u.name.toLowerCase().includes(q) ||
+          en.includes(q) ||
+          u.code.toLowerCase().includes(q)
+        );
+      });
+  }, [availableUnits, selectedUnitIds, searchAvailable, locale]);
 
   const isSystemAdmin = user?.roles?.includes('admin');
 
@@ -280,7 +288,13 @@ function UserSettingsSheetBody({
                 const rowPermissions = uu.permissions ?? [];
                 const meta = unitsById.get(uu.unitId);
                 const title =
-                  meta?.name ?? uu.unit?.name ?? uu.unitId.slice(0, 8);
+                  getUnitDisplayName(
+                    {
+                      name: meta?.name ?? uu.unit?.name ?? '',
+                      nameEn: meta?.nameEn ?? uu.unit?.nameEn
+                    },
+                    locale
+                  ) || uu.unitId.slice(0, 8);
                 const subtitle = meta?.code ?? uu.unit?.code ?? '';
                 const canManage = canManageUnitUsers(
                   currentUser as User | undefined,
@@ -391,7 +405,9 @@ function UserSettingsSheetBody({
                     )}
                   >
                     <span className='min-w-0 flex-1 text-sm'>
-                      <span className='font-medium'>{unit.name}</span>
+                      <span className='font-medium'>
+                        {getUnitDisplayName(unit, locale)}
+                      </span>
                       <span className='text-muted-foreground'>
                         {' '}
                         ({unit.code})

@@ -482,6 +482,24 @@ func (h *UnitHandler) UpdateUnit(w http.ResponseWriter, r *http.Request) {
 			existingUnit.Name = s
 		}
 	}
+	if v, ok := raw["nameEn"]; ok {
+		switch string(v) {
+		case "null":
+			existingUnit.NameEn = nil
+		default:
+			var s string
+			if err := json.Unmarshal(v, &s); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			s = strings.TrimSpace(s)
+			if s == "" {
+				existingUnit.NameEn = nil
+			} else {
+				existingUnit.NameEn = &s
+			}
+		}
+	}
 	if v, ok := raw["code"]; ok {
 		var s string
 		if err := json.Unmarshal(v, &s); err != nil {

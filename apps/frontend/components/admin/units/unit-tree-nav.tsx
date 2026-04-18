@@ -3,10 +3,11 @@
 import { Badge } from '@/components/ui/badge';
 import { Building2, FolderOpen } from 'lucide-react';
 import { Link } from '@/src/i18n/navigation';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import type { UnitTreeNode } from '@/lib/unit-tree';
 import { unitKindBadgeClassName } from '@/components/admin/units/unit-kind-badge-styles';
 import { cn } from '@/lib/utils';
+import { getUnitDisplayName } from '@/lib/unit-display';
 
 function UnitKindBadge({ unit }: { unit: { kind?: string | null } }) {
   const t = useTranslations('admin');
@@ -31,6 +32,7 @@ function UnitKindBadge({ unit }: { unit: { kind?: string | null } }) {
 }
 
 function NavBranch({ nodes, depth }: { nodes: UnitTreeNode[]; depth: number }) {
+  const locale = useLocale();
   return (
     <ul
       className={cn(
@@ -56,7 +58,7 @@ function NavBranch({ nodes, depth }: { nodes: UnitTreeNode[]; depth: number }) {
               href={`/settings/units/${unit.id}`}
               className='text-primary font-medium hover:underline'
             >
-              {unit.name}
+              {getUnitDisplayName(unit, locale)}
             </Link>
             <span className='text-muted-foreground text-sm'>{unit.code}</span>
             <UnitKindBadge unit={unit} />

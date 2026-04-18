@@ -2681,6 +2681,9 @@
                     "name": {
                         "type": "string"
                     },
+                    "nameEn": {
+                        "type": "string"
+                    },
                     "operations": {
                         "allOf": [
                             {
@@ -2893,6 +2896,9 @@
                     "phone": {
                         "type": "string"
                     },
+                    "photoUrl": {
+                        "type": "string"
+                    },
                     "roles": {
                         "description": "Relations",
                         "items": {
@@ -3036,6 +3042,9 @@
                         "type": "string"
                     },
                     "unitName": {
+                        "type": "string"
+                    },
+                    "unitNameEn": {
                         "type": "string"
                     },
                     "username": {

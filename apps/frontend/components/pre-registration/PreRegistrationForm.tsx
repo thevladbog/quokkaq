@@ -33,6 +33,7 @@ import {
   formatCalendarSlotLabel,
   preRegCalendarSlotRowKey
 } from '@/lib/pre-registration-calendar-slots';
+import { getUnitDisplayName } from '@/lib/unit-display';
 
 interface PreRegistrationFormProps {
   unitId: string;
@@ -469,7 +470,10 @@ export function PreRegistrationForm({
               {unitCalIntegrations.map((i) => (
                 <SelectItem key={i.id} value={i.id!}>
                   {i.displayName?.trim() ||
-                    i.unitName ||
+                    getUnitDisplayName(
+                      { name: i.unitName ?? '', nameEn: i.unitNameEn },
+                      locale
+                    ) ||
                     i.kind ||
                     i.id?.slice(0, 8)}
                 </SelectItem>

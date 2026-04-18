@@ -78,6 +78,7 @@ type Unit struct {
 	Kind      string          `gorm:"not null;default:subdivision" json:"kind"`
 	SortOrder int             `gorm:"not null;default:0" json:"sortOrder"`
 	Name      string          `gorm:"not null" json:"name"`
+	NameEn    *string         `gorm:"column:name_en" json:"nameEn,omitempty"`
 	Timezone  string          `gorm:"not null" json:"timezone"`
 	Config    json.RawMessage `gorm:"type:jsonb" json:"config,omitempty" swaggertype:"object"`
 	CreatedAt time.Time       `gorm:"default:now()" json:"createdAt"`

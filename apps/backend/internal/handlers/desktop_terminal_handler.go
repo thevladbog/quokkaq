@@ -81,7 +81,7 @@ func mapTerminalToJSON(t *models.DesktopTerminal) desktopTerminalJSON {
 		out.LastSeenAt = &s
 	}
 	if t.Unit.ID != "" {
-		out.UnitName = t.Unit.Name
+		out.UnitName = models.UnitDisplayName(&t.Unit, t.DefaultLocale)
 	}
 	if t.CounterID != nil && *t.CounterID != "" {
 		out.CounterID = t.CounterID

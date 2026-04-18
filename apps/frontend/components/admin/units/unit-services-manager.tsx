@@ -39,6 +39,7 @@ import { normalizeChildUnitsQueryData } from '@/lib/child-units-query';
 import { getGetUnitsUnitIdChildUnitsQueryKey } from '@/lib/api/generated/units';
 import { unitsApi } from '@/lib/api';
 import { useTranslations, useLocale } from 'next-intl';
+import { getUnitDisplayName } from '@/lib/unit-display';
 import { ImageUpload } from '@/components/ui/image-upload';
 import type { Service } from '@quokkaq/shared-types';
 
@@ -125,7 +126,9 @@ export function UnitServicesManager({ unitId }: UnitServicesManagerProps) {
             <CardTitle>{tServices('title')}</CardTitle>
             <CardDescription>
               {tServices('description', {
-                unit: selectedUnit?.name || 'selected unit'
+                unit: selectedUnit
+                  ? getUnitDisplayName(selectedUnit, locale)
+                  : 'selected unit'
               })}
             </CardDescription>
           </CardHeader>
@@ -378,6 +381,7 @@ function ServiceForm({
 }) {
   const tServices = useTranslations('admin.services');
   const tRoot = useTranslations();
+  const locale = useLocale();
   const createServiceMutation = useCreateService();
   const updateServiceMutation = useUpdateService();
 
@@ -655,7 +659,7 @@ function ServiceForm({
                 )
                 .map((zone) => (
                   <SelectItem key={zone.id} value={zone.id}>
-                    {zone.name}
+                    {getUnitDisplayName(zone, locale)}
                   </SelectItem>
                 ))}
             </SelectContent>

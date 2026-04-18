@@ -25,6 +25,7 @@ CREATE TABLE units (
 	kind text NOT NULL DEFAULT 'subdivision',
 	sort_order integer DEFAULT 0,
 	name text NOT NULL DEFAULT 'n',
+	name_en text,
 	timezone text NOT NULL DEFAULT 'UTC',
 	config text,
 	created_at datetime,

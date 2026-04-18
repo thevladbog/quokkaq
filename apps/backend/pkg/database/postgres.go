@@ -1280,6 +1280,15 @@ func RunVersionedMigrations(models ...interface{}) error {
 		return fmt.Errorf("failed to run v1.2.17_users_photo_url migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.2.18_units_name_en", func(db *gorm.DB) error {
+		return db.Exec(`
+			ALTER TABLE units ADD COLUMN IF NOT EXISTS name_en TEXT;
+		`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.2.18_units_name_en migration: %w", err)
+	}
+
 	fmt.Println("All migrations completed successfully")
 	return nil
 }

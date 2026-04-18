@@ -93,6 +93,7 @@ import {
   unwrapGuestSurveyQuestionsJson
 } from '@/lib/guest-survey-blocks';
 import { cn } from '@/lib/utils';
+import { getUnitDisplayName } from '@/lib/unit-display';
 import {
   ChartContainer,
   ChartTooltip,
@@ -231,7 +232,8 @@ function listNumericSurveyQuestions(
 
 function buildSubdivisionOptions(
   assignableIds: string[],
-  unitById: Map<string, ModelsUnit>
+  unitById: Map<string, ModelsUnit>,
+  locale: string
 ): { id: string; name: string }[] {
   const seen = new Set<string>();
   const out: { id: string; name: string }[] = [];
@@ -242,11 +244,11 @@ function buildSubdivisionOptions(
     let subName: string;
     if (u.kind === 'subdivision') {
       subId = u.id;
-      subName = (u.name ?? '').trim() || u.id;
+      subName = getUnitDisplayName(u, locale).trim() || u.id;
     } else if (u.kind === 'service_zone' && u.parentId?.trim()) {
       subId = u.parentId.trim();
       const p = unitById.get(subId);
-      subName = (p?.name ?? '').trim() || subId;
+      subName = (p ? getUnitDisplayName(p, locale) : '').trim() || subId;
     } else {
       continue;
     }
@@ -425,8 +427,8 @@ export default function StatisticsPage() {
   }, [wave1Units, wave2Units]);
 
   const subdivisionOptions = useMemo(
-    () => buildSubdivisionOptions(assignableUnitIds, unitById),
-    [assignableUnitIds, unitById]
+    () => buildSubdivisionOptions(assignableUnitIds, unitById, appLocale),
+    [assignableUnitIds, unitById, appLocale]
   );
 
   const statsSubdivisionId =
@@ -1221,7 +1223,7 @@ export default function StatisticsPage() {
                           )
                           .map((z) => (
                             <SelectItem key={z.id} value={z.id}>
-                              {z.name}
+                              {getUnitDisplayName(z, appLocale)}
                             </SelectItem>
                           ))}
                       </SelectContent>

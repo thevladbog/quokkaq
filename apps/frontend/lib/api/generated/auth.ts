@@ -192,6 +192,7 @@ export interface ModelsUnit {
   id?: string;
   kind?: string;
   name?: string;
+  nameEn?: string;
   /** Operations is hydrated for GET /units/{id} (kiosk freeze / EOD phase); not stored on units row. */
   readonly operations?: ModelsUnitOperationsPublic;
   parentId?: string;
@@ -219,6 +220,7 @@ export interface ModelsUser {
   isActive?: boolean;
   name?: string;
   phone?: string;
+  photoUrl?: string;
   /** Relations */
   roles?: ModelsUserRole[];
   type?: string;
@@ -1356,6 +1358,7 @@ export interface ServicesCalendarIntegrationPublic {
   timezone?: string;
   unitId?: string;
   unitName?: string;
+  unitNameEn?: string;
   username?: string;
 }
 

@@ -170,6 +170,7 @@ type CalendarIntegrationPublic struct {
 	ID                string     `json:"id"`
 	UnitID            string     `json:"unitId"`
 	UnitName          string     `json:"unitName,omitempty"`
+	UnitNameEn        string     `json:"unitNameEn,omitempty"`
 	Kind              string     `json:"kind"`
 	DisplayName       string     `json:"displayName,omitempty"`
 	Enabled           bool       `json:"enabled"`
@@ -183,7 +184,7 @@ type CalendarIntegrationPublic struct {
 	ReadOnlyCapacity  bool       `json:"readOnlyCapacity"`
 }
 
-func (s *CalendarIntegrationService) rowToPublic(row *models.UnitCalendarIntegration, unitName string) *CalendarIntegrationPublic {
+func (s *CalendarIntegrationService) rowToPublic(row *models.UnitCalendarIntegration, unitName, unitNameEn string) *CalendarIntegrationPublic {
 	kind := strings.TrimSpace(row.Kind)
 	if kind == "" {
 		kind = models.CalendarIntegrationKindYandexCalDAV
@@ -192,6 +193,7 @@ func (s *CalendarIntegrationService) rowToPublic(row *models.UnitCalendarIntegra
 		ID:                row.ID,
 		UnitID:            row.UnitID,
 		UnitName:          unitName,
+		UnitNameEn:        unitNameEn,
 		Kind:              kind,
 		DisplayName:       row.DisplayName,
 		Enabled:           row.Enabled,
@@ -218,7 +220,7 @@ func (s *CalendarIntegrationService) GetPublic(unitID, companyID string) (*Calen
 	if err != nil {
 		return nil, err
 	}
-	return s.rowToPublic(row, ""), nil
+	return s.rowToPublic(row, "", ""), nil
 }
 
 // ListPublicForCompany returns integrations for all units in the company (admin UI).
@@ -230,11 +232,14 @@ func (s *CalendarIntegrationService) ListPublicForCompany(companyID string) ([]C
 	out := make([]CalendarIntegrationPublic, 0, len(rows))
 	for i := range rows {
 		row := &rows[i]
-		uname := ""
+		uname, unameEn := "", ""
 		if u, err := s.unitRepo.FindByIDLight(row.UnitID); err == nil && u != nil {
-			uname = u.Name
+			uname = strings.TrimSpace(u.Name)
+			if u.NameEn != nil {
+				unameEn = strings.TrimSpace(*u.NameEn)
+			}
 		}
-		out = append(out, *s.rowToPublic(row, uname))
+		out = append(out, *s.rowToPublic(row, uname, unameEn))
 	}
 	return out, nil
 }
@@ -245,11 +250,14 @@ func (s *CalendarIntegrationService) GetPublicByID(integrationID string) (*Calen
 	if err != nil {
 		return nil, err
 	}
-	uname := ""
+	uname, unameEn := "", ""
 	if u, err := s.unitRepo.FindByIDLight(row.UnitID); err == nil && u != nil {
-		uname = u.Name
+		uname = strings.TrimSpace(u.Name)
+		if u.NameEn != nil {
+			unameEn = strings.TrimSpace(*u.NameEn)
+		}
 	}
-	return s.rowToPublic(row, uname), nil
+	return s.rowToPublic(row, uname, unameEn), nil
 }
 
 // VerifyUnitBelongsToCompany ensures unit scope for company-scoped APIs.

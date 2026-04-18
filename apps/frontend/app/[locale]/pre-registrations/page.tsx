@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo } from 'react';
 import { useQueries } from '@tanstack/react-query';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import {
   Card,
   CardContent,
@@ -17,12 +17,14 @@ import { useAuthContext } from '@/contexts/AuthContext';
 import { useActiveUnit } from '@/contexts/ActiveUnitContext';
 import { getGetUnitsIdQueryKey } from '@/lib/api/generated/units';
 import { unitsApi, type Unit } from '@/lib/api';
+import { getUnitDisplayName } from '@/lib/unit-display';
 
 export default function PreRegistrationsIndexPage() {
   const { isLoading: authLoading } = useAuthContext();
   const { assignableUnitIds } = useActiveUnit();
   const t = useTranslations('admin');
   const tNav = useTranslations('nav');
+  const locale = useLocale();
   const router = useRouter();
 
   const queries = useQueries({
@@ -101,7 +103,7 @@ export default function PreRegistrationsIndexPage() {
             onClick={() => router.push(`/pre-registrations/${unit.id}`)}
           >
             <CardHeader>
-              <CardTitle>{unit.name}</CardTitle>
+              <CardTitle>{getUnitDisplayName(unit, locale)}</CardTitle>
               <CardDescription>{unit.code}</CardDescription>
             </CardHeader>
             <CardContent>

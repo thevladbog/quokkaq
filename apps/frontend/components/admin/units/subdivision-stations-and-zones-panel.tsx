@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useQueryClient } from '@tanstack/react-query';
 import { Building2, FolderOpen, Plus, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
@@ -36,6 +36,7 @@ import {
 import { buildDescendantForest, type UnitTreeNode } from '@/lib/unit-tree';
 import { unitKindBadgeClassName } from '@/components/admin/units/unit-kind-badge-styles';
 import { cn } from '@/lib/utils';
+import { getUnitDisplayName } from '@/lib/unit-display';
 import { z } from 'zod';
 
 type CreateKind = 'subdivision' | 'service_zone';
@@ -50,6 +51,7 @@ function SubdivisionUnitsSubtree({
   subdivisionId: string;
 }) {
   const t = useTranslations('admin.units');
+  const locale = useLocale();
   const router = useRouter();
 
   return (
@@ -68,7 +70,9 @@ function SubdivisionUnitsSubtree({
                     className='text-muted-foreground h-5 w-5 shrink-0'
                     aria-hidden
                   />
-                  <span className='truncate font-semibold'>{unit.name}</span>
+                  <span className='truncate font-semibold'>
+                    {getUnitDisplayName(unit, locale)}
+                  </span>
                   <Badge
                     variant='outline'
                     className={cn(
@@ -113,7 +117,9 @@ function SubdivisionUnitsSubtree({
                     className='text-muted-foreground h-5 w-5 shrink-0'
                     aria-hidden
                   />
-                  <span className='truncate font-semibold'>{unit.name}</span>
+                  <span className='truncate font-semibold'>
+                    {getUnitDisplayName(unit, locale)}
+                  </span>
                   <Badge
                     variant='outline'
                     className={cn(

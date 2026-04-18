@@ -1,7 +1,7 @@
 'use client';
 
 import { use, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,7 @@ import { PreRegistrationTable } from '@/components/pre-registration/PreRegistrat
 import { PreRegistrationForm } from '@/components/pre-registration/PreRegistrationForm';
 import { useRouter } from '@/src/i18n/navigation';
 import { useSyncActiveUnit } from '@/contexts/ActiveUnitContext';
+import { getUnitDisplayName } from '@/lib/unit-display';
 
 interface UnitPreRegistrationsPageProps {
   params: Promise<{
@@ -33,6 +34,7 @@ export default function UnitPreRegistrationsPage({
   const router = useRouter();
   const t = useTranslations('admin.pre_registrations');
   const tCommon = useTranslations('common');
+  const locale = useLocale();
   useSyncActiveUnit(unitId);
 
   const { data: unit } = useQuery({
@@ -68,7 +70,11 @@ export default function UnitPreRegistrationsPage({
           </Button>
           <div>
             <h1 className='text-3xl font-bold'>{t('title')}</h1>
-            {unit && <p className='text-muted-foreground'>{unit.name}</p>}
+            {unit && (
+              <p className='text-muted-foreground'>
+                {getUnitDisplayName(unit, locale)}
+              </p>
+            )}
           </div>
         </div>
         <Button onClick={handleCreate}>

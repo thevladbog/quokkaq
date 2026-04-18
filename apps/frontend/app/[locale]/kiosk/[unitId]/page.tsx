@@ -41,6 +41,7 @@ import {
 } from '@/lib/kiosk-print';
 import { intlLocaleFromAppLocale } from '@/lib/format-datetime';
 import { logger } from '@/lib/logger';
+import { getUnitDisplayName } from '@/lib/unit-display';
 import {
   GRID_ZONE_SCOPE_NONE,
   SERVICE_GRID_CELL_COUNT,
@@ -160,7 +161,9 @@ export default function UnitKioskPage() {
       const ticketPageUrl = `${baseAppUrl}/${locale}/ticket/${ticket.id}`;
       const unitLabelOverride = kc.kioskUnitLabelText?.trim();
       const unitDisplayTitle =
-        unitLabelOverride || unit?.name?.trim() || t('kioskTitle');
+        unitLabelOverride ||
+        (unit ? getUnitDisplayName(unit, locale) : '').trim() ||
+        t('kioskTitle');
       const logoForPrint =
         kc.printerLogoUrl?.trim() || kc.logoUrl?.trim() || '';
       const logoFetchUrl =
@@ -213,7 +216,9 @@ export default function UnitKioskPage() {
   const showUnitInHeader = kioskCfg?.showUnitInHeader !== false;
   const unitLabelOverride = kioskCfg?.kioskUnitLabelText?.trim();
   const resolvedHeaderUnitTitle =
-    unitLabelOverride || unit?.name?.trim() || t('kioskTitle');
+    unitLabelOverride ||
+    (unit ? getUnitDisplayName(unit, locale) : '').trim() ||
+    t('kioskTitle');
 
   const switcherClass =
     'text-kiosk-ink h-11 min-w-[3.25rem] rounded-full border-0 bg-[#f2ede8] px-4 text-base font-semibold shadow-sm hover:bg-[#ebe4de] md:h-12 md:min-w-[3.5rem]';
@@ -861,7 +866,7 @@ export default function UnitKioskPage() {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         unitId={unitId!}
-        unitName={unit?.name ?? ''}
+        unitName={unit ? getUnitDisplayName(unit, locale) : ''}
         currentConfig={unit?.config}
         onLock={() => {
           setIsSettingsOpen(false);

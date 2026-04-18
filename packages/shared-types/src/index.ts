@@ -53,6 +53,7 @@ export const UserModelSchema = z.object({
             companyId: z.string().optional(),
             id: z.string().optional(),
             name: z.string().optional(),
+            nameEn: z.string().nullable().optional(),
             code: z.string().optional(),
             kind: z.string().optional()
           })
@@ -469,6 +470,7 @@ export const UnitOperationsPublicSchema = z.object({
 export const UnitModelSchema = z.object({
   id: z.string(),
   name: z.string(),
+  nameEn: z.string().nullable().optional(),
   code: z.string(),
   companyId: z.string(),
   parentId: z.string().nullable().optional(),

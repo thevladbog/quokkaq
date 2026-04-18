@@ -27,6 +27,7 @@ import {
 } from '@/lib/api/generated/units';
 import { countersApi, unitsApi, Ticket, type Service } from '@/lib/api';
 import { normalizeChildUnitsQueryData } from '@/lib/child-units-query';
+import { getUnitDisplayName } from '@/lib/unit-display';
 
 /** Stable empty refs so React Query “no data yet” does not allocate a new [] every render (avoids effect loops on [data]). */
 const EMPTY_TICKET_LIST: Ticket[] = [];
@@ -640,7 +641,7 @@ export default function StaffWorkspacePage({
             <div className='from-primary to-primary/70 hidden h-10 w-1 shrink-0 rounded-full bg-gradient-to-b sm:block' />
             <div className='min-w-0'>
               <p className='text-muted-foreground truncate text-[11px] font-medium tracking-wide uppercase'>
-                {unit?.name ?? '—'}
+                {unit ? getUnitDisplayName(unit, locale) : '—'}
               </p>
               <h1 className='truncate text-xl font-bold tracking-tight sm:text-2xl'>
                 {counterName}
