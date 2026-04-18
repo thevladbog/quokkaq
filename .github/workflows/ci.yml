@@ -1,4 +1,4 @@
-name: CI
+name: '🚀 CI'
 
 on:
   pull_request:
@@ -22,7 +22,7 @@ concurrency:
 
 jobs:
   affected:
-    name: Detect affected apps
+    name: '🎯 Detect affected apps'
     runs-on: ubuntu-latest
     env:
       NX_BASE: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha || github.event.before || 'origin/main' }}
@@ -38,7 +38,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Enable Corepack
+      - name: '📦 Enable Corepack'
         run: corepack enable
 
       - uses: actions/setup-node@v6
@@ -46,10 +46,10 @@ jobs:
           node-version: '22'
           cache: 'pnpm'
 
-      - name: Install dependencies
+      - name: '📥 Install dependencies'
         run: pnpm install --frozen-lockfile
 
-      - name: Check affected apps
+      - name: '🎯 Check affected apps'
         id: check
         run: |
           AFFECTED="$(pnpm nx show projects --affected --base=$NX_BASE --head=$NX_HEAD)"
@@ -85,7 +85,7 @@ jobs:
           fi
 
   ci-sherif:
-    name: Workspace (sherif)
+    name: '🧹 Workspace (sherif)'
     runs-on: ubuntu-latest
     needs: affected
     if: ${{ needs.affected.outputs.web == 'true' || needs.affected.outputs.backend == 'true' || needs.affected.outputs.kiosk == 'true' }}
@@ -97,7 +97,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Enable Corepack
+      - name: '📦 Enable Corepack'
         run: corepack enable
 
       - uses: actions/setup-node@v6
@@ -105,14 +105,14 @@ jobs:
           node-version: '22'
           cache: 'pnpm'
 
-      - name: Install dependencies
+      - name: '📥 Install dependencies'
         run: pnpm install --frozen-lockfile
 
-      - name: Check pnpm workspace (sherif)
+      - name: '🧹 Check pnpm workspace (sherif)'
         run: pnpm exec sherif -r packages-without-package-json
 
   ci-openapi:
-    name: OpenAPI / Orval
+    name: '📜 OpenAPI / Orval'
     runs-on: ubuntu-latest
     needs: affected
     if: ${{ needs.affected.outputs.frontend == 'true' || needs.affected.outputs.backend == 'true' || needs.affected.outputs.marketing == 'true' }}
@@ -124,7 +124,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Enable Corepack
+      - name: '📦 Enable Corepack'
         run: corepack enable
 
       - uses: actions/setup-node@v6
@@ -137,10 +137,10 @@ jobs:
         with:
           go-version-file: apps/backend/go.mod
 
-      - name: Install dependencies
+      - name: '📥 Install dependencies'
         run: pnpm install --frozen-lockfile
 
-      - name: Verify OpenAPI 3 artifacts match doc pipeline (backend)
+      - name: '📝 Verify OpenAPI 3 artifacts match doc pipeline (backend)'
         if: needs.affected.outputs.backend == 'true'
         working-directory: apps/backend
         run: |
@@ -150,16 +150,16 @@ jobs:
           python3 scripts/post_swagger_openapi_tweaks.py
           git diff --exit-code docs/docs.go docs/swagger.json docs/swagger.yaml
 
-      - name: Orval client in sync with OpenAPI
+      - name: '🔄 Orval client in sync with OpenAPI'
         if: needs.affected.outputs.frontend == 'true' || needs.affected.outputs.backend == 'true'
         run: pnpm nx run frontend:orval:check
 
-      - name: Orval marketing client in sync with OpenAPI
+      - name: '🔄 Orval marketing client in sync with OpenAPI'
         if: needs.affected.outputs.marketing == 'true' || needs.affected.outputs.backend == 'true'
         run: pnpm nx run marketing:orval:check
 
   ci-frontend:
-    name: Frontend (build, test, lint)
+    name: '🌐 Frontend (build, test, lint)'
     runs-on: ubuntu-latest
     needs: affected
     if: ${{ needs.affected.outputs.web == 'true' }}
@@ -177,7 +177,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Enable Corepack
+      - name: '📦 Enable Corepack'
         run: corepack enable
 
       - uses: actions/setup-node@v6
@@ -185,36 +185,36 @@ jobs:
           node-version: '22'
           cache: 'pnpm'
 
-      - name: Install dependencies
+      - name: '📥 Install dependencies'
         run: pnpm install --frozen-lockfile
 
-      - name: Prettier (frontend)
+      - name: '💅 Prettier (frontend)'
         if: needs.affected.outputs.frontend == 'true'
         run: pnpm nx run frontend:format:check
 
-      - name: Typecheck frontend (tsc --noEmit)
+      - name: '🔷 Typecheck frontend (tsc --noEmit)'
         if: needs.affected.outputs.frontend == 'true'
         run: pnpm --dir apps/frontend exec tsc --noEmit
 
-      - name: Prettier (marketing)
+      - name: '💅 Prettier (marketing)'
         run: pnpm nx run marketing:format:check
 
-      - name: Typecheck marketing (tsc --noEmit)
+      - name: '🔷 Typecheck marketing (tsc --noEmit)'
         run: pnpm --dir apps/marketing exec tsc --noEmit
 
-      - name: Build, test, lint (affected web stack)
+      - name: '🏗️ Build, test, lint (affected web stack)'
         run: pnpm nx affected -t build,test,lint --base=$NX_BASE --head=$NX_HEAD --outputStyle=static --parallel=3 --exclude="$NX_EXCLUDE_WEB"
 
-      - name: Publish Vitest JUnit
+      - name: '📊 Publish Vitest JUnit'
         if: always() && hashFiles('apps/frontend/test-results/vitest-junit.xml') != ''
         uses: EnricoMi/publish-unit-test-result-action@v2.23.0
         with:
           files: apps/frontend/test-results/vitest-junit.xml
-          check_name: Vitest (frontend)
+          check_name: '📊 Vitest (frontend)'
           comment_mode: ${{ github.event_name == 'pull_request' && 'always' || 'off' }}
 
   ci-backend:
-    name: Backend (build, test, lint)
+    name: '🔧 Backend (build, test, lint)'
     runs-on: ubuntu-latest
     needs: affected
     if: ${{ needs.affected.outputs.backend == 'true' }}
@@ -231,7 +231,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Enable Corepack
+      - name: '📦 Enable Corepack'
         run: corepack enable
 
       - uses: actions/setup-node@v6
@@ -243,24 +243,24 @@ jobs:
         with:
           go-version-file: apps/backend/go.mod
 
-      - name: Install dependencies
+      - name: '📥 Install dependencies'
         run: pnpm install --frozen-lockfile
 
-      - name: Build, test, lint (affected backend)
+      - name: '🏗️ Build, test, lint (affected backend)'
         env:
           CI: true
         run: pnpm nx affected -t build,test,lint --base=$NX_BASE --head=$NX_HEAD --outputStyle=static --parallel=3 --exclude="$NX_EXCLUDE_BACKEND"
 
-      - name: Publish Go JUnit
+      - name: '📊 Publish Go JUnit'
         if: always() && hashFiles('apps/backend/test-results/go-junit.xml') != ''
         uses: EnricoMi/publish-unit-test-result-action@v2.23.0
         with:
           files: apps/backend/test-results/go-junit.xml
-          check_name: Go (backend)
+          check_name: '📊 Go (backend)'
           comment_mode: ${{ github.event_name == 'pull_request' && 'always' || 'off' }}
 
   ci-kiosk:
-    name: Kiosk desktop (build, test, lint)
+    name: '🖥️ Kiosk desktop (build, test, lint)'
     runs-on: ubuntu-latest
     needs: affected
     if: ${{ needs.affected.outputs.kiosk == 'true' }}
@@ -277,7 +277,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Enable Corepack
+      - name: '📦 Enable Corepack'
         run: corepack enable
 
       - uses: actions/setup-node@v6
@@ -291,7 +291,7 @@ jobs:
         with:
           tool: cargo-nextest
 
-      - name: Install Tauri / GTK system dependencies (Linux)
+      - name: '🪟 Install Tauri / GTK system dependencies (Linux)'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -310,24 +310,24 @@ jobs:
             libudev-dev \
             patchelf
 
-      - name: Install dependencies
+      - name: '📥 Install dependencies'
         run: pnpm install --frozen-lockfile
 
-      - name: Build, test, lint (affected kiosk)
+      - name: '🏗️ Build, test, lint (affected kiosk)'
         env:
           CI: true
         run: pnpm nx affected -t build,test,lint --base=$NX_BASE --head=$NX_HEAD --outputStyle=static --parallel=3 --exclude="$NX_EXCLUDE_KIOSK"
 
-      - name: Publish Nextest JUnit
+      - name: '📊 Publish Nextest JUnit'
         if: always() && hashFiles('apps/kiosk-desktop/src-tauri/target/nextest/ci/junit.xml') != ''
         uses: EnricoMi/publish-unit-test-result-action@v2.23.0
         with:
           files: apps/kiosk-desktop/src-tauri/target/nextest/ci/junit.xml
-          check_name: Nextest (kiosk-desktop)
+          check_name: '📊 Nextest (kiosk-desktop)'
           comment_mode: ${{ github.event_name == 'pull_request' && 'always' || 'off' }}
 
   ci-gate:
-    name: CI status
+    name: '✅ CI status'
     runs-on: ubuntu-latest
     needs:
       - affected
@@ -338,7 +338,7 @@ jobs:
       - ci-kiosk
     if: always()
     steps:
-      - name: Verify required jobs
+      - name: '🚦 Verify required jobs'
         env:
           WEB: ${{ needs.affected.outputs.web }}
           FE: ${{ needs.affected.outputs.frontend }}
