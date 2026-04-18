@@ -1120,6 +1120,92 @@ func RunVersionedMigrations(models ...interface{}) error {
 		return fmt.Errorf("failed to run v1.2.8_support_report_shares_and_description migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.2.9_subscription_plan_is_public", func(db *gorm.DB) error {
+		return db.Exec(`
+			ALTER TABLE subscription_plans
+			ADD COLUMN IF NOT EXISTS is_public boolean NOT NULL DEFAULT true;
+		`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.2.9_subscription_plan_is_public migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.2.10_subscription_plan_display_and_purchase", func(db *gorm.DB) error {
+		if err := db.Exec(`
+			ALTER TABLE subscription_plans
+			ADD COLUMN IF NOT EXISTS display_order integer NOT NULL DEFAULT 1000;
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			ALTER TABLE subscription_plans
+			ADD COLUMN IF NOT EXISTS limits_negotiable jsonb NOT NULL DEFAULT '{}'::jsonb;
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			ALTER TABLE subscription_plans
+			ADD COLUMN IF NOT EXISTS allow_instant_purchase boolean NOT NULL DEFAULT true;
+		`).Error; err != nil {
+			return err
+		}
+		// Preserve legacy ordering for known plan codes until admins set display_order explicitly.
+		if err := db.Exec(`
+			UPDATE subscription_plans SET display_order = 1 WHERE code = 'starter';
+			UPDATE subscription_plans SET display_order = 2 WHERE code = 'professional';
+			UPDATE subscription_plans SET display_order = 3 WHERE code = 'enterprise';
+			UPDATE subscription_plans SET display_order = 99 WHERE code = 'grandfathered';
+		`).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.2.10_subscription_plan_display_and_purchase migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.2.11_subscription_plan_is_promoted", func(db *gorm.DB) error {
+		if err := db.Exec(`
+			ALTER TABLE subscription_plans
+			ADD COLUMN IF NOT EXISTS is_promoted boolean NOT NULL DEFAULT false;
+		`).Error; err != nil {
+			return err
+		}
+		// One promoted plan for public lists; default matches previous marketing hard-code.
+		if err := db.Exec(`
+			UPDATE subscription_plans SET is_promoted = false;
+			UPDATE subscription_plans SET is_promoted = true
+			WHERE code = 'professional' AND is_active = true AND is_public = true;
+		`).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.2.11_subscription_plan_is_promoted migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.2.12_subscription_plan_name_en", func(db *gorm.DB) error {
+		if err := db.Exec(`
+			ALTER TABLE subscription_plans
+			ADD COLUMN IF NOT EXISTS name_en text NOT NULL DEFAULT '';
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			UPDATE subscription_plans SET name_en = 'Starter' WHERE code = 'starter' AND name_en = '';
+			UPDATE subscription_plans SET name_en = 'Professional' WHERE code = 'professional' AND name_en = '';
+			UPDATE subscription_plans SET name_en = 'Enterprise' WHERE code = 'enterprise' AND name_en = '';
+			UPDATE subscription_plans SET name_en = 'Grandfathered' WHERE code = 'grandfathered' AND name_en = '';
+		`).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.2.12_subscription_plan_name_en migration: %w", err)
+	}
+
 	fmt.Println("All migrations completed successfully")
 	return nil
 }

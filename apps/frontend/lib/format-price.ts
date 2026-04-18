@@ -1,19 +1,14 @@
-/**
- * Subscription/billing amounts from the API are in minor units (e.g. kopeks for RUB).
- * Uses Intl currency fraction digits to pick divisor (100 for RUB/USD, 0 for JPY, etc.).
- */
-export function minorUnitDivisor(currency: string, intlLocale: string): number {
-  try {
-    const digits =
-      new Intl.NumberFormat(intlLocale, {
-        style: 'currency',
-        currency
-      }).resolvedOptions().maximumFractionDigits ?? 2;
-    return 10 ** Math.min(Math.max(digits, 0), 8);
-  } catch {
-    return 100;
-  }
-}
+import {
+  formatPriceMinorUnits,
+  formatPriceMinorUnitsAmountOnly,
+  minorUnitDivisor
+} from '@quokkaq/subscription-pricing';
+
+export {
+  formatPriceMinorUnits,
+  formatPriceMinorUnitsAmountOnly,
+  minorUnitDivisor
+};
 
 /**
  * Accepts only a non-negative decimal literal: integer, digits.digits, digits., or .digits.
@@ -26,22 +21,6 @@ function strictParseNonNegativeMajor(s: string): number | null {
   const n = Number.parseFloat(s);
   if (!Number.isFinite(n) || n < 0) return null;
   return n;
-}
-
-export function formatPriceMinorUnits(
-  amountMinor: number,
-  currency: string,
-  intlLocale: string
-): string {
-  const divisor = minorUnitDivisor(currency, intlLocale);
-  try {
-    return new Intl.NumberFormat(intlLocale, {
-      style: 'currency',
-      currency
-    }).format(amountMinor / divisor);
-  } catch {
-    return `${(amountMinor / divisor).toFixed(2)} ${currency}`;
-  }
 }
 
 /**

@@ -1,157 +1,115 @@
 import Link from 'next/link';
 
+import { TextLogoImg } from '@/components/landing/text-logo-img';
 import type { AppLocale, HomeMessages } from '@/src/messages';
 
 type Props = {
   locale: AppLocale;
   copy: HomeMessages;
+  appBaseUrl: string | null;
 };
 
-export function LandingFooterCta({ locale, copy }: Props) {
-  const currentYear = new Date().getFullYear();
+const pillPrimaryClass =
+  'focus-ring inline-flex min-h-12 min-w-[11rem] flex-1 items-center justify-center rounded-full bg-white px-8 py-3.5 text-center text-sm font-semibold text-neutral-900 shadow-lg shadow-black/15 transition hover:bg-neutral-50 sm:flex-none';
+
+const pillSecondaryClass =
+  'focus-ring inline-flex min-h-12 min-w-[11rem] flex-1 items-center justify-center rounded-full border-2 border-white bg-transparent px-8 py-3.5 text-center text-sm font-semibold text-white transition hover:bg-white/10 sm:flex-none';
+
+export function LandingFooterCta({ locale, copy, appBaseUrl }: Props) {
+  const year = new Date().getFullYear();
+  const trialHref = appBaseUrl
+    ? `${appBaseUrl}/${locale}/signup`
+    : `/${locale}/docs`;
+  const salesHref = appBaseUrl
+    ? `${appBaseUrl}/${locale}/contact`
+    : 'mailto:sales@quokkaq.com';
+  const privacyHref = `/${locale}/privacy`;
+  const termsHref = `/${locale}/terms`;
 
   return (
-    <footer
-      id='book-demo'
-      className='relative z-10 scroll-mt-24 border-t border-[color:var(--color-border)] bg-gradient-to-b from-[color:var(--color-surface)] to-[color:var(--color-surface-elevated)]'
-    >
-      <div className='mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8'>
-        <div className='mb-12 flex flex-col items-start justify-between gap-8 rounded-2xl border border-[color:var(--color-border)] bg-gradient-to-br from-[color:var(--color-primary)]/5 to-[color:var(--color-secondary)]/5 p-8 sm:flex-row sm:items-center lg:p-12'>
-          <div>
-            <h2 className='font-display mb-3 text-2xl font-bold text-[color:var(--color-text)] sm:text-3xl'>
-              {copy.footer.title}
-            </h2>
-            <p className='max-w-xl text-base text-[color:var(--color-text-muted)]'>
-              {copy.footer.body}
-            </p>
-          </div>
-          <Link
-            href={`/${locale}/docs`}
-            prefetch={false}
-            className='focus-ring inline-flex min-h-12 shrink-0 items-center justify-center rounded-xl bg-[color:var(--color-primary)] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-[color:var(--color-primary)]/30 transition hover:bg-[color:var(--color-primary-hover)]'
-          >
-            {copy.footer.cta}
-          </Link>
-        </div>
-
-        <div className='grid gap-8 border-t border-[color:var(--color-border)] pt-12 sm:grid-cols-2 lg:grid-cols-4'>
-          <div>
-            <h3 className='font-display mb-4 text-sm font-semibold text-[color:var(--color-text)]'>
-              Product
-            </h3>
-            <ul className='space-y-3'>
-              <li>
-                <a
-                  href='#how-it-works'
-                  className='focus-ring text-sm text-[color:var(--color-text-muted)] transition hover:text-[color:var(--color-primary)]'
-                >
-                  How it works
-                </a>
-              </li>
-              <li>
-                <a
-                  href='#pricing'
-                  className='focus-ring text-sm text-[color:var(--color-text-muted)] transition hover:text-[color:var(--color-primary)]'
-                >
-                  Pricing
-                </a>
-              </li>
-              <li>
-                <Link
-                  href={`/${locale}/docs`}
-                  className='focus-ring text-sm text-[color:var(--color-text-muted)] transition hover:text-[color:var(--color-primary)]'
-                >
-                  Documentation
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          <div>
-            <h3 className='font-display mb-4 text-sm font-semibold text-[color:var(--color-text)]'>
-              Resources
-            </h3>
-            <ul className='space-y-3'>
-              <li>
-                <a
-                  href='#faq'
-                  className='focus-ring text-sm text-[color:var(--color-text-muted)] transition hover:text-[color:var(--color-primary)]'
-                >
-                  FAQ
-                </a>
-              </li>
-              <li>
-                <Link
-                  href={`/${locale}/docs`}
-                  className='focus-ring text-sm text-[color:var(--color-text-muted)] transition hover:text-[color:var(--color-primary)]'
-                >
-                  Guides
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href={`/${locale}/docs`}
-                  className='focus-ring text-sm text-[color:var(--color-text-muted)] transition hover:text-[color:var(--color-primary)]'
-                >
-                  API Reference
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          <div>
-            <h3 className='font-display mb-4 text-sm font-semibold text-[color:var(--color-text)]'>
-              Company
-            </h3>
-            <ul className='space-y-3'>
-              <li>
-                <Link
-                  href={`/${locale}/docs`}
-                  className='focus-ring text-sm text-[color:var(--color-text-muted)] transition hover:text-[color:var(--color-primary)]'
-                >
-                  About
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href={`/${locale}/docs`}
-                  className='focus-ring text-sm text-[color:var(--color-text-muted)] transition hover:text-[color:var(--color-primary)]'
-                >
-                  Contact
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          <div>
-            <h3 className='font-display mb-4 text-sm font-semibold text-[color:var(--color-text)]'>
-              Legal
-            </h3>
-            <ul className='space-y-3'>
-              <li>
-                <Link
-                  href={`/${locale}/docs`}
-                  className='focus-ring text-sm text-[color:var(--color-text-muted)] transition hover:text-[color:var(--color-primary)]'
-                >
-                  Privacy
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href={`/${locale}/docs`}
-                  className='focus-ring text-sm text-[color:var(--color-text-muted)] transition hover:text-[color:var(--color-primary)]'
-                >
-                  Terms
-                </Link>
-              </li>
-            </ul>
-          </div>
-        </div>
-
-        <div className='mt-12 flex flex-col items-center justify-between gap-4 border-t border-[color:var(--color-border)] pt-8 text-center sm:flex-row sm:text-left'>
-          <p className='text-sm text-[color:var(--color-text-muted)]'>
-            © {currentYear} QuokkaQ. All rights reserved.
+    <footer className='relative z-10'>
+      <div
+        id='book-demo'
+        className='scroll-mt-24 bg-gradient-to-br from-[color:var(--color-primary)] to-[color:var(--color-primary-hover)] px-4 py-16 text-center sm:px-6 sm:py-20'
+      >
+        <div className='mx-auto max-w-3xl'>
+          <h2 className='font-display mb-4 text-3xl font-bold tracking-tight text-white sm:mb-5 sm:text-4xl'>
+            {copy.footer.title}
+          </h2>
+          <p className='mx-auto mb-10 max-w-2xl text-base leading-relaxed text-white/90 sm:text-lg'>
+            {copy.footer.body}
           </p>
+          <div className='mx-auto flex max-w-xl flex-col items-stretch justify-center gap-4 sm:flex-row sm:justify-center sm:gap-5'>
+            {appBaseUrl ? (
+              <a
+                href={trialHref}
+                target='_blank'
+                rel='noopener noreferrer'
+                className={pillPrimaryClass}
+              >
+                {copy.footer.cta}
+              </a>
+            ) : (
+              <Link
+                href={trialHref}
+                prefetch={false}
+                className={pillPrimaryClass}
+              >
+                {copy.footer.cta}
+              </Link>
+            )}
+            {appBaseUrl ? (
+              <a
+                href={salesHref}
+                target='_blank'
+                rel='noopener noreferrer'
+                className={pillSecondaryClass}
+              >
+                {copy.footer.ctaSecondary}
+              </a>
+            ) : (
+              <a href={salesHref} className={pillSecondaryClass}>
+                {copy.footer.ctaSecondary}
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className='border-t border-[color:var(--color-border)] bg-[#f4f1eb] px-4 py-6 dark:border-[color:var(--color-border)] dark:bg-[color:var(--color-surface)] sm:px-6'>
+        <div className='mx-auto grid max-w-6xl grid-cols-1 items-center gap-4 text-sm text-neutral-500 sm:grid-cols-3 sm:gap-6 dark:text-[color:var(--color-text-muted)]'>
+          <div className='flex justify-center sm:justify-start'>
+            <Link
+              href={`/${locale}`}
+              prefetch={false}
+              className='focus-ring inline-flex rounded-md grayscale opacity-90 transition-[filter,opacity] duration-200 ease-out hover:grayscale-0 hover:opacity-100 focus-visible:grayscale-0 focus-visible:opacity-100 dark:opacity-85 dark:hover:opacity-100'
+              aria-label={copy.logoAlt}
+            >
+              <TextLogoImg locale={locale} className='h-7 w-auto' />
+            </Link>
+          </div>
+          <p className='text-center tabular-nums'>
+            © {year} {copy.footer.copyrightBrand}. {copy.footer.copyrightReserved}
+          </p>
+          <nav
+            className='flex flex-wrap items-center justify-center gap-x-6 gap-y-2 sm:justify-end'
+            aria-label='Legal'
+          >
+            <Link
+              href={privacyHref}
+              prefetch={false}
+              className='focus-ring rounded-sm transition hover:text-[color:var(--color-primary)] dark:hover:text-[color:var(--color-primary)]'
+            >
+              {copy.footer.privacy}
+            </Link>
+            <Link
+              href={termsHref}
+              prefetch={false}
+              className='focus-ring rounded-sm transition hover:text-[color:var(--color-primary)] dark:hover:text-[color:var(--color-primary)]'
+            >
+              {copy.footer.terms}
+            </Link>
+          </nav>
         </div>
       </div>
     </footer>

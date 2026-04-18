@@ -818,6 +818,7 @@ func (h *PlatformHandler) ListSubscriptionPlans(w http.ResponseWriter, r *http.R
 // PlatformCreateSubscriptionPlanBody is the JSON body for POST /platform/subscription-plans.
 type PlatformCreateSubscriptionPlanBody struct {
 	Name     string          `json:"name"`
+	NameEn   string          `json:"nameEn"`
 	Code     string          `json:"code"`
 	Price    int64           `json:"price"`
 	Currency string          `json:"currency"`
@@ -825,6 +826,15 @@ type PlatformCreateSubscriptionPlanBody struct {
 	Features json.RawMessage `json:"features" swaggertype:"object"`
 	Limits   json.RawMessage `json:"limits" swaggertype:"object"`
 	IsActive bool            `json:"isActive"`
+	// IsPublic omitted or null defaults to true (backward compatible).
+	IsPublic *bool `json:"isPublic,omitempty"`
+	// DisplayOrder omitted or null defaults to 1000 (sort last among unnamed ordering).
+	DisplayOrder     *int            `json:"displayOrder,omitempty"`
+	LimitsNegotiable json.RawMessage `json:"limitsNegotiable,omitempty" swaggertype:"object"`
+	// AllowInstantPurchase omitted or null defaults to true.
+	AllowInstantPurchase *bool `json:"allowInstantPurchase,omitempty"`
+	// IsPromoted when true: this plan becomes the only promoted tier (others cleared in the same transaction).
+	IsPromoted *bool `json:"isPromoted,omitempty"`
 }
 
 // CreateSubscriptionPlan godoc
@@ -843,6 +853,7 @@ func (h *PlatformHandler) CreateSubscriptionPlan(w http.ResponseWriter, r *http.
 		return
 	}
 	body.Name = strings.TrimSpace(body.Name)
+	body.NameEn = strings.TrimSpace(body.NameEn)
 	body.Code = strings.ToLower(strings.TrimSpace(body.Code))
 	if body.Name == "" || body.Code == "" {
 		http.Error(w, "name and code are required", http.StatusBadRequest)
@@ -859,17 +870,52 @@ func (h *PlatformHandler) CreateSubscriptionPlan(w http.ResponseWriter, r *http.
 		http.Error(w, "interval must be month or year", http.StatusBadRequest)
 		return
 	}
-	plan := models.SubscriptionPlan{
-		Name:     body.Name,
-		Code:     body.Code,
-		Price:    body.Price,
-		Currency: body.Currency,
-		Interval: body.Interval,
-		Features: body.Features,
-		Limits:   body.Limits,
-		IsActive: body.IsActive,
+	isPublic := true
+	if body.IsPublic != nil {
+		isPublic = *body.IsPublic
 	}
-	if err := h.subscriptionRepo.CreatePlan(&plan); err != nil {
+	displayOrder := 1000
+	if body.DisplayOrder != nil {
+		displayOrder = *body.DisplayOrder
+	}
+	allowInstant := true
+	if body.AllowInstantPurchase != nil {
+		allowInstant = *body.AllowInstantPurchase
+	}
+	isPromoted := false
+	if body.IsPromoted != nil {
+		isPromoted = *body.IsPromoted
+	}
+	limitsNeg := body.LimitsNegotiable
+	if strings.TrimSpace(string(limitsNeg)) == "" {
+		limitsNeg = json.RawMessage("{}")
+	}
+	plan := models.SubscriptionPlan{
+		Name:                 body.Name,
+		NameEn:               body.NameEn,
+		Code:                 body.Code,
+		Price:                body.Price,
+		Currency:             body.Currency,
+		Interval:             body.Interval,
+		Features:             body.Features,
+		Limits:               body.Limits,
+		IsActive:             body.IsActive,
+		IsPublic:             isPublic,
+		DisplayOrder:         displayOrder,
+		LimitsNegotiable:     limitsNeg,
+		AllowInstantPurchase: allowInstant,
+		IsPromoted:           isPromoted,
+	}
+	if err := database.DB.Transaction(func(tx *gorm.DB) error {
+		if isPromoted {
+			if err := tx.Session(&gorm.Session{AllowGlobalUpdate: true}).
+				Model(&models.SubscriptionPlan{}).
+				Update("is_promoted", false).Error; err != nil {
+				return err
+			}
+		}
+		return tx.Create(&plan).Error
+	}); err != nil {
 		log.Printf("Platform CreateSubscriptionPlan: %v", err)
 		http.Error(w, "Could not create plan (duplicate code?)", http.StatusBadRequest)
 		return
@@ -879,14 +925,21 @@ func (h *PlatformHandler) CreateSubscriptionPlan(w http.ResponseWriter, r *http.
 
 // PlatformUpdateSubscriptionPlanBody is the JSON body for PUT /platform/subscription-plans/{id}.
 type PlatformUpdateSubscriptionPlanBody struct {
-	Name     string          `json:"name"`
-	Code     string          `json:"code"`
-	Price    int64           `json:"price"`
-	Currency string          `json:"currency"`
-	Interval string          `json:"interval"`
-	Features json.RawMessage `json:"features" swaggertype:"object"`
-	Limits   json.RawMessage `json:"limits" swaggertype:"object"`
-	IsActive bool            `json:"isActive"`
+	Name                 string          `json:"name"`
+	NameEn               string          `json:"nameEn"`
+	Code                 string          `json:"code"`
+	Price                int64           `json:"price"`
+	Currency             string          `json:"currency"`
+	Interval             string          `json:"interval"`
+	Features             json.RawMessage `json:"features" swaggertype:"object"`
+	Limits               json.RawMessage `json:"limits" swaggertype:"object"`
+	IsActive             bool            `json:"isActive"`
+	IsPublic             *bool           `json:"isPublic,omitempty"`
+	DisplayOrder         *int            `json:"displayOrder,omitempty"`
+	LimitsNegotiable     json.RawMessage `json:"limitsNegotiable,omitempty" swaggertype:"object"`
+	AllowInstantPurchase *bool           `json:"allowInstantPurchase,omitempty"`
+	// IsPromoted omitted: leave unchanged. When true, other plans are demoted in the same transaction.
+	IsPromoted *bool `json:"isPromoted,omitempty"`
 }
 
 // UpdateSubscriptionPlan godoc
@@ -917,6 +970,7 @@ func (h *PlatformHandler) UpdateSubscriptionPlan(w http.ResponseWriter, r *http.
 		return
 	}
 	body.Name = strings.TrimSpace(body.Name)
+	body.NameEn = strings.TrimSpace(body.NameEn)
 	body.Code = strings.ToLower(strings.TrimSpace(body.Code))
 	if body.Name == "" || body.Code == "" {
 		http.Error(w, "name and code are required", http.StatusBadRequest)
@@ -933,7 +987,12 @@ func (h *PlatformHandler) UpdateSubscriptionPlan(w http.ResponseWriter, r *http.
 		http.Error(w, "interval must be month or year", http.StatusBadRequest)
 		return
 	}
+	isPublic := true
+	if body.IsPublic != nil {
+		isPublic = *body.IsPublic
+	}
 	plan.Name = body.Name
+	plan.NameEn = body.NameEn
 	plan.Code = body.Code
 	plan.Price = body.Price
 	plan.Currency = body.Currency
@@ -941,7 +1000,31 @@ func (h *PlatformHandler) UpdateSubscriptionPlan(w http.ResponseWriter, r *http.
 	plan.Features = body.Features
 	plan.Limits = body.Limits
 	plan.IsActive = body.IsActive
-	if err := h.subscriptionRepo.UpdatePlan(plan); err != nil {
+	plan.IsPublic = isPublic
+	if body.DisplayOrder != nil {
+		plan.DisplayOrder = *body.DisplayOrder
+	}
+	if body.AllowInstantPurchase != nil {
+		plan.AllowInstantPurchase = *body.AllowInstantPurchase
+	}
+	if body.IsPromoted != nil {
+		plan.IsPromoted = *body.IsPromoted
+	}
+	if body.LimitsNegotiable != nil {
+		neg := body.LimitsNegotiable
+		if strings.TrimSpace(string(neg)) == "" {
+			neg = json.RawMessage("{}")
+		}
+		plan.LimitsNegotiable = neg
+	}
+	if err := database.DB.Transaction(func(tx *gorm.DB) error {
+		if body.IsPromoted != nil && *body.IsPromoted {
+			if err := tx.Model(&models.SubscriptionPlan{}).Where("id <> ?", id).Update("is_promoted", false).Error; err != nil {
+				return err
+			}
+		}
+		return tx.Save(plan).Error
+	}); err != nil {
 		log.Printf("Platform UpdateSubscriptionPlan: %v", err)
 		http.Error(w, "Could not update plan", http.StatusBadRequest)
 		return

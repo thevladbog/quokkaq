@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+
+import type { AppLocale } from '@/src/messages';
 
 type TicketPalette = {
   border: string;
@@ -61,46 +63,71 @@ const TICKET_PALETTES: TicketPalette[] = [
   }
 ];
 
-const LETTERS = 'АБВГДЕЖЗИКЛМНОПРСТУФХЦЧШЩЭЮЯABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const LETTERS_RU = 'АБВГДЕЖЗИКЛМНОПРСТУФХЦЧШЩЭЮЯ';
+const LETTERS_EN = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
-function generateTicketNumber(): string {
-  const letter = LETTERS[Math.floor(Math.random() * LETTERS.length)];
-  const number = Math.floor(Math.random() * 999) + 1;
-  return `${letter}-${number.toString().padStart(3, '0')}`;
+/** How many tickets fall at once (each has stable number/color from its seed). */
+const TICKET_COUNT = 24;
+
+/** Deterministic 0..1 PRNG so SSR and hydration output match (avoids hydration mismatch). */
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a += 0x6d2b79f5;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
-function randomPalette(): TicketPalette {
-  const i = Math.floor(Math.random() * TICKET_PALETTES.length);
+function alphabetForLocale(locale: AppLocale): string {
+  return locale === 'ru' ? LETTERS_RU : LETTERS_EN;
+}
+
+/** Prefix: 1–3 letters from locale alphabet + numeric suffix (stable per rng stream). */
+function generateTicketNumber(rng: () => number, locale: AppLocale): string {
+  const alphabet = alphabetForLocale(locale);
+  const prefixLen = 1 + Math.floor(rng() * 3);
+  let prefix = '';
+  for (let i = 0; i < prefixLen; i += 1) {
+    prefix += alphabet[Math.floor(rng() * alphabet.length)]!;
+  }
+  const number = Math.floor(rng() * 999) + 1;
+  return `${prefix}-${number.toString().padStart(3, '0')}`;
+}
+
+function pickPalette(rng: () => number): TicketPalette {
+  const i = Math.floor(rng() * TICKET_PALETTES.length);
   return TICKET_PALETTES[i]!;
 }
 
-function generateInitialTickets(): Ticket[] {
-  return Array.from({ length: 12 }, (_, i) => ({
-    id: i,
-    number: generateTicketNumber(),
-    left: Math.random() * 100,
-    delay: Math.random() * 15,
-    duration: 15 + Math.random() * 10,
-    palette: randomPalette()
-  }));
+function ticketFromStableSeed(id: number, locale: AppLocale): Ticket {
+  const rng = mulberry32(0x9e3779b9 ^ (id * 0x85ebca6b));
+  return {
+    id,
+    number: generateTicketNumber(rng, locale),
+    /** % по ширине вьюпорта; с translateX(-50%) держим якорь внутри полосы, без вылезания за край */
+    left: 12 + rng() * 76,
+    /** Phased + short jitter so the first tickets appear within ~1s, all started within ~4s (not 0–15s blank). */
+    delay: id * 0.12 + rng() * 0.85,
+    duration: 15 + rng() * 10,
+    palette: pickPalette(rng)
+  };
 }
 
-export function LandingTicketsAnimation() {
-  const [tickets, setTickets] = useState<Ticket[]>(generateInitialTickets);
+function generateInitialTickets(locale: AppLocale): Ticket[] {
+  return Array.from({ length: TICKET_COUNT }, (_, i) =>
+    ticketFromStableSeed(i, locale)
+  );
+}
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTickets((prev) =>
-        prev.map((ticket) => ({
-          ...ticket,
-          number: generateTicketNumber(),
-          palette: randomPalette()
-        }))
-      );
-    }, 25000);
+type AnimationProps = {
+  locale: AppLocale;
+};
 
-    return () => clearInterval(interval);
-  }, []);
+export function LandingTicketsAnimation({ locale }: AnimationProps) {
+  const [tickets] = useState<Ticket[]>(() => generateInitialTickets(locale));
 
   return (
     <div
@@ -110,7 +137,7 @@ export function LandingTicketsAnimation() {
       {tickets.map((ticket) => (
         <div
           key={ticket.id}
-          className='ticket-fall absolute w-20 sm:w-24'
+          className='ticket-fall absolute w-[5.75rem] min-w-0 sm:w-28'
           style={{
             left: `${ticket.left}%`,
             animationDelay: `${ticket.delay}s`,
@@ -135,25 +162,26 @@ export function LandingTicketsAnimation() {
       <style jsx>{`
         .ticket-fall {
           animation: fall linear infinite;
+          animation-fill-mode: backwards;
           will-change: transform;
         }
 
         @keyframes fall {
           0% {
-            transform: translateY(-120px) rotate(0deg);
+            transform: translate(-50%, calc(-45vh - 120px)) rotate(0deg);
             opacity: 0;
           }
-          10% {
-            opacity: 0.7;
+          2% {
+            opacity: 0.72;
           }
           50% {
-            opacity: 0.6;
+            opacity: 0.65;
           }
-          90% {
-            opacity: 0.4;
+          92% {
+            opacity: 0.45;
           }
           100% {
-            transform: translateY(100vh) rotate(15deg);
+            transform: translate(-50%, calc(100vh + 120px)) rotate(15deg);
             opacity: 0;
           }
         }

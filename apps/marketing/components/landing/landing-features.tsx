@@ -103,7 +103,10 @@ const FeatureIcons = [
 
 export function LandingFeatures({ copy }: Props) {
   return (
-    <section className='relative z-10 border-t border-[color:var(--color-border)] bg-[color:var(--color-surface-elevated)] py-20 sm:py-28'>
+    <section
+      id='features'
+      className='relative z-10 border-t border-[color:var(--color-border)] bg-[color:var(--color-surface-elevated)] py-20 sm:py-28'
+    >
       <div className='mx-auto max-w-6xl px-4 sm:px-6 lg:px-8'>
         <div className='mb-16 text-center'>
           <h2 className='font-display mb-4 text-3xl font-bold tracking-tight text-[color:var(--color-text)] sm:text-4xl lg:text-5xl'>

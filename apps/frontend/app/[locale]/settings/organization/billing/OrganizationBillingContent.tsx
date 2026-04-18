@@ -73,6 +73,10 @@ export function OrganizationBillingContent() {
   };
 
   const handlePlanSelect = async (plan: SubscriptionPlan) => {
+    if (plan.allowInstantPurchase === false) {
+      toast.info(t('planRequestOnlyMessage'));
+      return;
+    }
     checkoutMutation.mutate(plan.code);
   };
 

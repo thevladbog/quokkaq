@@ -1,6 +1,7 @@
 package subscriptions
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -95,10 +96,14 @@ func newPendingPlanTestDB(t *testing.T) *gorm.DB {
 func seedSubscriptionWithPending(t *testing.T, db *gorm.DB, effectiveAt time.Time) (planA, planB models.SubscriptionPlan, sub *models.Subscription) {
 	t.Helper()
 	planA = models.SubscriptionPlan{
-		ID: "plan-a", Name: "Plan A", Code: "a", Price: 100, Currency: "RUB", Interval: "month", IsActive: true,
+		ID: "plan-a", Name: "Plan A", Code: "a", Price: 100, Currency: "RUB", Interval: "month",
+		IsActive: true, IsPublic: true, DisplayOrder: 1,
+		LimitsNegotiable: json.RawMessage("{}"), AllowInstantPurchase: true,
 	}
 	planB = models.SubscriptionPlan{
-		ID: "plan-b", Name: "Plan B", Code: "b", Price: 200, Currency: "RUB", Interval: "month", IsActive: true,
+		ID: "plan-b", Name: "Plan B", Code: "b", Price: 200, Currency: "RUB", Interval: "month",
+		IsActive: true, IsPublic: true, DisplayOrder: 2,
+		LimitsNegotiable: json.RawMessage("{}"), AllowInstantPurchase: true,
 	}
 	if err := db.Create(&planA).Error; err != nil {
 		t.Fatal(err)

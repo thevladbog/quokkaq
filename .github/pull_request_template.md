@@ -7,6 +7,7 @@ What does this PR change and why?
 Check all that apply (CI may also add `area/*` labels from paths):
 
 - [ ] Frontend (`apps/frontend`)
+- [ ] Marketing site (`apps/marketing`)
 - [ ] Backend (`apps/backend`)
 - [ ] Kiosk desktop (`apps/kiosk-desktop`)
 - [ ] Shared packages (`packages/*`)
@@ -27,6 +28,13 @@ Steps you ran or reviewers should follow:
 - Same frontend paths → `pnpm nx run frontend:lint` when you touched TS/JS/CSS that should pass ESLint
 
 _(In this monorepo the app lives under `apps/frontend/`; use the same Nx targets if you only touched shared UI under `packages/` that the frontend consumes.)_
+
+**Marketing (copy-paste when applicable)**
+
+- Changes under `apps/marketing/**/*.{ts,tsx,js,jsx,mjs,css,md,mdx}` → `pnpm nx run marketing:lint`
+- Same tree → `pnpm nx run marketing:format:check`
+- Full build → `pnpm nx run marketing:build`
+- If OpenAPI / generated client under `apps/marketing/lib/api/generated` is involved → `pnpm nx run marketing:orval:check`
 
 ## Notes
 

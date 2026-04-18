@@ -248,6 +248,10 @@ func (h *SubscriptionHandler) CreateCheckout(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "Plan is not available", http.StatusBadRequest)
 		return
 	}
+	if !plan.AllowInstantPurchase {
+		http.Error(w, "This plan is not available for self-service checkout; contact sales to request access.", http.StatusConflict)
+		return
+	}
 
 	companyID, err := h.userRepo.ResolveCompanyIDForRequest(userID, r.Header.Get("X-Company-Id"))
 	if err != nil {

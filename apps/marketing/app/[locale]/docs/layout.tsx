@@ -46,7 +46,8 @@ export default async function DocsLayout({
     />
   );
 
-  const footer = <Footer>QuokkaQ</Footer>;
+  const footerBrand = raw === 'ru' ? 'КвоккаКю' : 'QuokkaQ';
+  const footer = <Footer>{footerBrand}</Footer>;
 
   return (
     <>

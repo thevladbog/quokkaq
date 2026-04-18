@@ -15,6 +15,8 @@
     --color-border: #f0e5db;
     --color-hero-glow: rgb(255 107 53 / 0.15);
     --color-accent-glow: rgb(247 147 30 / 0.12);
+    --marketing-scrollbar-thumb: rgb(255 107 53 / 0.38);
+    --marketing-scrollbar-thumb-hover: rgb(255 107 53 / 0.62);
   }
 
   .dark {
@@ -25,6 +27,8 @@
     --color-border: #2d2622;
     --color-hero-glow: rgb(255 107 53 / 0.25);
     --color-accent-glow: rgb(247 147 30 / 0.18);
+    --marketing-scrollbar-thumb: rgb(255 160 125 / 0.42);
+    --marketing-scrollbar-thumb-hover: rgb(255 170 135 / 0.68);
   }
 
   body {
@@ -111,6 +115,84 @@
       opacity: 1 !important;
       transform: none !important;
     }
+
+    .landing-pricing-popular-shimmer-bar {
+      animation: none !important;
+      opacity: 0 !important;
+    }
+  }
+
+  /** Soft glass edge + slow shimmer on promoted pricing card (marketing). */
+  .landing-pricing-popular-glass-edge {
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    border-radius: inherit;
+    box-shadow:
+      inset 0 1px 0 0 rgb(255 255 255 / 0.32),
+      inset 0 -1px 0 0 rgb(255 107 53 / 0.05);
+  }
+
+  .dark .landing-pricing-popular-glass-edge {
+    box-shadow:
+      inset 0 1px 0 0 rgb(255 255 255 / 0.1),
+      inset 0 -1px 0 0 rgb(255 107 53 / 0.06);
+  }
+
+  /**
+   * Horizontal light sweep: `left` % is relative to the card (glass) width.
+   * Full block height so the glare crosses title, list, and padding — not only the list band.
+   */
+  .landing-pricing-popular-shimmer-bar {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    width: 78%;
+    left: -82%;
+    border-radius: inherit;
+    pointer-events: none;
+    will-change: left;
+    background: linear-gradient(
+      90deg,
+      rgb(255 255 255 / 0) 0%,
+      rgb(255 255 255 / 0.14) 22%,
+      rgb(255 255 255 / 0.42) 47%,
+      rgb(255 255 255 / 0.55) 50%,
+      rgb(255 255 255 / 0.42) 53%,
+      rgb(255 255 255 / 0.14) 78%,
+      rgb(255 255 255 / 0) 100%
+    );
+    filter: blur(1px);
+    opacity: 0.85;
+    animation: landing-pricing-popular-shimmer-sweep 4.2s ease-in-out infinite;
+  }
+
+  .dark .landing-pricing-popular-shimmer-bar {
+    background: linear-gradient(
+      90deg,
+      rgb(255 255 255 / 0) 0%,
+      rgb(255 255 255 / 0.06) 22%,
+      rgb(255 255 255 / 0.22) 47%,
+      rgb(255 255 255 / 0.32) 50%,
+      rgb(255 255 255 / 0.22) 53%,
+      rgb(255 255 255 / 0.06) 78%,
+      rgb(255 255 255 / 0) 100%
+    );
+  }
+
+  @keyframes landing-pricing-popular-shimmer-sweep {
+    0% {
+      left: -82%;
+    }
+
+    38% {
+      left: 108%;
+    }
+
+    100% {
+      left: 108%;
+    }
   }
 
   .focus-ring {
@@ -130,5 +212,63 @@
     html {
       scroll-behavior: smooth;
     }
+  }
+}
+
+/**
+ * Скроллбар вне @layer — иначе Tailwind preflight перебивает и остаётся системный.
+ * Класс `doc-scroll-active` ставится на html и body (см. document-scroll-hint.tsx).
+ */
+html,
+body {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+html.doc-scroll-active,
+body.doc-scroll-active {
+  scrollbar-color: var(--marketing-scrollbar-thumb) transparent;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+html::-webkit-scrollbar-track,
+body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+html::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+  background-color: transparent;
+  transition: background-color 0.55s ease;
+}
+
+html.doc-scroll-active::-webkit-scrollbar-thumb,
+body.doc-scroll-active::-webkit-scrollbar-thumb {
+  background-color: var(--marketing-scrollbar-thumb);
+}
+
+html.doc-scroll-active::-webkit-scrollbar-thumb:hover,
+body.doc-scroll-active::-webkit-scrollbar-thumb:hover {
+  background-color: var(--marketing-scrollbar-thumb-hover);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html,
+  body {
+    scrollbar-color: var(--marketing-scrollbar-thumb) transparent;
+  }
+
+  html::-webkit-scrollbar-thumb,
+  body::-webkit-scrollbar-thumb {
+    background-color: var(--marketing-scrollbar-thumb);
+    transition: none;
   }
 }

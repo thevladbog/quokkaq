@@ -409,38 +409,67 @@ components:
       type: object
     handlers.PlatformCreateSubscriptionPlanBody:
       properties:
+        allowInstantPurchase:
+          description: AllowInstantPurchase omitted or null defaults to true.
+          type: boolean
         code:
           type: string
         currency:
           type: string
+        displayOrder:
+          description: DisplayOrder omitted or null defaults to 1000 (sort last among unnamed ordering).
+          type: integer
         features:
           type: object
         interval:
           type: string
         isActive:
           type: boolean
+        isPromoted:
+          description: 'IsPromoted when true: this plan becomes the only promoted tier (others cleared in the same transaction).'
+          type: boolean
+        isPublic:
+          description: IsPublic omitted or null defaults to true (backward compatible).
+          type: boolean
         limits:
           type: object
+        limitsNegotiable:
+          type: object
         name:
+          type: string
+        nameEn:
           type: string
         price:
           type: integer
       type: object
     handlers.PlatformUpdateSubscriptionPlanBody:
       properties:
+        allowInstantPurchase:
+          type: boolean
         code:
           type: string
         currency:
           type: string
+        displayOrder:
+          type: integer
         features:
           type: object
         interval:
           type: string
         isActive:
           type: boolean
+        isPromoted:
+          description: 'IsPromoted omitted: leave unchanged. When true, other plans are demoted in the same transaction.'
+          type: boolean
+        isPublic:
+          type: boolean
         limits:
           type: object
+        limitsNegotiable:
+          type: object
         name:
+          type: string
+        nameEn:
           type: string
         price:
           type: integer
@@ -1522,6 +1551,9 @@ components:
       type: object
     models.SubscriptionPlan:
       properties:
+        allowInstantPurchase:
+          description: 'AllowInstantPurchase when false: plan may still be public, but checkout is disabled until a sales-led flow exists.'
+          type: boolean
         code:
           description: unique plan code like "starter", "professional"
           type: string
@@ -1530,6 +1562,9 @@ components:
         currency:
           description: '"RUB", "USD"'
           type: string
+        displayOrder:
+          description: DisplayOrder is used for public plan lists (lower values first).
+          type: integer
         features:
           description: feature flags
           type: object
@@ -1540,11 +1575,21 @@ components:
           type: string
         isActive:
           type: boolean
+        isPromoted:
+          description: IsPromoted marks the single catalog recommended plan (marketing + in-app pricing highlight).
+          type: boolean
+        isPublic:
+          type: boolean
         limits:
           description: quota limits
           type: object
+        limitsNegotiable:
+          description: LimitsNegotiable maps limit keys to true when the catalog should show “by agreement” instead of a numeric cap.
+          type: object
         name:
-          description: '"Starter", "Professional", "Enterprise"'
+          description: Primary display name (e.g. Russian on RU marketing)
+          type: string
+        nameEn:
           type: string
         price:
           description: price in minor units (cents/kopeks)

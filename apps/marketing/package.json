@@ -4,20 +4,24 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3010",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 3010",
     "lint": "eslint .",
     "lint:fix": "eslint --fix",
     "format:fix": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "orval": "orval --config orval.config.ts"
   },
   "dependencies": {
+    "@quokkaq/shared-types": "workspace:*",
+    "@quokkaq/subscription-pricing": "workspace:*",
     "next": "^16.2.4",
     "nextra": "^4.6.0",
     "nextra-theme-docs": "^4.6.0",
     "react": "^19.2.5",
-    "react-dom": "^19.2.5"
+    "react-dom": "^19.2.5",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -27,6 +31,7 @@
     "eslint": "^9.39.4",
     "eslint-config-next": "^16.2.4",
     "eslint-config-prettier": "^10.1.8",
+    "orval": "8.8.0",
     "prettier": "^3.8.3",
     "prettier-plugin-tailwindcss": "^0.7.2",
     "tailwindcss": "^4",

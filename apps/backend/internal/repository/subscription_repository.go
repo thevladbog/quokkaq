@@ -58,13 +58,18 @@ func (r *subscriptionRepository) Delete(id string) error {
 
 func (r *subscriptionRepository) GetActivePlans() ([]models.SubscriptionPlan, error) {
 	var plans []models.SubscriptionPlan
-	err := database.DB.Where("is_active = ?", true).Find(&plans).Error
+	err := database.DB.Where("is_active = ? AND is_public = ?", true, true).
+		Order("display_order ASC").
+		Order("name ASC").
+		Find(&plans).Error
 	return plans, err
 }
 
 func (r *subscriptionRepository) FindPlanByCode(code string) (*models.SubscriptionPlan, error) {
 	var plan models.SubscriptionPlan
-	err := database.DB.Where("code = ?", code).Where("is_active = ?", true).First(&plan).Error
+	err := database.DB.Where("code = ?", code).
+		Where("is_active = ? AND is_public = ?", true, true).
+		First(&plan).Error
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +89,7 @@ func (r *subscriptionRepository) ListAllPaginated(limit, offset int) ([]models.S
 
 func (r *subscriptionRepository) ListAllPlans() ([]models.SubscriptionPlan, error) {
 	var plans []models.SubscriptionPlan
-	err := database.DB.Order("name ASC").Find(&plans).Error
+	err := database.DB.Order("display_order ASC").Order("name ASC").Find(&plans).Error
 	return plans, err
 }
 

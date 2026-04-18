@@ -11,8 +11,14 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { fetchPublicSubscriptionPlans } from '@/lib/subscription-plans-public';
-import { buildPricingRowsFromApiPlan } from '@/lib/pricing-plan-rows';
-import { formatPriceMinorUnits } from '@/lib/format-price';
+import {
+  buildPricingRowsFromApiPlan,
+  subscriptionPlanDisplayName
+} from '@quokkaq/subscription-pricing';
+import {
+  formatPriceMinorUnits,
+  formatPriceMinorUnitsAmountOnly
+} from '@/lib/format-price';
 import { intlLocaleFromAppLocale } from '@/lib/format-datetime';
 import type { SubscriptionPlan } from '@quokkaq/shared-types';
 
@@ -233,11 +239,19 @@ async function PricingCardApi({
   intlLocale: string;
 }) {
   const t = await getTranslations({ locale, namespace: 'pricing' });
-  const popular = plan.code === 'professional';
+  const popular = plan.isPromoted === true;
   const rows = buildPricingRowsFromApiPlan(plan);
   const isCustomPricing = plan.code === 'enterprise';
   const showPaidPrice = plan.price > 0;
+  const salesOnly =
+    isCustomPricing || (showPaidPrice && plan.allowInstantPurchase === false);
   const intervalLabel = plan.interval === 'year' ? t('perYear') : t('perMonth');
+  const planTitle = subscriptionPlanDisplayName(plan, locale);
+  const enSplitCurrency =
+    locale.startsWith('en') && !isCustomPricing && plan.price > 0;
+  const planHeading = enSplitCurrency
+    ? `${planTitle}, ${(plan.currency ?? 'RUB').toUpperCase()}`
+    : planTitle;
 
   return (
     <Card
@@ -252,16 +266,34 @@ async function PricingCardApi({
       )}
 
       <CardHeader className='pt-8 pb-8 text-center'>
-        <CardTitle className='mb-2 text-2xl font-bold'>{plan.name}</CardTitle>
+        <CardTitle className='mb-2 text-2xl font-bold'>{planHeading}</CardTitle>
         <div className='mt-6'>
           {isCustomPricing ? (
             <div className='text-3xl font-bold'>{t('customPricing')}</div>
           ) : (
-            <div className='flex flex-wrap items-baseline justify-center gap-x-1'>
-              <span className='text-5xl font-extrabold'>
-                {formatPriceMinorUnits(plan.price, plan.currency, intlLocale)}
+            <div className='inline-flex max-w-full flex-nowrap items-baseline justify-center gap-x-2 leading-tight whitespace-nowrap'>
+              <span
+                className={
+                  locale.startsWith('en')
+                    ? 'text-4xl font-extrabold tabular-nums sm:text-5xl'
+                    : 'text-5xl font-extrabold tabular-nums'
+                }
+              >
+                {enSplitCurrency
+                  ? formatPriceMinorUnitsAmountOnly(
+                      plan.price,
+                      plan.currency,
+                      intlLocale
+                    )
+                  : formatPriceMinorUnits(
+                      plan.price,
+                      plan.currency,
+                      intlLocale
+                    )}
               </span>
-              <span className='ml-2 text-gray-500'>{intervalLabel}</span>
+              <span className='shrink-0 text-sm font-medium text-gray-500'>
+                {intervalLabel}
+              </span>
             </div>
           )}
         </div>
@@ -293,14 +325,14 @@ async function PricingCardApi({
         >
           <Link
             href={
-              isCustomPricing
+              salesOnly
                 ? `/${locale}/contact`
                 : showPaidPrice
                   ? `/${locale}/signup?plan=${encodeURIComponent(plan.code)}`
                   : `/${locale}/register`
             }
           >
-            {isCustomPricing
+            {salesOnly
               ? t('contactUs')
               : showPaidPrice
                 ? t('startTrial')

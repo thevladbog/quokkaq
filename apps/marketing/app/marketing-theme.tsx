@@ -3,6 +3,7 @@
 import { useServerInsertedHTML } from 'next/navigation';
 import * as React from 'react';
 
+import { LOCALE_BOOTSTRAP_SCRIPT } from './locale-bootstrap-script';
 import { MARKETING_THEME_STORAGE_KEY } from './theme-constants';
 import { THEME_BOOTSTRAP_SCRIPT } from './theme-bootstrap-script';
 
@@ -53,6 +54,13 @@ export function MarketingThemeProvider({
     <script
       id='qq-marketing-theme-init'
       dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP_SCRIPT }}
+    />
+  ));
+
+  useServerInsertedHTML(() => (
+    <script
+      id='qq-marketing-locale-init'
+      dangerouslySetInnerHTML={{ __html: LOCALE_BOOTSTRAP_SCRIPT }}
     />
   ));
 

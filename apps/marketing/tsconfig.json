@@ -19,7 +19,11 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@quokkaq/shared-types": ["../../packages/shared-types/src/index.ts"],
+      "@quokkaq/subscription-pricing": [
+        "../../packages/subscription-pricing/src/index.ts"
+      ]
     }
   },
   "include": [

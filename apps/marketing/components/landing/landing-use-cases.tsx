@@ -1,5 +1,7 @@
 import type { HomeMessages } from '@/src/messages';
 
+import { getUseCaseSegmentVisual } from './use-case-segment-visuals';
+
 type Props = {
   copy: HomeMessages;
 };
@@ -17,28 +19,42 @@ export function LandingUseCases({ copy }: Props) {
           </p>
         </div>
 
-        <div className='grid gap-8 md:grid-cols-2 lg:grid-cols-3'>
-          {copy.useCases.items.map((useCase, index) => (
-            <div
-              key={useCase.title}
-              className='landing-reveal group flex flex-col gap-4 rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-6 shadow-sm transition hover:border-[color:var(--color-primary)]/50 hover:shadow-lg hover:shadow-[color:var(--color-primary)]/10 dark:bg-[color:var(--color-surface)]'
-              style={{
-                animationDelay: `${0.08 * index}s`
-              }}
-            >
-              <div className='inline-flex items-center gap-2'>
-                <span className='font-landing-label rounded-full bg-[color:var(--color-primary)]/10 px-3 py-1 text-xs font-medium text-[color:var(--color-primary)]'>
-                  {useCase.industry}
-                </span>
-              </div>
-              <h3 className='font-display text-xl font-semibold text-[color:var(--color-text)]'>
-                {useCase.title}
-              </h3>
-              <p className='text-sm leading-relaxed text-[color:var(--color-text-muted)]'>
-                {useCase.body}
-              </p>
-            </div>
-          ))}
+        <div className='grid gap-6 sm:gap-8 md:grid-cols-2 lg:grid-cols-3'>
+          {copy.useCases.items.map((useCase, index) => {
+            const { tagClass, iconWrapClass, Icon } = getUseCaseSegmentVisual(
+              useCase.segment
+            );
+            return (
+              <article
+                key={useCase.title}
+                className='landing-reveal group flex flex-col rounded-3xl border border-[color:var(--color-border)]/80 bg-[color:var(--color-surface)] p-7 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition sm:p-8 dark:shadow-[0_1px_2px_rgba(0,0,0,0.2)] dark:hover:border-[color:var(--color-border)] hover:border-[color:var(--color-primary)]/25 hover:shadow-[0_8px_30px_-12px_rgba(0,0,0,0.12)] dark:hover:shadow-[0_8px_30px_-12px_rgba(0,0,0,0.45)]'
+                style={{
+                  animationDelay: `${0.08 * index}s`
+                }}
+              >
+                <div className='mb-6 flex flex-wrap items-center gap-3'>
+                  <div
+                    className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ${iconWrapClass}`}
+                    aria-hidden
+                  >
+                    <Icon className='h-7 w-7' />
+                  </div>
+                  <span
+                    className={`font-landing-label inline-flex rounded-full px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] ${tagClass}`}
+                  >
+                    {useCase.industry}
+                  </span>
+                </div>
+
+                <h3 className='font-display text-xl font-semibold tracking-tight text-[color:var(--color-text)]'>
+                  {useCase.title}
+                </h3>
+                <p className='mt-3 text-[15px] leading-relaxed text-[color:var(--color-text-muted)]'>
+                  {useCase.body}
+                </p>
+              </article>
+            );
+          })}
         </div>
       </div>
     </section>

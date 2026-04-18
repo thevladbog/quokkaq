@@ -8,7 +8,7 @@
     "dev": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "next dev",
+        "command": "next dev -p 3010",
         "cwd": "apps/marketing"
       }
     },
@@ -23,7 +23,7 @@
     "start": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "next start",
+        "command": "next start -p 3010",
         "cwd": "apps/marketing"
       }
     },
@@ -52,6 +52,20 @@
       "executor": "nx:run-commands",
       "options": {
         "command": "prettier --write .",
+        "cwd": "apps/marketing"
+      }
+    },
+    "orval": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "orval --config orval.config.ts",
+        "cwd": "apps/marketing"
+      }
+    },
+    "orval:check": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "orval --config orval.config.ts && untracked=$(git ls-files --others --exclude-standard -- lib/api/generated/) && if [ -n \"$untracked\" ]; then echo 'Untracked files under lib/api/generated/ (run from repo root or commit generated output):' && echo \"$untracked\" && exit 1; fi && git diff --exit-code lib/api/generated/",
         "cwd": "apps/marketing"
       }
     }
