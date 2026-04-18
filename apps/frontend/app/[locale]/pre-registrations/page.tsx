@@ -22,6 +22,7 @@ export default function PreRegistrationsIndexPage() {
   const { isLoading: authLoading } = useAuthContext();
   const { assignableUnitIds } = useActiveUnit();
   const t = useTranslations('admin');
+  const tNav = useTranslations('nav');
   const router = useRouter();
 
   const queries = useQueries({
@@ -68,7 +69,7 @@ export default function PreRegistrationsIndexPage() {
     return (
       <div className='container mx-auto p-4'>
         <h1 className='mb-6 text-3xl font-bold'>
-          {t('navigation.pre_registrations', {
+          {tNav('pre_registrations', {
             defaultValue: 'Pre-registrations'
           })}
         </h1>
@@ -82,7 +83,7 @@ export default function PreRegistrationsIndexPage() {
   return (
     <div className='container mx-auto p-4'>
       <h1 className='mb-6 text-3xl font-bold'>
-        {t('navigation.pre_registrations', {
+        {tNav('pre_registrations', {
           defaultValue: 'Pre-registrations'
         })}
       </h1>

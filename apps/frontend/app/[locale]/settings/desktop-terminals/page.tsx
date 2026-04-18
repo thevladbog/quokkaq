@@ -78,6 +78,9 @@ function filterCountersForContext(unit: Unit, counters: Counter[]): Counter[] {
   return [];
 }
 
+/** Radix Select requires `value` to match a `SelectItem`; empty string is not a valid item value here. */
+const SELECT_UNSET = '__unset__';
+
 export default function DesktopTerminalsPage() {
   const t = useTranslations('admin.desktop_terminals');
   const locale = useLocale();
@@ -401,11 +404,18 @@ export default function DesktopTerminalsPage() {
       {formDeviceKind === 'kiosk' ? (
         <div className='grid gap-2'>
           <Label>{t('unit')}</Label>
-          <Select value={formUnitId} onValueChange={setFormUnitId}>
+          <Select
+            value={
+              (units.some((u) => u.id === formUnitId) ? formUnitId : '') ||
+              SELECT_UNSET
+            }
+            onValueChange={(v) => setFormUnitId(v === SELECT_UNSET ? '' : v)}
+          >
             <SelectTrigger>
               <SelectValue placeholder={t('select_unit')} />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value={SELECT_UNSET}>{t('select_unit')}</SelectItem>
               {units.map((u) => (
                 <SelectItem key={u.id} value={u.id}>
                   {u.name}
@@ -419,9 +429,13 @@ export default function DesktopTerminalsPage() {
           <div className='grid gap-2'>
             <Label>{t('context_unit')}</Label>
             <Select
-              value={formContextUnitId}
+              value={
+                (contextUnits.some((u) => u.id === formContextUnitId)
+                  ? formContextUnitId
+                  : '') || SELECT_UNSET
+              }
               onValueChange={(v) => {
-                setFormContextUnitId(v);
+                setFormContextUnitId(v === SELECT_UNSET ? '' : v);
                 setFormCounterId('');
               }}
             >
@@ -429,6 +443,9 @@ export default function DesktopTerminalsPage() {
                 <SelectValue placeholder={t('select_context')} />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value={SELECT_UNSET}>
+                  {t('select_context')}
+                </SelectItem>
                 {contextUnits.map((u) => (
                   <SelectItem key={u.id} value={u.id}>
                     {u.name}
@@ -440,8 +457,14 @@ export default function DesktopTerminalsPage() {
           <div className='grid gap-2'>
             <Label>{t('select_counter')}</Label>
             <Select
-              value={formCounterId}
-              onValueChange={setFormCounterId}
+              value={
+                (availableCounters.some((c) => c.id === formCounterId)
+                  ? formCounterId
+                  : '') || SELECT_UNSET
+              }
+              onValueChange={(v) =>
+                setFormCounterId(v === SELECT_UNSET ? '' : v)
+              }
               disabled={
                 !formContextUnitId ||
                 countersLoading ||
@@ -456,6 +479,9 @@ export default function DesktopTerminalsPage() {
                 />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value={SELECT_UNSET}>
+                  {t('select_counter')}
+                </SelectItem>
                 {availableCounters.map((c) => (
                   <SelectItem key={c.id} value={c.id}>
                     {c.name}

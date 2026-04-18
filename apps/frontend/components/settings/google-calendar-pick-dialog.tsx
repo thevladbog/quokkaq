@@ -31,6 +31,17 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import type { ServicesGoogleCalendarPickOption } from '@/lib/api/generated/calendar-integration';
 
+function pickDefaultCalendarId(
+  list: ServicesGoogleCalendarPickOption[]
+): string {
+  const primary = list.find((c) => c.primary)?.id;
+  const first = list[0]?.id;
+  const raw = (primary ?? first ?? '').trim();
+  if (raw) return raw;
+  const fallback = list.find((c) => (c.id ?? '').trim() !== '')?.id;
+  return (fallback ?? '').trim();
+}
+
 export function GoogleCalendarPickDialog({
   open,
   pickToken,
@@ -88,9 +99,7 @@ export function GoogleCalendarPickDialog({
             : [];
         const list = rawCalendars.filter((c) => (c.id ?? '').trim() !== '');
         setCalendars(list);
-        const primary = list.find((c) => c.primary)?.id;
-        const first = list[0]?.id;
-        setSelectedId((primary ?? first ?? '').trim());
+        setSelectedId(list.length > 0 ? pickDefaultCalendarId(list) : '');
         if (list.length === 0) {
           setLoadError(t('google_pick_empty'));
         }
@@ -107,6 +116,13 @@ export function GoogleCalendarPickDialog({
       cancelled = true;
     };
   }, [open, pickToken, resetLocal, t]);
+
+  useEffect(() => {
+    if (calendars.length === 0) return;
+    if (!calendars.some((c) => c.id === selectedId)) {
+      setSelectedId(pickDefaultCalendarId(calendars));
+    }
+  }, [calendars, selectedId]);
 
   const handleConnect = async () => {
     if (!pickToken || !selectedId) {

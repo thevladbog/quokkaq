@@ -70,22 +70,24 @@ export default function SettingsSidebar() {
       active: isActive('/settings/users')
     },
     {
-      icon: Activity,
-      label: tAdmin('navigation.operations'),
-      href: '/settings/operations',
-      active: isActive('/settings/operations')
-    },
-    {
       icon: Mail,
       label: tAdmin('navigation.invitations'),
       href: '/settings/invitations',
       active: isActive('/settings/invitations')
     },
     {
-      icon: MessageSquare,
-      label: tAdmin('navigation.templates'),
-      href: '/settings/templates',
-      active: isActive('/settings/templates')
+      icon: CreditCard,
+      label: tOrg('billing.title'),
+      href: '/settings/organization/billing',
+      active:
+        isActive('/settings/organization/billing') ||
+        isActiveSub('/settings/organization/billing')
+    },
+    {
+      icon: DollarSign,
+      label: tPricing('title'),
+      href: '/settings/pricing',
+      active: isActive('/settings/pricing')
     },
     {
       icon: Plug,
@@ -102,18 +104,16 @@ export default function SettingsSidebar() {
       active: isActive('/settings/desktop-terminals')
     },
     {
-      icon: DollarSign,
-      label: tPricing('title'),
-      href: '/settings/pricing',
-      active: isActive('/settings/pricing')
+      icon: MessageSquare,
+      label: tAdmin('navigation.templates'),
+      href: '/settings/templates',
+      active: isActive('/settings/templates')
     },
     {
-      icon: CreditCard,
-      label: tOrg('billing.title'),
-      href: '/settings/organization/billing',
-      active:
-        isActive('/settings/organization/billing') ||
-        isActiveSub('/settings/organization/billing')
+      icon: Activity,
+      label: tAdmin('navigation.operations'),
+      href: '/settings/operations',
+      active: isActive('/settings/operations')
     }
   ];
 

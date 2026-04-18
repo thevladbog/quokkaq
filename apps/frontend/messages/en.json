@@ -16,7 +16,8 @@
     "clients": "Clients",
     "statistics": "Statistics",
     "support_requests": "Support requests",
-    "login": "Login"
+    "login": "Login",
+    "pre_registrations": "Pre-registrations"
   },
   "clients": {
     "backHome": "Back to home",
@@ -244,7 +245,7 @@
       }
     },
     "units": {
-      "title": "Units",
+      "title": "Structure",
       "description": "Manage departments and locations",
       "code": "Code",
       "name": "Name",
@@ -504,13 +505,11 @@
     },
     "navigation": {
       "dashboard": "Dashboard",
-      "units": "Units",
+      "units": "Structure",
       "users": "Users",
-      "grid_configuration": "Grid Configuration",
       "invitations": "Invitations",
-      "templates": "Templates",
-      "pre_registrations": "Pre-registrations",
-      "desktop_terminals": "Desktop terminals",
+      "templates": "Email templates",
+      "desktop_terminals": "Terminals",
       "operations": "Operations",
       "settings": "Settings",
       "integrations": "Integrations"
@@ -2373,14 +2372,14 @@
     "setup": "System Setup - QuokkaQ",
     "admin": {
       "dashboard": "Admin Panel - QuokkaQ",
-      "units": "Units - Admin - QuokkaQ",
+      "units": "Structure - Admin - QuokkaQ",
       "unitDetails": "Unit Settings - QuokkaQ",
       "gridConfiguration": "Grid Configuration - Admin - QuokkaQ",
       "invitations": "Invitations - Admin - QuokkaQ",
       "templates": "Message Templates - Admin - QuokkaQ",
       "preRegistrations": "Pre-registrations - Admin - QuokkaQ",
       "users": "Users & Roles - Admin - QuokkaQ",
-      "desktopTerminals": "Desktop terminals - Admin - QuokkaQ",
+      "desktopTerminals": "Terminals - Admin - QuokkaQ",
       "operations": "Operations - Admin - QuokkaQ",
       "integrations": "Integrations - Admin - QuokkaQ"
     },

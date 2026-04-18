@@ -50,7 +50,6 @@ import { SidebarCollapseToggle } from '@/components/SidebarCollapseToggle';
 import { useActiveUnit } from '@/contexts/ActiveUnitContext';
 
 const AppSidebar = () => {
-  const tAdmin = useTranslations('admin');
   const tNav = useTranslations('nav');
   const tProfile = useTranslations('profile');
   const { user, isAuthenticated, logout } = useAuthContext();
@@ -112,7 +111,7 @@ const AppSidebar = () => {
     },
     {
       icon: CalendarClock,
-      label: tAdmin('navigation.pre_registrations', {
+      label: tNav('pre_registrations', {
         defaultValue: 'Pre-registrations'
       }),
       href: '/pre-registrations',

@@ -16,7 +16,8 @@
     "clients": "Клиенты",
     "statistics": "Статистика",
     "support_requests": "Обращения",
-    "login": "Войти"
+    "login": "Войти",
+    "pre_registrations": "Предварительная запись"
   },
   "clients": {
     "backHome": "На главную",
@@ -244,7 +245,7 @@
       }
     },
     "units": {
-      "title": "Подразделения",
+      "title": "Структура",
       "description": "Управление отедлами",
       "code": "Код",
       "name": "Название",
@@ -504,13 +505,11 @@
     },
     "navigation": {
       "dashboard": "Дашборд",
-      "units": "Подразделения",
+      "units": "Структура",
       "users": "Пользователи",
-      "grid_configuration": "Конфигурация сетки",
       "invitations": "Приглашения",
-      "templates": "Шаблоны",
-      "pre_registrations": "Предварительная запись",
-      "desktop_terminals": "Десктоп-терминалы",
+      "templates": "Шаблоны писем",
+      "desktop_terminals": "Терминалы",
       "operations": "Операции",
       "settings": "Настройки",
       "integrations": "Интеграции"
@@ -2373,14 +2372,14 @@
     "setup": "Настройка системы - QuokkaQ",
     "admin": {
       "dashboard": "Панель администратора - QuokkaQ",
-      "units": "Подразделения - Админ - QuokkaQ",
+      "units": "Структура - Админ - QuokkaQ",
       "unitDetails": "Настройки подразделения - QuokkaQ",
       "gridConfiguration": "Конфигурация сетки - Админ - QuokkaQ",
       "invitations": "Приглашения - Админ - QuokkaQ",
       "templates": "Шаблоны сообщений - Админ - QuokkaQ",
       "preRegistrations": "Предварительная запись - Админ - QuokkaQ",
       "users": "Пользователи и роли - Админ - QuokkaQ",
-      "desktopTerminals": "Десктоп-терминалы - Админ - QuokkaQ",
+      "desktopTerminals": "Терминалы - Админ - QuokkaQ",
       "operations": "Операции - Админ - QuokkaQ",
       "integrations": "Интеграции — Админ — QuokkaQ"
     },
