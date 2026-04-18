@@ -27,7 +27,7 @@ func NewAuthHandler(service services.AuthService, userService services.UserServi
 
 // PatchMeRequest is the body for PATCH /auth/me (self-service profile photo only).
 type PatchMeRequest struct {
-	PhotoURL *string `json:"photoUrl"`
+	PhotoURL *string `json:"photoUrl" binding:"required"`
 }
 
 type LoginRequest struct {
@@ -171,7 +171,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 // @Tags         auth
 // @Produce      json
 // @Security     BearerAuth
-// @Success      200  {object}  models.User
+// @Success      200  {object}  UserResponse
 // @Failure      401  {string}  string "Unauthorized"
 // @Failure      404  {string}  string "User not found"
 // @Router       /auth/me [get]

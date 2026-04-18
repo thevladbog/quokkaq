@@ -52,10 +52,10 @@ export function MyProfileSheet({ open, onOpenChange }: MyProfileSheetProps) {
     [allUnits]
   );
 
-  const getPermissionLabel = (permissionId: string) =>
-    (tAdminUsers as (key: string) => string)(
-      `permissions_list.${permissionId}`
-    ) || permissionId;
+  const getPermissionLabel = (permissionId: string) => {
+    const key = `permissions_list.${permissionId}`;
+    return tAdminUsers.has(key) ? tAdminUsers(key) : permissionId;
+  };
 
   const handlePhotoUploaded = async (url: string) => {
     try {

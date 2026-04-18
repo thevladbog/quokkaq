@@ -442,7 +442,7 @@ export interface HandlersOperatorCommentPatchDTO {
 }
 
 export interface HandlersPatchMeRequest {
-  photoUrl?: string;
+  photoUrl: string;
 }
 
 export type HandlersPatchPlatformCompanyBodyBillingAddress = { [key: string]: unknown };

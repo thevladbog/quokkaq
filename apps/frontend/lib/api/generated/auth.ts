@@ -461,7 +461,7 @@ export interface HandlersOperatorCommentPatchDTO {
 }
 
 export interface HandlersPatchMeRequest {
-  photoUrl?: string;
+  photoUrl: string;
 }
 
 export type HandlersPatchPlatformCompanyBodyBillingAddress = { [key: string]: unknown };
@@ -2439,7 +2439,7 @@ export const useAuthLogout = <TError = unknown,
  * @summary Get current user
  */
 export type getAuthMeResponse200 = {
-  data: ModelsUser
+  data: HandlersUserResponse
   status: 200
 }
 

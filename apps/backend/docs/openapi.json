@@ -429,6 +429,9 @@
                         "type": "string"
                     }
                 },
+                "required": [
+                    "photoUrl"
+                ],
                 "type": "object"
             },
             "handlers.PatchPlatformCompanyBody": {
@@ -4367,7 +4370,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/models.User"
+                                    "$ref": "#/components/schemas/handlers.UserResponse"
                                 }
                             }
                         },
