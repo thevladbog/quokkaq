@@ -19,6 +19,20 @@ const reactQueryOutput = {
   }
 };
 
+/** Server-side Orval client: direct backend URL + no auth (public endpoints). */
+const publicBackendFetchOutput = {
+  mode: 'single' as const,
+  client: 'fetch' as const,
+  httpClient: 'fetch' as const,
+  baseUrl: '',
+  override: {
+    mutator: {
+      path: './lib/public-backend-orval-mutator.ts',
+      name: 'publicBackendOrvalMutator'
+    }
+  }
+};
+
 export default defineConfig({
   quokkaqPlatform: {
     input: {
@@ -70,6 +84,19 @@ export default defineConfig({
     output: {
       ...reactQueryOutput,
       target: './lib/api/generated/tenant-billing.ts'
+    }
+  },
+  quokkaqPublicSubscriptions: {
+    input: {
+      target: '../backend/docs/swagger.json',
+      filters: {
+        mode: 'include',
+        tags: ['subscriptions']
+      }
+    },
+    output: {
+      ...publicBackendFetchOutput,
+      target: './lib/api/generated/public-subscriptions.ts'
     }
   },
   quokkaqUpload: {

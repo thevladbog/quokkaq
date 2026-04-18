@@ -567,33 +567,54 @@ export interface HandlersPlatformCreateSubscriptionBody {
   trialEnd?: string;
 }
 
-export type HandlersPlatformCreateSubscriptionPlanBodyFeatures = { [key: string]: unknown };
+export type HandlersPlatformCreateSubscriptionPlanBodyFeatures = {[key: string]: boolean};
 
-export type HandlersPlatformCreateSubscriptionPlanBodyLimits = { [key: string]: unknown };
+export type HandlersPlatformCreateSubscriptionPlanBodyLimits = {[key: string]: number};
+
+export type HandlersPlatformCreateSubscriptionPlanBodyLimitsNegotiable = {[key: string]: boolean};
 
 export interface HandlersPlatformCreateSubscriptionPlanBody {
+  /** AllowInstantPurchase omitted or null defaults to true. */
+  allowInstantPurchase?: boolean;
   code?: string;
   currency?: string;
+  /** DisplayOrder omitted or null defaults to 1000 (sort last among unnamed ordering). */
+  displayOrder?: number;
   features?: HandlersPlatformCreateSubscriptionPlanBodyFeatures;
   interval?: string;
   isActive?: boolean;
+  /** IsPromoted when true: this plan becomes the only promoted tier (others cleared in the same transaction). */
+  isPromoted?: boolean;
+  /** IsPublic omitted or null defaults to true (backward compatible). */
+  isPublic?: boolean;
   limits?: HandlersPlatformCreateSubscriptionPlanBodyLimits;
+  limitsNegotiable?: HandlersPlatformCreateSubscriptionPlanBodyLimitsNegotiable;
   name?: string;
+  nameEn?: string;
   price?: number;
 }
 
-export type HandlersPlatformUpdateSubscriptionPlanBodyFeatures = { [key: string]: unknown };
+export type HandlersPlatformUpdateSubscriptionPlanBodyFeatures = {[key: string]: boolean};
 
-export type HandlersPlatformUpdateSubscriptionPlanBodyLimits = { [key: string]: unknown };
+export type HandlersPlatformUpdateSubscriptionPlanBodyLimits = {[key: string]: number};
+
+export type HandlersPlatformUpdateSubscriptionPlanBodyLimitsNegotiable = {[key: string]: boolean};
 
 export interface HandlersPlatformUpdateSubscriptionPlanBody {
+  allowInstantPurchase?: boolean;
   code?: string;
   currency?: string;
+  displayOrder?: number;
   features?: HandlersPlatformUpdateSubscriptionPlanBodyFeatures;
   interval?: string;
   isActive?: boolean;
+  /** IsPromoted omitted: leave unchanged. When true, other plans are demoted in the same transaction. */
+  isPromoted?: boolean;
+  isPublic?: boolean;
   limits?: HandlersPlatformUpdateSubscriptionPlanBodyLimits;
+  limitsNegotiable?: HandlersPlatformUpdateSubscriptionPlanBodyLimitsNegotiable;
   name?: string;
+  nameEn?: string;
   price?: number;
 }
 
@@ -697,29 +718,44 @@ export interface HandlersAddSupportReportShareRequest {
 /**
  * feature flags
  */
-export type ModelsSubscriptionPlanFeatures = { [key: string]: unknown };
+export type ModelsSubscriptionPlanFeatures = {[key: string]: boolean};
 
 /**
  * quota limits
  */
-export type ModelsSubscriptionPlanLimits = { [key: string]: unknown };
+export type ModelsSubscriptionPlanLimits = {[key: string]: number};
+
+/**
+ * LimitsNegotiable maps limit keys to true when the catalog should show “by agreement” instead of a numeric cap.
+ */
+export type ModelsSubscriptionPlanLimitsNegotiable = {[key: string]: boolean};
 
 export interface ModelsSubscriptionPlan {
+  /** AllowInstantPurchase when false: plan may still be public, but checkout is disabled until a sales-led flow exists. */
+  allowInstantPurchase?: boolean;
   /** unique plan code like "starter", "professional" */
   code?: string;
   createdAt?: string;
   /** "RUB", "USD" */
   currency?: string;
+  /** DisplayOrder is used for public plan lists (lower values first). */
+  displayOrder?: number;
   /** feature flags */
   features?: ModelsSubscriptionPlanFeatures;
   id?: string;
   /** "month", "year" */
   interval?: string;
   isActive?: boolean;
+  /** IsPromoted marks the single catalog recommended plan (marketing + in-app pricing highlight). */
+  isPromoted?: boolean;
+  isPublic?: boolean;
   /** quota limits */
   limits?: ModelsSubscriptionPlanLimits;
-  /** "Starter", "Professional", "Enterprise" */
+  /** LimitsNegotiable maps limit keys to true when the catalog should show “by agreement” instead of a numeric cap. */
+  limitsNegotiable?: ModelsSubscriptionPlanLimitsNegotiable;
+  /** Primary display name (e.g. Russian on RU marketing) */
   name?: string;
+  nameEn?: string;
   /** price in minor units (cents/kopeks) */
   price?: number;
   updatedAt?: string;

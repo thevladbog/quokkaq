@@ -1105,6 +1105,8 @@ export const subscriptionPlanIntervalSchema = z.preprocess(
 export const SubscriptionPlanSchema = z.object({
   id: z.string(),
   name: z.string(),
+  /** English catalog title for EN locale; empty means use `name`. */
+  nameEn: z.string().optional().default(''),
   code: z.string(),
   price: z
     .number()
@@ -1116,6 +1118,13 @@ export const SubscriptionPlanSchema = z.object({
   features: z.record(z.string(), z.boolean()).optional(),
   limits: z.record(z.string(), z.number()).optional(),
   isActive: z.boolean(),
+  /** Omitted on older API responses; treat as public catalog visibility. */
+  isPublic: z.boolean().optional().default(true),
+  displayOrder: z.number().int().optional().default(1000),
+  limitsNegotiable: z.record(z.string(), z.boolean()).optional(),
+  allowInstantPurchase: z.boolean().optional().default(true),
+  /** Single highlighted tier on marketing and in-app plan pickers. */
+  isPromoted: z.boolean().optional().default(false),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional()
 });

@@ -1,0 +1,73 @@
+{
+  "name": "marketing",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/marketing",
+  "projectType": "application",
+  "tags": ["type:app", "platform:web"],
+  "targets": {
+    "dev": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "next dev -p 3010",
+        "cwd": "apps/marketing"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/.next"],
+      "options": {
+        "command": "next build",
+        "cwd": "apps/marketing"
+      }
+    },
+    "start": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "next start -p 3010",
+        "cwd": "apps/marketing"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "eslint .",
+        "cwd": "apps/marketing"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node -e \"process.exit(0)\"",
+        "cwd": "apps/marketing"
+      }
+    },
+    "format:check": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "prettier --check .",
+        "cwd": "apps/marketing"
+      }
+    },
+    "format:fix": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "prettier --write .",
+        "cwd": "apps/marketing"
+      }
+    },
+    "orval": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "orval --config orval.config.ts",
+        "cwd": "apps/marketing"
+      }
+    },
+    "orval:check": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "orval --config orval.config.ts && node ./scripts/check-orval-generated.js",
+        "cwd": "apps/marketing"
+      }
+    }
+  }
+}

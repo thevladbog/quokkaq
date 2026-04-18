@@ -107,6 +107,15 @@ pnpm nx dev frontend
 
 Frontend will be available at `http://localhost:3000`
 
+After you change the backend OpenAPI spec (`apps/backend/docs/swagger.json`), regenerate the TypeScript API clients so the frontend and marketing apps stay in sync:
+
+```bash
+pnpm --dir apps/frontend run orval
+pnpm --dir apps/marketing run orval
+```
+
+CI runs `pnpm nx run frontend:orval:check` and `pnpm nx run marketing:orval:check` when those projects (or the backend) are affected.
+
 ### 5. Run Kiosk Desktop
 
 ```bash

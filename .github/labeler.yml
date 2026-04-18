@@ -9,6 +9,10 @@ area/frontend:
   - changed-files:
       - any-glob-to-any-file: 'apps/frontend/**'
 
+area/marketing:
+  - changed-files:
+      - any-glob-to-any-file: 'apps/marketing/**'
+
 area/backend:
   - changed-files:
       - any-glob-to-any-file: 'apps/backend/**'

@@ -1,6 +1,13 @@
 'use client';
 
+import { useMemo } from 'react';
 import { SubscriptionPlan } from '@quokkaq/shared-types';
+import {
+  formatPriceMinorUnits,
+  formatPriceMinorUnitsAmountOnly,
+  subscriptionPlanDisplayName
+} from '@quokkaq/subscription-pricing';
+import { intlLocaleFromAppLocale } from '@/lib/format-datetime';
 import {
   Card,
   CardContent,
@@ -34,19 +41,9 @@ export function PlanSelector({
   isLoading
 }: PlanSelectorProps) {
   const locale = useLocale();
+  const intlLocale = useMemo(() => intlLocaleFromAppLocale(locale), [locale]);
   const t = useTranslations('organization.billing.planSelector');
   const tBilling = useTranslations('organization.billing');
-
-  const formatPrice = (price: number, currency: string) => {
-    try {
-      return new Intl.NumberFormat(locale, {
-        style: 'currency',
-        currency
-      }).format(price / 100);
-    } catch {
-      return `${(price / 100).toFixed(2)} ${currency}`;
-    }
-  };
 
   const getFeaturesList = (features: Record<string, boolean> | undefined) => {
     if (!features) return [];
@@ -59,36 +56,49 @@ export function PlanSelector({
       });
   };
 
-  const getLimitsText = (limits: Record<string, number> | undefined) => {
+  const getLimitsText = (plan: SubscriptionPlan) => {
+    const limits = plan.limits;
     if (!limits) return [];
+    const negotiable = plan.limitsNegotiable ?? {};
 
-    const formatLimit = (value: number) =>
-      value === -1 ? t('limits.unlimited') : value.toString();
+    const formatLimit = (key: string, value: number) => {
+      if (negotiable[key]) return t('limits.negotiable');
+      return value === -1 ? t('limits.unlimited') : value.toString();
+    };
 
     return Object.entries(limits).map(([key, value]) => {
       const k = `limits.${key}` as Parameters<typeof t>[0];
       const label = t.has(k) ? t(k) : key;
       return {
-        key: `limit-${key}-${value}`,
+        key: `limit-${key}-${value}-${Boolean(negotiable[key])}`,
         label,
-        value: formatLimit(value)
+        value: formatLimit(key, value)
       };
     });
   };
 
   const isCurrentPlan = (planId: string) => planId === currentPlanId;
-  const isPopular = (code: string) => code === PLAN_CODES.PROFESSIONAL;
+  const isPromotedPlan = (plan: SubscriptionPlan) => plan.isPromoted === true;
 
   return (
     <div className='grid gap-6 md:grid-cols-2 lg:grid-cols-3'>
       {plans
-        .filter((plan) => plan.code !== PLAN_CODES.GRANDFATHERED)
+        .filter((plan) => {
+          if (plan.code === PLAN_CODES.GRANDFATHERED) return false;
+          if (
+            plan.isPublic === false &&
+            (!currentPlanId || plan.id !== currentPlanId)
+          ) {
+            return false;
+          }
+          return true;
+        })
         .map((plan) => (
           <Card
             key={plan.id}
-            className={`relative ${isPopular(plan.code) ? 'border-2 border-blue-500 shadow-xl' : ''} ${isCurrentPlan(plan.id) ? 'bg-blue-50' : ''}`}
+            className={`relative ${isPromotedPlan(plan) ? 'border-2 border-blue-500 shadow-xl' : ''} ${isCurrentPlan(plan.id) ? 'bg-blue-50' : ''}`}
           >
-            {isPopular(plan.code) && (
+            {isPromotedPlan(plan) && (
               <div className='absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 transform'>
                 <Badge className='bg-blue-500'>
                   <Sparkles className='mr-1 h-3 w-3' />
@@ -104,14 +114,36 @@ export function PlanSelector({
             )}
 
             <CardHeader className='pb-4'>
-              <CardTitle className='text-2xl'>{plan.name}</CardTitle>
+              <CardTitle className='text-2xl'>
+                {(() => {
+                  const name = subscriptionPlanDisplayName(plan, locale);
+                  const split =
+                    locale.startsWith('en') &&
+                    plan.price > 0 &&
+                    plan.code !== PLAN_CODES.ENTERPRISE;
+                  return split
+                    ? `${name}, ${(plan.currency ?? 'RUB').toUpperCase()}`
+                    : name;
+                })()}
+              </CardTitle>
               <div className='mt-4'>
                 {plan.price > 0 ? (
-                  <div className='flex items-baseline'>
-                    <span className='text-4xl font-bold'>
-                      {formatPrice(plan.price, plan.currency)}
+                  <div className='flex flex-nowrap items-baseline gap-x-2 whitespace-nowrap'>
+                    <span className='text-4xl font-bold tabular-nums'>
+                      {locale.startsWith('en') &&
+                      plan.code !== PLAN_CODES.ENTERPRISE
+                        ? formatPriceMinorUnitsAmountOnly(
+                            plan.price,
+                            plan.currency,
+                            intlLocale
+                          )
+                        : formatPriceMinorUnits(
+                            plan.price,
+                            plan.currency ?? 'RUB',
+                            intlLocale
+                          )}
                     </span>
-                    <span className='ml-2 text-gray-500'>
+                    <span className='shrink-0 text-gray-500'>
                       {plan.interval === 'month'
                         ? tBilling('perMonth')
                         : tBilling('perYear')}
@@ -129,7 +161,7 @@ export function PlanSelector({
                   {t('limitsTitle')}
                 </p>
                 <ul className='space-y-1'>
-                  {getLimitsText(plan.limits).map((limit) => (
+                  {getLimitsText(plan).map((limit) => (
                     <li key={limit.key} className='text-sm text-gray-600'>
                       <span className='font-medium'>{limit.value}</span>{' '}
                       {limit.label}
@@ -177,9 +209,13 @@ export function PlanSelector({
                   onClick={() => onSelect(plan)}
                   disabled={isLoading}
                   className='w-full'
-                  variant={isPopular(plan.code) ? 'default' : 'outline'}
+                  variant={isPromotedPlan(plan) ? 'default' : 'outline'}
                 >
-                  {plan.price > 0 ? t('selectPlan') : t('contactUs')}
+                  {plan.price > 0
+                    ? plan.allowInstantPurchase === false
+                      ? t('requestPlanAccess')
+                      : t('selectPlan')
+                    : t('contactUs')}
                 </Button>
               ) : (
                 <Button

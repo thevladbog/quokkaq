@@ -23,6 +23,7 @@
     "@mdxeditor/gurx": "^1.2.4",
     "@quokkaq/kiosk-lib": "workspace:*",
     "@quokkaq/shared-types": "workspace:*",
+    "@quokkaq/subscription-pricing": "workspace:*",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-avatar": "^1.1.11",

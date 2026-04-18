@@ -1,0 +1,49 @@
+---
+description: Next.js marketing site — Orval, env, pricing sync, i18n (QuokkaQ)
+globs: apps/marketing/**
+alwaysApply: false
+---
+
+# Next.js marketing (`apps/marketing`)
+
+For **Nx, CI, and general agent workflow**, use `quokkaq-agent-workflow.mdc`. This rule covers **marketing-only** patterns.
+
+## Purpose
+
+Public landing and docs (Nextra + Next). Default dev port: **`3010`** (see [`apps/marketing/package.json`](apps/marketing/package.json)). Do not confuse with the product app [`apps/frontend`](apps/frontend).
+
+## API and Orval
+
+- **Contract source**: [`apps/backend/docs/swagger.json`](apps/backend/docs/swagger.json).
+- **Config**: [`apps/marketing/orval.config.ts`](apps/marketing/orval.config.ts) — OpenAPI filter tag **`subscriptions`**, output [`apps/marketing/lib/api/generated/subscriptions.ts`](apps/marketing/lib/api/generated/subscriptions.ts), Orval **`client: 'fetch'`** (no TanStack Query).
+- **HTTP mutator**: [`apps/marketing/lib/marketing-orval-mutator.ts`](apps/marketing/lib/marketing-orval-mutator.ts) — base URL from `MARKETING_API_URL` or `NEXT_PUBLIC_API_URL`; server `fetch` uses `next: { revalidate: 300 }`.
+- **Do not hand-edit** anything under `apps/marketing/lib/api/generated/` — regenerate instead.
+- **After OpenAPI / swagger changes**: from repo root run `pnpm --dir apps/marketing run orval` or `pnpm nx run marketing:orval`. Commit updated generated files. CI enforces sync with `pnpm nx run marketing:orval:check` when marketing or backend is affected (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)); human-oriented steps also in [SETUP.md](SETUP.md).
+
+## No ad-hoc API `fetch`
+
+Do not add raw `fetch(\`${apiBase}/subscriptions/...\`)` for product API calls. Use the Orval-generated client (e.g. `getSubscriptionPlans`) and thin wrappers such as [`apps/marketing/lib/fetch-marketing-subscription-plans.ts`](apps/marketing/lib/fetch-marketing-subscription-plans.ts).
+
+## Types and shared packages
+
+- **Runtime validation / types** for plans: `@quokkaq/shared-types` (e.g. `SubscriptionPlanSchema`).
+- **Pricing row construction and minor-unit formatting**: `@quokkaq/subscription-pricing` (`buildPricingRowsFromApiPlan`, `formatPriceMinorUnits`, `sortPublicSubscriptionPlans`). Do not duplicate limit/feature mapping in the marketing app; extend the package if new API flags need display rows.
+
+## Environment
+
+Documented in [`apps/marketing/.env.example`](apps/marketing/.env.example): API base for server-side Orval calls; `NEXT_PUBLIC_APP_URL` or `PUBLIC_APP_URL` for product signup/contact CTAs on the landing pricing block.
+
+## Localization
+
+Landing copy and static pricing fallback live in [`apps/marketing/src/messages.ts`](apps/marketing/src/messages.ts). API-driven pricing row labels: [`apps/marketing/src/pricing-row-labels.ts`](apps/marketing/src/pricing-row-labels.ts) — keep **en** and **ru** in sync when `buildPricingRowsFromApiPlan` emits new `translationKey` values.
+
+## Tooling
+
+- **Prettier**: [`apps/marketing/.prettierignore`](apps/marketing/.prettierignore) lists `lib/api/generated` so generated Orval output stays stable for `orval:check`.
+- **ESLint**: [`apps/marketing/eslint.config.mjs`](apps/marketing/eslint.config.mjs) ignores `lib/api/generated/**`.
+- **Checks**: `pnpm nx run marketing:lint`, `pnpm --dir apps/marketing exec tsc --noEmit`, `pnpm nx run marketing:format:check`.
+
+## Related rules
+
+- Workspace libraries (including `subscription-pricing`): `quokkaq-typescript-packages.mdc`.
+- Product Next app and its Orval setup: `quokkaq-next-frontend.mdc`.

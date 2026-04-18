@@ -1120,6 +1120,157 @@ func RunVersionedMigrations(models ...interface{}) error {
 		return fmt.Errorf("failed to run v1.2.8_support_report_shares_and_description migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.2.9_subscription_plan_is_public", func(db *gorm.DB) error {
+		return db.Exec(`
+			ALTER TABLE subscription_plans
+			ADD COLUMN IF NOT EXISTS is_public boolean NOT NULL DEFAULT true;
+		`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.2.9_subscription_plan_is_public migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.2.10_subscription_plan_display_and_purchase", func(db *gorm.DB) error {
+		if err := db.Exec(`
+			ALTER TABLE subscription_plans
+			ADD COLUMN IF NOT EXISTS display_order integer NOT NULL DEFAULT 1000;
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			ALTER TABLE subscription_plans
+			ADD COLUMN IF NOT EXISTS limits_negotiable jsonb NOT NULL DEFAULT '{}'::jsonb;
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			ALTER TABLE subscription_plans
+			ADD COLUMN IF NOT EXISTS allow_instant_purchase boolean NOT NULL DEFAULT true;
+		`).Error; err != nil {
+			return err
+		}
+		// Preserve legacy ordering for known plan codes until admins set display_order explicitly.
+		if err := db.Exec(`
+			UPDATE subscription_plans SET display_order = 1 WHERE code = 'starter';
+			UPDATE subscription_plans SET display_order = 2 WHERE code = 'professional';
+			UPDATE subscription_plans SET display_order = 3 WHERE code = 'enterprise';
+			UPDATE subscription_plans SET display_order = 99 WHERE code = 'grandfathered';
+		`).Error; err != nil {
+			return err
+		}
+		// Column defaults above are generic (true); align special tiers with pkg/plans + cmd/seed-plans
+		// so migration-only DBs match seed behavior (grandfathered hidden; enterprise sales-led checkout).
+		if err := db.Exec(`
+			UPDATE subscription_plans SET is_public = false WHERE code = 'grandfathered';
+			UPDATE subscription_plans SET allow_instant_purchase = false WHERE code IN ('enterprise', 'grandfathered');
+		`).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.2.10_subscription_plan_display_and_purchase migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.2.11_subscription_plan_is_promoted", func(db *gorm.DB) error {
+		if err := db.Exec(`
+			ALTER TABLE subscription_plans
+			ADD COLUMN IF NOT EXISTS is_promoted boolean NOT NULL DEFAULT false;
+		`).Error; err != nil {
+			return err
+		}
+		// One promoted plan for public lists; default matches previous marketing hard-code.
+		if err := db.Exec(`
+			UPDATE subscription_plans SET is_promoted = false;
+			UPDATE subscription_plans SET is_promoted = true
+			WHERE code = 'professional' AND is_active = true AND is_public = true;
+		`).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.2.11_subscription_plan_is_promoted migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.2.12_subscription_plan_name_en", func(db *gorm.DB) error {
+		if err := db.Exec(`
+			ALTER TABLE subscription_plans
+			ADD COLUMN IF NOT EXISTS name_en text NOT NULL DEFAULT '';
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			UPDATE subscription_plans SET name_en = 'Starter' WHERE code = 'starter' AND name_en = '';
+			UPDATE subscription_plans SET name_en = 'Professional' WHERE code = 'professional' AND name_en = '';
+			UPDATE subscription_plans SET name_en = 'Enterprise' WHERE code = 'enterprise' AND name_en = '';
+			UPDATE subscription_plans SET name_en = 'Grandfathered' WHERE code = 'grandfathered' AND name_en = '';
+			UPDATE subscription_plans SET name_en = name WHERE name_en = '' AND trim(name) <> '';
+		`).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.2.12_subscription_plan_name_en migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.2.13_subscription_plan_grandfathered_visibility", func(db *gorm.DB) error {
+		return db.Exec(`
+			UPDATE subscription_plans
+			SET is_public = false, allow_instant_purchase = false
+			WHERE code = 'grandfathered';
+		`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.2.13_subscription_plan_grandfathered_visibility migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.2.14_subscription_plan_single_promoted", func(db *gorm.DB) error {
+		// At most one promoted row before the partial unique index (idempotent cleanup).
+		if err := db.Exec(`
+			UPDATE subscription_plans p
+			SET is_promoted = false
+			WHERE p.is_promoted = true
+			  AND p.id <> (
+				SELECT s.id FROM subscription_plans s
+				WHERE s.is_promoted = true
+				ORDER BY s.display_order, s.code
+				LIMIT 1
+			  );
+		`).Error; err != nil {
+			return err
+		}
+		return db.Exec(`
+			CREATE UNIQUE INDEX IF NOT EXISTS ux_subscription_plans_single_promoted
+			ON subscription_plans ((1))
+			WHERE is_promoted = true;
+		`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.2.14_subscription_plan_single_promoted migration: %w", err)
+	}
+
+	// Idempotent backfill for DBs that already ran v1.2.12 before name_en fallback was added there.
+	err = manager.RunMigration("v1.2.15_subscription_plan_name_en_fallback", func(db *gorm.DB) error {
+		return db.Exec(`
+			UPDATE subscription_plans SET name_en = name WHERE name_en = '' AND trim(name) <> '';
+		`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.2.15_subscription_plan_name_en_fallback migration: %w", err)
+	}
+
+	// DBs that ran v1.2.10 before enterprise/grandfathered overrides were added there: sales-led enterprise tier.
+	err = manager.RunMigration("v1.2.16_subscription_plan_enterprise_allow_instant_purchase", func(db *gorm.DB) error {
+		return db.Exec(`
+			UPDATE subscription_plans SET allow_instant_purchase = false WHERE code = 'enterprise';
+		`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.2.16_subscription_plan_enterprise_allow_instant_purchase migration: %w", err)
+	}
+
 	fmt.Println("All migrations completed successfully")
 	return nil
 }

@@ -212,6 +212,7 @@ type CreateCheckoutResponse struct {
 // @Failure      401  {string}  string "Unauthorized"
 // @Failure      403  {string}  string "Forbidden"
 // @Failure      404  {string}  string "Not Found"
+// @Failure      409  {string}  string "Conflict (e.g. plan not eligible for instant self-service checkout)"
 // @Failure      501  {string}  string "Billing checkout not configured"
 // @Failure      500  {string}  string "Internal Server Error"
 // @Router       /subscriptions/checkout [post]
@@ -234,21 +235,6 @@ func (h *SubscriptionHandler) CreateCheckout(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	plan, err := h.subscriptionRepo.FindPlanByCode(planCode)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			http.Error(w, "Unknown plan code", http.StatusBadRequest)
-			return
-		}
-		log.Printf("CreateCheckout subscriptionRepo.FindPlanByCode(%q): %v", planCode, err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	if !plan.IsActive {
-		http.Error(w, "Plan is not available", http.StatusBadRequest)
-		return
-	}
-
 	companyID, err := h.userRepo.ResolveCompanyIDForRequest(userID, r.Header.Get("X-Company-Id"))
 	if err != nil {
 		if errors.Is(err, repository.ErrCompanyAccessDenied) {
@@ -264,6 +250,29 @@ func (h *SubscriptionHandler) CreateCheckout(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	if !h.requireBillingAdmin(w, userID, companyID) {
+		return
+	}
+
+	plan, err := h.subscriptionRepo.FindPlanByCode(planCode)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "Unknown plan code", http.StatusBadRequest)
+			return
+		}
+		log.Printf("CreateCheckout subscriptionRepo.FindPlanByCode(%q): %v", planCode, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if !plan.IsActive {
+		http.Error(w, "Plan is not available", http.StatusBadRequest)
+		return
+	}
+	if !plan.IsPublic {
+		http.Error(w, "Plan is not available", http.StatusBadRequest)
+		return
+	}
+	if !plan.AllowInstantPurchase {
+		http.Error(w, "This plan is not available for self-service checkout; contact sales to request access.", http.StatusConflict)
 		return
 	}
 

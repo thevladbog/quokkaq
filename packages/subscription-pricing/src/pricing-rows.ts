@@ -1,14 +1,10 @@
 import type { SubscriptionPlan } from '@quokkaq/shared-types';
+import {
+  API_BOOL_FEATURE_TO_PRICING,
+  PLAN_LIMIT_KEYS
+} from './plan-manifest';
 
-const LIMIT_KEYS_ORDER = [
-  'units',
-  'users',
-  'tickets_per_month',
-  'services',
-  'counters'
-] as const;
-
-const UNLIMITED_BY_LIMIT: Record<(typeof LIMIT_KEYS_ORDER)[number], string> = {
+const UNLIMITED_BY_LIMIT: Record<(typeof PLAN_LIMIT_KEYS)[number], string> = {
   units: 'unlimitedUnits',
   users: 'unlimitedUsers',
   tickets_per_month: 'unlimitedTickets',
@@ -16,31 +12,24 @@ const UNLIMITED_BY_LIMIT: Record<(typeof LIMIT_KEYS_ORDER)[number], string> = {
   counters: 'unlimitedCounters'
 };
 
+const NEGOTIABLE_BY_LIMIT: Record<(typeof PLAN_LIMIT_KEYS)[number], string> = {
+  units: 'negotiableUnits',
+  users: 'negotiableUsers',
+  tickets_per_month: 'negotiableTickets',
+  services: 'negotiableServices',
+  counters: 'negotiableCounters'
+};
+
 function limitToPricingFeatureKey(
-  limitKey: (typeof LIMIT_KEYS_ORDER)[number]
+  limitKey: (typeof PLAN_LIMIT_KEYS)[number]
 ): string {
   if (limitKey === 'tickets_per_month') return 'tickets';
   return limitKey;
 }
 
-const API_BOOL_FEATURE_TO_PRICING: Record<string, string> = {
-  basic_support: 'basicSupport',
-  websocket_updates: 'realtimeUpdates',
-  basic_reports: 'basicReports',
-  advanced_reports: 'advancedReports',
-  email_support: 'emailSupport',
-  phone_support: 'phoneSupport',
-  api_access: 'apiAccess',
-  white_label: 'whiteLabel',
-  custom_branding: 'customBranding',
-  priority_support: 'prioritySupport',
-  dedicated_support: 'dedicatedSupport',
-  sla_guarantee: 'slaGuarantee',
-  custom_integrations: 'customIntegrations',
-  team_training: 'teamTraining'
-};
-
-const FEATURE_FLAG_ORDER = Object.keys(API_BOOL_FEATURE_TO_PRICING);
+const FEATURE_FLAG_ORDER = Object.keys(
+  API_BOOL_FEATURE_TO_PRICING
+) as (keyof typeof API_BOOL_FEATURE_TO_PRICING)[];
 
 export type PricingFeatureRow = {
   rowKey: string;
@@ -48,14 +37,30 @@ export type PricingFeatureRow = {
   count?: number;
 };
 
-/** Rows for the public pricing page from an API plan (limits + enabled flags). */
+function isNegotiableLimit(
+  plan: SubscriptionPlan,
+  lk: (typeof PLAN_LIMIT_KEYS)[number]
+): boolean {
+  const m = plan.limitsNegotiable;
+  if (!m || typeof m !== 'object') return false;
+  return Boolean((m as Record<string, boolean>)[lk]);
+}
+
+/** Rows for public pricing UI from an API plan (limits + enabled flags). */
 export function buildPricingRowsFromApiPlan(
   plan: SubscriptionPlan
 ): PricingFeatureRow[] {
   const rows: PricingFeatureRow[] = [];
   const limits = plan.limits ?? {};
 
-  for (const lk of LIMIT_KEYS_ORDER) {
+  for (const lk of PLAN_LIMIT_KEYS) {
+    if (isNegotiableLimit(plan, lk)) {
+      rows.push({
+        rowKey: `lim-neg-${lk}`,
+        translationKey: `features.${NEGOTIABLE_BY_LIMIT[lk]}`
+      });
+      continue;
+    }
     const v = limits[lk];
     if (v === undefined) continue;
     if (v === -1) {
