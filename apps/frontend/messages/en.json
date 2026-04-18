@@ -1574,7 +1574,8 @@
       "changeLogo": "Change Logo",
       "hint": "Supported formats: JPG, PNG, SVG, WebP. Max 5MB.",
       "defaultImageLabel": "Image",
-      "defaultLogoLabel": "Logo"
+      "defaultLogoLabel": "Logo",
+      "removeLogo": "Remove logo"
     }
   },
   "general": {

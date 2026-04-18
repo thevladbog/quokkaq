@@ -429,9 +429,6 @@
                         "type": "string"
                     }
                 },
-                "required": [
-                    "photoUrl"
-                ],
                 "type": "object"
             },
             "handlers.PatchPlatformCompanyBody": {

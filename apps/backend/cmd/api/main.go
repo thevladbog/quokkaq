@@ -111,7 +111,7 @@ func main() {
 			&models.SupportReport{},
 		)
 		if err != nil {
-			log.Fatalf("Failed to run migrations: %v", err)
+			log.Fatalf("❌ Failed to run migrations: %v", err)
 		}
 	}
 

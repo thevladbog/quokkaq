@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"net/url"
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/pkg/authcookie"
@@ -26,8 +27,29 @@ func NewAuthHandler(service services.AuthService, userService services.UserServi
 }
 
 // PatchMeRequest is the body for PATCH /auth/me (self-service profile photo only).
+// Validation is performed in PatchMe (json.Decoder does not use Gin binding tags).
 type PatchMeRequest struct {
-	PhotoURL *string `json:"photoUrl" binding:"required"`
+	PhotoURL *string `json:"photoUrl"`
+}
+
+const maxProfilePhotoURLLen = 2048
+
+func validateProfilePhotoURL(raw string) error {
+	t := strings.TrimSpace(raw)
+	if t == "" {
+		return nil
+	}
+	if len(t) > maxProfilePhotoURLLen {
+		return errors.New("photoUrl is too long")
+	}
+	u, err := url.Parse(t)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return errors.New("photoUrl must be a valid http or https URL")
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return errors.New("photoUrl must use http or https")
+	}
+	return nil
 }
 
 type LoginRequest struct {
@@ -227,21 +249,38 @@ func (h *AuthHandler) PatchMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	trimmed := strings.TrimSpace(*req.PhotoURL)
+	if err := validateProfilePhotoURL(trimmed); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	photoForUpdate := trimmed
 	input := &models.UpdateUserInput{
-		PhotoURL: req.PhotoURL,
+		PhotoURL: &photoForUpdate,
 	}
 	if err := h.userService.UpdateUser(userID, input); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			http.Error(w, "User not found", http.StatusNotFound)
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		if errors.Is(err, services.ErrUpdateUserEmptyInput) || errors.Is(err, services.ErrUpdateUserNameEmpty) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		log.Printf("PatchMe: UpdateUser error: %v", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
 	user, err := h.service.GetMe(userID)
 	if err != nil {
-		http.Error(w, "User not found", http.StatusNotFound)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Printf("PatchMe: GetMe after update: user not found: %v", err)
+			http.Error(w, "User not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("PatchMe: GetMe after update error: %v", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")

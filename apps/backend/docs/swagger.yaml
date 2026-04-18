@@ -282,8 +282,6 @@ components:
       properties:
         photoUrl:
           type: string
-      required:
-      - photoUrl
       type: object
     handlers.PatchPlatformCompanyBody:
       properties:

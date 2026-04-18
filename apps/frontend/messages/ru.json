@@ -1574,7 +1574,8 @@
       "changeLogo": "Сменить логотип",
       "hint": "Форматы: JPG, PNG, SVG, WebP. Максимум 5 МБ.",
       "defaultImageLabel": "Изображение",
-      "defaultLogoLabel": "Логотип"
+      "defaultLogoLabel": "Логотип",
+      "removeLogo": "Удалить логотип"
     }
   },
   "general": {

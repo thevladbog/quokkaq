@@ -38,6 +38,9 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -331,41 +334,37 @@ const AppSidebar = () => {
 
                       <DropdownMenuSeparator />
 
-                      <DropdownMenuItem
-                        className='focus:bg-accent flex cursor-default items-center justify-between gap-2 py-2'
-                        onSelect={(e) => e.preventDefault()}
-                      >
-                        <span className='text-muted-foreground flex items-center gap-2'>
-                          <Globe className='size-4 shrink-0' />
-                          <span className='text-foreground text-sm'>
+                      <DropdownMenuSub>
+                        <DropdownMenuSubTrigger className='gap-2'>
+                          <Globe className='text-muted-foreground size-4 shrink-0' />
+                          <span className='text-foreground'>
                             {tProfile('language')}
                           </span>
-                        </span>
-                        <div
-                          className='shrink-0'
-                          onPointerDown={(e) => e.stopPropagation()}
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent
+                          sideOffset={8}
+                          className='min-w-[10rem] p-2'
+                          collisionPadding={{ left: 16, right: 12 }}
                         >
                           <LanguageSwitcher />
-                        </div>
-                      </DropdownMenuItem>
+                        </DropdownMenuSubContent>
+                      </DropdownMenuSub>
 
-                      <DropdownMenuItem
-                        className='focus:bg-accent flex cursor-default items-center justify-between gap-2 py-2'
-                        onSelect={(e) => e.preventDefault()}
-                      >
-                        <span className='text-muted-foreground flex items-center gap-2'>
-                          <Palette className='size-4 shrink-0' />
-                          <span className='text-foreground text-sm'>
+                      <DropdownMenuSub>
+                        <DropdownMenuSubTrigger className='gap-2'>
+                          <Palette className='text-muted-foreground size-4 shrink-0' />
+                          <span className='text-foreground'>
                             {tProfile('theme')}
                           </span>
-                        </span>
-                        <div
-                          className='shrink-0'
-                          onPointerDown={(e) => e.stopPropagation()}
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent
+                          sideOffset={8}
+                          className='min-w-[10rem] p-2'
+                          collisionPadding={{ left: 16, right: 12 }}
                         >
                           <ThemeSwitcher />
-                        </div>
-                      </DropdownMenuItem>
+                        </DropdownMenuSubContent>
+                      </DropdownMenuSub>
 
                       {user?.roles?.includes('admin') ? (
                         <>

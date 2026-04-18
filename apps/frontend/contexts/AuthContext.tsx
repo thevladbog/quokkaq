@@ -113,8 +113,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const refreshUser = useCallback(async (): Promise<void> => {
     if (typeof window === 'undefined') return;
+    const gen = sessionProbeGenRef.current;
     try {
       const userData = await fetchCurrentUser();
+      if (gen !== sessionProbeGenRef.current) {
+        return;
+      }
       setUser(userData);
     } catch (e) {
       logger.error('refreshUser failed', e);

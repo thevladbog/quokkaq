@@ -213,8 +213,12 @@ export function AdScreenSettings({
             <LogoUpload
               label={t('logo_upload')}
               currentLogoUrl={logoUrl}
-              onLogoUploaded={setLogoUrl}
-              onLogoRemoved={() => setLogoUrl('')}
+              onLogoUploaded={async (url) => {
+                setLogoUrl(url);
+              }}
+              onLogoRemoved={async () => {
+                setLogoUrl('');
+              }}
             />
           </div>
 

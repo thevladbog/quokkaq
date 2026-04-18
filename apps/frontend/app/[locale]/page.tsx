@@ -200,7 +200,7 @@ export default function Home() {
                 className={cn(
                   'flex h-48 transform touch-manipulation flex-col items-center justify-center p-4 transition-all duration-200 sm:h-48',
                   item.disabled
-                    ? 'dark:bg-muted/30 cursor-not-allowed bg-gray-100 opacity-50'
+                    ? 'bg-muted/30 cursor-not-allowed opacity-50'
                     : [
                         'group cursor-pointer hover:scale-[1.02] hover:shadow-lg',
                         item.hoverColor
@@ -211,7 +211,7 @@ export default function Home() {
                   <div
                     className={cn(
                       'mb-2 rounded-full p-4',
-                      item.disabled ? 'bg-gray-400' : item.color
+                      item.disabled ? 'bg-muted' : item.color
                     )}
                   >
                     <Icon className='text-primary-foreground h-8 w-8' />

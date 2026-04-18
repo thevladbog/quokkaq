@@ -12,8 +12,10 @@ import { uploadLogo, uploadPrinterLogo } from '@/lib/api/generated/upload';
 
 interface LogoUploadProps {
   currentLogoUrl?: string;
-  onLogoUploaded: (url: string) => void;
-  onLogoRemoved: () => void;
+  /** Called after upload succeeds; await so loading state clears only after persistence (e.g. PATCH profile). */
+  onLogoUploaded: (url: string) => Promise<void>;
+  /** Called when user removes the logo; await so loading state clears only after persistence. */
+  onLogoRemoved: () => Promise<void>;
   label?: string;
   /** e.g. `image/*` or `image/png,image/jpeg,image/bmp,.bmp` */
   accept?: string;
@@ -34,6 +36,8 @@ interface LogoUploadProps {
   uploadButtonLabel?: string;
   /** Overrides default "Change logo" button label */
   changeButtonLabel?: string;
+  /** When false, skips the built-in success toast after upload (caller may toast). Default true. */
+  showUploadSuccessToast?: boolean;
 }
 
 function isAllowedImageFile(file: File, allowBmpByExtension: boolean): boolean {
@@ -58,7 +62,8 @@ export function LogoUpload({
   disabled = false,
   hideLabel = false,
   uploadButtonLabel,
-  changeButtonLabel
+  changeButtonLabel,
+  showUploadSuccessToast = true
 }: LogoUploadProps) {
   const t = useTranslations('components.upload');
   const displayLabel = label ?? t('defaultLogoLabel');
@@ -99,8 +104,10 @@ export function LogoUpload({
       if (!url) {
         throw new Error('Upload failed');
       }
-      onLogoUploaded(url);
-      toast.success(t('logoSuccess'));
+      await onLogoUploaded(url);
+      if (showUploadSuccessToast) {
+        toast.success(t('logoSuccess'));
+      }
     } catch (error) {
       logger.error('Upload error:', error);
       toast.error(t('logoFailed'));
@@ -128,13 +135,23 @@ export function LogoUpload({
               className='max-h-full max-w-full object-contain p-1'
             />
             <Button
+              type='button'
               variant='destructive'
               size='icon'
               className='absolute top-0 right-0 h-5 w-5 rounded-tr-none rounded-bl-md'
-              onClick={onLogoRemoved}
-              disabled={disabled}
+              aria-label={t('removeLogo')}
+              onClick={async () => {
+                if (disabled) return;
+                setIsUploading(true);
+                try {
+                  await onLogoRemoved();
+                } finally {
+                  setIsUploading(false);
+                }
+              }}
+              disabled={disabled || isUploading}
             >
-              <X className='h-3 w-3' />
+              <X className='h-3 w-3' aria-hidden />
             </Button>
           </div>
         ) : (

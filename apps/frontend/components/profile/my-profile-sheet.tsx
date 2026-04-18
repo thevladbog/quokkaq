@@ -2,8 +2,8 @@
 
 import { useMemo } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import { useQuery } from '@tanstack/react-query';
-import type { User } from '@quokkaq/shared-types';
+import { UnitModelSchema, type User } from '@quokkaq/shared-types';
+import { z } from 'zod';
 import {
   Accordion,
   AccordionContent,
@@ -20,8 +20,7 @@ import {
   SheetTitle
 } from '@/components/ui/sheet';
 import { useAuthContext } from '@/contexts/AuthContext';
-import { unitsApi } from '@/lib/api';
-import { getGetUnitsQueryKey } from '@/lib/api/generated/units';
+import { useGetUnits } from '@/lib/api/generated/units';
 import { usePatchAuthMe } from '@/lib/hooks';
 import { UNIT_PERMISSIONS } from '@/lib/unit-permissions';
 import { getUnitDisplayName } from '@/lib/unit-display';
@@ -41,10 +40,14 @@ export function MyProfileSheet({ open, onOpenChange }: MyProfileSheetProps) {
   const { user, refreshUser } = useAuthContext();
   const patchMe = usePatchAuthMe();
 
-  const { data: allUnits = [] } = useQuery({
-    queryKey: getGetUnitsQueryKey(),
-    queryFn: () => unitsApi.getAll(),
-    enabled: open
+  const { data: allUnits = [] } = useGetUnits({
+    query: {
+      enabled: open,
+      select: (res) => {
+        if (res.status !== 200) return [];
+        return z.array(UnitModelSchema).parse(res.data ?? []);
+      }
+    }
   });
 
   const unitById = useMemo(
@@ -150,6 +153,7 @@ export function MyProfileSheet({ open, onOpenChange }: MyProfileSheetProps) {
               changeButtonLabel={t('profilePhotoChange')}
               hint={t('profilePhotoHint')}
               disabled={patchMe.isPending}
+              showUploadSuccessToast={false}
             />
           </section>
 
