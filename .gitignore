@@ -69,3 +69,6 @@ logs/
 # Temporary files
 tmp/
 temp/
+
+# TypeScript incremental build cache (tsc --incremental)
+*.tsbuildinfo
