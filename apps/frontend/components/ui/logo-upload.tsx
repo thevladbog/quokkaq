@@ -28,6 +28,12 @@ interface LogoUploadProps {
   allowBmpByExtension?: boolean;
   /** Disable upload and remove actions */
   disabled?: boolean;
+  /** When true, the visible `<Label>` is omitted (use an external heading instead). */
+  hideLabel?: boolean;
+  /** Overrides default "Upload logo" / similar button label */
+  uploadButtonLabel?: string;
+  /** Overrides default "Change logo" button label */
+  changeButtonLabel?: string;
 }
 
 function isAllowedImageFile(file: File, allowBmpByExtension: boolean): boolean {
@@ -49,7 +55,10 @@ export function LogoUpload({
   hint,
   uploadTarget = 'kiosk',
   allowBmpByExtension = false,
-  disabled = false
+  disabled = false,
+  hideLabel = false,
+  uploadButtonLabel,
+  changeButtonLabel
 }: LogoUploadProps) {
   const t = useTranslations('components.upload');
   const displayLabel = label ?? t('defaultLogoLabel');
@@ -103,9 +112,12 @@ export function LogoUpload({
     }
   };
 
+  const uploadBtn = uploadButtonLabel ?? t('uploadLogo');
+  const changeBtn = changeButtonLabel ?? t('changeLogo');
+
   return (
     <div className='space-y-2'>
-      <Label htmlFor={fileInputId}>{displayLabel}</Label>
+      {hideLabel ? null : <Label htmlFor={fileInputId}>{displayLabel}</Label>}
       <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4'>
         {currentLogoUrl ? (
           <div className='bg-muted/50 relative flex h-20 w-20 shrink-0 items-center justify-center self-center overflow-hidden rounded-md border sm:self-start'>
@@ -146,6 +158,7 @@ export function LogoUpload({
             disabled={isUploading || disabled}
             onClick={() => fileInputRef.current?.click()}
             className='w-full sm:w-auto sm:self-start'
+            aria-label={hideLabel ? displayLabel : undefined}
           >
             {isUploading ? (
               <>
@@ -155,7 +168,7 @@ export function LogoUpload({
             ) : (
               <>
                 <Upload className='mr-2 h-4 w-4' />
-                {currentLogoUrl ? t('changeLogo') : t('uploadLogo')}
+                {currentLogoUrl ? changeBtn : uploadBtn}
               </>
             )}
           </Button>

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import {
   Sidebar,
   SidebarContent,
@@ -25,21 +26,24 @@ import {
   Layers,
   Settings,
   BarChart3,
-  Bug
+  Bug,
+  UserCircle,
+  Palette
 } from 'lucide-react';
 import Image from 'next/image';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { Link, usePathname } from '@/src/i18n/navigation';
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger
-} from '@/components/ui/popover';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Separator } from '@/components/ui/separator';
-import { Button } from '@/components/ui/button';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { MyProfileSheet } from '@/components/profile/my-profile-sheet';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
-import ThemeToggle from '@/components/ThemeToggle';
+import ThemeSwitcher from '@/components/ThemeSwitcher';
 import { useLocale, useTranslations } from 'next-intl';
 import { getInitials, getAvatarColor } from '@/lib/utils';
 import { userCanOpenPlatformOperatorUI } from '@/lib/platform-access';
@@ -51,6 +55,8 @@ import { useActiveUnit } from '@/contexts/ActiveUnitContext';
 import { getWordmarkSrc } from '@/lib/wordmark-src';
 
 const AppSidebar = () => {
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [profileSheetOpen, setProfileSheetOpen] = useState(false);
   const locale = useLocale();
   const wordmarkSrc = getWordmarkSrc(locale);
   const tNav = useTranslations('nav');
@@ -230,8 +236,11 @@ const AppSidebar = () => {
               <SidebarActiveUnitSelect />
               <SidebarMenu>
                 <SidebarMenuItem>
-                  <Popover>
-                    <PopoverTrigger asChild>
+                  <DropdownMenu
+                    open={accountMenuOpen}
+                    onOpenChange={setAccountMenuOpen}
+                  >
+                    <DropdownMenuTrigger asChild>
                       <SidebarMenuButton
                         className='h-12 min-h-12 gap-2 py-2 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:min-h-8! group-data-[collapsible=icon]:gap-0!'
                         tooltip={{
@@ -246,6 +255,9 @@ const AppSidebar = () => {
                         }}
                       >
                         <Avatar size='sm' className='shrink-0'>
+                          {user?.photoUrl ? (
+                            <AvatarImage src={user.photoUrl} alt='' />
+                          ) : null}
                           <AvatarFallback
                             bgColor={getAvatarColor(
                               user?.name || user?.email || undefined
@@ -268,104 +280,140 @@ const AppSidebar = () => {
                           )}
                         </div>
                       </SidebarMenuButton>
-                    </PopoverTrigger>
+                    </DropdownMenuTrigger>
 
-                    <PopoverContent
-                      className='w-80'
-                      align='end'
+                    <DropdownMenuContent
                       side='top'
-                      sideOffset={8}
+                      align='end'
+                      sideOffset={12}
+                      alignOffset={4}
+                      collisionPadding={{ left: 16, right: 12 }}
+                      className='border-border/60 max-w-[min(20rem,calc(100vw-2rem))] min-w-[16rem] rounded-xl p-1.5 shadow-md'
                     >
-                      <div className='flex items-center gap-3 pb-3'>
-                        <Avatar size='lg'>
+                      <div className='flex items-center gap-2.5 px-2 py-1.5'>
+                        <Avatar size='md'>
+                          {user?.photoUrl ? (
+                            <AvatarImage src={user.photoUrl} alt='' />
+                          ) : null}
                           <AvatarFallback
                             bgColor={getAvatarColor(
                               user?.name || user?.email || undefined
                             )}
-                            className='text-lg text-white'
+                            className='text-sm text-white'
                           >
                             {getInitials(
                               user?.name || user?.email || undefined
                             )}
                           </AvatarFallback>
                         </Avatar>
-                        <div className='flex flex-1 flex-col overflow-hidden'>
-                          <p className='truncate font-medium'>
+                        <div className='min-w-0 flex-1'>
+                          <p className='truncate text-sm font-medium'>
                             {user?.name || 'User'}
                           </p>
-                          <p className='text-muted-foreground truncate text-sm'>
+                          <p className='text-muted-foreground truncate text-xs'>
                             {user?.email}
                           </p>
                         </div>
                       </div>
 
-                      <Separator />
+                      <DropdownMenuSeparator />
 
-                      <div className='space-y-3 py-3'>
-                        <div className='flex items-center justify-between'>
-                          <div className='flex items-center gap-2'>
-                            <Globe className='h-4 w-4' />
-                            <span className='text-sm'>
-                              {tProfile('language')}
-                            </span>
-                          </div>
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          setProfileSheetOpen(true);
+                        }}
+                      >
+                        <UserCircle className='text-muted-foreground' />
+                        {tProfile('openMyProfile', {
+                          defaultValue: 'My profile'
+                        })}
+                      </DropdownMenuItem>
+
+                      <DropdownMenuSeparator />
+
+                      <DropdownMenuItem
+                        className='focus:bg-accent flex cursor-default items-center justify-between gap-2 py-2'
+                        onSelect={(e) => e.preventDefault()}
+                      >
+                        <span className='text-muted-foreground flex items-center gap-2'>
+                          <Globe className='size-4 shrink-0' />
+                          <span className='text-foreground text-sm'>
+                            {tProfile('language')}
+                          </span>
+                        </span>
+                        <div
+                          className='shrink-0'
+                          onPointerDown={(e) => e.stopPropagation()}
+                        >
                           <LanguageSwitcher />
                         </div>
+                      </DropdownMenuItem>
 
-                        <div className='flex items-center justify-between'>
-                          <span className='text-sm'>{tProfile('theme')}</span>
-                          <ThemeToggle />
+                      <DropdownMenuItem
+                        className='focus:bg-accent flex cursor-default items-center justify-between gap-2 py-2'
+                        onSelect={(e) => e.preventDefault()}
+                      >
+                        <span className='text-muted-foreground flex items-center gap-2'>
+                          <Palette className='size-4 shrink-0' />
+                          <span className='text-foreground text-sm'>
+                            {tProfile('theme')}
+                          </span>
+                        </span>
+                        <div
+                          className='shrink-0'
+                          onPointerDown={(e) => e.stopPropagation()}
+                        >
+                          <ThemeSwitcher />
                         </div>
-                      </div>
+                      </DropdownMenuItem>
 
-                      {user?.roles?.includes('admin') && (
+                      {user?.roles?.includes('admin') ? (
                         <>
-                          <Separator />
-                          <Button
-                            variant='outline'
-                            className='w-full justify-start'
-                            asChild
-                          >
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem asChild>
                             <Link href='/settings/organization'>
-                              <Settings className='mr-2 h-4 w-4' />
+                              <Settings className='text-muted-foreground' />
                               {tProfile('openSystemSettings', {
                                 defaultValue: 'System settings'
                               })}
                             </Link>
-                          </Button>
+                          </DropdownMenuItem>
                         </>
-                      )}
+                      ) : null}
 
-                      {userCanOpenPlatformOperatorUI(user) && (
+                      {userCanOpenPlatformOperatorUI(user) ? (
                         <>
-                          <Separator />
-                          <Button
-                            variant='outline'
-                            className='w-full justify-start'
-                            asChild
-                          >
+                          {user?.roles?.includes('admin') ? null : (
+                            <DropdownMenuSeparator />
+                          )}
+                          <DropdownMenuItem asChild>
                             <Link href='/platform'>
-                              <Layers className='mr-2 h-4 w-4' />
+                              <Layers className='text-muted-foreground' />
                               {tProfile('openOperatorConsole', {
                                 defaultValue: 'Operator console'
                               })}
                             </Link>
-                          </Button>
+                          </DropdownMenuItem>
                         </>
-                      )}
+                      ) : null}
 
-                      <Separator />
+                      <DropdownMenuSeparator />
 
-                      <Button
-                        variant='ghost'
-                        className='hover:text-destructive text-destructive mt-2 w-full justify-start'
-                        onClick={logout}
+                      <DropdownMenuItem
+                        variant='destructive'
+                        onSelect={() => {
+                          logout();
+                        }}
                       >
-                        <LogOut className='mr-2 h-4 w-4' />
+                        <LogOut />
                         {tProfile('logout')}
-                      </Button>
-                    </PopoverContent>
-                  </Popover>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  <MyProfileSheet
+                    open={profileSheetOpen}
+                    onOpenChange={setProfileSheetOpen}
+                  />
                 </SidebarMenuItem>
                 <SidebarCollapseToggle />
               </SidebarMenu>

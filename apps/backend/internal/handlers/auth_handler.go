@@ -6,19 +6,28 @@ import (
 	"log"
 	"net/http"
 	"quokkaq-go-backend/internal/middleware"
+	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/pkg/authcookie"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
 	"strings"
+
+	"gorm.io/gorm"
 )
 
 type AuthHandler struct {
-	service  services.AuthService
-	userRepo repository.UserRepository
+	service     services.AuthService
+	userService services.UserService
+	userRepo    repository.UserRepository
 }
 
-func NewAuthHandler(service services.AuthService, userRepo repository.UserRepository) *AuthHandler {
-	return &AuthHandler{service: service, userRepo: userRepo}
+func NewAuthHandler(service services.AuthService, userService services.UserService, userRepo repository.UserRepository) *AuthHandler {
+	return &AuthHandler{service: service, userService: userService, userRepo: userRepo}
+}
+
+// PatchMeRequest is the body for PATCH /auth/me (self-service profile photo only).
+type PatchMeRequest struct {
+	PhotoURL *string `json:"photoUrl"`
 }
 
 type LoginRequest struct {
@@ -180,6 +189,62 @@ func (h *AuthHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Map to DTO for proper frontend format
+	response := MapUserToResponse(user)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
+}
+
+// PatchMe godoc
+// @ID           authPatchMe
+// @Summary      Update current user profile (photo only)
+// @Description  Authenticated users may update only their profile photo URL. Send `photoUrl` as a string (use empty string to clear). Omitted `photoUrl` is rejected.
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        body body PatchMeRequest true "photoUrl only"
+// @Success      200  {object}  UserResponse
+// @Failure      400  {string}  string "Bad Request"
+// @Failure      401  {string}  string "Unauthorized"
+// @Failure      404  {string}  string "User not found"
+// @Failure      500  {string}  string "Internal Server Error"
+// @Router       /auth/me [patch]
+// @Security     BearerAuth
+func (h *AuthHandler) PatchMe(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var req PatchMeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.PhotoURL == nil {
+		http.Error(w, "photoUrl is required", http.StatusBadRequest)
+		return
+	}
+
+	input := &models.UpdateUserInput{
+		PhotoURL: req.PhotoURL,
+	}
+	if err := h.userService.UpdateUser(userID, input); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "User not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	user, err := h.service.GetMe(userID)
+	if err != nil {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
 	response := MapUserToResponse(user)
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)

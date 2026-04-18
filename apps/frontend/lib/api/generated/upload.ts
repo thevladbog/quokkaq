@@ -451,6 +451,10 @@ export interface HandlersOperatorCommentPatchDTO {
   operatorComment: string | null;
 }
 
+export interface HandlersPatchMeRequest {
+  photoUrl?: string;
+}
+
 export type HandlersPatchPlatformCompanyBodyBillingAddress = { [key: string]: unknown };
 
 export type HandlersPatchPlatformCompanyBodyCounterparty = { [key: string]: unknown };
@@ -603,6 +607,14 @@ export interface HandlersResetPasswordRequest {
   token?: string;
 }
 
+export interface HandlersRoleInfoDTO {
+  name?: string;
+}
+
+export interface HandlersRoleDTO {
+  role?: HandlersRoleInfoDTO;
+}
+
 export type HandlersSaasVendorResponseBillingAddress = { [key: string]: unknown };
 
 export type HandlersSaasVendorResponseCounterparty = { [key: string]: unknown };
@@ -637,6 +649,14 @@ export interface HandlersTransferRequest {
   toUserId?: string;
 }
 
+export interface HandlersUnitSummaryDTO {
+  code?: string;
+  id?: string;
+  kind?: string;
+  name?: string;
+  nameEn?: string;
+}
+
 export interface HandlersUpdateCounterRequest {
   name?: string;
   serviceZoneId?: string;
@@ -668,6 +688,27 @@ export type HandlersUsageMetricsResponseMetrics = {[key: string]: HandlersUsageM
 export interface HandlersUsageMetricsResponse {
   currentPeriod?: HandlersPeriodResponse;
   metrics?: HandlersUsageMetricsResponseMetrics;
+}
+
+export type HandlersUserResponsePermissions = {[key: string]: string[]};
+
+export interface HandlersUserUnitDTO {
+  companyId?: string;
+  permissions?: string[];
+  unit?: HandlersUnitSummaryDTO;
+  unitId?: string;
+}
+
+export interface HandlersUserResponse {
+  createdAt?: string;
+  email?: string;
+  id?: string;
+  name?: string;
+  permissions?: HandlersUserResponsePermissions;
+  photoUrl?: string;
+  roles?: HandlersRoleDTO[];
+  type?: string;
+  units?: HandlersUserUnitDTO[];
 }
 
 export type HandlersYooKassaWebhookNotificationObject = { [key: string]: unknown };

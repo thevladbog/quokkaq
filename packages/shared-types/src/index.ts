@@ -57,6 +57,7 @@ export const UserModelSchema = z.object({
             code: z.string().optional(),
             kind: z.string().optional()
           })
+          .nullable()
           .optional()
       })
     )

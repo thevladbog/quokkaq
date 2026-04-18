@@ -60,10 +60,7 @@ export default function UnitsIndexPage() {
   );
 
   const companyIdFromUser = useMemo(
-    () =>
-      user?.units?.find(
-        (a: { unit?: { companyId?: string } }) => a.unit?.companyId
-      )?.unit?.companyId ?? '',
+    () => user?.units?.find((a) => a.unit?.companyId)?.unit?.companyId ?? '',
     [user?.units]
   );
 

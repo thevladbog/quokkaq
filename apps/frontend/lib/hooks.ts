@@ -27,6 +27,7 @@ import {
   type CreateTicketInUnitMutationVariables
 } from '../lib/api';
 import { fetchCurrentUser, loginWithPassword } from '../lib/auth-orval';
+import { authPatchMe } from '@/lib/api/generated/auth';
 import { invalidateTicketListQueries } from '../lib/ticket-query-invalidation';
 
 // User-related hooks
@@ -219,6 +220,26 @@ export function useCurrentUser() {
     queryKey: ['me', token],
     queryFn: () => fetchCurrentUser(),
     enabled: isAuthenticated && !!token
+  });
+}
+
+/** PATCH /auth/me — self-service profile photo only (`''` clears). */
+export function usePatchAuthMe() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (photoUrl: string) => {
+      const res = await authPatchMe({ photoUrl });
+      if (res.status !== 200) {
+        const msg = typeof res.data === 'string' ? res.data : 'patch_me_failed';
+        throw new Error(msg);
+      }
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        predicate: (q: Query) => q.queryKey[0] === 'me'
+      });
+    }
   });
 }
 

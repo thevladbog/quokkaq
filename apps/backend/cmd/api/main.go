@@ -209,7 +209,7 @@ func main() {
 	quotaService := services.NewQuotaService()
 
 	userHandler := handlers.NewUserHandler(userService)
-	authHandler := handlers.NewAuthHandler(authService, userRepo)
+	authHandler := handlers.NewAuthHandler(authService, userService, userRepo)
 	ssoHandler := handlers.NewSSOHandler(ssoService)
 	companySSOHTTP := handlers.NewCompanySSOHTTP(ssoService, userRepo, companyRepo)
 	unitHandler := handlers.NewUnitHandler(unitService, storageService, operationalService)
@@ -383,6 +383,7 @@ func main() {
 		r.Group(func(r chi.Router) {
 			r.Use(authmiddleware.JWTAuth)
 			r.Get("/me", authHandler.GetMe)
+			r.Patch("/me", authHandler.PatchMe)
 			r.Get("/accessible-companies", authHandler.ListAccessibleCompanies)
 		})
 	})

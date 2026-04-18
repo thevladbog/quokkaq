@@ -9,13 +9,15 @@ import {
   Monitor,
   MonitorSpeaker,
   Loader2,
-  ClipboardList
+  ClipboardList,
+  Tablet
 } from 'lucide-react';
 import Image from 'next/image';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useRouter } from '../../src/i18n/navigation';
 import { useEffect, useState } from 'react';
 import { getWordmarkSrc } from '@/lib/wordmark-src';
+import { cn } from '@/lib/utils';
 
 export default function Home() {
   const locale = useLocale();
@@ -155,6 +157,17 @@ export default function Home() {
       color: 'bg-purple-500',
       hoverColor: 'hover:bg-purple-600',
       disabled: !isAdmin && !hasPermissionInAnyUnit('ACCESS_TICKET_SCREEN')
+    },
+    {
+      href: '/counter-display',
+      title: t('counter_display'),
+      description: t('counter_display_description', {
+        defaultValue: 'Guest survey screen at the service counter (pairing)'
+      }),
+      icon: Tablet,
+      color: 'bg-teal-500',
+      hoverColor: 'hover:bg-teal-600',
+      disabled: !isAdmin && !hasPermissionInAnyUnit('ACCESS_KIOSK')
     }
   ];
 
@@ -181,20 +194,44 @@ export default function Home() {
         <div className='grid w-full max-w-5xl grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3'>
           {menuItems.map((item, index) => {
             const Icon = item.icon;
+            const interactive = !item.disabled;
             const CardComponent = (
               <Card
-                className={`flex h-48 transform flex-col items-center justify-center p-4 transition-all duration-200 sm:h-48 ${item.disabled ? 'cursor-not-allowed bg-gray-100 opacity-50' : `cursor-pointer hover:scale-[1.02] hover:shadow-lg ${item.hoverColor}`} touch-manipulation`}
+                className={cn(
+                  'flex h-48 transform touch-manipulation flex-col items-center justify-center p-4 transition-all duration-200 sm:h-48',
+                  item.disabled
+                    ? 'dark:bg-muted/30 cursor-not-allowed bg-gray-100 opacity-50'
+                    : [
+                        'group cursor-pointer hover:scale-[1.02] hover:shadow-lg',
+                        item.hoverColor
+                      ]
+                )}
               >
                 <CardContent className='flex h-full w-full flex-col items-center justify-center p-4 py-6 text-center'>
                   <div
-                    className={`${item.disabled ? 'bg-gray-400' : item.color} mb-2 rounded-full p-4`}
+                    className={cn(
+                      'mb-2 rounded-full p-4',
+                      item.disabled ? 'bg-gray-400' : item.color
+                    )}
                   >
                     <Icon className='text-primary-foreground h-8 w-8' />
                   </div>
-                  <h3 className='mb-1 text-sm font-semibold sm:text-base md:text-lg'>
+                  <h3
+                    className={cn(
+                      'mb-1 text-sm font-semibold transition-colors duration-200 sm:text-base md:text-lg',
+                      interactive && 'text-foreground group-hover:text-white'
+                    )}
+                  >
                     {item.title}
                   </h3>
-                  <p className='text-muted-foreground text-center text-xs sm:text-sm'>
+                  <p
+                    className={cn(
+                      'text-center text-xs transition-colors duration-200 sm:text-sm',
+                      interactive
+                        ? 'text-muted-foreground group-hover:text-white/95'
+                        : 'text-muted-foreground'
+                    )}
+                  >
                     {item.description}
                   </p>
                 </CardContent>
