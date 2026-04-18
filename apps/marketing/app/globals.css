@@ -2,14 +2,14 @@
 
 @layer base {
   :root {
-    --color-primary: #FF6B35;
-    --color-primary-hover: #E85A28;
-    --color-secondary: #F7931E;
+    --color-primary: #ff6b35;
+    --color-primary-hover: #e85a28;
+    --color-secondary: #f7931e;
     --color-success: #16a34a;
     --color-warning: #d97706;
     --color-danger: #dc2626;
-    --color-surface: #FEFEFE;
-    --color-surface-elevated: #FFF8F3;
+    --color-surface: #fefefe;
+    --color-surface-elevated: #fff8f3;
     --color-text: #111827;
     --color-text-muted: #6b7280;
     --color-border: #f0e5db;

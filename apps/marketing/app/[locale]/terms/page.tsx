@@ -32,11 +32,5 @@ export default async function TermsPage({ params }: PageProps) {
 
   const copy = legalPages[raw];
 
-  return (
-    <LegalDocumentView
-      locale={raw}
-      copy={copy}
-      page={copy.terms}
-    />
-  );
+  return <LegalDocumentView locale={raw} copy={copy} page={copy.terms} />;
 }

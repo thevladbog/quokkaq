@@ -111,9 +111,7 @@ export function HomeControls({ locale, copy }: Props) {
       <button
         type='button'
         className={themeIconBtnClass}
-        onClick={() =>
-          setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')
-        }
+        onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
         aria-label={
           !mounted
             ? copy.themeUseDark

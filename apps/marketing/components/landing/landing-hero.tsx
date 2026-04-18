@@ -16,21 +16,21 @@ export function LandingHero({ locale, copy }: Props) {
     <section className='relative z-10 mx-auto grid max-w-7xl grid-cols-1 content-center gap-8 px-4 py-8 sm:gap-10 sm:px-6 sm:py-10 lg:min-h-[calc(100dvh-5.25rem)] lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] lg:items-center lg:gap-12 lg:px-8 lg:py-6'>
       <LandingTicketsAnimation locale={locale} />
 
-      <div className='landing-reveal landing-reveal-delay-1 relative z-20 -mt-1 w-full min-w-0 max-w-none justify-self-stretch lg:-mt-3 lg:max-w-[38rem] xl:max-w-[42rem]'>
+      <div className='landing-reveal landing-reveal-delay-1 relative z-20 -mt-1 w-full max-w-none min-w-0 justify-self-stretch lg:-mt-3 lg:max-w-[38rem] xl:max-w-[42rem]'>
         <div className='rounded-[2rem] border-2 border-[color:var(--color-border)] bg-[color:var(--color-surface-elevated)]/95 p-7 shadow-2xl backdrop-blur-sm sm:p-9 lg:p-11'>
-          <p className='mb-5 inline-flex max-w-full items-center gap-2 rounded-full border border-[color:var(--color-primary)]/20 bg-[color:var(--color-primary)]/8 px-4 py-2 text-sm font-medium leading-snug text-[color:var(--color-primary)]'>
+          <p className='mb-5 inline-flex max-w-full items-center gap-2 rounded-full border border-[color:var(--color-primary)]/20 bg-[color:var(--color-primary)]/8 px-4 py-2 text-sm leading-snug font-medium text-[color:var(--color-primary)]'>
             <span
               className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[color:var(--color-primary)]/12 text-[color:var(--color-primary)]'
               aria-hidden
             >
               <FriendlySmileIcon className='h-[1.125rem] w-[1.125rem]' />
             </span>
-            <span className='min-w-0 inline-flex flex-wrap items-baseline gap-0.5'>
+            <span className='inline-flex min-w-0 flex-wrap items-baseline gap-0.5'>
               <span>{copy.heroEyebrowClaim}</span>
               <span className='group relative inline-flex shrink-0'>
                 <button
                   type='button'
-                  className='focus-ring relative -top-0.5 ml-px cursor-help text-[0.82em] font-semibold leading-none text-[color:var(--color-primary)] underline-offset-2 hover:underline'
+                  className='focus-ring relative -top-0.5 ml-px cursor-help text-[0.82em] leading-none font-semibold text-[color:var(--color-primary)] underline-offset-2 hover:underline'
                   aria-describedby='hero-claim-desc'
                   aria-label={copy.heroEyebrowNoteAriaLabel}
                 >
@@ -39,7 +39,7 @@ export function LandingHero({ locale, copy }: Props) {
                 <span
                   role='tooltip'
                   aria-hidden='true'
-                  className='pointer-events-none absolute left-1/2 top-full z-50 mt-2 w-[min(20rem,calc(100vw-2.5rem))] -translate-x-1/2 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 py-2 text-left text-xs font-normal leading-snug text-[color:var(--color-text-muted)] opacity-0 shadow-lg transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 dark:bg-[color:var(--color-surface-elevated)]'
+                  className='pointer-events-none absolute top-full left-1/2 z-50 mt-2 w-[min(20rem,calc(100vw-2.5rem))] -translate-x-1/2 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 py-2 text-left text-xs leading-snug font-normal text-[color:var(--color-text-muted)] opacity-0 shadow-lg transition-opacity duration-150 group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100 dark:bg-[color:var(--color-surface-elevated)]'
                 >
                   {copy.heroEyebrowDisclaimer}
                 </span>

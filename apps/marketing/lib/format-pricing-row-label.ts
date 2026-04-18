@@ -55,9 +55,7 @@ function formatEnLimitRow(key: string, n: number): string {
     case 'features.services':
       return one ? `Up to ${n} service` : `Up to ${n} services`;
     case 'features.counters':
-      return one
-        ? `Up to ${n} service counter`
-        : `Up to ${n} service counters`;
+      return one ? `Up to ${n} service counter` : `Up to ${n} service counters`;
     default:
       return '';
   }

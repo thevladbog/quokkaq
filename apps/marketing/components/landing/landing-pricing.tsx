@@ -99,7 +99,7 @@ export function LandingPricing({
                     key={plan.id}
                     className={`landing-reveal relative z-[1] flex flex-col overflow-visible rounded-2xl border-2 p-8 ${
                       isPopular
-                        ? 'isolate border-[color:var(--color-primary)] bg-gradient-to-br from-[color:var(--color-primary)]/5 to-[color:var(--color-secondary)]/5 pt-10 shadow-xl shadow-[color:var(--color-primary)]/20 ring-2 ring-[color:var(--color-primary)]/30 ring-offset-2 ring-offset-[color:var(--color-surface)]'
+                        ? 'isolate border-[color:var(--color-primary)] bg-gradient-to-br from-[color:var(--color-primary)]/5 to-[color:var(--color-secondary)]/5 pt-10 shadow-xl ring-2 shadow-[color:var(--color-primary)]/20 ring-[color:var(--color-primary)]/30 ring-offset-2 ring-offset-[color:var(--color-surface)]'
                         : 'border-[color:var(--color-border)] bg-[color:var(--color-surface-elevated)]'
                     }`}
                     style={{ animationDelay: `${0.1 * index}s` }}
@@ -116,7 +116,7 @@ export function LandingPricing({
                       <h3 className='font-display mb-2 text-2xl font-bold text-[color:var(--color-text)]'>
                         {planHeading}
                       </h3>
-                      <div className='mb-2 inline-flex min-w-0 max-w-full flex-nowrap items-baseline gap-x-1.5 whitespace-nowrap leading-tight'>
+                      <div className='mb-2 inline-flex max-w-full min-w-0 flex-nowrap items-baseline gap-x-1.5 leading-tight whitespace-nowrap'>
                         {isCustom ? (
                           <span className='font-display text-3xl font-bold text-[color:var(--color-text)]'>
                             {copy.pricingFromApi.customPricing}
@@ -138,7 +138,7 @@ export function LandingPricing({
                                     intlLocale
                                   )}
                             </span>
-                            <span className='shrink-0 self-baseline whitespace-nowrap text-sm font-medium leading-none text-[color:var(--color-text-muted)]'>
+                            <span className='shrink-0 self-baseline text-sm leading-none font-medium whitespace-nowrap text-[color:var(--color-text-muted)]'>
                               {intervalLabel}
                             </span>
                           </>
@@ -223,11 +223,11 @@ export function LandingPricing({
                       {plan.name}
                     </h3>
                     <div className='mb-2 flex min-w-0 flex-nowrap items-baseline gap-x-2 gap-y-0'>
-                      <span className='font-display text-4xl font-bold tabular-nums tracking-tight text-[color:var(--color-text)] sm:text-5xl'>
+                      <span className='font-display text-4xl font-bold tracking-tight text-[color:var(--color-text)] tabular-nums sm:text-5xl'>
                         {plan.price}
                       </span>
                       {plan.price !== 'Custom' && (
-                        <span className='shrink-0 whitespace-nowrap text-sm leading-none font-medium text-[color:var(--color-text-muted)]'>
+                        <span className='shrink-0 text-sm leading-none font-medium whitespace-nowrap text-[color:var(--color-text-muted)]'>
                           /{plan.period}
                         </span>
                       )}
@@ -283,7 +283,7 @@ export function LandingPricing({
 
         <div className='landing-reveal relative mt-12 overflow-hidden rounded-2xl border-2 border-[color:var(--color-primary)]/35 bg-gradient-to-br from-[color:var(--color-primary)]/14 via-[color:var(--color-surface-elevated)] to-[color:var(--color-secondary)]/12 p-6 shadow-xl shadow-[color:var(--color-primary)]/15 sm:mt-16 sm:p-8'>
           <div
-            className='pointer-events-none absolute -right-20 -top-24 h-56 w-56 rounded-full bg-[color:var(--color-primary)]/25 blur-3xl'
+            className='pointer-events-none absolute -top-24 -right-20 h-56 w-56 rounded-full bg-[color:var(--color-primary)]/25 blur-3xl'
             aria-hidden
           />
           <div
@@ -311,10 +311,10 @@ export function LandingPricing({
                 </svg>
               </div>
               <div className='min-w-0 flex-1 text-center sm:text-left'>
-                <p className='font-landing-label mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--color-primary)]'>
+                <p className='font-landing-label mb-2 text-xs font-semibold tracking-[0.12em] text-[color:var(--color-primary)] uppercase'>
                   {copy.pricingFromApi.customTermsEyebrow}
                 </p>
-                <h3 className='font-display text-xl font-bold leading-tight tracking-tight text-[color:var(--color-text)] sm:text-2xl'>
+                <h3 className='font-display text-xl leading-tight font-bold tracking-tight text-[color:var(--color-text)] sm:text-2xl'>
                   {copy.pricingFromApi.customTermsTitle}
                 </h3>
                 <p className='mt-3 max-w-2xl text-sm leading-relaxed text-[color:var(--color-text-muted)] sm:text-base'>

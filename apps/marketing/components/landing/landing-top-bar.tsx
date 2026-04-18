@@ -55,7 +55,7 @@ export function LandingTopBar({ locale, copy, appBaseUrl }: Props) {
         </Link>
 
         <nav
-          className='hidden items-center gap-6 lg:gap-7 md:flex'
+          className='hidden items-center gap-6 md:flex lg:gap-7'
           aria-label='Main navigation'
         >
           <a href='#features' className={navLinkClass}>

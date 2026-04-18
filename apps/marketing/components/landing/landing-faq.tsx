@@ -71,7 +71,7 @@ export function LandingFaq({ copy }: Props) {
                   }`}
                 >
                   <div className='overflow-hidden'>
-                    <div className='border-t border-[color:var(--color-border)] px-6 pb-6 pt-4 pl-16'>
+                    <div className='border-t border-[color:var(--color-border)] px-6 pt-4 pb-6 pl-16'>
                       <p className='text-sm leading-relaxed text-[color:var(--color-text-muted)]'>
                         {item.answer}
                       </p>

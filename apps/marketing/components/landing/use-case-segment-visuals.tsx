@@ -13,7 +13,13 @@ const iconStroke = {
 /** Medical cross — reads clearly at small sizes */
 function IconHealthcare({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox='0 0 24 24' width='24' height='24' aria-hidden>
+    <svg
+      className={className}
+      viewBox='0 0 24 24'
+      width='24'
+      height='24'
+      aria-hidden
+    >
       <path {...iconStroke} d='M12 3v18M5 10h14' strokeWidth={2.35} />
     </svg>
   );
@@ -21,7 +27,13 @@ function IconHealthcare({ className }: { className?: string }) {
 
 function IconPublicSector({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox='0 0 24 24' width='24' height='24' aria-hidden>
+    <svg
+      className={className}
+      viewBox='0 0 24 24'
+      width='24'
+      height='24'
+      aria-hidden
+    >
       {/* Крупнее в viewBox — прежний контур визуально казался меньше остальных */}
       <path {...iconStroke} d='M3 21h18M5 21V11l7-6 7 6v10M8 21v-6h8v6' />
       <path {...iconStroke} d='M11 13h2' />
@@ -31,7 +43,13 @@ function IconPublicSector({ className }: { className?: string }) {
 
 function IconRetailFinance({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox='0 0 24 24' width='24' height='24' aria-hidden>
+    <svg
+      className={className}
+      viewBox='0 0 24 24'
+      width='24'
+      height='24'
+      aria-hidden
+    >
       <rect {...iconStroke} x='2' y='5' width='20' height='14' rx='2.5' />
       <path {...iconStroke} d='M2 10h20' />
       <path {...iconStroke} d='M6 15h4M14 15h4' />
@@ -41,7 +59,13 @@ function IconRetailFinance({ className }: { className?: string }) {
 
 function IconHospitality({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox='0 0 24 24' width='24' height='24' aria-hidden>
+    <svg
+      className={className}
+      viewBox='0 0 24 24'
+      width='24'
+      height='24'
+      aria-hidden
+    >
       <path {...iconStroke} d='M6 8h12l1 4H5l1-4z' />
       <path {...iconStroke} d='M8 8V6a4 4 0 118 0v2' />
       <path {...iconStroke} d='M5 12v8a1 1 0 001 1h12a1 1 0 001-1v-8' />
@@ -51,15 +75,30 @@ function IconHospitality({ className }: { className?: string }) {
 
 function IconServices({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox='0 0 24 24' width='24' height='24' aria-hidden>
-      <path {...iconStroke} d='M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z' />
+    <svg
+      className={className}
+      viewBox='0 0 24 24'
+      width='24'
+      height='24'
+      aria-hidden
+    >
+      <path
+        {...iconStroke}
+        d='M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z'
+      />
     </svg>
   );
 }
 
 function IconEducation({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox='0 0 24 24' width='24' height='24' aria-hidden>
+    <svg
+      className={className}
+      viewBox='0 0 24 24'
+      width='24'
+      height='24'
+      aria-hidden
+    >
       <path {...iconStroke} d='M22 10l-10-5L2 10l10 5 10-5z' />
       <path {...iconStroke} d='M6 12v5c0 1 3 3 6 3s6-2 6-3v-5' />
     </svg>

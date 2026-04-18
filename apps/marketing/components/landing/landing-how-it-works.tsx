@@ -38,7 +38,7 @@ export function LandingHowItWorks({ copy }: Props) {
             const card = (
               <article
                 key={step.title}
-                className='landing-reveal flex min-h-0 flex-1 flex-col items-center rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-elevated)] px-6 py-8 text-center shadow-sm lg:min-w-0 lg:max-w-none lg:px-5 lg:py-8 xl:px-7'
+                className='landing-reveal flex min-h-0 flex-1 flex-col items-center rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-elevated)] px-6 py-8 text-center shadow-sm lg:max-w-none lg:min-w-0 lg:px-5 lg:py-8 xl:px-7'
                 style={{ animationDelay: `${0.08 * index}s` }}
               >
                 <div className='mb-5 flex h-11 w-11 items-center justify-center rounded-full bg-[color:var(--color-primary)]/12 sm:h-12 sm:w-12'>

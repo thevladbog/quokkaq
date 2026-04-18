@@ -271,8 +271,7 @@ export const legalPages: Record<AppLocale, LegalPagesCopy> = {
     },
     terms: {
       title: 'Условия использования',
-      description:
-        'Условия использования сайта КвоккаКю и связанных сервисов.',
+      description: 'Условия использования сайта КвоккаКю и связанных сервисов.',
       sections: [
         {
           heading: '1. Согласие',

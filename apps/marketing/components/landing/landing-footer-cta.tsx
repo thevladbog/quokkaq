@@ -76,20 +76,21 @@ export function LandingFooterCta({ locale, copy, appBaseUrl }: Props) {
         </div>
       </div>
 
-      <div className='border-t border-[color:var(--color-border)] bg-[#f4f1eb] px-4 py-6 dark:border-[color:var(--color-border)] dark:bg-[color:var(--color-surface)] sm:px-6'>
+      <div className='border-t border-[color:var(--color-border)] bg-[#f4f1eb] px-4 py-6 sm:px-6 dark:border-[color:var(--color-border)] dark:bg-[color:var(--color-surface)]'>
         <div className='mx-auto grid max-w-6xl grid-cols-1 items-center gap-4 text-sm text-neutral-500 sm:grid-cols-3 sm:gap-6 dark:text-[color:var(--color-text-muted)]'>
           <div className='flex justify-center sm:justify-start'>
             <Link
               href={`/${locale}`}
               prefetch={false}
-              className='focus-ring inline-flex rounded-md grayscale opacity-90 transition-[filter,opacity] duration-200 ease-out hover:grayscale-0 hover:opacity-100 focus-visible:grayscale-0 focus-visible:opacity-100 dark:opacity-85 dark:hover:opacity-100'
+              className='focus-ring inline-flex rounded-md opacity-90 grayscale transition-[filter,opacity] duration-200 ease-out hover:opacity-100 hover:grayscale-0 focus-visible:opacity-100 focus-visible:grayscale-0 dark:opacity-85 dark:hover:opacity-100'
               aria-label={copy.logoAlt}
             >
               <TextLogoImg locale={locale} className='h-7 w-auto' />
             </Link>
           </div>
           <p className='text-center tabular-nums'>
-            © {year} {copy.footer.copyrightBrand}. {copy.footer.copyrightReserved}
+            © {year} {copy.footer.copyrightBrand}.{' '}
+            {copy.footer.copyrightReserved}
           </p>
           <nav
             className='flex flex-wrap items-center justify-center gap-x-6 gap-y-2 sm:justify-end'

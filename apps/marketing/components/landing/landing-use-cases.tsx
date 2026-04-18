@@ -27,7 +27,7 @@ export function LandingUseCases({ copy }: Props) {
             return (
               <article
                 key={useCase.title}
-                className='landing-reveal group flex flex-col rounded-3xl border border-[color:var(--color-border)]/80 bg-[color:var(--color-surface)] p-7 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition sm:p-8 dark:shadow-[0_1px_2px_rgba(0,0,0,0.2)] dark:hover:border-[color:var(--color-border)] hover:border-[color:var(--color-primary)]/25 hover:shadow-[0_8px_30px_-12px_rgba(0,0,0,0.12)] dark:hover:shadow-[0_8px_30px_-12px_rgba(0,0,0,0.45)]'
+                className='landing-reveal group flex flex-col rounded-3xl border border-[color:var(--color-border)]/80 bg-[color:var(--color-surface)] p-7 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition hover:border-[color:var(--color-primary)]/25 hover:shadow-[0_8px_30px_-12px_rgba(0,0,0,0.12)] sm:p-8 dark:shadow-[0_1px_2px_rgba(0,0,0,0.2)] dark:hover:border-[color:var(--color-border)] dark:hover:shadow-[0_8px_30px_-12px_rgba(0,0,0,0.45)]'
                 style={{
                   animationDelay: `${0.08 * index}s`
                 }}
@@ -40,7 +40,7 @@ export function LandingUseCases({ copy }: Props) {
                     <Icon className='h-7 w-7' />
                   </div>
                   <span
-                    className={`font-landing-label inline-flex rounded-full px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] ${tagClass}`}
+                    className={`font-landing-label inline-flex rounded-full px-3.5 py-1.5 text-[11px] font-semibold tracking-[0.08em] uppercase ${tagClass}`}
                   >
                     {useCase.industry}
                   </span>

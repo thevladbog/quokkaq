@@ -26,8 +26,8 @@ export function LandingInterfaceShowcase({ copy }: Props) {
                 animationDelay: `${0.1 * index}s`
               }}
             >
-              <div className='absolute right-0 top-0 h-32 w-32 translate-x-8 -translate-y-8 rounded-full bg-gradient-to-br from-[color:var(--color-primary)]/20 to-[color:var(--color-secondary)]/10 blur-2xl transition group-hover:scale-150' />
-              
+              <div className='absolute top-0 right-0 h-32 w-32 translate-x-8 -translate-y-8 rounded-full bg-gradient-to-br from-[color:var(--color-primary)]/20 to-[color:var(--color-secondary)]/10 blur-2xl transition group-hover:scale-150' />
+
               <div className='relative z-10'>
                 <div className='mb-6 flex aspect-[16/10] items-center justify-center rounded-xl border border-[color:var(--color-border)] bg-gradient-to-br from-[color:var(--color-surface-elevated)] to-[color:var(--color-surface)] p-8'>
                   <div className='flex h-full w-full flex-col items-center justify-center gap-3'>

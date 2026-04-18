@@ -152,7 +152,7 @@ export function LandingTicketsAnimation({ locale }: AnimationProps) {
               color: ticket.palette.text
             }}
           >
-            <div className='font-landing-label tabular-nums text-center text-sm font-bold sm:text-base'>
+            <div className='font-landing-label text-center text-sm font-bold tabular-nums sm:text-base'>
               {ticket.number}
             </div>
           </div>
