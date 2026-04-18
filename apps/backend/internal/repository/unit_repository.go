@@ -2,6 +2,8 @@ package repository
 
 import (
 	"encoding/json"
+	"time"
+
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/pkg/database"
 
@@ -77,7 +79,20 @@ func (r *unitRepository) FindByIDLight(id string) (*models.Unit, error) {
 }
 
 func (r *unitRepository) Update(unit *models.Unit) error {
-	return r.db.Save(unit).Error
+	// Map-based Updates so nil pointers (e.g. name_en, parent_id) are written as SQL NULL.
+	// Save() can omit nil pointer fields on update.
+	return r.db.Model(&models.Unit{}).Where("id = ?", unit.ID).Updates(map[string]interface{}{
+		"company_id": unit.CompanyID,
+		"parent_id":  unit.ParentID,
+		"code":       unit.Code,
+		"kind":       unit.Kind,
+		"sort_order": unit.SortOrder,
+		"name":       unit.Name,
+		"name_en":    unit.NameEn,
+		"timezone":   unit.Timezone,
+		"config":     unit.Config,
+		"updated_at": time.Now(),
+	}).Error
 }
 
 func (r *unitRepository) UpdateConfig(unitID string, config json.RawMessage) error {

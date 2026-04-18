@@ -56,6 +56,7 @@ func (PanicUserRepo) Create(*models.User) error                                 
 func (PanicUserRepo) CreateTx(*gorm.DB, *models.User) error                     { panic("unexpected") }
 func (PanicUserRepo) FindAll(string) ([]models.User, error)                     { panic("unexpected") }
 func (PanicUserRepo) FindByID(string) (*models.User, error)                     { panic("unexpected") }
+func (PanicUserRepo) FindByIDTx(*gorm.DB, string) (*models.User, error)         { panic("unexpected") }
 func (PanicUserRepo) FindByEmail(string) (*models.User, error)                  { panic("unexpected") }
 func (PanicUserRepo) Update(*models.User) error                                 { panic("unexpected") }
 func (PanicUserRepo) UpdateTx(*gorm.DB, *models.User) error                     { panic("unexpected") }

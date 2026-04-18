@@ -18569,6 +18569,7 @@
             },
             "patch": {
                 "description": "Updates an existing user",
+                "operationId": "updateUser",
                 "parameters": [
                     {
                         "description": "User ID",
@@ -18588,9 +18589,9 @@
                             }
                         }
                     },
-                    "description": "User update (PATCH fields)",
+                    "description": "User Data",
                     "required": true,
-                    "x-originalParamName": "input"
+                    "x-originalParamName": "user"
                 },
                 "responses": {
                     "200": {
@@ -18612,6 +18613,16 @@
                             }
                         },
                         "description": "Bad Request"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "User not found"
                     },
                     "500": {
                         "content": {

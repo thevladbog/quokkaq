@@ -2,11 +2,13 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/services"
 
 	"github.com/go-chi/chi/v5"
+	"gorm.io/gorm"
 )
 
 type UserHandler struct {
@@ -99,15 +101,17 @@ func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 }
 
 // UpdateUser godoc
+// @ID           updateUser
 // @Summary      Update a user
 // @Description  Updates an existing user
 // @Tags         users
 // @Accept       json
 // @Produce      json
-// @Param        id     path      string                  true  "User ID"
-// @Param        input  body      models.UpdateUserInput  true  "User update (PATCH fields)"
+// @Param        id   path   string                  true  "User ID"
+// @Param        user body   models.UpdateUserInput  true  "User Data"
 // @Success      200   {object}  models.User
 // @Failure      400   {string}  string "Bad Request"
+// @Failure      404   {string}  string "User not found"
 // @Failure      500   {string}  string "Internal Server Error"
 // @Router       /users/{id} [patch]
 func (h *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
@@ -119,6 +123,10 @@ func (h *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.service.UpdateUser(id, &input); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "User not found", http.StatusNotFound)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

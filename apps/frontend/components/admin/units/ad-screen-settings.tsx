@@ -299,7 +299,7 @@ export function AdScreenSettings({
               min='0'
               max='50'
               value={width}
-              onChange={(e) => setWidth(parseInt(e.target.value) || 0)}
+              onChange={(e) => setWidth(parseInt(e.target.value, 10) || 0)}
               placeholder='0 = no ads'
               className='min-w-0'
             />
@@ -309,7 +309,7 @@ export function AdScreenSettings({
               min='1'
               max='60'
               value={duration}
-              onChange={(e) => setDuration(parseInt(e.target.value) || 5)}
+              onChange={(e) => setDuration(parseInt(e.target.value, 10) || 5)}
               className='min-w-0'
             />
             <p className='text-muted-foreground min-w-0 text-xs leading-relaxed'>

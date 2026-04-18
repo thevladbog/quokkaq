@@ -233,7 +233,11 @@ func (s *CalendarIntegrationService) ListPublicForCompany(companyID string) ([]C
 	for i := range rows {
 		row := &rows[i]
 		uname, unameEn := "", ""
-		if u, err := s.unitRepo.FindByIDLight(row.UnitID); err == nil && u != nil {
+		u, err := s.unitRepo.FindByIDLight(row.UnitID)
+		if err != nil {
+			return nil, err
+		}
+		if u != nil {
 			uname = strings.TrimSpace(u.Name)
 			if u.NameEn != nil {
 				unameEn = strings.TrimSpace(*u.NameEn)
@@ -251,7 +255,11 @@ func (s *CalendarIntegrationService) GetPublicByID(integrationID string) (*Calen
 		return nil, err
 	}
 	uname, unameEn := "", ""
-	if u, err := s.unitRepo.FindByIDLight(row.UnitID); err == nil && u != nil {
+	u, err := s.unitRepo.FindByIDLight(row.UnitID)
+	if err != nil {
+		return nil, err
+	}
+	if u != nil {
 		uname = strings.TrimSpace(u.Name)
 		if u.NameEn != nil {
 			unameEn = strings.TrimSpace(*u.NameEn)

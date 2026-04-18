@@ -70,29 +70,17 @@ export default function PreRegistrationsIndexPage() {
   if (!assignableUnitIds?.length) {
     return (
       <div className='container mx-auto p-4'>
-        <h1 className='mb-6 text-3xl font-bold'>
-          {tNav('pre_registrations', {
-            defaultValue: 'Pre-registrations'
-          })}
-        </h1>
-        <p className='text-muted-foreground'>
-          {t('units.no_units', { defaultValue: 'No units assigned.' })}
-        </p>
+        <h1 className='mb-6 text-3xl font-bold'>{tNav('pre_registrations')}</h1>
+        <p className='text-muted-foreground'>{t('units.no_units')}</p>
       </div>
     );
   }
 
   return (
     <div className='container mx-auto p-4'>
-      <h1 className='mb-6 text-3xl font-bold'>
-        {tNav('pre_registrations', {
-          defaultValue: 'Pre-registrations'
-        })}
-      </h1>
+      <h1 className='mb-6 text-3xl font-bold'>{tNav('pre_registrations')}</h1>
       <p className='text-muted-foreground mb-6'>
-        {t('pre_registrations.select_unit', {
-          defaultValue: 'Select a unit to manage pre-registrations.'
-        })}
+        {t('pre_registrations.select_unit')}
       </p>
 
       <div className='grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3'>
@@ -108,7 +96,7 @@ export default function PreRegistrationsIndexPage() {
             </CardHeader>
             <CardContent>
               <Button variant='outline' className='w-full'>
-                {t('general.view', { defaultValue: 'Manage' })}
+                {t('pre_registrations.manage_unit')}
               </Button>
             </CardContent>
           </Card>

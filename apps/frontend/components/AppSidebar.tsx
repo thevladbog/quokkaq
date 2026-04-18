@@ -48,10 +48,11 @@ import { SidebarTenantCompanySelect } from '@/components/SidebarTenantCompanySel
 import { SidebarCollapsedLogo } from '@/components/SidebarCollapsedLogo';
 import { SidebarCollapseToggle } from '@/components/SidebarCollapseToggle';
 import { useActiveUnit } from '@/contexts/ActiveUnitContext';
+import { getWordmarkSrc } from '@/lib/wordmark-src';
 
 const AppSidebar = () => {
   const locale = useLocale();
-  const wordmarkSrc = locale === 'ru' ? '/logo-text-ru.svg' : '/logo-text.svg';
+  const wordmarkSrc = getWordmarkSrc(locale);
   const tNav = useTranslations('nav');
   const tProfile = useTranslations('profile');
   const { user, isAuthenticated, logout } = useAuthContext();

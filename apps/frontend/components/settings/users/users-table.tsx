@@ -77,7 +77,12 @@ export function UsersTable({
       <TableBody>
         {users.map((user) => {
           const isAdmin = user.roles?.includes('admin');
-          const unitRows = user.units ?? [];
+          const seenUnitIds = new Set<string>();
+          const unitRows = (user.units ?? []).filter((uu) => {
+            if (seenUnitIds.has(uu.unitId)) return false;
+            seenUnitIds.add(uu.unitId);
+            return true;
+          });
           const extra = Math.max(0, unitRows.length - MAX_UNIT_TAGS);
 
           return (

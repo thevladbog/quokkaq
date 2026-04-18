@@ -1,6 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
 import { useLocale, useTranslations } from 'next-intl';
 import { useQueryClient } from '@tanstack/react-query';
 import { Building2, FolderOpen, Plus, ExternalLink } from 'lucide-react';
@@ -22,7 +24,14 @@ import {
   DialogTitle
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage
+} from '@/components/ui/form';
 import { Badge } from '@/components/ui/badge';
 import { useCreateUnit, useUnits } from '@/lib/hooks';
 import { Link, useRouter } from '@/src/i18n/navigation';
@@ -40,6 +49,11 @@ import { getUnitDisplayName } from '@/lib/unit-display';
 import { z } from 'zod';
 
 type CreateKind = 'subdivision' | 'service_zone';
+
+type CreateChildFormValues = {
+  name: string;
+  code: string;
+};
 
 function SubdivisionUnitsSubtree({
   nodes,
@@ -185,18 +199,32 @@ export function SubdivisionStationsAndZonesPanel({
     [subdivisionId, allUnits, locale]
   );
 
+  const createChildFormSchema = useMemo(
+    () =>
+      z.object({
+        name: z
+          .string()
+          .trim()
+          .min(1, { message: t('unit_name_code_required') }),
+        code: z
+          .string()
+          .trim()
+          .min(1, { message: t('unit_name_code_required') })
+      }),
+    [t]
+  );
+
+  const form = useForm<CreateChildFormValues>({
+    resolver: zodResolver(createChildFormSchema),
+    defaultValues: { name: '', code: '' }
+  });
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [createKind, setCreateKind] = useState<CreateKind>('service_zone');
-  const [name, setName] = useState('');
-  const [code, setCode] = useState('');
-
-  const resetForm = () => {
-    setName('');
-    setCode('');
-  };
 
   const openDialog = (kind: CreateKind) => {
     setCreateKind(kind);
+    form.reset({ name: '', code: '' });
     setDialogOpen(true);
   };
 
@@ -209,41 +237,11 @@ export function SubdivisionStationsAndZonesPanel({
     });
   };
 
-  const handleCreate = async () => {
-    const requiredMsg = t('unit_name_code_required');
-    const parsed = z
-      .object({
-        name: z.string().transform((s) => s.trim()),
-        code: z.string().transform((s) => s.trim())
-      })
-      .superRefine((val, ctx) => {
-        if (!val.name) {
-          ctx.addIssue({
-            code: 'custom',
-            message: requiredMsg,
-            path: ['name']
-          });
-        }
-        if (!val.code) {
-          ctx.addIssue({
-            code: 'custom',
-            message: requiredMsg,
-            path: ['code']
-          });
-        }
-      })
-      .safeParse({ name, code });
-    if (!parsed.success) {
-      toast.error(
-        parsed.error.issues[0]?.message ?? t('unit_name_code_required')
-      );
-      return;
-    }
-    const { name: validName, code: validCode } = parsed.data;
+  const onCreateSubmit = form.handleSubmit(async (values) => {
     try {
       await createUnitMutation.mutateAsync({
-        name: validName,
-        code: validCode,
+        name: values.name,
+        code: values.code,
         companyId,
         timezone: parentTimezone,
         kind: createKind,
@@ -251,7 +249,7 @@ export function SubdivisionStationsAndZonesPanel({
       });
       await invalidateChildQueries();
       setDialogOpen(false);
-      resetForm();
+      form.reset({ name: '', code: '' });
       toast.success(
         createKind === 'service_zone'
           ? t('child_service_zone_created')
@@ -264,7 +262,7 @@ export function SubdivisionStationsAndZonesPanel({
         })
       );
     }
-  };
+  });
 
   return (
     <>
@@ -348,7 +346,9 @@ export function SubdivisionStationsAndZonesPanel({
         open={dialogOpen}
         onOpenChange={(open) => {
           setDialogOpen(open);
-          if (!open) resetForm();
+          if (!open) {
+            form.reset({ name: '', code: '' });
+          }
         }}
       >
         <DialogContent className='sm:max-w-md'>
@@ -364,41 +364,66 @@ export function SubdivisionStationsAndZonesPanel({
                 : t('create_service_zone_dialog_desc')}
             </DialogDescription>
           </DialogHeader>
-          <div className='grid gap-4 py-2'>
-            <div className='space-y-2'>
-              <Label htmlFor='subdiv-child-name'>{t('unit_name')}</Label>
-              <Input
-                id='subdiv-child-name'
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder={t('name_placeholder')}
+          <Form {...form}>
+            <form onSubmit={onCreateSubmit} className='grid gap-4 py-2'>
+              <FormField
+                control={form.control}
+                name='name'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel htmlFor='subdiv-child-name'>
+                      {t('unit_name')}
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        id='subdiv-child-name'
+                        autoComplete='off'
+                        placeholder={t('name_placeholder')}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div className='space-y-2'>
-              <Label htmlFor='subdiv-child-code'>{t('code')}</Label>
-              <Input
-                id='subdiv-child-code'
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                placeholder={t('code_placeholder')}
+              <FormField
+                control={form.control}
+                name='code'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel htmlFor='subdiv-child-code'>
+                      {t('code')}
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        id='subdiv-child-code'
+                        autoComplete='off'
+                        placeholder={t('code_placeholder')}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant='outline' onClick={() => setDialogOpen(false)}>
-              {tAdminGeneral('cancel')}
-            </Button>
-            <Button
-              onClick={() => void handleCreate()}
-              disabled={createUnitMutation.isPending}
-            >
-              {createUnitMutation.isPending
-                ? t('saving', { defaultValue: 'Saving...' })
-                : createKind === 'subdivision'
-                  ? t('create_subdivision_submit')
-                  : t('create_service_zone_submit')}
-            </Button>
-          </DialogFooter>
+              <DialogFooter className='gap-2 sm:gap-0'>
+                <Button
+                  type='button'
+                  variant='outline'
+                  onClick={() => setDialogOpen(false)}
+                >
+                  {tAdminGeneral('cancel')}
+                </Button>
+                <Button type='submit' disabled={createUnitMutation.isPending}>
+                  {createUnitMutation.isPending
+                    ? t('saving', { defaultValue: 'Saving...' })
+                    : createKind === 'subdivision'
+                      ? t('create_subdivision_submit')
+                      : t('create_service_zone_submit')}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
     </>

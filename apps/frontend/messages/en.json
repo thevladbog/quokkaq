@@ -894,6 +894,7 @@
     },
     "pre_registrations": {
       "title": "Pre-registrations",
+      "manage_unit": "Manage",
       "select_unit": "Select a unit to manage pre-registrations",
       "create_title": "Create Pre-registration",
       "create_desc": "Fill in the details to create a new pre-registration.",
@@ -1953,6 +1954,7 @@
   "templates": {
     "title": "Message Templates",
     "description": "Manage invitation templates",
+    "loading": "Loading templates…",
     "create_template": "Create Template",
     "name": "Name",
     "subject": "Subject",

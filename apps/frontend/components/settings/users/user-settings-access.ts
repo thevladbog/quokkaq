@@ -9,7 +9,9 @@ export function getAvailableUnitsForManager(
     return units;
   }
   const allowedUnitIds = Object.entries(currentUser?.permissions || {})
-    .filter(([, perms]) => (perms as string[]).includes('UNIT_USERS_MANAGE'))
+    .filter(([, perms]) =>
+      Array.isArray(perms) ? perms.includes('UNIT_USERS_MANAGE') : false
+    )
     .map(([unitId]) => unitId);
   const allowed = new Set(allowedUnitIds);
   return units.filter((u) => allowed.has(u.id));

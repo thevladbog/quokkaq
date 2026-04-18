@@ -15,10 +15,11 @@ import Image from 'next/image';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useRouter } from '../../src/i18n/navigation';
 import { useEffect, useState } from 'react';
+import { getWordmarkSrc } from '@/lib/wordmark-src';
 
 export default function Home() {
   const locale = useLocale();
-  const wordmarkSrc = locale === 'ru' ? '/logo-text-ru.svg' : '/logo-text.svg';
+  const wordmarkSrc = getWordmarkSrc(locale);
   const t = useTranslations('home');
   const { isAuthenticated, isLoading, user, token } = useAuthContext();
   const router = useRouter();

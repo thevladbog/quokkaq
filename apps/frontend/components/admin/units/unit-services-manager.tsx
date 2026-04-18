@@ -485,7 +485,16 @@ function ServiceForm({
         </p>
       ) : null}
       <div className='space-y-2'>
-        <Label htmlFor='name'>{tServices('name')} (EN) *</Label>
+        <Label htmlFor='name'>
+          {tRoot('forms.fields.name_en')}
+          <span
+            className='text-destructive ml-0.5'
+            title={tRoot('forms.fields.required_field')}
+            aria-hidden
+          >
+            *
+          </span>
+        </Label>
         <Input
           id='name'
           name='name'

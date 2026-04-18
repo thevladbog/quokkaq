@@ -73,6 +73,9 @@ export function buildDescendantForest(
 
   function collectDescendants(id: string) {
     for (const child of childrenOfFull.get(id) ?? []) {
+      if (subtreeIds.has(child.id)) {
+        continue;
+      }
       subtreeIds.add(child.id);
       collectDescendants(child.id);
     }

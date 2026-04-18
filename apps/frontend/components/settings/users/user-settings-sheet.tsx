@@ -161,9 +161,15 @@ function UserSettingsSheetBody({
   };
 
   const handleToggleAdmin = async (checked: boolean) => {
+    const base = [...(user.roles ?? [])];
+    const nextRoles = checked
+      ? base.includes('admin')
+        ? base
+        : [...base, 'admin']
+      : base.filter((r) => r !== 'admin');
     await updateUserMutation.mutateAsync({
       userId: user.id,
-      data: { roles: checked ? ['admin'] : [] }
+      data: { roles: nextRoles }
     });
   };
 
@@ -262,6 +268,7 @@ function UserSettingsSheetBody({
                   checked={!!isSystemAdmin}
                   onCheckedChange={handleToggleAdmin}
                   disabled={updateUserMutation.isPending}
+                  aria-label={t('system_admin')}
                 />
               </div>
             </section>

@@ -6,6 +6,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { Link, usePathname } from '@/src/i18n/navigation';
 import { SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
+import { getWordmarkSrc } from '@/lib/wordmark-src';
 
 function useMobileLogoHref(): string {
   const pathname = usePathname();
@@ -31,7 +32,7 @@ export function SidebarInsetShell({
   const t = useTranslations('nav');
   const locale = useLocale();
   const logoHref = useMobileLogoHref();
-  const wordmarkSrc = locale === 'ru' ? '/logo-text-ru.svg' : '/logo-text.svg';
+  const wordmarkSrc = getWordmarkSrc(locale);
 
   return (
     <SidebarInset>

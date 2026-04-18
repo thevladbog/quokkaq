@@ -25,10 +25,11 @@ import { Link, usePathname } from '@/src/i18n/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { SidebarCollapsedLogo } from '@/components/SidebarCollapsedLogo';
 import { SidebarCollapseToggle } from '@/components/SidebarCollapseToggle';
+import { getWordmarkSrc } from '@/lib/wordmark-src';
 
 export default function PlatformSidebar() {
   const locale = useLocale();
-  const wordmarkSrc = locale === 'ru' ? '/logo-text-ru.svg' : '/logo-text.svg';
+  const wordmarkSrc = getWordmarkSrc(locale);
   const pathname = usePathname();
   const t = useTranslations('platform.nav');
 

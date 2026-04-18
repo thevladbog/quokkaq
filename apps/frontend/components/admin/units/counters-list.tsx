@@ -268,9 +268,7 @@ export function UnitCountersSection({
   return (
     <div className={cn('flex flex-col gap-3', className)}>
       {hideEmbeddedHeading ? (
-        <div className='flex w-full flex-col gap-2 sm:flex-row sm:justify-end'>
-          {addButton}
-        </div>
+        <div className='flex w-full sm:justify-end'>{addButton}</div>
       ) : (
         <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
           <div className='min-w-0 space-y-1'>

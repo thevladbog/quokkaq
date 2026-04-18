@@ -58,6 +58,7 @@ export function LogoUpload({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (disabled) return;
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -136,6 +137,7 @@ export function LogoUpload({
             type='file'
             accept={accept}
             className='hidden'
+            disabled={disabled}
             onChange={handleFileChange}
             id={fileInputId}
           />

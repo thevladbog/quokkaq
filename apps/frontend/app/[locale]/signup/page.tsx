@@ -25,11 +25,12 @@ import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
 import { authAccessibleCompanies } from '@/lib/api/generated/auth';
 import { isValidTenantSlug, normalizeTenantSlug } from '@quokkaq/shared-types';
+import { getWordmarkSrc } from '@/lib/wordmark-src';
 
 export default function SignupPage() {
   const t = useTranslations('signup');
   const locale = useLocale();
-  const wordmarkSrc = locale === 'ru' ? '/logo-text-ru.svg' : '/logo-text.svg';
+  const wordmarkSrc = getWordmarkSrc(locale);
   const searchParams = useSearchParams();
   const planCode = searchParams.get('plan')?.trim() || undefined;
 

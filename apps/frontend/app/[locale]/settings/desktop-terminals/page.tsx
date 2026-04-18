@@ -62,6 +62,7 @@ import {
   type DesktopTerminal,
   type Unit
 } from '@/lib/api';
+import { getUnitDisplayName } from '@/lib/unit-display';
 
 function filterCountersForContext(unit: Unit, counters: Counter[]): Counter[] {
   if (unit.kind === 'subdivision') {
@@ -138,6 +139,22 @@ export default function DesktopTerminalsPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (formUnitId && !units.some((u) => u.id === formUnitId)) {
+      setFormUnitId('');
+    }
+  }, [units, formUnitId]);
+
+  useEffect(() => {
+    if (
+      formContextUnitId &&
+      !contextUnits.some((u) => u.id === formContextUnitId)
+    ) {
+      setFormContextUnitId('');
+      setFormCounterId('');
+    }
+  }, [contextUnits, formContextUnitId]);
 
   useEffect(() => {
     if (!(createOpen || editOpen)) return;
@@ -246,9 +263,15 @@ export default function DesktopTerminalsPage() {
 
   const submitCreate = async () => {
     const nameTrim = formName.trim();
+    const safeUnitId = units.some((u) => u.id === formUnitId) ? formUnitId : '';
+    const safeContextUnitId = contextUnits.some(
+      (u) => u.id === formContextUnitId
+    )
+      ? formContextUnitId
+      : '';
     try {
       if (formDeviceKind === 'counter_display') {
-        if (!formContextUnitId || !formCounterId) {
+        if (!safeContextUnitId || !formCounterId) {
           toast.error(t('select_counter_error'));
           return;
         }
@@ -261,7 +284,7 @@ export default function DesktopTerminalsPage() {
           unitId: counter.unitId,
           defaultLocale: formLocale,
           kioskFullscreen: formKioskFullscreen,
-          contextUnitId: formContextUnitId,
+          contextUnitId: safeContextUnitId,
           counterId: formCounterId,
           ...(nameTrim ? { name: nameTrim } : {})
         });
@@ -274,12 +297,12 @@ export default function DesktopTerminalsPage() {
         return;
       }
 
-      if (!formUnitId) {
+      if (!safeUnitId) {
         toast.error(t('select_unit'));
         return;
       }
       const res = await desktopTerminalsApi.create({
-        unitId: formUnitId,
+        unitId: safeUnitId,
         defaultLocale: formLocale,
         kioskFullscreen: formKioskFullscreen,
         ...(nameTrim ? { name: nameTrim } : {})
@@ -302,9 +325,15 @@ export default function DesktopTerminalsPage() {
   const submitEdit = async () => {
     if (!editing) return;
     const nameTrim = formName.trim();
+    const safeUnitId = units.some((u) => u.id === formUnitId) ? formUnitId : '';
+    const safeContextUnitId = contextUnits.some(
+      (u) => u.id === formContextUnitId
+    )
+      ? formContextUnitId
+      : '';
     try {
       if (formDeviceKind === 'counter_display') {
-        if (!formContextUnitId || !formCounterId) {
+        if (!safeContextUnitId || !formCounterId) {
           toast.error(t('select_counter_error'));
           return;
         }
@@ -317,17 +346,17 @@ export default function DesktopTerminalsPage() {
           unitId: counter.unitId,
           defaultLocale: formLocale,
           kioskFullscreen: formKioskFullscreen,
-          contextUnitId: formContextUnitId,
+          contextUnitId: safeContextUnitId,
           counterId: formCounterId,
           ...(nameTrim ? { name: nameTrim } : {})
         });
       } else {
-        if (!formUnitId) {
+        if (!safeUnitId) {
           toast.error(t('select_unit'));
           return;
         }
         await desktopTerminalsApi.update(editing.id, {
-          unitId: formUnitId,
+          unitId: safeUnitId,
           defaultLocale: formLocale,
           kioskFullscreen: formKioskFullscreen,
           counterId: '',
@@ -424,7 +453,7 @@ export default function DesktopTerminalsPage() {
               <SelectItem value={SELECT_UNSET}>{t('select_unit')}</SelectItem>
               {units.map((u) => (
                 <SelectItem key={u.id} value={u.id}>
-                  {u.name}
+                  {getUnitDisplayName(u, locale)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -454,7 +483,7 @@ export default function DesktopTerminalsPage() {
                 </SelectItem>
                 {contextUnits.map((u) => (
                   <SelectItem key={u.id} value={u.id}>
-                    {u.name}
+                    {getUnitDisplayName(u, locale)}
                   </SelectItem>
                 ))}
               </SelectContent>

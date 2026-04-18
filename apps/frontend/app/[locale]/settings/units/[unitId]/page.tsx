@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useMemo, useState } from 'react';
+import { use, useEffect, useMemo, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
@@ -64,13 +64,15 @@ export default function UnitPage({ params }: UnitPageProps) {
   const [unitCode, setUnitCode] = useState('');
   const [unitTimezone, setUnitTimezone] = useState('');
 
-  // Initialize state when unit loads
-  if (unit && unitName === '' && unitCode === '') {
+  useEffect(() => {
+    if (!unit) return;
+    // Sync local form state when the loaded unit payload changes (e.g. refetch).
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional reset from server
     setUnitName(unit.name);
     setUnitNameEn(unit.nameEn ?? '');
     setUnitCode(unit.code);
     setUnitTimezone(unit.timezone);
-  }
+  }, [unit]);
 
   const updateUnitMutation = useUpdateUnit();
 

@@ -8,6 +8,7 @@ import (
 	"quokkaq-go-backend/pkg/database"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // UserUnitResult is the first user_units row joined to units for a user.
@@ -21,6 +22,7 @@ type UserRepository interface {
 	CreateTx(tx *gorm.DB, user *models.User) error
 	FindAll(search string) ([]models.User, error)
 	FindByID(id string) (*models.User, error)
+	FindByIDTx(tx *gorm.DB, id string) (*models.User, error)
 	FindByEmail(email string) (*models.User, error)
 	Update(user *models.User) error
 	UpdateTx(tx *gorm.DB, user *models.User) error
@@ -105,6 +107,15 @@ func (r *userRepository) FindByID(id string) (*models.User, error) {
 	return &user, nil
 }
 
+func (r *userRepository) FindByIDTx(tx *gorm.DB, id string) (*models.User, error) {
+	var user models.User
+	err := tx.Preload("Roles.Role").Preload("Units.Unit").Preload("Units").First(&user, "id = ?", id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
 func (r *userRepository) FindByEmail(email string) (*models.User, error) {
 	var user models.User
 	err := r.db.Preload("Roles.Role").Preload("Units.Unit").Preload("Units").First(&user, "email = ?", email).Error
@@ -138,20 +149,15 @@ func (r *userRepository) Delete(id string) error {
 }
 
 func (r *userRepository) AssignUnit(userID, unitID string, permissions []string) error {
-	// Upsert by (user_id, unit_id): always create at most one row. A previous bug used
-	// unconditional Create, which inserted duplicates on every permission toggle.
-	return r.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("user_id = ? AND unit_id = ?", userID, unitID).
-			Delete(&models.UserUnit{}).Error; err != nil {
-			return err
-		}
-		uu := models.UserUnit{
-			UserID:      userID,
-			UnitID:      unitID,
-			Permissions: models.StringArray(permissions),
-		}
-		return tx.Create(&uu).Error
-	})
+	uu := models.UserUnit{
+		UserID:      userID,
+		UnitID:      unitID,
+		Permissions: models.StringArray(permissions),
+	}
+	return r.db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "user_id"}, {Name: "unit_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"permissions"}),
+	}).Create(&uu).Error
 }
 
 func (r *userRepository) CreateUserUnitTx(tx *gorm.DB, uu *models.UserUnit) error {

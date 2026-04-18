@@ -37,6 +37,7 @@ import { toast } from 'sonner';
 import type { UnitKind } from '@quokkaq/shared-types';
 import { buildUnitForest } from '@/lib/unit-tree';
 import { UnitTreeNavList } from '@/components/admin/units/unit-tree-nav';
+import { getUnitDisplayName } from '@/lib/unit-display';
 
 const PARENT_NONE = '__none__';
 
@@ -235,7 +236,7 @@ export default function UnitsIndexPage() {
                   </SelectItem>
                   {parentCandidates.map((z) => (
                     <SelectItem key={z.id} value={z.id}>
-                      {z.name} ({z.code})
+                      {getUnitDisplayName(z, locale)} ({z.code})
                     </SelectItem>
                   ))}
                 </SelectContent>

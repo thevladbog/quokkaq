@@ -30,10 +30,11 @@ import { Link, usePathname, useRouter } from '@/src/i18n/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { SidebarCollapsedLogo } from '@/components/SidebarCollapsedLogo';
 import { SidebarCollapseToggle } from '@/components/SidebarCollapseToggle';
+import { getWordmarkSrc } from '@/lib/wordmark-src';
 
 export default function SettingsSidebar() {
   const locale = useLocale();
-  const wordmarkSrc = locale === 'ru' ? '/logo-text-ru.svg' : '/logo-text.svg';
+  const wordmarkSrc = getWordmarkSrc(locale);
   const pathname = usePathname();
   const router = useRouter();
   const tAdmin = useTranslations('admin');

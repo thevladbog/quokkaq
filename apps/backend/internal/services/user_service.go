@@ -2,6 +2,9 @@ package services
 
 import (
 	"errors"
+	"slices"
+	"strings"
+
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/pkg/database"
@@ -76,15 +79,6 @@ func userHasAdminRole(u *models.User) bool {
 	return false
 }
 
-func sliceContainsString(ss []string, v string) bool {
-	for _, s := range ss {
-		if s == v {
-			return true
-		}
-	}
-	return false
-}
-
 func (s *userService) UpdateUser(id string, input *models.UpdateUserInput) error {
 	if input == nil {
 		return errors.New("empty update")
@@ -94,10 +88,13 @@ func (s *userService) UpdateUser(id string, input *models.UpdateUserInput) error
 		return err
 	}
 
-	if input.Name != nil && *input.Name != "" {
-		existing.Name = *input.Name
+	if input.Name != nil {
+		if strings.TrimSpace(*input.Name) == "" {
+			return errors.New("name cannot be empty")
+		}
+		existing.Name = strings.TrimSpace(*input.Name)
 	}
-	if input.Email != nil {
+	if input.Email != nil && *input.Email != "" {
 		existing.Email = input.Email
 	}
 	if input.Password != nil && *input.Password != "" {
@@ -120,23 +117,23 @@ func (s *userService) UpdateUser(id string, input *models.UpdateUserInput) error
 		return s.repo.Update(existing)
 	}
 
-	wantsAdmin := sliceContainsString(input.Roles, "admin")
-	hasAdmin := userHasAdminRole(existing)
-
-	var adminRole *models.Role
-	if wantsAdmin && !hasAdmin {
-		var err error
-		adminRole, err = s.repo.FindRoleByName("admin")
-		if err != nil {
-			return err
-		}
-	}
+	wantsAdmin := slices.Contains(input.Roles, "admin")
 
 	return database.DB.Transaction(func(tx *gorm.DB) error {
 		if err := s.repo.UpdateTx(tx, existing); err != nil {
 			return err
 		}
+		fresh, err := s.repo.FindByIDTx(tx, id)
+		if err != nil {
+			return err
+		}
+		hasAdmin := userHasAdminRole(fresh)
+
 		if wantsAdmin && !hasAdmin {
+			adminRole, err := s.repo.FindRoleByName("admin")
+			if err != nil {
+				return err
+			}
 			return s.repo.AssignRoleTx(tx, id, adminRole.ID)
 		}
 		if !wantsAdmin && hasAdmin {

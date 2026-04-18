@@ -473,7 +473,7 @@ export function KioskSettings({
                         printerConnection === 'network' ? 'default' : 'outline'
                       }
                       onClick={() => setPrinterConnection('network')}
-                      className='min-w-0'
+                      className='min-w-0 break-words whitespace-normal'
                     >
                       {t('printer_connection_network')}
                     </Button>
@@ -483,7 +483,7 @@ export function KioskSettings({
                         printerConnection === 'system' ? 'default' : 'outline'
                       }
                       onClick={() => setPrinterConnection('system')}
-                      className='min-w-0'
+                      className='min-w-0 break-words whitespace-normal'
                     >
                       {t('printer_connection_system')}
                     </Button>
@@ -540,7 +540,7 @@ export function KioskSettings({
                         printerType === 'receipt' ? 'default' : 'outline'
                       }
                       onClick={() => setPrinterType('receipt')}
-                      className='min-w-0'
+                      className='min-w-0 break-words whitespace-normal'
                       type='button'
                     >
                       {t('printer_type_receipt')}
@@ -548,7 +548,7 @@ export function KioskSettings({
                     <Button
                       variant={printerType === 'label' ? 'default' : 'outline'}
                       onClick={() => setPrinterType('label')}
-                      className='min-w-0'
+                      className='min-w-0 break-words whitespace-normal'
                       type='button'
                     >
                       {t('printer_type_label')}

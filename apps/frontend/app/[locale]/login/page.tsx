@@ -35,6 +35,7 @@ import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { getWordmarkSrc } from '@/lib/wordmark-src';
 
 function toAuthSSOAuthorizeLocale(
   loc: string
@@ -70,7 +71,7 @@ export default function LoginPage() {
   const t = useTranslations('login');
   const locale = useLocale();
   const searchParams = useSearchParams();
-  const wordmarkSrc = locale === 'ru' ? '/logo-text-ru.svg' : '/logo-text.svg';
+  const wordmarkSrc = getWordmarkSrc(locale);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [tenantSlugManual, setTenantSlugManual] = useState('');

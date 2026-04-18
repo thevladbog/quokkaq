@@ -132,7 +132,7 @@ export default function TemplatesPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className='py-8 text-center'>{t('name')}</div>
+            <div className='py-8 text-center'>{t('loading')}</div>
           ) : templates.length === 0 ? (
             <div className='text-muted-foreground py-8 text-center'>
               {t('no_templates')}

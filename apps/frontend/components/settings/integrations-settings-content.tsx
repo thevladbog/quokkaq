@@ -80,7 +80,7 @@ export function IntegrationsSettingsContent() {
     return [...list].sort((a, b) =>
       getUnitDisplayName(a, locale).localeCompare(
         getUnitDisplayName(b, locale),
-        undefined,
+        locale,
         { sensitivity: 'base' }
       )
     );

@@ -28,12 +28,12 @@ const nextConfig: NextConfig = {
       {
         source: '/:locale/settings',
         destination: '/:locale/settings/organization',
-        permanent: true
+        permanent: false
       },
       {
         source: '/:locale/settings/grid-configuration',
         destination: '/:locale/settings/units',
-        permanent: true
+        permanent: false
       },
       {
         source: '/:locale/settings/settings/:path*',

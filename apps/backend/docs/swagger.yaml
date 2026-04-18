@@ -11570,6 +11570,7 @@ paths:
       - users
     patch:
       description: Updates an existing user
+      operationId: updateUser
       parameters:
       - description: User ID
         in: path
@@ -11582,9 +11583,9 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/models.UpdateUserInput'
-        description: User update (PATCH fields)
+        description: User Data
         required: true
-        x-originalParamName: input
+        x-originalParamName: user
       responses:
         '200':
           content:
@@ -11598,6 +11599,12 @@ paths:
               schema:
                 type: string
           description: Bad Request
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: User not found
         '500':
           content:
             application/json:

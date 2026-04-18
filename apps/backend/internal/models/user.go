@@ -98,8 +98,8 @@ type UserRole struct {
 
 type UserUnit struct {
 	ID          string      `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
-	UserID      string      `gorm:"not null" json:"userId"`
-	UnitID      string      `gorm:"not null" json:"unitId"`
+	UserID      string      `gorm:"not null;uniqueIndex:ux_user_units_user_unit" json:"userId"`
+	UnitID      string      `gorm:"not null;uniqueIndex:ux_user_units_user_unit" json:"unitId"`
 	Permissions StringArray `gorm:"type:text[]" json:"permissions,omitempty"`
 
 	User User `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-" swaggerignore:"true"`

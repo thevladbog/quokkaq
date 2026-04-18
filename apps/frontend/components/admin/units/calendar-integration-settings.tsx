@@ -791,11 +791,11 @@ export function CalendarIntegrationsPanel({
         { name: b.unitName ?? '', nameEn: b.unitNameEn },
         locale
       );
-      const c = na.localeCompare(nb);
+      const c = na.localeCompare(nb, locale);
       if (c !== 0) return c;
       const da = a.displayName ?? '';
       const db = b.displayName ?? '';
-      return da.localeCompare(db);
+      return da.localeCompare(db, locale);
     });
   }, [filtered, locale]);
 

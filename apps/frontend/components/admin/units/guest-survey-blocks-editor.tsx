@@ -172,7 +172,9 @@ export function GuestSurveyBlocksEditor({
             className='border-border max-w-full min-w-0 space-y-3 rounded-lg border p-4'
           >
             <div className='space-y-1.5'>
-              <Label className='text-xs'>{t('block_type')}</Label>
+              <Label className='text-xs' htmlFor={`${idPrefix}-type-${index}`}>
+                {t('block_type')}
+              </Label>
               <div className='flex min-w-0 items-center justify-between gap-2'>
                 <div className='min-w-0 flex-1 sm:max-w-xs'>
                   <Select
