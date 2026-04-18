@@ -178,19 +178,25 @@ export default function UnitPage({ params }: UnitPageProps) {
     );
 
     return (
-      <div className='container mx-auto flex-1 p-4'>
-        <div className='mb-6 flex items-center gap-4'>
+      <div className='container mx-auto min-w-0 p-4'>
+        <div className='mb-6 flex min-w-0 items-center gap-3'>
           <Button variant='ghost' size='icon' onClick={() => router.back()}>
             <ArrowLeft className='h-4 w-4' />
           </Button>
-          <h1 className='text-3xl font-bold'>{unit.name}</h1>
+          <h1 className='min-w-0 flex-1 text-2xl font-bold tracking-tight break-words md:text-3xl'>
+            {unit.name}
+          </h1>
         </div>
 
         <p className='text-muted-foreground mb-6 max-w-3xl text-sm'>
           {t('units.service_zone_folder_description')}
         </p>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className='w-full'>
+        <Tabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className='w-full min-w-0'
+        >
           <TabsList>
             <PermissionGuard
               permissions={['UNIT_SETTINGS_MANAGE']}
@@ -368,12 +374,14 @@ export default function UnitPage({ params }: UnitPageProps) {
   }
 
   return (
-    <div className='container mx-auto flex-1 p-4'>
-      <div className='mb-6 flex items-center gap-4'>
+    <div className='container mx-auto min-w-0 p-4'>
+      <div className='mb-6 flex min-w-0 items-center gap-3'>
         <Button variant='ghost' size='icon' onClick={() => router.back()}>
           <ArrowLeft className='h-4 w-4' />
         </Button>
-        <h1 className='text-3xl font-bold'>{unit.name}</h1>
+        <h1 className='min-w-0 flex-1 text-2xl font-bold tracking-tight break-words md:text-3xl'>
+          {unit.name}
+        </h1>
       </div>
 
       {unit.kind === 'subdivision' ? (
@@ -395,7 +403,11 @@ export default function UnitPage({ params }: UnitPageProps) {
         </Alert>
       ) : null}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className='w-full'>
+      <Tabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className='w-full min-w-0'
+      >
         <TabsList>
           <PermissionGuard
             permissions={['UNIT_SETTINGS_MANAGE']}

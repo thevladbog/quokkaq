@@ -84,7 +84,7 @@ export function ImageUpload({
   return (
     <div className={`space-y-2 ${className ?? ''}`}>
       <Label htmlFor={inputId}>{displayLabel}</Label>
-      <div className='flex items-center gap-4'>
+      <div className='flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:gap-4'>
         {value ? (
           <div className='bg-muted/50 relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-md border'>
             <Image
@@ -110,7 +110,7 @@ export function ImageUpload({
           </div>
         )}
 
-        <div className='flex-1'>
+        <div className='w-full min-w-0 sm:flex-1'>
           <Input
             ref={fileInputRef}
             type='file'
@@ -124,7 +124,7 @@ export function ImageUpload({
             variant='outline'
             disabled={isUploading}
             onClick={() => fileInputRef.current?.click()}
-            className='w-full sm:w-auto'
+            className='h-auto min-h-9 w-full max-w-full px-3 py-2.5 text-center leading-snug whitespace-normal sm:w-auto sm:whitespace-nowrap'
           >
             {isUploading ? (
               <>

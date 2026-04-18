@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -61,7 +62,7 @@ export function UnitServicesManager({ unitId }: UnitServicesManagerProps) {
 
   const deleteServiceMutation = useDeleteService();
 
-  const t = useTranslations('admin');
+  const tServices = useTranslations('admin.services');
   const tRoot = useTranslations();
   const locale = useLocale();
 
@@ -69,8 +70,8 @@ export function UnitServicesManager({ unitId }: UnitServicesManagerProps) {
     if (!formIsDirty) {
       return true;
     }
-    return confirm(t('services.unsaved_discard_confirm'));
-  }, [formIsDirty, t]);
+    return confirm(tServices('unsaved_discard_confirm'));
+  }, [formIsDirty, tServices]);
 
   const handleEdit = (service: Service) => {
     if (!confirmDiscardIfDirty()) {
@@ -83,7 +84,7 @@ export function UnitServicesManager({ unitId }: UnitServicesManagerProps) {
   const handleDelete = async (serviceId: string) => {
     if (
       confirm(
-        t('services.delete_confirm', {
+        tServices('delete_confirm', {
           defaultValue: 'Are you sure you want to delete this service?'
         })
       )
@@ -121,9 +122,9 @@ export function UnitServicesManager({ unitId }: UnitServicesManagerProps) {
         {/* Services List */}
         <Card className='lg:col-span-2'>
           <CardHeader>
-            <CardTitle>{t('services.title')}</CardTitle>
+            <CardTitle>{tServices('title')}</CardTitle>
             <CardDescription>
-              {t('services.description', {
+              {tServices('description', {
                 unit: selectedUnit?.name || 'selected unit'
               })}
             </CardDescription>
@@ -139,25 +140,25 @@ export function UnitServicesManager({ unitId }: UnitServicesManagerProps) {
                   setEditingService(null);
                 }}
               >
-                {t('services.add_new')}
+                {tServices('add_new')}
               </Button>
             </div>
 
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>{t('services.name')}</TableHead>
-                  <TableHead>{t('services.ticket_prefix')}</TableHead>
-                  <TableHead>{t('services.duration_short')}</TableHead>
-                  <TableHead>{t('services.is_leaf_short')}</TableHead>
-                  <TableHead>{t('services.actions')}</TableHead>
+                  <TableHead>{tServices('name')}</TableHead>
+                  <TableHead>{tServices('ticket_prefix')}</TableHead>
+                  <TableHead>{tServices('duration_short')}</TableHead>
+                  <TableHead>{tServices('is_leaf_short')}</TableHead>
+                  <TableHead>{tServices('actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {servicesLoading ? (
                   <TableRow>
                     <TableCell colSpan={5} className='text-center'>
-                      {t('services.loading', {
+                      {tServices('loading', {
                         defaultValue: 'Loading services...'
                       })}
                     </TableCell>
@@ -165,7 +166,7 @@ export function UnitServicesManager({ unitId }: UnitServicesManagerProps) {
                 ) : services.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className='text-center'>
-                      {t('services.no_services_found', {
+                      {tServices('no_services_found', {
                         defaultValue: 'No services found'
                       })}
                     </TableCell>
@@ -196,7 +197,7 @@ export function UnitServicesManager({ unitId }: UnitServicesManagerProps) {
                               handleEdit(service as unknown as Service)
                             }
                           >
-                            {t('services.edit')}
+                            {tServices('edit')}
                           </Button>
                           <Button
                             variant='destructive'
@@ -222,22 +223,22 @@ export function UnitServicesManager({ unitId }: UnitServicesManagerProps) {
           <CardHeader>
             <CardTitle>
               {editingService
-                ? t('services.edit')
+                ? tServices('edit')
                 : isCreating
-                  ? t('services.add_new')
-                  : t('services.title')}
+                  ? tServices('add_new')
+                  : tServices('title')}
             </CardTitle>
             <CardDescription>
               {editingService
-                ? t('services.editing_desc', {
+                ? tServices('editing_desc', {
                     name: editingService.name,
                     defaultValue: `Editing service: ${editingService.name}`
                   })
                 : isCreating
-                  ? t('services.creating_desc', {
+                  ? tServices('creating_desc', {
                       defaultValue: 'Create a new service'
                     })
-                  : t('services.select_desc', {
+                  : tServices('select_desc', {
                       defaultValue:
                         'Select a service to edit or create a new one'
                     })}
@@ -264,7 +265,7 @@ export function UnitServicesManager({ unitId }: UnitServicesManagerProps) {
 
             {!editingService && !isCreating && (
               <div className='text-muted-foreground py-8 text-center'>
-                {t('services.select_to_edit_or_click_add', {
+                {tServices('select_to_edit_or_click_add', {
                   defaultValue:
                     'Select a service to edit or click "Add New Service"'
                 })}
@@ -375,7 +376,7 @@ function ServiceForm({
   onCancel: () => void;
   onSaved: () => void;
 }) {
-  const t = useTranslations('admin');
+  const tServices = useTranslations('admin.services');
   const tRoot = useTranslations();
   const createServiceMutation = useCreateService();
   const updateServiceMutation = useUpdateService();
@@ -416,13 +417,11 @@ function ServiceForm({
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
     >
   ) => {
-    const { name, value, type } = e.target;
-    const val =
-      type === 'checkbox' ? (e.target as HTMLInputElement).checked : value;
+    const { name, value } = e.target;
 
     setFormValues((prev) => ({
       ...prev,
-      [name]: val
+      [name]: value
     }));
   };
 
@@ -478,11 +477,11 @@ function ServiceForm({
           className='rounded-md border border-amber-200/80 bg-amber-50 px-2.5 py-2 text-sm text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100'
           role='status'
         >
-          {t('services.unsaved_changes')}
+          {tServices('unsaved_changes')}
         </p>
       ) : null}
       <div className='space-y-2'>
-        <Label htmlFor='name'>{t('services.name')} (EN) *</Label>
+        <Label htmlFor='name'>{tServices('name')} (EN) *</Label>
         <Input
           id='name'
           name='name'
@@ -571,7 +570,7 @@ function ServiceForm({
 
       <div className='space-y-2'>
         <Label htmlFor='calendarSlotKey'>
-          {t('services.calendar_slot_key', {
+          {tServices('calendar_slot_key', {
             defaultValue: 'Calendar slot label (optional)'
           })}
         </Label>
@@ -580,14 +579,14 @@ function ServiceForm({
           name='calendarSlotKey'
           value={formValues.calendarSlotKey || ''}
           onChange={handleInputChange}
-          placeholder={t('services.calendar_slot_placeholder', {
+          placeholder={tServices('calendar_slot_placeholder', {
             defaultValue: 'e.g. Returns-Desk-A'
           })}
         />
         <p className='text-muted-foreground text-xs'>
-          {t('services.calendar_slot_key_hint', {
+          {tServices('calendar_slot_key_hint', {
             defaultValue:
-              'Used in Yandex calendar event titles when two services share the same display name.'
+              'Used in pre-registration and when syncing with connected calendars. If two services share the same display name, this label distinguishes them; it is included in calendar event titles so the correct slots are created.'
           })}
         </p>
       </div>
@@ -627,7 +626,7 @@ function ServiceForm({
       {(formValues.isLeaf ?? editingService?.isLeaf ?? false) ? (
         <div className='space-y-2'>
           <Label htmlFor='restrictedServiceZoneId'>
-            {t('services.restricted_zone')}
+            {tServices('restricted_zone')}
           </Label>
           <Select
             value={
@@ -643,11 +642,11 @@ function ServiceForm({
             }
           >
             <SelectTrigger id='restrictedServiceZoneId' className='w-full'>
-              <SelectValue placeholder={t('services.restricted_zone_none')} />
+              <SelectValue placeholder={tServices('restricted_zone_none')} />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value='__none__'>
-                {t('services.restricted_zone_none')}
+                {tServices('restricted_zone_none')}
               </SelectItem>
               {serviceZones
                 .filter(
@@ -662,7 +661,7 @@ function ServiceForm({
             </SelectContent>
           </Select>
           <p className='text-muted-foreground text-xs'>
-            {t('services.restricted_zone_hint')}
+            {tServices('restricted_zone_hint')}
           </p>
         </div>
       ) : null}
@@ -816,45 +815,53 @@ function ServiceForm({
         </p>
       </div>
 
-      <div className='space-y-2'>
-        <div className='flex items-center'>
-          <input
+      <div className='space-y-3'>
+        <div className='flex items-start gap-2'>
+          <Checkbox
             id='prebook'
-            name='prebook'
-            type='checkbox'
             checked={!!formValues.prebook}
-            onChange={handleInputChange}
-            className='mr-2'
+            onCheckedChange={(v) =>
+              setFormValues((prev) => ({ ...prev, prebook: v === true }))
+            }
+            className='mt-0.5'
           />
-          <Label htmlFor='prebook'>
+          <Label htmlFor='prebook' className='cursor-pointer font-normal'>
             {tRoot('forms.fields.allow_prebooking')}
           </Label>
         </div>
 
-        <div className='flex items-center'>
-          <input
+        <div className='flex items-start gap-2'>
+          <Checkbox
             id='offerIdentification'
-            name='offerIdentification'
-            type='checkbox'
             checked={!!formValues.offerIdentification}
-            onChange={handleInputChange}
-            className='mr-2'
+            onCheckedChange={(v) =>
+              setFormValues((prev) => ({
+                ...prev,
+                offerIdentification: v === true
+              }))
+            }
+            className='mt-0.5'
           />
-          <Label htmlFor='offerIdentification'>
+          <Label
+            htmlFor='offerIdentification'
+            className='cursor-pointer font-normal'
+          >
             {tRoot('forms.fields.offer_identification')}
           </Label>
         </div>
 
-        <div className='flex items-center'>
-          <input
+        <div className='flex items-start gap-2'>
+          <Checkbox
             id='isLeaf'
-            name='isLeaf'
-            type='checkbox'
             checked={!!formValues.isLeaf}
-            onChange={handleInputChange}
-            className='mr-2'
+            onCheckedChange={(v) =>
+              setFormValues((prev) => ({ ...prev, isLeaf: v === true }))
+            }
+            className='mt-0.5'
           />
-          <Label htmlFor='isLeaf'>{tRoot('forms.fields.is_leaf')}</Label>
+          <Label htmlFor='isLeaf' className='cursor-pointer font-normal'>
+            {tRoot('forms.fields.is_leaf')}
+          </Label>
         </div>
       </div>
 

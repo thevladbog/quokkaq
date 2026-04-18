@@ -1,7 +1,8 @@
 'use client';
 
 import { ReactNode, useMemo } from 'react';
-import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
+import { SidebarProvider } from '@/components/ui/sidebar';
+import { SidebarInsetShell } from '@/components/SidebarInsetShell';
 import AppSidebar from '@/components/AppSidebar';
 import PlatformSidebar from '@/components/PlatformSidebar';
 import SettingsSidebar from '@/components/SettingsSidebar';
@@ -211,9 +212,7 @@ const ConditionalLayout = ({ children }: ConditionalLayoutProps) => {
       return (
         <SidebarProvider>
           <AppSidebar />
-          <SidebarInset>
-            <main className='p-4 md:p-8'>{children}</main>
-          </SidebarInset>
+          <SidebarInsetShell>{children}</SidebarInsetShell>
           {backgroundElement}
         </SidebarProvider>
       );

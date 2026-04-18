@@ -129,7 +129,11 @@ export function UnitCountersSection({
   };
 
   const addButton = (
-    <Button onClick={handleAdd} size='sm' className='shrink-0'>
+    <Button
+      onClick={handleAdd}
+      size='sm'
+      className={cn('shrink-0', variant === 'embedded' && 'w-full sm:w-auto')}
+    >
       <Plus className='mr-2 h-4 w-4' />
       {t('add')}
     </Button>
@@ -262,9 +266,11 @@ export function UnitCountersSection({
   }
 
   return (
-    <div className={cn('space-y-3', className)}>
+    <div className={cn('flex flex-col gap-3', className)}>
       {hideEmbeddedHeading ? (
-        <div className='flex justify-end'>{addButton}</div>
+        <div className='flex w-full flex-col gap-2 sm:flex-row sm:justify-end'>
+          {addButton}
+        </div>
       ) : (
         <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
           <div className='min-w-0 space-y-1'>

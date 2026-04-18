@@ -116,12 +116,15 @@ export default function TemplatesPage() {
     <div className='container mx-auto p-6'>
       <Card>
         <CardHeader>
-          <div className='flex items-center justify-between'>
-            <div>
+          <div className='flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4'>
+            <div className='min-w-0'>
               <CardTitle>{t('title')}</CardTitle>
               <CardDescription>{t('description')}</CardDescription>
             </div>
-            <Button onClick={handleCreate}>
+            <Button
+              className='w-full shrink-0 sm:w-auto'
+              onClick={handleCreate}
+            >
               <Plus className='mr-2 h-4 w-4' />
               {t('create_template')}
             </Button>

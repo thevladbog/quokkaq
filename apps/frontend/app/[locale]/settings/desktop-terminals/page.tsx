@@ -368,6 +368,9 @@ export default function DesktopTerminalsPage() {
     }
   };
 
+  /** Radix SelectTrigger defaults to `w-fit`; full width matches inputs on narrow screens. */
+  const fullWidthSelectTrigger = 'w-full min-w-0';
+
   const terminalFormFields = (idPrefix: string) => (
     <>
       <div className='grid gap-2'>
@@ -381,7 +384,10 @@ export default function DesktopTerminalsPage() {
             if (v === 'kiosk') setAvailableCounters([]);
           }}
         >
-          <SelectTrigger id={`${idPrefix}-kind`}>
+          <SelectTrigger
+            id={`${idPrefix}-kind`}
+            className={fullWidthSelectTrigger}
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -411,7 +417,7 @@ export default function DesktopTerminalsPage() {
             }
             onValueChange={(v) => setFormUnitId(v === SELECT_UNSET ? '' : v)}
           >
-            <SelectTrigger>
+            <SelectTrigger className={fullWidthSelectTrigger}>
               <SelectValue placeholder={t('select_unit')} />
             </SelectTrigger>
             <SelectContent>
@@ -439,7 +445,7 @@ export default function DesktopTerminalsPage() {
                 setFormCounterId('');
               }}
             >
-              <SelectTrigger>
+              <SelectTrigger className={fullWidthSelectTrigger}>
                 <SelectValue placeholder={t('select_context')} />
               </SelectTrigger>
               <SelectContent>
@@ -471,7 +477,7 @@ export default function DesktopTerminalsPage() {
                 availableCounters.length === 0
               }
             >
-              <SelectTrigger>
+              <SelectTrigger className={fullWidthSelectTrigger}>
                 <SelectValue
                   placeholder={
                     countersLoading ? t('loading') : t('select_counter')
@@ -495,7 +501,7 @@ export default function DesktopTerminalsPage() {
       <div className='grid gap-2'>
         <Label>{t('locale')}</Label>
         <Select value={formLocale} onValueChange={setFormLocale}>
-          <SelectTrigger>
+          <SelectTrigger className={fullWidthSelectTrigger}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

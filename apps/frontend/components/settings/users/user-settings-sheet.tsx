@@ -75,10 +75,29 @@ function UserSettingsSheetBody({
   const updateUserMutation = useUpdateUser();
 
   const userUnits = useMemo(() => {
-    return ((userUnitsRaw ?? []) as SheetUserUnit[]).map((uu) => ({
+    const raw = ((userUnitsRaw ?? []) as SheetUserUnit[]).map((uu) => ({
       ...uu,
       permissions: Array.isArray(uu.permissions) ? uu.permissions : []
     }));
+    // Legacy bug: backend used to INSERT on every permission change, duplicating (userId, unitId).
+    // Merge rows per unitId (union permissions) so the UI shows one accordion per unit.
+    const byUnit = new Map<string, SheetUserUnit>();
+    for (const uu of raw) {
+      const prev = byUnit.get(uu.unitId);
+      if (!prev) {
+        byUnit.set(uu.unitId, uu);
+        continue;
+      }
+      const merged = new Set([
+        ...(prev.permissions ?? []),
+        ...(uu.permissions ?? [])
+      ]);
+      byUnit.set(uu.unitId, {
+        ...prev,
+        permissions: Array.from(merged)
+      });
+    }
+    return Array.from(byUnit.values());
   }, [userUnitsRaw]);
 
   const unitsById = useMemo(

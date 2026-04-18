@@ -381,7 +381,7 @@ export function UnitGuestSurveySettings({ unitId }: { unitId: string }) {
           <CardTitle>{t('create')}</CardTitle>
           <CardDescription>{t('builder_hint')}</CardDescription>
         </CardHeader>
-        <CardContent className='space-y-4'>
+        <CardContent className='min-w-0 space-y-4'>
           <div className='grid gap-2'>
             <Label htmlFor='sv-title'>{t('title_label')}</Label>
             <Input
@@ -424,12 +424,12 @@ export function UnitGuestSurveySettings({ unitId }: { unitId: string }) {
             <p className='text-muted-foreground text-xs'>
               {t('completion_images_hint')}
             </p>
-            <Tabs defaultValue='en' className='w-full'>
+            <Tabs defaultValue='en' className='w-full min-w-0'>
               <TabsList>
                 <TabsTrigger value='en'>{t('completion_tab_en')}</TabsTrigger>
                 <TabsTrigger value='ru'>{t('completion_tab_ru')}</TabsTrigger>
               </TabsList>
-              <TabsContent value='en' className='mt-3'>
+              <TabsContent value='en' className='mt-3 min-w-0'>
                 <GuestSurveyCompletionEditor
                   unitId={unitId}
                   markdown={completionEn}
@@ -437,7 +437,7 @@ export function UnitGuestSurveySettings({ unitId }: { unitId: string }) {
                   placeholder={t('completion_placeholder')}
                 />
               </TabsContent>
-              <TabsContent value='ru' className='mt-3'>
+              <TabsContent value='ru' className='mt-3 min-w-0'>
                 <GuestSurveyCompletionEditor
                   unitId={unitId}
                   markdown={completionRu}
@@ -464,6 +464,7 @@ export function UnitGuestSurveySettings({ unitId }: { unitId: string }) {
             t={t}
           />
           <Button
+            className='w-full sm:w-auto'
             disabled={!title.trim() || createMut.isPending}
             onClick={handleCreateClick}
           >
@@ -599,7 +600,7 @@ export function UnitGuestSurveySettings({ unitId }: { unitId: string }) {
                 <p className='text-muted-foreground text-xs'>
                   {t('completion_images_hint')}
                 </p>
-                <Tabs defaultValue='en' className='w-full'>
+                <Tabs defaultValue='en' className='w-full min-w-0'>
                   <TabsList>
                     <TabsTrigger value='en'>
                       {t('completion_tab_en')}
@@ -608,7 +609,7 @@ export function UnitGuestSurveySettings({ unitId }: { unitId: string }) {
                       {t('completion_tab_ru')}
                     </TabsTrigger>
                   </TabsList>
-                  <TabsContent value='en' className='mt-3'>
+                  <TabsContent value='en' className='mt-3 min-w-0'>
                     <GuestSurveyCompletionEditor
                       unitId={unitId}
                       markdown={editCompletionEn}
@@ -616,7 +617,7 @@ export function UnitGuestSurveySettings({ unitId }: { unitId: string }) {
                       placeholder={t('completion_placeholder')}
                     />
                   </TabsContent>
-                  <TabsContent value='ru' className='mt-3'>
+                  <TabsContent value='ru' className='mt-3 min-w-0'>
                     <GuestSurveyCompletionEditor
                       unitId={unitId}
                       markdown={editCompletionRu}
@@ -646,6 +647,7 @@ export function UnitGuestSurveySettings({ unitId }: { unitId: string }) {
           </div>
           <DialogFooter>
             <Button
+              className='w-full sm:w-auto'
               variant='outline'
               onClick={() => {
                 setEditOpen(false);
@@ -655,6 +657,7 @@ export function UnitGuestSurveySettings({ unitId }: { unitId: string }) {
               {t('cancel_edit')}
             </Button>
             <Button
+              className='w-full sm:w-auto'
               disabled={patchMut.isPending || !editTitle.trim()}
               onClick={handleSaveEdit}
             >

@@ -62,7 +62,7 @@ function SubdivisionUnitsSubtree({
         <li key={unit.id}>
           {unit.kind === 'service_zone' ? (
             <section className='bg-muted/25 space-y-4 rounded-lg border p-4'>
-              <div className='flex flex-wrap items-start justify-between gap-3'>
+              <div className='flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between'>
                 <div className='flex min-w-0 items-center gap-2'>
                   <FolderOpen
                     className='text-muted-foreground h-5 w-5 shrink-0'
@@ -82,7 +82,7 @@ function SubdivisionUnitsSubtree({
                 <Button
                   variant='outline'
                   size='sm'
-                  className='shrink-0'
+                  className='w-full shrink-0 sm:w-auto sm:self-start'
                   asChild
                 >
                   <Link href={`/settings/units/${unit.id}`}>
@@ -107,7 +107,7 @@ function SubdivisionUnitsSubtree({
             </section>
           ) : (
             <section className='bg-card/50 space-y-3 rounded-lg border p-4'>
-              <div className='flex flex-wrap items-start justify-between gap-3'>
+              <div className='flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between'>
                 <div className='flex min-w-0 items-center gap-2'>
                   <Building2
                     className='text-muted-foreground h-5 w-5 shrink-0'
@@ -127,7 +127,7 @@ function SubdivisionUnitsSubtree({
                 <Button
                   variant='outline'
                   size='sm'
-                  className='shrink-0'
+                  className='w-full shrink-0 sm:w-auto sm:self-start'
                   onClick={() => router.push(`/settings/units/${unit.id}`)}
                 >
                   <ExternalLink className='mr-2 h-4 w-4' />

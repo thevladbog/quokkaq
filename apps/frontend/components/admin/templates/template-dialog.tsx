@@ -120,7 +120,7 @@ export default function TemplateDialog({
           <DialogDescription>{t('description')}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className='space-y-4'>
-          <div>
+          <div className='space-y-2'>
             <Label htmlFor='name'>{t('name')}</Label>
             <Input
               id='name'
@@ -131,7 +131,7 @@ export default function TemplateDialog({
             />
           </div>
 
-          <div>
+          <div className='space-y-2'>
             <Label htmlFor='subject'>{t('subject')}</Label>
             <Input
               id='subject'
@@ -142,7 +142,7 @@ export default function TemplateDialog({
             />
           </div>
 
-          <div>
+          <div className='space-y-2'>
             <Label htmlFor='content'>{t('content')}</Label>
             <Textarea
               id='content'
@@ -152,7 +152,7 @@ export default function TemplateDialog({
               rows={10}
               required
             />
-            <p className='text-muted-foreground mt-1 text-sm'>
+            <p className='text-muted-foreground text-sm'>
               {t('variables_help', { link: '{{link}}', email: '{{email}}' })}
             </p>
           </div>

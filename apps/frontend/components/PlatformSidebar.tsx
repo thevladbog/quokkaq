@@ -22,11 +22,13 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import { Link, usePathname } from '@/src/i18n/navigation';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { SidebarCollapsedLogo } from '@/components/SidebarCollapsedLogo';
 import { SidebarCollapseToggle } from '@/components/SidebarCollapseToggle';
 
 export default function PlatformSidebar() {
+  const locale = useLocale();
+  const wordmarkSrc = locale === 'ru' ? '/logo-text-ru.svg' : '/logo-text.svg';
   const pathname = usePathname();
   const t = useTranslations('platform.nav');
 
@@ -85,7 +87,7 @@ export default function PlatformSidebar() {
                   </span>
                   <div className='relative h-8 w-36'>
                     <Image
-                      src='/logo-text.svg'
+                      src={wordmarkSrc}
                       alt='QuokkaQ'
                       fill
                       className='object-contain object-left'

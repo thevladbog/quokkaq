@@ -132,12 +132,20 @@ func (r *userRepository) Delete(id string) error {
 }
 
 func (r *userRepository) AssignUnit(userID, unitID string, permissions []string) error {
-	userUnit := models.UserUnit{
-		UserID:      userID,
-		UnitID:      unitID,
-		Permissions: models.StringArray(permissions),
-	}
-	return r.db.Create(&userUnit).Error
+	// Upsert by (user_id, unit_id): always create at most one row. A previous bug used
+	// unconditional Create, which inserted duplicates on every permission toggle.
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("user_id = ? AND unit_id = ?", userID, unitID).
+			Delete(&models.UserUnit{}).Error; err != nil {
+			return err
+		}
+		uu := models.UserUnit{
+			UserID:      userID,
+			UnitID:      unitID,
+			Permissions: models.StringArray(permissions),
+		}
+		return tx.Create(&uu).Error
+	})
 }
 
 func (r *userRepository) CreateUserUnitTx(tx *gorm.DB, uu *models.UserUnit) error {

@@ -210,16 +210,21 @@ export default async function PricingPage({
         </div>
 
         {/* CTA Section */}
-        <div className='mt-16 text-center'>
+        <div className='mt-16 min-w-0 text-center'>
           <h2 className='mb-4 text-3xl font-bold text-gray-900'>
             {t('cta.title')}
           </h2>
           <p className='mb-8 text-xl text-gray-600'>{t('cta.subtitle')}</p>
-          <div className='flex justify-center gap-4'>
-            <Button size='lg' asChild>
+          <div className='mx-auto flex w-full max-w-lg flex-col items-stretch justify-center gap-3 md:max-w-none md:flex-row md:justify-center md:gap-4'>
+            <Button className='w-full md:w-auto' size='lg' asChild>
               <Link href={`/${locale}/register`}>{t('cta.tryFree')}</Link>
             </Button>
-            <Button size='lg' variant='outline' asChild>
+            <Button
+              className='w-full md:w-auto'
+              size='lg'
+              variant='outline'
+              asChild
+            >
               <a href='mailto:sales@quokkaq.com'>{t('cta.contactSales')}</a>
             </Button>
           </div>

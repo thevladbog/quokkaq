@@ -131,21 +131,24 @@ export default function UnitsIndexPage() {
   };
 
   if (isLoading) {
-    return <div className='container mx-auto p-4'>{t('units.loading')}</div>;
+    return (
+      <div className='container mx-auto min-w-0 p-4'>{t('units.loading')}</div>
+    );
   }
 
   return (
-    <div className='container mx-auto p-4'>
-      <div className='mb-6 flex items-center justify-between'>
-        <h1 className='text-3xl font-bold'>
+    <div className='container mx-auto min-w-0 p-4'>
+      <div className='mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between'>
+        <h1 className='min-w-0 text-2xl font-bold tracking-tight md:text-3xl'>
           {t('units.title', { defaultValue: 'Units' })}
         </h1>
         <PermissionGuard permissions={['UNIT_CREATE']}>
           <Button
+            className='h-auto min-h-9 w-full shrink-0 px-3 py-2.5 text-center leading-snug whitespace-normal md:w-auto md:whitespace-nowrap'
             onClick={() => setCreateDialogOpen(true)}
             disabled={!companyId || isLoading || isFetchingCompanyMe}
           >
-            <Plus className='mr-2 h-4 w-4' />
+            <Plus className='mr-2 h-4 w-4 shrink-0' />
             {t('units.add')}
           </Button>
         </PermissionGuard>

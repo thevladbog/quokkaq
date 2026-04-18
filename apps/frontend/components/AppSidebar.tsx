@@ -40,7 +40,7 @@ import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import ThemeToggle from '@/components/ThemeToggle';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { getInitials, getAvatarColor } from '@/lib/utils';
 import { userCanOpenPlatformOperatorUI } from '@/lib/platform-access';
 import { SidebarActiveUnitSelect } from '@/components/SidebarActiveUnitSelect';
@@ -50,6 +50,8 @@ import { SidebarCollapseToggle } from '@/components/SidebarCollapseToggle';
 import { useActiveUnit } from '@/contexts/ActiveUnitContext';
 
 const AppSidebar = () => {
+  const locale = useLocale();
+  const wordmarkSrc = locale === 'ru' ? '/logo-text-ru.svg' : '/logo-text.svg';
   const tNav = useTranslations('nav');
   const tProfile = useTranslations('profile');
   const { user, isAuthenticated, logout } = useAuthContext();
@@ -182,7 +184,7 @@ const AppSidebar = () => {
                 <div className='flex items-center gap-2'>
                   <div className='relative h-10 w-40 group-data-[collapsible=icon]:hidden'>
                     <Image
-                      src='/logo-text.svg'
+                      src={wordmarkSrc}
                       alt='QuokkaQ'
                       fill
                       className='object-contain'

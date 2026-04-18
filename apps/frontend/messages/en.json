@@ -12,6 +12,7 @@
     "active_unit_placeholder": "Select unit",
     "sidebar_collapse": "Collapse menu",
     "sidebar_expand": "Expand menu",
+    "open_menu": "Open menu",
     "audit_journal": "Audit log",
     "clients": "Clients",
     "statistics": "Statistics",
@@ -427,6 +428,8 @@
       "unsaved_changes": "You have unsaved changes",
       "unsaved_discard_confirm": "You have unsaved changes. Discard them and continue?",
       "delete_confirm": "Are you sure you want to delete this service?",
+      "calendar_slot_key": "Calendar slot label (optional)",
+      "calendar_slot_key_hint": "Used in pre-registration and when syncing with connected calendars. If two services share the same display name, this label distinguishes them; it is included in calendar event titles so the correct slots are created.",
       "calendar_slot_placeholder": "e.g. Returns-Desk-A"
     },
     "users": {

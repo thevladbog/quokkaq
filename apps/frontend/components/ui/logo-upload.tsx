@@ -105,9 +105,9 @@ export function LogoUpload({
   return (
     <div className='space-y-2'>
       <Label htmlFor={fileInputId}>{displayLabel}</Label>
-      <div className='flex items-center gap-4'>
+      <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4'>
         {currentLogoUrl ? (
-          <div className='bg-muted/50 relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-md border'>
+          <div className='bg-muted/50 relative flex h-20 w-20 shrink-0 items-center justify-center self-center overflow-hidden rounded-md border sm:self-start'>
             {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary upload URLs; next/image blocks hosts outside remotePatterns */}
             <img
               src={currentLogoUrl}
@@ -125,12 +125,12 @@ export function LogoUpload({
             </Button>
           </div>
         ) : (
-          <div className='bg-muted/20 text-muted-foreground flex h-20 w-20 items-center justify-center rounded-md border border-dashed'>
+          <div className='bg-muted/20 text-muted-foreground flex h-20 w-20 shrink-0 items-center justify-center self-center rounded-md border border-dashed sm:self-start'>
             <Upload className='h-8 w-8 opacity-50' />
           </div>
         )}
 
-        <div className='flex-1'>
+        <div className='flex w-full min-w-0 flex-col gap-2 sm:flex-1'>
           <Input
             ref={fileInputRef}
             type='file'
@@ -143,7 +143,7 @@ export function LogoUpload({
             variant='outline'
             disabled={isUploading || disabled}
             onClick={() => fileInputRef.current?.click()}
-            className='w-full sm:w-auto'
+            className='w-full sm:w-auto sm:self-start'
           >
             {isUploading ? (
               <>
@@ -157,9 +157,7 @@ export function LogoUpload({
               </>
             )}
           </Button>
-          <p className='text-muted-foreground mt-1 text-xs'>
-            {hint ?? t('hint')}
-          </p>
+          <p className='text-muted-foreground text-xs'>{hint ?? t('hint')}</p>
         </div>
       </div>
     </div>
