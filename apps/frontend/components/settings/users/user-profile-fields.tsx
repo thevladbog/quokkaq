@@ -12,8 +12,8 @@ export interface UserProfileFieldsProps {
   onSaveName: () => void;
   savingName: boolean;
   photoUrl?: string | null;
-  onPhotoUploaded: (url: string) => void;
-  onPhotoRemoved: () => void;
+  onPhotoUploaded: (url: string) => Promise<void>;
+  onPhotoRemoved: () => Promise<void>;
   photoBusy: boolean;
 }
 

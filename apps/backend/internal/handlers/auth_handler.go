@@ -5,20 +5,51 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"net/url"
 	"quokkaq-go-backend/internal/middleware"
+	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/pkg/authcookie"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
 	"strings"
+
+	"gorm.io/gorm"
 )
 
 type AuthHandler struct {
-	service  services.AuthService
-	userRepo repository.UserRepository
+	service     services.AuthService
+	userService services.UserService
+	userRepo    repository.UserRepository
 }
 
-func NewAuthHandler(service services.AuthService, userRepo repository.UserRepository) *AuthHandler {
-	return &AuthHandler{service: service, userRepo: userRepo}
+func NewAuthHandler(service services.AuthService, userService services.UserService, userRepo repository.UserRepository) *AuthHandler {
+	return &AuthHandler{service: service, userService: userService, userRepo: userRepo}
+}
+
+// PatchMeRequest is the body for PATCH /auth/me (self-service profile photo only).
+// Validation is performed in PatchMe (json.Decoder does not use Gin binding tags).
+type PatchMeRequest struct {
+	PhotoURL *string `json:"photoUrl"`
+}
+
+const maxProfilePhotoURLLen = 2048
+
+func validateProfilePhotoURL(raw string) error {
+	t := strings.TrimSpace(raw)
+	if t == "" {
+		return nil
+	}
+	if len(t) > maxProfilePhotoURLLen {
+		return errors.New("photoUrl is too long")
+	}
+	u, err := url.Parse(t)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return errors.New("photoUrl must be a valid http or https URL")
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return errors.New("photoUrl must use http or https")
+	}
+	return nil
 }
 
 type LoginRequest struct {
@@ -162,7 +193,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 // @Tags         auth
 // @Produce      json
 // @Security     BearerAuth
-// @Success      200  {object}  models.User
+// @Success      200  {object}  UserResponse
 // @Failure      401  {string}  string "Unauthorized"
 // @Failure      404  {string}  string "User not found"
 // @Router       /auth/me [get]
@@ -180,6 +211,79 @@ func (h *AuthHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Map to DTO for proper frontend format
+	response := MapUserToResponse(user)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
+}
+
+// PatchMe godoc
+// @ID           authPatchMe
+// @Summary      Update current user profile (photo only)
+// @Description  Authenticated users may update only their profile photo URL. Send `photoUrl` as a string (use empty string to clear). Omitted `photoUrl` is rejected.
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        body body PatchMeRequest true "photoUrl only"
+// @Success      200  {object}  UserResponse
+// @Failure      400  {string}  string "Bad Request"
+// @Failure      401  {string}  string "Unauthorized"
+// @Failure      404  {string}  string "User not found"
+// @Failure      500  {string}  string "Internal Server Error"
+// @Router       /auth/me [patch]
+// @Security     BearerAuth
+func (h *AuthHandler) PatchMe(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var req PatchMeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.PhotoURL == nil {
+		http.Error(w, "photoUrl is required", http.StatusBadRequest)
+		return
+	}
+
+	trimmed := strings.TrimSpace(*req.PhotoURL)
+	if err := validateProfilePhotoURL(trimmed); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	photoForUpdate := trimmed
+	input := &models.UpdateUserInput{
+		PhotoURL: &photoForUpdate,
+	}
+	if err := h.userService.UpdateUser(userID, input); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "User not found", http.StatusNotFound)
+			return
+		}
+		if errors.Is(err, services.ErrUpdateUserEmptyInput) || errors.Is(err, services.ErrUpdateUserNameEmpty) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		log.Printf("PatchMe: UpdateUser error: %v", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	user, err := h.service.GetMe(userID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Printf("PatchMe: GetMe after update: user not found: %v", err)
+			http.Error(w, "User not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("PatchMe: GetMe after update error: %v", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
 	response := MapUserToResponse(user)
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)

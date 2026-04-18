@@ -49,6 +49,8 @@ interface AuthContextType {
   token: string | null;
   isAuthenticated: boolean;
   login: (legacyAccessToken?: string | null) => Promise<void>;
+  /** Refetch GET /auth/me and update `user` (e.g. after profile photo change). */
+  refreshUser: () => Promise<void>;
   logout: () => void;
   isLoading: boolean;
 }
@@ -107,6 +109,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         window.location.href = loginPath;
       }
     })();
+  }, []);
+
+  const refreshUser = useCallback(async (): Promise<void> => {
+    if (typeof window === 'undefined') return;
+    const gen = sessionProbeGenRef.current;
+    try {
+      const userData = await fetchCurrentUser();
+      if (gen !== sessionProbeGenRef.current) {
+        return;
+      }
+      setUser(userData);
+    } catch (e) {
+      logger.error('refreshUser failed', e);
+    }
   }, []);
 
   const login = useCallback(
@@ -230,6 +246,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     token,
     isAuthenticated: !!user,
     login,
+    refreshUser,
     logout,
     isLoading
   };

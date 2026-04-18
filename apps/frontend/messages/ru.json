@@ -215,6 +215,8 @@
     "kiosk_description": "Киоск обслуживания и получения талонов",
     "screen": "Экран ожидания",
     "screen_description": "Публичный экран отображения очереди",
+    "counter_display": "Экран у стойки",
+    "counter_display_description": "Опрос у стойки — откройте для сопряжения планшета",
     "supervisor": "Старший смены",
     "supervisor_description": "Панель старшего смены"
   },
@@ -1572,7 +1574,8 @@
       "changeLogo": "Сменить логотип",
       "hint": "Форматы: JPG, PNG, SVG, WebP. Максимум 5 МБ.",
       "defaultImageLabel": "Изображение",
-      "defaultLogoLabel": "Логотип"
+      "defaultLogoLabel": "Логотип",
+      "removeLogo": "Удалить логотип"
     }
   },
   "general": {
@@ -2447,7 +2450,27 @@
     "theme": "Тема",
     "logout": "Выйти",
     "openOperatorConsole": "Панель оператора SaaS",
-    "openSystemSettings": "Настройки системы"
+    "openSystemSettings": "Настройки системы",
+    "openMyProfile": "Мой профиль",
+    "myProfileTitle": "Мой профиль",
+    "myProfileDescription": "Данные учётной записи и права доступа",
+    "aboutSection": "О вас",
+    "nameLabel": "Имя",
+    "emailLabel": "Email",
+    "systemAdminBadge": "Системный администратор",
+    "photoSection": "Фото профиля",
+    "unitsPermissionsSection": "Подразделения и права",
+    "noUnitsAssigned": "Нет назначенных подразделений",
+    "noPermissionsInUnit": "Нет прав в этом подразделении",
+    "photoUpdated": "Фото профиля обновлено",
+    "photoRemoved": "Фото профиля удалено",
+    "photoUpdateError": "Не удалось обновить фото: {message}",
+    "profilePhotoUpload": "Загрузить фото",
+    "profilePhotoChange": "Сменить фото",
+    "profilePhotoHint": "Форматы: JPG, PNG, SVG, WebP. Максимум 5 МБ.",
+    "theme_light": "Светлая",
+    "theme_dark": "Тёмная",
+    "theme_system": "Как в системе"
   },
   "pricing": {
     "title": "Тарифные планы",

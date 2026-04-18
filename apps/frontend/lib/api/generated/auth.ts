@@ -460,6 +460,10 @@ export interface HandlersOperatorCommentPatchDTO {
   operatorComment: string | null;
 }
 
+export interface HandlersPatchMeRequest {
+  photoUrl?: string;
+}
+
 export type HandlersPatchPlatformCompanyBodyBillingAddress = { [key: string]: unknown };
 
 export type HandlersPatchPlatformCompanyBodyCounterparty = { [key: string]: unknown };
@@ -612,6 +616,14 @@ export interface HandlersResetPasswordRequest {
   token?: string;
 }
 
+export interface HandlersRoleInfoDTO {
+  name?: string;
+}
+
+export interface HandlersRoleDTO {
+  role?: HandlersRoleInfoDTO;
+}
+
 export type HandlersSaasVendorResponseBillingAddress = { [key: string]: unknown };
 
 export type HandlersSaasVendorResponseCounterparty = { [key: string]: unknown };
@@ -646,6 +658,14 @@ export interface HandlersTransferRequest {
   toUserId?: string;
 }
 
+export interface HandlersUnitSummaryDTO {
+  code?: string;
+  id?: string;
+  kind?: string;
+  name?: string;
+  nameEn?: string;
+}
+
 export interface HandlersUpdateCounterRequest {
   name?: string;
   serviceZoneId?: string;
@@ -677,6 +697,27 @@ export type HandlersUsageMetricsResponseMetrics = {[key: string]: HandlersUsageM
 export interface HandlersUsageMetricsResponse {
   currentPeriod?: HandlersPeriodResponse;
   metrics?: HandlersUsageMetricsResponseMetrics;
+}
+
+export type HandlersUserResponsePermissions = {[key: string]: string[]};
+
+export interface HandlersUserUnitDTO {
+  companyId?: string;
+  permissions?: string[];
+  unit?: HandlersUnitSummaryDTO;
+  unitId?: string;
+}
+
+export interface HandlersUserResponse {
+  createdAt?: string;
+  email?: string;
+  id?: string;
+  name?: string;
+  permissions?: HandlersUserResponsePermissions;
+  photoUrl?: string;
+  roles?: HandlersRoleDTO[];
+  type?: string;
+  units?: HandlersUserUnitDTO[];
 }
 
 export type HandlersYooKassaWebhookNotificationObject = { [key: string]: unknown };
@@ -2398,7 +2439,7 @@ export const useAuthLogout = <TError = unknown,
  * @summary Get current user
  */
 export type getAuthMeResponse200 = {
-  data: ModelsUser
+  data: HandlersUserResponse
   status: 200
 }
 
@@ -2518,6 +2559,112 @@ export function useGetAuthMe<TData = Awaited<ReturnType<typeof getAuthMe>>, TErr
 
 
 
+
+/**
+ * Authenticated users may update only their profile photo URL. Send `photoUrl` as a string (use empty string to clear). Omitted `photoUrl` is rejected.
+ * @summary Update current user profile (photo only)
+ */
+export type authPatchMeResponse200 = {
+  data: HandlersUserResponse
+  status: 200
+}
+
+export type authPatchMeResponse400 = {
+  data: string
+  status: 400
+}
+
+export type authPatchMeResponse401 = {
+  data: string
+  status: 401
+}
+
+export type authPatchMeResponse404 = {
+  data: string
+  status: 404
+}
+
+export type authPatchMeResponse500 = {
+  data: string
+  status: 500
+}
+
+export type authPatchMeResponseSuccess = (authPatchMeResponse200) & {
+  headers: Headers;
+};
+export type authPatchMeResponseError = (authPatchMeResponse400 | authPatchMeResponse401 | authPatchMeResponse404 | authPatchMeResponse500) & {
+  headers: Headers;
+};
+
+export type authPatchMeResponse = (authPatchMeResponseSuccess | authPatchMeResponseError)
+
+export const getAuthPatchMeUrl = () => {
+
+
+
+
+  return `/auth/me`
+}
+
+export const authPatchMe = async (handlersPatchMeRequest: HandlersPatchMeRequest, options?: RequestInit): Promise<authPatchMeResponse> => {
+
+  return orvalMutator<authPatchMeResponse>(getAuthPatchMeUrl(),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersPatchMeRequest,)
+  }
+);}
+
+
+
+
+export const getAuthPatchMeMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authPatchMe>>, TError,{data: HandlersPatchMeRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof authPatchMe>>, TError,{data: HandlersPatchMeRequest}, TContext> => {
+
+const mutationKey = ['authPatchMe'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof authPatchMe>>, {data: HandlersPatchMeRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  authPatchMe(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AuthPatchMeMutationResult = NonNullable<Awaited<ReturnType<typeof authPatchMe>>>
+    export type AuthPatchMeMutationBody = HandlersPatchMeRequest
+    export type AuthPatchMeMutationError = string
+
+    /**
+ * @summary Update current user profile (photo only)
+ */
+export const useAuthPatchMe = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authPatchMe>>, TError,{data: HandlersPatchMeRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof authPatchMe>>,
+        TError,
+        {data: HandlersPatchMeRequest},
+        TContext
+      > => {
+      return useMutation(getAuthPatchMeMutationOptions(options), queryClient);
+    }
 
 /**
  * Exchanges a valid refresh JWT for a new access JWT. The refresh token is read from HttpOnly session cookies when present; otherwise send `Authorization: Bearer <refresh>`. Rotated refresh tokens are returned only via `Set-Cookie`, not in the JSON body.

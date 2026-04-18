@@ -11,6 +11,7 @@ type UserResponse struct {
 	Email       *string             `json:"email,omitempty"`
 	Type        string              `json:"type,omitempty"`
 	CreatedAt   string              `json:"createdAt,omitempty"`
+	PhotoURL    *string             `json:"photoUrl,omitempty"`
 	Roles       []RoleDTO           `json:"roles,omitempty"`
 	Units       []UserUnitDTO       `json:"units,omitempty"`
 	Permissions map[string][]string `json:"permissions,omitempty"`
@@ -24,10 +25,20 @@ type RoleInfoDTO struct {
 	Name string `json:"name"`
 }
 
+// UnitSummaryDTO is nested under user units for display (names, codes).
+type UnitSummaryDTO struct {
+	ID     string  `json:"id,omitempty"`
+	Name   string  `json:"name,omitempty"`
+	NameEn *string `json:"nameEn,omitempty"`
+	Code   string  `json:"code,omitempty"`
+	Kind   string  `json:"kind,omitempty"`
+}
+
 type UserUnitDTO struct {
-	UnitID      string   `json:"unitId"`
-	CompanyID   string   `json:"companyId,omitempty"`
-	Permissions []string `json:"permissions,omitempty"`
+	UnitID      string          `json:"unitId"`
+	CompanyID   string          `json:"companyId,omitempty"`
+	Permissions []string        `json:"permissions,omitempty"`
+	Unit        *UnitSummaryDTO `json:"unit,omitempty"`
 }
 
 // MapUserToResponse converts a User model to UserResponse DTO
@@ -38,6 +49,7 @@ func MapUserToResponse(user *models.User) *UserResponse {
 		Email:       user.Email,
 		Type:        user.Type,
 		CreatedAt:   user.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		PhotoURL:    user.PhotoURL,
 		Roles:       make([]RoleDTO, 0),
 		Units:       make([]UserUnitDTO, 0),
 		Permissions: make(map[string][]string),
@@ -64,6 +76,15 @@ func MapUserToResponse(user *models.User) *UserResponse {
 		}
 		if userUnit.Unit.ID != "" && userUnit.Unit.CompanyID != "" {
 			uu.CompanyID = userUnit.Unit.CompanyID
+		}
+		if userUnit.Unit.ID != "" {
+			uu.Unit = &UnitSummaryDTO{
+				ID:     userUnit.Unit.ID,
+				Name:   userUnit.Unit.Name,
+				NameEn: userUnit.Unit.NameEn,
+				Code:   userUnit.Unit.Code,
+				Kind:   userUnit.Unit.Kind,
+			}
 		}
 		response.Units = append(response.Units, uu)
 

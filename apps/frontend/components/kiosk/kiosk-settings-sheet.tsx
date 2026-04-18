@@ -289,8 +289,12 @@ function KioskSettingsForm({
             label={t('logo_screen')}
             hint={t('logo_screen_hint')}
             currentLogoUrl={logoUrl}
-            onLogoUploaded={setLogoUrl}
-            onLogoRemoved={() => setLogoUrl('')}
+            onLogoUploaded={async (url) => {
+              setLogoUrl(url);
+            }}
+            onLogoRemoved={async () => {
+              setLogoUrl('');
+            }}
           />
         </div>
 
@@ -370,8 +374,12 @@ function KioskSettingsForm({
                 label={t('printer_logo_upload')}
                 hint={t('printer_logo_upload_hint')}
                 currentLogoUrl={printerLogoUrl}
-                onLogoUploaded={setPrinterLogoUrl}
-                onLogoRemoved={() => setPrinterLogoUrl('')}
+                onLogoUploaded={async (url) => {
+                  setPrinterLogoUrl(url);
+                }}
+                onLogoRemoved={async () => {
+                  setPrinterLogoUrl('');
+                }}
                 uploadTarget='printer'
                 allowBmpByExtension
                 accept='image/png,image/jpeg,image/jpg,image/webp,image/svg+xml,image/bmp,.bmp,.dib'

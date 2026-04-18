@@ -41,7 +41,7 @@ func Connect() {
 	}
 
 	if dsn == "" {
-		log.Fatal("DATABASE_URL or DB_* environment variables are not set")
+		log.Fatal("❌ DATABASE_URL or DB_* environment variables are not set")
 	}
 
 	var err error
@@ -50,10 +50,10 @@ func Connect() {
 		DisableForeignKeyConstraintWhenMigrating: true,                                  // Disable FK constraints during migration
 	})
 	if err != nil {
-		log.Fatal("Failed to connect to database:", err)
+		log.Fatal("❌ Failed to connect to database:", err)
 	}
 
-	fmt.Println("Database connected successfully")
+	fmt.Println("✅ Database connected successfully")
 }
 
 // requirePostgresAtLeastVersionNum fails if server_version_num < minNum (e.g. 160000 = PostgreSQL 16.0).
@@ -90,14 +90,14 @@ func Ping(ctx context.Context) error {
 func AutoMigrate(models ...interface{}) {
 	err := DB.AutoMigrate(models...)
 	if err != nil {
-		log.Fatal("Failed to migrate database:", err)
+		log.Fatal("❌ Failed to migrate database:", err)
 	}
-	fmt.Println("Database migration completed")
+	fmt.Println("✅ Database migration completed")
 }
 
 // RunVersionedMigrations initializes migration tracking and runs all migrations
 func RunVersionedMigrations(models ...interface{}) error {
-	fmt.Println("Initializing migration system...")
+	fmt.Println("🗄️ Initializing migration system...")
 
 	// Create migration manager
 	manager := NewMigrationManager(DB)
@@ -1345,6 +1345,6 @@ func RunVersionedMigrations(models ...interface{}) error {
 		return fmt.Errorf("failed to run v1.2.20_user_units_merge_permissions_dedupe_unique migration: %w", err)
 	}
 
-	fmt.Println("All migrations completed successfully")
+	fmt.Println("✅ All migrations completed successfully")
 	return nil
 }

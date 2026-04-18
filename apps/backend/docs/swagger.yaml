@@ -278,6 +278,11 @@ components:
       required:
       - operatorComment
       type: object
+    handlers.PatchMeRequest:
+      properties:
+        photoUrl:
+          type: string
+      type: object
     handlers.PatchPlatformCompanyBody:
       properties:
         billingAddress:
@@ -512,6 +517,16 @@ components:
         token:
           type: string
       type: object
+    handlers.RoleDTO:
+      properties:
+        role:
+          $ref: '#/components/schemas/handlers.RoleInfoDTO'
+      type: object
+    handlers.RoleInfoDTO:
+      properties:
+        name:
+          type: string
+      type: object
     handlers.SaasVendorResponse:
       properties:
         billingAddress:
@@ -563,6 +578,19 @@ components:
         toUserId:
           type: string
       type: object
+    handlers.UnitSummaryDTO:
+      properties:
+        code:
+          type: string
+        id:
+          type: string
+        kind:
+          type: string
+        name:
+          type: string
+        nameEn:
+          type: string
+      type: object
     handlers.UpdateCounterRequest:
       properties:
         name:
@@ -611,6 +639,48 @@ components:
           additionalProperties:
             $ref: '#/components/schemas/handlers.UsageMetricInfoResponse'
           type: object
+      type: object
+    handlers.UserResponse:
+      properties:
+        createdAt:
+          type: string
+        email:
+          type: string
+        id:
+          type: string
+        name:
+          type: string
+        permissions:
+          additionalProperties:
+            items:
+              type: string
+            type: array
+          type: object
+        photoUrl:
+          type: string
+        roles:
+          items:
+            $ref: '#/components/schemas/handlers.RoleDTO'
+          type: array
+        type:
+          type: string
+        units:
+          items:
+            $ref: '#/components/schemas/handlers.UserUnitDTO'
+          type: array
+      type: object
+    handlers.UserUnitDTO:
+      properties:
+        companyId:
+          type: string
+        permissions:
+          items:
+            type: string
+          type: array
+        unit:
+          $ref: '#/components/schemas/handlers.UnitSummaryDTO'
+        unitId:
+          type: string
       type: object
     handlers.YooKassaWebhookNotification:
       properties:
@@ -2839,7 +2909,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/models.User'
+                $ref: '#/components/schemas/handlers.UserResponse'
           description: OK
         '401':
           content:
@@ -2856,6 +2926,53 @@ paths:
       security:
       - BearerAuth: []
       summary: Get current user
+      tags:
+      - auth
+    patch:
+      description: Authenticated users may update only their profile photo URL. Send `photoUrl` as a string (use empty string to clear). Omitted `photoUrl` is rejected.
+      operationId: authPatchMe
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/handlers.PatchMeRequest'
+        description: photoUrl only
+        required: true
+        x-originalParamName: body
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/handlers.UserResponse'
+          description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad Request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: User not found
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: Update current user profile (photo only)
       tags:
       - auth
   /auth/refresh:

@@ -12,8 +12,10 @@ import { uploadLogo, uploadPrinterLogo } from '@/lib/api/generated/upload';
 
 interface LogoUploadProps {
   currentLogoUrl?: string;
-  onLogoUploaded: (url: string) => void;
-  onLogoRemoved: () => void;
+  /** Called after upload succeeds; await so loading state clears only after persistence (e.g. PATCH profile). */
+  onLogoUploaded: (url: string) => Promise<void>;
+  /** Called when user removes the logo; await so loading state clears only after persistence. */
+  onLogoRemoved: () => Promise<void>;
   label?: string;
   /** e.g. `image/*` or `image/png,image/jpeg,image/bmp,.bmp` */
   accept?: string;
@@ -28,6 +30,14 @@ interface LogoUploadProps {
   allowBmpByExtension?: boolean;
   /** Disable upload and remove actions */
   disabled?: boolean;
+  /** When true, the visible `<Label>` is omitted (use an external heading instead). */
+  hideLabel?: boolean;
+  /** Overrides default "Upload logo" / similar button label */
+  uploadButtonLabel?: string;
+  /** Overrides default "Change logo" button label */
+  changeButtonLabel?: string;
+  /** When false, skips the built-in success toast after upload (caller may toast). Default true. */
+  showUploadSuccessToast?: boolean;
 }
 
 function isAllowedImageFile(file: File, allowBmpByExtension: boolean): boolean {
@@ -49,7 +59,11 @@ export function LogoUpload({
   hint,
   uploadTarget = 'kiosk',
   allowBmpByExtension = false,
-  disabled = false
+  disabled = false,
+  hideLabel = false,
+  uploadButtonLabel,
+  changeButtonLabel,
+  showUploadSuccessToast = true
 }: LogoUploadProps) {
   const t = useTranslations('components.upload');
   const displayLabel = label ?? t('defaultLogoLabel');
@@ -90,8 +104,10 @@ export function LogoUpload({
       if (!url) {
         throw new Error('Upload failed');
       }
-      onLogoUploaded(url);
-      toast.success(t('logoSuccess'));
+      await onLogoUploaded(url);
+      if (showUploadSuccessToast) {
+        toast.success(t('logoSuccess'));
+      }
     } catch (error) {
       logger.error('Upload error:', error);
       toast.error(t('logoFailed'));
@@ -103,9 +119,12 @@ export function LogoUpload({
     }
   };
 
+  const uploadBtn = uploadButtonLabel ?? t('uploadLogo');
+  const changeBtn = changeButtonLabel ?? t('changeLogo');
+
   return (
     <div className='space-y-2'>
-      <Label htmlFor={fileInputId}>{displayLabel}</Label>
+      {hideLabel ? null : <Label htmlFor={fileInputId}>{displayLabel}</Label>}
       <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4'>
         {currentLogoUrl ? (
           <div className='bg-muted/50 relative flex h-20 w-20 shrink-0 items-center justify-center self-center overflow-hidden rounded-md border sm:self-start'>
@@ -116,13 +135,23 @@ export function LogoUpload({
               className='max-h-full max-w-full object-contain p-1'
             />
             <Button
+              type='button'
               variant='destructive'
               size='icon'
               className='absolute top-0 right-0 h-5 w-5 rounded-tr-none rounded-bl-md'
-              onClick={onLogoRemoved}
-              disabled={disabled}
+              aria-label={t('removeLogo')}
+              onClick={async () => {
+                if (disabled) return;
+                setIsUploading(true);
+                try {
+                  await onLogoRemoved();
+                } finally {
+                  setIsUploading(false);
+                }
+              }}
+              disabled={disabled || isUploading}
             >
-              <X className='h-3 w-3' />
+              <X className='h-3 w-3' aria-hidden />
             </Button>
           </div>
         ) : (
@@ -146,6 +175,7 @@ export function LogoUpload({
             disabled={isUploading || disabled}
             onClick={() => fileInputRef.current?.click()}
             className='w-full sm:w-auto sm:self-start'
+            aria-label={hideLabel ? displayLabel : undefined}
           >
             {isUploading ? (
               <>
@@ -155,7 +185,7 @@ export function LogoUpload({
             ) : (
               <>
                 <Upload className='mr-2 h-4 w-4' />
-                {currentLogoUrl ? t('changeLogo') : t('uploadLogo')}
+                {currentLogoUrl ? changeBtn : uploadBtn}
               </>
             )}
           </Button>
