@@ -73,6 +73,7 @@ sleep 1
 
 ## Principles
 
+- **Backend DB migrations** (`apps/backend/pkg/database/postgres.go`): never rewrite already-committed migration steps; add a **new** `RunMigration("v…", …)` version instead (see [`apps/backend/AGENTS.md`](../../apps/backend/AGENTS.md)).
 - Run commands yourself; do not only suggest that the user run lint or restart servers.
 - **Dev stands:** proactively restart API + Next.js after relevant edits; do not end the turn with “please restart” unless the user opted out of restarts.
 - Prefer `nx run-many -t lint --all` before handing off a multi-area change.

@@ -18,7 +18,7 @@ import {
 import { normalizeChildUnitsQueryData } from '@/lib/child-units-query';
 import { Service, Unit, unitsApi, isRequestAbortError } from '@/lib/api';
 import { logger } from '@/lib/logger';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -32,6 +32,7 @@ import {
 import { FolderIcon } from '@/src/components/ui/icons/akar-icons-folder';
 import { XSmallIcon } from '@/src/components/ui/icons/akar-icons-x-small';
 import { useUpdateService } from '@/lib/hooks';
+import { getUnitDisplayName } from '@/lib/unit-display';
 import { toast } from 'sonner';
 import {
   SERVICE_GRID_COLS,
@@ -1331,7 +1332,8 @@ const UnitList: React.FC<{
   selectedUnitId: string | null;
   onSelect: (id: string) => void;
   t: (key: string) => string;
-}> = ({ units, selectedUnitId, onSelect, t }) => {
+  locale: string;
+}> = ({ units, selectedUnitId, onSelect, t, locale }) => {
   return (
     <Card className='h-full'>
       <CardHeader>
@@ -1349,7 +1351,9 @@ const UnitList: React.FC<{
             onClick={() => onSelect(unit.id)}
           >
             <div className='flex items-center'>
-              <span className='flex-grow'>{unit.name}</span>
+              <span className='flex-grow'>
+                {getUnitDisplayName(unit, locale)}
+              </span>
             </div>
           </div>
         ))}
@@ -1450,6 +1454,7 @@ const ServiceGridEditor: React.FC<ServiceGridEditorProps> = ({
   lockedServiceZoneId
 }) => {
   const t = useTranslations('admin');
+  const locale = useLocale();
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(
     unitId || null
   );
@@ -1507,11 +1512,11 @@ const ServiceGridEditor: React.FC<ServiceGridEditorProps> = ({
     const m = new Map<string, string>();
     for (const u of zoneLabelChildUnits) {
       if (u.kind === 'service_zone' && u.id) {
-        m.set(u.id, u.name ?? '');
+        m.set(u.id, getUnitDisplayName(u, locale));
       }
     }
     return m;
-  }, [zoneLabelChildUnits]);
+  }, [zoneLabelChildUnits, locale]);
 
   const servicesTreeFetchSeqRef = useRef(0);
   const tRef = useRef(t);
@@ -1795,6 +1800,7 @@ const ServiceGridEditor: React.FC<ServiceGridEditorProps> = ({
             selectedUnitId={selectedUnitId}
             onSelect={handleUnitSelect}
             t={t}
+            locale={locale}
           />
         </div>
       )}

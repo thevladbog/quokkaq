@@ -33,14 +33,15 @@ export function ActiveUnitProvider({ children }: { children: ReactNode }) {
     const units = user?.units;
     if (!units?.length) return [];
     const cid = activeCompanyId?.trim();
-    if (!cid) {
-      return units.map((u: { unitId: string }) => u.unitId);
-    }
-    return units
-      .filter(
-        (u: { unitId: string; companyId?: string }) => u.companyId === cid
-      )
-      .map((u: { unitId: string }) => u.unitId);
+    const ids = !cid
+      ? units.map((u: { unitId: string }) => u.unitId)
+      : units
+          .filter(
+            (u: { unitId: string; companyId?: string }) => u.companyId === cid
+          )
+          .map((u: { unitId: string }) => u.unitId);
+    // user.units can list the same unit more than once (e.g. multiple roles); keys must be unique.
+    return [...new Set(ids)];
   }, [user?.units, activeCompanyId]);
 
   const userId = user?.id;

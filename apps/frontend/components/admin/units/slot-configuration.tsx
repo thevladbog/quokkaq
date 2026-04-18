@@ -641,8 +641,8 @@ function GenerationSection({
         </CardDescription>
       </CardHeader>
       <CardContent className='space-y-4'>
-        <div className='flex items-end gap-4'>
-          <div className='space-y-2'>
+        <div className='grid grid-cols-1 gap-4 sm:grid-cols-2'>
+          <div className='min-w-0 space-y-2'>
             <Label>{t('from_date', { defaultValue: 'From Date' })}</Label>
             <DatePicker
               value={from}
@@ -651,7 +651,7 @@ function GenerationSection({
               disabled={readOnly}
             />
           </div>
-          <div className='space-y-2'>
+          <div className='min-w-0 space-y-2'>
             <Label>{t('to_date', { defaultValue: 'To Date' })}</Label>
             <DatePicker
               value={to}
@@ -660,16 +660,17 @@ function GenerationSection({
               disabled={readOnly}
             />
           </div>
-          <Button
-            onClick={() => generateMutation.mutate()}
-            disabled={readOnly || !from || !to || generateMutation.isPending}
-          >
-            {generateMutation.isPending && (
-              <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-            )}
-            {t('generate_btn', { defaultValue: 'Generate' })}
-          </Button>
         </div>
+        <Button
+          className='h-auto min-h-9 w-full max-w-full px-3 py-2.5 text-center leading-snug whitespace-normal sm:w-auto sm:whitespace-nowrap'
+          onClick={() => generateMutation.mutate()}
+          disabled={readOnly || !from || !to || generateMutation.isPending}
+        >
+          {generateMutation.isPending && (
+            <Loader2 className='mr-2 h-4 w-4 shrink-0 animate-spin' />
+          )}
+          {t('generate_btn', { defaultValue: 'Generate' })}
+        </Button>
       </CardContent>
     </Card>
   );

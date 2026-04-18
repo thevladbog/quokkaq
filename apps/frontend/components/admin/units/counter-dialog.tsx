@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import {
   Dialog,
   DialogContent,
@@ -26,6 +26,7 @@ import { normalizeChildUnitsQueryData } from '@/lib/child-units-query';
 import { getGetUnitsUnitIdChildUnitsQueryKey } from '@/lib/api/generated/units';
 import { countersApi, Counter, unitsApi } from '@/lib/api';
 import type { CounterServiceZoneFilter } from '@/components/admin/units/counter-zone-filter';
+import { getUnitDisplayName } from '@/lib/unit-display';
 
 interface CounterDialogProps {
   open: boolean;
@@ -85,6 +86,7 @@ function CounterForm({
 }) {
   const t = useTranslations('admin.counters');
   const tGeneral = useTranslations('general');
+  const locale = useLocale();
   const queryClient = useQueryClient();
   const isEditing = !!counter;
   const [name, setName] = useState(counter?.name || '');
@@ -195,9 +197,12 @@ function CounterForm({
             {serviceZoneFilter === null
               ? t('service_zone_locked_none')
               : t('service_zone_locked_zone', {
-                  name:
-                    serviceZones.find((z) => z.id === serviceZoneFilter)
-                      ?.name ?? ''
+                  name: (() => {
+                    const z = serviceZones.find(
+                      (x) => x.id === serviceZoneFilter
+                    );
+                    return z ? getUnitDisplayName(z, locale) : '';
+                  })()
                 })}
           </p>
         ) : (
@@ -217,7 +222,7 @@ function CounterForm({
                 )
                 .map((zone) => (
                   <SelectItem key={zone.id} value={zone.id}>
-                    {zone.name}
+                    {getUnitDisplayName(zone, locale)}
                   </SelectItem>
                 ))}
             </SelectContent>

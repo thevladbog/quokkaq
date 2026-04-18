@@ -40,7 +40,7 @@ import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import ThemeToggle from '@/components/ThemeToggle';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { getInitials, getAvatarColor } from '@/lib/utils';
 import { userCanOpenPlatformOperatorUI } from '@/lib/platform-access';
 import { SidebarActiveUnitSelect } from '@/components/SidebarActiveUnitSelect';
@@ -48,9 +48,11 @@ import { SidebarTenantCompanySelect } from '@/components/SidebarTenantCompanySel
 import { SidebarCollapsedLogo } from '@/components/SidebarCollapsedLogo';
 import { SidebarCollapseToggle } from '@/components/SidebarCollapseToggle';
 import { useActiveUnit } from '@/contexts/ActiveUnitContext';
+import { getWordmarkSrc } from '@/lib/wordmark-src';
 
 const AppSidebar = () => {
-  const tAdmin = useTranslations('admin');
+  const locale = useLocale();
+  const wordmarkSrc = getWordmarkSrc(locale);
   const tNav = useTranslations('nav');
   const tProfile = useTranslations('profile');
   const { user, isAuthenticated, logout } = useAuthContext();
@@ -112,7 +114,7 @@ const AppSidebar = () => {
     },
     {
       icon: CalendarClock,
-      label: tAdmin('navigation.pre_registrations', {
+      label: tNav('pre_registrations', {
         defaultValue: 'Pre-registrations'
       }),
       href: '/pre-registrations',
@@ -183,7 +185,7 @@ const AppSidebar = () => {
                 <div className='flex items-center gap-2'>
                   <div className='relative h-10 w-40 group-data-[collapsible=icon]:hidden'>
                     <Image
-                      src='/logo-text.svg'
+                      src={wordmarkSrc}
                       alt='QuokkaQ'
                       fill
                       className='object-contain'
@@ -324,7 +326,7 @@ const AppSidebar = () => {
                             className='w-full justify-start'
                             asChild
                           >
-                            <Link href='/settings'>
+                            <Link href='/settings/organization'>
                               <Settings className='mr-2 h-4 w-4' />
                               {tProfile('openSystemSettings', {
                                 defaultValue: 'System settings'

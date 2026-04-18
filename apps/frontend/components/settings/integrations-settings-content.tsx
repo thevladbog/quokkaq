@@ -3,7 +3,7 @@
 import { startTransition, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import {
   Card,
   CardContent,
@@ -32,11 +32,13 @@ import { CalendarIntegrationsPanel } from '@/components/admin/units/calendar-int
 import { GoogleCalendarPickDialog } from '@/components/settings/google-calendar-pick-dialog';
 import { resolveUnitFilterFromQuery } from '@/lib/integrations-unit-filter';
 import { OrganizationTenantSlugCard } from '@/components/organization/organization-tenant-slug-card';
+import { getUnitDisplayName } from '@/lib/unit-display';
 import { OrganizationSsoSettingsCard } from '@/components/organization/organization-sso-settings-card';
 
 export function IntegrationsSettingsContent() {
   const t = useTranslations('admin.integrations');
   const tCal = useTranslations('admin.calendar_integration');
+  const locale = useLocale();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -75,8 +77,14 @@ export function IntegrationsSettingsContent() {
 
   const unitOptions = useMemo(() => {
     const list = unitsQuery.data ?? [];
-    return [...list].sort((a, b) => a.name.localeCompare(b.name));
-  }, [unitsQuery.data]);
+    return [...list].sort((a, b) =>
+      getUnitDisplayName(a, locale).localeCompare(
+        getUnitDisplayName(b, locale),
+        locale,
+        { sensitivity: 'base' }
+      )
+    );
+  }, [unitsQuery.data, locale]);
 
   /** Optional filter: `?unit=` from URL (e.g. deep link from a unit page). */
   const filterUnitId = useMemo(() => {
@@ -233,7 +241,7 @@ export function IntegrationsSettingsContent() {
                         </SelectItem>
                         {unitOptions.map((u) => (
                           <SelectItem key={u.id} value={u.id}>
-                            {u.name}
+                            {getUnitDisplayName(u, locale)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -246,7 +254,8 @@ export function IntegrationsSettingsContent() {
                     filterUnitId={filterUnitId}
                     unitOptions={unitOptions.map((u) => ({
                       id: u.id,
-                      name: u.name
+                      name: u.name,
+                      nameEn: u.nameEn
                     }))}
                   />
                 </>

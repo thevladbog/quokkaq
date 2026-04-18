@@ -2,18 +2,29 @@ package services
 
 import (
 	"errors"
+	"slices"
+	"strings"
+
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
+	"quokkaq-go-backend/pkg/database"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
+)
+
+// Client validation errors for PATCH /users/{id} (map to HTTP 400).
+var (
+	ErrUpdateUserEmptyInput = errors.New("empty update")
+	ErrUpdateUserNameEmpty  = errors.New("name cannot be empty")
 )
 
 type UserService interface {
 	CreateUser(user *models.User) error
 	GetAllUsers(search string) ([]models.User, error)
 	GetUserByID(id string) (*models.User, error)
-	UpdateUser(user *models.User) error
+	UpdateUser(id string, input *models.UpdateUserInput) error
 	DeleteUser(id string) error
 	AssignUnit(userID, unitID string, permissions []string) error
 	RemoveUnit(userID, unitID string) error
@@ -65,16 +76,77 @@ func (s *userService) GetUserByID(id string) (*models.User, error) {
 	return s.repo.FindByID(id)
 }
 
-func (s *userService) UpdateUser(user *models.User) error {
-	if user.Password != nil {
-		hashed, err := bcrypt.GenerateFromPassword([]byte(*user.Password), bcrypt.DefaultCost)
+func userHasAdminRole(u *models.User) bool {
+	for i := range u.Roles {
+		if u.Roles[i].Role.Name == "admin" {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *userService) UpdateUser(id string, input *models.UpdateUserInput) error {
+	if input == nil {
+		return ErrUpdateUserEmptyInput
+	}
+	existing, err := s.repo.FindByID(id)
+	if err != nil {
+		return err
+	}
+
+	if input.Name != nil {
+		if strings.TrimSpace(*input.Name) == "" {
+			return ErrUpdateUserNameEmpty
+		}
+		existing.Name = strings.TrimSpace(*input.Name)
+	}
+	if input.Email != nil && *input.Email != "" {
+		existing.Email = input.Email
+	}
+	if input.Password != nil && *input.Password != "" {
+		hashed, err := bcrypt.GenerateFromPassword([]byte(*input.Password), bcrypt.DefaultCost)
 		if err != nil {
 			return err
 		}
 		hashedStr := string(hashed)
-		user.Password = &hashedStr
+		existing.Password = &hashedStr
 	}
-	return s.repo.Update(user)
+	if input.PhotoURL != nil {
+		if *input.PhotoURL == "" {
+			existing.PhotoURL = nil
+		} else {
+			existing.PhotoURL = input.PhotoURL
+		}
+	}
+
+	if input.Roles == nil {
+		return s.repo.Update(existing)
+	}
+
+	wantsAdmin := slices.Contains(input.Roles, "admin")
+
+	return database.DB.Transaction(func(tx *gorm.DB) error {
+		if err := s.repo.UpdateTx(tx, existing); err != nil {
+			return err
+		}
+		fresh, err := s.repo.FindByIDTx(tx, id)
+		if err != nil {
+			return err
+		}
+		hasAdmin := userHasAdminRole(fresh)
+
+		if wantsAdmin && !hasAdmin {
+			adminRole, err := s.repo.FindRoleByName("admin")
+			if err != nil {
+				return err
+			}
+			return s.repo.AssignRoleTx(tx, id, adminRole.ID)
+		}
+		if !wantsAdmin && hasAdmin {
+			return s.repo.RemoveUserRoleByNameTx(tx, id, "admin")
+		}
+		return nil
+	})
 }
 
 func (s *userService) DeleteUser(id string) error {

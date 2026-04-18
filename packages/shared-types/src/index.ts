@@ -18,6 +18,7 @@ export const UserModelSchema = z.object({
   id: z.string(),
   name: z.string(),
   email: z.string().nullable().optional(),
+  photoUrl: z.string().nullable().optional(),
   createdAt: z.string().nullable().optional(),
   unitIds: z.array(z.string()).optional(),
   roles: z
@@ -49,7 +50,12 @@ export const UserModelSchema = z.object({
         permissions: z.array(z.string()).optional().default([]),
         unit: z
           .object({
-            companyId: z.string()
+            companyId: z.string().optional(),
+            id: z.string().optional(),
+            name: z.string().optional(),
+            nameEn: z.string().nullable().optional(),
+            code: z.string().optional(),
+            kind: z.string().optional()
           })
           .optional()
       })
@@ -464,6 +470,7 @@ export const UnitOperationsPublicSchema = z.object({
 export const UnitModelSchema = z.object({
   id: z.string(),
   name: z.string(),
+  nameEn: z.string().nullable().optional(),
   code: z.string(),
   companyId: z.string(),
   parentId: z.string().nullable().optional(),

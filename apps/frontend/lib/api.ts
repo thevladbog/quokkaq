@@ -313,12 +313,14 @@ export const usersApi = {
       body: JSON.stringify({ unitId })
     }),
 
+  /** PATCH body: backend applies only present fields; `photoUrl: ''` clears the photo (JSON `null` does not). */
   update: (
     userId: string,
     data: {
       name?: string;
       email?: string;
       password?: string;
+      photoUrl?: string;
       roles?: string[];
     }
   ) =>

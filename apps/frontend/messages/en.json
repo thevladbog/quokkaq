@@ -12,11 +12,13 @@
     "active_unit_placeholder": "Select unit",
     "sidebar_collapse": "Collapse menu",
     "sidebar_expand": "Expand menu",
+    "open_menu": "Open menu",
     "audit_journal": "Audit log",
     "clients": "Clients",
     "statistics": "Statistics",
     "support_requests": "Support requests",
-    "login": "Login"
+    "login": "Login",
+    "pre_registrations": "Pre-registrations"
   },
   "clients": {
     "backHome": "Back to home",
@@ -244,7 +246,7 @@
       }
     },
     "units": {
-      "title": "Units",
+      "title": "Structure",
       "description": "Manage departments and locations",
       "code": "Code",
       "name": "Name",
@@ -260,6 +262,7 @@
       "name_placeholder": "Unit Name",
       "code_placeholder": "UNIT-001",
       "no_units": "No units found.",
+      "tree_hint": "Structure of subdivisions and service zones. Open one to manage its tabs (services, grid, stations, kiosk, etc.).",
       "view_unit_settings_aria": "Open settings for {name}",
       "general_settings": "General Settings",
       "general_settings_description": "Manage general settings for this unit.",
@@ -292,6 +295,9 @@
       "open_service_zone_page": "Zone details",
       "nested_subdivisions_section_title": "Nested subdivisions",
       "nested_subdivisions_section_description": "Child branches with their own tabs (services, kiosk, etc.). Open one to manage its stations and zones.",
+      "branch_children_empty": "No service zones or nested subdivisions under this branch yet.",
+      "branch_tree_title": "Zones and nested subdivisions",
+      "branch_tree_description": "Tree structure under this subdivision. Zones show counters; nested subdivisions link to their own settings.",
       "no_nested_subdivisions": "No nested subdivisions yet.",
       "stations_on_zone_hint": "This zone only groups counters. Add stations or nest zones and subdivisions below. Queue-facing settings stay on the parent subdivision.",
       "zone_children_title": "Nested units under this branch",
@@ -422,6 +428,8 @@
       "unsaved_changes": "You have unsaved changes",
       "unsaved_discard_confirm": "You have unsaved changes. Discard them and continue?",
       "delete_confirm": "Are you sure you want to delete this service?",
+      "calendar_slot_key": "Calendar slot label (optional)",
+      "calendar_slot_key_hint": "Used in pre-registration and when syncing with connected calendars. If two services share the same display name, this label distinguishes them; it is included in calendar event titles so the correct slots are created.",
       "calendar_slot_placeholder": "e.g. Returns-Desk-A"
     },
     "users": {
@@ -468,7 +476,23 @@
         "ACCESS_STATISTICS_ZONE": "Statistics: assigned service zones only"
       },
       "system_admin": "System Administrator",
-      "system_admin_desc": "Grant full access to the system"
+      "system_admin_desc": "Grant full access to the system",
+      "table_column_user": "User",
+      "table_column_units": "Units",
+      "table_column_admin": "Admin",
+      "open_user_settings_aria": "Open settings for {name}",
+      "admin_badge_aria": "System administrator",
+      "sheet_title": "User settings",
+      "profile_section": "Profile",
+      "role_section": "Role",
+      "profile_name_label": "Display name",
+      "save_profile": "Save name",
+      "operator_photo_label": "Operator photo",
+      "operator_photo_hint": "Shown in staff-facing views. Uses the same secure upload as logos.",
+      "operator_photo_upload": "Profile photo",
+      "units_section": "Units & permissions",
+      "add_unit_section": "Assign units",
+      "no_permission_to_manage_unit": "You cannot change assignments for this unit."
     },
     "reports": {
       "title": "Reports",
@@ -484,13 +508,11 @@
     },
     "navigation": {
       "dashboard": "Dashboard",
-      "units": "Units",
+      "units": "Structure",
       "users": "Users",
-      "grid_configuration": "Grid Configuration",
       "invitations": "Invitations",
-      "templates": "Templates",
-      "pre_registrations": "Pre-registrations",
-      "desktop_terminals": "Desktop terminals",
+      "templates": "Email templates",
+      "desktop_terminals": "Terminals",
       "operations": "Operations",
       "settings": "Settings",
       "integrations": "Integrations"
@@ -872,6 +894,7 @@
     },
     "pre_registrations": {
       "title": "Pre-registrations",
+      "manage_unit": "Manage",
       "select_unit": "Select a unit to manage pre-registrations",
       "create_title": "Create Pre-registration",
       "create_desc": "Fill in the details to create a new pre-registration.",
@@ -1931,6 +1954,7 @@
   "templates": {
     "title": "Message Templates",
     "description": "Manage invitation templates",
+    "loading": "Loading templates…",
     "create_template": "Create Template",
     "name": "Name",
     "subject": "Subject",
@@ -2353,14 +2377,14 @@
     "setup": "System Setup - QuokkaQ",
     "admin": {
       "dashboard": "Admin Panel - QuokkaQ",
-      "units": "Units - Admin - QuokkaQ",
+      "units": "Structure - Admin - QuokkaQ",
       "unitDetails": "Unit Settings - QuokkaQ",
       "gridConfiguration": "Grid Configuration - Admin - QuokkaQ",
       "invitations": "Invitations - Admin - QuokkaQ",
       "templates": "Message Templates - Admin - QuokkaQ",
       "preRegistrations": "Pre-registrations - Admin - QuokkaQ",
       "users": "Users & Roles - Admin - QuokkaQ",
-      "desktopTerminals": "Desktop terminals - Admin - QuokkaQ",
+      "desktopTerminals": "Terminals - Admin - QuokkaQ",
       "operations": "Operations - Admin - QuokkaQ",
       "integrations": "Integrations - Admin - QuokkaQ"
     },

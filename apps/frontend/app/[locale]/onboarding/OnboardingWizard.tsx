@@ -28,7 +28,7 @@ export function OnboardingWizard() {
   const completeMutation = useMutation({
     mutationFn: () => companiesApiExt.completeOnboarding(),
     onSuccess: () => {
-      router.push('/settings');
+      router.push('/settings/organization');
     },
     onError: () => {
       toast.error(t('complete.completeError'));

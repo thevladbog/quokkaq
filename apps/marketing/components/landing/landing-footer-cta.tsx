@@ -9,11 +9,12 @@ type Props = {
   appBaseUrl: string | null;
 };
 
+/** Full width on small screens; side-by-side only from `md` so long RU labels never clip at `sm`. */
 const pillPrimaryClass =
-  'focus-ring inline-flex min-h-12 min-w-[11rem] flex-1 items-center justify-center rounded-full bg-white px-8 py-3.5 text-center text-sm font-semibold text-neutral-900 shadow-lg shadow-black/15 transition hover:bg-neutral-50 sm:flex-none';
+  'focus-ring inline-flex min-h-12 w-full max-w-full min-w-0 items-center justify-center rounded-full bg-white px-5 py-3.5 text-center text-sm font-semibold leading-snug whitespace-normal text-balance text-neutral-900 shadow-lg shadow-black/15 transition hover:bg-neutral-50 md:w-auto md:min-w-[10rem] md:max-w-md md:px-8';
 
 const pillSecondaryClass =
-  'focus-ring inline-flex min-h-12 min-w-[11rem] flex-1 items-center justify-center rounded-full border-2 border-white bg-transparent px-8 py-3.5 text-center text-sm font-semibold text-white transition hover:bg-white/10 sm:flex-none';
+  'focus-ring inline-flex min-h-12 w-full max-w-full min-w-0 items-center justify-center rounded-full border-2 border-white bg-transparent px-5 py-3.5 text-center text-sm font-semibold leading-snug whitespace-normal text-balance text-white transition hover:bg-white/10 md:w-auto md:min-w-[10rem] md:max-w-md md:px-8';
 
 export function LandingFooterCta({ locale, copy, appBaseUrl }: Props) {
   const year = new Date().getFullYear();
@@ -31,16 +32,16 @@ export function LandingFooterCta({ locale, copy, appBaseUrl }: Props) {
     <footer className='relative z-10'>
       <div
         id='book-demo'
-        className='scroll-mt-24 bg-gradient-to-br from-[color:var(--color-primary)] to-[color:var(--color-primary-hover)] px-4 py-16 text-center sm:px-6 sm:py-20'
+        className='scroll-mt-24 overflow-x-hidden bg-gradient-to-br from-[color:var(--color-primary)] to-[color:var(--color-primary-hover)] px-4 py-16 text-center sm:px-6 sm:py-20'
       >
-        <div className='mx-auto max-w-3xl'>
+        <div className='mx-auto max-w-3xl min-w-0'>
           <h2 className='font-display mb-4 text-3xl font-bold tracking-tight text-white sm:mb-5 sm:text-4xl'>
             {copy.footer.title}
           </h2>
           <p className='mx-auto mb-10 max-w-2xl text-base leading-relaxed text-white/90 sm:text-lg'>
             {copy.footer.body}
           </p>
-          <div className='mx-auto flex max-w-xl flex-col items-stretch justify-center gap-4 sm:flex-row sm:justify-center sm:gap-5'>
+          <div className='mx-auto flex w-full max-w-xl min-w-0 flex-col items-stretch justify-center gap-3 md:flex-row md:justify-center md:gap-5'>
             {appBaseUrl ? (
               <a
                 href={trialHref}

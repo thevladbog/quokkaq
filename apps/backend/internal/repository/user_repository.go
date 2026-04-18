@@ -8,6 +8,7 @@ import (
 	"quokkaq-go-backend/pkg/database"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // UserUnitResult is the first user_units row joined to units for a user.
@@ -21,14 +22,18 @@ type UserRepository interface {
 	CreateTx(tx *gorm.DB, user *models.User) error
 	FindAll(search string) ([]models.User, error)
 	FindByID(id string) (*models.User, error)
+	FindByIDTx(tx *gorm.DB, id string) (*models.User, error)
 	FindByEmail(email string) (*models.User, error)
 	Update(user *models.User) error
+	UpdateTx(tx *gorm.DB, user *models.User) error
 	Delete(id string) error
 	AssignUnit(userID, unitID string, permissions []string) error
 	CreateUserUnitTx(tx *gorm.DB, uu *models.UserUnit) error
 	RemoveUnit(userID, unitID string) error
 	AssignRole(userID, roleID string) error
 	AssignRoleTx(tx *gorm.DB, userID, roleID string) error
+	RemoveUserRoleByName(userID, roleName string) error
+	RemoveUserRoleByNameTx(tx *gorm.DB, userID, roleName string) error
 	FindRoleByName(name string) (*models.Role, error)
 	CreatePasswordResetToken(token *models.PasswordResetToken) error
 	FindPasswordResetToken(token string) (*models.PasswordResetToken, error)
@@ -102,6 +107,15 @@ func (r *userRepository) FindByID(id string) (*models.User, error) {
 	return &user, nil
 }
 
+func (r *userRepository) FindByIDTx(tx *gorm.DB, id string) (*models.User, error) {
+	var user models.User
+	err := tx.Preload("Roles.Role").Preload("Units.Unit").Preload("Units").First(&user, "id = ?", id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
 func (r *userRepository) FindByEmail(email string) (*models.User, error) {
 	var user models.User
 	err := r.db.Preload("Roles.Role").Preload("Units.Unit").Preload("Units").First(&user, "email = ?", email).Error
@@ -112,7 +126,22 @@ func (r *userRepository) FindByEmail(email string) (*models.User, error) {
 }
 
 func (r *userRepository) Update(user *models.User) error {
-	return r.db.Save(user).Error
+	return r.UpdateTx(r.db, user)
+}
+
+func (r *userRepository) UpdateTx(tx *gorm.DB, user *models.User) error {
+	updates := map[string]interface{}{
+		"name":      user.Name,
+		"email":     user.Email,
+		"phone":     user.Phone,
+		"is_active": user.IsActive,
+		"type":      user.Type,
+		"photo_url": user.PhotoURL,
+	}
+	if user.Password != nil {
+		updates["password"] = user.Password
+	}
+	return tx.Model(&models.User{}).Where("id = ?", user.ID).Updates(updates).Error
 }
 
 func (r *userRepository) Delete(id string) error {
@@ -120,12 +149,15 @@ func (r *userRepository) Delete(id string) error {
 }
 
 func (r *userRepository) AssignUnit(userID, unitID string, permissions []string) error {
-	userUnit := models.UserUnit{
+	uu := models.UserUnit{
 		UserID:      userID,
 		UnitID:      unitID,
 		Permissions: models.StringArray(permissions),
 	}
-	return r.db.Create(&userUnit).Error
+	return r.db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "user_id"}, {Name: "unit_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"permissions"}),
+	}).Create(&uu).Error
 }
 
 func (r *userRepository) CreateUserUnitTx(tx *gorm.DB, uu *models.UserUnit) error {
@@ -146,6 +178,18 @@ func (r *userRepository) AssignRoleTx(tx *gorm.DB, userID, roleID string) error 
 		RoleID: roleID,
 	}
 	return tx.Create(&userRole).Error
+}
+
+func (r *userRepository) RemoveUserRoleByName(userID, roleName string) error {
+	return r.RemoveUserRoleByNameTx(r.db, userID, roleName)
+}
+
+func (r *userRepository) RemoveUserRoleByNameTx(tx *gorm.DB, userID, roleName string) error {
+	return tx.Exec(`
+		DELETE FROM user_roles ur
+		USING roles r
+		WHERE ur.role_id = r.id AND ur.user_id = ? AND r.name = ?
+	`, userID, roleName).Error
 }
 
 func (r *userRepository) FindRoleByName(name string) (*models.Role, error) {

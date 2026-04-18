@@ -17,9 +17,7 @@ import {
   Building2,
   CreditCard,
   DollarSign,
-  Grid3X3,
   Home,
-  LayoutDashboard,
   Mail,
   MessageSquare,
   Monitor,
@@ -29,11 +27,14 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import { Link, usePathname, useRouter } from '@/src/i18n/navigation';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { SidebarCollapsedLogo } from '@/components/SidebarCollapsedLogo';
 import { SidebarCollapseToggle } from '@/components/SidebarCollapseToggle';
+import { getWordmarkSrc } from '@/lib/wordmark-src';
 
 export default function SettingsSidebar() {
+  const locale = useLocale();
+  const wordmarkSrc = getWordmarkSrc(locale);
   const pathname = usePathname();
   const router = useRouter();
   const tAdmin = useTranslations('admin');
@@ -48,12 +49,19 @@ export default function SettingsSidebar() {
     return pathname !== path && pathname.startsWith(`${path}/`);
   };
 
+  /** Organization settings index and sub-routes except billing (billing has its own nav item). */
+  const isOrgActive = (p: string) =>
+    p === '/settings/organization' ||
+    (p.startsWith('/settings/organization/') &&
+      !p.startsWith('/settings/organization/billing/') &&
+      p !== '/settings/organization/billing');
+
   const items = [
     {
-      icon: LayoutDashboard,
-      label: tAdmin('navigation.dashboard', { defaultValue: 'Dashboard' }),
-      href: '/settings',
-      active: isActive('/settings')
+      icon: Building2,
+      label: tOrg('title'),
+      href: '/settings/organization',
+      active: isOrgActive(pathname)
     },
     {
       icon: Building,
@@ -68,28 +76,24 @@ export default function SettingsSidebar() {
       active: isActive('/settings/users')
     },
     {
-      icon: Activity,
-      label: tAdmin('navigation.operations'),
-      href: '/settings/operations',
-      active: isActive('/settings/operations')
-    },
-    {
-      icon: Grid3X3,
-      label: tAdmin('navigation.grid_configuration'),
-      href: '/settings/grid-configuration',
-      active: isActive('/settings/grid-configuration')
-    },
-    {
       icon: Mail,
       label: tAdmin('navigation.invitations'),
       href: '/settings/invitations',
       active: isActive('/settings/invitations')
     },
     {
-      icon: MessageSquare,
-      label: tAdmin('navigation.templates'),
-      href: '/settings/templates',
-      active: isActive('/settings/templates')
+      icon: CreditCard,
+      label: tOrg('billing.title'),
+      href: '/settings/organization/billing',
+      active:
+        isActive('/settings/organization/billing') ||
+        isActiveSub('/settings/organization/billing')
+    },
+    {
+      icon: DollarSign,
+      label: tPricing('title'),
+      href: '/settings/pricing',
+      active: isActive('/settings/pricing')
     },
     {
       icon: Plug,
@@ -106,28 +110,16 @@ export default function SettingsSidebar() {
       active: isActive('/settings/desktop-terminals')
     },
     {
-      icon: DollarSign,
-      label: tPricing('title'),
-      href: '/settings/pricing',
-      active: isActive('/settings/pricing')
+      icon: MessageSquare,
+      label: tAdmin('navigation.templates'),
+      href: '/settings/templates',
+      active: isActive('/settings/templates')
     },
     {
-      icon: Building2,
-      label: tOrg('title'),
-      href: '/settings/organization',
-      active:
-        pathname === '/settings/organization' ||
-        (pathname.startsWith('/settings/organization/') &&
-          !pathname.startsWith('/settings/organization/billing/') &&
-          pathname !== '/settings/organization/billing')
-    },
-    {
-      icon: CreditCard,
-      label: tOrg('billing.title'),
-      href: '/settings/organization/billing',
-      active:
-        isActive('/settings/organization/billing') ||
-        isActiveSub('/settings/organization/billing')
+      icon: Activity,
+      label: tAdmin('navigation.operations'),
+      href: '/settings/operations',
+      active: isActive('/settings/operations')
     }
   ];
 
@@ -137,14 +129,14 @@ export default function SettingsSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size='lg' asChild>
-              <Link href='/settings'>
+              <Link href='/settings/organization'>
                 <div className='flex flex-col gap-0.5 group-data-[collapsible=icon]:hidden'>
                   <span className='text-muted-foreground text-xs font-medium tracking-wide uppercase'>
                     {tNav('settingsZone', { defaultValue: 'Settings' })}
                   </span>
                   <div className='relative h-8 w-36'>
                     <Image
-                      src='/logo-text.svg'
+                      src={wordmarkSrc}
                       alt='QuokkaQ'
                       fill
                       className='object-contain object-left'

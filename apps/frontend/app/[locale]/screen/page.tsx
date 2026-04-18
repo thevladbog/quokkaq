@@ -1,16 +1,18 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useRouter } from '@/src/i18n/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { unitsApi, Unit } from '@/lib/api';
 import { Spinner } from '@/components/ui/spinner';
+import { getUnitDisplayName } from '@/lib/unit-display';
 
 export default function ScreenPage() {
   const [units, setUnits] = useState<Unit[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const t = useTranslations('screen');
+  const locale = useLocale();
   const router = useRouter();
 
   useEffect(() => {
@@ -54,7 +56,7 @@ export default function ScreenPage() {
             >
               <CardHeader>
                 <CardTitle className='text-center text-xl'>
-                  {unit.name}
+                  {getUnitDisplayName(unit, locale)}
                 </CardTitle>
               </CardHeader>
               <CardContent>

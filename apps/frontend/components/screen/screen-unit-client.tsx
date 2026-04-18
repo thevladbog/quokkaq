@@ -18,6 +18,7 @@ import { AdPlayer } from '@/components/screen/ad-player';
 import { CalledTicketsTable } from '@/components/screen/called-tickets-table';
 import { QueueTicker } from '@/components/screen/queue-ticker';
 import { Spinner } from '@/components/ui/spinner';
+import { getUnitDisplayName } from '@/lib/unit-display';
 
 interface ScreenUnitClientProps {
   unitId: string;
@@ -275,7 +276,9 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
               />
             </div>
           )}
-          <h1 className='text-primary text-4xl font-bold'>{unit.name}</h1>
+          <h1 className='text-primary text-4xl font-bold'>
+            {getUnitDisplayName(unit, locale)}
+          </h1>
         </div>
         <div className='text-right'>
           <div className='font-mono text-3xl font-bold'>

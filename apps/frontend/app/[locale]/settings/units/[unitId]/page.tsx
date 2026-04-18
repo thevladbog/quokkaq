@@ -1,7 +1,7 @@
 'use client';
 
-import { use, useMemo, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { use, useEffect, useMemo, useState } from 'react';
+import { useLocale, useTranslations } from 'next-intl';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -37,6 +37,7 @@ import ServiceGridEditor from '@/components/ServiceGridEditor';
 import { useRouter } from '@/src/i18n/navigation';
 import PermissionGuard from '@/components/auth/permission-guard';
 import { toast } from 'sonner';
+import { getUnitDisplayName } from '@/lib/unit-display';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface UnitPageProps {
@@ -50,6 +51,7 @@ export default function UnitPage({ params }: UnitPageProps) {
   const { unitId } = use(params);
   const router = useRouter();
   const t = useTranslations('admin'); // Using admin namespace
+  const locale = useLocale();
   const [activeTab, setActiveTab] = useState('general');
 
   const { data: unit } = useQuery({
@@ -58,15 +60,19 @@ export default function UnitPage({ params }: UnitPageProps) {
   });
 
   const [unitName, setUnitName] = useState('');
+  const [unitNameEn, setUnitNameEn] = useState('');
   const [unitCode, setUnitCode] = useState('');
   const [unitTimezone, setUnitTimezone] = useState('');
 
-  // Initialize state when unit loads
-  if (unit && unitName === '' && unitCode === '') {
+  useEffect(() => {
+    if (!unit) return;
+    // Sync local form state when the loaded unit payload changes (e.g. refetch).
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional reset from server
     setUnitName(unit.name);
+    setUnitNameEn(unit.nameEn ?? '');
     setUnitCode(unit.code);
     setUnitTimezone(unit.timezone);
-  }
+  }, [unit]);
 
   const updateUnitMutation = useUpdateUnit();
 
@@ -77,7 +83,12 @@ export default function UnitPage({ params }: UnitPageProps) {
 
   const handleSaveGeneral = () => {
     updateUnitMutation.mutate(
-      { id: unitId, name: unitName, timezone: unitTimezone },
+      {
+        id: unitId,
+        name: unitName,
+        timezone: unitTimezone,
+        nameEn: unitNameEn.trim() === '' ? null : unitNameEn.trim()
+      },
       {
         onSuccess: () => {
           toast.success(t('units.update_success'));
@@ -99,7 +110,11 @@ export default function UnitPage({ params }: UnitPageProps) {
 
   const handleSaveServiceZoneName = () => {
     updateUnitMutation.mutate(
-      { id: unitId, name: unitName },
+      {
+        id: unitId,
+        name: unitName,
+        nameEn: unitNameEn.trim() === '' ? null : unitNameEn.trim()
+      },
       {
         onSuccess: () => {
           toast.success(t('units.update_success'));
@@ -178,19 +193,25 @@ export default function UnitPage({ params }: UnitPageProps) {
     );
 
     return (
-      <div className='container mx-auto flex-1 p-4'>
-        <div className='mb-6 flex items-center gap-4'>
+      <div className='container mx-auto min-w-0 p-4'>
+        <div className='mb-6 flex min-w-0 items-center gap-3'>
           <Button variant='ghost' size='icon' onClick={() => router.back()}>
             <ArrowLeft className='h-4 w-4' />
           </Button>
-          <h1 className='text-3xl font-bold'>{unit.name}</h1>
+          <h1 className='min-w-0 flex-1 text-2xl font-bold tracking-tight break-words md:text-3xl'>
+            {getUnitDisplayName(unit, locale)}
+          </h1>
         </div>
 
         <p className='text-muted-foreground mb-6 max-w-3xl text-sm'>
           {t('units.service_zone_folder_description')}
         </p>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className='w-full'>
+        <Tabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className='w-full min-w-0'
+        >
           <TabsList>
             <PermissionGuard
               permissions={['UNIT_SETTINGS_MANAGE']}
@@ -270,6 +291,17 @@ export default function UnitPage({ params }: UnitPageProps) {
                       />
                     </div>
                     <div className='space-y-2'>
+                      <Label htmlFor='zone-name-en'>
+                        {t('forms.fields.name_en')}
+                      </Label>
+                      <Input
+                        id='zone-name-en'
+                        value={unitNameEn}
+                        onChange={(e) => setUnitNameEn(e.target.value)}
+                        placeholder={t('forms.fields.name_en')}
+                      />
+                    </div>
+                    <div className='space-y-2'>
                       <Label htmlFor='zone-code'>{t('units.unit_code')}</Label>
                       <Input
                         id='zone-code'
@@ -333,7 +365,7 @@ export default function UnitPage({ params }: UnitPageProps) {
               <KioskSettings
                 key={JSON.stringify(unit.config?.kiosk)}
                 unitId={unitId}
-                unitName={unit.name}
+                unitName={getUnitDisplayName(unit, locale)}
                 currentConfig={unit.config || {}}
               />
             </PermissionGuard>
@@ -368,12 +400,14 @@ export default function UnitPage({ params }: UnitPageProps) {
   }
 
   return (
-    <div className='container mx-auto flex-1 p-4'>
-      <div className='mb-6 flex items-center gap-4'>
+    <div className='container mx-auto min-w-0 p-4'>
+      <div className='mb-6 flex min-w-0 items-center gap-3'>
         <Button variant='ghost' size='icon' onClick={() => router.back()}>
           <ArrowLeft className='h-4 w-4' />
         </Button>
-        <h1 className='text-3xl font-bold'>{unit.name}</h1>
+        <h1 className='min-w-0 flex-1 text-2xl font-bold tracking-tight break-words md:text-3xl'>
+          {getUnitDisplayName(unit, locale)}
+        </h1>
       </div>
 
       {unit.kind === 'subdivision' ? (
@@ -395,7 +429,11 @@ export default function UnitPage({ params }: UnitPageProps) {
         </Alert>
       ) : null}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className='w-full'>
+      <Tabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className='w-full min-w-0'
+      >
         <TabsList>
           <PermissionGuard
             permissions={['UNIT_SETTINGS_MANAGE']}
@@ -493,6 +531,15 @@ export default function UnitPage({ params }: UnitPageProps) {
                     id='name'
                     value={unitName}
                     onChange={(e) => setUnitName(e.target.value)}
+                  />
+                </div>
+                <div className='space-y-2'>
+                  <Label htmlFor='name-en'>{t('forms.fields.name_en')}</Label>
+                  <Input
+                    id='name-en'
+                    value={unitNameEn}
+                    onChange={(e) => setUnitNameEn(e.target.value)}
+                    placeholder={t('forms.fields.name_en')}
                   />
                 </div>
                 <div className='space-y-2'>
@@ -606,7 +653,7 @@ export default function UnitPage({ params }: UnitPageProps) {
             <KioskSettings
               key={JSON.stringify(unit.config?.kiosk)}
               unitId={unitId}
-              unitName={unit.name}
+              unitName={getUnitDisplayName(unit, locale)}
               currentConfig={unit.config || {}}
             />
           </PermissionGuard>

@@ -1,7 +1,8 @@
 'use client';
 
 import { ComponentType, ReactNode } from 'react';
-import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
+import { SidebarProvider } from '@/components/ui/sidebar';
+import { SidebarInsetShell } from '@/components/SidebarInsetShell';
 import AppSidebar from '@/components/AppSidebar';
 import OperationalSupportFab from '@/components/staff/OperationalSupportFab';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -33,9 +34,7 @@ const ProtectedSidebarLayout = ({
     >
       <SidebarProvider>
         <SidebarComponent />
-        <SidebarInset>
-          <div className='p-4 md:p-8'>{children}</div>
-        </SidebarInset>
+        <SidebarInsetShell>{children}</SidebarInsetShell>
         <OperationalSupportFab />
       </SidebarProvider>
     </ProtectedRoute>

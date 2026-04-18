@@ -83,7 +83,7 @@ export default function SetupPage() {
 
         if (response && response.accessToken) {
           await login(response.accessToken);
-          router.push('/settings');
+          router.push('/settings/organization');
         }
       } catch (loginError) {
         console.error('Auto-login failed:', loginError);

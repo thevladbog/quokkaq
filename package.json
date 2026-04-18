@@ -27,6 +27,9 @@
     "precommit": "lint-staged && pnpm --dir apps/frontend run format:check"
   },
   "private": true,
+  "sherif": {
+    "ignoreRule": ["packages-without-package-json"]
+  },
   "devDependencies": {
     "@nx/js": "22.6.5",
     "@nx/workspace": "22.6.5",

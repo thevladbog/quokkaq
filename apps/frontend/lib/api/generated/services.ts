@@ -192,6 +192,7 @@ export interface ModelsUnit {
   id?: string;
   kind?: string;
   name?: string;
+  nameEn?: string;
   /** Operations is hydrated for GET /units/{id} (kiosk freeze / EOD phase); not stored on units row. */
   readonly operations?: ModelsUnitOperationsPublic;
   parentId?: string;
@@ -219,6 +220,7 @@ export interface ModelsUser {
   isActive?: boolean;
   name?: string;
   phone?: string;
+  photoUrl?: string;
   /** Relations */
   roles?: ModelsUserRole[];
   type?: string;
@@ -1323,6 +1325,15 @@ export interface ModelsUpdateDayScheduleRequest {
   slots?: ModelsServiceSlot[];
 }
 
+export interface ModelsUpdateUserInput {
+  email?: string;
+  name?: string;
+  password?: string;
+  /** URL of the user's profile photo. Send an empty string to clear the photo; omit the field to leave the current value unchanged. */
+  photoUrl?: string;
+  roles?: string[];
+}
+
 export interface ModelsWeeklySlotCapacity {
   capacity?: number;
   createdAt?: string;
@@ -1356,6 +1367,7 @@ export interface ServicesCalendarIntegrationPublic {
   timezone?: string;
   unitId?: string;
   unitName?: string;
+  unitNameEn?: string;
   username?: string;
 }
 

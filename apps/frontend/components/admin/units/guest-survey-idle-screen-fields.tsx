@@ -241,7 +241,7 @@ export function GuestSurveyIdleScreenFields({
   };
 
   return (
-    <div className='space-y-4 rounded-lg border p-4'>
+    <div className='max-w-full min-w-0 space-y-4 rounded-lg border p-4'>
       <div>
         <Label className='text-base font-medium'>
           {t('idle_section_title')}
@@ -275,14 +275,32 @@ export function GuestSurveyIdleScreenFields({
         </p>
       </div>
 
-      <div className='flex flex-wrap gap-2'>
-        <Button type='button' variant='outline' size='sm' onClick={addText}>
+      <div className='flex flex-col gap-2 sm:flex-row sm:flex-wrap'>
+        <Button
+          type='button'
+          variant='outline'
+          size='sm'
+          className='w-full sm:w-auto'
+          onClick={addText}
+        >
           {t('idle_add_text')}
         </Button>
-        <Button type='button' variant='outline' size='sm' onClick={addImage}>
+        <Button
+          type='button'
+          variant='outline'
+          size='sm'
+          className='w-full sm:w-auto'
+          onClick={addImage}
+        >
           {t('idle_add_image')}
         </Button>
-        <Button type='button' variant='outline' size='sm' onClick={addVideo}>
+        <Button
+          type='button'
+          variant='outline'
+          size='sm'
+          className='w-full sm:w-auto'
+          onClick={addVideo}
+        >
           {t('idle_add_video')}
         </Button>
       </div>
@@ -296,15 +314,15 @@ export function GuestSurveyIdleScreenFields({
           {draft.slides.map((slide, index) => (
             <li
               key={slide.key}
-              className='bg-card space-y-3 rounded-lg border p-3 shadow-sm'
+              className='bg-card max-w-full min-w-0 space-y-3 rounded-lg border p-3 shadow-sm'
             >
-              <div className='flex flex-wrap items-center justify-between gap-2'>
-                <span className='text-sm font-medium'>
+              <div className='flex min-w-0 items-center justify-between gap-2'>
+                <span className='min-w-0 truncate text-sm font-medium'>
                   {slide.type === 'text' && t('idle_type_text')}
                   {slide.type === 'image' && t('idle_type_image')}
                   {slide.type === 'video' && t('idle_type_video')}
                 </span>
-                <div className='flex flex-wrap gap-1'>
+                <div className='flex shrink-0 justify-end gap-1'>
                   <Button
                     type='button'
                     variant='ghost'
@@ -341,7 +359,7 @@ export function GuestSurveyIdleScreenFields({
               </div>
 
               {slide.type === 'text' && (
-                <Tabs defaultValue='en' className='w-full'>
+                <Tabs defaultValue='en' className='w-full min-w-0'>
                   <TabsList>
                     <TabsTrigger value='en'>
                       {t('completion_tab_en')}

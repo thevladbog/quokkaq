@@ -99,9 +99,9 @@ export function GuestSurveyTerminalThemeFields({
     onChange({ ...draft, ...patch });
 
   return (
-    <div className='border-border space-y-4 rounded-lg border p-4'>
-      <div className='flex items-center justify-between gap-3'>
-        <div className='space-y-1'>
+    <div className='border-border max-w-full min-w-0 space-y-4 rounded-lg border p-4'>
+      <div className='flex min-w-0 items-center justify-between gap-3'>
+        <div className='min-w-0 space-y-1'>
           <Label htmlFor={`${idPrefix}-theme-enabled`} className='text-sm'>
             {t('terminal_theme_section')}
           </Label>

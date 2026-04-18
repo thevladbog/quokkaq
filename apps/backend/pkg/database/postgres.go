@@ -1271,6 +1271,80 @@ func RunVersionedMigrations(models ...interface{}) error {
 		return fmt.Errorf("failed to run v1.2.16_subscription_plan_enterprise_allow_instant_purchase migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.2.17_users_photo_url", func(db *gorm.DB) error {
+		return db.Exec(`
+			ALTER TABLE users ADD COLUMN IF NOT EXISTS photo_url TEXT;
+		`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.2.17_users_photo_url migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.2.18_units_name_en", func(db *gorm.DB) error {
+		return db.Exec(`
+			ALTER TABLE units ADD COLUMN IF NOT EXISTS name_en TEXT;
+		`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.2.18_units_name_en migration: %w", err)
+	}
+
+	// v1.2.19_user_units_unique_user_unit: reserved version key (may already be applied with an older body).
+	// Canonical DDL + permission-safe dedupe lives in v1.2.20_user_units_merge_permissions_dedupe_unique.
+	err = manager.RunMigration("v1.2.19_user_units_unique_user_unit", func(db *gorm.DB) error {
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.2.19_user_units_unique_user_unit migration: %w", err)
+	}
+
+	// Required for UserRepository.AssignUnit ON CONFLICT (user_id, unit_id); merges permissions before removing duplicate rows, then ensures the unique index.
+	err = manager.RunMigration("v1.2.20_user_units_merge_permissions_dedupe_unique", func(db *gorm.DB) error {
+		return db.Transaction(func(tx *gorm.DB) error {
+			// Merge permissions across duplicate (user_id, unit_id) rows before deleting extras so we never drop rights.
+			if err := tx.Exec(`
+				WITH merged AS (
+					SELECT u.user_id, u.unit_id,
+						ARRAY(
+							SELECT DISTINCT p
+							FROM user_units u2,
+							LATERAL unnest(COALESCE(u2.permissions, '{}'::text[])) AS p
+							WHERE u2.user_id = u.user_id AND u2.unit_id = u.unit_id
+						) AS merged_perms
+					FROM user_units u
+					GROUP BY u.user_id, u.unit_id
+					HAVING COUNT(*) > 1
+				),
+				keepers AS (
+					SELECT user_id, unit_id, MAX(ctid) AS keeper_ctid
+					FROM user_units
+					GROUP BY user_id, unit_id
+					HAVING COUNT(*) > 1
+				)
+				UPDATE user_units u
+				SET permissions = m.merged_perms
+				FROM merged m
+				JOIN keepers k ON k.user_id = m.user_id AND k.unit_id = m.unit_id
+				WHERE u.ctid = k.keeper_ctid;
+			`).Error; err != nil {
+				return err
+			}
+			if err := tx.Exec(`
+				DELETE FROM user_units u1
+				USING user_units u2
+				WHERE u1.user_id = u2.user_id AND u1.unit_id = u2.unit_id AND u1.ctid < u2.ctid;
+			`).Error; err != nil {
+				return err
+			}
+			return tx.Exec(`
+				CREATE UNIQUE INDEX IF NOT EXISTS ux_user_units_user_unit ON user_units (user_id, unit_id);
+			`).Error
+		})
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.2.20_user_units_merge_permissions_dedupe_unique migration: %w", err)
+	}
+
 	fmt.Println("All migrations completed successfully")
 	return nil
 }

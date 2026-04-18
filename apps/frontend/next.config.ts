@@ -26,6 +26,16 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       {
+        source: '/:locale/settings',
+        destination: '/:locale/settings/organization',
+        permanent: false
+      },
+      {
+        source: '/:locale/settings/grid-configuration',
+        destination: '/:locale/settings/units',
+        permanent: false
+      },
+      {
         source: '/:locale/settings/settings/:path*',
         destination: '/:locale/settings/:path*',
         permanent: false
@@ -42,7 +52,7 @@ const nextConfig: NextConfig = {
       },
       {
         source: '/:locale/admin',
-        destination: '/:locale/settings',
+        destination: '/:locale/settings/organization',
         permanent: true
       },
       {

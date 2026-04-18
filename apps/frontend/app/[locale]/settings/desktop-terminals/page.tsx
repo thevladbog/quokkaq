@@ -62,6 +62,7 @@ import {
   type DesktopTerminal,
   type Unit
 } from '@/lib/api';
+import { getUnitDisplayName } from '@/lib/unit-display';
 
 function filterCountersForContext(unit: Unit, counters: Counter[]): Counter[] {
   if (unit.kind === 'subdivision') {
@@ -77,6 +78,9 @@ function filterCountersForContext(unit: Unit, counters: Counter[]): Counter[] {
   }
   return [];
 }
+
+/** Radix Select requires `value` to match a `SelectItem`; empty string is not a valid item value here. */
+const SELECT_UNSET = '__unset__';
 
 export default function DesktopTerminalsPage() {
   const t = useTranslations('admin.desktop_terminals');
@@ -135,6 +139,22 @@ export default function DesktopTerminalsPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (formUnitId && !units.some((u) => u.id === formUnitId)) {
+      setFormUnitId('');
+    }
+  }, [units, formUnitId]);
+
+  useEffect(() => {
+    if (
+      formContextUnitId &&
+      !contextUnits.some((u) => u.id === formContextUnitId)
+    ) {
+      setFormContextUnitId('');
+      setFormCounterId('');
+    }
+  }, [contextUnits, formContextUnitId]);
 
   useEffect(() => {
     if (!(createOpen || editOpen)) return;
@@ -243,9 +263,15 @@ export default function DesktopTerminalsPage() {
 
   const submitCreate = async () => {
     const nameTrim = formName.trim();
+    const safeUnitId = units.some((u) => u.id === formUnitId) ? formUnitId : '';
+    const safeContextUnitId = contextUnits.some(
+      (u) => u.id === formContextUnitId
+    )
+      ? formContextUnitId
+      : '';
     try {
       if (formDeviceKind === 'counter_display') {
-        if (!formContextUnitId || !formCounterId) {
+        if (!safeContextUnitId || !formCounterId) {
           toast.error(t('select_counter_error'));
           return;
         }
@@ -258,7 +284,7 @@ export default function DesktopTerminalsPage() {
           unitId: counter.unitId,
           defaultLocale: formLocale,
           kioskFullscreen: formKioskFullscreen,
-          contextUnitId: formContextUnitId,
+          contextUnitId: safeContextUnitId,
           counterId: formCounterId,
           ...(nameTrim ? { name: nameTrim } : {})
         });
@@ -271,12 +297,12 @@ export default function DesktopTerminalsPage() {
         return;
       }
 
-      if (!formUnitId) {
+      if (!safeUnitId) {
         toast.error(t('select_unit'));
         return;
       }
       const res = await desktopTerminalsApi.create({
-        unitId: formUnitId,
+        unitId: safeUnitId,
         defaultLocale: formLocale,
         kioskFullscreen: formKioskFullscreen,
         ...(nameTrim ? { name: nameTrim } : {})
@@ -299,9 +325,15 @@ export default function DesktopTerminalsPage() {
   const submitEdit = async () => {
     if (!editing) return;
     const nameTrim = formName.trim();
+    const safeUnitId = units.some((u) => u.id === formUnitId) ? formUnitId : '';
+    const safeContextUnitId = contextUnits.some(
+      (u) => u.id === formContextUnitId
+    )
+      ? formContextUnitId
+      : '';
     try {
       if (formDeviceKind === 'counter_display') {
-        if (!formContextUnitId || !formCounterId) {
+        if (!safeContextUnitId || !formCounterId) {
           toast.error(t('select_counter_error'));
           return;
         }
@@ -314,17 +346,17 @@ export default function DesktopTerminalsPage() {
           unitId: counter.unitId,
           defaultLocale: formLocale,
           kioskFullscreen: formKioskFullscreen,
-          contextUnitId: formContextUnitId,
+          contextUnitId: safeContextUnitId,
           counterId: formCounterId,
           ...(nameTrim ? { name: nameTrim } : {})
         });
       } else {
-        if (!formUnitId) {
+        if (!safeUnitId) {
           toast.error(t('select_unit'));
           return;
         }
         await desktopTerminalsApi.update(editing.id, {
-          unitId: formUnitId,
+          unitId: safeUnitId,
           defaultLocale: formLocale,
           kioskFullscreen: formKioskFullscreen,
           counterId: '',
@@ -365,6 +397,9 @@ export default function DesktopTerminalsPage() {
     }
   };
 
+  /** Radix SelectTrigger defaults to `w-fit`; full width matches inputs on narrow screens. */
+  const fullWidthSelectTrigger = 'w-full min-w-0';
+
   const terminalFormFields = (idPrefix: string) => (
     <>
       <div className='grid gap-2'>
@@ -378,7 +413,10 @@ export default function DesktopTerminalsPage() {
             if (v === 'kiosk') setAvailableCounters([]);
           }}
         >
-          <SelectTrigger id={`${idPrefix}-kind`}>
+          <SelectTrigger
+            id={`${idPrefix}-kind`}
+            className={fullWidthSelectTrigger}
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -401,14 +439,21 @@ export default function DesktopTerminalsPage() {
       {formDeviceKind === 'kiosk' ? (
         <div className='grid gap-2'>
           <Label>{t('unit')}</Label>
-          <Select value={formUnitId} onValueChange={setFormUnitId}>
-            <SelectTrigger>
+          <Select
+            value={
+              (units.some((u) => u.id === formUnitId) ? formUnitId : '') ||
+              SELECT_UNSET
+            }
+            onValueChange={(v) => setFormUnitId(v === SELECT_UNSET ? '' : v)}
+          >
+            <SelectTrigger className={fullWidthSelectTrigger}>
               <SelectValue placeholder={t('select_unit')} />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value={SELECT_UNSET}>{t('select_unit')}</SelectItem>
               {units.map((u) => (
                 <SelectItem key={u.id} value={u.id}>
-                  {u.name}
+                  {getUnitDisplayName(u, locale)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -419,19 +464,26 @@ export default function DesktopTerminalsPage() {
           <div className='grid gap-2'>
             <Label>{t('context_unit')}</Label>
             <Select
-              value={formContextUnitId}
+              value={
+                (contextUnits.some((u) => u.id === formContextUnitId)
+                  ? formContextUnitId
+                  : '') || SELECT_UNSET
+              }
               onValueChange={(v) => {
-                setFormContextUnitId(v);
+                setFormContextUnitId(v === SELECT_UNSET ? '' : v);
                 setFormCounterId('');
               }}
             >
-              <SelectTrigger>
+              <SelectTrigger className={fullWidthSelectTrigger}>
                 <SelectValue placeholder={t('select_context')} />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value={SELECT_UNSET}>
+                  {t('select_context')}
+                </SelectItem>
                 {contextUnits.map((u) => (
                   <SelectItem key={u.id} value={u.id}>
-                    {u.name}
+                    {getUnitDisplayName(u, locale)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -440,15 +492,21 @@ export default function DesktopTerminalsPage() {
           <div className='grid gap-2'>
             <Label>{t('select_counter')}</Label>
             <Select
-              value={formCounterId}
-              onValueChange={setFormCounterId}
+              value={
+                (availableCounters.some((c) => c.id === formCounterId)
+                  ? formCounterId
+                  : '') || SELECT_UNSET
+              }
+              onValueChange={(v) =>
+                setFormCounterId(v === SELECT_UNSET ? '' : v)
+              }
               disabled={
                 !formContextUnitId ||
                 countersLoading ||
                 availableCounters.length === 0
               }
             >
-              <SelectTrigger>
+              <SelectTrigger className={fullWidthSelectTrigger}>
                 <SelectValue
                   placeholder={
                     countersLoading ? t('loading') : t('select_counter')
@@ -456,6 +514,9 @@ export default function DesktopTerminalsPage() {
                 />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value={SELECT_UNSET}>
+                  {t('select_counter')}
+                </SelectItem>
                 {availableCounters.map((c) => (
                   <SelectItem key={c.id} value={c.id}>
                     {c.name}
@@ -469,7 +530,7 @@ export default function DesktopTerminalsPage() {
       <div className='grid gap-2'>
         <Label>{t('locale')}</Label>
         <Select value={formLocale} onValueChange={setFormLocale}>
-          <SelectTrigger>
+          <SelectTrigger className={fullWidthSelectTrigger}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

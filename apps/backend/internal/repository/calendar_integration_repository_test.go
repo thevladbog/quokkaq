@@ -25,6 +25,7 @@ CREATE TABLE units (
 	code text NOT NULL,
 	kind text NOT NULL DEFAULT 'subdivision',
 	name text NOT NULL,
+	name_en text,
 	timezone text NOT NULL,
 	created_at datetime,
 	updated_at datetime

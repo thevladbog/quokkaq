@@ -120,7 +120,7 @@ export default function SettingsOperationsPage() {
   };
 
   return (
-    <div className='container mx-auto flex-1 space-y-6 p-4'>
+    <div className='container mx-auto min-w-0 flex-1 space-y-6 p-4'>
       <div>
         <h1 className='text-3xl font-bold tracking-tight'>{t('title')}</h1>
         <p className='text-muted-foreground mt-1 text-sm'>{t('subtitle')}</p>
@@ -238,11 +238,12 @@ export default function SettingsOperationsPage() {
           <CardTitle>{t('actions_title')}</CardTitle>
           <CardDescription>{t('actions_hint')}</CardDescription>
         </CardHeader>
-        <CardContent className='flex flex-wrap gap-3'>
+        <CardContent className='grid max-w-full gap-3'>
           <Button
             type='button'
             variant='destructive'
             disabled={!unitId || unlockMutation.isPending}
+            className='h-auto min-h-9 w-full max-w-full px-3 py-2.5 text-center leading-snug whitespace-normal'
             onClick={() => {
               setUnlockTyped('');
               setUnlockOpen(true);
@@ -254,6 +255,7 @@ export default function SettingsOperationsPage() {
             type='button'
             variant='secondary'
             disabled={!unitId || clearQuietMutation.isPending}
+            className='h-auto min-h-9 w-full max-w-full px-3 py-2.5 text-center leading-snug whitespace-normal'
             onClick={() => clearQuietMutation.mutate({ unitId })}
           >
             {t('action_clear_quiet')}
@@ -281,10 +283,11 @@ export default function SettingsOperationsPage() {
             value={unlockTyped}
             onChange={(e) => setUnlockTyped(e.target.value)}
           />
-          <DialogFooter className='gap-2 sm:gap-0'>
+          <DialogFooter className='flex-col gap-2 sm:flex-row sm:gap-0'>
             <Button
               type='button'
               variant='outline'
+              className='h-auto min-h-9 w-full py-2.5 whitespace-normal sm:w-auto'
               onClick={() => setUnlockOpen(false)}
             >
               {t('unlock_confirm_cancel')}
@@ -292,6 +295,7 @@ export default function SettingsOperationsPage() {
             <Button
               type='button'
               variant='destructive'
+              className='h-auto min-h-9 w-full py-2.5 text-center leading-snug whitespace-normal sm:w-auto'
               disabled={
                 !unitId || unlockTyped !== 'UNLOCK' || unlockMutation.isPending
               }

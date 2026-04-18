@@ -33,6 +33,7 @@ CREATE TABLE units (
 	kind text NOT NULL DEFAULT 'subdivision',
 	sort_order integer NOT NULL DEFAULT 0,
 	name text NOT NULL,
+	name_en text,
 	timezone text NOT NULL,
 	config text,
 	created_at datetime,
@@ -229,6 +230,48 @@ func TestCalendarIntegrationService_ListPublicForCompany(t *testing.T) {
 	}
 	if _, ok := names["Beta"]; !ok {
 		t.Fatalf("missing unit name Beta: %#v", list)
+	}
+}
+
+func TestCalendarIntegrationService_GetPublicByID_MissingUnitLeavesNamesEmpty(t *testing.T) {
+	defer setupCalendarIntegrationServiceTestDB(t)()
+	svc := newTestCalendarService()
+
+	if err := database.DB.Create(&models.Unit{
+		ID:        "u-missing",
+		CompanyID: "co-miss",
+		Code:      "m",
+		Kind:      models.UnitKindSubdivision,
+		Name:      "Gone",
+		Timezone:  "UTC",
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	pub, err := svc.CreateIntegration("co-miss", &CreateCalendarIntegrationRequest{
+		UnitID:       "u-missing",
+		Kind:         models.CalendarIntegrationKindYandexCalDAV,
+		Enabled:      boolPtr(true),
+		CalendarPath: "/gone/",
+		Username:     "x@yandex.ru",
+		AppPassword:  "app-pass-123456789012",
+		Timezone:     "UTC",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := database.DB.Exec(`DELETE FROM units WHERE id = ?`, "u-missing").Error; err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := svc.GetPublicByID(pub.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.UnitName != "" || out.UnitNameEn != "" {
+		t.Fatalf("want empty unit names when unit row is missing, got UnitName=%q UnitNameEn=%q", out.UnitName, out.UnitNameEn)
+	}
+	if out.UnitID != "u-missing" {
+		t.Fatalf("want unitId preserved, got %q", out.UnitID)
 	}
 }
 

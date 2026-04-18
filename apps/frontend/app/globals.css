@@ -301,3 +301,16 @@
 .mdxeditor-select-content {
   z-index: 300 !important;
 }
+
+/* Guest survey completion editor: keep MDXEditor inside narrow cards (flex/grid children need min-width: 0).
+   Selectors target @mdxeditor/editor (^3.54.1) CSS-module class hashes — re-check after upgrades. */
+.guest-survey-mdx-editor [class*='_editorRoot_'] {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.guest-survey-mdx-editor [class*='_toolbarRoot_'] {
+  flex-wrap: wrap;
+  row-gap: 0.25rem;
+  overflow-x: visible;
+}

@@ -142,12 +142,24 @@ export function GuestSurveyBlocksEditor({
 
   return (
     <div className='space-y-4'>
-      <div className='flex flex-wrap gap-2'>
-        <Button type='button' variant='outline' size='sm' onClick={addScale}>
+      <div className='flex flex-col gap-2 sm:flex-row sm:flex-wrap'>
+        <Button
+          type='button'
+          variant='outline'
+          size='sm'
+          className='w-full sm:w-auto'
+          onClick={addScale}
+        >
           <Plus className='mr-1 h-4 w-4' />
           {t('add_scale_block')}
         </Button>
-        <Button type='button' variant='outline' size='sm' onClick={addInfo}>
+        <Button
+          type='button'
+          variant='outline'
+          size='sm'
+          className='w-full sm:w-auto'
+          onClick={addInfo}
+        >
           <Plus className='mr-1 h-4 w-4' />
           {t('add_info_block')}
         </Button>
@@ -157,59 +169,70 @@ export function GuestSurveyBlocksEditor({
         {blocks.map((block, index) => (
           <div
             key={index}
-            className='border-border space-y-3 rounded-lg border p-4'
+            className='border-border max-w-full min-w-0 space-y-3 rounded-lg border p-4'
           >
-            <div className='flex flex-wrap items-center justify-between gap-2'>
-              <div className='grid w-full max-w-xs gap-1.5'>
-                <Label className='text-xs'>{t('block_type')}</Label>
-                <Select
-                  value={block.kind}
-                  onValueChange={(v) => setKind(index, v as 'scale' | 'info')}
-                >
-                  <SelectTrigger id={`${idPrefix}-type-${index}`}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value='scale'>
-                      {t('block_type_scale')}
-                    </SelectItem>
-                    <SelectItem value='info'>{t('block_type_info')}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className='flex shrink-0 gap-1'>
-                <Button
-                  type='button'
-                  variant='ghost'
-                  size='icon'
-                  className='h-8 w-8'
-                  disabled={index === 0}
-                  onClick={() => onChange(move(blocks, index, -1))}
-                  aria-label={t('move_up')}
-                >
-                  <ChevronUp className='h-4 w-4' />
-                </Button>
-                <Button
-                  type='button'
-                  variant='ghost'
-                  size='icon'
-                  className='h-8 w-8'
-                  disabled={index === blocks.length - 1}
-                  onClick={() => onChange(move(blocks, index, 1))}
-                  aria-label={t('move_down')}
-                >
-                  <ChevronDown className='h-4 w-4' />
-                </Button>
-                <Button
-                  type='button'
-                  variant='ghost'
-                  size='icon'
-                  className='text-destructive h-8 w-8'
-                  onClick={() => onChange(blocks.filter((_, i) => i !== index))}
-                  aria-label={t('remove_block')}
-                >
-                  <Trash2 className='h-4 w-4' />
-                </Button>
+            <div className='space-y-1.5'>
+              <Label className='text-xs' htmlFor={`${idPrefix}-type-${index}`}>
+                {t('block_type')}
+              </Label>
+              <div className='flex min-w-0 items-center justify-between gap-2'>
+                <div className='min-w-0 flex-1 sm:max-w-xs'>
+                  <Select
+                    value={block.kind}
+                    onValueChange={(v) => setKind(index, v as 'scale' | 'info')}
+                  >
+                    <SelectTrigger
+                      id={`${idPrefix}-type-${index}`}
+                      className='w-full min-w-0'
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value='scale'>
+                        {t('block_type_scale')}
+                      </SelectItem>
+                      <SelectItem value='info'>
+                        {t('block_type_info')}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className='flex shrink-0 gap-1'>
+                  <Button
+                    type='button'
+                    variant='ghost'
+                    size='icon'
+                    className='h-8 w-8'
+                    disabled={index === 0}
+                    onClick={() => onChange(move(blocks, index, -1))}
+                    aria-label={t('move_up')}
+                  >
+                    <ChevronUp className='h-4 w-4' />
+                  </Button>
+                  <Button
+                    type='button'
+                    variant='ghost'
+                    size='icon'
+                    className='h-8 w-8'
+                    disabled={index === blocks.length - 1}
+                    onClick={() => onChange(move(blocks, index, 1))}
+                    aria-label={t('move_down')}
+                  >
+                    <ChevronDown className='h-4 w-4' />
+                  </Button>
+                  <Button
+                    type='button'
+                    variant='ghost'
+                    size='icon'
+                    className='text-destructive h-8 w-8'
+                    onClick={() =>
+                      onChange(blocks.filter((_, i) => i !== index))
+                    }
+                    aria-label={t('remove_block')}
+                  >
+                    <Trash2 className='h-4 w-4' />
+                  </Button>
+                </div>
               </div>
             </div>
 
@@ -225,8 +248,8 @@ export function GuestSurveyBlocksEditor({
               />
             </div>
 
-            <div className='grid gap-3 sm:grid-cols-2'>
-              <div className='grid gap-2'>
+            <div className='grid min-w-0 gap-3 sm:grid-cols-2'>
+              <div className='grid min-w-0 gap-2'>
                 <Label htmlFor={`${idPrefix}-en-${index}`}>
                   {t('label_en')}
                 </Label>
@@ -235,10 +258,10 @@ export function GuestSurveyBlocksEditor({
                   value={block.labelEn}
                   onChange={(e) => updateAt(index, { labelEn: e.target.value })}
                   rows={block.kind === 'info' ? 4 : 2}
-                  className='text-sm'
+                  className='max-w-full min-w-0 text-sm'
                 />
               </div>
-              <div className='grid gap-2'>
+              <div className='grid min-w-0 gap-2'>
                 <Label htmlFor={`${idPrefix}-ru-${index}`}>
                   {t('label_ru')}
                 </Label>
@@ -247,7 +270,7 @@ export function GuestSurveyBlocksEditor({
                   value={block.labelRu}
                   onChange={(e) => updateAt(index, { labelRu: e.target.value })}
                   rows={block.kind === 'info' ? 4 : 2}
-                  className='text-sm'
+                  className='max-w-full min-w-0 text-sm'
                 />
               </div>
             </div>

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useQueryClient } from '@tanstack/react-query';
 import { CalendarDays, Globe, Loader2, Plus, Save, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -43,6 +43,7 @@ import {
   AlertDialogTitle
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
+import { getUnitDisplayName } from '@/lib/unit-display';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -93,6 +94,7 @@ function CalendarIntegrationCardForm({
 }) {
   const t = useTranslations('admin.calendar_integration');
   const tUnits = useTranslations('admin.units');
+  const locale = useLocale();
   const queryClient = useQueryClient();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const isGoogle = pub.kind === CALENDAR_KIND_GOOGLE_CALDAV;
@@ -209,7 +211,11 @@ function CalendarIntegrationCardForm({
         <Badge variant='secondary'>{kindLabel}</Badge>
         {pub.unitName ? (
           <span className='text-muted-foreground text-sm'>
-            {t('unit_label')}: {pub.unitName}
+            {t('unit_label')}:{' '}
+            {getUnitDisplayName(
+              { name: pub.unitName ?? '', nameEn: pub.unitNameEn },
+              locale
+            )}
           </span>
         ) : null}
       </div>
@@ -385,7 +391,7 @@ function CalendarIntegrationCardForm({
   );
 }
 
-type UnitOption = { id: string; name: string };
+type UnitOption = { id: string; name: string; nameEn?: string | null };
 
 function CreateCalendarIntegrationDialog({
   open,
@@ -403,6 +409,7 @@ function CreateCalendarIntegrationDialog({
   const t = useTranslations('admin.calendar_integration');
   const tInt = useTranslations('admin.integrations');
   const tUnits = useTranslations('admin.units');
+  const locale = useLocale();
   const queryClient = useQueryClient();
 
   const [unitId, setUnitId] = useState(
@@ -503,7 +510,7 @@ function CreateCalendarIntegrationDialog({
               <SelectContent>
                 {units.map((u) => (
                   <SelectItem key={u.id} value={u.id}>
-                    {u.name}
+                    {getUnitDisplayName(u, locale)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -633,6 +640,7 @@ function GoogleConnectCalendarDialog({
 }) {
   const t = useTranslations('admin.calendar_integration');
   const tInt = useTranslations('admin.integrations');
+  const locale = useLocale();
   const [unitId, setUnitId] = useState(
     () => defaultUnitId ?? units[0]?.id ?? ''
   );
@@ -707,7 +715,7 @@ function GoogleConnectCalendarDialog({
               <SelectContent>
                 {units.map((u) => (
                   <SelectItem key={u.id} value={u.id}>
-                    {u.name}
+                    {getUnitDisplayName(u, locale)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -746,6 +754,7 @@ export function CalendarIntegrationsPanel({
 }: CalendarIntegrationsPanelProps) {
   const t = useTranslations('admin.integrations');
   const tCal = useTranslations('admin.calendar_integration');
+  const locale = useLocale();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const listQuery = useCalendarIntegrationListMine({
@@ -774,18 +783,28 @@ export function CalendarIntegrationsPanel({
 
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
-      const na = a.unitName ?? a.unitId ?? '';
-      const nb = b.unitName ?? b.unitId ?? '';
-      const c = na.localeCompare(nb);
+      const na = getUnitDisplayName(
+        { name: a.unitName ?? '', nameEn: a.unitNameEn },
+        locale
+      );
+      const nb = getUnitDisplayName(
+        { name: b.unitName ?? '', nameEn: b.unitNameEn },
+        locale
+      );
+      const c = na.localeCompare(nb, locale);
       if (c !== 0) return c;
       const da = a.displayName ?? '';
       const db = b.displayName ?? '';
-      return da.localeCompare(db);
+      return da.localeCompare(db, locale);
     });
-  }, [filtered]);
+  }, [filtered, locale]);
 
   const triggerTitle = (row: ServicesCalendarIntegrationPublic) => {
-    const unit = row.unitName ?? row.unitId ?? '';
+    const unitLabel = getUnitDisplayName(
+      { name: row.unitName ?? '', nameEn: row.unitNameEn },
+      locale
+    ).trim();
+    const unit = unitLabel || row.unitId || '';
     const kindFallback =
       row.kind === CALENDAR_KIND_GOOGLE_CALDAV
         ? tCal('kind_google')

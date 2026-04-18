@@ -279,37 +279,45 @@ export function AdScreenSettings({
             )}
           </div>
 
-          <div className='grid grid-cols-2 gap-4'>
-            <div>
-              <Label htmlFor='width'>{t('ad_width')}</Label>
-              <Input
-                id='width'
-                type='number'
-                min='0'
-                max='50'
-                value={width}
-                onChange={(e) => setWidth(parseInt(e.target.value) || 0)}
-                placeholder='0 = no ads'
-              />
-              <p className='text-muted-foreground mt-1 text-xs'>
-                {t('ad_width_help')}
-              </p>
-            </div>
-
-            <div>
-              <Label htmlFor='duration'>{t('image_duration')}</Label>
-              <Input
-                id='duration'
-                type='number'
-                min='1'
-                max='60'
-                value={duration}
-                onChange={(e) => setDuration(parseInt(e.target.value) || 5)}
-              />
-              <p className='text-muted-foreground mt-1 text-xs'>
-                {t('image_duration_help')}
-              </p>
-            </div>
+          {/* Two columns × three rows so inputs share one row even when labels wrap to different heights */}
+          <div className='grid grid-cols-2 gap-x-3 gap-y-2 sm:gap-x-4'>
+            <Label
+              htmlFor='width'
+              className='min-w-0 self-start leading-snug sm:leading-normal'
+            >
+              {t('ad_width')}
+            </Label>
+            <Label
+              htmlFor='duration'
+              className='min-w-0 self-start leading-snug sm:leading-normal'
+            >
+              {t('image_duration')}
+            </Label>
+            <Input
+              id='width'
+              type='number'
+              min='0'
+              max='50'
+              value={width}
+              onChange={(e) => setWidth(parseInt(e.target.value, 10) || 0)}
+              placeholder='0 = no ads'
+              className='min-w-0'
+            />
+            <Input
+              id='duration'
+              type='number'
+              min='1'
+              max='60'
+              value={duration}
+              onChange={(e) => setDuration(parseInt(e.target.value, 10) || 5)}
+              className='min-w-0'
+            />
+            <p className='text-muted-foreground min-w-0 text-xs leading-relaxed'>
+              {t('ad_width_help')}
+            </p>
+            <p className='text-muted-foreground min-w-0 text-xs leading-relaxed'>
+              {t('image_duration_help')}
+            </p>
           </div>
 
           <div className='max-w-md space-y-2'>

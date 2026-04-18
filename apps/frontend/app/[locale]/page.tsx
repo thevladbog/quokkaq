@@ -1,6 +1,6 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { Link } from '../../src/i18n/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -15,8 +15,11 @@ import Image from 'next/image';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useRouter } from '../../src/i18n/navigation';
 import { useEffect, useState } from 'react';
+import { getWordmarkSrc } from '@/lib/wordmark-src';
 
 export default function Home() {
+  const locale = useLocale();
+  const wordmarkSrc = getWordmarkSrc(locale);
   const t = useTranslations('home');
   const { isAuthenticated, isLoading, user, token } = useAuthContext();
   const router = useRouter();
@@ -93,7 +96,7 @@ export default function Home() {
 
   const menuItems = [
     {
-      href: '/settings',
+      href: '/settings/organization',
       title: t('admin'),
       description: t('admin_description', {
         defaultValue: 'Manage system settings and services'
@@ -161,7 +164,7 @@ export default function Home() {
         <div className='mb-3 text-center'>
           <div className='relative mb-4 h-20 w-64'>
             <Image
-              src='/logo-text.svg'
+              src={wordmarkSrc}
               alt={t('title')}
               fill
               className='object-contain'

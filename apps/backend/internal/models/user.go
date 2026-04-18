@@ -62,6 +62,7 @@ type User struct {
 	Email     *string   `gorm:"unique" json:"email,omitempty"`
 	Phone     *string   `json:"phone,omitempty"`
 	Name      string    `gorm:"not null" json:"name"`
+	PhotoURL  *string   `gorm:"column:photo_url" json:"photoUrl,omitempty"`
 	Password  *string   `json:"-"` // Never expose password in JSON
 	IsActive  bool      `gorm:"default:true" json:"isActive"`
 	CreatedAt time.Time `gorm:"default:now()" json:"createdAt"`
@@ -69,6 +70,15 @@ type User struct {
 	// Relations
 	Roles []UserRole `gorm:"foreignKey:UserID" json:"roles,omitempty"`
 	Units []UserUnit `gorm:"foreignKey:UserID" json:"units,omitempty"`
+}
+
+// UpdateUserInput is a PATCH body: only non-nil fields are applied; Roles, when present, syncs the tenant "admin" role only.
+type UpdateUserInput struct {
+	Name     *string  `json:"name"`
+	Email    *string  `json:"email"`
+	Password *string  `json:"password"`
+	PhotoURL *string  `json:"photoUrl"`
+	Roles    []string `json:"roles"`
 }
 
 type Role struct {
@@ -88,8 +98,8 @@ type UserRole struct {
 
 type UserUnit struct {
 	ID          string      `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
-	UserID      string      `gorm:"not null" json:"userId"`
-	UnitID      string      `gorm:"not null" json:"unitId"`
+	UserID      string      `gorm:"not null;uniqueIndex:ux_user_units_user_unit" json:"userId"`
+	UnitID      string      `gorm:"not null;uniqueIndex:ux_user_units_user_unit" json:"unitId"`
 	Permissions StringArray `gorm:"type:text[]" json:"permissions,omitempty"`
 
 	User User `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-" swaggerignore:"true"`

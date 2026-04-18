@@ -33,6 +33,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
 import { Link } from '@/src/i18n/navigation';
 import { useLocale, useTranslations } from 'next-intl';
+import { getUnitDisplayName } from '@/lib/unit-display';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -784,7 +785,7 @@ export default function PlatformCompanyDetailPage() {
             <ul className='list-inside list-disc text-sm'>
               {company.units.map((u) => (
                 <li key={u.id}>
-                  {u.name} ({u.code})
+                  {getUnitDisplayName(u, appLocale)} ({u.code})
                 </li>
               ))}
             </ul>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -24,6 +24,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { useUnits } from '@/lib/hooks';
 import { UNIT_PERMISSIONS } from '@/lib/unit-permissions';
+import { getUnitDisplayName } from '@/lib/unit-display';
 
 interface Template {
   id: string;
@@ -48,6 +49,7 @@ export default function InviteDialog({
   const t = useTranslations('invitations');
   const tTemplates = useTranslations('templates');
   const tPermissions = useTranslations('admin.users.permissions_list');
+  const locale = useLocale();
   const [email, setEmail] = useState('');
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string>('');
@@ -256,7 +258,7 @@ export default function InviteDialog({
                         htmlFor={`unit-${unit.id}`}
                         className='cursor-pointer font-medium'
                       >
-                        {unit.name}
+                        {getUnitDisplayName(unit, locale)}
                       </Label>
                     </div>
 

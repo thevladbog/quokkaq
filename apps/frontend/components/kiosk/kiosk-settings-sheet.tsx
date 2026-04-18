@@ -380,14 +380,14 @@ function KioskSettingsForm({
 
             <div className='space-y-2'>
               <Label>{t('printer_connection')}</Label>
-              <div className='flex gap-4'>
+              <div className='grid w-full grid-cols-2 gap-2'>
                 <Button
                   type='button'
                   variant={
                     printerConnection === 'network' ? 'default' : 'outline'
                   }
                   onClick={() => setPrinterConnection('network')}
-                  className='flex-1'
+                  className='min-w-0'
                 >
                   {t('printer_connection_network')}
                 </Button>
@@ -397,7 +397,7 @@ function KioskSettingsForm({
                     printerConnection === 'system' ? 'default' : 'outline'
                   }
                   onClick={() => setPrinterConnection('system')}
-                  className='flex-1'
+                  className='min-w-0'
                 >
                   {t('printer_connection_system')}
                 </Button>
@@ -408,8 +408,8 @@ function KioskSettingsForm({
             </div>
 
             {printerConnection === 'network' ? (
-              <div className='grid grid-cols-3 gap-4'>
-                <div className='col-span-2 space-y-2'>
+              <div className='grid grid-cols-1 gap-4 sm:grid-cols-3'>
+                <div className='space-y-2 sm:col-span-2'>
                   <Label>{t('printer_ip')}</Label>
                   <Input
                     value={printerIp}
@@ -463,12 +463,12 @@ function KioskSettingsForm({
 
             <div className='space-y-2'>
               <Label>{t('printer_type')}</Label>
-              <div className='flex gap-4'>
+              <div className='grid w-full grid-cols-2 gap-2'>
                 <Button
                   type='button'
                   variant={printerType === 'receipt' ? 'default' : 'outline'}
                   onClick={() => setPrinterType('receipt')}
-                  className='flex-1'
+                  className='min-w-0'
                 >
                   {t('printer_type_receipt')}
                 </Button>
@@ -476,7 +476,7 @@ function KioskSettingsForm({
                   type='button'
                   variant={printerType === 'label' ? 'default' : 'outline'}
                   onClick={() => setPrinterType('label')}
-                  className='flex-1'
+                  className='min-w-0'
                 >
                   {t('printer_type_label')}
                 </Button>
@@ -521,7 +521,11 @@ function KioskSettingsForm({
       </div>
 
       <SheetFooter>
-        <Button onClick={handleSave} disabled={patchKioskMutation.isPending}>
+        <Button
+          className='w-full'
+          onClick={handleSave}
+          disabled={patchKioskMutation.isPending}
+        >
           {patchKioskMutation.isPending ? t('saving') : t('save_changes')}
         </Button>
       </SheetFooter>

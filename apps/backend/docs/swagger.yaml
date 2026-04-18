@@ -1794,6 +1794,8 @@ components:
           type: string
         name:
           type: string
+        nameEn:
+          type: string
         operations:
           allOf:
           - $ref: '#/components/schemas/models.UnitOperationsPublic'
@@ -1901,6 +1903,24 @@ components:
             $ref: '#/components/schemas/models.ServiceSlot'
           type: array
       type: object
+    models.UpdateUserInput:
+      properties:
+        email:
+          type: string
+        name:
+          type: string
+        password:
+          type: string
+          writeOnly: true
+          format: password
+        photoUrl:
+          type: string
+          description: URL of the user's profile photo. Send an empty string to clear the photo; omit the field to leave the current value unchanged.
+        roles:
+          items:
+            type: string
+          type: array
+      type: object
     models.UsageRecord:
       properties:
         billingMonth:
@@ -1935,6 +1955,8 @@ components:
         name:
           type: string
         phone:
+          type: string
+        photoUrl:
           type: string
         roles:
           description: Relations
@@ -2031,6 +2053,8 @@ components:
         unitId:
           type: string
         unitName:
+          type: string
+        unitNameEn:
           type: string
         username:
           type: string
@@ -11548,7 +11572,8 @@ paths:
       tags:
       - users
     patch:
-      description: Updates an existing user
+      description: Partially updates an existing user — fields provided in the JSON body are merged into the existing user; omitted keys are left unchanged.
+      operationId: updateUser
       parameters:
       - description: User ID
         in: path
@@ -11560,7 +11585,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/models.User'
+              $ref: '#/components/schemas/models.UpdateUserInput'
         description: User Data
         required: true
         x-originalParamName: user
@@ -11577,6 +11602,12 @@ paths:
               schema:
                 type: string
           description: Bad Request
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: User not found
         '500':
           content:
             application/json:

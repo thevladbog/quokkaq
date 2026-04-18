@@ -26,6 +26,8 @@ interface LogoUploadProps {
   uploadTarget?: 'kiosk' | 'printer';
   /** When true, allow `.bmp` / `.dib` even if `file.type` is empty */
   allowBmpByExtension?: boolean;
+  /** Disable upload and remove actions */
+  disabled?: boolean;
 }
 
 function isAllowedImageFile(file: File, allowBmpByExtension: boolean): boolean {
@@ -46,7 +48,8 @@ export function LogoUpload({
   accept = 'image/*',
   hint,
   uploadTarget = 'kiosk',
-  allowBmpByExtension = false
+  allowBmpByExtension = false,
+  disabled = false
 }: LogoUploadProps) {
   const t = useTranslations('components.upload');
   const displayLabel = label ?? t('defaultLogoLabel');
@@ -55,6 +58,7 @@ export function LogoUpload({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (disabled) return;
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -102,9 +106,9 @@ export function LogoUpload({
   return (
     <div className='space-y-2'>
       <Label htmlFor={fileInputId}>{displayLabel}</Label>
-      <div className='flex items-center gap-4'>
+      <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4'>
         {currentLogoUrl ? (
-          <div className='bg-muted/50 relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-md border'>
+          <div className='bg-muted/50 relative flex h-20 w-20 shrink-0 items-center justify-center self-center overflow-hidden rounded-md border sm:self-start'>
             {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary upload URLs; next/image blocks hosts outside remotePatterns */}
             <img
               src={currentLogoUrl}
@@ -116,30 +120,32 @@ export function LogoUpload({
               size='icon'
               className='absolute top-0 right-0 h-5 w-5 rounded-tr-none rounded-bl-md'
               onClick={onLogoRemoved}
+              disabled={disabled}
             >
               <X className='h-3 w-3' />
             </Button>
           </div>
         ) : (
-          <div className='bg-muted/20 text-muted-foreground flex h-20 w-20 items-center justify-center rounded-md border border-dashed'>
+          <div className='bg-muted/20 text-muted-foreground flex h-20 w-20 shrink-0 items-center justify-center self-center rounded-md border border-dashed sm:self-start'>
             <Upload className='h-8 w-8 opacity-50' />
           </div>
         )}
 
-        <div className='flex-1'>
+        <div className='flex w-full min-w-0 flex-col gap-2 sm:flex-1'>
           <Input
             ref={fileInputRef}
             type='file'
             accept={accept}
             className='hidden'
+            disabled={disabled}
             onChange={handleFileChange}
             id={fileInputId}
           />
           <Button
             variant='outline'
-            disabled={isUploading}
+            disabled={isUploading || disabled}
             onClick={() => fileInputRef.current?.click()}
-            className='w-full sm:w-auto'
+            className='w-full sm:w-auto sm:self-start'
           >
             {isUploading ? (
               <>
@@ -153,9 +159,7 @@ export function LogoUpload({
               </>
             )}
           </Button>
-          <p className='text-muted-foreground mt-1 text-xs'>
-            {hint ?? t('hint')}
-          </p>
+          <p className='text-muted-foreground text-xs'>{hint ?? t('hint')}</p>
         </div>
       </div>
     </div>
