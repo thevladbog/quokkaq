@@ -6,7 +6,9 @@ export async function publicBackendOrvalMutator<T>(
   url: string,
   init: RequestInit = {}
 ): Promise<T> {
-  const base = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '');
+  const base = (process.env.NEXT_PUBLIC_API_URL ?? '')
+    .trim()
+    .replace(/\/$/, '');
   const response = await fetch(`${base}${url}`, {
     ...init,
     next: { revalidate: 300 }

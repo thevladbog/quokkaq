@@ -54,19 +54,19 @@ jobs:
         run: |
           AFFECTED="$(pnpm nx show projects --affected --base=$NX_BASE --head=$NX_HEAD)"
 
-          if echo "$AFFECTED" | grep -qE 'frontend|marketing|shared-types|ui-kit'; then
+          if echo "$AFFECTED" | grep -qE 'frontend|marketing|shared-types|ui-kit|subscription-pricing'; then
             echo "web=true" >> $GITHUB_OUTPUT
           else
             echo "web=false" >> $GITHUB_OUTPUT
           fi
 
-          if echo "$AFFECTED" | grep -qE 'frontend|shared-types|ui-kit'; then
+          if echo "$AFFECTED" | grep -qE 'frontend|shared-types|ui-kit|subscription-pricing'; then
             echo "frontend=true" >> $GITHUB_OUTPUT
           else
             echo "frontend=false" >> $GITHUB_OUTPUT
           fi
 
-          if echo "$AFFECTED" | grep -q "marketing"; then
+          if echo "$AFFECTED" | grep -qE 'marketing|subscription-pricing'; then
             echo "marketing=true" >> $GITHUB_OUTPUT
           else
             echo "marketing=false" >> $GITHUB_OUTPUT
@@ -151,7 +151,7 @@ jobs:
           git diff --exit-code docs/docs.go docs/swagger.json docs/swagger.yaml
 
       - name: Orval client in sync with OpenAPI
-        if: needs.affected.outputs.frontend == 'true'
+        if: needs.affected.outputs.frontend == 'true' || needs.affected.outputs.backend == 'true'
         run: pnpm nx run frontend:orval:check
 
       - name: Orval marketing client in sync with OpenAPI

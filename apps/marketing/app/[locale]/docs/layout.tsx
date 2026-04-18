@@ -5,12 +5,11 @@ import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 
 import { TextLogoImg } from '@/components/landing/text-logo-img';
+import { MARKETING_THEME_STORAGE_KEY } from '@/app/theme-constants';
 import { isAppLocale } from '@/src/messages';
 
 import './docs-nextra-defaults.css';
 import 'nextra-theme-docs/style.css';
-
-const themeStorageKey = 'quokkaq-marketing-theme';
 
 const docsI18n = [
   { locale: 'en', name: 'English' },
@@ -60,7 +59,7 @@ export default async function DocsLayout({
         nextThemes={{
           attribute: 'class',
           defaultTheme: 'system',
-          storageKey: themeStorageKey,
+          storageKey: MARKETING_THEME_STORAGE_KEY,
           disableTransitionOnChange: true
         }}
       >

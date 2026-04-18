@@ -987,10 +987,6 @@ func (h *PlatformHandler) UpdateSubscriptionPlan(w http.ResponseWriter, r *http.
 		http.Error(w, "interval must be month or year", http.StatusBadRequest)
 		return
 	}
-	isPublic := true
-	if body.IsPublic != nil {
-		isPublic = *body.IsPublic
-	}
 	plan.Name = body.Name
 	plan.NameEn = body.NameEn
 	plan.Code = body.Code
@@ -1000,7 +996,9 @@ func (h *PlatformHandler) UpdateSubscriptionPlan(w http.ResponseWriter, r *http.
 	plan.Features = body.Features
 	plan.Limits = body.Limits
 	plan.IsActive = body.IsActive
-	plan.IsPublic = isPublic
+	if body.IsPublic != nil {
+		plan.IsPublic = *body.IsPublic
+	}
 	if body.DisplayOrder != nil {
 		plan.DisplayOrder = *body.DisplayOrder
 	}
