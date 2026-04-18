@@ -28,6 +28,8 @@ export function TextLogoImg({
       height={40}
       className={imageClassName}
       unoptimized
+      priority
+      loading='eager'
     />
   );
 }
