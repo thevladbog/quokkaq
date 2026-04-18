@@ -28,6 +28,17 @@ func displayOrderForPlanCode(code string) int {
 	}
 }
 
+func planSeedIsPublic(code string) bool {
+	return code != "grandfathered"
+}
+
+func planSeedAllowInstantPurchase(code string) bool {
+	if code == "grandfathered" || code == "enterprise" {
+		return false
+	}
+	return true
+}
+
 func main() {
 	config.Load()
 	database.Connect()
@@ -62,11 +73,11 @@ func main() {
 				Limits:               limitsJSON,
 				Features:             featuresJSON,
 				IsActive:             true,
-				IsPublic:             true,
+				IsPublic:             planSeedIsPublic(planDef.Code),
 				IsPromoted:           planDef.Code == "professional",
 				DisplayOrder:         displayOrderForPlanCode(planDef.Code),
 				LimitsNegotiable:     json.RawMessage("{}"),
-				AllowInstantPurchase: true,
+				AllowInstantPurchase: planSeedAllowInstantPurchase(planDef.Code),
 			}
 			if err := db.Create(plan).Error; err != nil {
 				log.Printf("Failed to create plan %s: %v", planDef.Code, err)
@@ -89,10 +100,10 @@ func main() {
 		existing.Limits = limitsJSON
 		existing.Features = featuresJSON
 		existing.IsActive = true
-		existing.IsPublic = true
+		existing.IsPublic = planSeedIsPublic(planDef.Code)
 		existing.IsPromoted = planDef.Code == "professional"
 		existing.DisplayOrder = displayOrderForPlanCode(planDef.Code)
-		existing.AllowInstantPurchase = true
+		existing.AllowInstantPurchase = planSeedAllowInstantPurchase(planDef.Code)
 		if len(existing.LimitsNegotiable) == 0 {
 			existing.LimitsNegotiable = json.RawMessage("{}")
 		}

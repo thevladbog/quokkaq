@@ -10,7 +10,7 @@ export const PLAN_LIMIT_KEYS = [
 export type PlanLimitKey = (typeof PLAN_LIMIT_KEYS)[number];
 
 /** Maps API feature flag keys to i18n suffixes under `features.*` in pricing copy. */
-export const API_BOOL_FEATURE_TO_PRICING: Record<string, string> = {
+export const API_BOOL_FEATURE_TO_PRICING = {
   basic_support: 'basicSupport',
   websocket_updates: 'realtimeUpdates',
   basic_reports: 'basicReports',
@@ -25,7 +25,7 @@ export const API_BOOL_FEATURE_TO_PRICING: Record<string, string> = {
   sla_guarantee: 'slaGuarantee',
   custom_integrations: 'customIntegrations',
   team_training: 'teamTraining'
-};
+} as const satisfies Record<string, string>;
 
 const BASE_FEATURE_KEYS = Object.keys(
   API_BOOL_FEATURE_TO_PRICING

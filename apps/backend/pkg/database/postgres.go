@@ -1206,6 +1206,42 @@ func RunVersionedMigrations(models ...interface{}) error {
 		return fmt.Errorf("failed to run v1.2.12_subscription_plan_name_en migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.2.13_subscription_plan_grandfathered_visibility", func(db *gorm.DB) error {
+		return db.Exec(`
+			UPDATE subscription_plans
+			SET is_public = false, allow_instant_purchase = false
+			WHERE code = 'grandfathered';
+		`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.2.13_subscription_plan_grandfathered_visibility migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.2.14_subscription_plan_single_promoted", func(db *gorm.DB) error {
+		// At most one promoted row before the partial unique index (idempotent cleanup).
+		if err := db.Exec(`
+			UPDATE subscription_plans p
+			SET is_promoted = false
+			WHERE p.is_promoted = true
+			  AND p.id <> (
+				SELECT s.id FROM subscription_plans s
+				WHERE s.is_promoted = true
+				ORDER BY s.display_order, s.code
+				LIMIT 1
+			  );
+		`).Error; err != nil {
+			return err
+		}
+		return db.Exec(`
+			CREATE UNIQUE INDEX IF NOT EXISTS ux_subscription_plans_single_promoted
+			ON subscription_plans ((1))
+			WHERE is_promoted = true;
+		`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.2.14_subscription_plan_single_promoted migration: %w", err)
+	}
+
 	fmt.Println("All migrations completed successfully")
 	return nil
 }

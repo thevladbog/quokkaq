@@ -13,9 +13,11 @@ import (
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/pkg/tenantslug"
 	"quokkaq-go-backend/internal/repository"
+	"quokkaq-go-backend/internal/services"
 	"quokkaq-go-backend/pkg/database"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -36,6 +38,16 @@ var platformInvoiceStatuses = map[string]struct{}{
 func isValidPlatformInvoiceStatus(s string) bool {
 	_, ok := platformInvoiceStatuses[s]
 	return ok
+}
+
+// isSubscriptionPlanSinglePromotedUniqueViolation detects conflicts on
+// ux_subscription_plans_single_promoted (at most one is_promoted = true).
+func isSubscriptionPlanSinglePromotedUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) || pgErr.Code != "23505" {
+		return false
+	}
+	return strings.EqualFold(pgErr.ConstraintName, "ux_subscription_plans_single_promoted")
 }
 
 // platformSubscriptionStatuses is the allowed set for models.Subscription.Status on platform create/patch.
@@ -921,7 +933,15 @@ func (h *PlatformHandler) CreateSubscriptionPlan(w http.ResponseWriter, r *http.
 		return tx.Create(&plan).Error
 	}); err != nil {
 		log.Printf("Platform CreateSubscriptionPlan: %v", err)
-		http.Error(w, "Could not create plan (duplicate code?)", http.StatusBadRequest)
+		if isSubscriptionPlanSinglePromotedUniqueViolation(err) {
+			http.Error(w, "only one plan may be promoted at a time; try again", http.StatusConflict)
+			return
+		}
+		if services.IsUniqueConstraintViolation(err) {
+			http.Error(w, "Could not create plan (duplicate code?)", http.StatusBadRequest)
+			return
+		}
+		http.Error(w, "Could not create plan", http.StatusBadRequest)
 		return
 	}
 	RespondJSONWithStatus(w, http.StatusCreated, plan)
@@ -1032,6 +1052,14 @@ func (h *PlatformHandler) UpdateSubscriptionPlan(w http.ResponseWriter, r *http.
 		return tx.Save(plan).Error
 	}); err != nil {
 		log.Printf("Platform UpdateSubscriptionPlan: %v", err)
+		if isSubscriptionPlanSinglePromotedUniqueViolation(err) {
+			http.Error(w, "only one plan may be promoted at a time; try again", http.StatusConflict)
+			return
+		}
+		if services.IsUniqueConstraintViolation(err) {
+			http.Error(w, "Could not update plan (duplicate code?)", http.StatusBadRequest)
+			return
+		}
 		http.Error(w, "Could not update plan", http.StatusBadRequest)
 		return
 	}

@@ -27,7 +27,9 @@ function limitToPricingFeatureKey(
   return limitKey;
 }
 
-const FEATURE_FLAG_ORDER = Object.keys(API_BOOL_FEATURE_TO_PRICING);
+const FEATURE_FLAG_ORDER = Object.keys(
+  API_BOOL_FEATURE_TO_PRICING
+) as (keyof typeof API_BOOL_FEATURE_TO_PRICING)[];
 
 export type PricingFeatureRow = {
   rowKey: string;
@@ -52,8 +54,6 @@ export function buildPricingRowsFromApiPlan(
   const limits = plan.limits ?? {};
 
   for (const lk of PLAN_LIMIT_KEYS) {
-    const v = limits[lk];
-    if (v === undefined) continue;
     if (isNegotiableLimit(plan, lk)) {
       rows.push({
         rowKey: `lim-neg-${lk}`,
@@ -61,6 +61,8 @@ export function buildPricingRowsFromApiPlan(
       });
       continue;
     }
+    const v = limits[lk];
+    if (v === undefined) continue;
     if (v === -1) {
       rows.push({
         rowKey: `lim-${lk}`,

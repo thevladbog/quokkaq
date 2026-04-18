@@ -7,19 +7,22 @@ type Props = {
   className?: string;
   /** CSS height e.g. h-8 */
   heightClass?: string;
+  /** Accessible name for the wordmark (defaults to product name). */
+  alt?: string;
 };
 
 export function TextLogoImg({
   locale,
   className = 'h-8 w-auto',
-  heightClass
+  heightClass,
+  alt = 'QuokkaQ'
 }: Props) {
   const src = locale === 'ru' ? '/logo-text-ru.svg' : '/logo-text.svg';
 
   return (
     <Image
       src={src}
-      alt=''
+      alt={alt}
       width={160}
       height={40}
       className={heightClass ?? className}
