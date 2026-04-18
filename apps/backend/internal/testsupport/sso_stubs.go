@@ -58,6 +58,7 @@ func (PanicUserRepo) FindAll(string) ([]models.User, error)                     
 func (PanicUserRepo) FindByID(string) (*models.User, error)                     { panic("unexpected") }
 func (PanicUserRepo) FindByEmail(string) (*models.User, error)                  { panic("unexpected") }
 func (PanicUserRepo) Update(*models.User) error                                 { panic("unexpected") }
+func (PanicUserRepo) UpdateTx(*gorm.DB, *models.User) error                     { panic("unexpected") }
 func (PanicUserRepo) Delete(string) error                                       { panic("unexpected") }
 func (PanicUserRepo) AssignUnit(string, string, []string) error                 { panic("unexpected") }
 func (PanicUserRepo) CreateUserUnitTx(*gorm.DB, *models.UserUnit) error         { panic("unexpected") }
@@ -65,6 +66,7 @@ func (PanicUserRepo) RemoveUnit(string, string) error                           
 func (PanicUserRepo) AssignRole(string, string) error                           { panic("unexpected") }
 func (PanicUserRepo) AssignRoleTx(*gorm.DB, string, string) error               { panic("unexpected") }
 func (PanicUserRepo) RemoveUserRoleByName(string, string) error                 { panic("unexpected") }
+func (PanicUserRepo) RemoveUserRoleByNameTx(*gorm.DB, string, string) error     { panic("unexpected") }
 func (PanicUserRepo) FindRoleByName(string) (*models.Role, error)               { panic("unexpected") }
 func (PanicUserRepo) CreatePasswordResetToken(*models.PasswordResetToken) error { panic("unexpected") }
 func (PanicUserRepo) FindPasswordResetToken(string) (*models.PasswordResetToken, error) {

@@ -104,8 +104,8 @@ func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 // @Tags         users
 // @Accept       json
 // @Produce      json
-// @Param        id    path      string       true  "User ID"
-// @Param        user  body      models.User  true  "User Data"
+// @Param        id     path      string                  true  "User ID"
+// @Param        input  body      models.UpdateUserInput  true  "User update (PATCH fields)"
 // @Success      200   {object}  models.User
 // @Failure      400   {string}  string "Bad Request"
 // @Failure      500   {string}  string "Internal Server Error"

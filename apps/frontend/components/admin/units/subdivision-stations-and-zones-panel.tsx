@@ -169,6 +169,7 @@ export function SubdivisionStationsAndZonesPanel({
   const t = useTranslations('admin.units');
   const tCommon = useTranslations('common');
   const tAdminGeneral = useTranslations('admin.general');
+  const locale = useLocale();
   const queryClient = useQueryClient();
   const createUnitMutation = useCreateUnit();
 
@@ -180,8 +181,8 @@ export function SubdivisionStationsAndZonesPanel({
   } = useUnits();
 
   const childForest = useMemo(
-    () => buildDescendantForest(subdivisionId, allUnits),
-    [subdivisionId, allUnits]
+    () => buildDescendantForest(subdivisionId, allUnits, locale),
+    [subdivisionId, allUnits, locale]
   );
 
   const [dialogOpen, setDialogOpen] = useState(false);

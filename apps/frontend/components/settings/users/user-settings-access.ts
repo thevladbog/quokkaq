@@ -11,7 +11,8 @@ export function getAvailableUnitsForManager(
   const allowedUnitIds = Object.entries(currentUser?.permissions || {})
     .filter(([, perms]) => (perms as string[]).includes('UNIT_USERS_MANAGE'))
     .map(([unitId]) => unitId);
-  return units.filter((u) => allowedUnitIds.includes(u.id));
+  const allowed = new Set(allowedUnitIds);
+  return units.filter((u) => allowed.has(u.id));
 }
 
 export function canManageUnitUsers(

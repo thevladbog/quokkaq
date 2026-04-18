@@ -1325,6 +1325,14 @@ export interface ModelsUpdateDayScheduleRequest {
   slots?: ModelsServiceSlot[];
 }
 
+export interface ModelsUpdateUserInput {
+  email?: string;
+  name?: string;
+  password?: string;
+  photoUrl?: string;
+  roles?: string[];
+}
+
 export interface ModelsWeeklySlotCapacity {
   capacity?: number;
   createdAt?: string;

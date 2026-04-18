@@ -1903,6 +1903,21 @@ components:
             $ref: '#/components/schemas/models.ServiceSlot'
           type: array
       type: object
+    models.UpdateUserInput:
+      properties:
+        email:
+          type: string
+        name:
+          type: string
+        password:
+          type: string
+        photoUrl:
+          type: string
+        roles:
+          items:
+            type: string
+          type: array
+      type: object
     models.UsageRecord:
       properties:
         billingMonth:
@@ -11566,10 +11581,10 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/models.User'
-        description: User Data
+              $ref: '#/components/schemas/models.UpdateUserInput'
+        description: User update (PATCH fields)
         required: true
-        x-originalParamName: user
+        x-originalParamName: input
       responses:
         '200':
           content:

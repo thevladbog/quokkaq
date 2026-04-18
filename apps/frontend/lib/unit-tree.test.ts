@@ -6,13 +6,15 @@ const u = (
   id: string,
   parentId: string | null,
   kind: Unit['kind'],
-  name: string
+  name: string,
+  nameEn?: string | null
 ): Unit =>
   ({
     id,
     parentId,
     kind,
     name,
+    nameEn: nameEn ?? null,
     code: id,
     companyId: 'c1',
     timezone: 'UTC'
@@ -30,6 +32,15 @@ describe('buildUnitForest', () => {
     expect(forest[0].unit.id).toBe('a');
     expect(forest[0].children.map((c) => c.unit.id).sort()).toEqual(['b', 'c']);
     expect(forest[0].children[0].children).toEqual([]);
+  });
+
+  it('sorts roots by English display name when locale is en', () => {
+    const units = [
+      u('x', null, 'subdivision', 'Я', 'Zulu'),
+      u('y', null, 'subdivision', 'А', 'Alpha')
+    ];
+    const forest = buildUnitForest(units, 'en');
+    expect(forest.map((n) => n.unit.id)).toEqual(['y', 'x']);
   });
 });
 

@@ -4,9 +4,11 @@ import (
 	"errors"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
+	"quokkaq-go-backend/pkg/database"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
 type UserService interface {
@@ -114,32 +116,34 @@ func (s *userService) UpdateUser(id string, input *models.UpdateUserInput) error
 		}
 	}
 
-	if err := s.repo.Update(existing); err != nil {
-		return err
-	}
-
 	if input.Roles == nil {
-		return nil
+		return s.repo.Update(existing)
 	}
 
 	wantsAdmin := sliceContainsString(input.Roles, "admin")
-	reloaded, err := s.repo.FindByID(id)
-	if err != nil {
-		return err
-	}
-	hasAdmin := userHasAdminRole(reloaded)
+	hasAdmin := userHasAdminRole(existing)
 
+	var adminRole *models.Role
 	if wantsAdmin && !hasAdmin {
-		adminRole, err := s.repo.FindRoleByName("admin")
+		var err error
+		adminRole, err = s.repo.FindRoleByName("admin")
 		if err != nil {
 			return err
 		}
-		return s.repo.AssignRole(id, adminRole.ID)
 	}
-	if !wantsAdmin && hasAdmin {
-		return s.repo.RemoveUserRoleByName(id, "admin")
-	}
-	return nil
+
+	return database.DB.Transaction(func(tx *gorm.DB) error {
+		if err := s.repo.UpdateTx(tx, existing); err != nil {
+			return err
+		}
+		if wantsAdmin && !hasAdmin {
+			return s.repo.AssignRoleTx(tx, id, adminRole.ID)
+		}
+		if !wantsAdmin && hasAdmin {
+			return s.repo.RemoveUserRoleByNameTx(tx, id, "admin")
+		}
+		return nil
+	})
 }
 
 func (s *userService) DeleteUser(id string) error {

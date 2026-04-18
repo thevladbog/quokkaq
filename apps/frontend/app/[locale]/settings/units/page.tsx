@@ -6,7 +6,7 @@ import { useUnits, useCreateUnit } from '@/lib/hooks';
 import { companiesApiExt } from '@/lib/api';
 import PermissionGuard from '@/components/auth/permission-guard';
 import { Plus } from 'lucide-react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import {
   Card,
   CardContent,
@@ -45,6 +45,7 @@ export default function UnitsIndexPage() {
   const createUnitMutation = useCreateUnit();
   const t = useTranslations('admin');
   const tCommon = useTranslations('common');
+  const locale = useLocale();
   const { user } = useAuthContext();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [newUnitName, setNewUnitName] = useState('');
@@ -84,7 +85,10 @@ export default function UnitsIndexPage() {
     [units, companyId]
   );
 
-  const unitForest = useMemo(() => buildUnitForest(units), [units]);
+  const unitForest = useMemo(
+    () => buildUnitForest(units, locale),
+    [units, locale]
+  );
 
   const resetCreateForm = () => {
     setNewUnitName('');
