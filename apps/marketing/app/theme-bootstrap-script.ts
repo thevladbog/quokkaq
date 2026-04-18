@@ -4,13 +4,13 @@ import { MARKETING_THEME_STORAGE_KEY } from './theme-constants';
 const THEME_STORAGE_KEY_LITERAL = 'quokkaq-marketing-theme';
 if (MARKETING_THEME_STORAGE_KEY !== THEME_STORAGE_KEY_LITERAL) {
   throw new Error(
-    'Theme bootstrap script key out of sync with theme-constants.ts (MARKETING_THEME_STORAGE_KEY)',
+    'Theme bootstrap script key out of sync with theme-constants.ts (MARKETING_THEME_STORAGE_KEY)'
   );
 }
 
 /** Safe to embed inside `<script>`: escape `</` sequences in the JSON literal. */
 const themeStorageKeyForScript = JSON.stringify(
-  MARKETING_THEME_STORAGE_KEY,
+  MARKETING_THEME_STORAGE_KEY
 ).replace(/<\//g, '<\\/');
 
 /** Inline theme init — injected via `useServerInsertedHTML` in `MarketingThemeProvider` (React 19–safe). */

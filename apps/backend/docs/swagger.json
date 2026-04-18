@@ -623,9 +623,7 @@
             "handlers.PlatformCreateSubscriptionPlanBody": {
                 "properties": {
                     "allowInstantPurchase": {
-                        "default": true,
-                        "description": "When omitted or null, defaults to true.",
-                        "nullable": true,
+                        "description": "AllowInstantPurchase omitted or null defaults to true.",
                         "type": "boolean"
                     },
                     "code": {
@@ -635,9 +633,7 @@
                         "type": "string"
                     },
                     "displayOrder": {
-                        "default": 1000,
-                        "description": "Sort order for public plan lists (lower values first). When omitted or null, defaults to 1000.",
-                        "nullable": true,
+                        "description": "DisplayOrder omitted or null defaults to 1000 (sort last among unnamed ordering).",
                         "type": "integer"
                     },
                     "features": {
@@ -657,9 +653,7 @@
                         "type": "boolean"
                     },
                     "isPublic": {
-                        "default": true,
-                        "description": "When omitted or null, defaults to true (backward compatible).",
-                        "nullable": true,
+                        "description": "IsPublic omitted or null defaults to true (backward compatible).",
                         "type": "boolean"
                     },
                     "limits": {

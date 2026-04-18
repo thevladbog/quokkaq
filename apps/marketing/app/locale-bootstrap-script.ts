@@ -4,7 +4,7 @@ import { MARKETING_LOCALE_STORAGE_KEY } from './theme-constants';
 const LOCALE_STORAGE_KEY_LITERAL = 'quokkaq-marketing-locale';
 if (MARKETING_LOCALE_STORAGE_KEY !== LOCALE_STORAGE_KEY_LITERAL) {
   throw new Error(
-    'Locale bootstrap script key out of sync with theme-constants.ts (MARKETING_LOCALE_STORAGE_KEY)',
+    'Locale bootstrap script key out of sync with theme-constants.ts (MARKETING_LOCALE_STORAGE_KEY)'
   );
 }
 

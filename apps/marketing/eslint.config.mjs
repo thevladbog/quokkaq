@@ -7,6 +7,12 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   prettier,
+  {
+    files: ['scripts/**/*.js'],
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off'
+    }
+  },
   globalIgnores([
     '.next/**',
     'out/**',

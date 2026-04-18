@@ -1158,6 +1158,14 @@ func RunVersionedMigrations(models ...interface{}) error {
 		`).Error; err != nil {
 			return err
 		}
+		// Column defaults above are generic (true); align special tiers with pkg/plans + cmd/seed-plans
+		// so migration-only DBs match seed behavior (grandfathered hidden; enterprise sales-led checkout).
+		if err := db.Exec(`
+			UPDATE subscription_plans SET is_public = false WHERE code = 'grandfathered';
+			UPDATE subscription_plans SET allow_instant_purchase = false WHERE code IN ('enterprise', 'grandfathered');
+		`).Error; err != nil {
+			return err
+		}
 		return nil
 	})
 	if err != nil {
@@ -1251,6 +1259,16 @@ func RunVersionedMigrations(models ...interface{}) error {
 	})
 	if err != nil {
 		return fmt.Errorf("failed to run v1.2.15_subscription_plan_name_en_fallback migration: %w", err)
+	}
+
+	// DBs that ran v1.2.10 before enterprise/grandfathered overrides were added there: sales-led enterprise tier.
+	err = manager.RunMigration("v1.2.16_subscription_plan_enterprise_allow_instant_purchase", func(db *gorm.DB) error {
+		return db.Exec(`
+			UPDATE subscription_plans SET allow_instant_purchase = false WHERE code = 'enterprise';
+		`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.2.16_subscription_plan_enterprise_allow_instant_purchase migration: %w", err)
 	}
 
 	fmt.Println("All migrations completed successfully")

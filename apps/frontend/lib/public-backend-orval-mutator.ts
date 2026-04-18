@@ -59,7 +59,7 @@ export async function publicBackendOrvalMutator<T>(
   const method = (init.method ?? 'GET').toUpperCase();
   const cacheable = method === 'GET' || method === 'HEAD';
   const { signal, dispose } = mergeTimeoutSignal(
-    init.signal,
+    init.signal ?? undefined,
     DEFAULT_TIMEOUT_MS
   );
 

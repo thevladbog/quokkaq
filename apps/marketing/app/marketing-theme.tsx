@@ -65,8 +65,9 @@ export function MarketingThemeProvider({
     />
   ));
 
-  const [theme, setThemeState] =
-    React.useState<ThemeSetting>(() => readStoredTheme());
+  const [theme, setThemeState] = React.useState<ThemeSetting>(() =>
+    readStoredTheme()
+  );
   const [mounted, setMounted] = React.useState(false);
 
   React.useLayoutEffect(() => {

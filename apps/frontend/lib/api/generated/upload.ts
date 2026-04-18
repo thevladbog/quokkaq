@@ -531,35 +531,26 @@ export interface HandlersPlatformCreateSubscriptionBody {
   trialEnd?: string;
 }
 
-export type HandlersPlatformCreateSubscriptionPlanBodyFeatures = { [key: string]: unknown };
+export type HandlersPlatformCreateSubscriptionPlanBodyFeatures = {[key: string]: boolean};
 
-export type HandlersPlatformCreateSubscriptionPlanBodyLimits = { [key: string]: unknown };
+export type HandlersPlatformCreateSubscriptionPlanBodyLimits = {[key: string]: number};
 
 export type HandlersPlatformCreateSubscriptionPlanBodyLimitsNegotiable = {[key: string]: boolean};
 
 export interface HandlersPlatformCreateSubscriptionPlanBody {
-  /**
-     * When omitted or null, defaults to true.
-     * @nullable
-     */
-  allowInstantPurchase?: boolean | null;
+  /** AllowInstantPurchase omitted or null defaults to true. */
+  allowInstantPurchase?: boolean;
   code?: string;
   currency?: string;
-  /**
-     * Sort order for public plan lists (lower values first). When omitted or null, defaults to 1000.
-     * @nullable
-     */
-  displayOrder?: number | null;
+  /** DisplayOrder omitted or null defaults to 1000 (sort last among unnamed ordering). */
+  displayOrder?: number;
   features?: HandlersPlatformCreateSubscriptionPlanBodyFeatures;
   interval?: string;
   isActive?: boolean;
   /** IsPromoted when true: this plan becomes the only promoted tier (others cleared in the same transaction). */
   isPromoted?: boolean;
-  /**
-     * When omitted or null, defaults to true (backward compatible).
-     * @nullable
-     */
-  isPublic?: boolean | null;
+  /** IsPublic omitted or null defaults to true (backward compatible). */
+  isPublic?: boolean;
   limits?: HandlersPlatformCreateSubscriptionPlanBodyLimits;
   limitsNegotiable?: HandlersPlatformCreateSubscriptionPlanBodyLimitsNegotiable;
   name?: string;
@@ -567,9 +558,9 @@ export interface HandlersPlatformCreateSubscriptionPlanBody {
   price?: number;
 }
 
-export type HandlersPlatformUpdateSubscriptionPlanBodyFeatures = { [key: string]: unknown };
+export type HandlersPlatformUpdateSubscriptionPlanBodyFeatures = {[key: string]: boolean};
 
-export type HandlersPlatformUpdateSubscriptionPlanBodyLimits = { [key: string]: unknown };
+export type HandlersPlatformUpdateSubscriptionPlanBodyLimits = {[key: string]: number};
 
 export type HandlersPlatformUpdateSubscriptionPlanBodyLimitsNegotiable = {[key: string]: boolean};
 
@@ -691,12 +682,12 @@ export interface HandlersAddSupportReportShareRequest {
 /**
  * feature flags
  */
-export type ModelsSubscriptionPlanFeatures = { [key: string]: unknown };
+export type ModelsSubscriptionPlanFeatures = {[key: string]: boolean};
 
 /**
  * quota limits
  */
-export type ModelsSubscriptionPlanLimits = { [key: string]: unknown };
+export type ModelsSubscriptionPlanLimits = {[key: string]: number};
 
 /**
  * LimitsNegotiable maps limit keys to true when the catalog should show “by agreement” instead of a numeric cap.
