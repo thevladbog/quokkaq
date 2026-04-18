@@ -535,22 +535,31 @@ export type HandlersPlatformCreateSubscriptionPlanBodyFeatures = { [key: string]
 
 export type HandlersPlatformCreateSubscriptionPlanBodyLimits = { [key: string]: unknown };
 
-export type HandlersPlatformCreateSubscriptionPlanBodyLimitsNegotiable = { [key: string]: unknown };
+export type HandlersPlatformCreateSubscriptionPlanBodyLimitsNegotiable = {[key: string]: boolean};
 
 export interface HandlersPlatformCreateSubscriptionPlanBody {
-  /** AllowInstantPurchase omitted or null defaults to true. */
-  allowInstantPurchase?: boolean;
+  /**
+     * When omitted or null, defaults to true.
+     * @nullable
+     */
+  allowInstantPurchase?: boolean | null;
   code?: string;
   currency?: string;
-  /** DisplayOrder omitted or null defaults to 1000 (sort last among unnamed ordering). */
-  displayOrder?: number;
+  /**
+     * Sort order for public plan lists (lower values first). When omitted or null, defaults to 1000.
+     * @nullable
+     */
+  displayOrder?: number | null;
   features?: HandlersPlatformCreateSubscriptionPlanBodyFeatures;
   interval?: string;
   isActive?: boolean;
   /** IsPromoted when true: this plan becomes the only promoted tier (others cleared in the same transaction). */
   isPromoted?: boolean;
-  /** IsPublic omitted or null defaults to true (backward compatible). */
-  isPublic?: boolean;
+  /**
+     * When omitted or null, defaults to true (backward compatible).
+     * @nullable
+     */
+  isPublic?: boolean | null;
   limits?: HandlersPlatformCreateSubscriptionPlanBodyLimits;
   limitsNegotiable?: HandlersPlatformCreateSubscriptionPlanBodyLimitsNegotiable;
   name?: string;
@@ -562,7 +571,7 @@ export type HandlersPlatformUpdateSubscriptionPlanBodyFeatures = { [key: string]
 
 export type HandlersPlatformUpdateSubscriptionPlanBodyLimits = { [key: string]: unknown };
 
-export type HandlersPlatformUpdateSubscriptionPlanBodyLimitsNegotiable = { [key: string]: unknown };
+export type HandlersPlatformUpdateSubscriptionPlanBodyLimitsNegotiable = {[key: string]: boolean};
 
 export interface HandlersPlatformUpdateSubscriptionPlanBody {
   allowInstantPurchase?: boolean;
@@ -692,7 +701,7 @@ export type ModelsSubscriptionPlanLimits = { [key: string]: unknown };
 /**
  * LimitsNegotiable maps limit keys to true when the catalog should show “by agreement” instead of a numeric cap.
  */
-export type ModelsSubscriptionPlanLimitsNegotiable = { [key: string]: unknown };
+export type ModelsSubscriptionPlanLimitsNegotiable = {[key: string]: boolean};
 
 export interface ModelsSubscriptionPlan {
   /** AllowInstantPurchase when false: plan may still be public, but checkout is disabled until a sales-led flow exists. */

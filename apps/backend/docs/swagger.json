@@ -623,7 +623,9 @@
             "handlers.PlatformCreateSubscriptionPlanBody": {
                 "properties": {
                     "allowInstantPurchase": {
-                        "description": "AllowInstantPurchase omitted or null defaults to true.",
+                        "default": true,
+                        "description": "When omitted or null, defaults to true.",
+                        "nullable": true,
                         "type": "boolean"
                     },
                     "code": {
@@ -633,7 +635,9 @@
                         "type": "string"
                     },
                     "displayOrder": {
-                        "description": "DisplayOrder omitted or null defaults to 1000 (sort last among unnamed ordering).",
+                        "default": 1000,
+                        "description": "Sort order for public plan lists (lower values first). When omitted or null, defaults to 1000.",
+                        "nullable": true,
                         "type": "integer"
                     },
                     "features": {
@@ -650,14 +654,19 @@
                         "type": "boolean"
                     },
                     "isPublic": {
-                        "description": "IsPublic omitted or null defaults to true (backward compatible).",
+                        "default": true,
+                        "description": "When omitted or null, defaults to true (backward compatible).",
+                        "nullable": true,
                         "type": "boolean"
                     },
                     "limits": {
                         "type": "object"
                     },
                     "limitsNegotiable": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "boolean"
+                        }
                     },
                     "name": {
                         "type": "string"
@@ -705,7 +714,10 @@
                         "type": "object"
                     },
                     "limitsNegotiable": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "boolean"
+                        }
                     },
                     "name": {
                         "type": "string"
@@ -2370,7 +2382,10 @@
                     },
                     "limitsNegotiable": {
                         "description": "LimitsNegotiable maps limit keys to true when the catalog should show “by agreement” instead of a numeric cap.",
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "boolean"
+                        }
                     },
                     "name": {
                         "description": "Primary display name (e.g. Russian on RU marketing)",
