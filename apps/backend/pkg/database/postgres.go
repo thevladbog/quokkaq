@@ -1271,6 +1271,15 @@ func RunVersionedMigrations(models ...interface{}) error {
 		return fmt.Errorf("failed to run v1.2.16_subscription_plan_enterprise_allow_instant_purchase migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.2.17_users_photo_url", func(db *gorm.DB) error {
+		return db.Exec(`
+			ALTER TABLE users ADD COLUMN IF NOT EXISTS photo_url TEXT;
+		`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.2.17_users_photo_url migration: %w", err)
+	}
+
 	fmt.Println("All migrations completed successfully")
 	return nil
 }

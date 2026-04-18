@@ -29,6 +29,7 @@ type UserRepository interface {
 	RemoveUnit(userID, unitID string) error
 	AssignRole(userID, roleID string) error
 	AssignRoleTx(tx *gorm.DB, userID, roleID string) error
+	RemoveUserRoleByName(userID, roleName string) error
 	FindRoleByName(name string) (*models.Role, error)
 	CreatePasswordResetToken(token *models.PasswordResetToken) error
 	FindPasswordResetToken(token string) (*models.PasswordResetToken, error)
@@ -112,7 +113,18 @@ func (r *userRepository) FindByEmail(email string) (*models.User, error) {
 }
 
 func (r *userRepository) Update(user *models.User) error {
-	return r.db.Save(user).Error
+	updates := map[string]interface{}{
+		"name":      user.Name,
+		"email":     user.Email,
+		"phone":     user.Phone,
+		"is_active": user.IsActive,
+		"type":      user.Type,
+		"photo_url": user.PhotoURL,
+	}
+	if user.Password != nil {
+		updates["password"] = user.Password
+	}
+	return r.db.Model(&models.User{}).Where("id = ?", user.ID).Updates(updates).Error
 }
 
 func (r *userRepository) Delete(id string) error {
@@ -146,6 +158,14 @@ func (r *userRepository) AssignRoleTx(tx *gorm.DB, userID, roleID string) error 
 		RoleID: roleID,
 	}
 	return tx.Create(&userRole).Error
+}
+
+func (r *userRepository) RemoveUserRoleByName(userID, roleName string) error {
+	return r.db.Exec(`
+		DELETE FROM user_roles ur
+		USING roles r
+		WHERE ur.role_id = r.id AND ur.user_id = ? AND r.name = ?
+	`, userID, roleName).Error
 }
 
 func (r *userRepository) FindRoleByName(name string) (*models.Role, error) {

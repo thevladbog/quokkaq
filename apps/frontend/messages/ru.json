@@ -472,7 +472,23 @@
         "ACCESS_STATISTICS_ZONE": "Статистика: только назначенные зоны обслуживания"
       },
       "system_admin": "Системный администратор",
-      "system_admin_desc": "Полный доступ к системе"
+      "system_admin_desc": "Полный доступ к системе",
+      "table_column_user": "Пользователь",
+      "table_column_units": "Подразделения",
+      "table_column_admin": "Админ",
+      "open_user_settings_aria": "Открыть настройки: {name}",
+      "admin_badge_aria": "Системный администратор",
+      "sheet_title": "Настройки пользователя",
+      "profile_section": "Профиль",
+      "role_section": "Роль",
+      "profile_name_label": "Отображаемое имя",
+      "save_profile": "Сохранить имя",
+      "operator_photo_label": "Фото оператора",
+      "operator_photo_hint": "Отображается в интерфейсах для персонала. Используется тот же защищённый загрузчик, что и для логотипов.",
+      "operator_photo_upload": "Фото профиля",
+      "units_section": "Подразделения и права",
+      "add_unit_section": "Назначить подразделения",
+      "no_permission_to_manage_unit": "Нет прав изменять назначения для этого подразделения."
     },
     "reports": {
       "title": "Отчеты",

@@ -319,6 +319,7 @@ export const usersApi = {
       name?: string;
       email?: string;
       password?: string;
+      photoUrl?: string | null;
       roles?: string[];
     }
   ) =>

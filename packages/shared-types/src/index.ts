@@ -18,6 +18,7 @@ export const UserModelSchema = z.object({
   id: z.string(),
   name: z.string(),
   email: z.string().nullable().optional(),
+  photoUrl: z.string().nullable().optional(),
   createdAt: z.string().nullable().optional(),
   unitIds: z.array(z.string()).optional(),
   roles: z
@@ -49,7 +50,11 @@ export const UserModelSchema = z.object({
         permissions: z.array(z.string()).optional().default([]),
         unit: z
           .object({
-            companyId: z.string()
+            companyId: z.string().optional(),
+            id: z.string().optional(),
+            name: z.string().optional(),
+            code: z.string().optional(),
+            kind: z.string().optional()
           })
           .optional()
       })

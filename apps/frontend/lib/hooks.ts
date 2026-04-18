@@ -178,6 +178,7 @@ export function useUpdateUser() {
         name?: string;
         email?: string;
         password?: string;
+        photoUrl?: string | null;
         roles?: string[];
       };
     }) => usersApi.update(userId, data),

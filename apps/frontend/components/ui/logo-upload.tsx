@@ -26,6 +26,8 @@ interface LogoUploadProps {
   uploadTarget?: 'kiosk' | 'printer';
   /** When true, allow `.bmp` / `.dib` even if `file.type` is empty */
   allowBmpByExtension?: boolean;
+  /** Disable upload and remove actions */
+  disabled?: boolean;
 }
 
 function isAllowedImageFile(file: File, allowBmpByExtension: boolean): boolean {
@@ -46,7 +48,8 @@ export function LogoUpload({
   accept = 'image/*',
   hint,
   uploadTarget = 'kiosk',
-  allowBmpByExtension = false
+  allowBmpByExtension = false,
+  disabled = false
 }: LogoUploadProps) {
   const t = useTranslations('components.upload');
   const displayLabel = label ?? t('defaultLogoLabel');
@@ -116,6 +119,7 @@ export function LogoUpload({
               size='icon'
               className='absolute top-0 right-0 h-5 w-5 rounded-tr-none rounded-bl-md'
               onClick={onLogoRemoved}
+              disabled={disabled}
             >
               <X className='h-3 w-3' />
             </Button>
@@ -137,7 +141,7 @@ export function LogoUpload({
           />
           <Button
             variant='outline'
-            disabled={isUploading}
+            disabled={isUploading || disabled}
             onClick={() => fileInputRef.current?.click()}
             className='w-full sm:w-auto'
           >

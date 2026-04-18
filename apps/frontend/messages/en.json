@@ -472,7 +472,23 @@
         "ACCESS_STATISTICS_ZONE": "Statistics: assigned service zones only"
       },
       "system_admin": "System Administrator",
-      "system_admin_desc": "Grant full access to the system"
+      "system_admin_desc": "Grant full access to the system",
+      "table_column_user": "User",
+      "table_column_units": "Units",
+      "table_column_admin": "Admin",
+      "open_user_settings_aria": "Open settings for {name}",
+      "admin_badge_aria": "System administrator",
+      "sheet_title": "User settings",
+      "profile_section": "Profile",
+      "role_section": "Role",
+      "profile_name_label": "Display name",
+      "save_profile": "Save name",
+      "operator_photo_label": "Operator photo",
+      "operator_photo_hint": "Shown in staff-facing views. Uses the same secure upload as logos.",
+      "operator_photo_upload": "Profile photo",
+      "units_section": "Units & permissions",
+      "add_unit_section": "Assign units",
+      "no_permission_to_manage_unit": "You cannot change assignments for this unit."
     },
     "reports": {
       "title": "Reports",

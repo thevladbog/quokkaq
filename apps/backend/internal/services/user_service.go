@@ -13,7 +13,7 @@ type UserService interface {
 	CreateUser(user *models.User) error
 	GetAllUsers(search string) ([]models.User, error)
 	GetUserByID(id string) (*models.User, error)
-	UpdateUser(user *models.User) error
+	UpdateUser(id string, input *models.UpdateUserInput) error
 	DeleteUser(id string) error
 	AssignUnit(userID, unitID string, permissions []string) error
 	RemoveUnit(userID, unitID string) error
@@ -65,16 +65,81 @@ func (s *userService) GetUserByID(id string) (*models.User, error) {
 	return s.repo.FindByID(id)
 }
 
-func (s *userService) UpdateUser(user *models.User) error {
-	if user.Password != nil {
-		hashed, err := bcrypt.GenerateFromPassword([]byte(*user.Password), bcrypt.DefaultCost)
+func userHasAdminRole(u *models.User) bool {
+	for i := range u.Roles {
+		if u.Roles[i].Role.Name == "admin" {
+			return true
+		}
+	}
+	return false
+}
+
+func sliceContainsString(ss []string, v string) bool {
+	for _, s := range ss {
+		if s == v {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *userService) UpdateUser(id string, input *models.UpdateUserInput) error {
+	if input == nil {
+		return errors.New("empty update")
+	}
+	existing, err := s.repo.FindByID(id)
+	if err != nil {
+		return err
+	}
+
+	if input.Name != nil && *input.Name != "" {
+		existing.Name = *input.Name
+	}
+	if input.Email != nil {
+		existing.Email = input.Email
+	}
+	if input.Password != nil && *input.Password != "" {
+		hashed, err := bcrypt.GenerateFromPassword([]byte(*input.Password), bcrypt.DefaultCost)
 		if err != nil {
 			return err
 		}
 		hashedStr := string(hashed)
-		user.Password = &hashedStr
+		existing.Password = &hashedStr
 	}
-	return s.repo.Update(user)
+	if input.PhotoURL != nil {
+		if *input.PhotoURL == "" {
+			existing.PhotoURL = nil
+		} else {
+			existing.PhotoURL = input.PhotoURL
+		}
+	}
+
+	if err := s.repo.Update(existing); err != nil {
+		return err
+	}
+
+	if input.Roles == nil {
+		return nil
+	}
+
+	wantsAdmin := sliceContainsString(input.Roles, "admin")
+	reloaded, err := s.repo.FindByID(id)
+	if err != nil {
+		return err
+	}
+	hasAdmin := userHasAdminRole(reloaded)
+
+	if wantsAdmin && !hasAdmin {
+		adminRole, err := s.repo.FindRoleByName("admin")
+		if err != nil {
+			return err
+		}
+		return s.repo.AssignRole(id, adminRole.ID)
+	}
+	if !wantsAdmin && hasAdmin {
+		return s.repo.RemoveUserRoleByName(id, "admin")
+	}
+	return nil
 }
 
 func (s *userService) DeleteUser(id string) error {

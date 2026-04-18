@@ -64,6 +64,7 @@ func (PanicUserRepo) CreateUserUnitTx(*gorm.DB, *models.UserUnit) error         
 func (PanicUserRepo) RemoveUnit(string, string) error                           { panic("unexpected") }
 func (PanicUserRepo) AssignRole(string, string) error                           { panic("unexpected") }
 func (PanicUserRepo) AssignRoleTx(*gorm.DB, string, string) error               { panic("unexpected") }
+func (PanicUserRepo) RemoveUserRoleByName(string, string) error                 { panic("unexpected") }
 func (PanicUserRepo) FindRoleByName(string) (*models.Role, error)               { panic("unexpected") }
 func (PanicUserRepo) CreatePasswordResetToken(*models.PasswordResetToken) error { panic("unexpected") }
 func (PanicUserRepo) FindPasswordResetToken(string) (*models.PasswordResetToken, error) {
