@@ -33,7 +33,7 @@ auth, users, units, tickets, services, counters, shifts, slots, bookings, pre-re
 
 ## Локальная разработка
 
-- `go run cmd/api/main.go` или `air`
+- Из корня монорепо: `pnpm nx run backend:serve` — API с **Air** и `.air.toml` (пересборка при изменении `.go`). Nx ставит `air` в `tmp/` через `go install` и `exec` (не `go run`: при Ctrl+C `go run` даёт код 1 и ломает статус задачи в Nx). Без Nx: `go run cmd/api/main.go` или `GOBIN=$PWD/tmp go install …/air@v… && ./tmp/air` из `apps/backend`.
 - `docker-compose.yml`: postgres, redis, minio, backend — API **:3001**
 - После старта: Scalar `http://localhost:3001/swagger/`, спека OpenAPI 3: `http://localhost:3001/docs/openapi.json` (и исторический путь `/docs/swagger.json`).
 - Новые эндпоинты: model → repository → service → handler → регистрация в `main.go` → аннотации swag (Swagger 2) → пайплайн доков из `apps/backend`:

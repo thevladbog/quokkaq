@@ -74,9 +74,8 @@ s3-data/
 # Redis dump
 dump.rdb
 
-# Air (hot reload tool)
+# Air (hot reload tool) — build output under tmp/
 tmp/
-.air.toml
 
 # Generated documentation (optional - comment out if you want to track it)
 # docs/swagger.json

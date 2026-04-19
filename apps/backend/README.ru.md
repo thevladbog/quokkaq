@@ -212,17 +212,23 @@ go build -o quokkaq-backend cmd/api/main.go
 
 ### Использование Air (горячая перезагрузка)
 
-Установка Air:
+Стандартная команда из корня монорепо — Air с закоммиченным [`.air.toml`](./.air.toml):
 
 ```bash
-go install github.com/air-verse/air@latest
+pnpm nx run backend:serve
 ```
 
-Запуск с горячей перезагрузкой:
+Nx `serve` ставит Air в `tmp/air` через `go install` и запускает через `exec` (не `go run`): при **Ctrl+C** у `go run` в Go toolchain часто получается код **1** независимо от приложения, из‑за чего Nx помечает задачу как failed даже при корректном останове.
+
+Без Nx из `apps/backend`:
 
 ```bash
-air
+mkdir -p tmp && GOBIN="$PWD/tmp" go install github.com/air-verse/air@v1.65.1 && exec ./tmp/air
 ```
+
+По желанию: глобально установить бинарник (`go install github.com/air-verse/air@v1.65.1`) и запускать `air` в `apps/backend`.
+
+Если Air пишет **`Process Exit with Code: 1`** сразу после `Server starting on port …`, процесс API завершился с ошибкой — чаще всего в логе выше есть **`ListenAndServe: … bind: address already in use`**: порт `PORT` (по умолчанию **3001**) уже занят другим процессом или старым экземпляром после перезапуска. Остановите лишний процесс (`lsof -iTCP:3001 -sTCP:LISTEN`) или увеличьте `kill_delay` в `.air.toml`, если это ловится только при hot reload.
 
 ---
 

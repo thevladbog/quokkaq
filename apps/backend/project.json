@@ -16,7 +16,7 @@
     "serve": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "go build -o bin/server ./cmd/api && ./bin/server",
+        "command": "bash -lc 'set -euo pipefail; mkdir -p tmp; GOBIN=\"${PWD}/tmp\" go install github.com/air-verse/air@v1.65.1; exec ./tmp/air'",
         "cwd": "apps/backend",
         "usePty": false
       }
