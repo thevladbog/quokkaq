@@ -66,7 +66,8 @@ export function LandingPricing({
                   !isCustom && plan.allowInstantPurchase !== false;
                 const href = (() => {
                   if (appBaseUrl && sellable) {
-                    return `${appBaseUrl}/${locale}/signup?plan=${encodeURIComponent(plan.code)}`;
+                    const base = String(appBaseUrl).replace(/\/$/, '');
+                    return `${base}/${locale}/signup?plan=${encodeURIComponent(plan.code)}`;
                   }
                   if (!sellable) {
                     return '';
@@ -170,17 +171,32 @@ export function LandingPricing({
                     </ul>
 
                     {sellable ? (
-                      <Link
-                        href={href}
-                        prefetch={false}
-                        className={`focus-ring relative mt-auto inline-flex w-full items-center justify-center rounded-xl px-6 py-3 font-semibold transition ${
-                          isPopular
-                            ? 'z-[3] min-h-12 bg-gradient-to-r from-[color:var(--color-primary)] to-[color:var(--color-primary-hover)] text-base font-bold text-white shadow-lg shadow-[color:var(--color-primary)]/35 hover:from-[color:var(--color-primary-hover)] hover:to-[color:var(--color-primary-hover)] hover:shadow-xl hover:shadow-[color:var(--color-primary)]/45'
-                            : 'z-[1] min-h-11 border-2 border-[color:var(--color-border)] bg-[color:var(--color-surface)] text-sm text-[color:var(--color-text)] hover:border-[color:var(--color-primary)] hover:text-[color:var(--color-primary)]'
-                        }`}
-                      >
-                        {ctaLabel}
-                      </Link>
+                      appBaseUrl ? (
+                        <a
+                          href={href}
+                          target='_blank'
+                          rel='noopener noreferrer'
+                          className={`focus-ring relative mt-auto inline-flex w-full items-center justify-center rounded-xl px-6 py-3 font-semibold transition ${
+                            isPopular
+                              ? 'z-[3] min-h-12 bg-gradient-to-r from-[color:var(--color-primary)] to-[color:var(--color-primary-hover)] text-base font-bold text-white shadow-lg shadow-[color:var(--color-primary)]/35 hover:from-[color:var(--color-primary-hover)] hover:to-[color:var(--color-primary-hover)] hover:shadow-xl hover:shadow-[color:var(--color-primary)]/45'
+                              : 'z-[1] min-h-11 border-2 border-[color:var(--color-border)] bg-[color:var(--color-surface)] text-sm text-[color:var(--color-text)] hover:border-[color:var(--color-primary)] hover:text-[color:var(--color-primary)]'
+                          }`}
+                        >
+                          {ctaLabel}
+                        </a>
+                      ) : (
+                        <Link
+                          href={href}
+                          prefetch={false}
+                          className={`focus-ring relative mt-auto inline-flex w-full items-center justify-center rounded-xl px-6 py-3 font-semibold transition ${
+                            isPopular
+                              ? 'z-[3] min-h-12 bg-gradient-to-r from-[color:var(--color-primary)] to-[color:var(--color-primary-hover)] text-base font-bold text-white shadow-lg shadow-[color:var(--color-primary)]/35 hover:from-[color:var(--color-primary-hover)] hover:to-[color:var(--color-primary-hover)] hover:shadow-xl hover:shadow-[color:var(--color-primary)]/45'
+                              : 'z-[1] min-h-11 border-2 border-[color:var(--color-border)] bg-[color:var(--color-surface)] text-sm text-[color:var(--color-text)] hover:border-[color:var(--color-primary)] hover:text-[color:var(--color-primary)]'
+                          }`}
+                        >
+                          {ctaLabel}
+                        </Link>
+                      )
                     ) : (
                       <LeadRequestCta
                         locale={locale}

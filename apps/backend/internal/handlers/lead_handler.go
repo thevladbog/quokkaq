@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strings"
 
+	"quokkaq-go-backend/internal/config"
+	"quokkaq-go-backend/internal/logger"
 	"quokkaq-go-backend/internal/services"
 )
 
@@ -81,8 +83,18 @@ func (h *LeadHandler) PostPublicLeadRequest(w http.ResponseWriter, r *http.Reque
 	err = h.leadIssues.CreateLeadRequest(r.Context(), name, email, strings.TrimSpace(req.Company), strings.TrimSpace(req.Message),
 		strings.TrimSpace(req.Source), strings.TrimSpace(req.Locale), strings.TrimSpace(req.Referrer), strings.TrimSpace(req.PlanCode))
 	if err != nil {
+		logger.PrintfCtx(r.Context(), "PostPublicLeadRequest: CreateLeadRequest: %v", err)
 		if strings.Contains(strings.ToLower(err.Error()), "not configured") {
 			http.Error(w, err.Error(), http.StatusServiceUnavailable)
+			return
+		}
+		if config.ExposePublicLeadUpstreamError() {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadGateway)
+			_ = json.NewEncoder(w).Encode(map[string]string{
+				"error":  "Failed to create ticket",
+				"detail": err.Error(),
+			})
 			return
 		}
 		http.Error(w, "Failed to create ticket", http.StatusBadGateway)

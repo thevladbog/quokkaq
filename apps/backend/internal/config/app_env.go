@@ -19,3 +19,16 @@ func AppEnvAllowsYooKassaDevReturnURLFallback() bool {
 	}
 	return app == "development" || app == "dev" || app == "local"
 }
+
+// ExposePublicLeadUpstreamError is true when POST /public/leads/request may include the
+// upstream Tracker error in the JSON body (never when APP_ENV is production or staging).
+func ExposePublicLeadUpstreamError() bool {
+	app := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV")))
+	if app == "production" || app == "staging" {
+		return false
+	}
+	if v := strings.TrimSpace(os.Getenv("PUBLIC_LEAD_DEBUG")); v == "1" || strings.EqualFold(v, "true") {
+		return true
+	}
+	return app == "development" || app == "dev" || app == "local"
+}

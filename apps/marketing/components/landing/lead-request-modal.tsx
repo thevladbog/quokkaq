@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import {
   postPublicLeadRequest,
@@ -32,15 +33,24 @@ export function LeadRequestModal({
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState(false);
+  /** Filled when API returns JSON { detail } (dev / PUBLIC_LEAD_DEBUG). */
+  const [errorDetail, setErrorDetail] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) {
       return;
     }
-    const prev = document.body.style.overflow;
+    const scrollBarGap =
+      window.innerWidth - document.documentElement.clientWidth;
+    const prevOverflow = document.body.style.overflow;
+    const prevPaddingRight = document.body.style.paddingRight;
     document.body.style.overflow = 'hidden';
+    if (scrollBarGap > 0) {
+      document.body.style.paddingRight = `${scrollBarGap}px`;
+    }
     return () => {
-      document.body.style.overflow = prev;
+      document.body.style.overflow = prevOverflow;
+      document.body.style.paddingRight = prevPaddingRight;
     };
   }, [open]);
 
@@ -48,6 +58,7 @@ export function LeadRequestModal({
     if (!open) {
       setSuccess(false);
       setError(false);
+      setErrorDetail(null);
       setSubmitting(false);
     }
   }, [open]);
@@ -56,9 +67,14 @@ export function LeadRequestModal({
     return null;
   }
 
+  if (typeof document === 'undefined' || !document.body) {
+    return null;
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(false);
+    setErrorDetail(null);
     const n = name.trim();
     const em = email.trim();
     if (!n || !em) {
@@ -90,16 +106,26 @@ export function LeadRequestModal({
       } else {
         setError(true);
       }
-    } catch {
+    } catch (e: unknown) {
       setError(true);
+      if (e && typeof e === 'object' && 'body' in e) {
+        const raw = (e as { body?: unknown }).body;
+        if (raw && typeof raw === 'object' && raw !== null && 'detail' in raw) {
+          const d = (raw as { detail?: unknown }).detail;
+          if (typeof d === 'string' && d.trim()) {
+            setErrorDetail(d.trim());
+          }
+        }
+      }
+      console.error('postPublicLeadRequest failed', e);
     } finally {
       setSubmitting(false);
     }
   };
 
-  return (
+  return createPortal(
     <div
-      className='fixed inset-0 z-[100] flex items-center justify-center p-4'
+      className='fixed inset-0 z-[200] flex items-center justify-center p-4'
       role='dialog'
       aria-modal='true'
       aria-labelledby='lead-modal-title'
@@ -110,7 +136,7 @@ export function LeadRequestModal({
         aria-label='Close'
         onClick={onClose}
       />
-      <div className='relative z-[101] w-full max-w-lg rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-elevated)] p-6 shadow-xl'>
+      <div className='relative z-[201] w-full max-w-lg rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-elevated)] p-6 shadow-xl'>
         <h2
           id='lead-modal-title'
           className='font-display mb-2 text-xl font-semibold text-[color:var(--color-text)]'
@@ -185,9 +211,14 @@ export function LeadRequestModal({
               />
             </div>
             {error ? (
-              <p className='text-sm text-red-600 dark:text-red-400' role='alert'>
-                {lead.error}
-              </p>
+              <div className='space-y-1' role='alert'>
+                <p className='text-sm text-red-600 dark:text-red-400'>{lead.error}</p>
+                {errorDetail ? (
+                  <p className='font-mono text-xs break-words text-red-600/90 dark:text-red-400/90'>
+                    {errorDetail}
+                  </p>
+                ) : null}
+              </div>
             ) : null}
             <div className='flex flex-wrap gap-3 pt-2'>
               <button
@@ -208,6 +239,7 @@ export function LeadRequestModal({
           </form>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

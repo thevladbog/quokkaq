@@ -38,3 +38,35 @@ func TestAppEnvAllowsYooKassaDevReturnURLFallback(t *testing.T) {
 		}
 	}
 }
+
+func TestExposePublicLeadUpstreamError(t *testing.T) {
+	origApp, hadApp := os.LookupEnv("APP_ENV")
+	origDbg, hadDbg := os.LookupEnv("PUBLIC_LEAD_DEBUG")
+	t.Cleanup(func() {
+		if !hadApp {
+			_ = os.Unsetenv("APP_ENV")
+		} else {
+			_ = os.Setenv("APP_ENV", origApp)
+		}
+		if !hadDbg {
+			_ = os.Unsetenv("PUBLIC_LEAD_DEBUG")
+		} else {
+			_ = os.Setenv("PUBLIC_LEAD_DEBUG", origDbg)
+		}
+	})
+
+	_ = os.Unsetenv("PUBLIC_LEAD_DEBUG")
+	_ = os.Setenv("APP_ENV", "development")
+	if !ExposePublicLeadUpstreamError() {
+		t.Fatal("want true when APP_ENV=development")
+	}
+	_ = os.Setenv("APP_ENV", "production")
+	if ExposePublicLeadUpstreamError() {
+		t.Fatal("want false when APP_ENV=production")
+	}
+	_ = os.Setenv("APP_ENV", "production")
+	_ = os.Setenv("PUBLIC_LEAD_DEBUG", "1")
+	if ExposePublicLeadUpstreamError() {
+		t.Fatal("want false when APP_ENV=production even if PUBLIC_LEAD_DEBUG=1")
+	}
+}

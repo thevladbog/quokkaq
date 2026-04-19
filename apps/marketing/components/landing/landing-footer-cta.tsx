@@ -20,10 +20,13 @@ const pillSecondaryClass =
 export function LandingFooterCta({ locale, copy, appBaseUrl }: Props) {
   const year = new Date().getFullYear();
   const salesHref = 'mailto:sales@quokkaq.com';
-  /** Without app URL, keep the primary trial CTA (`copy.footer.cta`) on a conversion path — not docs. */
-  const trialHref = appBaseUrl
-    ? `${appBaseUrl}/${locale}/signup`
-    : `/${locale}#book-demo`;
+  /** Product app registration (new tab); same base as hero/pricing signup links. */
+  const signupHref =
+    appBaseUrl != null && String(appBaseUrl).trim() !== ''
+      ? `${String(appBaseUrl).replace(/\/$/, '')}/${locale}/signup`
+      : null;
+  /** Without app URL, primary CTA scrolls to this anchor. */
+  const trialHref = `/${locale}#book-demo`;
   const privacyHref = `/${locale}/privacy`;
   const termsHref = `/${locale}/terms`;
 
@@ -41,9 +44,9 @@ export function LandingFooterCta({ locale, copy, appBaseUrl }: Props) {
             {copy.footer.body}
           </p>
           <div className='mx-auto flex w-full max-w-xl min-w-0 flex-col items-stretch justify-center gap-3 md:flex-row md:justify-center md:gap-5'>
-            {appBaseUrl ? (
+            {signupHref ? (
               <a
-                href={trialHref}
+                href={signupHref}
                 target='_blank'
                 rel='noopener noreferrer'
                 className={pillPrimaryClass}

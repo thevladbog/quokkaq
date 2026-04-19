@@ -34,7 +34,7 @@ export default async function HomePage({ params }: PageProps) {
     <div className='landing-page flex min-h-dvh flex-col'>
       <LandingTopBar copy={t.home} locale={raw} appBaseUrl={appBaseUrl} />
       <main className='relative z-10 flex min-w-0 flex-1 flex-col overflow-x-clip'>
-        <LandingHero copy={t.home} locale={raw} />
+        <LandingHero copy={t.home} locale={raw} appBaseUrl={appBaseUrl} />
         <LandingStats copy={t.home} />
         <LandingHowItWorks copy={t.home} />
         <LandingFeatures copy={t.home} />
