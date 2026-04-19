@@ -2,14 +2,14 @@
 
 import { useQuery } from '@tanstack/react-query';
 import {
-  getGetPlatformInvoicesQueryKey,
-  getGetPlatformSubscriptionPlansQueryKey,
-  getPlatformInvoices,
-  getPlatformListCompaniesQueryKey,
-  getPlatformListSubscriptionsQueryKey,
-  getPlatformSubscriptionPlans,
-  platformListCompanies,
-  platformListSubscriptions
+  getListInvoicesQueryKey,
+  getListSubscriptionPlansQueryKey,
+  listInvoices,
+  listCompanies,
+  listSubscriptions,
+  getListCompaniesQueryKey,
+  getListSubscriptionsQueryKey,
+  listSubscriptionPlans
 } from '@/lib/api/generated/platform';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -35,8 +35,8 @@ export default function PlatformOverviewPage() {
     isError: isCompaniesError,
     refetch: refetchCompanies
   } = useQuery({
-    queryKey: getPlatformListCompaniesQueryKey(overviewListParams),
-    queryFn: async () => (await platformListCompanies(overviewListParams)).data
+    queryKey: getListCompaniesQueryKey(overviewListParams),
+    queryFn: async () => (await listCompanies(overviewListParams)).data
   });
   const {
     data: subs,
@@ -44,9 +44,8 @@ export default function PlatformOverviewPage() {
     isError: isSubsError,
     refetch: refetchSubs
   } = useQuery({
-    queryKey: getPlatformListSubscriptionsQueryKey(overviewListParams),
-    queryFn: async () =>
-      (await platformListSubscriptions(overviewListParams)).data
+    queryKey: getListSubscriptionsQueryKey(overviewListParams),
+    queryFn: async () => (await listSubscriptions(overviewListParams)).data
   });
   const {
     data: plans,
@@ -54,8 +53,8 @@ export default function PlatformOverviewPage() {
     isError: isPlansError,
     refetch: refetchPlans
   } = useQuery({
-    queryKey: getGetPlatformSubscriptionPlansQueryKey(),
-    queryFn: async () => (await getPlatformSubscriptionPlans()).data
+    queryKey: getListSubscriptionPlansQueryKey(),
+    queryFn: async () => (await listSubscriptionPlans()).data
   });
   const {
     data: inv,
@@ -63,8 +62,8 @@ export default function PlatformOverviewPage() {
     isError: isInvError,
     refetch: refetchInv
   } = useQuery({
-    queryKey: getGetPlatformInvoicesQueryKey(overviewListParams),
-    queryFn: async () => (await getPlatformInvoices(overviewListParams)).data
+    queryKey: getListInvoicesQueryKey(overviewListParams),
+    queryFn: async () => (await listInvoices(overviewListParams)).data
   });
 
   const loading = lc || ls || lp || li;

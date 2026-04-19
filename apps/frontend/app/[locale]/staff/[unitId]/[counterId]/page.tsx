@@ -22,7 +22,7 @@ import {
 } from '@/lib/hooks';
 import { getGetUnitsUnitIdCountersQueryKey } from '@/lib/api/generated/tickets-counters';
 import {
-  getGetUnitsIdQueryKey,
+  getGetUnitByIDQueryKey,
   getGetUnitsUnitIdChildUnitsQueryKey
 } from '@/lib/api/generated/units';
 import { countersApi, unitsApi, Ticket, type Service } from '@/lib/api';
@@ -105,7 +105,7 @@ export default function StaffWorkspacePage({
 
   // Fetch Unit Info for display
   const { data: unit } = useQuery({
-    queryKey: getGetUnitsIdQueryKey(unitId),
+    queryKey: getGetUnitByIDQueryKey(unitId),
     queryFn: () => unitsApi.getById(unitId)
   });
 

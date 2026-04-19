@@ -6,15 +6,15 @@ import type {
   ModelsInvoice
 } from '@/lib/api/generated/platform';
 import {
-  getGetPlatformInvoicesQueryKey,
-  getPlatformListCompaniesQueryKey,
-  getPlatformListSubscriptionsQueryKey,
-  platformCreateSubscription,
-  postPlatformInvoices,
-  postPlatformInvoicesIdIssue,
-  useGetPlatformSubscriptionPlans,
-  usePlatformListCompanies,
-  usePlatformListSubscriptions
+  getListInvoicesQueryKey,
+  getListCompaniesQueryKey,
+  getListSubscriptionsQueryKey,
+  createSubscription,
+  platformCreateInvoice,
+  platformIssueInvoice,
+  useListSubscriptionPlans,
+  useListCompanies,
+  useListSubscriptions
 } from '@/lib/api/generated/platform';
 import { Button } from '@/components/ui/button';
 import {
@@ -100,18 +100,16 @@ export default function PlatformSubscriptionsPage() {
   const [invAmount, setInvAmount] = useState('');
   const [invDue, setInvDue] = useState('');
 
-  const { data: subscriptionsPayload, isLoading } =
-    usePlatformListSubscriptions({ limit: 200 });
+  const { data: subscriptionsPayload, isLoading } = useListSubscriptions({
+    limit: 200
+  });
   const data = subscriptionsPayload?.data;
 
   const {
     data: companiesPayload,
     isError: companiesError,
     isLoading: companiesLoading
-  } = usePlatformListCompanies(
-    { limit: 100 },
-    { query: { enabled: createOpen } }
-  );
+  } = useListCompanies({ limit: 100 }, { query: { enabled: createOpen } });
   const companiesData = companiesPayload?.data;
 
   const companyOptions = useMemo(() => {
@@ -137,10 +135,9 @@ export default function PlatformSubscriptionsPage() {
     return !!(c?.subscriptionId && String(c.subscriptionId).trim());
   }, [companiesData?.items, companyId]);
 
-  const { data: plansPayload, isError: plansError } =
-    useGetPlatformSubscriptionPlans({
-      query: { enabled: createOpen }
-    });
+  const { data: plansPayload, isError: plansError } = useListSubscriptionPlans({
+    query: { enabled: createOpen }
+  });
   const plans = plansPayload?.data ?? [];
 
   const createMut = useMutation({
@@ -201,12 +198,12 @@ export default function PlatformSubscriptionsPage() {
         }
         const due = dueDate.toISOString();
 
-        await platformCreateSubscription(body);
+        await createSubscription(body);
 
         const plan = plans.find((p) => p.id === planId);
         let inv: ModelsInvoice;
         try {
-          const invRes = await postPlatformInvoices({
+          const invRes = await platformCreateInvoice({
             companyId,
             dueDate: due,
             currency: (plan?.currency ?? 'RUB').trim() || 'RUB',
@@ -233,7 +230,7 @@ export default function PlatformSubscriptionsPage() {
         }
         try {
           if (!inv.id?.trim()) throw new Error('missing invoice id');
-          await postPlatformInvoicesIdIssue(inv.id);
+          await platformIssueInvoice(inv.id);
         } catch (issueErr) {
           logger.error(
             'issueInvoice after createSubscription+createInvoice',
@@ -247,7 +244,7 @@ export default function PlatformSubscriptionsPage() {
         return { outcome: 'subscription-and-invoice' };
       }
 
-      await platformCreateSubscription(body);
+      await createSubscription(body);
       return { outcome: 'subscription-only' };
     },
     onSuccess: (result) => {
@@ -274,10 +271,10 @@ export default function PlatformSubscriptionsPage() {
         );
       }
       qc.invalidateQueries({
-        queryKey: getPlatformListSubscriptionsQueryKey()
+        queryKey: getListSubscriptionsQueryKey()
       });
       qc.invalidateQueries({
-        queryKey: getPlatformListCompaniesQueryKey()
+        queryKey: getListCompaniesQueryKey()
       });
       qc.invalidateQueries({
         predicate: (q) =>
@@ -286,7 +283,7 @@ export default function PlatformSubscriptionsPage() {
           /^\/platform\/companies\/[^/]+$/.test(q.queryKey[0])
       });
       qc.invalidateQueries({
-        queryKey: getGetPlatformInvoicesQueryKey()
+        queryKey: getListInvoicesQueryKey()
       });
       setCreateOpen(false);
       setCompanyId('');

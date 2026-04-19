@@ -1966,7 +1966,7 @@ code: string;
 state: string;
 };
 
-export type PostCompaniesMeCompleteOnboarding200 = {[key: string]: boolean};
+export type CompaniesMeCompleteOnboarding200 = {[key: string]: boolean};
 
 export type ListCompanyUsersParams = {
 /**
@@ -3907,41 +3907,41 @@ export const usePatchCompaniesMe = <TError = string,
  * Marks onboarding as complete for the user's company
  * @summary Complete Onboarding
  */
-export type postCompaniesMeCompleteOnboardingResponse200 = {
-  data: PostCompaniesMeCompleteOnboarding200
+export type companiesMeCompleteOnboardingResponse200 = {
+  data: CompaniesMeCompleteOnboarding200
   status: 200
 }
 
-export type postCompaniesMeCompleteOnboardingResponse401 = {
+export type companiesMeCompleteOnboardingResponse401 = {
   data: string
   status: 401
 }
 
-export type postCompaniesMeCompleteOnboardingResponse403 = {
+export type companiesMeCompleteOnboardingResponse403 = {
   data: string
   status: 403
 }
 
-export type postCompaniesMeCompleteOnboardingResponse404 = {
+export type companiesMeCompleteOnboardingResponse404 = {
   data: string
   status: 404
 }
 
-export type postCompaniesMeCompleteOnboardingResponse500 = {
+export type companiesMeCompleteOnboardingResponse500 = {
   data: string
   status: 500
 }
 
-export type postCompaniesMeCompleteOnboardingResponseSuccess = (postCompaniesMeCompleteOnboardingResponse200) & {
+export type companiesMeCompleteOnboardingResponseSuccess = (companiesMeCompleteOnboardingResponse200) & {
   headers: Headers;
 };
-export type postCompaniesMeCompleteOnboardingResponseError = (postCompaniesMeCompleteOnboardingResponse401 | postCompaniesMeCompleteOnboardingResponse403 | postCompaniesMeCompleteOnboardingResponse404 | postCompaniesMeCompleteOnboardingResponse500) & {
+export type companiesMeCompleteOnboardingResponseError = (companiesMeCompleteOnboardingResponse401 | companiesMeCompleteOnboardingResponse403 | companiesMeCompleteOnboardingResponse404 | companiesMeCompleteOnboardingResponse500) & {
   headers: Headers;
 };
 
-export type postCompaniesMeCompleteOnboardingResponse = (postCompaniesMeCompleteOnboardingResponseSuccess | postCompaniesMeCompleteOnboardingResponseError)
+export type companiesMeCompleteOnboardingResponse = (companiesMeCompleteOnboardingResponseSuccess | companiesMeCompleteOnboardingResponseError)
 
-export const getPostCompaniesMeCompleteOnboardingUrl = () => {
+export const getCompaniesMeCompleteOnboardingUrl = () => {
 
 
 
@@ -3949,9 +3949,9 @@ export const getPostCompaniesMeCompleteOnboardingUrl = () => {
   return `/companies/me/complete-onboarding`
 }
 
-export const postCompaniesMeCompleteOnboarding = async ( options?: RequestInit): Promise<postCompaniesMeCompleteOnboardingResponse> => {
+export const companiesMeCompleteOnboarding = async ( options?: RequestInit): Promise<companiesMeCompleteOnboardingResponse> => {
 
-  return orvalMutator<postCompaniesMeCompleteOnboardingResponse>(getPostCompaniesMeCompleteOnboardingUrl(),
+  return orvalMutator<companiesMeCompleteOnboardingResponse>(getCompaniesMeCompleteOnboardingUrl(),
   {
     ...options,
     method: 'POST'
@@ -3963,11 +3963,11 @@ export const postCompaniesMeCompleteOnboarding = async ( options?: RequestInit):
 
 
 
-export const getPostCompaniesMeCompleteOnboardingMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postCompaniesMeCompleteOnboarding>>, TError,void, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof postCompaniesMeCompleteOnboarding>>, TError,void, TContext> => {
+export const getCompaniesMeCompleteOnboardingMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof companiesMeCompleteOnboarding>>, TError,void, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof companiesMeCompleteOnboarding>>, TError,void, TContext> => {
 
-const mutationKey = ['postCompaniesMeCompleteOnboarding'];
+const mutationKey = ['companiesMeCompleteOnboarding'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -3977,10 +3977,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postCompaniesMeCompleteOnboarding>>, void> = () => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof companiesMeCompleteOnboarding>>, void> = () => {
 
 
-          return  postCompaniesMeCompleteOnboarding(requestOptions)
+          return  companiesMeCompleteOnboarding(requestOptions)
         }
 
 
@@ -3990,22 +3990,22 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PostCompaniesMeCompleteOnboardingMutationResult = NonNullable<Awaited<ReturnType<typeof postCompaniesMeCompleteOnboarding>>>
+    export type CompaniesMeCompleteOnboardingMutationResult = NonNullable<Awaited<ReturnType<typeof companiesMeCompleteOnboarding>>>
 
-    export type PostCompaniesMeCompleteOnboardingMutationError = string
+    export type CompaniesMeCompleteOnboardingMutationError = string
 
     /**
  * @summary Complete Onboarding
  */
-export const usePostCompaniesMeCompleteOnboarding = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postCompaniesMeCompleteOnboarding>>, TError,void, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const useCompaniesMeCompleteOnboarding = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof companiesMeCompleteOnboarding>>, TError,void, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof postCompaniesMeCompleteOnboarding>>,
+        Awaited<ReturnType<typeof companiesMeCompleteOnboarding>>,
         TError,
         void,
         TContext
       > => {
-      return useMutation(getPostCompaniesMeCompleteOnboardingMutationOptions(options), queryClient);
+      return useMutation(getCompaniesMeCompleteOnboardingMutationOptions(options), queryClient);
     }
 
 /**

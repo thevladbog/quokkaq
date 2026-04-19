@@ -24,7 +24,7 @@ import { useLocale } from 'next-intl';
 import { getLocalizedName } from '@/lib/utils';
 import KioskLanguageSwitcher from '@/components/KioskLanguageSwitcher';
 import { useUnit } from '@/lib/hooks';
-import { getGetUnitsIdQueryKey } from '@/lib/api/generated/units';
+import { getGetUnitByIDQueryKey } from '@/lib/api/generated/units';
 import { PinCodeModal } from '@/components/kiosk/pin-code-modal';
 import { KioskSettingsSheet } from '@/components/kiosk/kiosk-settings-sheet';
 import { LockScreen } from '@/components/kiosk/lock-screen';
@@ -96,7 +96,7 @@ export default function UnitKioskPage() {
       return;
     }
     void queryClient.invalidateQueries({
-      queryKey: getGetUnitsIdQueryKey(unitId)
+      queryKey: getGetUnitByIDQueryKey(unitId)
     });
   }, [queryClient, unitId]);
 

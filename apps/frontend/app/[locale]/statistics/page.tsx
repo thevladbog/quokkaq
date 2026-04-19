@@ -68,8 +68,8 @@ import { useGetUnitsUnitIdShiftActivityActors } from '@/lib/api/generated/shift'
 import { useGetUnitsUnitIdServices } from '@/lib/api/generated/services';
 import { normalizeChildUnitsQueryData } from '@/lib/child-units-query';
 import {
-  getUnitsId,
-  useGetUnitsId,
+  getUnitByID,
+  useGetUnitByID,
   useGetUnitsUnitIdChildUnits,
   type ModelsService,
   type ModelsUnit
@@ -309,7 +309,7 @@ export default function StatisticsPage() {
     'percent'
   );
 
-  const unitQuery = useGetUnitsId(activeUnitId ?? '', {
+  const unitQuery = useGetUnitByID(activeUnitId ?? '', {
     query: { enabled: Boolean(activeUnitId) }
   });
   const activeUnit =
@@ -368,7 +368,7 @@ export default function StatisticsPage() {
     queries: assignableSorted.map((id) => ({
       queryKey: ['statistics', 'assignable-unit', id],
       queryFn: async () => {
-        const r = await getUnitsId(id);
+        const r = await getUnitByID(id);
         if (r.status !== 200) return undefined;
         return r.data;
       },
@@ -401,7 +401,7 @@ export default function StatisticsPage() {
     queries: extraParentIds.map((id) => ({
       queryKey: ['statistics', 'parent-unit', id],
       queryFn: async () => {
-        const r = await getUnitsId(id);
+        const r = await getUnitByID(id);
         if (r.status !== 200) return undefined;
         return r.data;
       },

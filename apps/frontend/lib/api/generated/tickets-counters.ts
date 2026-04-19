@@ -2726,26 +2726,26 @@ export const usePostCountersIdForceRelease = <TError = string,
  * Sets a counter as occupied by the current user
  * @summary Occupy counter
  */
-export type postCountersIdOccupyResponse200 = {
+export type occupyCounterResponse200 = {
   data: ModelsCounter
   status: 200
 }
 
-export type postCountersIdOccupyResponse404 = {
+export type occupyCounterResponse404 = {
   data: string
   status: 404
 }
 
-export type postCountersIdOccupyResponseSuccess = (postCountersIdOccupyResponse200) & {
+export type occupyCounterResponseSuccess = (occupyCounterResponse200) & {
   headers: Headers;
 };
-export type postCountersIdOccupyResponseError = (postCountersIdOccupyResponse404) & {
+export type occupyCounterResponseError = (occupyCounterResponse404) & {
   headers: Headers;
 };
 
-export type postCountersIdOccupyResponse = (postCountersIdOccupyResponseSuccess | postCountersIdOccupyResponseError)
+export type occupyCounterResponse = (occupyCounterResponseSuccess | occupyCounterResponseError)
 
-export const getPostCountersIdOccupyUrl = (id: string,) => {
+export const getOccupyCounterUrl = (id: string,) => {
 
 
 
@@ -2753,9 +2753,9 @@ export const getPostCountersIdOccupyUrl = (id: string,) => {
   return `/counters/${id}/occupy`
 }
 
-export const postCountersIdOccupy = async (id: string, options?: RequestInit): Promise<postCountersIdOccupyResponse> => {
+export const occupyCounter = async (id: string, options?: RequestInit): Promise<occupyCounterResponse> => {
 
-  return orvalMutator<postCountersIdOccupyResponse>(getPostCountersIdOccupyUrl(id),
+  return orvalMutator<occupyCounterResponse>(getOccupyCounterUrl(id),
   {
     ...options,
     method: 'POST'
@@ -2767,11 +2767,11 @@ export const postCountersIdOccupy = async (id: string, options?: RequestInit): P
 
 
 
-export const getPostCountersIdOccupyMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postCountersIdOccupy>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof postCountersIdOccupy>>, TError,{id: string}, TContext> => {
+export const getOccupyCounterMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof occupyCounter>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof occupyCounter>>, TError,{id: string}, TContext> => {
 
-const mutationKey = ['postCountersIdOccupy'];
+const mutationKey = ['occupyCounter'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -2781,10 +2781,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postCountersIdOccupy>>, {id: string}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof occupyCounter>>, {id: string}> = (props) => {
           const {id} = props ?? {};
 
-          return  postCountersIdOccupy(id,requestOptions)
+          return  occupyCounter(id,requestOptions)
         }
 
 
@@ -2794,22 +2794,22 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PostCountersIdOccupyMutationResult = NonNullable<Awaited<ReturnType<typeof postCountersIdOccupy>>>
+    export type OccupyCounterMutationResult = NonNullable<Awaited<ReturnType<typeof occupyCounter>>>
 
-    export type PostCountersIdOccupyMutationError = string
+    export type OccupyCounterMutationError = string
 
     /**
  * @summary Occupy counter
  */
-export const usePostCountersIdOccupy = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postCountersIdOccupy>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const useOccupyCounter = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof occupyCounter>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof postCountersIdOccupy>>,
+        Awaited<ReturnType<typeof occupyCounter>>,
         TError,
         {id: string},
         TContext
       > => {
-      return useMutation(getPostCountersIdOccupyMutationOptions(options), queryClient);
+      return useMutation(getOccupyCounterMutationOptions(options), queryClient);
     }
 
 /**

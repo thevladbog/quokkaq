@@ -3,8 +3,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  getPlatformListCompaniesQueryKey,
-  platformListCompanies
+  getListCompaniesQueryKey,
+  listCompanies
 } from '@/lib/api/generated/platform';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -40,8 +40,8 @@ export default function PlatformCompaniesPage() {
   } as const;
 
   const { data, isLoading, error } = useQuery({
-    queryKey: getPlatformListCompaniesQueryKey(listParams),
-    queryFn: async () => (await platformListCompanies(listParams)).data
+    queryKey: getListCompaniesQueryKey(listParams),
+    queryFn: async () => (await listCompanies(listParams)).data
   });
 
   return (

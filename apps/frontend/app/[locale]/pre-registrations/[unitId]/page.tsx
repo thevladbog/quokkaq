@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog';
-import { getGetUnitsIdQueryKey } from '@/lib/api/generated/units';
+import { getGetUnitByIDQueryKey } from '@/lib/api/generated/units';
 import { unitsApi, PreRegistration } from '@/lib/api';
 import { PreRegistrationTable } from '@/components/pre-registration/PreRegistrationTable';
 import { PreRegistrationForm } from '@/components/pre-registration/PreRegistrationForm';
@@ -38,7 +38,7 @@ export default function UnitPreRegistrationsPage({
   useSyncActiveUnit(unitId);
 
   const { data: unit } = useQuery({
-    queryKey: getGetUnitsIdQueryKey(unitId),
+    queryKey: getGetUnitByIDQueryKey(unitId),
     queryFn: () => unitsApi.getById(unitId)
   });
 

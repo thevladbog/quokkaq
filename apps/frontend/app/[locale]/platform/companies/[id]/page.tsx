@@ -7,15 +7,15 @@ import type {
   HandlersPatchPlatformSubscriptionBody
 } from '@/lib/api/generated/platform';
 import {
-  getGetPlatformCompaniesIdQueryKey,
-  getGetPlatformFeaturesQueryKey,
-  getGetPlatformSubscriptionPlansQueryKey,
-  getPlatformCompaniesId,
-  getPlatformFeatures,
-  getPlatformSubscriptionPlans,
-  getPlatformListCompaniesQueryKey,
-  patchPlatformCompaniesId,
-  platformPatchSubscription
+  getGetCompanyQueryKey,
+  getGetFeaturesQueryKey,
+  getListSubscriptionPlansQueryKey,
+  getCompany,
+  getFeatures,
+  listSubscriptionPlans,
+  getListCompaniesQueryKey,
+  patchCompany,
+  patchSubscription
 } from '@/lib/api/generated/platform';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -182,14 +182,14 @@ function PlatformSubscriptionEditor({
         throw new Error(t('nothingToSave'));
       }
 
-      return platformPatchSubscription(
+      return patchSubscription(
         sub.id,
         body as HandlersPatchPlatformSubscriptionBody
       );
     },
     onSuccess: () => {
       qc.invalidateQueries({
-        queryKey: getGetPlatformCompaniesIdQueryKey(companyId)
+        queryKey: getGetCompanyQueryKey(companyId)
       });
       toast.success(t('toastSubscriptionSaved'));
     },
@@ -199,10 +199,10 @@ function PlatformSubscriptionEditor({
   });
 
   const clearPendingMut = useMutation({
-    mutationFn: () => platformPatchSubscription(sub.id, { clearPending: true }),
+    mutationFn: () => patchSubscription(sub.id, { clearPending: true }),
     onSuccess: () => {
       qc.invalidateQueries({
-        queryKey: getGetPlatformCompaniesIdQueryKey(companyId)
+        queryKey: getGetCompanyQueryKey(companyId)
       });
       toast.success(t('toastPendingCleared'));
     },
@@ -371,14 +371,14 @@ function PlatformCompanyPaymentAccountsSection({
         const msg = p.error.issues.map((i) => i.message).join('; ');
         throw new Error(msg);
       }
-      return patchPlatformCompaniesId(companyId, {
+      return patchCompany(companyId, {
         paymentAccounts:
           p.data as HandlersPatchPlatformCompanyBody['paymentAccounts']
       });
     },
     onSuccess: () => {
       void qc.invalidateQueries({
-        queryKey: getGetPlatformCompaniesIdQueryKey(companyId)
+        queryKey: getGetCompanyQueryKey(companyId)
       });
       toast.success(t('toastPaymentAccountsSaved'));
     },
@@ -440,13 +440,13 @@ function PlatformCompanyCounterpartySection({
         const msg = p.error.issues.map((i) => i.message).join('; ');
         throw new Error(msg);
       }
-      return patchPlatformCompaniesId(companyId, {
+      return patchCompany(companyId, {
         counterparty: p.data as HandlersPatchPlatformCompanyBody['counterparty']
       });
     },
     onSuccess: () => {
       void qc.invalidateQueries({
-        queryKey: getGetPlatformCompaniesIdQueryKey(companyId)
+        queryKey: getGetCompanyQueryKey(companyId)
       });
       toast.success(t('toastCounterpartySaved'));
     },
@@ -517,11 +517,11 @@ function PlatformLoginPolicySection({
       if (trimmed !== '' && trimmed !== initialSlug) {
         body.slug = trimmed;
       }
-      return patchPlatformCompaniesId(companyId, body);
+      return patchCompany(companyId, body);
     },
     onSuccess: () => {
       void qc.invalidateQueries({
-        queryKey: getGetPlatformCompaniesIdQueryKey(companyId)
+        queryKey: getGetCompanyQueryKey(companyId)
       });
       toast.success(t('toastLoginPolicySaved'));
     },
@@ -603,26 +603,25 @@ export default function PlatformCompanyDetailPage() {
   const qc = useQueryClient();
 
   const { data: company, isLoading } = useQuery({
-    queryKey: getGetPlatformCompaniesIdQueryKey(id),
-    queryFn: async () => (await getPlatformCompaniesId(id)).data as Company,
+    queryKey: getGetCompanyQueryKey(id),
+    queryFn: async () => (await getCompany(id)).data as Company,
     enabled: !!id
   });
 
   const { data: platFeatures } = useQuery({
-    queryKey: getGetPlatformFeaturesQueryKey(),
-    queryFn: async () => (await getPlatformFeatures()).data,
+    queryKey: getGetFeaturesQueryKey(),
+    queryFn: async () => (await getFeatures()).data,
     enabled: !!company
   });
 
   const patchSaasOperator = useMutation({
-    mutationFn: (next: boolean) =>
-      patchPlatformCompaniesId(id, { isSaasOperator: next }),
+    mutationFn: (next: boolean) => patchCompany(id, { isSaasOperator: next }),
     onSuccess: () => {
       void qc.invalidateQueries({
-        queryKey: getGetPlatformCompaniesIdQueryKey(id)
+        queryKey: getGetCompanyQueryKey(id)
       });
       void qc.invalidateQueries({
-        queryKey: getPlatformListCompaniesQueryKey()
+        queryKey: getListCompaniesQueryKey()
       });
       toast.success(t('toastSaasOperatorUpdated'));
     },
@@ -634,8 +633,8 @@ export default function PlatformCompanyDetailPage() {
   const sub = company?.subscription;
 
   const { data: subscriptionPlans = [] } = useQuery({
-    queryKey: getGetPlatformSubscriptionPlansQueryKey(),
-    queryFn: async () => (await getPlatformSubscriptionPlans()).data,
+    queryKey: getListSubscriptionPlansQueryKey(),
+    queryFn: async () => (await listSubscriptionPlans()).data,
     enabled: !!company
   });
 

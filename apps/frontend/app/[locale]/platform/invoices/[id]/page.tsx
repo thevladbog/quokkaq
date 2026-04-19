@@ -14,12 +14,12 @@ import {
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import {
-  getGetPlatformCompaniesIdQueryKey,
-  getGetPlatformInvoicesIdQueryKey,
-  getGetPlatformInvoicesQueryKey,
-  getPlatformCompaniesId,
-  getPlatformInvoicesId,
-  patchPlatformInvoicesId
+  getGetCompanyQueryKey,
+  getPlatformGetPlatformInvoiceQueryKey,
+  getListInvoicesQueryKey,
+  getCompany,
+  platformGetPlatformInvoice,
+  patchInvoice
 } from '@/lib/api/generated/platform';
 import {
   downloadInvoicePdf,
@@ -63,15 +63,14 @@ function PlatformInvoiceReadOnly({
   const [pdfBusy, setPdfBusy] = useState(false);
 
   const { data: company, isLoading: companyLoading } = useQuery({
-    queryKey: getGetPlatformCompaniesIdQueryKey(inv.companyId!),
-    queryFn: async () =>
-      (await getPlatformCompaniesId(inv.companyId!)).data as Company,
+    queryKey: getGetCompanyQueryKey(inv.companyId!),
+    queryFn: async () => (await getCompany(inv.companyId!)).data as Company,
     enabled: !!inv.companyId?.trim()
   });
 
   const patch = useMutation({
     mutationFn: ({ status }: { status: (typeof INV_STATUSES)[number] }) =>
-      patchPlatformInvoicesId(inv.id, { status }),
+      patchInvoice(inv.id, { status }),
     onSuccess: () => {
       toast.success(
         tInv('toastStatusUpdated', {
@@ -79,10 +78,10 @@ function PlatformInvoiceReadOnly({
         })
       );
       void qc.invalidateQueries({
-        queryKey: getGetPlatformInvoicesIdQueryKey(inv.id)
+        queryKey: getPlatformGetPlatformInvoiceQueryKey(inv.id)
       });
       void qc.invalidateQueries({
-        queryKey: getGetPlatformInvoicesQueryKey()
+        queryKey: getListInvoicesQueryKey()
       });
     },
     onError: (err) => {
@@ -270,8 +269,8 @@ export default function PlatformInvoiceDetailPage() {
     isLoading,
     isError
   } = useQuery({
-    queryKey: getGetPlatformInvoicesIdQueryKey(id),
-    queryFn: async () => (await getPlatformInvoicesId(id)).data as Invoice,
+    queryKey: getPlatformGetPlatformInvoiceQueryKey(id),
+    queryFn: async () => (await platformGetPlatformInvoice(id)).data as Invoice,
     enabled: !!id
   });
 

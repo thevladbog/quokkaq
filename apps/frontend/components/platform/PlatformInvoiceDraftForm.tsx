@@ -12,19 +12,19 @@ import type {
 } from '@/lib/api/generated/platform';
 import {
   getGetPlatformCatalogItemsQueryKey,
-  getGetPlatformCompaniesIdQueryKey,
-  getGetPlatformInvoicesIdQueryKey,
-  getGetPlatformInvoicesQueryKey,
-  getGetPlatformSubscriptionPlansQueryKey,
+  getGetCompanyQueryKey,
+  getPlatformGetPlatformInvoiceQueryKey,
+  getListInvoicesQueryKey,
+  getListSubscriptionPlansQueryKey,
   getPlatformCatalogItems,
-  getPlatformCompaniesId,
-  getPlatformInvoicesId,
-  getPlatformSubscriptionPlans,
-  getPlatformListCompaniesQueryKey,
-  patchPlatformInvoicesIdDraft,
-  platformListCompanies,
-  postPlatformInvoices,
-  postPlatformInvoicesIdIssue
+  getCompany,
+  platformGetPlatformInvoice,
+  listSubscriptionPlans,
+  getListCompaniesQueryKey,
+  platformPatchInvoiceDraft,
+  listCompanies,
+  platformCreateInvoice,
+  platformIssueInvoice
 } from '@/lib/api/generated/platform';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -173,8 +173,8 @@ export function PlatformInvoiceDraftForm({
     isError: companiesQueryError,
     error: companiesErrorObj
   } = useQuery({
-    queryKey: getPlatformListCompaniesQueryKey({ limit: 200 }),
-    queryFn: async () => (await platformListCompanies({ limit: 200 })).data,
+    queryKey: getListCompaniesQueryKey({ limit: 200 }),
+    queryFn: async () => (await listCompanies({ limit: 200 })).data,
     enabled: !isEdit
   });
 
@@ -194,8 +194,8 @@ export function PlatformInvoiceDraftForm({
     isError: companyForEditQueryError,
     error: companyForEditErrorObj
   } = useQuery({
-    queryKey: getGetPlatformCompaniesIdQueryKey(companyId),
-    queryFn: async () => (await getPlatformCompaniesId(companyId)).data,
+    queryKey: getGetCompanyQueryKey(companyId),
+    queryFn: async () => (await getCompany(companyId)).data,
     enabled: isEdit && !!companyId.trim()
   });
 
@@ -224,9 +224,9 @@ export function PlatformInvoiceDraftForm({
     isError: plansQueryError,
     error: plansErrorObj
   } = useQuery({
-    queryKey: getGetPlatformSubscriptionPlansQueryKey(),
+    queryKey: getListSubscriptionPlansQueryKey(),
     queryFn: async () =>
-      (await getPlatformSubscriptionPlans()).data as ModelsSubscriptionPlan[]
+      (await listSubscriptionPlans()).data as ModelsSubscriptionPlan[]
   });
 
   const referenceDataBlocked =
@@ -384,7 +384,7 @@ export function PlatformInvoiceDraftForm({
         rows,
         intlLocale
       );
-      return postPlatformInvoices(body as HandlersInvoiceDraftCreateBody);
+      return platformCreateInvoice(body as HandlersInvoiceDraftCreateBody);
     },
     onSuccess: (res) => {
       const invId = (res.data as ModelsInvoice | undefined)?.id;
@@ -396,7 +396,7 @@ export function PlatformInvoiceDraftForm({
         t('toastDraftCreated', { defaultValue: 'Draft invoice created.' })
       );
       void qc.invalidateQueries({
-        queryKey: getGetPlatformInvoicesQueryKey()
+        queryKey: getListInvoicesQueryKey()
       });
       router.push(`/platform/invoices/${invId}`);
     },
@@ -416,7 +416,7 @@ export function PlatformInvoiceDraftForm({
         rows,
         intlLocale
       );
-      return patchPlatformInvoicesIdDraft(
+      return platformPatchInvoiceDraft(
         initialInvoice.id,
         body as HandlersInvoiceDraftUpsertBody
       );
@@ -424,11 +424,11 @@ export function PlatformInvoiceDraftForm({
     onSuccess: () => {
       toast.success(t('toastDraftSaved', { defaultValue: 'Draft saved.' }));
       void qc.invalidateQueries({
-        queryKey: getGetPlatformInvoicesQueryKey()
+        queryKey: getListInvoicesQueryKey()
       });
       if (initialInvoice?.id) {
         void qc.invalidateQueries({
-          queryKey: getGetPlatformInvoicesIdQueryKey(initialInvoice.id)
+          queryKey: getPlatformGetPlatformInvoiceQueryKey(initialInvoice.id)
         });
       }
     },
@@ -452,21 +452,21 @@ export function PlatformInvoiceDraftForm({
         intlLocale
       );
 
-      const snapshotRes = await getPlatformInvoicesId(id);
+      const snapshotRes = await platformGetPlatformInvoice(id);
       const snapshot = snapshotRes.data as Invoice;
       const originalBody = invoiceToDraftUpsertBody(snapshot);
 
-      await patchPlatformInvoicesIdDraft(
+      await platformPatchInvoiceDraft(
         id,
         body as HandlersInvoiceDraftUpsertBody
       );
       try {
-        return await postPlatformInvoicesIdIssue(id);
+        return await platformIssueInvoice(id);
       } catch (issueErr) {
         const detail =
           issueErr instanceof Error ? issueErr.message : String(issueErr);
         try {
-          await patchPlatformInvoicesIdDraft(
+          await platformPatchInvoiceDraft(
             id,
             originalBody as HandlersInvoiceDraftUpsertBody
           );
@@ -490,22 +490,22 @@ export function PlatformInvoiceDraftForm({
     onSuccess: async () => {
       toast.success(t('toastIssued', { defaultValue: 'Invoice issued.' }));
       void qc.invalidateQueries({
-        queryKey: getGetPlatformInvoicesQueryKey()
+        queryKey: getListInvoicesQueryKey()
       });
       if (initialInvoice?.id) {
         await qc.invalidateQueries({
-          queryKey: getGetPlatformInvoicesIdQueryKey(initialInvoice.id)
+          queryKey: getPlatformGetPlatformInvoiceQueryKey(initialInvoice.id)
         });
       }
     },
     onError: (err) => {
       toastMutationError(err);
       void qc.invalidateQueries({
-        queryKey: getGetPlatformInvoicesQueryKey()
+        queryKey: getListInvoicesQueryKey()
       });
       if (initialInvoice?.id) {
         void qc.invalidateQueries({
-          queryKey: getGetPlatformInvoicesIdQueryKey(initialInvoice.id)
+          queryKey: getPlatformGetPlatformInvoiceQueryKey(initialInvoice.id)
         });
       }
     }

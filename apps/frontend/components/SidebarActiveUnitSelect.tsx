@@ -6,7 +6,7 @@ import { useTranslations } from 'next-intl';
 import { Building2 } from 'lucide-react';
 import { usePathname, useRouter } from '@/src/i18n/navigation';
 import { useActiveUnit } from '@/contexts/ActiveUnitContext';
-import { getGetUnitsIdQueryKey } from '@/lib/api/generated/units';
+import { getGetUnitByIDQueryKey } from '@/lib/api/generated/units';
 import { unitsApi } from '@/lib/api';
 import {
   Select,
@@ -34,7 +34,7 @@ export function SidebarActiveUnitSelect({ className }: { className?: string }) {
 
   const queries = useQueries({
     queries: assignableUnitIds.map((id) => ({
-      queryKey: getGetUnitsIdQueryKey(id),
+      queryKey: getGetUnitByIDQueryKey(id),
       queryFn: () => unitsApi.getById(id),
       enabled: assignableUnitIds.length > 0,
       staleTime: 5 * 60 * 1000

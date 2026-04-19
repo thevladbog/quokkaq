@@ -10,9 +10,9 @@ import type {
 import {
   deletePlatformCatalogItemsId,
   getGetPlatformCatalogItemsQueryKey,
-  getGetPlatformSubscriptionPlansQueryKey,
+  getListSubscriptionPlansQueryKey,
   getPlatformCatalogItems,
-  getPlatformSubscriptionPlans,
+  listSubscriptionPlans,
   patchPlatformCatalogItemsId,
   postPlatformCatalogItems
 } from '@/lib/api/generated/platform';
@@ -100,8 +100,8 @@ export default function PlatformCatalogItemsPage() {
     error: plansError,
     isLoading: plansLoading
   } = useQuery({
-    queryKey: getGetPlatformSubscriptionPlansQueryKey(),
-    queryFn: async () => (await getPlatformSubscriptionPlans()).data
+    queryKey: getListSubscriptionPlansQueryKey(),
+    queryFn: async () => (await listSubscriptionPlans()).data
   });
 
   const items = (data?.items ?? []) as CatalogItem[];

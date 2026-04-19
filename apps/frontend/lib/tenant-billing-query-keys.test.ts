@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   getGetInvoicesIdQueryKey,
-  getGetInvoicesMeQueryKey,
+  getGetMyInvoicesQueryKey,
   getGetInvoicesMeVendorQueryKey,
   getGetSubscriptionPlansQueryKey,
   getGetMySubscriptionQueryKey
@@ -9,7 +9,7 @@ import {
 
 describe('tenant-billing query keys', () => {
   it('uses path-shaped keys so billing screens align with Orval invalidation', () => {
-    expect(getGetInvoicesMeQueryKey()).toEqual(['/invoices/me']);
+    expect(getGetMyInvoicesQueryKey()).toEqual(['/invoices/me']);
     expect(getGetInvoicesMeVendorQueryKey()).toEqual(['/invoices/me/vendor']);
     expect(getGetMySubscriptionQueryKey()).toEqual(['/subscriptions/me']);
     expect(getGetSubscriptionPlansQueryKey()).toEqual(['/subscriptions/plans']);

@@ -1918,41 +1918,41 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
  * Returns invoices for the authenticated user's company
  * @summary Get Current User's Invoices
  */
-export type getInvoicesMeResponse200 = {
+export type getMyInvoicesResponse200 = {
   data: ModelsInvoice[]
   status: 200
 }
 
-export type getInvoicesMeResponse401 = {
+export type getMyInvoicesResponse401 = {
   data: string
   status: 401
 }
 
-export type getInvoicesMeResponse403 = {
+export type getMyInvoicesResponse403 = {
   data: string
   status: 403
 }
 
-export type getInvoicesMeResponse404 = {
+export type getMyInvoicesResponse404 = {
   data: string
   status: 404
 }
 
-export type getInvoicesMeResponse500 = {
+export type getMyInvoicesResponse500 = {
   data: string
   status: 500
 }
 
-export type getInvoicesMeResponseSuccess = (getInvoicesMeResponse200) & {
+export type getMyInvoicesResponseSuccess = (getMyInvoicesResponse200) & {
   headers: Headers;
 };
-export type getInvoicesMeResponseError = (getInvoicesMeResponse401 | getInvoicesMeResponse403 | getInvoicesMeResponse404 | getInvoicesMeResponse500) & {
+export type getMyInvoicesResponseError = (getMyInvoicesResponse401 | getMyInvoicesResponse403 | getMyInvoicesResponse404 | getMyInvoicesResponse500) & {
   headers: Headers;
 };
 
-export type getInvoicesMeResponse = (getInvoicesMeResponseSuccess | getInvoicesMeResponseError)
+export type getMyInvoicesResponse = (getMyInvoicesResponseSuccess | getMyInvoicesResponseError)
 
-export const getGetInvoicesMeUrl = () => {
+export const getGetMyInvoicesUrl = () => {
 
 
 
@@ -1960,9 +1960,9 @@ export const getGetInvoicesMeUrl = () => {
   return `/invoices/me`
 }
 
-export const getInvoicesMe = async ( options?: RequestInit): Promise<getInvoicesMeResponse> => {
+export const getMyInvoices = async ( options?: RequestInit): Promise<getMyInvoicesResponse> => {
 
-  return orvalMutator<getInvoicesMeResponse>(getGetInvoicesMeUrl(),
+  return orvalMutator<getMyInvoicesResponse>(getGetMyInvoicesUrl(),
   {
     ...options,
     method: 'GET'
@@ -1975,69 +1975,69 @@ export const getInvoicesMe = async ( options?: RequestInit): Promise<getInvoices
 
 
 
-export const getGetInvoicesMeQueryKey = () => {
+export const getGetMyInvoicesQueryKey = () => {
     return [
     `/invoices/me`
     ] as const;
     }
 
 
-export const getGetInvoicesMeQueryOptions = <TData = Awaited<ReturnType<typeof getInvoicesMe>>, TError = string>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getInvoicesMe>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export const getGetMyInvoicesQueryOptions = <TData = Awaited<ReturnType<typeof getMyInvoices>>, TError = string>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMyInvoices>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetInvoicesMeQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetMyInvoicesQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getInvoicesMe>>> = ({ signal }) => getInvoicesMe({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMyInvoices>>> = ({ signal }) => getMyInvoices({ signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getInvoicesMe>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMyInvoices>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type GetInvoicesMeQueryResult = NonNullable<Awaited<ReturnType<typeof getInvoicesMe>>>
-export type GetInvoicesMeQueryError = string
+export type GetMyInvoicesQueryResult = NonNullable<Awaited<ReturnType<typeof getMyInvoices>>>
+export type GetMyInvoicesQueryError = string
 
 
-export function useGetInvoicesMe<TData = Awaited<ReturnType<typeof getInvoicesMe>>, TError = string>(
-  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getInvoicesMe>>, TError, TData>> & Pick<
+export function useGetMyInvoices<TData = Awaited<ReturnType<typeof getMyInvoices>>, TError = string>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMyInvoices>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getInvoicesMe>>,
+          Awaited<ReturnType<typeof getMyInvoices>>,
           TError,
-          Awaited<ReturnType<typeof getInvoicesMe>>
+          Awaited<ReturnType<typeof getMyInvoices>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetInvoicesMe<TData = Awaited<ReturnType<typeof getInvoicesMe>>, TError = string>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getInvoicesMe>>, TError, TData>> & Pick<
+export function useGetMyInvoices<TData = Awaited<ReturnType<typeof getMyInvoices>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMyInvoices>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getInvoicesMe>>,
+          Awaited<ReturnType<typeof getMyInvoices>>,
           TError,
-          Awaited<ReturnType<typeof getInvoicesMe>>
+          Awaited<ReturnType<typeof getMyInvoices>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetInvoicesMe<TData = Awaited<ReturnType<typeof getInvoicesMe>>, TError = string>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getInvoicesMe>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useGetMyInvoices<TData = Awaited<ReturnType<typeof getMyInvoices>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMyInvoices>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get Current User's Invoices
  */
 
-export function useGetInvoicesMe<TData = Awaited<ReturnType<typeof getInvoicesMe>>, TError = string>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getInvoicesMe>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useGetMyInvoices<TData = Awaited<ReturnType<typeof getMyInvoices>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMyInvoices>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetInvoicesMeQueryOptions(options)
+  const queryOptions = getGetMyInvoicesQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -2321,76 +2321,76 @@ export function useGetInvoicesId<TData = Awaited<ReturnType<typeof getInvoicesId
  * Returns application/pdf (A4 счёт на оплату with ST00012 QR). 422 if SaaS operator bank details cannot form a valid QR.
  * @summary Download invoice PDF
  */
-export type getInvoicesIdDownloadResponse200ApplicationJson = {
+export type downloadInvoiceResponse200ApplicationJson = {
   data: Blob
   status: 200
 }
 
-export type getInvoicesIdDownloadResponse200ApplicationPdf = {
+export type downloadInvoiceResponse200ApplicationPdf = {
   data: Blob
   status: 200
 }
 
-export type getInvoicesIdDownloadResponse401ApplicationJson = {
+export type downloadInvoiceResponse401ApplicationJson = {
   data: string
   status: 401
 }
 
-export type getInvoicesIdDownloadResponse401ApplicationPdf = {
+export type downloadInvoiceResponse401ApplicationPdf = {
   data: Blob
   status: 401
 }
 
-export type getInvoicesIdDownloadResponse403ApplicationJson = {
+export type downloadInvoiceResponse403ApplicationJson = {
   data: string
   status: 403
 }
 
-export type getInvoicesIdDownloadResponse403ApplicationPdf = {
+export type downloadInvoiceResponse403ApplicationPdf = {
   data: Blob
   status: 403
 }
 
-export type getInvoicesIdDownloadResponse404ApplicationJson = {
+export type downloadInvoiceResponse404ApplicationJson = {
   data: string
   status: 404
 }
 
-export type getInvoicesIdDownloadResponse404ApplicationPdf = {
+export type downloadInvoiceResponse404ApplicationPdf = {
   data: Blob
   status: 404
 }
 
-export type getInvoicesIdDownloadResponse422ApplicationJson = {
+export type downloadInvoiceResponse422ApplicationJson = {
   data: HandlersInvoicePDFPrerequisiteError
   status: 422
 }
 
-export type getInvoicesIdDownloadResponse422ApplicationPdf = {
+export type downloadInvoiceResponse422ApplicationPdf = {
   data: Blob
   status: 422
 }
 
-export type getInvoicesIdDownloadResponse500ApplicationJson = {
+export type downloadInvoiceResponse500ApplicationJson = {
   data: string
   status: 500
 }
 
-export type getInvoicesIdDownloadResponse500ApplicationPdf = {
+export type downloadInvoiceResponse500ApplicationPdf = {
   data: Blob
   status: 500
 }
 
-export type getInvoicesIdDownloadResponseSuccess = (getInvoicesIdDownloadResponse200ApplicationJson | getInvoicesIdDownloadResponse200ApplicationPdf) & {
+export type downloadInvoiceResponseSuccess = (downloadInvoiceResponse200ApplicationJson | downloadInvoiceResponse200ApplicationPdf) & {
   headers: Headers;
 };
-export type getInvoicesIdDownloadResponseError = (getInvoicesIdDownloadResponse401ApplicationJson | getInvoicesIdDownloadResponse401ApplicationPdf | getInvoicesIdDownloadResponse403ApplicationJson | getInvoicesIdDownloadResponse403ApplicationPdf | getInvoicesIdDownloadResponse404ApplicationJson | getInvoicesIdDownloadResponse404ApplicationPdf | getInvoicesIdDownloadResponse422ApplicationJson | getInvoicesIdDownloadResponse422ApplicationPdf | getInvoicesIdDownloadResponse500ApplicationJson | getInvoicesIdDownloadResponse500ApplicationPdf) & {
+export type downloadInvoiceResponseError = (downloadInvoiceResponse401ApplicationJson | downloadInvoiceResponse401ApplicationPdf | downloadInvoiceResponse403ApplicationJson | downloadInvoiceResponse403ApplicationPdf | downloadInvoiceResponse404ApplicationJson | downloadInvoiceResponse404ApplicationPdf | downloadInvoiceResponse422ApplicationJson | downloadInvoiceResponse422ApplicationPdf | downloadInvoiceResponse500ApplicationJson | downloadInvoiceResponse500ApplicationPdf) & {
   headers: Headers;
 };
 
-export type getInvoicesIdDownloadResponse = (getInvoicesIdDownloadResponseSuccess | getInvoicesIdDownloadResponseError)
+export type downloadInvoiceResponse = (downloadInvoiceResponseSuccess | downloadInvoiceResponseError)
 
-export const getGetInvoicesIdDownloadUrl = (id: string,) => {
+export const getDownloadInvoiceUrl = (id: string,) => {
 
 
 
@@ -2398,9 +2398,9 @@ export const getGetInvoicesIdDownloadUrl = (id: string,) => {
   return `/invoices/${id}/download`
 }
 
-export const getInvoicesIdDownload = async (id: string, options?: RequestInit): Promise<getInvoicesIdDownloadResponse> => {
+export const downloadInvoice = async (id: string, options?: RequestInit): Promise<downloadInvoiceResponse> => {
 
-  return orvalMutator<getInvoicesIdDownloadResponse>(getGetInvoicesIdDownloadUrl(id),
+  return orvalMutator<downloadInvoiceResponse>(getDownloadInvoiceUrl(id),
   {
     ...options,
     method: 'GET'
@@ -2413,69 +2413,69 @@ export const getInvoicesIdDownload = async (id: string, options?: RequestInit): 
 
 
 
-export const getGetInvoicesIdDownloadQueryKey = (id: string,) => {
+export const getDownloadInvoiceQueryKey = (id: string,) => {
     return [
     `/invoices/${id}/download`
     ] as const;
     }
 
 
-export const getGetInvoicesIdDownloadQueryOptions = <TData = Awaited<ReturnType<typeof getInvoicesIdDownload>>, TError = string | Blob | HandlersInvoicePDFPrerequisiteError>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getInvoicesIdDownload>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export const getDownloadInvoiceQueryOptions = <TData = Awaited<ReturnType<typeof downloadInvoice>>, TError = string | Blob | HandlersInvoicePDFPrerequisiteError>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadInvoice>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetInvoicesIdDownloadQueryKey(id);
+  const queryKey =  queryOptions?.queryKey ?? getDownloadInvoiceQueryKey(id);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getInvoicesIdDownload>>> = ({ signal }) => getInvoicesIdDownload(id, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadInvoice>>> = ({ signal }) => downloadInvoice(id, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getInvoicesIdDownload>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof downloadInvoice>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type GetInvoicesIdDownloadQueryResult = NonNullable<Awaited<ReturnType<typeof getInvoicesIdDownload>>>
-export type GetInvoicesIdDownloadQueryError = string | Blob | HandlersInvoicePDFPrerequisiteError
+export type DownloadInvoiceQueryResult = NonNullable<Awaited<ReturnType<typeof downloadInvoice>>>
+export type DownloadInvoiceQueryError = string | Blob | HandlersInvoicePDFPrerequisiteError
 
 
-export function useGetInvoicesIdDownload<TData = Awaited<ReturnType<typeof getInvoicesIdDownload>>, TError = string | Blob | HandlersInvoicePDFPrerequisiteError>(
- id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getInvoicesIdDownload>>, TError, TData>> & Pick<
+export function useDownloadInvoice<TData = Awaited<ReturnType<typeof downloadInvoice>>, TError = string | Blob | HandlersInvoicePDFPrerequisiteError>(
+ id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadInvoice>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getInvoicesIdDownload>>,
+          Awaited<ReturnType<typeof downloadInvoice>>,
           TError,
-          Awaited<ReturnType<typeof getInvoicesIdDownload>>
+          Awaited<ReturnType<typeof downloadInvoice>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetInvoicesIdDownload<TData = Awaited<ReturnType<typeof getInvoicesIdDownload>>, TError = string | Blob | HandlersInvoicePDFPrerequisiteError>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getInvoicesIdDownload>>, TError, TData>> & Pick<
+export function useDownloadInvoice<TData = Awaited<ReturnType<typeof downloadInvoice>>, TError = string | Blob | HandlersInvoicePDFPrerequisiteError>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadInvoice>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getInvoicesIdDownload>>,
+          Awaited<ReturnType<typeof downloadInvoice>>,
           TError,
-          Awaited<ReturnType<typeof getInvoicesIdDownload>>
+          Awaited<ReturnType<typeof downloadInvoice>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetInvoicesIdDownload<TData = Awaited<ReturnType<typeof getInvoicesIdDownload>>, TError = string | Blob | HandlersInvoicePDFPrerequisiteError>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getInvoicesIdDownload>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useDownloadInvoice<TData = Awaited<ReturnType<typeof downloadInvoice>>, TError = string | Blob | HandlersInvoicePDFPrerequisiteError>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadInvoice>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Download invoice PDF
  */
 
-export function useGetInvoicesIdDownload<TData = Awaited<ReturnType<typeof getInvoicesIdDownload>>, TError = string | Blob | HandlersInvoicePDFPrerequisiteError>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getInvoicesIdDownload>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useDownloadInvoice<TData = Awaited<ReturnType<typeof downloadInvoice>>, TError = string | Blob | HandlersInvoicePDFPrerequisiteError>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadInvoice>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetInvoicesIdDownloadQueryOptions(id,options)
+  const queryOptions = getDownloadInvoiceQueryOptions(id,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

@@ -40,7 +40,8 @@ export default defineConfig({
         test: {
           name: 'component-jsdom',
           environment: 'jsdom',
-          include: ['**/*.test.tsx']
+          include: ['**/*.test.tsx'],
+          exclude: ['**/node_modules/**', '**/.next/**', '**/dist/**']
         }
       }
     ]
