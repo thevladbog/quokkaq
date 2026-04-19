@@ -34,7 +34,7 @@ func (fakeAuthExchange) IssueTokenPairForUserID(string) (*TokenPair, error) {
 
 func TestExchangeFinishCode_MissingCode(t *testing.T) {
 	t.Parallel()
-	svc := NewSSOService(testsupport.PanicCompanyRepo{}, testsupport.PanicUserRepo{}, testsupport.PanicSSORepo{}, testsupport.PanicUnitRepo{}, fakeAuthExchange{})
+	svc := NewSSOService(testsupport.PanicCompanyRepo{}, testsupport.PanicUserRepo{}, testsupport.PanicSSORepo{}, testsupport.PanicUnitRepo{}, nil, fakeAuthExchange{})
 	_, err := svc.ExchangeFinishCode(context.Background(), "   ")
 	if err == nil {
 		t.Fatal("expected error")
@@ -43,7 +43,7 @@ func TestExchangeFinishCode_MissingCode(t *testing.T) {
 
 func TestExchangeFinishCode_RedisDisabled(t *testing.T) {
 	t.Setenv("SSO_REDIS_DISABLED", "true")
-	svc := NewSSOService(testsupport.PanicCompanyRepo{}, testsupport.PanicUserRepo{}, testsupport.PanicSSORepo{}, testsupport.PanicUnitRepo{}, fakeAuthExchange{})
+	svc := NewSSOService(testsupport.PanicCompanyRepo{}, testsupport.PanicUserRepo{}, testsupport.PanicSSORepo{}, testsupport.PanicUnitRepo{}, nil, fakeAuthExchange{})
 	_, err := svc.ExchangeFinishCode(context.Background(), "sometoken")
 	if err == nil {
 		t.Fatal("expected error when redis unavailable")
@@ -52,7 +52,7 @@ func TestExchangeFinishCode_RedisDisabled(t *testing.T) {
 
 func TestTenantHint_ChooseSlugWhenNoAtSign(t *testing.T) {
 	t.Parallel()
-	svc := NewSSOService(testsupport.PanicCompanyRepo{}, testsupport.PanicUserRepo{}, testsupport.PanicSSORepo{}, testsupport.PanicUnitRepo{}, fakeAuthExchange{})
+	svc := NewSSOService(testsupport.PanicCompanyRepo{}, testsupport.PanicUserRepo{}, testsupport.PanicSSORepo{}, testsupport.PanicUnitRepo{}, nil, fakeAuthExchange{})
 	out := svc.TenantHint("not-an-email")
 	if out.Next != "choose_slug" || out.SsoAvailable {
 		t.Fatalf("got %+v", out)
@@ -61,7 +61,7 @@ func TestTenantHint_ChooseSlugWhenNoAtSign(t *testing.T) {
 
 func TestPublicTenantBySlug_StrictNotFound(t *testing.T) {
 	t.Parallel()
-	svc := NewSSOService(testsupport.StrictPublicTenantCompanyRepo{}, testsupport.PanicUserRepo{}, testsupport.PanicSSORepo{}, testsupport.PanicUnitRepo{}, fakeAuthExchange{})
+	svc := NewSSOService(testsupport.StrictPublicTenantCompanyRepo{}, testsupport.PanicUserRepo{}, testsupport.PanicSSORepo{}, testsupport.PanicUnitRepo{}, nil, fakeAuthExchange{})
 	_, err := svc.PublicTenantBySlug("acme-corp")
 	if err == nil || !errors.Is(err, gorm.ErrRecordNotFound) {
 		t.Fatalf("want ErrRecordNotFound, got %v", err)

@@ -216,6 +216,55 @@ func (s *SSOService) BeginSAMLAuth(ctx context.Context, w http.ResponseWriter, r
 	return nil
 }
 
+func displayNameFromSAMLAssertion(a *saml.Assertion) string {
+	if a == nil {
+		return ""
+	}
+	for _, stmt := range a.AttributeStatements {
+		for _, attr := range stmt.Attributes {
+			n := strings.ToLower(attr.Name)
+			if strings.Contains(n, "displayname") || n == "name" || strings.Contains(n, "givenname") {
+				for _, v := range attr.Values {
+					t := strings.TrimSpace(v.Value)
+					if t != "" {
+						return t
+					}
+				}
+			}
+		}
+	}
+	return ""
+}
+
+// groupsFromSAMLAssertion collects group identifiers from common SAML attribute names (AD FS, Azure).
+func groupsFromSAMLAssertion(a *saml.Assertion) []string {
+	if a == nil {
+		return nil
+	}
+	var out []string
+	seen := make(map[string]struct{})
+	for _, stmt := range a.AttributeStatements {
+		for _, attr := range stmt.Attributes {
+			n := strings.ToLower(attr.Name)
+			if strings.Contains(n, "group") || strings.Contains(n, "memberof") ||
+				strings.Contains(n, "http://schemas.microsoft.com/ws/2008/06/identity/claims/groups") {
+				for _, v := range attr.Values {
+					t := strings.TrimSpace(v.Value)
+					if t == "" {
+						continue
+					}
+					if _, ok := seen[t]; ok {
+						continue
+					}
+					seen[t] = struct{}{}
+					out = append(out, t)
+				}
+			}
+		}
+	}
+	return out
+}
+
 func emailFromSAMLAssertion(a *saml.Assertion) string {
 	if a == nil {
 		return ""
@@ -312,12 +361,13 @@ func (s *SSOService) HandleSAMLACS(ctx context.Context, w http.ResponseWriter, r
 	if sub == "" {
 		sub = email
 	}
-	displayName := ""
-	if assertion.Subject != nil && assertion.Subject.NameID != nil {
+	displayName := displayNameFromSAMLAssertion(assertion)
+	if displayName == "" && assertion.Subject != nil && assertion.Subject.NameID != nil {
 		displayName = strings.TrimSpace(assertion.Subject.NameID.Value)
 	}
+	groups := groupsFromSAMLAssertion(assertion)
 
-	user, err := s.resolveSSOUser(ctx, c, conn, iss, sub, email, displayName, true)
+	user, err := s.resolveSSOUser(ctx, c, conn, iss, sub, email, displayName, true, "")
 	if err != nil {
 		log.Printf("saml resolve user: %v", err)
 		code := ssoErrorQueryCode(err)
@@ -325,6 +375,8 @@ func (s *SSOService) HandleSAMLACS(ctx context.Context, w http.ResponseWriter, r
 		s.redirectLoginSSOError(ctx, w, r, &cid, code, "saml_acs_denied:"+code, payload.UILocale)
 		return
 	}
+
+	s.ApplyPostSSOLogin(ctx, c, user, displayName, email, true, groups, "", iss, sub)
 
 	finish := randomHex(16)
 	if err := redisstore.SetJSON(ctx, redisstore.KeyExchange(finish), map[string]string{

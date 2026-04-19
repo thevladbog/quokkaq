@@ -68,6 +68,7 @@ type authService struct {
 	companyRepo      repository.CompanyRepository
 	mailService      MailService
 	subscriptionRepo repository.SubscriptionRepository
+	tenantRBAC       repository.TenantRBACRepository
 }
 
 func NewAuthService(
@@ -75,12 +76,14 @@ func NewAuthService(
 	companyRepo repository.CompanyRepository,
 	mailService MailService,
 	subscriptionRepo repository.SubscriptionRepository,
+	tenantRBAC repository.TenantRBACRepository,
 ) AuthService {
 	return &authService{
 		userRepo:         userRepo,
 		companyRepo:      companyRepo,
 		mailService:      mailService,
 		subscriptionRepo: subscriptionRepo,
+		tenantRBAC:       tenantRBAC,
 	}
 }
 
@@ -367,6 +370,17 @@ func (s *authService) Signup(name, email, password, companyName, planCode string
 
 		if err := s.userRepo.AssignRoleTx(tx, user.ID, adminRole.ID); err != nil {
 			return fmt.Errorf("failed to assign admin role: %w", err)
+		}
+
+		sysRoleID, err := s.tenantRBAC.EnsureSystemTenantRoleTx(tx, company.ID)
+		if err != nil {
+			return fmt.Errorf("ensure system tenant role: %w", err)
+		}
+		if err := s.tenantRBAC.ReplaceUserTenantRolesTx(tx, user.ID, company.ID, []string{sysRoleID}); err != nil {
+			return fmt.Errorf("assign system tenant role: %w", err)
+		}
+		if err := s.tenantRBAC.SyncUserUnitsFromTenantRolesTx(tx, user.ID, company.ID); err != nil {
+			return fmt.Errorf("sync user units from tenant roles: %w", err)
 		}
 
 		var genErr error

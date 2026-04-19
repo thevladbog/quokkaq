@@ -43,12 +43,13 @@ type UnitAnonymousEnsurer interface {
 }
 
 type unitService struct {
-	repo      repository.UnitRepository
-	anonymous UnitAnonymousEnsurer
+	repo       repository.UnitRepository
+	anonymous  UnitAnonymousEnsurer
+	tenantRBAC repository.TenantRBACRepository
 }
 
-func NewUnitService(repo repository.UnitRepository, anonymous UnitAnonymousEnsurer) UnitService {
-	return &unitService{repo: repo, anonymous: anonymous}
+func NewUnitService(repo repository.UnitRepository, anonymous UnitAnonymousEnsurer, tenantRBAC repository.TenantRBACRepository) UnitService {
+	return &unitService{repo: repo, anonymous: anonymous, tenantRBAC: tenantRBAC}
 }
 
 func normalizeUnitKind(kind string) string {
@@ -153,6 +154,11 @@ func (s *unitService) CreateUnit(unit *models.Unit) error {
 	return s.repo.Transaction(func(tx *gorm.DB) error {
 		if err := s.repo.CreateTx(tx, unit); err != nil {
 			return err
+		}
+		if s.tenantRBAC != nil {
+			if err := s.tenantRBAC.EnsureSystemTenantRoleTRUForUnitTx(tx, unit.CompanyID, unit.ID); err != nil {
+				return err
+			}
 		}
 		if s.anonymous != nil {
 			if err := s.anonymous.EnsureAnonymousClientTx(tx, unit.ID); err != nil {

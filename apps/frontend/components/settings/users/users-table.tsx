@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import { BadgeCheck } from 'lucide-react';
+import { BadgeCheck, Ban } from 'lucide-react';
 import type { Unit, User } from '@quokkaq/shared-types';
 import { unitKindBadgeClassName } from '@/components/admin/units/unit-kind-badge-styles';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -17,8 +17,10 @@ import {
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { getUnitDisplayName } from '@/lib/unit-display';
+import { isTenantSystemAdminSlug } from '@/lib/tenant-roles';
 
 const MAX_UNIT_TAGS = 4;
+const MAX_ROLE_TAGS = 3;
 
 export interface UsersTableProps {
   users: User[];
@@ -42,6 +44,8 @@ export function UsersTable({
     () => ({
       user: t('table_column_user'),
       units: t('table_column_units'),
+      tenantRoles: t('table_column_tenant_roles'),
+      blocked: t('table_column_blocked'),
       admin: t('table_column_admin')
     }),
     [t]
@@ -67,16 +71,24 @@ export function UsersTable({
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead className='w-[40%]'>{colNames.user}</TableHead>
-          <TableHead className='w-[45%]'>{colNames.units}</TableHead>
-          <TableHead className='w-[15%] text-center'>
+          <TableHead className='w-[28%]'>{colNames.user}</TableHead>
+          <TableHead className='w-[22%]'>{colNames.units}</TableHead>
+          <TableHead className='w-[22%]'>{colNames.tenantRoles}</TableHead>
+          <TableHead className='w-[14%] text-center'>
+            {colNames.blocked}
+          </TableHead>
+          <TableHead className='w-[14%] text-center'>
             {colNames.admin}
           </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {users.map((user) => {
-          const isAdmin = user.roles?.includes('admin');
+          const isAdmin =
+            user.roles?.includes('admin') ||
+            (user.tenantRoles ?? []).some((tr) =>
+              isTenantSystemAdminSlug(tr.slug)
+            );
           const seenUnitIds = new Set<string>();
           const unitRows = (user.units ?? []).filter((uu) => {
             if (seenUnitIds.has(uu.unitId)) return false;
@@ -84,6 +96,9 @@ export function UsersTable({
             return true;
           });
           const extra = Math.max(0, unitRows.length - MAX_UNIT_TAGS);
+          const tenantRoles = user.tenantRoles ?? [];
+          const extraRoles = Math.max(0, tenantRoles.length - MAX_ROLE_TAGS);
+          const isBlocked = user.isActive === false;
 
           return (
             <TableRow
@@ -164,10 +179,42 @@ export function UsersTable({
                   ) : null}
                 </div>
               </TableCell>
+              <TableCell className='whitespace-normal'>
+                <div className='flex flex-wrap gap-1'>
+                  {tenantRoles.slice(0, MAX_ROLE_TAGS).map((tr) => (
+                    <Badge
+                      key={tr.id}
+                      variant='secondary'
+                      className='max-w-[160px] truncate font-normal'
+                      title={tr.name}
+                    >
+                      <span className='truncate'>{tr.name}</span>
+                    </Badge>
+                  ))}
+                  {extraRoles > 0 ? (
+                    <Badge variant='outline' className='font-normal'>
+                      +{extraRoles}
+                    </Badge>
+                  ) : null}
+                  {tenantRoles.length === 0 ? (
+                    <span className='text-muted-foreground text-sm'>—</span>
+                  ) : null}
+                </div>
+              </TableCell>
+              <TableCell className='text-center'>
+                {isBlocked ? (
+                  <Ban
+                    className='inline-block size-5 text-red-600 dark:text-red-500'
+                    aria-label={t('blocked_badge_aria')}
+                  />
+                ) : (
+                  <span className='text-muted-foreground'>—</span>
+                )}
+              </TableCell>
               <TableCell className='text-center'>
                 {isAdmin ? (
                   <BadgeCheck
-                    className='text-primary inline-block size-5'
+                    className='inline-block size-5 text-emerald-600 dark:text-emerald-500'
                     aria-label={t('admin_badge_aria')}
                   />
                 ) : (

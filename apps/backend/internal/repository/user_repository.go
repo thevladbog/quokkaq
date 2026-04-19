@@ -21,11 +21,16 @@ type UserRepository interface {
 	Create(user *models.User) error
 	CreateTx(tx *gorm.DB, user *models.User) error
 	FindAll(search string) ([]models.User, error)
+	// ListUsersForCompany returns users visible for the tenant: unit members, tenant-role assignments,
+	// global admin/platform_admin (same scope as HasCompanyAccess), and the company owner. Optional name/email search.
+	ListUsersForCompany(companyID string, search string) ([]models.User, error)
 	FindByID(id string) (*models.User, error)
 	FindByIDTx(tx *gorm.DB, id string) (*models.User, error)
 	FindByEmail(email string) (*models.User, error)
 	Update(user *models.User) error
 	UpdateTx(tx *gorm.DB, user *models.User) error
+	// UpdateFields applies partial column updates (e.g. SSO profile sync).
+	UpdateFields(userID string, updates map[string]interface{}) error
 	Delete(id string) error
 	AssignUnit(userID, unitID string, permissions []string) error
 	CreateUserUnitTx(tx *gorm.DB, uu *models.UserUnit) error
@@ -67,6 +72,10 @@ type UserRepository interface {
 	ShiftJournalSeesAllActivity(userID, unitID string) (bool, error)
 	// HasUnitBranchAccess is true for tenant admin, or if the user has any user_units row for the subdivision or a descendant unit in the org tree.
 	HasUnitBranchAccess(userID, subdivisionID string) (bool, error)
+	// UserHasEffectiveAccess is true if the user can log in / act: global admin or platform_admin, tenant roles, company owner, or any unit with non-empty permissions.
+	UserHasEffectiveAccess(userID string) (bool, error)
+	// RecomputeUserIsActive sets users.is_active from UserHasEffectiveAccess (call after access-changing operations).
+	RecomputeUserIsActive(userID string) error
 }
 
 type userRepository struct {
@@ -95,6 +104,41 @@ func (r *userRepository) FindAll(search string) ([]models.User, error) {
 	}
 
 	err := query.Find(&users).Error
+	return users, err
+}
+
+func (r *userRepository) ListUsersForCompany(companyID string, search string) ([]models.User, error) {
+	var ids []string
+	q := `
+		SELECT DISTINCT u.id FROM users u
+		WHERE u.id IN (
+			SELECT uu.user_id FROM user_units uu
+			INNER JOIN units un ON un.id = uu.unit_id AND un.company_id = ?
+			UNION
+			SELECT utr.user_id FROM user_tenant_roles utr WHERE utr.company_id = ?
+			UNION
+			SELECT ur.user_id FROM user_roles ur
+			INNER JOIN roles r ON r.id = ur.role_id
+			WHERE r.name IN ('admin', 'platform_admin')
+			UNION
+			SELECT c.owner_user_id FROM companies c
+			WHERE c.id = ? AND c.owner_user_id IS NOT NULL AND TRIM(c.owner_user_id) != ''
+		)`
+	args := []interface{}{companyID, companyID, companyID}
+	if strings.TrimSpace(search) != "" {
+		term := "%" + search + "%"
+		q += ` AND (u.name ILIKE ? OR COALESCE(u.email, '') ILIKE ?)`
+		args = append(args, term, term)
+	}
+	if err := r.db.Raw(q, args...).Scan(&ids).Error; err != nil {
+		return nil, err
+	}
+	if len(ids) == 0 {
+		return []models.User{}, nil
+	}
+	var users []models.User
+	err := r.db.Preload("Roles.Role").Preload("Units.Unit").Preload("Units").
+		Where("id IN ?", ids).Order("name ASC").Find(&users).Error
 	return users, err
 }
 
@@ -131,17 +175,26 @@ func (r *userRepository) Update(user *models.User) error {
 
 func (r *userRepository) UpdateTx(tx *gorm.DB, user *models.User) error {
 	updates := map[string]interface{}{
-		"name":      user.Name,
-		"email":     user.Email,
-		"phone":     user.Phone,
-		"is_active": user.IsActive,
-		"type":      user.Type,
-		"photo_url": user.PhotoURL,
+		"name":                     user.Name,
+		"email":                    user.Email,
+		"phone":                    user.Phone,
+		"is_active":                user.IsActive,
+		"type":                     user.Type,
+		"photo_url":                user.PhotoURL,
+		"exempt_from_sso_sync":     user.ExemptFromSSOSync,
+		"sso_profile_sync_opt_out": user.SSOProfileSyncOptOut,
 	}
 	if user.Password != nil {
 		updates["password"] = user.Password
 	}
 	return tx.Model(&models.User{}).Where("id = ?", user.ID).Updates(updates).Error
+}
+
+func (r *userRepository) UpdateFields(userID string, updates map[string]interface{}) error {
+	if len(updates) == 0 {
+		return nil
+	}
+	return r.db.Model(&models.User{}).Where("id = ?", userID).Updates(updates).Error
 }
 
 func (r *userRepository) Delete(id string) error {
@@ -546,4 +599,49 @@ ORDER BY name ASC NULLS LAST, u.id ASC
 LIMIT ?
 `, companyID, authorUserID, reportID, term, term, limit).Scan(&out).Error
 	return out, err
+}
+
+func (r *userRepository) UserHasEffectiveAccess(userID string) (bool, error) {
+	if strings.TrimSpace(userID) == "" {
+		return false, nil
+	}
+	ok, err := r.IsAdmin(userID)
+	if err != nil || ok {
+		return ok, err
+	}
+	ok, err = r.IsPlatformAdmin(userID)
+	if err != nil || ok {
+		return ok, err
+	}
+	var n int64
+	if err := r.db.Model(&models.UserTenantRole{}).Where("user_id = ?", userID).Count(&n).Error; err != nil {
+		return false, err
+	}
+	if n > 0 {
+		return true, nil
+	}
+	if err := r.db.Model(&models.Company{}).Where("owner_user_id = ?", userID).Count(&n).Error; err != nil {
+		return false, err
+	}
+	if n > 0 {
+		return true, nil
+	}
+	var uus []models.UserUnit
+	if err := r.db.Where("user_id = ?", userID).Find(&uus).Error; err != nil {
+		return false, err
+	}
+	for i := range uus {
+		if len(uus[i].Permissions) > 0 {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (r *userRepository) RecomputeUserIsActive(userID string) error {
+	ok, err := r.UserHasEffectiveAccess(userID)
+	if err != nil {
+		return err
+	}
+	return r.db.Model(&models.User{}).Where("id = ?", userID).Update("is_active", ok).Error
 }

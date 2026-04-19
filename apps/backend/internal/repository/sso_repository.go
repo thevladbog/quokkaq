@@ -17,6 +17,9 @@ type SSORepository interface {
 	UpsertConnection(conn *models.CompanySSOConnection) error
 	FindCompaniesByEmailDomain(domain string) ([]models.Company, []models.CompanySSOConnection, error)
 	FindExternalIdentity(issuer, subject string) (*models.UserExternalIdentity, error)
+	FindExternalIdentityByCompanyAndObjectID(companyID, externalObjectID string) (*models.UserExternalIdentity, error)
+	FindExternalIdentityByUserAndCompany(userID, companyID string) (*models.UserExternalIdentity, error)
+	UpdateExternalIdentity(id *models.UserExternalIdentity) error
 	CreateExternalIdentity(id *models.UserExternalIdentity) error
 	CreateExternalIdentityTx(tx *gorm.DB, id *models.UserExternalIdentity) error
 	FindLoginLinkByHash(tokenHash string) (*models.TenantLoginLink, error)
@@ -115,6 +118,36 @@ func (r *ssoRepository) FindExternalIdentity(issuer, subject string) (*models.Us
 		return nil, err
 	}
 	return &u, nil
+}
+
+func (r *ssoRepository) FindExternalIdentityByUserAndCompany(userID, companyID string) (*models.UserExternalIdentity, error) {
+	var u models.UserExternalIdentity
+	err := database.DB.Where("user_id = ? AND company_id = ?", userID, companyID).First(&u).Error
+	if err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
+func (r *ssoRepository) FindExternalIdentityByCompanyAndObjectID(companyID, externalObjectID string) (*models.UserExternalIdentity, error) {
+	externalObjectID = strings.TrimSpace(externalObjectID)
+	if companyID == "" || externalObjectID == "" {
+		return nil, gorm.ErrRecordNotFound
+	}
+	var u models.UserExternalIdentity
+	err := database.DB.Where("company_id = ? AND external_object_id = ?", companyID, externalObjectID).First(&u).Error
+	if err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
+func (r *ssoRepository) UpdateExternalIdentity(id *models.UserExternalIdentity) error {
+	return database.DB.Model(&models.UserExternalIdentity{}).Where("id = ?", id.ID).Updates(map[string]interface{}{
+		"issuer":             id.Issuer,
+		"subject":            id.Subject,
+		"external_object_id": id.ExternalObjectID,
+	}).Error
 }
 
 func (r *ssoRepository) CreateExternalIdentity(id *models.UserExternalIdentity) error {

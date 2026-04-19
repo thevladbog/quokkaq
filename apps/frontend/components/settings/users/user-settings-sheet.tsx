@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import type { Unit, User } from '@quokkaq/shared-types';
 import { UserProfileFields } from '@/components/settings/users/user-profile-fields';
@@ -19,6 +20,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
 import {
   Sheet,
   SheetContent,
@@ -26,17 +28,25 @@ import {
   SheetHeader,
   SheetTitle
 } from '@/components/ui/sheet';
-import { Switch } from '@/components/ui/switch';
 import {
   useAssignUserToUnit,
   useCurrentUser,
+  usePatchUserTenantRoles,
   useRemoveUserFromUnit,
   useUpdateUser,
   useUserUnits
 } from '@/lib/hooks';
+import {
+  useCompaniesMeSSOGet,
+  useGetCompaniesMeTenantRoles,
+  usePatchCompaniesMeUsersUserIdExternalIdentity,
+  usePatchCompaniesMeUsersUserIdSsoDirectory
+} from '@/lib/api/generated/auth';
 import { UNIT_PERMISSIONS } from '@/lib/unit-permissions';
 import { cn } from '@/lib/utils';
 import { getUnitDisplayName } from '@/lib/unit-display';
+import { toast } from 'sonner';
+import { isTenantSystemAdminSlug } from '@/lib/tenant-roles';
 
 interface SheetUserUnit {
   id: string;
@@ -59,9 +69,11 @@ function UserSettingsSheetBody({
 }: UserSettingsSheetBodyProps) {
   const t = useTranslations('admin.users');
   const locale = useLocale();
+  const qc = useQueryClient();
   const { data: currentUser } = useCurrentUser();
   const [editName, setEditName] = useState(user.name);
   const [searchAvailable, setSearchAvailable] = useState('');
+  const [searchTenantRoles, setSearchTenantRoles] = useState('');
   const [assigningUnitId, setAssigningUnitId] = useState<string | null>(null);
   const [assignPerms, setAssignPerms] = useState<string[]>([]);
 
@@ -75,6 +87,125 @@ function UserSettingsSheetBody({
   const assignMutation = useAssignUserToUnit();
   const removeMutation = useRemoveUserFromUnit();
   const updateUserMutation = useUpdateUser();
+  const patchTenantRoles = usePatchUserTenantRoles();
+
+  const rolesCatalogQ = useGetCompaniesMeTenantRoles({
+    query: { enabled: open }
+  });
+  const tenantRolesCatalog = useMemo(
+    () =>
+      rolesCatalogQ.data?.status === 200 ? (rolesCatalogQ.data.data ?? []) : [],
+    [rolesCatalogQ.data]
+  );
+  const showTenantRolesBlock =
+    open && rolesCatalogQ.isSuccess && rolesCatalogQ.data?.status === 200;
+
+  const filteredTenantRolesCatalog = useMemo(() => {
+    const q = searchTenantRoles.trim().toLowerCase();
+    if (!q) {
+      return tenantRolesCatalog;
+    }
+    return tenantRolesCatalog.filter((r) => {
+      const name = (r.name ?? '').toLowerCase();
+      const slug = (r.slug ?? '').toLowerCase();
+      return name.includes(q) || slug.includes(q);
+    });
+  }, [tenantRolesCatalog, searchTenantRoles]);
+
+  const selectedTenantIds = useMemo(
+    () => new Set((user.tenantRoles ?? []).map((r) => r.id)),
+    [user.tenantRoles]
+  );
+
+  const viewerCanAssignSystemTenantRole =
+    currentUser?.roles?.includes('platform_admin') ||
+    currentUser?.roles?.includes('admin') ||
+    (currentUser?.tenantRoles ?? []).some((r) =>
+      isTenantSystemAdminSlug(r.slug)
+    );
+
+  const targetHasSystemTenantAdmin = (user.tenantRoles ?? []).some((r) =>
+    isTenantSystemAdminSlug(r.slug)
+  );
+
+  const toggleTenantRole = async (
+    roleId: string,
+    roleSlug: string | undefined,
+    checked: boolean
+  ) => {
+    let next = new Set(selectedTenantIds);
+    const sysCatalog = tenantRolesCatalog.find((r) =>
+      isTenantSystemAdminSlug(r.slug)
+    );
+    if (isTenantSystemAdminSlug(roleSlug)) {
+      if (checked) {
+        next = new Set(roleId ? [roleId] : []);
+      } else {
+        next.delete(roleId);
+      }
+    } else {
+      if (checked) {
+        if (sysCatalog?.id) next.delete(sysCatalog.id);
+        next.add(roleId);
+      } else {
+        next.delete(roleId);
+      }
+    }
+    try {
+      await patchTenantRoles.mutateAsync({
+        userId: user.id,
+        tenantRoleIds: Array.from(next)
+      });
+      toast.success(t('tenant_roles_saved'));
+    } catch {
+      toast.error(t('tenant_roles_error'));
+    }
+  };
+
+  const patchSsoFlags = usePatchCompaniesMeUsersUserIdSsoDirectory({
+    mutation: {
+      onSuccess: (res) => {
+        if (res.status === 200) {
+          void qc.invalidateQueries({ queryKey: ['users'] });
+          toast.success(t('sso_flags_saved'));
+        } else {
+          toast.error(t('sso_flags_error'));
+        }
+      },
+      onError: () => toast.error(t('sso_flags_error'))
+    }
+  });
+
+  const patchExternalId = usePatchCompaniesMeUsersUserIdExternalIdentity({
+    mutation: {
+      onSuccess: (res) => {
+        if (res.status === 200) {
+          void qc.invalidateQueries({ queryKey: ['users'] });
+          toast.success(t('sso_external_saved'));
+          if (res.data) {
+            setExtIssuer(res.data.issuer ?? '');
+            setExtSubject(res.data.subject ?? '');
+            setExtOid(res.data.externalObjectId ?? '');
+          }
+        } else if (res.status === 404) {
+          toast.error(t('sso_external_not_found'));
+        } else {
+          toast.error(t('sso_external_error'));
+        }
+      },
+      onError: () => toast.error(t('sso_external_error'))
+    }
+  });
+
+  const [exemptSync, setExemptSync] = useState(
+    () => user.exemptFromSsoSync ?? false
+  );
+  const [profileOptOut, setProfileOptOut] = useState(
+    () => user.ssoProfileSyncOptOut ?? false
+  );
+  const [extIssuer, setExtIssuer] = useState('');
+  const [extSubject, setExtSubject] = useState('');
+  const [extOid, setExtOid] = useState('');
 
   const userUnits = useMemo(() => {
     const raw = ((userUnitsRaw ?? []) as SheetUserUnit[]).map((uu) => ({
@@ -132,7 +263,23 @@ function UserSettingsSheetBody({
       });
   }, [availableUnits, selectedUnitIds, searchAvailable, locale]);
 
-  const isSystemAdmin = user?.roles?.includes('admin');
+  /** Global roles with org-wide access; unit/tenant-role matrices are not applied. */
+  const isFullAccessGlobalRole =
+    user?.roles?.includes('admin') ||
+    user?.roles?.includes('platform_admin') ||
+    targetHasSystemTenantAdmin;
+  /** Tenant roles drive user_units via sync; manual per-unit permissions would collide. */
+  const hasTenantRoles = (user.tenantRoles?.length ?? 0) > 0;
+  const unitManualAccessLocked = isFullAccessGlobalRole || hasTenantRoles;
+  const viewerIsGlobalAdmin = currentUser?.roles?.includes('admin');
+
+  const ssoSettingsQ = useCompaniesMeSSOGet({
+    query: { enabled: open && !!viewerIsGlobalAdmin }
+  });
+  const showSsoDirectoryBlock =
+    !!viewerIsGlobalAdmin &&
+    ssoSettingsQ.data?.status === 200 &&
+    ssoSettingsQ.data.data?.enabled === true;
 
   const getPermissionLabel = (permissionId: string) =>
     (t as (key: string) => string)(`permissions_list.${permissionId}`) ||
@@ -157,19 +304,6 @@ function UserSettingsSheetBody({
     await updateUserMutation.mutateAsync({
       userId: user.id,
       data: { photoUrl: '' }
-    });
-  };
-
-  const handleToggleAdmin = async (checked: boolean) => {
-    const base = [...(user.roles ?? [])];
-    const nextRoles = checked
-      ? base.includes('admin')
-        ? base
-        : [...base, 'admin']
-      : base.filter((r) => r !== 'admin');
-    await updateUserMutation.mutateAsync({
-      userId: user.id,
-      data: { roles: nextRoles }
     });
   };
 
@@ -251,33 +385,102 @@ function UserSettingsSheetBody({
           />
         </section>
 
-        <Separator />
-
-        {currentUser?.roles?.includes('admin') ? (
+        {showTenantRolesBlock && tenantRolesCatalog.length > 0 ? (
           <>
+            <Separator />
             <section className='space-y-3'>
-              <h3 className='text-sm font-medium'>{t('role_section')}</h3>
-              <div className='bg-muted/20 flex items-center justify-between rounded-lg border p-4'>
-                <div>
-                  <p className='font-medium'>{t('system_admin')}</p>
+              <h3 className='text-sm font-medium'>
+                {t('tenant_roles_section')}
+              </h3>
+              {isFullAccessGlobalRole ? (
+                <p className='text-muted-foreground text-xs'>
+                  {t('global_role_access_locked_hint')}
+                </p>
+              ) : null}
+              <Input
+                type='search'
+                placeholder={t('search_tenant_roles')}
+                value={searchTenantRoles}
+                onChange={(e) => setSearchTenantRoles(e.target.value)}
+                className='bg-background'
+                autoComplete='off'
+              />
+              <div className='bg-muted/20 space-y-3 rounded-lg border p-4'>
+                {filteredTenantRolesCatalog.length === 0 ? (
                   <p className='text-muted-foreground text-sm'>
-                    {t('system_admin_desc')}
+                    {t('tenant_roles_search_empty')}
                   </p>
-                </div>
-                <Switch
-                  checked={!!isSystemAdmin}
-                  onCheckedChange={handleToggleAdmin}
-                  disabled={updateUserMutation.isPending}
-                  aria-label={t('system_admin')}
-                />
+                ) : (
+                  filteredTenantRolesCatalog.map((role) =>
+                    role.id ? (
+                      <div
+                        key={role.id}
+                        className={cn(
+                          'flex gap-2',
+                          isTenantSystemAdminSlug(role.slug) &&
+                            !viewerCanAssignSystemTenantRole
+                            ? 'items-start'
+                            : 'items-center'
+                        )}
+                      >
+                        <Checkbox
+                          id={`tr-${user.id}-${role.id}`}
+                          className={
+                            isTenantSystemAdminSlug(role.slug) &&
+                            !viewerCanAssignSystemTenantRole
+                              ? 'mt-0.5 shrink-0'
+                              : 'shrink-0'
+                          }
+                          checked={selectedTenantIds.has(role.id)}
+                          onCheckedChange={(c) => {
+                            const rid = role.id as string;
+                            void toggleTenantRole(rid, role.slug, c === true);
+                          }}
+                          disabled={
+                            patchTenantRoles.isPending ||
+                            isFullAccessGlobalRole ||
+                            (isTenantSystemAdminSlug(role.slug) &&
+                              !viewerCanAssignSystemTenantRole) ||
+                            (targetHasSystemTenantAdmin &&
+                              !isTenantSystemAdminSlug(role.slug))
+                          }
+                        />
+                        <div className='min-w-0'>
+                          <Label
+                            htmlFor={`tr-${user.id}-${role.id}`}
+                            className='cursor-pointer font-normal'
+                          >
+                            {role.name ?? role.slug}
+                          </Label>
+                          {isTenantSystemAdminSlug(role.slug) &&
+                          !viewerCanAssignSystemTenantRole ? (
+                            <p className='text-muted-foreground mt-0.5 text-xs'>
+                              {t('tenant_system_role_assign_forbidden_hint')}
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
+                    ) : null
+                  )
+                )}
               </div>
             </section>
-            <Separator />
           </>
         ) : null}
 
+        <Separator />
+
         <section className='space-y-3'>
           <h3 className='text-sm font-medium'>{t('units_section')}</h3>
+          {isFullAccessGlobalRole ? (
+            <p className='text-muted-foreground text-xs'>
+              {t('global_role_access_locked_hint')}
+            </p>
+          ) : hasTenantRoles ? (
+            <p className='text-muted-foreground text-xs'>
+              {t('tenant_roles_units_locked_hint')}
+            </p>
+          ) : null}
           {userUnitsLoading ? (
             <p className='text-muted-foreground text-sm'>
               {t('loading_units')}
@@ -327,7 +530,7 @@ function UserSettingsSheetBody({
                           ) : null}
                         </span>
                       </AccordionTrigger>
-                      {canManage ? (
+                      {canManage && !unitManualAccessLocked ? (
                         <Button
                           type='button'
                           variant='ghost'
@@ -344,7 +547,7 @@ function UserSettingsSheetBody({
                       ) : null}
                     </div>
                     <AccordionContent>
-                      {canManage ? (
+                      {canManage && !unitManualAccessLocked ? (
                         <div className='border-muted space-y-3 border-t pt-3'>
                           <p className='text-muted-foreground text-xs'>
                             {t('permissions')}
@@ -363,7 +566,10 @@ function UserSettingsSheetBody({
                                   onCheckedChange={() =>
                                     toggleAssignedPermission(uu, permission.id)
                                   }
-                                  disabled={assignMutation.isPending}
+                                  disabled={
+                                    assignMutation.isPending ||
+                                    unitManualAccessLocked
+                                  }
                                 />
                                 <Label
                                   htmlFor={`${uu.id}-${permission.id}`}
@@ -375,6 +581,12 @@ function UserSettingsSheetBody({
                             ))}
                           </div>
                         </div>
+                      ) : unitManualAccessLocked && canManage ? (
+                        <p className='text-muted-foreground text-xs'>
+                          {isFullAccessGlobalRole
+                            ? t('global_role_access_locked_hint')
+                            : t('tenant_roles_units_locked_hint')}
+                        </p>
                       ) : (
                         <p className='text-muted-foreground text-xs'>
                           {t('no_permission_to_manage_unit')}
@@ -423,7 +635,7 @@ function UserSettingsSheetBody({
                     {canManageUnitUsers(
                       currentUser as User | undefined,
                       unit.id
-                    ) ? (
+                    ) && !unitManualAccessLocked ? (
                       <Button
                         type='button'
                         size='sm'
@@ -488,6 +700,145 @@ function UserSettingsSheetBody({
             )}
           </div>
         </section>
+
+        {showSsoDirectoryBlock ? (
+          <>
+            <Separator />
+            <section className='space-y-3'>
+              <h3 className='text-sm font-medium'>
+                {t('sso_directory_section')}
+              </h3>
+              <p className='text-muted-foreground text-xs'>
+                {t('sso_directory_hint')}
+              </p>
+              <div className='bg-muted/20 flex flex-col gap-4 rounded-lg border p-4'>
+                <div className='flex items-center justify-between gap-4'>
+                  <div>
+                    <p className='font-medium'>{t('exempt_sso_sync')}</p>
+                    <p className='text-muted-foreground text-sm'>
+                      {t('exempt_sso_sync_desc')}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={exemptSync}
+                    onCheckedChange={(checked) => {
+                      setExemptSync(checked);
+                      patchSsoFlags.mutate({
+                        userId: user.id,
+                        data: { exemptFromSsoSync: checked }
+                      });
+                    }}
+                    disabled={patchSsoFlags.isPending}
+                    aria-label={t('exempt_sso_sync')}
+                  />
+                </div>
+                <div className='flex items-center justify-between gap-4'>
+                  <div>
+                    <p className='font-medium'>{t('sso_profile_opt_out')}</p>
+                    <p className='text-muted-foreground text-sm'>
+                      {t('sso_profile_opt_out_desc')}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={profileOptOut}
+                    onCheckedChange={(checked) => {
+                      setProfileOptOut(checked);
+                      patchSsoFlags.mutate({
+                        userId: user.id,
+                        data: { ssoProfileSyncOptOut: checked }
+                      });
+                    }}
+                    disabled={patchSsoFlags.isPending}
+                    aria-label={t('sso_profile_opt_out')}
+                  />
+                </div>
+              </div>
+            </section>
+            <Separator />
+            <section className='space-y-3'>
+              <Accordion
+                type='single'
+                collapsible
+                className='bg-muted/20 rounded-lg border'
+              >
+                <AccordionItem value='sso-external' className='border-0'>
+                  <AccordionTrigger className='px-4 py-3 text-sm font-medium hover:no-underline'>
+                    {t('sso_external_section')}
+                  </AccordionTrigger>
+                  <AccordionContent className='text-muted-foreground space-y-4 px-4 pb-4'>
+                    <p className='text-xs'>{t('sso_external_hint')}</p>
+                    <div className='flex flex-col gap-4'>
+                      <div className='space-y-2'>
+                        <Label htmlFor={`ext-iss-${user.id}`}>
+                          {t('sso_issuer')}
+                        </Label>
+                        <Input
+                          id={`ext-iss-${user.id}`}
+                          value={extIssuer}
+                          onChange={(e) => setExtIssuer(e.target.value)}
+                          className='font-mono text-xs'
+                          autoComplete='off'
+                        />
+                      </div>
+                      <div className='space-y-2'>
+                        <Label htmlFor={`ext-sub-${user.id}`}>
+                          {t('sso_subject')}
+                        </Label>
+                        <Input
+                          id={`ext-sub-${user.id}`}
+                          value={extSubject}
+                          onChange={(e) => setExtSubject(e.target.value)}
+                          className='font-mono text-xs'
+                          autoComplete='off'
+                        />
+                      </div>
+                      <div className='space-y-2'>
+                        <Label htmlFor={`ext-oid-${user.id}`}>
+                          {t('sso_object_id')}
+                        </Label>
+                        <Input
+                          id={`ext-oid-${user.id}`}
+                          value={extOid}
+                          onChange={(e) => setExtOid(e.target.value)}
+                          className='font-mono text-xs'
+                          autoComplete='off'
+                        />
+                      </div>
+                    </div>
+                    <Button
+                      type='button'
+                      size='sm'
+                      className='mt-2 self-start'
+                      disabled={patchExternalId.isPending}
+                      onClick={() => {
+                        const body: {
+                          issuer?: string;
+                          subject?: string;
+                          externalObjectId?: string;
+                        } = {};
+                        if (extIssuer.trim() !== '')
+                          body.issuer = extIssuer.trim();
+                        if (extSubject.trim() !== '')
+                          body.subject = extSubject.trim();
+                        if (extOid.trim() !== '')
+                          body.externalObjectId = extOid.trim();
+                        if (Object.keys(body).length === 0) {
+                          toast.error(t('sso_external_empty'));
+                          return;
+                        }
+                        patchExternalId.mutate({ userId: user.id, data: body });
+                      }}
+                    >
+                      {patchExternalId.isPending
+                        ? t('saving')
+                        : t('sso_external_save')}
+                    </Button>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+            </section>
+          </>
+        ) : null}
       </div>
     </>
   );

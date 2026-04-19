@@ -12,6 +12,7 @@ import (
 	"quokkaq-go-backend/internal/jobs"
 	authmiddleware "quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/models"
+	"quokkaq-go-backend/internal/rbac"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
 	"quokkaq-go-backend/internal/services/billing"
@@ -152,14 +153,15 @@ func main() {
 
 	userService := services.NewUserService(userRepo)
 	mailService := services.NewMailService()
-	authService := services.NewAuthService(userRepo, companyRepo, mailService, subscriptionRepo)
+	tenantRBACRepo := repository.NewTenantRBACRepository()
+	authService := services.NewAuthService(userRepo, companyRepo, mailService, subscriptionRepo, tenantRBACRepo)
 	ssoRepo := repository.NewSSORepository()
-	ssoService := services.NewSSOService(companyRepo, userRepo, ssoRepo, unitRepo, authService)
+	ssoService := services.NewSSOService(companyRepo, userRepo, ssoRepo, unitRepo, tenantRBACRepo, authService)
 	unitClientRepo := repository.NewUnitClientRepository()
 	visitorTagDefRepo := repository.NewVisitorTagDefinitionRepository()
 	unitClientHistRepo := repository.NewUnitClientHistoryRepository()
 	unitClientService := services.NewUnitClientService(unitClientRepo, visitorTagDefRepo, unitClientHistRepo, database.DB)
-	unitService := services.NewUnitService(unitRepo, unitClientService)
+	unitService := services.NewUnitService(unitRepo, unitClientService, tenantRBACRepo)
 	visitorTagDefService := services.NewVisitorTagDefinitionService(visitorTagDefRepo)
 	calendarIntegrationService := services.NewCalendarIntegrationService(calendarIntegrationRepo, serviceRepo, unitRepo, mailService)
 	ticketService := services.NewTicketService(ticketRepo, counterRepo, serviceRepo, unitRepo, operatorIntervalRepo, unitClientRepo, visitorTagDefRepo, unitClientHistRepo, preRegRepo, calendarIntegrationService, hub, jobClient)
@@ -209,9 +211,10 @@ func main() {
 	quotaService := services.NewQuotaService()
 
 	userHandler := handlers.NewUserHandler(userService)
-	authHandler := handlers.NewAuthHandler(authService, userService, userRepo)
+	authHandler := handlers.NewAuthHandler(authService, userService, userRepo, tenantRBACRepo)
 	ssoHandler := handlers.NewSSOHandler(ssoService)
 	companySSOHTTP := handlers.NewCompanySSOHTTP(ssoService, userRepo, companyRepo)
+	tenantRBACHTTP := handlers.NewTenantRBACHTTP(tenantRBACRepo, userRepo, ssoService)
 	unitHandler := handlers.NewUnitHandler(unitService, storageService, operationalService)
 	ticketHandler := handlers.NewTicketHandler(ticketService, operationalService)
 	serviceHandler := handlers.NewServiceHandler(serviceService, userRepo)
@@ -610,8 +613,6 @@ func main() {
 		r.Use(authmiddleware.JWTAuth)
 		r.Group(func(r chi.Router) {
 			r.Use(authmiddleware.RequireAdmin(userRepo))
-			r.Get("/me", companyHandler.GetMyCompany)
-			r.Patch("/me", companyHandler.PatchMyCompany)
 			r.Get("/me/sso", companySSOHTTP.GetCompanySSO)
 			r.Patch("/me/sso", companySSOHTTP.PatchCompanySSO)
 			r.Patch("/me/slug", companySSOHTTP.PatchCompanySlug)
@@ -628,6 +629,23 @@ func main() {
 			r.Post("/dadata/address/suggest", dadataHandler.SuggestAddress)
 			r.Post("/dadata/bank/suggest", dadataHandler.SuggestBank)
 			r.Post("/dadata/address/clean", dadataHandler.CleanAddress)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(authmiddleware.RequireAdminOrTenantPermission(userRepo, tenantRBACRepo, rbac.PermTenantAdmin))
+			r.Get("/me", companyHandler.GetMyCompany)
+			r.Patch("/me", companyHandler.PatchMyCompany)
+			r.Get("/me/rbac/permissions", tenantRBACHTTP.GetPermissionCatalog)
+			r.Get("/me/sso/group-mappings", tenantRBACHTTP.ListGroupMappings)
+			r.Post("/me/sso/group-mappings", tenantRBACHTTP.UpsertGroupMapping)
+			r.Delete("/me/sso/group-mappings/{mappingId}", tenantRBACHTTP.DeleteGroupMapping)
+			r.Get("/me/tenant-roles", tenantRBACHTTP.ListTenantRoles)
+			r.Post("/me/tenant-roles", tenantRBACHTTP.CreateTenantRole)
+			r.Patch("/me/tenant-roles/{roleId}", tenantRBACHTTP.PatchTenantRole)
+			r.Delete("/me/tenant-roles/{roleId}", tenantRBACHTTP.DeleteTenantRole)
+			r.Get("/me/users", tenantRBACHTTP.ListCompanyUsers)
+			r.Patch("/me/users/{userId}/tenant-roles", tenantRBACHTTP.PatchUserTenantRoles)
+			r.Patch("/me/users/{userId}/sso-directory", tenantRBACHTTP.PatchUserSSOFlags)
+			r.Patch("/me/users/{userId}/external-identity", tenantRBACHTTP.PatchExternalIdentity)
 		})
 		r.Post("/me/complete-onboarding", companyHandler.CompleteOnboarding)
 		r.Get("/{companyId}/usage-metrics", usageHandler.GetUsageMetrics)

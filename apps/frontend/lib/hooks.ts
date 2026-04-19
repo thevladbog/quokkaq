@@ -60,6 +60,22 @@ export const useCreateUser = () => {
   });
 };
 
+export const usePatchUserTenantRoles = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      userId,
+      tenantRoleIds
+    }: {
+      userId: string;
+      tenantRoleIds: string[];
+    }) => usersApi.patchTenantRoles(userId, tenantRoleIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    }
+  });
+};
+
 // Unit-related hooks
 export const useUnits = () => {
   return useQuery({

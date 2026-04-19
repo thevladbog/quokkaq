@@ -4,17 +4,25 @@ import (
 	"quokkaq-go-backend/internal/models"
 )
 
+// TenantRoleBriefResponse is a tenant-defined role (id, name, slug) for the active company on /auth/me.
+type TenantRoleBriefResponse struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+}
+
 // UserResponse is the DTO for user API responses
 type UserResponse struct {
-	ID          string              `json:"id"`
-	Name        string              `json:"name"`
-	Email       *string             `json:"email,omitempty"`
-	Type        string              `json:"type,omitempty"`
-	CreatedAt   string              `json:"createdAt,omitempty"`
-	PhotoURL    *string             `json:"photoUrl,omitempty"`
-	Roles       []RoleDTO           `json:"roles,omitempty"`
-	Units       []UserUnitDTO       `json:"units,omitempty"`
-	Permissions map[string][]string `json:"permissions,omitempty"`
+	ID          string                    `json:"id"`
+	Name        string                    `json:"name"`
+	Email       *string                   `json:"email,omitempty"`
+	Type        string                    `json:"type,omitempty"`
+	CreatedAt   string                    `json:"createdAt,omitempty"`
+	PhotoURL    *string                   `json:"photoUrl,omitempty"`
+	Roles       []RoleDTO                 `json:"roles,omitempty"`
+	Units       []UserUnitDTO             `json:"units,omitempty"`
+	Permissions map[string][]string       `json:"permissions,omitempty"`
+	TenantRoles []TenantRoleBriefResponse `json:"tenantRoles,omitempty"`
 }
 
 type RoleDTO struct {

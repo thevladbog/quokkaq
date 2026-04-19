@@ -27,14 +27,20 @@ import {
   getAuthSSOAuthorizeUrl,
   publicTenantBySlug,
   useAuthAccessibleCompanies,
+  usePublicTenantBySlug,
   type authAccessibleCompaniesResponse,
   type AuthSSOAuthorizeParams,
   type HandlersAccessibleCompanyItem
 } from '@/lib/api/generated/auth';
-import { Loader2 } from 'lucide-react';
+import { CircleHelp, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger
+} from '@/components/ui/tooltip';
 import { getWordmarkSrc } from '@/lib/wordmark-src';
 
 function toAuthSSOAuthorizeLocale(
@@ -191,6 +197,19 @@ export default function LoginPage() {
   const effectiveSlug =
     (hintSlug || '').trim() || tenantSlugManual.trim() || '';
 
+  const publicTenantQ = usePublicTenantBySlug(effectiveSlug, {
+    query: {
+      enabled: subStep === 'password' && effectiveSlug.length > 0,
+      staleTime: 60_000
+    }
+  });
+
+  const ssoAvailableFromPublicTenant =
+    publicTenantQ.data?.status === 200 &&
+    publicTenantQ.data.data?.ssoAvailable === true;
+
+  const showSsoButton = hintSso || ssoAvailableFromPublicTenant;
+
   const startSso = () => {
     if (!effectiveSlug) {
       toast.error(t('tenantSlug'));
@@ -330,19 +349,58 @@ export default function LoginPage() {
                         t('continue')
                       )}
                     </Button>
-                    <button
-                      type='button'
-                      className='text-muted-foreground hover:text-primary w-full text-center text-sm underline-offset-4 hover:underline'
-                      onClick={() => setSubStep('password')}
-                    >
-                      {t('combinedLoginLink')}
-                    </button>
                   </div>
                 ) : (
                   <form onSubmit={handleSubmit} className='space-y-4'>
                     {tenantBanner ? (
                       <div className='bg-muted/50 text-muted-foreground rounded-md px-3 py-2 text-sm'>
                         {tenantBanner}
+                      </div>
+                    ) : null}
+
+                    {hintNext === 'choose_slug' && !hintSlug?.trim() ? (
+                      <div className='grid gap-2'>
+                        <div className='flex items-center gap-1.5'>
+                          <Label htmlFor='tenant-slug'>{t('tenantSlug')}</Label>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type='button'
+                                className='text-muted-foreground hover:text-foreground inline-flex shrink-0 rounded-sm p-0.5 transition-colors'
+                                aria-label={t('tenantSlugHintHelpAria')}
+                              >
+                                <CircleHelp className='size-4' aria-hidden />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side='top' className='max-w-sm'>
+                              {t('tenantHintDomainUnknown')}
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <span id='tenant-slug-desc' className='sr-only'>
+                          {t('tenantHintDomainUnknown')}
+                        </span>
+                        <Input
+                          id='tenant-slug'
+                          aria-describedby='tenant-slug-desc'
+                          value={tenantSlugManual}
+                          onChange={(e) => setTenantSlugManual(e.target.value)}
+                          placeholder={t('tenantSlugHint')}
+                          autoComplete='organization'
+                        />
+                      </div>
+                    ) : hintSlug?.trim() ? (
+                      <div className='grid gap-2'>
+                        <Label htmlFor='tenant-slug-resolved'>
+                          {t('tenantSlug')}
+                        </Label>
+                        <Input
+                          id='tenant-slug-resolved'
+                          readOnly
+                          value={hintSlug}
+                          className='bg-muted/50'
+                          autoComplete='organization'
+                        />
                       </div>
                     ) : null}
 
@@ -358,19 +416,6 @@ export default function LoginPage() {
                         placeholder={t('emailPlaceholder')}
                       />
                     </div>
-
-                    {hintNext === 'choose_slug' && !hintSlug?.trim() ? (
-                      <div className='grid gap-2'>
-                        <Label htmlFor='tenant-slug'>{t('tenantSlug')}</Label>
-                        <Input
-                          id='tenant-slug'
-                          value={tenantSlugManual}
-                          onChange={(e) => setTenantSlugManual(e.target.value)}
-                          placeholder={t('tenantSlugHint')}
-                          autoComplete='organization'
-                        />
-                      </div>
-                    ) : null}
 
                     <div className='grid gap-2'>
                       <Label htmlFor='password'>{t('password')}</Label>
@@ -394,7 +439,7 @@ export default function LoginPage() {
                       </Link>
                     </div>
 
-                    {hintSso ? (
+                    {showSsoButton ? (
                       <Button
                         type='button'
                         variant='outline'

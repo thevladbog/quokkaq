@@ -261,16 +261,40 @@ async function apiRequestBlob(
   }
 }
 
+const PatchUserTenantRolesResponseSchema = z.object({
+  tenantRoles: z
+    .array(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+        slug: z.string()
+      })
+    )
+    .nullable()
+    .transform((v) => v ?? [])
+});
+
 // User API functions
 export const usersApi = {
+  /** Users in the active company (X-Company-Id), with tenantRoles when applicable. */
   getAll: (search?: string) => {
     const queryParams = search ? `?search=${encodeURIComponent(search)}` : '';
     return apiRequest<User[]>(
-      `/users${queryParams}`,
+      `/companies/me/users${queryParams}`,
       {},
       z.array(UserModelSchema)
     );
   },
+
+  patchTenantRoles: (userId: string, tenantRoleIds: string[]) =>
+    apiRequest<{ tenantRoles: { id: string; name: string; slug: string }[] }>(
+      `/companies/me/users/${userId}/tenant-roles`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ tenantRoleIds })
+      },
+      PatchUserTenantRolesResponseSchema
+    ),
 
   getById: (id: string) =>
     apiRequest<User>(`/users/${id}`, {}, UserModelSchema),
@@ -1377,6 +1401,8 @@ export const companiesApiExt = {
     clearCounterparty?: boolean;
     /** Shape matches PaymentAccountsSchema in @quokkaq/shared-types; validate client-side when needed. */
     paymentAccounts?: PaymentAccount[];
+    /** "manual" | "sso_groups" */
+    ssoAccessSource?: string;
   }) =>
     apiRequest<Company>(
       `/companies/me`,

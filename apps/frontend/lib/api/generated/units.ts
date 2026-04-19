@@ -243,6 +243,8 @@ export interface ModelsUserUnit {
 export interface ModelsUser {
   createdAt?: string;
   email?: string;
+  /** ExemptFromSSOSync: when true, SSO directory reconcile does not change this user's roles/units. */
+  exemptFromSsoSync?: boolean;
   id?: string;
   isActive?: boolean;
   name?: string;
@@ -250,6 +252,8 @@ export interface ModelsUser {
   photoUrl?: string;
   /** Relations */
   roles?: ModelsUserRole[];
+  /** SSOProfileSyncOptOut: when true, skip name/email updates from IdP on SSO login. */
+  ssoProfileSyncOptOut?: boolean;
   type?: string;
   units?: ModelsUserUnit[];
 }
@@ -344,6 +348,18 @@ export interface HandlersCreateInvitationRequest {
   targetRoles?: HandlersCreateInvitationRequestTargetRoles;
   targetUnits?: HandlersCreateInvitationRequestTargetUnits;
   templateId?: string;
+}
+
+export interface HandlersTenantRoleUnitJSON {
+  permissions?: string[];
+  unitId?: string;
+}
+
+export interface HandlersCreateTenantRoleJSON {
+  description?: string;
+  name?: string;
+  slug?: string;
+  units?: HandlersTenantRoleUnitJSON[];
 }
 
 export interface HandlersCreateTicketRequestAnonymous {
@@ -487,6 +503,12 @@ export interface HandlersOperatorCommentPatchDTO {
   operatorComment: string | null;
 }
 
+export interface HandlersPatchExternalIdentityJSON {
+  externalObjectId?: string;
+  issuer?: string;
+  subject?: string;
+}
+
 export interface HandlersPatchMeRequest {
   photoUrl?: string;
 }
@@ -553,6 +575,15 @@ export type HandlersPatchUnitKioskConfigRequestConfig = {
 
 export interface HandlersPatchUnitKioskConfigRequest {
   config: HandlersPatchUnitKioskConfigRequestConfig;
+}
+
+export interface HandlersPatchUserSSOFlagsJSON {
+  exemptFromSsoSync?: boolean;
+  ssoProfileSyncOptOut?: boolean;
+}
+
+export interface HandlersPatchUserTenantRolesJSON {
+  tenantRoleIds?: string[];
 }
 
 export interface HandlersPeriodResponse {
@@ -676,6 +707,12 @@ export interface HandlersSignupRequest {
   planCode?: string;
 }
 
+export interface HandlersTenantRoleBriefResponse {
+  id?: string;
+  name?: string;
+  slug?: string;
+}
+
 export interface HandlersTransferRequest {
   /** @nullable */
   operatorComment?: string | null;
@@ -714,6 +751,12 @@ export interface HandlersUploadSurveyIdleMediaResponse {
   url: string;
 }
 
+export interface HandlersUpsertGroupMappingJSON {
+  idpGroupId?: string;
+  legacyRoleName?: string;
+  tenantRoleId?: string;
+}
+
 export interface HandlersUsageMetricInfoResponse {
   current?: number;
   limit?: number;
@@ -743,6 +786,7 @@ export interface HandlersUserResponse {
   permissions?: HandlersUserResponsePermissions;
   photoUrl?: string;
   roles?: HandlersRoleDTO[];
+  tenantRoles?: HandlersTenantRoleBriefResponse[];
   type?: string;
   units?: HandlersUserUnitDTO[];
 }
@@ -960,6 +1004,8 @@ export interface ModelsCompany {
   settings?: ModelsCompanySettings;
   /** public tenant slug for login URLs */
   slug?: string;
+  /** SsoAccessSource: "manual" (default) or "sso_groups" — IdP groups are source of truth for access when set. */
+  ssoAccessSource?: string;
   /** SsoJitProvisioning: allow creating a user on first successful SSO when policy permits. */
   ssoJitProvisioning?: boolean;
   /** StrictPublicTenantResolve: SaaS-enabled — GET /public/tenants/{slug} does not expose org metadata for slug guessing. */
@@ -978,6 +1024,31 @@ export interface HandlersCompanyMeResponse {
   features?: HandlersFeaturesFlags;
   publicApiUrl?: string;
   publicAppUrl?: string;
+}
+
+export interface HandlersTenantRoleBrief {
+  id?: string;
+  name?: string;
+  slug?: string;
+}
+
+export interface HandlersCompanyUserListItem {
+  createdAt?: string;
+  email?: string;
+  /** ExemptFromSSOSync: when true, SSO directory reconcile does not change this user's roles/units. */
+  exemptFromSsoSync?: boolean;
+  id?: string;
+  isActive?: boolean;
+  name?: string;
+  phone?: string;
+  photoUrl?: string;
+  /** Relations */
+  roles?: ModelsUserRole[];
+  /** SSOProfileSyncOptOut: when true, skip name/email updates from IdP on SSO login. */
+  ssoProfileSyncOptOut?: boolean;
+  tenantRoles?: HandlersTenantRoleBrief[];
+  type?: string;
+  units?: ModelsUserUnit[];
 }
 
 export type HandlersCreateSupportReportRequestDiagnostics = { [key: string]: unknown };
@@ -1171,6 +1242,17 @@ export interface ModelsCompanyPatch {
   /** items: @quokkaq/shared-types PaymentAccountSchema */
   paymentAccounts?: ModelsCompanyPatchPaymentAccountsItem[];
   slug?: string;
+  /** "manual" | "sso_groups" */
+  ssoAccessSource?: string;
+}
+
+export interface ModelsCompanySSOGroupMapping {
+  companyId?: string;
+  id?: string;
+  idpGroupId?: string;
+  /** e.g. staff, admin */
+  legacyRoleName?: string;
+  tenantRoleId?: string;
 }
 
 export interface ModelsServiceSlot {
@@ -1379,6 +1461,25 @@ export interface ModelsSurveyResponse {
   unitId?: string;
 }
 
+export interface ModelsTenantRoleUnit {
+  id?: string;
+  permissions?: string[];
+  tenantRoleId?: string;
+  unit?: ModelsUnit;
+  unitId?: string;
+}
+
+export interface ModelsTenantRole {
+  companyId?: string;
+  createdAt?: string;
+  description?: string;
+  id?: string;
+  name?: string;
+  slug?: string;
+  units?: ModelsTenantRoleUnit[];
+  updatedAt?: string;
+}
+
 export interface ModelsUnitMaterial {
   createdAt?: string;
   filename?: string;
@@ -1400,6 +1501,17 @@ export interface ModelsUpdateUserInput {
   /** URL of the user's profile photo. Send an empty string to clear the photo; omit the field to leave the current value unchanged. */
   photoUrl?: string;
   roles?: string[];
+}
+
+export interface ModelsUserExternalIdentity {
+  companyId?: string;
+  createdAt?: string;
+  /** ExternalObjectID is an optional stable directory id (e.g. Entra oid) for matching across subject changes. */
+  externalObjectId?: string;
+  id?: string;
+  issuer?: string;
+  subject?: string;
+  userId?: string;
 }
 
 export interface ModelsWeeklySlotCapacity {

@@ -39,6 +39,7 @@ func TestSSOHandler_TenantHint_JSONShape(t *testing.T) {
 		testsupport.PanicUserRepo{},
 		testsupport.PanicSSORepo{},
 		testsupport.PanicUnitRepo{},
+		nil,
 		fakeAuthExchange{},
 	)
 	h := NewSSOHandler(svc)
@@ -75,6 +76,7 @@ func TestSSOHandler_PublicTenant_StrictReturns404(t *testing.T) {
 		testsupport.PanicUserRepo{},
 		testsupport.PanicSSORepo{},
 		testsupport.PanicUnitRepo{},
+		nil,
 		fakeAuthExchange{},
 	)
 	h := NewSSOHandler(svc)
@@ -96,6 +98,7 @@ func TestSSOHandler_SSOExchange_InvalidCode401(t *testing.T) {
 		testsupport.PanicUserRepo{},
 		testsupport.PanicSSORepo{},
 		testsupport.PanicUnitRepo{},
+		nil,
 		fakeAuthExchange{},
 	)
 	h := NewSSOHandler(svc)
