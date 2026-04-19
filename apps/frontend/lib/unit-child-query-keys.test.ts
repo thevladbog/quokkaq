@@ -4,6 +4,7 @@ import {
   childUnitsQueryKey
 } from '@/components/admin/units/unit-child-query-keys';
 import {
+  getGetUnitByIDQueryKey,
   getGetUnitsUnitIdChildUnitsQueryKey,
   getGetUnitsUnitIdChildWorkplacesQueryKey
 } from '@/lib/api/generated/units';
@@ -17,5 +18,9 @@ describe('unit-child-query-keys', () => {
     expect(childSubdivisionsQueryKey(id)).toEqual(
       getGetUnitsUnitIdChildWorkplacesQueryKey(id)
     );
+  });
+
+  it('getGetUnitByIDQueryKey matches path used by unit detail queries', () => {
+    expect(getGetUnitByIDQueryKey('unit-xyz')).toEqual(['/units/unit-xyz']);
   });
 });

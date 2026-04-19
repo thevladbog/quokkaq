@@ -32,7 +32,7 @@ export default defineConfig({
         test: {
           name: 'unit-node',
           environment: 'node',
-          include: ['lib/**/*.test.ts']
+          include: ['lib/**/*.test.ts', 'app/api/**/*.test.ts']
         }
       },
       {

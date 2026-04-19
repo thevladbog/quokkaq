@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+import {
+  resolveUpstreamTracesUrl,
+  validateOtlpTracePayload
+} from '@/lib/telemetry/otlp-traces-proxy';
+
 export const runtime = 'nodejs';
 
 /** Not authentication — browser-exposed routing key only (see .env.example). */
@@ -50,44 +55,6 @@ function clientIp(req: NextRequest): string {
     if (first) return first;
   }
   return req.headers.get('x-real-ip')?.trim() || 'unknown';
-}
-
-/**
- * Minimal OTLP JSON traces validation: object with optional resourceSpans array.
- * Rejects non-JSON shapes; does not fully schema-validate protobuf JSON.
- */
-function validateOtlpTracePayload(parsed: unknown): boolean {
-  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    return false;
-  }
-  const o = parsed as Record<string, unknown>;
-  if ('resourceSpans' in o && !Array.isArray(o.resourceSpans)) {
-    return false;
-  }
-  return true;
-}
-
-/**
- * OTLP HTTP traces ingest (browser → Next → collector).
- * Browser POSTs JSON OTLP to same origin; this route forwards to the internal collector.
- *
- * Upstream URL: `OTEL_BROWSER_INGEST_UPSTREAM` (full `/v1/traces` URL) or
- * `OTEL_EXPORTER_OTLP_ENDPOINT` base (e.g. http://localhost:4318) + `/v1/traces`.
- */
-function resolveUpstreamTracesUrl(): string | null {
-  const explicit = process.env.OTEL_BROWSER_INGEST_UPSTREAM?.trim();
-  if (explicit) {
-    return explicit.replace(/\/+$/, '');
-  }
-  const base = process.env.OTEL_EXPORTER_OTLP_ENDPOINT?.trim();
-  if (!base) {
-    return null;
-  }
-  const u = base.replace(/\/+$/, '');
-  if (u.endsWith('/v1/traces')) {
-    return u;
-  }
-  return `${u}/v1/traces`;
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -173,7 +140,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  const upstream = resolveUpstreamTracesUrl();
+  const upstream = resolveUpstreamTracesUrl(process.env);
   if (!upstream) {
     return NextResponse.json(
       {
