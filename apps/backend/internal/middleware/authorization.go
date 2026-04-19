@@ -12,6 +12,12 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// normalizeUnitIDParam canonicalizes URL unit ids for comparison with JWT terminal claims
+// (jwtStringClaim lowercases unit_id).
+func normalizeUnitIDParam(s string) string {
+	return strings.ToLower(strings.TrimSpace(s))
+}
+
 // RespondRepoFindError writes 404 for missing rows (GORM not found) or 500 + log for other failures. Returns true if the handler should stop.
 func RespondRepoFindError(ctx context.Context, w http.ResponseWriter, err error, op string) bool {
 	if err == nil {
@@ -183,8 +189,8 @@ func RequirePlatformAdmin(userRepo repository.UserRepository) func(http.Handler)
 func RequireAdminTerminalOrUnitMemberForUnit(userRepo repository.UserRepository, urlUnitIDParam string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			unitID := chi.URLParam(r, urlUnitIDParam)
-			if strings.TrimSpace(unitID) == "" {
+			unitID := normalizeUnitIDParam(chi.URLParam(r, urlUnitIDParam))
+			if unitID == "" {
 				http.Error(w, "Unit ID required", http.StatusBadRequest)
 				return
 			}
@@ -415,8 +421,8 @@ func RequireCounterUnit(userRepo repository.UserRepository, counterRepo reposito
 func RequireGuestSurveyCompletionImageRead(userRepo repository.UserRepository, urlUnitIDParam string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			unitID := chi.URLParam(r, urlUnitIDParam)
-			if strings.TrimSpace(unitID) == "" {
+			unitID := normalizeUnitIDParam(chi.URLParam(r, urlUnitIDParam))
+			if unitID == "" {
 				http.Error(w, "Unit ID required", http.StatusBadRequest)
 				return
 			}
@@ -463,21 +469,50 @@ func RequireGuestSurveyCompletionImageRead(userRepo repository.UserRepository, u
 	}
 }
 
-// RequireTerminalGuestSurvey allows only a terminal JWT bound to a counter, with unit_id matching the URL unit.
-// Use after JWTAuth on /units/{unitId}/guest-survey/* routes.
-func RequireTerminalGuestSurvey(urlUnitIDParam string) func(http.Handler) http.Handler {
+// RequireTerminalUnitMatch allows only a desktop terminal JWT whose unit_id claim matches the URL unit param.
+// Does not require counter_id in the token (binding is validated in the service from DB). Use for routes that
+// scope by unit only, e.g. GET /units/{unitId}/counter-board/session.
+func RequireTerminalUnitMatch(urlUnitIDParam string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if typ, _ := r.Context().Value(TokenTypeKey).(string); typ != "terminal" {
 				http.Error(w, "Forbidden", http.StatusForbidden)
 				return
 			}
-			want := chi.URLParam(r, urlUnitIDParam)
-			if strings.TrimSpace(want) == "" {
+			want := strings.ToLower(strings.TrimSpace(chi.URLParam(r, urlUnitIDParam)))
+			if want == "" {
 				http.Error(w, "Unit ID required", http.StatusBadRequest)
 				return
 			}
 			got, ok := r.Context().Value(TerminalUnitIDKey).(string)
+			got = strings.ToLower(strings.TrimSpace(got))
+			if !ok || got != want {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// RequireTerminalWithCounter allows only a desktop terminal JWT (typ=terminal) that is bound to a counter:
+// unit_id and counter_id claims must be present, and unit_id must match the URL unit param.
+// It does not inspect terminal kind — handlers enforce guest-survey vs counter-board rules.
+// Use after JWTAuth on /units/{unitId}/guest-survey/*.
+func RequireTerminalWithCounter(urlUnitIDParam string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if typ, _ := r.Context().Value(TokenTypeKey).(string); typ != "terminal" {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+			want := strings.ToLower(strings.TrimSpace(chi.URLParam(r, urlUnitIDParam)))
+			if want == "" {
+				http.Error(w, "Unit ID required", http.StatusBadRequest)
+				return
+			}
+			got, ok := r.Context().Value(TerminalUnitIDKey).(string)
+			got = strings.ToLower(strings.TrimSpace(got))
 			if !ok || got != want {
 				http.Error(w, "Forbidden", http.StatusForbidden)
 				return

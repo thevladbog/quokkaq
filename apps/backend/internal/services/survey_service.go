@@ -42,12 +42,31 @@ type GuestSurveySessionTicket struct {
 	Status      string `json:"status"`
 }
 
+// CounterBoardSessionTicket is the active ticket for counter-board displays (minimal fields; no survey payload).
+type CounterBoardSessionTicket struct {
+	ID          string `json:"id"`
+	QueueNumber string `json:"queueNumber"`
+	Status      string `json:"status"`
+}
+
 type GuestSurveySessionSurvey struct {
 	ID                string          `json:"id"`
 	Title             string          `json:"title"`
 	Questions         json.RawMessage `json:"questions" swaggertype:"object"`
 	CompletionMessage json.RawMessage `json:"completionMessage,omitempty" swaggertype:"object"`
 	DisplayTheme      json.RawMessage `json:"displayTheme,omitempty" swaggertype:"object"`
+}
+
+// CounterBoardSession is for above-counter ticket displays only (counter_board terminals).
+// It does not load survey definitions and does not require the guest survey subscription feature.
+type CounterBoardSession struct {
+	CounterID   string `json:"counterId"`
+	CounterName string `json:"counterName"`
+	// false when no operator has taken the counter
+	CounterStaffed bool                       `json:"counterStaffed"`
+	OnBreak        bool                       `json:"onBreak"`
+	UnitConfig     json.RawMessage            `json:"unitConfig,omitempty" swaggertype:"object"`
+	ActiveTicket   *CounterBoardSessionTicket `json:"activeTicket,omitempty"`
 }
 
 const maxCompletionMessagePerLocaleBytes = 64 * 1024
@@ -350,6 +369,8 @@ type SurveyService interface {
 	ListResponsesForClient(ctx context.Context, actorUserID, unitID, clientID string) ([]models.SurveyResponse, error)
 
 	GuestSession(ctx context.Context, unitID, terminalID string) (*GuestSurveySession, error)
+	// CounterBoardSession: above-counter ticket display only — no survey definitions (independent of guest survey feature).
+	CounterBoardSession(ctx context.Context, unitID, terminalID string) (*CounterBoardSession, error)
 	SubmitGuestResponse(ctx context.Context, unitID, terminalID, ticketID, surveyID string, answers json.RawMessage) error
 
 	CompanyIDForUnit(unitID string) (string, error)
@@ -449,6 +470,24 @@ func (s *surveyService) ensureFeatureForUnit(unitID string) error {
 		return err
 	}
 	ok, err := CompanyHasPlanFeature(u.CompanyID, PlanFeatureCounterGuestSurvey)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return ErrSurveyFeatureLocked
+	}
+	return nil
+}
+
+func (s *surveyService) ensureCounterBoardFeatureForUnit(unitID string) error {
+	u, err := s.unitRepo.FindByIDLight(unitID)
+	if err != nil {
+		if repository.IsNotFound(err) {
+			return ErrSurveyNotFound
+		}
+		return err
+	}
+	ok, err := CompanyHasCounterBoardFeature(u.CompanyID)
 	if err != nil {
 		return err
 	}
@@ -721,6 +760,8 @@ func (s *surveyService) resolveActiveSurveyForCounter(ctx context.Context, count
 }
 
 func (s *surveyService) GuestSession(ctx context.Context, unitID, terminalID string) (*GuestSurveySession, error) {
+	unitID = strings.ToLower(strings.TrimSpace(unitID))
+	terminalID = strings.ToLower(strings.TrimSpace(terminalID))
 	tm, err := s.terminalRepo.FindByID(terminalID)
 	if err != nil {
 		if repository.IsNotFound(err) {
@@ -731,14 +772,23 @@ func (s *surveyService) GuestSession(ctx context.Context, unitID, terminalID str
 	if tm.RevokedAt != nil {
 		return nil, ErrSurveyForbidden
 	}
-	if tm.UnitID != unitID {
+	if strings.ToLower(strings.TrimSpace(tm.UnitID)) != unitID {
 		return nil, ErrSurveyForbidden
 	}
 	if tm.CounterID == nil || *tm.CounterID == "" {
 		return nil, ErrSurveyBadRequest
 	}
-	if err := s.ensureFeatureForUnit(unitID); err != nil {
-		return nil, err
+	kind := models.EffectiveTerminalKind(tm)
+	switch kind {
+	case models.DesktopTerminalKindCounterBoard:
+		// Use GET /units/{unitId}/counter-board/session — no survey payloads, no guest survey feature gate.
+		return nil, ErrSurveyBadRequest
+	case models.DesktopTerminalKindCounterGuestSurvey:
+		if err := s.ensureFeatureForUnit(unitID); err != nil {
+			return nil, err
+		}
+	default:
+		return nil, ErrSurveyForbidden
 	}
 
 	counter, err := s.counterRepo.FindByID(*tm.CounterID)
@@ -767,7 +817,8 @@ func (s *surveyService) GuestSession(ctx context.Context, unitID, terminalID str
 		out.IdleScreen = idleDef.IdleScreen
 	}
 
-	ticket, err := s.ticketRepo.FindInServiceTicketByCounter(counter.ID)
+	// Include called + in_service so headers show the ticket as soon as the guest is called.
+	ticket, err := s.ticketRepo.GetActiveTicketByCounter(counter.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -800,10 +851,84 @@ func (s *surveyService) GuestSession(ctx context.Context, unitID, terminalID str
 	return out, nil
 }
 
+// buildCounterBoardSessionPayload maps counter, unit, and optional active ticket into the counter-board API DTO.
+func buildCounterBoardSessionPayload(counter *models.Counter, u *models.Unit, ticket *models.Ticket) *CounterBoardSession {
+	staffed := counter.AssignedTo != nil
+	out := &CounterBoardSession{
+		CounterID:      counter.ID,
+		CounterName:    counter.Name,
+		CounterStaffed: staffed,
+		OnBreak:        counter.OnBreak,
+	}
+	if len(u.Config) > 0 {
+		out.UnitConfig = u.Config
+	}
+	if ticket != nil {
+		out.ActiveTicket = &CounterBoardSessionTicket{
+			ID:          ticket.ID,
+			QueueNumber: ticket.QueueNumber,
+			Status:      ticket.Status,
+		}
+	}
+	return out
+}
+
+func (s *surveyService) CounterBoardSession(ctx context.Context, unitID, terminalID string) (*CounterBoardSession, error) {
+	unitID = strings.ToLower(strings.TrimSpace(unitID))
+	terminalID = strings.ToLower(strings.TrimSpace(terminalID))
+	tm, err := s.terminalRepo.FindByID(terminalID)
+	if err != nil {
+		if repository.IsNotFound(err) {
+			return nil, ErrSurveyForbidden
+		}
+		return nil, err
+	}
+	if tm.RevokedAt != nil {
+		return nil, ErrSurveyForbidden
+	}
+	if strings.ToLower(strings.TrimSpace(tm.UnitID)) != unitID {
+		return nil, ErrSurveyForbidden
+	}
+	if tm.CounterID == nil || *tm.CounterID == "" {
+		return nil, ErrSurveyBadRequest
+	}
+	if models.EffectiveTerminalKind(tm) != models.DesktopTerminalKindCounterBoard {
+		return nil, ErrSurveyForbidden
+	}
+	if err := s.ensureCounterBoardFeatureForUnit(unitID); err != nil {
+		return nil, err
+	}
+
+	counter, err := s.counterRepo.FindByID(*tm.CounterID)
+	if err != nil {
+		if repository.IsNotFound(err) {
+			return nil, ErrSurveyNotFound
+		}
+		return nil, err
+	}
+
+	u, err := s.unitRepo.FindByIDLight(unitID)
+	if err != nil {
+		if repository.IsNotFound(err) {
+			return nil, ErrSurveyNotFound
+		}
+		return nil, err
+	}
+
+	ticket, err := s.ticketRepo.GetActiveTicketByCounterLight(counter.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return buildCounterBoardSessionPayload(counter, u, ticket), nil
+}
+
 func (s *surveyService) SubmitGuestResponse(ctx context.Context, unitID, terminalID, ticketID, surveyID string, answers json.RawMessage) error {
 	if len(answers) == 0 || !json.Valid(answers) {
 		return ErrSurveyBadRequest
 	}
+	unitID = strings.ToLower(strings.TrimSpace(unitID))
+	terminalID = strings.ToLower(strings.TrimSpace(terminalID))
 	tm, err := s.terminalRepo.FindByID(terminalID)
 	if err != nil {
 		if repository.IsNotFound(err) {
@@ -811,10 +936,13 @@ func (s *surveyService) SubmitGuestResponse(ctx context.Context, unitID, termina
 		}
 		return err
 	}
-	if tm.RevokedAt != nil || tm.UnitID != unitID {
+	if tm.RevokedAt != nil || strings.ToLower(strings.TrimSpace(tm.UnitID)) != unitID {
 		return ErrSurveyForbidden
 	}
 	if tm.CounterID == nil || *tm.CounterID == "" {
+		return ErrSurveyBadRequest
+	}
+	if models.EffectiveTerminalKind(tm) == models.DesktopTerminalKindCounterBoard {
 		return ErrSurveyBadRequest
 	}
 	if err := s.ensureFeatureForUnit(unitID); err != nil {
@@ -831,7 +959,7 @@ func (s *surveyService) SubmitGuestResponse(ctx context.Context, unitID, termina
 	if ticket.Status != "in_service" || ticket.CounterID == nil || *ticket.CounterID != *tm.CounterID {
 		return ErrSurveyBadRequest
 	}
-	if ticket.UnitID != unitID {
+	if strings.ToLower(strings.TrimSpace(ticket.UnitID)) != unitID {
 		return ErrSurveyForbidden
 	}
 

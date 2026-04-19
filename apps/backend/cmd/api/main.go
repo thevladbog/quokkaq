@@ -260,6 +260,7 @@ func run() error {
 	desktopTerminalHandler := handlers.NewDesktopTerminalHandler(desktopTerminalService)
 	surveyHandler := handlers.NewSurveyHandler(surveyService, storageService)
 	guestSurveyHandler := handlers.NewGuestSurveyHandler(surveyService)
+	counterBoardHandler := handlers.NewCounterBoardHandler(surveyService)
 	usageHandler := handlers.NewUsageHandler(quotaService, userRepo)
 
 	supportReportRepo := repository.NewSupportReportRepository()
@@ -469,9 +470,15 @@ func run() error {
 
 		r.Group(func(r chi.Router) {
 			r.Use(authmiddleware.JWTAuth)
-			r.Use(authmiddleware.RequireTerminalGuestSurvey("unitId"))
+			r.Use(authmiddleware.RequireTerminalWithCounter("unitId"))
 			r.Get("/{unitId}/guest-survey/session", guestSurveyHandler.Session)
 			r.Post("/{unitId}/guest-survey/responses", guestSurveyHandler.SubmitResponse)
+		})
+
+		r.Group(func(r chi.Router) {
+			r.Use(authmiddleware.JWTAuth)
+			r.Use(authmiddleware.RequireTerminalUnitMatch("unitId"))
+			r.Get("/{unitId}/counter-board/session", counterBoardHandler.Session)
 		})
 
 		r.Group(func(r chi.Router) {
@@ -782,7 +789,7 @@ func run() error {
 		shutdownOtel = func(context.Context) error { return nil }
 	}
 	defer func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
 		defer cancel()
 		if err := shutdownOtel(ctx); err != nil {
 			slog.Error("telemetry shutdown", "err", err)
@@ -807,9 +814,9 @@ func run() error {
 
 	errCh := make(chan error, 1)
 	go func() {
-		// Air's runner stops the old binary with a 5s wait, while srv.Shutdown below allows up to 30s.
-		// The next process can start while the previous release is still in progress → EADDRINUSE.
-		errCh <- listenAndServeWithBindRetry(srv, 35*time.Second)
+		// The next process can start while the previous release is still shutting down (Air hot reload):
+		// HTTP Shutdown allows up to 30s, plus asynq/DB — the old listener can outlive a short retry window.
+		errCh <- listenAndServeWithBindRetry(srv, 2*time.Minute)
 	}()
 
 	quit := make(chan os.Signal, 1)

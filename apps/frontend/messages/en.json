@@ -667,6 +667,7 @@
       "table": {
         "name": "Name",
         "unit": "Unit",
+        "kind": "Type",
         "locale": "Default language",
         "kiosk_fullscreen": "Fullscreen",
         "status": "Status",
@@ -674,6 +675,12 @@
         "counter": "Counter",
         "actions": "Actions"
       },
+      "table_scroll_hint": "Scroll horizontally if needed; the Actions column stays pinned on the right.",
+      "action_edit": "Edit",
+      "action_edit_aria": "Edit terminal pairing",
+      "action_revoke": "Revoke",
+      "action_revoke_aria": "Revoke terminal pairing",
+      "actions_unavailable_revoked": "Edit and revoke are unavailable for revoked terminals.",
       "kiosk_fullscreen": "Kiosk mode (fullscreen)",
       "kiosk_fullscreen_hint": "Saved when the device pairs (re-pair to refresh). QUOKKAQ_KIOSK_FULLSCREEN on the device overrides.",
       "fullscreen_on": "Yes",
@@ -709,12 +716,14 @@
       "device_kind": "Device type",
       "device_kiosk": "Ticket kiosk",
       "device_counter_display": "Counter survey screen",
+      "device_counter_board": "Counter board (above counter)",
       "context_unit": "Location (subdivision or zone)",
       "select_context": "Select location",
       "select_counter": "Select counter",
       "load_counters_error": "Could not load counters for this location",
       "select_counter_error": "Select a counter",
-      "feature_locked_create": "Guest survey at counters is not included in your plan."
+      "feature_locked_create": "Guest survey at counters is not included in your plan.",
+      "feature_locked_create_board": "Counter board is not included in your plan."
     },
     "general": {
       "view": "View Details",
@@ -1638,6 +1647,28 @@
     "switch_to_ru": "Switch to Russian",
     "scale_icon_rating_aria": "Rate {n} out of 5"
   },
+  "counter_board": {
+    "pair_title": "Counter board",
+    "pair_desc": "Enter the pairing code from Settings → Desktop terminals (device type: counter board). You can open this page with ?code=…",
+    "code_label": "Pairing code",
+    "pair_submit": "Connect",
+    "pair_error": "Invalid code or connection failed",
+    "counter_label": "Counter",
+    "ticket_label": "Ticket",
+    "loading": "Loading…",
+    "session_error": "Could not load session",
+    "reset": "Reset device pairing",
+    "feature_locked": "This feature is not enabled for your organization.",
+    "wrong_terminal_type": "This code is for a ticket kiosk. In Settings → Desktop terminals, create a counter board terminal (kind counter_board) bound to this counter.",
+    "reset_icon_aria": "Device options. Tap five times within a few seconds to reset pairing.",
+    "switch_to_en": "Switch to English",
+    "switch_to_ru": "Switch to Russian",
+    "idle_no_ticket": "----",
+    "counter_unstaffed": "Not serving visitors",
+    "break_not_working": "Service break",
+    "status_called": "Called",
+    "status_in_service": "In service"
+  },
   "screen": {
     "title": "QuokkaQ",
     "subtitle": "Queue Management System",
@@ -2519,6 +2550,9 @@
     },
     "counter_display": {
       "selection": "Counter display - QuokkaQ"
+    },
+    "workplace_display": {
+      "selection": "Counter board - QuokkaQ"
     },
     "kiosk": {
       "selection": "Kiosk - QuokkaQ",

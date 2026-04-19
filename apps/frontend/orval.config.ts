@@ -143,7 +143,7 @@ export default defineConfig({
       target: '../backend/docs/swagger.json',
       filters: {
         mode: 'include',
-        tags: ['guest-survey']
+        tags: ['guest-survey', 'counter-board']
       }
     },
     output: {
@@ -156,6 +156,20 @@ export default defineConfig({
           name: 'terminalOrvalMutator'
         }
       }
+    }
+  },
+  /** Admin terminal CRUD + public bootstrap (same mutator as main app API). */
+  quokkaqDesktopTerminal: {
+    input: {
+      target: '../backend/docs/swagger.json',
+      filters: {
+        mode: 'include',
+        tags: ['DesktopTerminal']
+      }
+    },
+    output: {
+      ...reactQueryOutput,
+      target: './lib/api/generated/desktop-terminal.ts'
     }
   },
   quokkaqServices: {

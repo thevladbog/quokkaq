@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"quokkaq-go-backend/internal/models"
+	"quokkaq-go-backend/internal/rbac"
 
 	"gorm.io/gorm"
 )
@@ -42,6 +43,30 @@ func BackfillAllCompanies(db *gorm.DB) error {
 			}
 			return RebuildUserUnitsFromTenantRoles(tx, ownerID, c.ID)
 		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// BackfillSystemAdminUserUnits re-runs RebuildUserUnitsFromTenantRoles for every user with the
+// reserved system_admin tenant role. Use after logic changes so existing DB rows get full user_units.
+func BackfillSystemAdminUserUnits(tx *gorm.DB) error {
+	type pair struct {
+		UserID    string `gorm:"column:user_id"`
+		CompanyID string `gorm:"column:company_id"`
+	}
+	var rows []pair
+	if err := tx.Raw(`
+SELECT DISTINCT utr.user_id, utr.company_id
+FROM user_tenant_roles utr
+INNER JOIN tenant_roles tr ON tr.id = utr.tenant_role_id AND tr.company_id = utr.company_id
+WHERE tr.slug = ?
+`, rbac.TenantRoleSlugSystemAdmin).Scan(&rows).Error; err != nil {
+		return err
+	}
+	for _, r := range rows {
+		if err := RebuildUserUnitsFromTenantRoles(tx, r.UserID, r.CompanyID); err != nil {
 			return err
 		}
 	}

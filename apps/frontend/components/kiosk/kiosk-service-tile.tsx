@@ -47,8 +47,8 @@ export function KioskServiceTile({
     ? 'linear-gradient(145deg, rgba(255,255,255,0.12) 0%, transparent 55%)'
     : 'linear-gradient(145deg, rgba(253,218,178,0.22) 0%, transparent 50%)';
 
-  const titleClass = `line-clamp-3 max-w-full text-sm leading-tight font-bold tracking-tight wrap-break-word sm:text-base md:text-lg lg:text-xl ${fg ? '' : 'text-kiosk-ink'}`;
-  const descClass = `line-clamp-2 max-w-full text-[11px] leading-snug wrap-break-word sm:text-xs ${fg ? 'opacity-75' : 'text-neutral-500'}`;
+  const titleClass = `kiosk-service-tile-title line-clamp-3 max-w-full font-bold tracking-tight wrap-break-word ${fg ? '' : 'text-kiosk-ink'}`;
+  const descClass = `kiosk-service-tile-desc line-clamp-2 max-w-full wrap-break-word ${fg ? 'opacity-75' : 'text-neutral-500'}`;
 
   if (!service.imageUrl) {
     return (

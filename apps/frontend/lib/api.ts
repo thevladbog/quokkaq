@@ -9,6 +9,7 @@ import { logger } from './logger';
 import * as orvalTc from './api/generated/tickets-counters';
 import * as orvalTenantBilling from './api/generated/tenant-billing';
 import * as orvalUnits from './api/generated/units';
+import type { Locale } from '@/i18n';
 
 export { ApiHttpError } from './api-errors';
 export { isRequestAbortError } from './authenticated-api-fetch';
@@ -35,6 +36,7 @@ import type {
   Booking,
   Counter,
   DesktopTerminal,
+  DesktopTerminalKind,
   Material,
   PreRegistration,
   UsageMetrics,
@@ -54,6 +56,7 @@ import {
   BookingModelSchema,
   CounterModelSchema,
   DesktopTerminalSchema,
+  DesktopTerminalKindSchema,
   CreateDesktopTerminalResponseSchema,
   UsageMetricsSchema,
   SubscriptionSchema,
@@ -379,6 +382,7 @@ export const desktopTerminalsApi = {
     kioskFullscreen?: boolean;
     contextUnitId?: string;
     counterId?: string;
+    kind?: DesktopTerminalKind;
   }) =>
     apiRequest<{ terminal: DesktopTerminal; pairingCode: string }>(
       '/desktop-terminals',
@@ -398,6 +402,7 @@ export const desktopTerminalsApi = {
       kioskFullscreen?: boolean;
       contextUnitId?: string;
       counterId?: string;
+      kind?: DesktopTerminalKind;
     }
   ) =>
     apiRequest<void>(`/desktop-terminals/${id}`, {
@@ -414,10 +419,27 @@ export const desktopTerminalsApi = {
 export const COUNTER_DISPLAY_TOKEN_KEY = 'quokkaq_counter_display_token';
 export const COUNTER_DISPLAY_UNIT_KEY = 'quokkaq_counter_display_unitId';
 
+/** Desktop terminal paired for the minimal counter board (above-counter ticket display). */
+export const COUNTER_BOARD_TOKEN_KEY = 'quokkaq_counter_board_token';
+export const COUNTER_BOARD_UNIT_KEY = 'quokkaq_counter_board_unitId';
+/** Set from bootstrap `defaultLocale` (chosen when the pairing code / terminal was created). */
+export const COUNTER_BOARD_LOCALE_KEY = 'quokkaq_counter_board_locale';
+
+/** Dispatch after pair/unpair so `WorkplaceDisplayIntlRoot` can re-read locale from localStorage. */
+export const COUNTER_BOARD_STORAGE_CHANGED_EVENT =
+  'quokkaq:counter-board-storage-changed';
+
+/** Maps API `defaultLocale` to app `en` | `ru` (terminal pairing / bootstrap). */
+export function terminalBootstrapDisplayLocale(raw: string): Locale {
+  const k = raw.trim().toLowerCase();
+  return k === 'ru' ? 'ru' : 'en';
+}
+
 const TerminalBootstrapResponseSchema = z.object({
   token: z.string(),
   unitId: z.string(),
   counterId: z.string().nullable().optional(),
+  terminalKind: DesktopTerminalKindSchema,
   defaultLocale: z.string(),
   appBaseUrl: z.string(),
   kioskFullscreen: z.boolean()

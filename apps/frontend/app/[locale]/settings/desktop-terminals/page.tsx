@@ -62,25 +62,25 @@ import {
   type DesktopTerminal,
   type Unit
 } from '@/lib/api';
+import { filterCountersForContext } from '@/lib/desktop-terminal-filters';
 import { getUnitDisplayName } from '@/lib/unit-display';
-
-function filterCountersForContext(unit: Unit, counters: Counter[]): Counter[] {
-  if (unit.kind === 'subdivision') {
-    return counters.filter((c) => c.unitId === unit.id);
-  }
-  if (unit.kind === 'service_zone') {
-    return counters.filter(
-      (c) =>
-        !c.serviceZoneId ||
-        String(c.serviceZoneId).trim() === '' ||
-        c.serviceZoneId === unit.id
-    );
-  }
-  return [];
-}
 
 /** Radix Select requires `value` to match a `SelectItem`; empty string is not a valid item value here. */
 const SELECT_UNSET = '__unset__';
+
+function isCounterTerminalKind(
+  kind: 'kiosk' | 'counter_display' | 'counter_board'
+): boolean {
+  return kind === 'counter_display' || kind === 'counter_board';
+}
+
+function featureLockedToastKey(
+  kind: 'kiosk' | 'counter_display' | 'counter_board'
+): 'feature_locked_create_board' | 'feature_locked_create' {
+  return kind === 'counter_board'
+    ? 'feature_locked_create_board'
+    : 'feature_locked_create';
+}
 
 export default function DesktopTerminalsPage() {
   const t = useTranslations('admin.desktop_terminals');
@@ -99,7 +99,7 @@ export default function DesktopTerminalsPage() {
   const [editing, setEditing] = useState<DesktopTerminal | null>(null);
 
   const [formDeviceKind, setFormDeviceKind] = useState<
-    'kiosk' | 'counter_display'
+    'kiosk' | 'counter_display' | 'counter_board'
   >('kiosk');
   const [formUnitId, setFormUnitId] = useState('');
   const [formContextUnitId, setFormContextUnitId] = useState('');
@@ -158,7 +158,12 @@ export default function DesktopTerminalsPage() {
 
   useEffect(() => {
     if (!(createOpen || editOpen)) return;
-    if (formDeviceKind !== 'counter_display' || !formContextUnitId) {
+    if (!isCounterTerminalKind(formDeviceKind)) {
+      setAvailableCounters([]);
+      setCountersLoading(false);
+      return;
+    }
+    if (!formContextUnitId) {
       setAvailableCounters([]);
       setCountersLoading(false);
       return;
@@ -225,7 +230,10 @@ export default function DesktopTerminalsPage() {
     setFormKioskFullscreen(row.kioskFullscreen === true);
 
     if (row.counterId) {
-      setFormDeviceKind('counter_display');
+      const rowKind = row.kind ?? 'counter_guest_survey';
+      setFormDeviceKind(
+        rowKind === 'counter_board' ? 'counter_board' : 'counter_display'
+      );
       setFormUnitId(row.unitId);
       setFormCounterId(row.counterId);
       const seq = ++editPreloadSeq.current;
@@ -270,7 +278,7 @@ export default function DesktopTerminalsPage() {
       ? formContextUnitId
       : '';
     try {
-      if (formDeviceKind === 'counter_display') {
+      if (isCounterTerminalKind(formDeviceKind)) {
         if (!safeContextUnitId || !formCounterId) {
           toast.error(t('select_counter_error'));
           return;
@@ -286,6 +294,10 @@ export default function DesktopTerminalsPage() {
           kioskFullscreen: formKioskFullscreen,
           contextUnitId: safeContextUnitId,
           counterId: formCounterId,
+          kind:
+            formDeviceKind === 'counter_board'
+              ? 'counter_board'
+              : 'counter_guest_survey',
           ...(nameTrim ? { name: nameTrim } : {})
         });
         setCreateOpen(false);
@@ -305,6 +317,7 @@ export default function DesktopTerminalsPage() {
         unitId: safeUnitId,
         defaultLocale: formLocale,
         kioskFullscreen: formKioskFullscreen,
+        kind: 'kiosk',
         ...(nameTrim ? { name: nameTrim } : {})
       });
       setCreateOpen(false);
@@ -315,7 +328,7 @@ export default function DesktopTerminalsPage() {
       load();
     } catch (e) {
       if (e instanceof ApiHttpError && e.status === 403) {
-        toast.error(t('feature_locked_create'));
+        toast.error(t(featureLockedToastKey(formDeviceKind)));
         return;
       }
       toast.error(t('error_save'));
@@ -332,7 +345,7 @@ export default function DesktopTerminalsPage() {
       ? formContextUnitId
       : '';
     try {
-      if (formDeviceKind === 'counter_display') {
+      if (isCounterTerminalKind(formDeviceKind)) {
         if (!safeContextUnitId || !formCounterId) {
           toast.error(t('select_counter_error'));
           return;
@@ -348,6 +361,10 @@ export default function DesktopTerminalsPage() {
           kioskFullscreen: formKioskFullscreen,
           contextUnitId: safeContextUnitId,
           counterId: formCounterId,
+          kind:
+            formDeviceKind === 'counter_board'
+              ? 'counter_board'
+              : 'counter_guest_survey',
           ...(nameTrim ? { name: nameTrim } : {})
         });
       } else {
@@ -360,6 +377,7 @@ export default function DesktopTerminalsPage() {
           defaultLocale: formLocale,
           kioskFullscreen: formKioskFullscreen,
           counterId: '',
+          kind: 'kiosk',
           ...(nameTrim ? { name: nameTrim } : {})
         });
       }
@@ -369,7 +387,7 @@ export default function DesktopTerminalsPage() {
       load();
     } catch (e) {
       if (e instanceof ApiHttpError && e.status === 403) {
-        toast.error(t('feature_locked_create'));
+        toast.error(t(featureLockedToastKey(formDeviceKind)));
         return;
       }
       toast.error(t('error_save'));
@@ -407,7 +425,9 @@ export default function DesktopTerminalsPage() {
         <Select
           value={formDeviceKind}
           onValueChange={(v) => {
-            setFormDeviceKind(v as 'kiosk' | 'counter_display');
+            setFormDeviceKind(
+              v as 'kiosk' | 'counter_display' | 'counter_board'
+            );
             setFormContextUnitId('');
             setFormCounterId('');
             if (v === 'kiosk') setAvailableCounters([]);
@@ -423,6 +443,9 @@ export default function DesktopTerminalsPage() {
             <SelectItem value='kiosk'>{t('device_kiosk')}</SelectItem>
             <SelectItem value='counter_display'>
               {t('device_counter_display')}
+            </SelectItem>
+            <SelectItem value='counter_board'>
+              {t('device_counter_board')}
             </SelectItem>
           </SelectContent>
         </Select>
@@ -590,79 +613,139 @@ export default function DesktopTerminalsPage() {
               {t('empty')}
             </p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('table.name')}</TableHead>
-                  <TableHead>{t('table.unit')}</TableHead>
-                  <TableHead>{t('table.counter')}</TableHead>
-                  <TableHead>{t('table.locale')}</TableHead>
-                  <TableHead>{t('table.kiosk_fullscreen')}</TableHead>
-                  <TableHead>{t('table.status')}</TableHead>
-                  <TableHead>{t('table.last_seen')}</TableHead>
-                  <TableHead className='text-right'>
-                    {t('table.actions')}
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell className='font-medium'>
-                      {row.name?.trim() || '—'}
-                    </TableCell>
-                    <TableCell>{row.unitName ?? row.unitId}</TableCell>
-                    <TableCell>
-                      {row.counterId
-                        ? row.counterName?.trim() || row.counterId
-                        : '—'}
-                    </TableCell>
-                    <TableCell>{row.defaultLocale}</TableCell>
-                    <TableCell>
-                      {row.kioskFullscreen ? (
-                        <Badge variant='default'>{t('fullscreen_on')}</Badge>
-                      ) : (
-                        <span className='text-muted-foreground text-sm'>
-                          {t('fullscreen_off')}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {row.revokedAt ? (
-                        <Badge variant='destructive'>
-                          {t('status_revoked')}
-                        </Badge>
-                      ) : (
-                        <Badge variant='secondary'>{t('status_active')}</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className='text-muted-foreground text-sm'>
-                      {formatAppDateTime(row.lastSeenAt, intlLocale)}
-                    </TableCell>
-                    <TableCell className='text-right'>
-                      <Button
-                        variant='ghost'
-                        size='icon'
-                        disabled={!!row.revokedAt}
-                        onClick={() => openEdit(row)}
-                        aria-label='Edit'
-                      >
-                        <Pencil className='h-4 w-4' />
-                      </Button>
-                      <Button
-                        variant='ghost'
-                        size='icon'
-                        disabled={!!row.revokedAt}
-                        onClick={() => setRevokeTarget(row)}
-                        aria-label='Revoke'
-                      >
-                        <Trash2 className='h-4 w-4' />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <>
+              <p className='text-muted-foreground mb-3 text-sm'>
+                {t('table_scroll_hint')}
+              </p>
+              <div className='overflow-x-auto'>
+                <Table className='min-w-[56rem]'>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className='max-w-[14rem]'>
+                        {t('table.name')}
+                      </TableHead>
+                      <TableHead className='max-w-[14rem]'>
+                        {t('table.unit')}
+                      </TableHead>
+                      <TableHead>{t('table.kind')}</TableHead>
+                      <TableHead className='max-w-[12rem]'>
+                        {t('table.counter')}
+                      </TableHead>
+                      <TableHead className='h-auto min-h-10 w-[5rem] max-w-[5rem] px-1 py-2 text-center align-middle text-xs leading-tight whitespace-normal'>
+                        {t('table.locale')}
+                      </TableHead>
+                      <TableHead>{t('table.kiosk_fullscreen')}</TableHead>
+                      <TableHead>{t('table.status')}</TableHead>
+                      <TableHead className='min-w-[10rem]'>
+                        {t('table.last_seen')}
+                      </TableHead>
+                      <TableHead className='bg-card sticky right-0 z-30 border-l text-right shadow-[-6px_0_12px_-4px_rgba(0,0,0,0.08)] dark:shadow-[-6px_0_12px_-4px_rgba(0,0,0,0.3)]'>
+                        {t('table.actions')}
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {rows.map((row) => {
+                      const effectiveKind =
+                        row.kind ||
+                        (row.counterId ? 'counter_guest_survey' : undefined);
+                      return (
+                        <TableRow key={row.id} className='group'>
+                          <TableCell className='max-w-[14rem] truncate font-medium'>
+                            {row.name?.trim() || '—'}
+                          </TableCell>
+                          <TableCell className='max-w-[14rem] truncate'>
+                            {row.unitName ?? row.unitId}
+                          </TableCell>
+                          <TableCell>
+                            {effectiveKind === 'counter_board'
+                              ? t('device_counter_board')
+                              : effectiveKind === 'counter_guest_survey'
+                                ? t('device_counter_display')
+                                : t('device_kiosk')}
+                          </TableCell>
+                          <TableCell className='max-w-[12rem] truncate'>
+                            {row.counterId
+                              ? row.counterName?.trim() || row.counterId
+                              : '—'}
+                          </TableCell>
+                          <TableCell className='w-[5rem] max-w-[5rem] text-center'>
+                            {row.defaultLocale}
+                          </TableCell>
+                          <TableCell>
+                            {row.kioskFullscreen ? (
+                              <Badge variant='default'>
+                                {t('fullscreen_on')}
+                              </Badge>
+                            ) : (
+                              <span className='text-muted-foreground text-sm'>
+                                {t('fullscreen_off')}
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {row.revokedAt ? (
+                              <Badge variant='destructive'>
+                                {t('status_revoked')}
+                              </Badge>
+                            ) : (
+                              <Badge variant='secondary'>
+                                {t('status_active')}
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className='text-muted-foreground max-w-[13rem] min-w-[10rem] truncate text-sm'>
+                            {formatAppDateTime(row.lastSeenAt, intlLocale)}
+                          </TableCell>
+                          <TableCell className='bg-card group-hover:bg-muted/50 sticky right-0 z-20 border-l text-right shadow-[-6px_0_12px_-4px_rgba(0,0,0,0.08)] dark:shadow-[-6px_0_12px_-4px_rgba(0,0,0,0.3)]'>
+                            <div className='flex items-center justify-end gap-0.5'>
+                              <Button
+                                variant='outline'
+                                size='icon'
+                                className='size-8 shrink-0'
+                                disabled={!!row.revokedAt}
+                                onClick={() => openEdit(row)}
+                                title={
+                                  row.revokedAt
+                                    ? t('actions_unavailable_revoked')
+                                    : t('action_edit')
+                                }
+                                aria-label={
+                                  row.revokedAt
+                                    ? t('actions_unavailable_revoked')
+                                    : t('action_edit_aria')
+                                }
+                              >
+                                <Pencil className='h-4 w-4' />
+                              </Button>
+                              <Button
+                                variant='outline'
+                                size='icon'
+                                className='size-8 shrink-0'
+                                disabled={!!row.revokedAt}
+                                onClick={() => setRevokeTarget(row)}
+                                title={
+                                  row.revokedAt
+                                    ? t('actions_unavailable_revoked')
+                                    : t('action_revoke')
+                                }
+                                aria-label={
+                                  row.revokedAt
+                                    ? t('actions_unavailable_revoked')
+                                    : t('action_revoke_aria')
+                                }
+                              >
+                                <Trash2 className='h-4 w-4' />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

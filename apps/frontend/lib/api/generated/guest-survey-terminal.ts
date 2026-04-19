@@ -329,6 +329,51 @@ export interface HandlersCreateCheckoutResponse {
   sessionId?: string;
 }
 
+/**
+ * Kind: kiosk | counter_guest_survey | counter_board (required semantics: counter_* need counterId).
+ */
+export type HandlersCreateDesktopTerminalRequestKind = typeof HandlersCreateDesktopTerminalRequestKind[keyof typeof HandlersCreateDesktopTerminalRequestKind];
+
+
+export const HandlersCreateDesktopTerminalRequestKind = {
+  kiosk: 'kiosk',
+  counter_guest_survey: 'counter_guest_survey',
+  counter_board: 'counter_board',
+} as const;
+
+export interface HandlersCreateDesktopTerminalRequest {
+  /** ContextUnitID: subdivision or service_zone selected in the pairing wizard (required with counterId). */
+  contextUnitId?: string;
+  counterId?: string;
+  defaultLocale?: string;
+  /** Kind: kiosk | counter_guest_survey | counter_board (required semantics: counter_* need counterId). */
+  kind?: HandlersCreateDesktopTerminalRequestKind;
+  kioskFullscreen?: boolean;
+  name?: string;
+  unitId?: string;
+}
+
+export interface HandlersDesktopTerminalJSON {
+  counterId?: string;
+  counterName?: string;
+  createdAt?: string;
+  defaultLocale?: string;
+  id?: string;
+  kind?: string;
+  kioskFullscreen?: boolean;
+  lastSeenAt?: string;
+  name?: string;
+  revokedAt?: string;
+  unitId?: string;
+  unitName?: string;
+  updatedAt?: string;
+}
+
+export interface HandlersCreateDesktopTerminalResponse {
+  pairingCode?: string;
+  terminal?: HandlersDesktopTerminalJSON;
+}
+
 export type HandlersCreateInvitationRequestTargetRoles = { [key: string]: unknown };
 
 export type HandlersCreateInvitationRequestTargetUnits = { [key: string]: unknown };
@@ -706,6 +751,21 @@ export interface HandlersSignupRequest {
   planCode?: string;
 }
 
+export interface HandlersTerminalBootstrapRequest {
+  /** @minLength 1 */
+  code: string;
+}
+
+export interface HandlersTerminalBootstrapResponse {
+  appBaseUrl?: string;
+  counterId?: string;
+  defaultLocale?: string;
+  kioskFullscreen?: boolean;
+  terminalKind?: string;
+  token?: string;
+  unitId?: string;
+}
+
 export interface HandlersTransferRequest {
   /** @nullable */
   operatorComment?: string | null;
@@ -726,6 +786,16 @@ export interface HandlersUnitSummaryDTO {
 export interface HandlersUpdateCounterRequest {
   name?: string;
   serviceZoneId?: string;
+}
+
+export interface HandlersUpdateDesktopTerminalRequest {
+  contextUnitId?: string;
+  counterId?: string;
+  defaultLocale?: string;
+  kind?: string;
+  kioskFullscreen?: boolean;
+  name?: string;
+  unitId?: string;
 }
 
 export interface HandlersUpdateStatusRequest {
@@ -1604,6 +1674,24 @@ export interface ServicesCompanySSOPatch {
   ssoProtocol?: ServicesCompanySSOPatchSsoProtocol;
 }
 
+export type ServicesCounterBoardSessionUnitConfig = { [key: string]: unknown };
+
+export interface ServicesCounterBoardSessionTicket {
+  id?: string;
+  queueNumber?: string;
+  status?: string;
+}
+
+export interface ServicesCounterBoardSession {
+  activeTicket?: ServicesCounterBoardSessionTicket;
+  counterId?: string;
+  counterName?: string;
+  /** false when no operator has taken the counter */
+  counterStaffed?: boolean;
+  onBreak?: boolean;
+  unitConfig?: ServicesCounterBoardSessionUnitConfig;
+}
+
 export interface ServicesCreateCalendarIntegrationRequest {
   adminNotifyEmails?: string;
   appPassword: string;
@@ -1909,6 +1997,147 @@ export interface HandlersLoginLinkResponse {
 }
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+
+
+/**
+ * Above-counter ticket display only. Does not load guest survey definitions and does not require the counter guest survey subscription feature.
+ * @summary Counter board session (terminal)
+ */
+export type counterBoardSessionResponse200 = {
+  data: ServicesCounterBoardSession
+  status: 200
+}
+
+export type counterBoardSessionResponse400 = {
+  data: string
+  status: 400
+}
+
+export type counterBoardSessionResponse401 = {
+  data: string
+  status: 401
+}
+
+export type counterBoardSessionResponse403 = {
+  data: string
+  status: 403
+}
+
+export type counterBoardSessionResponse404 = {
+  data: string
+  status: 404
+}
+
+export type counterBoardSessionResponse500 = {
+  data: string
+  status: 500
+}
+
+export type counterBoardSessionResponseSuccess = (counterBoardSessionResponse200) & {
+  headers: Headers;
+};
+export type counterBoardSessionResponseError = (counterBoardSessionResponse400 | counterBoardSessionResponse401 | counterBoardSessionResponse403 | counterBoardSessionResponse404 | counterBoardSessionResponse500) & {
+  headers: Headers;
+};
+
+export type counterBoardSessionResponse = (counterBoardSessionResponseSuccess | counterBoardSessionResponseError)
+
+export const getCounterBoardSessionUrl = (unitId: string,) => {
+
+
+
+
+  return `/units/${unitId}/counter-board/session`
+}
+
+export const counterBoardSession = async (unitId: string, options?: RequestInit): Promise<counterBoardSessionResponse> => {
+
+  return terminalOrvalMutator<counterBoardSessionResponse>(getCounterBoardSessionUrl(unitId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getCounterBoardSessionQueryKey = (unitId: string,) => {
+    return [
+    `/units/${unitId}/counter-board/session`
+    ] as const;
+    }
+
+
+export const getCounterBoardSessionQueryOptions = <TData = Awaited<ReturnType<typeof counterBoardSession>>, TError = string>(unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof counterBoardSession>>, TError, TData>>, request?: SecondParameter<typeof terminalOrvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getCounterBoardSessionQueryKey(unitId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof counterBoardSession>>> = ({ signal }) => counterBoardSession(unitId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof counterBoardSession>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type CounterBoardSessionQueryResult = NonNullable<Awaited<ReturnType<typeof counterBoardSession>>>
+export type CounterBoardSessionQueryError = string
+
+
+export function useCounterBoardSession<TData = Awaited<ReturnType<typeof counterBoardSession>>, TError = string>(
+ unitId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof counterBoardSession>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof counterBoardSession>>,
+          TError,
+          Awaited<ReturnType<typeof counterBoardSession>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof terminalOrvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useCounterBoardSession<TData = Awaited<ReturnType<typeof counterBoardSession>>, TError = string>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof counterBoardSession>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof counterBoardSession>>,
+          TError,
+          Awaited<ReturnType<typeof counterBoardSession>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof terminalOrvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useCounterBoardSession<TData = Awaited<ReturnType<typeof counterBoardSession>>, TError = string>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof counterBoardSession>>, TError, TData>>, request?: SecondParameter<typeof terminalOrvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Counter board session (terminal)
+ */
+
+export function useCounterBoardSession<TData = Awaited<ReturnType<typeof counterBoardSession>>, TError = string>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof counterBoardSession>>, TError, TData>>, request?: SecondParameter<typeof terminalOrvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getCounterBoardSessionQueryOptions(unitId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
 
 
 

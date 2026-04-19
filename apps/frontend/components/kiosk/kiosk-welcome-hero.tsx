@@ -8,11 +8,11 @@ type KioskWelcomeHeroProps = {
 export function KioskWelcomeHero({ title, subtitle }: KioskWelcomeHeroProps) {
   return (
     <div className='mb-3 shrink-0 px-1 text-center sm:mb-4'>
-      <h1 className='text-kiosk-ink text-2xl leading-tight font-extrabold tracking-tight sm:text-3xl md:text-4xl lg:text-[2.75rem] lg:leading-[1.1]'>
+      <h1 className='kiosk-welcome-title text-kiosk-ink font-extrabold tracking-tight'>
         {title}
       </h1>
       {subtitle ? (
-        <p className='text-kiosk-ink-muted mx-auto mt-2 max-w-2xl text-base font-medium sm:text-lg'>
+        <p className='kiosk-welcome-subtitle text-kiosk-ink-muted mx-auto mt-2 max-w-2xl font-medium'>
           {subtitle}
         </p>
       ) : null}

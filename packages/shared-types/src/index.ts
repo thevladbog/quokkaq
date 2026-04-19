@@ -596,35 +596,84 @@ export const BookingModelSchema = z.object({
   createdAt: z.string().nullable().optional()
 });
 
-export const CounterModelSchema = z.object({
-  id: z.string(),
-  unitId: z.string(),
-  serviceZoneId: z.string().nullable().optional(),
-  name: z.string(),
-  assignedTo: z.string().nullable().optional(),
-  onBreak: z.boolean().optional(),
-  breakStartedAt: z.string().nullable().optional(),
-  assignedUser: z
-    .object({
-      name: z.string()
-    })
-    .optional()
-});
+export const CounterModelSchema = z
+  .object({
+    id: z.string(),
+    unitId: z.string(),
+    serviceZoneId: z.string().nullable().optional(),
+    name: z.string(),
+    assignedTo: z.string().nullable().optional(),
+    onBreak: z.boolean().optional(),
+    breakStartedAt: z.string().nullable().optional(),
+    /** Hydrated operator; backend may send only `id` when name is omitted. */
+    assignedUser: z
+      .object({
+        name: z.string().optional()
+      })
+      .passthrough()
+      .optional()
+      .nullable()
+  })
+  .passthrough();
 
-export const DesktopTerminalSchema = z.object({
-  id: z.string(),
-  unitId: z.string(),
-  counterId: z.string().nullable().optional(),
-  counterName: z.string().optional(),
-  name: z.string().nullable().optional(),
-  defaultLocale: z.string(),
-  kioskFullscreen: z.boolean().optional().default(false),
-  revokedAt: z.string().nullable().optional(),
-  lastSeenAt: z.string().nullable().optional(),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-  unitName: z.string().optional()
-});
+export const DesktopTerminalKindSchema = z.enum([
+  'kiosk',
+  'counter_guest_survey',
+  'counter_board'
+]);
+
+export type DesktopTerminalKind = z.infer<typeof DesktopTerminalKindSchema>;
+
+/**
+ * Mirrors backend `models.EffectiveTerminalKind` for API payloads parsed with {@link DesktopTerminalSchema}.
+ *
+ * **Important:** If `counterId` is non-empty, the result is always `counter_guest_survey` or `counter_board`
+ * — never `kiosk`. That includes when the wire payload has `kind: 'kiosk'` together with a counter binding:
+ * `effectiveDesktopTerminalKind` coerces that combination to `counter_guest_survey` (invalid kiosk+counter
+ * pairs are normalized like the server). The returned `kind` may therefore **not round-trip** as the same
+ * string that was sent.
+ *
+ * For stricter validation (reject `kiosk` + `counterId` instead of coercing), enforce rules at your
+ * request/schema boundary before calling this helper.
+ */
+export function effectiveDesktopTerminalKind(input: {
+  kind?: DesktopTerminalKind | undefined;
+  counterId?: string | null | undefined;
+}): DesktopTerminalKind {
+  const hasCounter =
+    input.counterId != null && String(input.counterId).trim() !== '';
+  const raw = input.kind;
+  const k =
+    raw === undefined || raw === null ? '' : String(raw).toLowerCase().trim();
+  if (!k) {
+    return hasCounter ? 'counter_guest_survey' : 'kiosk';
+  }
+  if (k === 'counter_board') return 'counter_board';
+  if (k === 'counter_guest_survey') return 'counter_guest_survey';
+  if (hasCounter) return 'counter_guest_survey';
+  return 'kiosk';
+}
+
+export const DesktopTerminalSchema = z
+  .object({
+    id: z.string(),
+    unitId: z.string(),
+    counterId: z.string().nullable().optional(),
+    counterName: z.string().optional(),
+    kind: DesktopTerminalKindSchema.optional(),
+    name: z.string().nullable().optional(),
+    defaultLocale: z.string(),
+    kioskFullscreen: z.boolean().optional().default(false),
+    revokedAt: z.string().nullable().optional(),
+    lastSeenAt: z.string().nullable().optional(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+    unitName: z.string().optional()
+  })
+  .transform((row) => ({
+    ...row,
+    kind: effectiveDesktopTerminalKind(row)
+  }));
 
 export const CreateDesktopTerminalResponseSchema = z.object({
   terminal: DesktopTerminalSchema,

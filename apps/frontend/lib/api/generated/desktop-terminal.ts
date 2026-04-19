@@ -6,13 +6,22 @@
  * OpenAPI spec version: 1.0
  */
 import {
-  useMutation
+  useMutation,
+  useQuery
 } from '@tanstack/react-query';
 import type {
+  DataTag,
+  DefinedInitialDataOptions,
+  DefinedUseQueryResult,
   MutationFunction,
   QueryClient,
+  QueryFunction,
+  QueryKey,
+  UndefinedInitialDataOptions,
   UseMutationOptions,
-  UseMutationResult
+  UseMutationResult,
+  UseQueryOptions,
+  UseQueryResult
 } from '@tanstack/react-query';
 
 import { orvalMutator } from '../../orval-mutator';
@@ -1987,88 +1996,71 @@ export interface HandlersLoginLinkResponse {
   exampleUrl: string;
 }
 
-export type UploadLogoBody = {
-  /** Image file */
-  file: Blob;
-};
-
-export type UploadPrinterLogoBody = {
-  /** Image file */
-  file: Blob;
-};
-
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
 
 /**
- * Upload kiosk/ad logo (JPG, PNG, SVG, WebP). Admin JWT. Stored under public/logos/.
- * @summary Upload logo file
+ * Public: exchanges a pairing code for a terminal JWT. Response includes `terminalKind` (effective kind: kiosk, counter_guest_survey, or counter_board) and optional `counterId`. No staff session required.
+ * @summary Bootstrap desktop terminal (pairing code exchange)
  */
-export type uploadLogoResponse200 = {
-  data: HandlersUploadLogoResponse
+export type bootstrapDesktopTerminalResponse200 = {
+  data: HandlersTerminalBootstrapResponse
   status: 200
 }
 
-export type uploadLogoResponse400 = {
+export type bootstrapDesktopTerminalResponse400 = {
   data: string
   status: 400
 }
 
-export type uploadLogoResponse401 = {
+export type bootstrapDesktopTerminalResponse401 = {
   data: string
   status: 401
 }
 
-export type uploadLogoResponse403 = {
-  data: string
-  status: 403
-}
-
-export type uploadLogoResponse500 = {
+export type bootstrapDesktopTerminalResponse500 = {
   data: string
   status: 500
 }
 
-export type uploadLogoResponseSuccess = (uploadLogoResponse200) & {
+export type bootstrapDesktopTerminalResponseSuccess = (bootstrapDesktopTerminalResponse200) & {
   headers: Headers;
 };
-export type uploadLogoResponseError = (uploadLogoResponse400 | uploadLogoResponse401 | uploadLogoResponse403 | uploadLogoResponse500) & {
+export type bootstrapDesktopTerminalResponseError = (bootstrapDesktopTerminalResponse400 | bootstrapDesktopTerminalResponse401 | bootstrapDesktopTerminalResponse500) & {
   headers: Headers;
 };
 
-export type uploadLogoResponse = (uploadLogoResponseSuccess | uploadLogoResponseError)
+export type bootstrapDesktopTerminalResponse = (bootstrapDesktopTerminalResponseSuccess | bootstrapDesktopTerminalResponseError)
 
-export const getUploadLogoUrl = () => {
-
-
+export const getBootstrapDesktopTerminalUrl = () => {
 
 
-  return `/upload`
+
+
+  return `/auth/terminal/bootstrap`
 }
 
-export const uploadLogo = async (uploadLogoBody: UploadLogoBody, options?: RequestInit): Promise<uploadLogoResponse> => {
-    const formData = new FormData();
-formData.append(`file`, uploadLogoBody.file);
+export const bootstrapDesktopTerminal = async (handlersTerminalBootstrapRequest: HandlersTerminalBootstrapRequest, options?: RequestInit): Promise<bootstrapDesktopTerminalResponse> => {
 
-  return orvalMutator<uploadLogoResponse>(getUploadLogoUrl(),
+  return orvalMutator<bootstrapDesktopTerminalResponse>(getBootstrapDesktopTerminalUrl(),
   {
     ...options,
-    method: 'POST'
-    ,
-    body:
-      formData,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersTerminalBootstrapRequest,)
   }
 );}
 
 
 
 
-export const getUploadLogoMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadLogo>>, TError,{data: UploadLogoBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof uploadLogo>>, TError,{data: UploadLogoBody}, TContext> => {
+export const getBootstrapDesktopTerminalMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bootstrapDesktopTerminal>>, TError,{data: HandlersTerminalBootstrapRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof bootstrapDesktopTerminal>>, TError,{data: HandlersTerminalBootstrapRequest}, TContext> => {
 
-const mutationKey = ['uploadLogo'];
+const mutationKey = ['bootstrapDesktopTerminal'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -2078,10 +2070,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadLogo>>, {data: UploadLogoBody}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bootstrapDesktopTerminal>>, {data: HandlersTerminalBootstrapRequest}> = (props) => {
           const {data} = props ?? {};
 
-          return  uploadLogo(data,requestOptions)
+          return  bootstrapDesktopTerminal(data,requestOptions)
         }
 
 
@@ -2091,92 +2083,211 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type UploadLogoMutationResult = NonNullable<Awaited<ReturnType<typeof uploadLogo>>>
-    export type UploadLogoMutationBody = UploadLogoBody
-    export type UploadLogoMutationError = string
+    export type BootstrapDesktopTerminalMutationResult = NonNullable<Awaited<ReturnType<typeof bootstrapDesktopTerminal>>>
+    export type BootstrapDesktopTerminalMutationBody = HandlersTerminalBootstrapRequest
+    export type BootstrapDesktopTerminalMutationError = string
 
     /**
- * @summary Upload logo file
+ * @summary Bootstrap desktop terminal (pairing code exchange)
  */
-export const useUploadLogo = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadLogo>>, TError,{data: UploadLogoBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const useBootstrapDesktopTerminal = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bootstrapDesktopTerminal>>, TError,{data: HandlersTerminalBootstrapRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof uploadLogo>>,
+        Awaited<ReturnType<typeof bootstrapDesktopTerminal>>,
         TError,
-        {data: UploadLogoBody},
+        {data: HandlersTerminalBootstrapRequest},
         TContext
       > => {
-      return useMutation(getUploadLogoMutationOptions(options), queryClient);
+      return useMutation(getBootstrapDesktopTerminalMutationOptions(options), queryClient);
     }
 
 /**
- * Upload thermal-receipt logo (includes BMP). Admin JWT. Stored under public/printer-logos/.
- * @summary Upload printer logo file
+ * Returns every paired desktop terminal for the tenant (admin JWT). Each row includes effective `kind` (kiosk, counter_guest_survey, counter_board) and optional counter metadata.
+ * @summary List desktop terminals
  */
-export type uploadPrinterLogoResponse200 = {
-  data: HandlersUploadLogoResponse
+export type listDesktopTerminalsResponse200 = {
+  data: HandlersDesktopTerminalJSON[]
   status: 200
 }
 
-export type uploadPrinterLogoResponse400 = {
-  data: string
-  status: 400
-}
-
-export type uploadPrinterLogoResponse401 = {
-  data: string
-  status: 401
-}
-
-export type uploadPrinterLogoResponse403 = {
-  data: string
-  status: 403
-}
-
-export type uploadPrinterLogoResponse500 = {
+export type listDesktopTerminalsResponse500 = {
   data: string
   status: 500
 }
 
-export type uploadPrinterLogoResponseSuccess = (uploadPrinterLogoResponse200) & {
+export type listDesktopTerminalsResponseSuccess = (listDesktopTerminalsResponse200) & {
   headers: Headers;
 };
-export type uploadPrinterLogoResponseError = (uploadPrinterLogoResponse400 | uploadPrinterLogoResponse401 | uploadPrinterLogoResponse403 | uploadPrinterLogoResponse500) & {
+export type listDesktopTerminalsResponseError = (listDesktopTerminalsResponse500) & {
   headers: Headers;
 };
 
-export type uploadPrinterLogoResponse = (uploadPrinterLogoResponseSuccess | uploadPrinterLogoResponseError)
+export type listDesktopTerminalsResponse = (listDesktopTerminalsResponseSuccess | listDesktopTerminalsResponseError)
 
-export const getUploadPrinterLogoUrl = () => {
-
-
+export const getListDesktopTerminalsUrl = () => {
 
 
-  return `/upload-printer-logo`
+
+
+  return `/desktop-terminals`
 }
 
-export const uploadPrinterLogo = async (uploadPrinterLogoBody: UploadPrinterLogoBody, options?: RequestInit): Promise<uploadPrinterLogoResponse> => {
-    const formData = new FormData();
-formData.append(`file`, uploadPrinterLogoBody.file);
+export const listDesktopTerminals = async ( options?: RequestInit): Promise<listDesktopTerminalsResponse> => {
 
-  return orvalMutator<uploadPrinterLogoResponse>(getUploadPrinterLogoUrl(),
+  return orvalMutator<listDesktopTerminalsResponse>(getListDesktopTerminalsUrl(),
   {
     ...options,
-    method: 'POST'
-    ,
-    body:
-      formData,
+    method: 'GET'
+
+
   }
 );}
 
 
 
 
-export const getUploadPrinterLogoMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadPrinterLogo>>, TError,{data: UploadPrinterLogoBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof uploadPrinterLogo>>, TError,{data: UploadPrinterLogoBody}, TContext> => {
 
-const mutationKey = ['uploadPrinterLogo'];
+export const getListDesktopTerminalsQueryKey = () => {
+    return [
+    `/desktop-terminals`
+    ] as const;
+    }
+
+
+export const getListDesktopTerminalsQueryOptions = <TData = Awaited<ReturnType<typeof listDesktopTerminals>>, TError = string>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDesktopTerminals>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListDesktopTerminalsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listDesktopTerminals>>> = ({ signal }) => listDesktopTerminals({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listDesktopTerminals>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListDesktopTerminalsQueryResult = NonNullable<Awaited<ReturnType<typeof listDesktopTerminals>>>
+export type ListDesktopTerminalsQueryError = string
+
+
+export function useListDesktopTerminals<TData = Awaited<ReturnType<typeof listDesktopTerminals>>, TError = string>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDesktopTerminals>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listDesktopTerminals>>,
+          TError,
+          Awaited<ReturnType<typeof listDesktopTerminals>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListDesktopTerminals<TData = Awaited<ReturnType<typeof listDesktopTerminals>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDesktopTerminals>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listDesktopTerminals>>,
+          TError,
+          Awaited<ReturnType<typeof listDesktopTerminals>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListDesktopTerminals<TData = Awaited<ReturnType<typeof listDesktopTerminals>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDesktopTerminals>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List desktop terminals
+ */
+
+export function useListDesktopTerminals<TData = Awaited<ReturnType<typeof listDesktopTerminals>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDesktopTerminals>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListDesktopTerminalsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * Admin creates a paired kiosk/counter terminal and receives a one-time pairing code.
+ * @summary Create desktop terminal
+ */
+export type createDesktopTerminalResponse201 = {
+  data: HandlersCreateDesktopTerminalResponse
+  status: 201
+}
+
+export type createDesktopTerminalResponse400 = {
+  data: string
+  status: 400
+}
+
+export type createDesktopTerminalResponse401 = {
+  data: string
+  status: 401
+}
+
+export type createDesktopTerminalResponse403 = {
+  data: string
+  status: 403
+}
+
+export type createDesktopTerminalResponse500 = {
+  data: string
+  status: 500
+}
+
+export type createDesktopTerminalResponseSuccess = (createDesktopTerminalResponse201) & {
+  headers: Headers;
+};
+export type createDesktopTerminalResponseError = (createDesktopTerminalResponse400 | createDesktopTerminalResponse401 | createDesktopTerminalResponse403 | createDesktopTerminalResponse500) & {
+  headers: Headers;
+};
+
+export type createDesktopTerminalResponse = (createDesktopTerminalResponseSuccess | createDesktopTerminalResponseError)
+
+export const getCreateDesktopTerminalUrl = () => {
+
+
+
+
+  return `/desktop-terminals`
+}
+
+export const createDesktopTerminal = async (handlersCreateDesktopTerminalRequest: HandlersCreateDesktopTerminalRequest, options?: RequestInit): Promise<createDesktopTerminalResponse> => {
+
+  return orvalMutator<createDesktopTerminalResponse>(getCreateDesktopTerminalUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersCreateDesktopTerminalRequest,)
+  }
+);}
+
+
+
+
+export const getCreateDesktopTerminalMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createDesktopTerminal>>, TError,{data: HandlersCreateDesktopTerminalRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof createDesktopTerminal>>, TError,{data: HandlersCreateDesktopTerminalRequest}, TContext> => {
+
+const mutationKey = ['createDesktopTerminal'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -2186,10 +2297,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadPrinterLogo>>, {data: UploadPrinterLogoBody}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createDesktopTerminal>>, {data: HandlersCreateDesktopTerminalRequest}> = (props) => {
           const {data} = props ?? {};
 
-          return  uploadPrinterLogo(data,requestOptions)
+          return  createDesktopTerminal(data,requestOptions)
         }
 
 
@@ -2199,20 +2310,373 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type UploadPrinterLogoMutationResult = NonNullable<Awaited<ReturnType<typeof uploadPrinterLogo>>>
-    export type UploadPrinterLogoMutationBody = UploadPrinterLogoBody
-    export type UploadPrinterLogoMutationError = string
+    export type CreateDesktopTerminalMutationResult = NonNullable<Awaited<ReturnType<typeof createDesktopTerminal>>>
+    export type CreateDesktopTerminalMutationBody = HandlersCreateDesktopTerminalRequest
+    export type CreateDesktopTerminalMutationError = string
 
     /**
- * @summary Upload printer logo file
+ * @summary Create desktop terminal
  */
-export const useUploadPrinterLogo = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadPrinterLogo>>, TError,{data: UploadPrinterLogoBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const useCreateDesktopTerminal = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createDesktopTerminal>>, TError,{data: HandlersCreateDesktopTerminalRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof uploadPrinterLogo>>,
+        Awaited<ReturnType<typeof createDesktopTerminal>>,
         TError,
-        {data: UploadPrinterLogoBody},
+        {data: HandlersCreateDesktopTerminalRequest},
         TContext
       > => {
-      return useMutation(getUploadPrinterLogoMutationOptions(options), queryClient);
+      return useMutation(getCreateDesktopTerminalMutationOptions(options), queryClient);
+    }
+
+/**
+ * Returns one terminal by id, including effective `kind` and hydrated `counterName`/`unitName` when present.
+ * @summary Get desktop terminal by ID
+ */
+export type getDesktopTerminalByIDResponse200 = {
+  data: HandlersDesktopTerminalJSON
+  status: 200
+}
+
+export type getDesktopTerminalByIDResponse401 = {
+  data: string
+  status: 401
+}
+
+export type getDesktopTerminalByIDResponse403 = {
+  data: string
+  status: 403
+}
+
+export type getDesktopTerminalByIDResponse404 = {
+  data: string
+  status: 404
+}
+
+export type getDesktopTerminalByIDResponse500 = {
+  data: string
+  status: 500
+}
+
+export type getDesktopTerminalByIDResponseSuccess = (getDesktopTerminalByIDResponse200) & {
+  headers: Headers;
+};
+export type getDesktopTerminalByIDResponseError = (getDesktopTerminalByIDResponse401 | getDesktopTerminalByIDResponse403 | getDesktopTerminalByIDResponse404 | getDesktopTerminalByIDResponse500) & {
+  headers: Headers;
+};
+
+export type getDesktopTerminalByIDResponse = (getDesktopTerminalByIDResponseSuccess | getDesktopTerminalByIDResponseError)
+
+export const getGetDesktopTerminalByIDUrl = (id: string,) => {
+
+
+
+
+  return `/desktop-terminals/${id}`
+}
+
+export const getDesktopTerminalByID = async (id: string, options?: RequestInit): Promise<getDesktopTerminalByIDResponse> => {
+
+  return orvalMutator<getDesktopTerminalByIDResponse>(getGetDesktopTerminalByIDUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDesktopTerminalByIDQueryKey = (id: string,) => {
+    return [
+    `/desktop-terminals/${id}`
+    ] as const;
+    }
+
+
+export const getGetDesktopTerminalByIDQueryOptions = <TData = Awaited<ReturnType<typeof getDesktopTerminalByID>>, TError = string>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDesktopTerminalByID>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDesktopTerminalByIDQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDesktopTerminalByID>>> = ({ signal }) => getDesktopTerminalByID(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDesktopTerminalByID>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetDesktopTerminalByIDQueryResult = NonNullable<Awaited<ReturnType<typeof getDesktopTerminalByID>>>
+export type GetDesktopTerminalByIDQueryError = string
+
+
+export function useGetDesktopTerminalByID<TData = Awaited<ReturnType<typeof getDesktopTerminalByID>>, TError = string>(
+ id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDesktopTerminalByID>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getDesktopTerminalByID>>,
+          TError,
+          Awaited<ReturnType<typeof getDesktopTerminalByID>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetDesktopTerminalByID<TData = Awaited<ReturnType<typeof getDesktopTerminalByID>>, TError = string>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDesktopTerminalByID>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getDesktopTerminalByID>>,
+          TError,
+          Awaited<ReturnType<typeof getDesktopTerminalByID>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetDesktopTerminalByID<TData = Awaited<ReturnType<typeof getDesktopTerminalByID>>, TError = string>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDesktopTerminalByID>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get desktop terminal by ID
+ */
+
+export function useGetDesktopTerminalByID<TData = Awaited<ReturnType<typeof getDesktopTerminalByID>>, TError = string>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDesktopTerminalByID>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetDesktopTerminalByIDQueryOptions(id,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * Patches name, locale, kiosk fullscreen, and optionally counter binding. Body may include `kind` (kiosk | counter_guest_survey | counter_board) with `counterId`/`contextUnitId` when changing bindings; metadata-only updates omit counter fields.
+ * @summary Update desktop terminal
+ */
+export type updateDesktopTerminalResponse204 = {
+  data: void
+  status: 204
+}
+
+export type updateDesktopTerminalResponse400 = {
+  data: string
+  status: 400
+}
+
+export type updateDesktopTerminalResponse401 = {
+  data: string
+  status: 401
+}
+
+export type updateDesktopTerminalResponse403 = {
+  data: string
+  status: 403
+}
+
+export type updateDesktopTerminalResponse404 = {
+  data: string
+  status: 404
+}
+
+export type updateDesktopTerminalResponse500 = {
+  data: string
+  status: 500
+}
+
+export type updateDesktopTerminalResponseSuccess = (updateDesktopTerminalResponse204) & {
+  headers: Headers;
+};
+export type updateDesktopTerminalResponseError = (updateDesktopTerminalResponse400 | updateDesktopTerminalResponse401 | updateDesktopTerminalResponse403 | updateDesktopTerminalResponse404 | updateDesktopTerminalResponse500) & {
+  headers: Headers;
+};
+
+export type updateDesktopTerminalResponse = (updateDesktopTerminalResponseSuccess | updateDesktopTerminalResponseError)
+
+export const getUpdateDesktopTerminalUrl = (id: string,) => {
+
+
+
+
+  return `/desktop-terminals/${id}`
+}
+
+export const updateDesktopTerminal = async (id: string,
+    handlersUpdateDesktopTerminalRequest: HandlersUpdateDesktopTerminalRequest, options?: RequestInit): Promise<updateDesktopTerminalResponse> => {
+
+  return orvalMutator<updateDesktopTerminalResponse>(getUpdateDesktopTerminalUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersUpdateDesktopTerminalRequest,)
+  }
+);}
+
+
+
+
+export const getUpdateDesktopTerminalMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDesktopTerminal>>, TError,{id: string;data: HandlersUpdateDesktopTerminalRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateDesktopTerminal>>, TError,{id: string;data: HandlersUpdateDesktopTerminalRequest}, TContext> => {
+
+const mutationKey = ['updateDesktopTerminal'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateDesktopTerminal>>, {id: string;data: HandlersUpdateDesktopTerminalRequest}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateDesktopTerminal(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateDesktopTerminalMutationResult = NonNullable<Awaited<ReturnType<typeof updateDesktopTerminal>>>
+    export type UpdateDesktopTerminalMutationBody = HandlersUpdateDesktopTerminalRequest
+    export type UpdateDesktopTerminalMutationError = string
+
+    /**
+ * @summary Update desktop terminal
+ */
+export const useUpdateDesktopTerminal = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDesktopTerminal>>, TError,{id: string;data: HandlersUpdateDesktopTerminalRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateDesktopTerminal>>,
+        TError,
+        {id: string;data: HandlersUpdateDesktopTerminalRequest},
+        TContext
+      > => {
+      return useMutation(getUpdateDesktopTerminalMutationOptions(options), queryClient);
+    }
+
+/**
+ * Marks the terminal as revoked; the pairing code stops working immediately.
+ * @summary Revoke desktop terminal
+ */
+export type revokeDesktopTerminalResponse204 = {
+  data: void
+  status: 204
+}
+
+export type revokeDesktopTerminalResponse401 = {
+  data: string
+  status: 401
+}
+
+export type revokeDesktopTerminalResponse403 = {
+  data: string
+  status: 403
+}
+
+export type revokeDesktopTerminalResponse404 = {
+  data: string
+  status: 404
+}
+
+export type revokeDesktopTerminalResponse500 = {
+  data: string
+  status: 500
+}
+
+export type revokeDesktopTerminalResponseSuccess = (revokeDesktopTerminalResponse204) & {
+  headers: Headers;
+};
+export type revokeDesktopTerminalResponseError = (revokeDesktopTerminalResponse401 | revokeDesktopTerminalResponse403 | revokeDesktopTerminalResponse404 | revokeDesktopTerminalResponse500) & {
+  headers: Headers;
+};
+
+export type revokeDesktopTerminalResponse = (revokeDesktopTerminalResponseSuccess | revokeDesktopTerminalResponseError)
+
+export const getRevokeDesktopTerminalUrl = (id: string,) => {
+
+
+
+
+  return `/desktop-terminals/${id}/revoke`
+}
+
+export const revokeDesktopTerminal = async (id: string, options?: RequestInit): Promise<revokeDesktopTerminalResponse> => {
+
+  return orvalMutator<revokeDesktopTerminalResponse>(getRevokeDesktopTerminalUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getRevokeDesktopTerminalMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokeDesktopTerminal>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof revokeDesktopTerminal>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['revokeDesktopTerminal'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof revokeDesktopTerminal>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  revokeDesktopTerminal(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RevokeDesktopTerminalMutationResult = NonNullable<Awaited<ReturnType<typeof revokeDesktopTerminal>>>
+
+    export type RevokeDesktopTerminalMutationError = string
+
+    /**
+ * @summary Revoke desktop terminal
+ */
+export const useRevokeDesktopTerminal = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokeDesktopTerminal>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof revokeDesktopTerminal>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getRevokeDesktopTerminalMutationOptions(options), queryClient);
     }

@@ -91,6 +91,36 @@ components:
         sessionId:
           type: string
       type: object
+    handlers.CreateDesktopTerminalRequest:
+      properties:
+        contextUnitId:
+          description: 'ContextUnitID: subdivision or service_zone selected in the pairing wizard (required with counterId).'
+          type: string
+        counterId:
+          type: string
+        defaultLocale:
+          type: string
+        kind:
+          description: 'Kind: kiosk | counter_guest_survey | counter_board (required semantics: counter_* need counterId).'
+          enum:
+          - kiosk
+          - counter_guest_survey
+          - counter_board
+          type: string
+        kioskFullscreen:
+          type: boolean
+        name:
+          type: string
+        unitId:
+          type: string
+      type: object
+    handlers.CreateDesktopTerminalResponse:
+      properties:
+        pairingCode:
+          type: string
+        terminal:
+          $ref: '#/components/schemas/handlers.DesktopTerminalJSON'
+      type: object
     handlers.CreateInvitationRequest:
       properties:
         email:
@@ -137,6 +167,35 @@ components:
       type: object
     handlers.DaDataUpstreamResponse:
       additionalProperties: true
+      type: object
+    handlers.DesktopTerminalJSON:
+      properties:
+        counterId:
+          type: string
+        counterName:
+          type: string
+        createdAt:
+          type: string
+        defaultLocale:
+          type: string
+        id:
+          type: string
+        kind:
+          type: string
+        kioskFullscreen:
+          type: boolean
+        lastSeenAt:
+          type: string
+        name:
+          type: string
+        revokedAt:
+          type: string
+        unitId:
+          type: string
+        unitName:
+          type: string
+        updatedAt:
+          type: string
       type: object
     handlers.FeaturesFlags:
       properties:
@@ -661,6 +720,32 @@ components:
         unitId:
           type: string
       type: object
+    handlers.TerminalBootstrapRequest:
+      properties:
+        code:
+          example: PAIR12345
+          type: string
+          minLength: 1
+      required:
+      - code
+      type: object
+    handlers.TerminalBootstrapResponse:
+      properties:
+        appBaseUrl:
+          type: string
+        counterId:
+          type: string
+        defaultLocale:
+          type: string
+        kioskFullscreen:
+          type: boolean
+        terminalKind:
+          type: string
+        token:
+          type: string
+        unitId:
+          type: string
+      type: object
     handlers.TransferRequest:
       properties:
         operatorComment:
@@ -693,6 +778,23 @@ components:
         name:
           type: string
         serviceZoneId:
+          type: string
+      type: object
+    handlers.UpdateDesktopTerminalRequest:
+      properties:
+        contextUnitId:
+          type: string
+        counterId:
+          type: string
+        defaultLocale:
+          type: string
+        kind:
+          type: string
+        kioskFullscreen:
+          type: boolean
+        name:
+          type: string
+        unitId:
           type: string
       type: object
     handlers.UpdateStatusRequest:
@@ -2404,6 +2506,31 @@ components:
           - oidc
           - saml
       type: object
+    services.CounterBoardSession:
+      properties:
+        activeTicket:
+          $ref: '#/components/schemas/services.CounterBoardSessionTicket'
+        counterId:
+          type: string
+        counterName:
+          type: string
+        counterStaffed:
+          description: false when no operator has taken the counter
+          type: boolean
+        onBreak:
+          type: boolean
+        unitConfig:
+          type: object
+      type: object
+    services.CounterBoardSessionTicket:
+      properties:
+        id:
+          type: string
+        queueNumber:
+          type: string
+        status:
+          type: string
+      type: object
     services.CreateCalendarIntegrationRequest:
       properties:
         adminNotifyEmails:
@@ -3455,6 +3582,46 @@ paths:
       summary: Exchange one-time SSO code for JWT pair
       tags:
       - auth
+  /auth/terminal/bootstrap:
+    post:
+      description: 'Public: exchanges a pairing code for a terminal JWT. Response includes `terminalKind` (effective kind: kiosk, counter_guest_survey, or counter_board) and optional `counterId`. No staff session required.'
+      operationId: bootstrapDesktopTerminal
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/handlers.TerminalBootstrapRequest'
+        description: Pairing code
+        required: true
+        x-originalParamName: body
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/handlers.TerminalBootstrapResponse'
+          description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
+      summary: Bootstrap desktop terminal (pairing code exchange)
+      tags:
+      - DesktopTerminal
   /bookings:
     post:
       description: Creates a new booking for a service in a unit
@@ -5548,6 +5715,12 @@ paths:
               schema:
                 type: string
           description: Bad Request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
         '404':
           content:
             application/json:
@@ -5566,6 +5739,8 @@ paths:
               schema:
                 type: string
           description: Internal Server Error
+      security:
+      - BearerAuth: []
       summary: Call next ticket
       tags:
       - counters
@@ -5587,12 +5762,20 @@ paths:
                 additionalProperties: true
                 type: object
           description: OK
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
         '404':
           content:
             application/json:
               schema:
                 type: string
           description: Counter not found
+      security:
+      - BearerAuth: []
       summary: Force release counter
       tags:
       - counters
@@ -5614,12 +5797,20 @@ paths:
               schema:
                 $ref: '#/components/schemas/models.Counter'
           description: OK
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
         '404':
           content:
             application/json:
               schema:
                 type: string
           description: Counter not found
+      security:
+      - BearerAuth: []
       summary: Occupy counter
       tags:
       - counters
@@ -5640,15 +5831,240 @@ paths:
               schema:
                 $ref: '#/components/schemas/models.Counter'
           description: OK
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
         '404':
           content:
             application/json:
               schema:
                 type: string
           description: Counter not found
+      security:
+      - BearerAuth: []
       summary: Release counter
       tags:
       - counters
+  /desktop-terminals:
+    get:
+      description: Returns every paired desktop terminal for the tenant (admin JWT). Each row includes effective `kind` (kiosk, counter_guest_survey, counter_board) and optional counter metadata.
+      operationId: listDesktopTerminals
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/handlers.DesktopTerminalJSON'
+                type: array
+          description: OK
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: List desktop terminals
+      tags:
+      - DesktopTerminal
+    post:
+      description: Admin creates a paired kiosk/counter terminal and receives a one-time pairing code.
+      operationId: createDesktopTerminal
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/handlers.CreateDesktopTerminalRequest'
+        description: Create payload
+        required: true
+        x-originalParamName: body
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/handlers.CreateDesktopTerminalResponse'
+          description: Created
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: Create desktop terminal
+      tags:
+      - DesktopTerminal
+  /desktop-terminals/{id}:
+    get:
+      description: Returns one terminal by id, including effective `kind` and hydrated `counterName`/`unitName` when present.
+      operationId: getDesktopTerminalByID
+      parameters:
+      - description: Terminal ID
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/handlers.DesktopTerminalJSON'
+          description: OK
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Not found
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: Get desktop terminal by ID
+      tags:
+      - DesktopTerminal
+    patch:
+      description: Patches name, locale, kiosk fullscreen, and optionally counter binding. Body may include `kind` (kiosk | counter_guest_survey | counter_board) with `counterId`/`contextUnitId` when changing bindings; metadata-only updates omit counter fields.
+      operationId: updateDesktopTerminal
+      parameters:
+      - description: Terminal ID
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/handlers.UpdateDesktopTerminalRequest'
+        description: Update payload
+        required: true
+        x-originalParamName: body
+      responses:
+        '204':
+          description: No Content
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Not found
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: Update desktop terminal
+      tags:
+      - DesktopTerminal
+  /desktop-terminals/{id}/revoke:
+    post:
+      description: Marks the terminal as revoked; the pairing code stops working immediately.
+      operationId: revokeDesktopTerminal
+      parameters:
+      - description: Terminal ID
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: No Content
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Not found
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: Revoke desktop terminal
+      tags:
+      - DesktopTerminal
   /health/live:
     get:
       description: Returns 200 if the HTTP server accepts requests. Does not check databases or Redis.
@@ -9660,6 +10076,59 @@ paths:
       summary: Search unit clients (visitors)
       tags:
       - clients
+  /units/{unitId}/counter-board/session:
+    get:
+      description: Above-counter ticket display only. Does not load guest survey definitions and does not require the counter guest survey subscription feature.
+      operationId: counterBoardSession
+      parameters:
+      - description: Subdivision unit id (queue scope)
+        in: path
+        name: unitId
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/services.CounterBoardSession'
+          description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Not Found
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: Counter board session (terminal)
+      tags:
+      - counter-board
   /units/{unitId}/counters:
     get:
       description: Retrieves all counters for a specific unit
@@ -12895,3 +13364,6 @@ paths:
       - webhooks
 servers:
 - url: https://localhost:3001/
+tags:
+- name: counter-board
+  description: Above-counter ticket display for paired counter_board terminals (terminal JWT). Session for workplace display; separate from guest-survey survey flows.

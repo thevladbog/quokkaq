@@ -15,6 +15,8 @@
 ## Структура
 
 - Маршруты под `app/[locale]/`: `login`, `register`, `forgot-password`, `reset-password`, `admin/*`, `staff`, `supervisor`, `kiosk`, `screen`, `ticket`, `setup` — у зон отдельные `layout.tsx`.
+- **`/counter-display`** — экран у стойки: реклама/idle, гостевой опрос; терминальный JWT, ключи `quokkaq_counter_display_*`.
+- **`/workplace-display`** — табло над стойкой: только название стойки и талон (вызов или обслуживание), крупная типографика; отдельные ключи `quokkaq_counter_board_*`; десктоп-терминал с **`kind: counter_board`** (в админке — «Табло над стойкой»), не путать с **`counter_guest_survey`** («Экран опроса у стойки»). Сессия: `GET .../counter-board/session` (не гостевой опрос; не требует фичи опроса у стойки). Нужна фича **`counter_board`** на плане. Сопряжение можно передать в URL: `?code=…`.
 - Общие утилиты и компоненты — по соглашениям уже принятым в репозитории.
 
 ## Бэкенд (соседний репозиторий)

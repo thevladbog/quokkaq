@@ -39,6 +39,7 @@ var Plans = map[string]PlanDefinition{
 			"custom_branding":      false,
 			"priority_support":     false,
 			"counter_guest_survey": false,
+			"counter_board":        true,
 		},
 	},
 	"professional": {
@@ -65,6 +66,7 @@ var Plans = map[string]PlanDefinition{
 			"custom_branding":      true,
 			"priority_support":     true,
 			"counter_guest_survey": true,
+			"counter_board":        true,
 		},
 	},
 	"enterprise": {
@@ -94,6 +96,7 @@ var Plans = map[string]PlanDefinition{
 			"sla_guarantee":        true,
 			"custom_integrations":  true,
 			"counter_guest_survey": true,
+			"counter_board":        true,
 		},
 	},
 	"grandfathered": {
@@ -117,6 +120,7 @@ var Plans = map[string]PlanDefinition{
 			"api_access":           true,
 			"white_label":          false,
 			"counter_guest_survey": true,
+			"counter_board":        true,
 		},
 	},
 }

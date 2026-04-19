@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"quokkaq-go-backend/internal/models"
+	"quokkaq-go-backend/internal/rbac"
 	"quokkaq-go-backend/pkg/database"
 
 	"gorm.io/gorm"
@@ -417,7 +418,17 @@ func (r *userRepository) IsAdminOrHasUnitAccess(userID, unitID string) (bool, er
 			return true, nil
 		}
 	}
-	return false, nil
+	// Tenant "system administrator" (company-scoped): access to every unit in that company.
+	var n int64
+	if err := r.db.Raw(`
+SELECT COUNT(1) FROM units un
+INNER JOIN user_tenant_roles utr ON utr.company_id = un.company_id AND utr.user_id = ?
+INNER JOIN tenant_roles tr ON tr.id = utr.tenant_role_id AND tr.company_id = utr.company_id
+WHERE un.id = ? AND tr.slug = ?
+`, userID, unitID, rbac.TenantRoleSlugSystemAdmin).Scan(&n).Error; err != nil {
+		return false, err
+	}
+	return n > 0, nil
 }
 
 // HasCompanyAccess checks if user has access to any unit within a company

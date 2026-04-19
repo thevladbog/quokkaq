@@ -356,6 +356,51 @@ export interface HandlersCreateCheckoutResponse {
   sessionId?: string;
 }
 
+/**
+ * Kind: kiosk | counter_guest_survey | counter_board (required semantics: counter_* need counterId).
+ */
+export type HandlersCreateDesktopTerminalRequestKind = typeof HandlersCreateDesktopTerminalRequestKind[keyof typeof HandlersCreateDesktopTerminalRequestKind];
+
+
+export const HandlersCreateDesktopTerminalRequestKind = {
+  kiosk: 'kiosk',
+  counter_guest_survey: 'counter_guest_survey',
+  counter_board: 'counter_board',
+} as const;
+
+export interface HandlersCreateDesktopTerminalRequest {
+  /** ContextUnitID: subdivision or service_zone selected in the pairing wizard (required with counterId). */
+  contextUnitId?: string;
+  counterId?: string;
+  defaultLocale?: string;
+  /** Kind: kiosk | counter_guest_survey | counter_board (required semantics: counter_* need counterId). */
+  kind?: HandlersCreateDesktopTerminalRequestKind;
+  kioskFullscreen?: boolean;
+  name?: string;
+  unitId?: string;
+}
+
+export interface HandlersDesktopTerminalJSON {
+  counterId?: string;
+  counterName?: string;
+  createdAt?: string;
+  defaultLocale?: string;
+  id?: string;
+  kind?: string;
+  kioskFullscreen?: boolean;
+  lastSeenAt?: string;
+  name?: string;
+  revokedAt?: string;
+  unitId?: string;
+  unitName?: string;
+  updatedAt?: string;
+}
+
+export interface HandlersCreateDesktopTerminalResponse {
+  pairingCode?: string;
+  terminal?: HandlersDesktopTerminalJSON;
+}
+
 export type HandlersCreateInvitationRequestTargetRoles = { [key: string]: unknown };
 
 export type HandlersCreateInvitationRequestTargetUnits = { [key: string]: unknown };
@@ -733,6 +778,21 @@ export interface HandlersSignupRequest {
   planCode?: string;
 }
 
+export interface HandlersTerminalBootstrapRequest {
+  /** @minLength 1 */
+  code: string;
+}
+
+export interface HandlersTerminalBootstrapResponse {
+  appBaseUrl?: string;
+  counterId?: string;
+  defaultLocale?: string;
+  kioskFullscreen?: boolean;
+  terminalKind?: string;
+  token?: string;
+  unitId?: string;
+}
+
 export interface HandlersTransferRequest {
   /** @nullable */
   operatorComment?: string | null;
@@ -753,6 +813,16 @@ export interface HandlersUnitSummaryDTO {
 export interface HandlersUpdateCounterRequest {
   name?: string;
   serviceZoneId?: string;
+}
+
+export interface HandlersUpdateDesktopTerminalRequest {
+  contextUnitId?: string;
+  counterId?: string;
+  defaultLocale?: string;
+  kind?: string;
+  kioskFullscreen?: boolean;
+  name?: string;
+  unitId?: string;
 }
 
 export interface HandlersUpdateStatusRequest {
@@ -1629,6 +1699,24 @@ export interface ServicesCompanySSOPatch {
   scopes?: string;
   /** "oidc" | "saml" */
   ssoProtocol?: ServicesCompanySSOPatchSsoProtocol;
+}
+
+export type ServicesCounterBoardSessionUnitConfig = { [key: string]: unknown };
+
+export interface ServicesCounterBoardSessionTicket {
+  id?: string;
+  queueNumber?: string;
+  status?: string;
+}
+
+export interface ServicesCounterBoardSession {
+  activeTicket?: ServicesCounterBoardSessionTicket;
+  counterId?: string;
+  counterName?: string;
+  /** false when no operator has taken the counter */
+  counterStaffed?: boolean;
+  onBreak?: boolean;
+  unitConfig?: ServicesCounterBoardSessionUnitConfig;
 }
 
 export interface ServicesCreateCalendarIntegrationRequest {

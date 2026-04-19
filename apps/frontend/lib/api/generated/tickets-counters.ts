@@ -329,6 +329,51 @@ export interface HandlersCreateCheckoutResponse {
   sessionId?: string;
 }
 
+/**
+ * Kind: kiosk | counter_guest_survey | counter_board (required semantics: counter_* need counterId).
+ */
+export type HandlersCreateDesktopTerminalRequestKind = typeof HandlersCreateDesktopTerminalRequestKind[keyof typeof HandlersCreateDesktopTerminalRequestKind];
+
+
+export const HandlersCreateDesktopTerminalRequestKind = {
+  kiosk: 'kiosk',
+  counter_guest_survey: 'counter_guest_survey',
+  counter_board: 'counter_board',
+} as const;
+
+export interface HandlersCreateDesktopTerminalRequest {
+  /** ContextUnitID: subdivision or service_zone selected in the pairing wizard (required with counterId). */
+  contextUnitId?: string;
+  counterId?: string;
+  defaultLocale?: string;
+  /** Kind: kiosk | counter_guest_survey | counter_board (required semantics: counter_* need counterId). */
+  kind?: HandlersCreateDesktopTerminalRequestKind;
+  kioskFullscreen?: boolean;
+  name?: string;
+  unitId?: string;
+}
+
+export interface HandlersDesktopTerminalJSON {
+  counterId?: string;
+  counterName?: string;
+  createdAt?: string;
+  defaultLocale?: string;
+  id?: string;
+  kind?: string;
+  kioskFullscreen?: boolean;
+  lastSeenAt?: string;
+  name?: string;
+  revokedAt?: string;
+  unitId?: string;
+  unitName?: string;
+  updatedAt?: string;
+}
+
+export interface HandlersCreateDesktopTerminalResponse {
+  pairingCode?: string;
+  terminal?: HandlersDesktopTerminalJSON;
+}
+
 export type HandlersCreateInvitationRequestTargetRoles = { [key: string]: unknown };
 
 export type HandlersCreateInvitationRequestTargetUnits = { [key: string]: unknown };
@@ -706,6 +751,21 @@ export interface HandlersSignupRequest {
   planCode?: string;
 }
 
+export interface HandlersTerminalBootstrapRequest {
+  /** @minLength 1 */
+  code: string;
+}
+
+export interface HandlersTerminalBootstrapResponse {
+  appBaseUrl?: string;
+  counterId?: string;
+  defaultLocale?: string;
+  kioskFullscreen?: boolean;
+  terminalKind?: string;
+  token?: string;
+  unitId?: string;
+}
+
 export interface HandlersTransferRequest {
   /** @nullable */
   operatorComment?: string | null;
@@ -726,6 +786,16 @@ export interface HandlersUnitSummaryDTO {
 export interface HandlersUpdateCounterRequest {
   name?: string;
   serviceZoneId?: string;
+}
+
+export interface HandlersUpdateDesktopTerminalRequest {
+  contextUnitId?: string;
+  counterId?: string;
+  defaultLocale?: string;
+  kind?: string;
+  kioskFullscreen?: boolean;
+  name?: string;
+  unitId?: string;
 }
 
 export interface HandlersUpdateStatusRequest {
@@ -1602,6 +1672,24 @@ export interface ServicesCompanySSOPatch {
   scopes?: string;
   /** "oidc" | "saml" */
   ssoProtocol?: ServicesCompanySSOPatchSsoProtocol;
+}
+
+export type ServicesCounterBoardSessionUnitConfig = { [key: string]: unknown };
+
+export interface ServicesCounterBoardSessionTicket {
+  id?: string;
+  queueNumber?: string;
+  status?: string;
+}
+
+export interface ServicesCounterBoardSession {
+  activeTicket?: ServicesCounterBoardSessionTicket;
+  counterId?: string;
+  counterName?: string;
+  /** false when no operator has taken the counter */
+  counterStaffed?: boolean;
+  onBreak?: boolean;
+  unitConfig?: ServicesCounterBoardSessionUnitConfig;
 }
 
 export interface ServicesCreateCalendarIntegrationRequest {
@@ -2539,6 +2627,11 @@ export type postCountersIdCallNextResponse400 = {
   status: 400
 }
 
+export type postCountersIdCallNextResponse401 = {
+  data: string
+  status: 401
+}
+
 export type postCountersIdCallNextResponse404 = {
   data: string
   status: 404
@@ -2557,7 +2650,7 @@ export type postCountersIdCallNextResponse500 = {
 export type postCountersIdCallNextResponseSuccess = (postCountersIdCallNextResponse200) & {
   headers: Headers;
 };
-export type postCountersIdCallNextResponseError = (postCountersIdCallNextResponse400 | postCountersIdCallNextResponse404 | postCountersIdCallNextResponse409 | postCountersIdCallNextResponse500) & {
+export type postCountersIdCallNextResponseError = (postCountersIdCallNextResponse400 | postCountersIdCallNextResponse401 | postCountersIdCallNextResponse404 | postCountersIdCallNextResponse409 | postCountersIdCallNextResponse500) & {
   headers: Headers;
 };
 
@@ -2641,6 +2734,11 @@ export type postCountersIdForceReleaseResponse200 = {
   status: 200
 }
 
+export type postCountersIdForceReleaseResponse401 = {
+  data: string
+  status: 401
+}
+
 export type postCountersIdForceReleaseResponse404 = {
   data: string
   status: 404
@@ -2649,7 +2747,7 @@ export type postCountersIdForceReleaseResponse404 = {
 export type postCountersIdForceReleaseResponseSuccess = (postCountersIdForceReleaseResponse200) & {
   headers: Headers;
 };
-export type postCountersIdForceReleaseResponseError = (postCountersIdForceReleaseResponse404) & {
+export type postCountersIdForceReleaseResponseError = (postCountersIdForceReleaseResponse401 | postCountersIdForceReleaseResponse404) & {
   headers: Headers;
 };
 
@@ -2731,6 +2829,11 @@ export type occupyCounterResponse200 = {
   status: 200
 }
 
+export type occupyCounterResponse401 = {
+  data: string
+  status: 401
+}
+
 export type occupyCounterResponse404 = {
   data: string
   status: 404
@@ -2739,7 +2842,7 @@ export type occupyCounterResponse404 = {
 export type occupyCounterResponseSuccess = (occupyCounterResponse200) & {
   headers: Headers;
 };
-export type occupyCounterResponseError = (occupyCounterResponse404) & {
+export type occupyCounterResponseError = (occupyCounterResponse401 | occupyCounterResponse404) & {
   headers: Headers;
 };
 
@@ -2821,6 +2924,11 @@ export type postCountersIdReleaseResponse200 = {
   status: 200
 }
 
+export type postCountersIdReleaseResponse401 = {
+  data: string
+  status: 401
+}
+
 export type postCountersIdReleaseResponse404 = {
   data: string
   status: 404
@@ -2829,7 +2937,7 @@ export type postCountersIdReleaseResponse404 = {
 export type postCountersIdReleaseResponseSuccess = (postCountersIdReleaseResponse200) & {
   headers: Headers;
 };
-export type postCountersIdReleaseResponseError = (postCountersIdReleaseResponse404) & {
+export type postCountersIdReleaseResponseError = (postCountersIdReleaseResponse401 | postCountersIdReleaseResponse404) & {
   headers: Headers;
 };
 
