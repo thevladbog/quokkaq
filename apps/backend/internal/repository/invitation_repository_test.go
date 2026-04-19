@@ -26,12 +26,13 @@ CREATE TABLE invitations (
 	token TEXT NOT NULL UNIQUE,
 	status TEXT DEFAULT 'active',
 	expires_at DATETIME NOT NULL,
-	user_id TEXT UNIQUE,
+	user_id TEXT,
 	email TEXT NOT NULL,
 	created_at DATETIME,
 	updated_at DATETIME,
 	target_units TEXT,
-	target_roles TEXT
+	target_roles TEXT,
+	UNIQUE (company_id, user_id)
 );
 `).Error
 	if err != nil {
@@ -139,5 +140,40 @@ func TestInvitationRepository_FindActiveByCompanyAndEmail_ignoresExpired(t *test
 	_, err := repo.FindActiveByCompanyAndEmail(companyID, email)
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		t.Fatalf("expected ErrRecordNotFound, got %v", err)
+	}
+}
+
+func TestInvitationRepository_Delete_scopedByCompany(t *testing.T) {
+	t.Parallel()
+	db := newInvitationRepoTestDB(t)
+	repo := &invitationRepository{db: db}
+
+	const companyA = "company-a"
+	const companyB = "company-b"
+	future := time.Now().UTC().Add(24 * time.Hour)
+	inv := models.Invitation{
+		ID:        "inv-del",
+		CompanyID: companyA,
+		Token:     "tok-del",
+		Status:    "active",
+		ExpiresAt: future,
+		Email:     "del@example.com",
+	}
+	if err := repo.Create(&inv); err != nil {
+		t.Fatal(err)
+	}
+	err := repo.Delete("inv-del", companyB)
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("wrong company: expected ErrRecordNotFound, got %v", err)
+	}
+	var still models.Invitation
+	if err := db.First(&still, "id = ?", "inv-del").Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Delete("inv-del", companyA); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.First(&still, "id = ?", "inv-del").Error; !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("after delete: expected row gone, err=%v", err)
 	}
 }

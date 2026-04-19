@@ -392,8 +392,8 @@ export interface HandlersTenantRoleUnitJSON {
 
 export interface HandlersCreateTenantRoleJSON {
   description?: string;
-  name?: string;
-  slug?: string;
+  name: string;
+  slug: string;
   units?: HandlersTenantRoleUnitJSON[];
 }
 
@@ -428,7 +428,8 @@ export interface HandlersCreateTicketRequestKiosk {
 export type HandlersCreateTicketRequest = HandlersCreateTicketRequestAnonymous | HandlersCreateTicketRequestStaff | HandlersCreateTicketRequestKiosk;
 
 export interface HandlersCustomTermsLeadRequestBody {
-  comment?: string;
+  /** @minLength 1 */
+  comment: string;
 }
 
 export interface HandlersDaDataFindPartyByInnRequest {
@@ -644,7 +645,8 @@ export interface HandlersPickRequest {
 }
 
 export interface HandlersPlanChangeRequestBody {
-  requestedPlanCode?: string;
+  /** @minLength 1 */
+  requestedPlanCode: string;
 }
 
 export interface HandlersPlatformCreateSubscriptionBody {
@@ -684,12 +686,12 @@ export interface HandlersPlatformCreateSubscriptionPlanBody {
 }
 
 export interface HandlersPlatformIntegrationsResponse {
-  leadsTrackerQueue?: string;
-  supportTrackerQueue?: string;
-  trackerTypeError?: string;
-  trackerTypeRegistration?: string;
-  trackerTypeRequest?: string;
-  trackerTypeSupport?: string;
+  leadsTrackerQueue: string;
+  supportTrackerQueue: string;
+  trackerTypeError: string;
+  trackerTypeRegistration: string;
+  trackerTypeRequest: string;
+  trackerTypeSupport: string;
 }
 
 export type HandlersPlatformUpdateSubscriptionPlanBodyFeatures = {[key: string]: boolean};
@@ -718,10 +720,10 @@ export interface HandlersPlatformUpdateSubscriptionPlanBody {
 
 export interface HandlersPublicLeadRequestBody {
   company?: string;
-  email?: string;
+  email: string;
   locale?: string;
   message?: string;
-  name?: string;
+  name: string;
   planCode?: string;
   referrer?: string;
   source?: string;
@@ -1735,6 +1737,15 @@ export interface ServicesCreateCalendarIntegrationRequest {
   username: string;
 }
 
+export interface ServicesDeploymentSaaSSettingsPatch {
+  leadsTrackerQueue?: string;
+  supportTrackerQueue?: string;
+  trackerTypeError?: string;
+  trackerTypeRegistration?: string;
+  trackerTypeRequest?: string;
+  trackerTypeSupport?: string;
+}
+
 export interface ServicesEmployeeRadarResponse {
   computedAt?: string;
   rating?: number;
@@ -2221,12 +2232,27 @@ export const useDeleteCountersId = <TError = string,
     }
 
 /**
- * Retrieves a specific counter by its ID
- * @summary Get a counter by ID
+ * Requires a Bearer token. Platform admins may read any counter; other callers must resolve a tenant via X-Company-Id when applicable, and the counter's unit must belong to that company (otherwise 404).
+ * @summary Get a counter by ID (authenticated)
  */
 export type getCountersIdResponse200 = {
   data: ModelsCounter
   status: 200
+}
+
+export type getCountersIdResponse400 = {
+  data: string
+  status: 400
+}
+
+export type getCountersIdResponse401 = {
+  data: string
+  status: 401
+}
+
+export type getCountersIdResponse403 = {
+  data: string
+  status: 403
 }
 
 export type getCountersIdResponse404 = {
@@ -2234,10 +2260,15 @@ export type getCountersIdResponse404 = {
   status: 404
 }
 
+export type getCountersIdResponse500 = {
+  data: string
+  status: 500
+}
+
 export type getCountersIdResponseSuccess = (getCountersIdResponse200) & {
   headers: Headers;
 };
-export type getCountersIdResponseError = (getCountersIdResponse404) & {
+export type getCountersIdResponseError = (getCountersIdResponse400 | getCountersIdResponse401 | getCountersIdResponse403 | getCountersIdResponse404 | getCountersIdResponse500) & {
   headers: Headers;
 };
 
@@ -2320,7 +2351,7 @@ export function useGetCountersId<TData = Awaited<ReturnType<typeof getCountersId
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Get a counter by ID
+ * @summary Get a counter by ID (authenticated)
  */
 
 export function useGetCountersId<TData = Awaited<ReturnType<typeof getCountersId>>, TError = string>(

@@ -27,7 +27,7 @@ type SubscriptionHandler struct {
 	userRepo         repository.UserRepository
 	companyRepo      repository.CompanyRepository
 	paymentProvider  services.PaymentProvider
-	leadIssues       *services.LeadIssueService
+	subscriptionSvc  *services.SubscriptionService
 }
 
 func NewSubscriptionHandler(
@@ -35,14 +35,14 @@ func NewSubscriptionHandler(
 	userRepo repository.UserRepository,
 	companyRepo repository.CompanyRepository,
 	paymentProvider services.PaymentProvider,
-	leadIssues *services.LeadIssueService,
+	subscriptionSvc *services.SubscriptionService,
 ) *SubscriptionHandler {
 	return &SubscriptionHandler{
 		subscriptionRepo: subscriptionRepo,
 		userRepo:         userRepo,
 		companyRepo:      companyRepo,
 		paymentProvider:  paymentProvider,
-		leadIssues:       leadIssues,
+		subscriptionSvc:  subscriptionSvc,
 	}
 }
 
@@ -479,7 +479,7 @@ const maxPlanChangeRequestBodyBytes = 4096
 
 // PlanChangeRequestBody is JSON for POST /subscriptions/plan-change-request.
 type PlanChangeRequestBody struct {
-	RequestedPlanCode string `json:"requestedPlanCode"`
+	RequestedPlanCode string `json:"requestedPlanCode" binding:"required" minLength:"1"`
 }
 
 // PostPlanChangeRequest creates a Yandex Tracker issue for a requested subscription plan change (same queue as marketing leads).
@@ -501,30 +501,9 @@ type PlanChangeRequestBody struct {
 // @Failure      502   {string}  string  "Tracker error"
 // @Router       /subscriptions/plan-change-request [post]
 func (h *SubscriptionHandler) PostPlanChangeRequest(w http.ResponseWriter, r *http.Request) {
-	if h.leadIssues == nil {
-		http.Error(w, "Plan change requests are not configured", http.StatusServiceUnavailable)
-		return
-	}
 	userID, ok := middleware.GetUserIDFromContext(r.Context())
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-	companyID, err := h.userRepo.ResolveCompanyIDForRequest(userID, r.Header.Get("X-Company-Id"))
-	if err != nil {
-		if errors.Is(err, repository.ErrCompanyAccessDenied) {
-			http.Error(w, "Forbidden: no access to selected organization", http.StatusForbidden)
-			return
-		}
-		if repository.IsNotFound(err) {
-			http.Error(w, "User has no associated company", http.StatusNotFound)
-			return
-		}
-		logger.PrintfCtx(r.Context(), "PostPlanChangeRequest ResolveCompanyIDForRequest: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	if !h.requireBillingAdmin(w, r.Context(), userID, companyID) {
 		return
 	}
 	limited := http.MaxBytesReader(w, r.Body, maxPlanChangeRequestBodyBytes)
@@ -543,75 +522,18 @@ func (h *SubscriptionHandler) PostPlanChangeRequest(w http.ResponseWriter, r *ht
 		http.Error(w, "requestedPlanCode is required", http.StatusBadRequest)
 		return
 	}
-	subscription, err := h.subscriptionRepo.FindByCompanyID(companyID)
+	err = h.subscriptionSvc.SubmitPlanChangeRequest(r.Context(), userID, r.Header.Get("X-Company-Id"), requested)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			http.Error(w, "No subscription found", http.StatusNotFound)
+		var reqErr *services.SubscriptionRequestError
+		if errors.As(err, &reqErr) {
+			if reqErr.LogErr != nil {
+				logger.PrintfCtx(r.Context(), "PostPlanChangeRequest: %v", reqErr.LogErr)
+			}
+			http.Error(w, reqErr.Message, reqErr.Status)
 			return
 		}
-		logger.PrintfCtx(r.Context(), "PostPlanChangeRequest FindByCompanyID: %v", err)
+		logger.PrintfCtx(r.Context(), "PostPlanChangeRequest: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	currentCode := ""
-	if subscription.Plan.ID != "" {
-		currentCode = strings.TrimSpace(subscription.Plan.Code)
-	}
-	if strings.EqualFold(currentCode, requested) {
-		http.Error(w, "Already on this plan", http.StatusBadRequest)
-		return
-	}
-	if _, err := h.subscriptionRepo.FindPlanByCode(requested); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			http.Error(w, "Unknown or unavailable plan code", http.StatusBadRequest)
-			return
-		}
-		logger.PrintfCtx(r.Context(), "PostPlanChangeRequest FindPlanByCode: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	user, err := h.userRepo.FindByID(r.Context(), userID)
-	if err != nil || user == nil {
-		logger.PrintfCtx(r.Context(), "PostPlanChangeRequest FindByID user: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	userEmail := ""
-	if user.Email != nil {
-		userEmail = strings.TrimSpace(*user.Email)
-	}
-	company, err := h.companyRepo.FindByID(companyID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			http.Error(w, "Company not found", http.StatusNotFound)
-			return
-		}
-		logger.PrintfCtx(r.Context(), "PostPlanChangeRequest companyRepo.FindByID: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	okTracker, err := h.leadIssues.LeadsConfigured(r.Context())
-	if err != nil {
-		logger.PrintfCtx(r.Context(), "PostPlanChangeRequest LeadsConfigured: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	if !okTracker {
-		http.Error(w, "Plan change requests are not available (Tracker or leads queue not configured)", http.StatusServiceUnavailable)
-		return
-	}
-	err = h.leadIssues.CreatePlanChangeRequest(r.Context(),
-		companyID,
-		strings.TrimSpace(company.Name),
-		strings.TrimSpace(company.Slug),
-		strings.TrimSpace(user.Name),
-		userEmail,
-		currentCode,
-		requested,
-	)
-	if err != nil {
-		logger.PrintfCtx(r.Context(), "PostPlanChangeRequest CreatePlanChangeRequest: %v", err)
-		http.Error(w, "Failed to create Tracker ticket", http.StatusBadGateway)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -624,7 +546,7 @@ const maxCustomTermsCommentRunes = 8000
 
 // CustomTermsLeadRequestBody is JSON for POST /subscriptions/custom-terms-lead-request.
 type CustomTermsLeadRequestBody struct {
-	Comment string `json:"comment"`
+	Comment string `json:"comment" binding:"required" minLength:"1"`
 }
 
 // PostCustomTermsLeadRequest creates a [REQ] Yandex Tracker issue (individual pricing / custom terms).
@@ -646,30 +568,9 @@ type CustomTermsLeadRequestBody struct {
 // @Failure      502   {string}  string  "Tracker error"
 // @Router       /subscriptions/custom-terms-lead-request [post]
 func (h *SubscriptionHandler) PostCustomTermsLeadRequest(w http.ResponseWriter, r *http.Request) {
-	if h.leadIssues == nil {
-		http.Error(w, "Lead requests are not configured", http.StatusServiceUnavailable)
-		return
-	}
 	userID, ok := middleware.GetUserIDFromContext(r.Context())
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-	companyID, err := h.userRepo.ResolveCompanyIDForRequest(userID, r.Header.Get("X-Company-Id"))
-	if err != nil {
-		if errors.Is(err, repository.ErrCompanyAccessDenied) {
-			http.Error(w, "Forbidden: no access to selected organization", http.StatusForbidden)
-			return
-		}
-		if repository.IsNotFound(err) {
-			http.Error(w, "User has no associated company", http.StatusNotFound)
-			return
-		}
-		logger.PrintfCtx(r.Context(), "PostCustomTermsLeadRequest ResolveCompanyIDForRequest: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	if !h.requireBillingAdmin(w, r.Context(), userID, companyID) {
 		return
 	}
 	limited := http.MaxBytesReader(w, r.Body, maxCustomTermsLeadRequestBodyBytes)
@@ -692,47 +593,18 @@ func (h *SubscriptionHandler) PostCustomTermsLeadRequest(w http.ResponseWriter, 
 		http.Error(w, "comment is too long", http.StatusBadRequest)
 		return
 	}
-	user, err := h.userRepo.FindByID(r.Context(), userID)
-	if err != nil || user == nil {
-		logger.PrintfCtx(r.Context(), "PostCustomTermsLeadRequest FindByID user: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	userEmail := ""
-	if user.Email != nil {
-		userEmail = strings.TrimSpace(*user.Email)
-	}
-	company, err := h.companyRepo.FindByID(companyID)
+	err = h.subscriptionSvc.SubmitCustomTermsRequest(r.Context(), userID, r.Header.Get("X-Company-Id"), comment)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			http.Error(w, "Company not found", http.StatusNotFound)
+		var reqErr *services.SubscriptionRequestError
+		if errors.As(err, &reqErr) {
+			if reqErr.LogErr != nil {
+				logger.PrintfCtx(r.Context(), "PostCustomTermsLeadRequest: %v", reqErr.LogErr)
+			}
+			http.Error(w, reqErr.Message, reqErr.Status)
 			return
 		}
-		logger.PrintfCtx(r.Context(), "PostCustomTermsLeadRequest companyRepo.FindByID: %v", err)
+		logger.PrintfCtx(r.Context(), "PostCustomTermsLeadRequest: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	okTracker, err := h.leadIssues.LeadsConfigured(r.Context())
-	if err != nil {
-		logger.PrintfCtx(r.Context(), "PostCustomTermsLeadRequest LeadsConfigured: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	if !okTracker {
-		http.Error(w, "Lead requests are not available (Tracker or leads queue not configured)", http.StatusServiceUnavailable)
-		return
-	}
-	err = h.leadIssues.CreateTenantCustomTermsLeadRequest(r.Context(),
-		companyID,
-		strings.TrimSpace(company.Name),
-		strings.TrimSpace(company.Slug),
-		strings.TrimSpace(user.Name),
-		userEmail,
-		comment,
-	)
-	if err != nil {
-		logger.PrintfCtx(r.Context(), "PostCustomTermsLeadRequest CreateTenantCustomTermsLeadRequest: %v", err)
-		http.Error(w, "Failed to create Tracker ticket", http.StatusBadGateway)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")

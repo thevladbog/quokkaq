@@ -63,6 +63,26 @@ func (h *UserHandler) allowUserOpOnTarget(w http.ResponseWriter, viewerID, targe
 	return true
 }
 
+// filterUserUnitsForTenantScope trims user.Units to units in the resolved tenant when the viewer is not a platform admin (matches GetUserByID / GetUserUnits).
+func (h *UserHandler) filterUserUnitsForTenantScope(viewerID, companyID string, user *models.User) error {
+	pf, err := h.userRepo.IsPlatformAdmin(viewerID)
+	if err != nil {
+		return err
+	}
+	if pf || user == nil || user.Units == nil {
+		return nil
+	}
+	filtered := user.Units[:0]
+	for i := range user.Units {
+		uu := user.Units[i]
+		if uu.Unit.ID != "" && uu.Unit.CompanyID == companyID {
+			filtered = append(filtered, uu)
+		}
+	}
+	user.Units = filtered
+	return nil
+}
+
 // CreateUser godoc
 // @Summary      Create a new user
 // @Description  Creates a new user with the provided details
@@ -91,6 +111,7 @@ func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetAllUsers godoc
+// @ID           listUsers
 // @Summary      List users for the current tenant company
 // @Description  Returns users belonging to the tenant company resolved from the JWT and optional X-Company-Id header.
 // @Tags         users
@@ -118,13 +139,20 @@ func (h *UserHandler) GetAllUsers(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetUserByID godoc
+// @ID           getUserByID
 // @Summary      Get a user by ID
 // @Description  Retrieves a specific user by their ID
 // @Tags         users
 // @Produce      json
 // @Param        id   path      string  true  "User ID"
+// @Param        X-Company-Id header string false "Tenant company UUID when the user belongs to multiple organizations"
+// @Security     BearerAuth
 // @Success      200  {object}  models.User
+// @Failure      400  {string}  string "Company context required"
+// @Failure      401  {string}  string "Unauthorized"
+// @Failure      403  {string}  string "Forbidden"
 // @Failure      404  {string}  string "User not found"
+// @Failure      500  {string}  string "Internal Server Error"
 // @Router       /users/{id} [get]
 func (h *UserHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 	viewerID, companyID, ok := h.resolveViewerCompany(w, r)
@@ -140,30 +168,26 @@ func (h *UserHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 	if !h.allowUserOpOnTarget(w, viewerID, id, companyID) {
 		return
 	}
-	pf, err := h.userRepo.IsPlatformAdmin(viewerID)
-	if err != nil {
+	if err := h.filterUserUnitsForTenantScope(viewerID, companyID, user); err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
-	}
-	if !pf && user.Units != nil {
-		filtered := user.Units[:0]
-		for i := range user.Units {
-			uu := user.Units[i]
-			if uu.Unit.ID != "" && uu.Unit.CompanyID == companyID {
-				filtered = append(filtered, uu)
-			}
-		}
-		user.Units = filtered
 	}
 	RespondJSON(w, user)
 }
 
 // DeleteUser godoc
+// @ID           deleteUser
 // @Summary      Delete a user
 // @Description  Deletes a user by their ID
 // @Tags         users
 // @Param        id   path      string  true  "User ID"
+// @Param        X-Company-Id header string false "Tenant company UUID when the user belongs to multiple organizations"
+// @Security     BearerAuth
 // @Success      204  {object}  nil
+// @Failure      400  {string}  string "Company context required"
+// @Failure      401  {string}  string "Unauthorized"
+// @Failure      403  {string}  string "Forbidden"
+// @Failure      404  {string}  string "User not found"
 // @Failure      500  {string}  string "Internal Server Error"
 // @Router       /users/{id} [delete]
 func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
@@ -229,6 +253,10 @@ func (h *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
+	if err := h.filterUserUnitsForTenantScope(viewerID, companyID, user); err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
 	RespondJSON(w, user)
 }
 
@@ -238,15 +266,21 @@ type AssignUnitRequest struct {
 }
 
 // AssignUnit godoc
+// @ID           assignUserUnit
 // @Summary      Assign unit to user
 // @Description  Assigns a unit to a user with optional permissions
 // @Tags         users
 // @Accept       json
 // @Produce      json
 // @Param        id       path      string             true  "User ID"
+// @Param        X-Company-Id header string false "Tenant company UUID when the user belongs to multiple organizations"
 // @Param        request  body      AssignUnitRequest  true  "Assign Request"
+// @Security     BearerAuth
 // @Success      200      {object}  map[string]bool
 // @Failure      400      {string}  string "Bad Request"
+// @Failure      401      {string}  string "Unauthorized"
+// @Failure      403      {string}  string "Forbidden"
+// @Failure      404      {string}  string "Not found"
 // @Failure      500      {string}  string "Internal Server Error"
 // @Router       /users/{id}/units/assign [post]
 func (h *UserHandler) AssignUnit(w http.ResponseWriter, r *http.Request) {
@@ -290,15 +324,21 @@ type RemoveUnitRequest struct {
 }
 
 // RemoveUnit godoc
+// @ID           removeUserUnit
 // @Summary      Remove unit from user
 // @Description  Removes a unit from a user
 // @Tags         users
 // @Accept       json
 // @Produce      json
 // @Param        id       path      string             true  "User ID"
+// @Param        X-Company-Id header string false "Tenant company UUID when the user belongs to multiple organizations"
 // @Param        request  body      RemoveUnitRequest  true  "Remove Request"
+// @Security     BearerAuth
 // @Success      200      {object}  map[string]bool
 // @Failure      400      {string}  string "Bad Request"
+// @Failure      401      {string}  string "Unauthorized"
+// @Failure      403      {string}  string "Forbidden"
+// @Failure      404      {string}  string "Not found"
 // @Failure      500      {string}  string "Internal Server Error"
 // @Router       /users/{id}/units/remove [post]
 func (h *UserHandler) RemoveUnit(w http.ResponseWriter, r *http.Request) {
@@ -338,13 +378,20 @@ func (h *UserHandler) RemoveUnit(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetUserUnits godoc
+// @ID           getUserUnits
 // @Summary      Get user units
 // @Description  Retrieves units assigned to a user
 // @Tags         users
 // @Produce      json
 // @Param        id   path      string  true  "User ID"
+// @Param        X-Company-Id header string false "Tenant company UUID when the user belongs to multiple organizations"
+// @Security     BearerAuth
 // @Success      200  {array}   models.Unit
+// @Failure      400  {string}  string "Company context required"
+// @Failure      401  {string}  string "Unauthorized"
+// @Failure      403  {string}  string "Forbidden"
 // @Failure      404  {string}  string "User not found"
+// @Failure      500  {string}  string "Internal Server Error"
 // @Router       /users/{id}/units [get]
 func (h *UserHandler) GetUserUnits(w http.ResponseWriter, r *http.Request) {
 	viewerID, companyID, ok := h.resolveViewerCompany(w, r)
@@ -360,23 +407,11 @@ func (h *UserHandler) GetUserUnits(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
-	pf, err := h.userRepo.IsPlatformAdmin(viewerID)
-	if err != nil {
+	if err := h.filterUserUnitsForTenantScope(viewerID, companyID, user); err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-	units := user.Units
-	if !pf && units != nil {
-		filtered := units[:0]
-		for i := range units {
-			uu := units[i]
-			if uu.Unit.ID != "" && uu.Unit.CompanyID == companyID {
-				filtered = append(filtered, uu)
-			}
-		}
-		units = filtered
-	}
-	RespondJSON(w, units)
+	RespondJSON(w, user.Units)
 }
 
 // GetSystemStatus godoc

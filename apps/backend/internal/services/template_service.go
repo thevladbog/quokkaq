@@ -29,12 +29,7 @@ func (s *templateService) CreateTemplate(companyID string, template *models.Mess
 		return errors.New("companyId is required")
 	}
 	template.CompanyID = companyID
-	if template.IsDefault {
-		if err := s.repo.ClearDefaultFlagForCompany(companyID, ""); err != nil {
-			return err
-		}
-	}
-	return s.repo.Create(template)
+	return s.repo.CreateWithDefaultPromotion(companyID, template)
 }
 
 func (s *templateService) GetAllTemplates(companyID string) ([]models.MessageTemplate, error) {
@@ -62,16 +57,8 @@ func (s *templateService) UpdateTemplate(companyID string, template *models.Mess
 	if companyID == "" {
 		return errors.New("companyId is required")
 	}
-	if _, err := s.repo.FindByIDAndCompany(template.ID, companyID); err != nil {
-		return err
-	}
 	template.CompanyID = companyID
-	if template.IsDefault {
-		if err := s.repo.ClearDefaultFlagForCompany(companyID, template.ID); err != nil {
-			return err
-		}
-	}
-	return s.repo.Update(template)
+	return s.repo.UpdateWithDefaultPromotion(companyID, template)
 }
 
 func (s *templateService) DeleteTemplate(id, companyID string) error {

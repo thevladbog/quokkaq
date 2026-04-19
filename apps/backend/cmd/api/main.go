@@ -178,6 +178,7 @@ func run() error {
 	mailService := services.NewMailService()
 	tenantRBACRepo := repository.NewTenantRBACRepository()
 	deploymentSaaSSettingsRepo := repository.NewDeploymentSaaSSettingsRepository()
+	deploymentSaaSSettingsService := services.NewDeploymentSaaSSettingsService(deploymentSaaSSettingsRepo)
 	trackerClient := services.NewYandexTrackerClientFromEnv()
 	leadIssueService := services.NewLeadIssueService(deploymentSaaSSettingsRepo, trackerClient)
 	authService, err := services.NewAuthService(userRepo, companyRepo, mailService, subscriptionRepo, tenantRBACRepo, leadIssueService)
@@ -242,7 +243,7 @@ func run() error {
 
 	userHandler := handlers.NewUserHandler(userService, userRepo, unitRepo)
 	authHandler := handlers.NewAuthHandler(authService, userService, userRepo, tenantRBACRepo, leadIssueService)
-	integrationsHandler := handlers.NewIntegrationsHandler(deploymentSaaSSettingsRepo)
+	integrationsHandler := handlers.NewIntegrationsHandler(deploymentSaaSSettingsService)
 	leadHandler := handlers.NewLeadHandler(leadIssueService)
 	ssoHandler := handlers.NewSSOHandler(ssoService)
 	companySSOHTTP := handlers.NewCompanySSOHTTP(ssoService, userRepo, companyRepo)
@@ -288,7 +289,8 @@ func run() error {
 			paymentProvider = services.NewStripeProvider(stripeKey, strings.TrimSpace(os.Getenv("STRIPE_WEBHOOK_SECRET")))
 		}
 	}
-	subscriptionHandler := handlers.NewSubscriptionHandler(subscriptionRepo, userRepo, companyRepo, paymentProvider, leadIssueService)
+	subscriptionSvc := services.NewSubscriptionService(subscriptionRepo, userRepo, companyRepo, leadIssueService)
+	subscriptionHandler := handlers.NewSubscriptionHandler(subscriptionRepo, userRepo, companyRepo, paymentProvider, subscriptionSvc)
 	yShop := strings.TrimSpace(os.Getenv("YOOKASSA_SHOP_ID"))
 	ySecret := strings.TrimSpace(os.Getenv("YOOKASSA_SECRET_KEY"))
 	yWebhook := strings.TrimSpace(os.Getenv("YOOKASSA_WEBHOOK_SECRET"))

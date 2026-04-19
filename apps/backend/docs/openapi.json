@@ -221,6 +221,10 @@
                         "type": "array"
                     }
                 },
+                "required": [
+                    "name",
+                    "slug"
+                ],
                 "type": "object"
             },
             "handlers.CreateTicketRequest": {
@@ -239,9 +243,13 @@
             "handlers.CustomTermsLeadRequestBody": {
                 "properties": {
                     "comment": {
+                        "minLength": 1,
                         "type": "string"
                     }
                 },
+                "required": [
+                    "comment"
+                ],
                 "type": "object"
             },
             "handlers.DaDataFindPartyByInnRequest": {
@@ -815,9 +823,13 @@
             "handlers.PlanChangeRequestBody": {
                 "properties": {
                     "requestedPlanCode": {
+                        "minLength": 1,
                         "type": "string"
                     }
                 },
+                "required": [
+                    "requestedPlanCode"
+                ],
                 "type": "object"
             },
             "handlers.PlatformCreateSubscriptionBody": {
@@ -928,6 +940,14 @@
                         "type": "string"
                     }
                 },
+                "required": [
+                    "leadsTrackerQueue",
+                    "supportTrackerQueue",
+                    "trackerTypeError",
+                    "trackerTypeRegistration",
+                    "trackerTypeRequest",
+                    "trackerTypeSupport"
+                ],
                 "type": "object"
             },
             "handlers.PlatformUpdateSubscriptionPlanBody": {
@@ -993,6 +1013,7 @@
                         "type": "string"
                     },
                     "email": {
+                        "format": "email",
                         "type": "string"
                     },
                     "locale": {
@@ -1014,6 +1035,10 @@
                         "type": "string"
                     }
                 },
+                "required": [
+                    "email",
+                    "name"
+                ],
                 "type": "object"
             },
             "handlers.RefreshResponse": {
@@ -3897,6 +3922,29 @@
                     "unitId",
                     "username"
                 ],
+                "type": "object"
+            },
+            "services.DeploymentSaaSSettingsPatch": {
+                "properties": {
+                    "leadsTrackerQueue": {
+                        "type": "string"
+                    },
+                    "supportTrackerQueue": {
+                        "type": "string"
+                    },
+                    "trackerTypeError": {
+                        "type": "string"
+                    },
+                    "trackerTypeRegistration": {
+                        "type": "string"
+                    },
+                    "trackerTypeRequest": {
+                        "type": "string"
+                    },
+                    "trackerTypeSupport": {
+                        "type": "string"
+                    }
+                },
                 "type": "object"
             },
             "services.EmployeeRadarResponse": {
@@ -9276,6 +9324,16 @@
             "get": {
                 "description": "Returns every paired desktop terminal for the tenant (admin JWT). Each row includes effective `kind` (kiosk, counter_guest_survey, counter_board) and optional counter metadata.",
                 "operationId": "listDesktopTerminals",
+                "parameters": [
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "content": {
@@ -9290,53 +9348,6 @@
                         },
                         "description": "OK"
                     },
-                    "500": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "string"
-                                }
-                            }
-                        },
-                        "description": "Internal Server Error"
-                    }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "summary": "List desktop terminals",
-                "tags": [
-                    "DesktopTerminal"
-                ]
-            },
-            "post": {
-                "description": "Admin creates a paired kiosk/counter terminal and receives a one-time pairing code.",
-                "operationId": "createDesktopTerminal",
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/handlers.CreateDesktopTerminalRequest"
-                            }
-                        }
-                    },
-                    "description": "Create payload",
-                    "required": true,
-                    "x-originalParamName": "body"
-                },
-                "responses": {
-                    "201": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/handlers.CreateDesktopTerminalResponse"
-                                }
-                            }
-                        },
-                        "description": "Created"
-                    },
                     "400": {
                         "content": {
                             "application/json": {
@@ -9345,7 +9356,7 @@
                                 }
                             }
                         },
-                        "description": "Bad request"
+                        "description": "Company context required"
                     },
                     "401": {
                         "content": {
@@ -9383,6 +9394,103 @@
                         "BearerAuth": []
                     }
                 ],
+                "summary": "List desktop terminals",
+                "tags": [
+                    "DesktopTerminal"
+                ]
+            },
+            "post": {
+                "description": "Admin creates a paired kiosk/counter terminal and receives a one-time pairing code.",
+                "operationId": "createDesktopTerminal",
+                "parameters": [
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.CreateDesktopTerminalRequest"
+                            }
+                        }
+                    },
+                    "description": "Create payload",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.CreateDesktopTerminalResponse"
+                                }
+                            }
+                        },
+                        "description": "Created"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad request or company context required"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "summary": "Create desktop terminal",
                 "tags": [
                     "DesktopTerminal"
@@ -9402,6 +9510,14 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 ],
                 "responses": {
@@ -9414,6 +9530,16 @@
                             }
                         },
                         "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Company context required"
                     },
                     "401": {
                         "content": {
@@ -9478,6 +9604,14 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 ],
                 "requestBody": {
@@ -9504,7 +9638,7 @@
                                 }
                             }
                         },
-                        "description": "Bad request"
+                        "description": "Bad request or company context required"
                     },
                     "401": {
                         "content": {
@@ -9571,11 +9705,29 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 ],
                 "responses": {
                     "204": {
                         "description": "No Content"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Company context required"
                     },
                     "401": {
                         "content": {
@@ -9720,6 +9872,7 @@
         "/invitations": {
             "get": {
                 "description": "Lists invitations for the resolved tenant company only.",
+                "operationId": "ListInvitations",
                 "parameters": [
                     {
                         "description": "Tenant company UUID when the user belongs to multiple organizations",
@@ -9797,6 +9950,7 @@
             },
             "post": {
                 "description": "Creates a new invitation for the resolved tenant company. Organization for the invitee is determined by the invitation token on acceptance, not by email alone.",
+                "operationId": "CreateInvitation",
                 "parameters": [
                     {
                         "description": "Tenant company UUID when the user belongs to multiple organizations",
@@ -9885,6 +10039,7 @@
         "/invitations/register": {
             "post": {
                 "description": "Registers a new user using an invitation token",
+                "operationId": "RegisterUser",
                 "requestBody": {
                     "content": {
                         "application/json": {
@@ -9938,6 +10093,7 @@
         "/invitations/token/{token}": {
             "get": {
                 "description": "Retrieves an invitation by its token",
+                "operationId": "GetInvitation",
                 "parameters": [
                     {
                         "description": "Invitation Token",
@@ -9990,6 +10146,7 @@
         "/invitations/{id}": {
             "delete": {
                 "description": "Deletes an invitation by its ID within the resolved tenant company.",
+                "operationId": "DeleteInvitation",
                 "parameters": [
                     {
                         "description": "Tenant company UUID when the user belongs to multiple organizations",
@@ -10068,6 +10225,7 @@
         "/invitations/{id}/resend": {
             "patch": {
                 "description": "Resends an active invitation by its ID within the resolved tenant company.",
+                "operationId": "ResendInvitation",
                 "parameters": [
                     {
                         "description": "Tenant company UUID when the user belongs to multiple organizations",
@@ -11624,6 +11782,26 @@
                         },
                         "description": "OK"
                     },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
                     "500": {
                         "content": {
                             "application/json": {
@@ -11651,11 +11829,11 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/handlers.PlatformIntegrationsResponse"
+                                "$ref": "#/components/schemas/services.DeploymentSaaSSettingsPatch"
                             }
                         }
                     },
-                    "description": "Integration settings",
+                    "description": "Fields to update (omit keys to leave unchanged)",
                     "required": true,
                     "x-originalParamName": "body"
                 },
@@ -11679,6 +11857,26 @@
                             }
                         },
                         "description": "Bad request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
                     },
                     "500": {
                         "content": {
@@ -12485,7 +12683,7 @@
         },
         "/public/leads/request": {
             "post": {
-                "description": "Public endpoint; creates a Tracker issue when leads queue and Tracker credentials are configured.",
+                "description": "Public endpoint; creates a Tracker issue when leads queue and Tracker credentials are configured. The JSON body is read via `http.MaxBytesReader` with a cap of `MaxPublicLeadRequestBodyBytes` (see `PublicLeadRequestBody`); if the client sends more than that, `io.ReadAll` returns an error and the handler responds with 413 Request Entity Too Large.",
                 "operationId": "postPublicLeadRequest",
                 "requestBody": {
                     "content": {
@@ -12522,6 +12720,26 @@
                             }
                         },
                         "description": "Bad request"
+                    },
+                    "413": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Request entity too large"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Failed to verify configuration"
                     },
                     "502": {
                         "content": {
@@ -14523,6 +14741,7 @@
         "/templates": {
             "get": {
                 "description": "Lists message templates for the resolved tenant company only.",
+                "operationId": "ListTemplates",
                 "parameters": [
                     {
                         "description": "Tenant company UUID when the user belongs to multiple organizations",
@@ -14600,6 +14819,7 @@
             },
             "post": {
                 "description": "Creates a new message template for the resolved tenant company (JWT admin + X-Company-Id when applicable).",
+                "operationId": "CreateTemplate",
                 "parameters": [
                     {
                         "description": "Tenant company UUID when the user belongs to multiple organizations",
@@ -14688,6 +14908,7 @@
         "/templates/{id}": {
             "delete": {
                 "description": "Deletes a template by its ID within the resolved tenant company.",
+                "operationId": "DeleteTemplateByID",
                 "parameters": [
                     {
                         "description": "Tenant company UUID when the user belongs to multiple organizations",
@@ -14774,6 +14995,7 @@
             },
             "get": {
                 "description": "Retrieves a template by ID within the resolved tenant company.",
+                "operationId": "GetTemplateByID",
                 "parameters": [
                     {
                         "description": "Tenant company UUID when the user belongs to multiple organizations",
@@ -14857,6 +15079,7 @@
             },
             "put": {
                 "description": "Updates an existing template within the resolved tenant company.",
+                "operationId": "UpdateTemplateByID",
                 "parameters": [
                     {
                         "description": "Tenant company UUID when the user belongs to multiple organizations",
@@ -21936,6 +22159,7 @@
         "/users": {
             "get": {
                 "description": "Returns users belonging to the tenant company resolved from the JWT and optional X-Company-Id header.",
+                "operationId": "listUsers",
                 "parameters": [
                     {
                         "description": "Tenant company UUID when the user belongs to multiple organizations",
@@ -22066,6 +22290,7 @@
         "/users/{id}": {
             "delete": {
                 "description": "Deletes a user by their ID",
+                "operationId": "deleteUser",
                 "parameters": [
                     {
                         "description": "User ID",
@@ -22075,11 +22300,59 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 ],
                 "responses": {
                     "204": {
                         "description": "No Content"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Company context required"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "User not found"
                     },
                     "500": {
                         "content": {
@@ -22092,6 +22365,11 @@
                         "description": "Internal Server Error"
                     }
                 },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "summary": "Delete a user",
                 "tags": [
                     "users"
@@ -22099,12 +22377,21 @@
             },
             "get": {
                 "description": "Retrieves a specific user by their ID",
+                "operationId": "getUserByID",
                 "parameters": [
                     {
                         "description": "User ID",
                         "in": "path",
                         "name": "id",
                         "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
                         "schema": {
                             "type": "string"
                         }
@@ -22121,6 +22408,36 @@
                         },
                         "description": "OK"
                     },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Company context required"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
                     "404": {
                         "content": {
                             "application/json": {
@@ -22130,8 +22447,23 @@
                             }
                         },
                         "description": "User not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
                     }
                 },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "summary": "Get a user by ID",
                 "tags": [
                     "users"
@@ -22214,12 +22546,21 @@
         "/users/{id}/units": {
             "get": {
                 "description": "Retrieves units assigned to a user",
+                "operationId": "getUserUnits",
                 "parameters": [
                     {
                         "description": "User ID",
                         "in": "path",
                         "name": "id",
                         "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
                         "schema": {
                             "type": "string"
                         }
@@ -22239,6 +22580,36 @@
                         },
                         "description": "OK"
                     },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Company context required"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
                     "404": {
                         "content": {
                             "application/json": {
@@ -22248,8 +22619,23 @@
                             }
                         },
                         "description": "User not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
                     }
                 },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "summary": "Get user units",
                 "tags": [
                     "users"
@@ -22259,12 +22645,21 @@
         "/users/{id}/units/assign": {
             "post": {
                 "description": "Assigns a unit to a user with optional permissions",
+                "operationId": "assignUserUnit",
                 "parameters": [
                     {
                         "description": "User ID",
                         "in": "path",
                         "name": "id",
                         "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
                         "schema": {
                             "type": "string"
                         }
@@ -22306,6 +22701,36 @@
                         },
                         "description": "Bad Request"
                     },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Not found"
+                    },
                     "500": {
                         "content": {
                             "application/json": {
@@ -22317,6 +22742,11 @@
                         "description": "Internal Server Error"
                     }
                 },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "summary": "Assign unit to user",
                 "tags": [
                     "users"
@@ -22326,12 +22756,21 @@
         "/users/{id}/units/remove": {
             "post": {
                 "description": "Removes a unit from a user",
+                "operationId": "removeUserUnit",
                 "parameters": [
                     {
                         "description": "User ID",
                         "in": "path",
                         "name": "id",
                         "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
                         "schema": {
                             "type": "string"
                         }
@@ -22373,6 +22812,36 @@
                         },
                         "description": "Bad Request"
                     },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Not found"
+                    },
                     "500": {
                         "content": {
                             "application/json": {
@@ -22384,6 +22853,11 @@
                         "description": "Internal Server Error"
                     }
                 },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "summary": "Remove unit from user",
                 "tags": [
                     "users"

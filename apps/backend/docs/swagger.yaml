@@ -144,6 +144,9 @@ components:
           items:
             $ref: '#/components/schemas/handlers.TenantRoleUnitJSON'
           type: array
+      required:
+      - name
+      - slug
       type: object
     handlers.CreateTicketRequest:
       oneOf:
@@ -153,7 +156,10 @@ components:
     handlers.CustomTermsLeadRequestBody:
       properties:
         comment:
+          minLength: 1
           type: string
+      required:
+      - comment
       type: object
     handlers.DaDataFindPartyByInnRequest:
       properties:
@@ -540,7 +546,10 @@ components:
     handlers.PlanChangeRequestBody:
       properties:
         requestedPlanCode:
+          minLength: 1
           type: string
+      required:
+      - requestedPlanCode
       type: object
     handlers.PlatformCreateSubscriptionBody:
       properties:
@@ -615,6 +624,13 @@ components:
           type: string
         trackerTypeSupport:
           type: string
+      required:
+      - leadsTrackerQueue
+      - supportTrackerQueue
+      - trackerTypeError
+      - trackerTypeRegistration
+      - trackerTypeRequest
+      - trackerTypeSupport
       type: object
     handlers.PlatformUpdateSubscriptionPlanBody:
       properties:
@@ -659,6 +675,7 @@ components:
         company:
           type: string
         email:
+          format: email
           type: string
         locale:
           type: string
@@ -672,6 +689,9 @@ components:
           type: string
         source:
           type: string
+      required:
+      - email
+      - name
       type: object
     handlers.RefreshResponse:
       properties:
@@ -2607,6 +2627,21 @@ components:
       - enabled
       - unitId
       - username
+      type: object
+    services.DeploymentSaaSSettingsPatch:
+      properties:
+        leadsTrackerQueue:
+          type: string
+        supportTrackerQueue:
+          type: string
+        trackerTypeError:
+          type: string
+        trackerTypeRegistration:
+          type: string
+        trackerTypeRequest:
+          type: string
+        trackerTypeSupport:
+          type: string
       type: object
     services.EmployeeRadarResponse:
       properties:
@@ -5931,6 +5966,12 @@ paths:
     get:
       description: Returns every paired desktop terminal for the tenant (admin JWT). Each row includes effective `kind` (kiosk, counter_guest_survey, counter_board) and optional counter metadata.
       operationId: listDesktopTerminals
+      parameters:
+      - description: Tenant company UUID when the user belongs to multiple organizations
+        in: header
+        name: X-Company-Id
+        schema:
+          type: string
       responses:
         '200':
           content:
@@ -5940,6 +5981,24 @@ paths:
                   $ref: '#/components/schemas/handlers.DesktopTerminalJSON'
                 type: array
           description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Company context required
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
         '500':
           content:
             application/json:
@@ -5954,6 +6013,12 @@ paths:
     post:
       description: Admin creates a paired kiosk/counter terminal and receives a one-time pairing code.
       operationId: createDesktopTerminal
+      parameters:
+      - description: Tenant company UUID when the user belongs to multiple organizations
+        in: header
+        name: X-Company-Id
+        schema:
+          type: string
       requestBody:
         content:
           application/json:
@@ -5974,7 +6039,7 @@ paths:
             application/json:
               schema:
                 type: string
-          description: Bad request
+          description: Bad request or company context required
         '401':
           content:
             application/json:
@@ -5987,6 +6052,12 @@ paths:
               schema:
                 type: string
           description: Forbidden
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Not found
         '500':
           content:
             application/json:
@@ -6009,6 +6080,11 @@ paths:
         required: true
         schema:
           type: string
+      - description: Tenant company UUID when the user belongs to multiple organizations
+        in: header
+        name: X-Company-Id
+        schema:
+          type: string
       responses:
         '200':
           content:
@@ -6016,6 +6092,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/handlers.DesktopTerminalJSON'
           description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Company context required
         '401':
           content:
             application/json:
@@ -6055,6 +6137,11 @@ paths:
         required: true
         schema:
           type: string
+      - description: Tenant company UUID when the user belongs to multiple organizations
+        in: header
+        name: X-Company-Id
+        schema:
+          type: string
       requestBody:
         content:
           application/json:
@@ -6071,7 +6158,7 @@ paths:
             application/json:
               schema:
                 type: string
-          description: Bad request
+          description: Bad request or company context required
         '401':
           content:
             application/json:
@@ -6112,9 +6199,20 @@ paths:
         required: true
         schema:
           type: string
+      - description: Tenant company UUID when the user belongs to multiple organizations
+        in: header
+        name: X-Company-Id
+        schema:
+          type: string
       responses:
         '204':
           description: No Content
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Company context required
         '401':
           content:
             application/json:
@@ -6203,6 +6301,7 @@ paths:
   /invitations:
     get:
       description: Lists invitations for the resolved tenant company only.
+      operationId: ListInvitations
       parameters:
       - description: Tenant company UUID when the user belongs to multiple organizations
         in: header
@@ -6249,6 +6348,7 @@ paths:
       - invitations
     post:
       description: Creates a new invitation for the resolved tenant company. Organization for the invitee is determined by the invitation token on acceptance, not by email alone.
+      operationId: CreateInvitation
       parameters:
       - description: Tenant company UUID when the user belongs to multiple organizations
         in: header
@@ -6302,6 +6402,7 @@ paths:
   /invitations/{id}:
     delete:
       description: Deletes an invitation by its ID within the resolved tenant company.
+      operationId: DeleteInvitation
       parameters:
       - description: Tenant company UUID when the user belongs to multiple organizations
         in: header
@@ -6349,6 +6450,7 @@ paths:
   /invitations/{id}/resend:
     patch:
       description: Resends an active invitation by its ID within the resolved tenant company.
+      operationId: ResendInvitation
       parameters:
       - description: Tenant company UUID when the user belongs to multiple organizations
         in: header
@@ -6396,6 +6498,7 @@ paths:
   /invitations/register:
     post:
       description: Registers a new user using an invitation token
+      operationId: RegisterUser
       requestBody:
         content:
           application/json:
@@ -6429,6 +6532,7 @@ paths:
   /invitations/token/{token}:
     get:
       description: Retrieves an invitation by its token
+      operationId: GetInvitation
       parameters:
       - description: Invitation Token
         in: path
@@ -7352,6 +7456,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/handlers.PlatformIntegrationsResponse'
           description: OK
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
         '500':
           content:
             application/json:
@@ -7369,8 +7485,8 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/handlers.PlatformIntegrationsResponse'
-        description: Integration settings
+              $ref: '#/components/schemas/services.DeploymentSaaSSettingsPatch'
+        description: Fields to update (omit keys to leave unchanged)
         required: true
         x-originalParamName: body
       responses:
@@ -7386,6 +7502,18 @@ paths:
               schema:
                 type: string
           description: Bad request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
         '500':
           content:
             application/json:
@@ -7871,7 +7999,7 @@ paths:
       - platform
   /public/leads/request:
     post:
-      description: Public endpoint; creates a Tracker issue when leads queue and Tracker credentials are configured.
+      description: Public endpoint; creates a Tracker issue when leads queue and Tracker credentials are configured. The JSON body is read via `http.MaxBytesReader` with a cap of `MaxPublicLeadRequestBodyBytes` (see `PublicLeadRequestBody`); if the client sends more than that, `io.ReadAll` returns an error and the handler responds with 413 Request Entity Too Large.
       operationId: postPublicLeadRequest
       requestBody:
         content:
@@ -7896,6 +8024,18 @@ paths:
               schema:
                 type: string
           description: Bad request
+        '413':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Request entity too large
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Failed to verify configuration
         '502':
           content:
             application/json:
@@ -9112,6 +9252,7 @@ paths:
   /templates:
     get:
       description: Lists message templates for the resolved tenant company only.
+      operationId: ListTemplates
       parameters:
       - description: Tenant company UUID when the user belongs to multiple organizations
         in: header
@@ -9158,6 +9299,7 @@ paths:
       - templates
     post:
       description: Creates a new message template for the resolved tenant company (JWT admin + X-Company-Id when applicable).
+      operationId: CreateTemplate
       parameters:
       - description: Tenant company UUID when the user belongs to multiple organizations
         in: header
@@ -9211,6 +9353,7 @@ paths:
   /templates/{id}:
     delete:
       description: Deletes a template by its ID within the resolved tenant company.
+      operationId: DeleteTemplateByID
       parameters:
       - description: Tenant company UUID when the user belongs to multiple organizations
         in: header
@@ -9263,6 +9406,7 @@ paths:
       - templates
     get:
       description: Retrieves a template by ID within the resolved tenant company.
+      operationId: GetTemplateByID
       parameters:
       - description: Tenant company UUID when the user belongs to multiple organizations
         in: header
@@ -9313,6 +9457,7 @@ paths:
       - templates
     put:
       description: Updates an existing template within the resolved tenant company.
+      operationId: UpdateTemplateByID
       parameters:
       - description: Tenant company UUID when the user belongs to multiple organizations
         in: header
@@ -13646,6 +13791,7 @@ paths:
   /users:
     get:
       description: Returns users belonging to the tenant company resolved from the JWT and optional X-Company-Id header.
+      operationId: listUsers
       parameters:
       - description: Tenant company UUID when the user belongs to multiple organizations
         in: header
@@ -13725,6 +13871,7 @@ paths:
   /users/{id}:
     delete:
       description: Deletes a user by their ID
+      operationId: deleteUser
       parameters:
       - description: User ID
         in: path
@@ -13732,25 +13879,62 @@ paths:
         required: true
         schema:
           type: string
+      - description: Tenant company UUID when the user belongs to multiple organizations
+        in: header
+        name: X-Company-Id
+        schema:
+          type: string
       responses:
         '204':
           description: No Content
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Company context required
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: User not found
         '500':
           content:
             application/json:
               schema:
                 type: string
           description: Internal Server Error
+      security:
+      - BearerAuth: []
       summary: Delete a user
       tags:
       - users
     get:
       description: Retrieves a specific user by their ID
+      operationId: getUserByID
       parameters:
       - description: User ID
         in: path
         name: id
         required: true
+        schema:
+          type: string
+      - description: Tenant company UUID when the user belongs to multiple organizations
+        in: header
+        name: X-Company-Id
         schema:
           type: string
       responses:
@@ -13760,12 +13944,38 @@ paths:
               schema:
                 $ref: '#/components/schemas/models.User'
           description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Company context required
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
         '404':
           content:
             application/json:
               schema:
                 type: string
           description: User not found
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
       summary: Get a user by ID
       tags:
       - users
@@ -13818,11 +14028,17 @@ paths:
   /users/{id}/units:
     get:
       description: Retrieves units assigned to a user
+      operationId: getUserUnits
       parameters:
       - description: User ID
         in: path
         name: id
         required: true
+        schema:
+          type: string
+      - description: Tenant company UUID when the user belongs to multiple organizations
+        in: header
+        name: X-Company-Id
         schema:
           type: string
       responses:
@@ -13834,23 +14050,55 @@ paths:
                   $ref: '#/components/schemas/models.Unit'
                 type: array
           description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Company context required
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
         '404':
           content:
             application/json:
               schema:
                 type: string
           description: User not found
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
       summary: Get user units
       tags:
       - users
   /users/{id}/units/assign:
     post:
       description: Assigns a unit to a user with optional permissions
+      operationId: assignUserUnit
       parameters:
       - description: User ID
         in: path
         name: id
         required: true
+        schema:
+          type: string
+      - description: Tenant company UUID when the user belongs to multiple organizations
+        in: header
+        name: X-Company-Id
         schema:
           type: string
       requestBody:
@@ -13876,23 +14124,49 @@ paths:
               schema:
                 type: string
           description: Bad Request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Not found
         '500':
           content:
             application/json:
               schema:
                 type: string
           description: Internal Server Error
+      security:
+      - BearerAuth: []
       summary: Assign unit to user
       tags:
       - users
   /users/{id}/units/remove:
     post:
       description: Removes a unit from a user
+      operationId: removeUserUnit
       parameters:
       - description: User ID
         in: path
         name: id
         required: true
+        schema:
+          type: string
+      - description: Tenant company UUID when the user belongs to multiple organizations
+        in: header
+        name: X-Company-Id
         schema:
           type: string
       requestBody:
@@ -13918,12 +14192,32 @@ paths:
               schema:
                 type: string
           description: Bad Request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Not found
         '500':
           content:
             application/json:
               schema:
                 type: string
           description: Internal Server Error
+      security:
+      - BearerAuth: []
       summary: Remove unit from user
       tags:
       - users

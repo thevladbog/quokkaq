@@ -20,8 +20,12 @@ type Props = {
 };
 
 export function LandingHero({ locale, copy, appBaseUrl }: Props) {
-  const signupHref = appBaseUrl
-    ? `${appBaseUrl.replace(/\/$/, '')}/${locale}/signup`
+  const normalized = appBaseUrl?.trim();
+  const normalizedAppBase = normalized
+    ? normalized.replace(/\/$/, '')
+    : null;
+  const signupHref = normalizedAppBase
+    ? `${normalizedAppBase}/${locale}/signup`
     : null;
   return (
     <section className='relative z-10 mx-auto grid max-w-7xl grid-cols-1 content-center gap-8 px-4 py-8 sm:gap-10 sm:px-6 sm:py-10 lg:min-h-[calc(100dvh-5.25rem)] lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] lg:items-center lg:gap-12 lg:px-8 lg:py-6'>
@@ -89,12 +93,12 @@ export function LandingHero({ locale, copy, appBaseUrl }: Props) {
                 {copy.docsCta}
               </Link>
             )}
-            {appBaseUrl ? (
+            {normalizedAppBase ? (
               <LeadRequestCta
                 locale={locale}
                 source='hero_demo'
                 lead={copy.leadForm}
-                appBaseUrl={appBaseUrl}
+                appBaseUrl={normalizedAppBase}
                 className={heroSecondaryClass}
               >
                 {copy.secondaryCta}

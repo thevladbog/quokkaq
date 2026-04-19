@@ -35,11 +35,11 @@ type UnitMaterial struct {
 
 type Invitation struct {
 	ID        string    `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
-	CompanyID string    `gorm:"not null;index" json:"companyId"`
+	CompanyID string    `gorm:"not null;uniqueIndex:idx_invitations_company_user" json:"companyId"`
 	Token     string    `gorm:"unique;not null" json:"token"`
 	Status    string    `gorm:"default:'active'" json:"status"`
 	ExpiresAt time.Time `gorm:"not null" json:"expiresAt"`
-	UserID    *string   `gorm:"unique" json:"userId,omitempty"`
+	UserID    *string   `gorm:"uniqueIndex:idx_invitations_company_user" json:"userId,omitempty"`
 	Email     string    `gorm:"not null" json:"email"`
 	CreatedAt time.Time `gorm:"default:now()" json:"createdAt"`
 	UpdatedAt time.Time `gorm:"autoUpdateTime" json:"updatedAt"`

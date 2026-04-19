@@ -267,8 +267,8 @@ type TenantRoleUnitJSON struct {
 
 // CreateTenantRoleJSON is the body for POST/PATCH tenant role.
 type CreateTenantRoleJSON struct {
-	Name        string               `json:"name"`
-	Slug        string               `json:"slug"`
+	Name        string               `json:"name" binding:"required"`
+	Slug        string               `json:"slug" binding:"required"`
 	Description string               `json:"description"`
 	Units       []TenantRoleUnitJSON `json:"units"`
 }

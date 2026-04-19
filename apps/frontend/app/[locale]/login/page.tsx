@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useRouter, Link } from '@/src/i18n/navigation';
 import Image from 'next/image';
@@ -92,6 +92,9 @@ export default function LoginPage() {
   const [tenantBanner, setTenantBanner] = useState<string | null>(null);
   const [hintLoading, setHintLoading] = useState(false);
   const [step, setStep] = useState<Step>('form');
+  /** True while resolving accessible companies after login so redirect/spinner logic does not run ahead of setStep('company'). */
+  const [resolvingAccessibleCompanies, setResolvingAccessibleCompanies] =
+    useState(false);
   const [companySearch, setCompanySearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [ssoErrorCode, setSsoErrorCode] = useState<SSOErrorCode | null>(null);
@@ -271,12 +274,46 @@ export default function LoginPage() {
 
   const sessionResolving = Boolean(token && !user);
 
+  const finalizeLoginAfterToken = useCallback(
+    async (accessToken: string) => {
+      setResolvingAccessibleCompanies(true);
+      try {
+        await login(accessToken);
+        const acRes = await authAccessibleCompanies();
+        if (acRes.status !== 200) {
+          throw new Error('accessible_companies_failed');
+        }
+        const companies = acRes.data.companies ?? [];
+        if (companies.length > 1) {
+          setStep('company');
+          return;
+        }
+        if (companies.length === 1 && companies[0].id) {
+          setActiveCompanyId(companies[0].id);
+        }
+        router.replace('/');
+      } finally {
+        setResolvingAccessibleCompanies(false);
+      }
+    },
+    [login, router, setActiveCompanyId]
+  );
+
   useEffect(() => {
     if (ssoErrorCode) return;
+    if (resolvingAccessibleCompanies) return;
+    if (step === 'company') return;
     if (isAuthenticated && user) {
       router.replace('/');
     }
-  }, [isAuthenticated, user, router, ssoErrorCode]);
+  }, [
+    isAuthenticated,
+    user,
+    router,
+    ssoErrorCode,
+    resolvingAccessibleCompanies,
+    step
+  ]);
 
   useEffect(() => {
     if (ssoErrorCode) return;
@@ -287,7 +324,7 @@ export default function LoginPage() {
     const at = localStorage.getItem('access_token')?.trim();
     if (!at) return;
     legacySessionRecoveryAttemptedRef.current = true;
-    void login(at).catch(() => {
+    void finalizeLoginAfterToken(at).catch(() => {
       legacySessionRecoveryAttemptedRef.current = false;
     });
   }, [
@@ -295,11 +332,15 @@ export default function LoginPage() {
     sessionResolving,
     isAuthenticated,
     user,
-    login,
+    finalizeLoginAfterToken,
     ssoErrorCode
   ]);
 
-  if (isAuthLoading || sessionResolving || (isAuthenticated && user)) {
+  if (
+    isAuthLoading ||
+    sessionResolving ||
+    (isAuthenticated && user && step !== 'company')
+  ) {
     return (
       <div className='bg-background flex min-h-dvh items-center justify-center'>
         <Loader2 className='text-primary h-8 w-8 animate-spin' />
@@ -308,9 +349,14 @@ export default function LoginPage() {
   }
 
   const confirmSsoRedirect = () => {
-    const slug = ssoModalSlug.trim();
-    if (!slug) {
+    const slugFromInput = ssoModalSlug.trim();
+    const slugValidated = debouncedSsoModalSlug.trim();
+    if (!slugFromInput) {
       toast.error(t('ssoSlugRequired'));
+      return;
+    }
+    if (slugFromInput !== slugValidated) {
+      toast.error(t('ssoSlugWaitValidation'));
       return;
     }
     if (!ssoReady) {
@@ -320,7 +366,7 @@ export default function LoginPage() {
     window.location.href =
       '/api' +
       getAuthSSOAuthorizeUrl({
-        tenant: slug,
+        tenant: slugValidated,
         locale: toAuthSSOAuthorizeLocale(locale)
       });
   };
@@ -350,20 +396,7 @@ export default function LoginPage() {
       });
 
       if (response && response.accessToken) {
-        await login(response.accessToken);
-        const acRes = await authAccessibleCompanies();
-        if (acRes.status !== 200) {
-          throw new Error('accessible_companies_failed');
-        }
-        const companies = acRes.data.companies ?? [];
-        if (companies.length > 1) {
-          setStep('company');
-          return;
-        }
-        if (companies.length === 1 && companies[0].id) {
-          setActiveCompanyId(companies[0].id);
-        }
-        router.replace('/');
+        await finalizeLoginAfterToken(response.accessToken);
       }
     } catch (error) {
       logger.error('Login failed:', error);
@@ -664,7 +697,8 @@ export default function LoginPage() {
               disabled={
                 ssoModalPrepareLoading ||
                 !ssoReady ||
-                debouncedSsoModalSlug.length < MIN_TENANT_SLUG_LENGTH
+                debouncedSsoModalSlug.length < MIN_TENANT_SLUG_LENGTH ||
+                ssoModalSlug.trim() !== debouncedSsoModalSlug.trim()
               }
               onClick={confirmSsoRedirect}
             >

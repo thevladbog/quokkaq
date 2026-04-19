@@ -9,6 +9,7 @@ import (
 	"quokkaq-go-backend/internal/services"
 
 	"github.com/go-chi/chi/v5"
+	"gorm.io/gorm"
 )
 
 type InvitationHandler struct {
@@ -46,6 +47,7 @@ type CreateInvitationRequest struct {
 }
 
 // CreateInvitation godoc
+// @ID           CreateInvitation
 // @Summary      Create a new invitation
 // @Description  Creates a new invitation for the resolved tenant company. Organization for the invitee is determined by the invitation token on acceptance, not by email alone.
 // @Tags         invitations
@@ -87,6 +89,7 @@ func (h *InvitationHandler) CreateInvitation(w http.ResponseWriter, r *http.Requ
 }
 
 // GetAllInvitations godoc
+// @ID           ListInvitations
 // @Summary      Get all invitations
 // @Description  Lists invitations for the resolved tenant company only.
 // @Tags         invitations
@@ -113,6 +116,7 @@ func (h *InvitationHandler) GetAllInvitations(w http.ResponseWriter, r *http.Req
 }
 
 // DeleteInvitation godoc
+// @ID           DeleteInvitation
 // @Summary      Delete an invitation
 // @Description  Deletes an invitation by its ID within the resolved tenant company.
 // @Tags         invitations
@@ -132,6 +136,10 @@ func (h *InvitationHandler) DeleteInvitation(w http.ResponseWriter, r *http.Requ
 	}
 	id := chi.URLParam(r, "id")
 	if err := h.service.DeleteInvitation(id, companyID); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "Invitation not found", http.StatusNotFound)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -139,6 +147,7 @@ func (h *InvitationHandler) DeleteInvitation(w http.ResponseWriter, r *http.Requ
 }
 
 // ResendInvitation godoc
+// @ID           ResendInvitation
 // @Summary      Resend an invitation
 // @Description  Resends an active invitation by its ID within the resolved tenant company.
 // @Tags         invitations
@@ -172,6 +181,7 @@ type RegisterUserRequest struct {
 }
 
 // RegisterUser godoc
+// @ID           RegisterUser
 // @Summary      Register a new user via invitation
 // @Description  Registers a new user using an invitation token
 // @Tags         invitations
@@ -205,6 +215,7 @@ func (h *InvitationHandler) RegisterUser(w http.ResponseWriter, r *http.Request)
 }
 
 // GetInvitationByToken godoc
+// @ID           GetInvitation
 // @Summary      Get invitation by token
 // @Description  Retrieves an invitation by its token
 // @Tags         invitations

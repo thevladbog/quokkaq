@@ -40,7 +40,12 @@ export function TenantPricingPlansContent() {
     }
   });
 
-  const { data: plans, isLoading: plansLoading } = useQuery({
+  const {
+    data: plans,
+    isLoading: plansLoading,
+    isError: plansQueryError,
+    error: plansLoadError
+  } = useQuery({
     queryKey: getGetMySubscriptionPlansQueryKey(),
     queryFn: () => subscriptionsApi.getPlans()
   });
@@ -124,6 +129,14 @@ export function TenantPricingPlansContent() {
         <h2 className='mb-3 text-xl font-semibold'>{t('availablePlans')}</h2>
         {plansLoading ? (
           <div className='text-muted-foreground'>{t('loadingPlans')}</div>
+        ) : plansQueryError ? (
+          <Alert variant='destructive'>
+            <AlertDescription>
+              {t('loadPlansFailed')}
+              {': '}
+              {formatApiToastErrorMessage(plansLoadError, tCommon('error'))}
+            </AlertDescription>
+          </Alert>
         ) : (
           <PlanSelector
             plans={plans ?? []}

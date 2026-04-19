@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"quokkaq-go-backend/internal/models"
+	"quokkaq-go-backend/internal/rbac"
 	"quokkaq-go-backend/internal/repository"
 	"strings"
 	"time"
@@ -65,7 +66,7 @@ func validateInvitationTargetUnits(unitRepo repository.UnitRepository, companyID
 	for _, u := range targetUnits {
 		uid := strings.TrimSpace(u.UnitID)
 		if uid == "" {
-			continue
+			return fmt.Errorf("invalid target unit: empty unitId")
 		}
 		un, err := unitRepo.FindByIDLight(uid)
 		if err != nil {
@@ -188,10 +189,7 @@ func (s *invitationService) DeleteInvitation(id, companyID string) error {
 	if companyID == "" {
 		return errors.New("companyId is required")
 	}
-	if _, err := s.repo.FindByIDAndCompany(id, companyID); err != nil {
-		return err
-	}
-	return s.repo.Delete(id)
+	return s.repo.Delete(id, companyID)
 }
 
 func (s *invitationService) ResendInvitation(id, companyID string) error {
@@ -278,13 +276,20 @@ func (s *invitationService) RegisterUser(token, name, password string) (*models.
 	}
 
 	if len(invitation.TargetUnits) > 0 {
+		if err := validateInvitationTargetUnits(s.unitRepo, invitation.CompanyID, invitation.TargetUnits); err != nil {
+			return nil, err
+		}
 		var targetUnits []struct {
 			UnitID      string   `json:"unitId"`
 			Permissions []string `json:"permissions"`
 		}
-		if err := json.Unmarshal(invitation.TargetUnits, &targetUnits); err == nil {
-			for _, unit := range targetUnits {
-				_ = s.userRepo.AssignUnit(user.ID, unit.UnitID, unit.Permissions)
+		if err := json.Unmarshal(invitation.TargetUnits, &targetUnits); err != nil {
+			return nil, fmt.Errorf("invalid targetUnits: %w", err)
+		}
+		for _, unit := range targetUnits {
+			uid := strings.TrimSpace(unit.UnitID)
+			if err := s.userRepo.AssignUnit(user.ID, uid, unit.Permissions); err != nil {
+				return nil, fmt.Errorf("assign unit: %w", err)
 			}
 		}
 	}
@@ -298,6 +303,23 @@ func (s *invitationService) RegisterUser(token, name, password string) (*models.
 					_ = s.userRepo.AssignRole(user.ID, role.ID)
 				}
 			}
+		}
+	}
+
+	// Global roles (AssignRole) do not grant tenant-scoped company access; ensure at least one unit
+	// in this company so the user is not orphaned (e.g. empty targetUnits/targetRoles).
+	hasCompany, err := s.userRepo.HasCompanyAccess(user.ID, invitation.CompanyID)
+	if err != nil {
+		return nil, err
+	}
+	if !hasCompany {
+		rootUnit, err := s.unitRepo.FindFirstByCompanyID(invitation.CompanyID)
+		if err != nil {
+			return nil, fmt.Errorf("assign tenant membership: %w", err)
+		}
+		defaultPerms := rbac.LegacyRolePermissions("staff")
+		if err := s.userRepo.AssignUnit(user.ID, rootUnit.ID, defaultPerms); err != nil {
+			return nil, fmt.Errorf("assign tenant membership: %w", err)
 		}
 	}
 

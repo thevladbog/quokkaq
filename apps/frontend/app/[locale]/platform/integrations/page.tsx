@@ -1,25 +1,205 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { useForm, useFormState } from 'react-hook-form';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel
+} from '@/components/ui/form';
 import { Spinner } from '@/components/ui/spinner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   getGetPlatformIntegrationsQueryKey,
   getPlatformIntegrations,
   patchPlatformIntegrations,
-  type HandlersPlatformIntegrationsResponse
+  type HandlersPlatformIntegrationsResponse,
+  type ServicesDeploymentSaaSSettingsPatch
 } from '@/lib/api/generated/platform';
+
+type PlatformIntegrationsFormValues = {
+  leadsTrackerQueue: string;
+  trackerTypeRegistration: string;
+  trackerTypeRequest: string;
+  trackerTypeError: string;
+  supportTrackerQueue: string;
+  trackerTypeSupport: string;
+};
+
+function toFormValues(
+  data: HandlersPlatformIntegrationsResponse
+): PlatformIntegrationsFormValues {
+  return {
+    leadsTrackerQueue: data.leadsTrackerQueue ?? '',
+    trackerTypeRegistration: data.trackerTypeRegistration ?? '',
+    trackerTypeRequest: data.trackerTypeRequest ?? '',
+    trackerTypeError: data.trackerTypeError ?? '',
+    supportTrackerQueue: data.supportTrackerQueue ?? '',
+    trackerTypeSupport: data.trackerTypeSupport ?? ''
+  };
+}
+
+function PlatformIntegrationsForm({
+  data
+}: {
+  data: HandlersPlatformIntegrationsResponse;
+}) {
+  const t = useTranslations('platform.integrations');
+  const queryClient = useQueryClient();
+
+  const form = useForm<PlatformIntegrationsFormValues>({
+    defaultValues: toFormValues(data)
+  });
+  const { reset, control } = form;
+  const { isDirty } = useFormState({ control });
+
+  useEffect(() => {
+    if (!isDirty) {
+      reset(toFormValues(data));
+    }
+  }, [data, isDirty, reset]);
+
+  const mutation = useMutation({
+    mutationFn: async (values: PlatformIntegrationsFormValues) =>
+      patchPlatformIntegrations({
+        leadsTrackerQueue: values.leadsTrackerQueue ?? '',
+        trackerTypeRegistration: values.trackerTypeRegistration ?? '',
+        trackerTypeRequest: values.trackerTypeRequest ?? '',
+        trackerTypeError: values.trackerTypeError ?? '',
+        supportTrackerQueue: values.supportTrackerQueue ?? '',
+        trackerTypeSupport: values.trackerTypeSupport ?? ''
+      } satisfies ServicesDeploymentSaaSSettingsPatch),
+    onSuccess: (res) => {
+      if (res.status === 200 && res.data) {
+        toast.success(t('saved'));
+        void queryClient.invalidateQueries({
+          queryKey: getGetPlatformIntegrationsQueryKey()
+        });
+        reset(toFormValues(res.data));
+      } else {
+        toast.error(t('saveError'));
+      }
+    },
+    onError: () => toast.error(t('saveError'))
+  });
+
+  const onSave = form.handleSubmit((values) => {
+    mutation.mutate(values);
+  });
+
+  return (
+    <Form {...form}>
+      <Tabs defaultValue='tracker' className='max-w-2xl'>
+        <TabsList className='grid w-full max-w-md grid-cols-2'>
+          <TabsTrigger value='tracker'>{t('tabTracker')}</TabsTrigger>
+          <TabsTrigger value='support'>{t('tabSupport')}</TabsTrigger>
+        </TabsList>
+        <TabsContent value='tracker' className='mt-6 space-y-6'>
+          <p className='text-muted-foreground text-sm'>{t('trackerIntro')}</p>
+          <FormField
+            control={form.control}
+            name='leadsTrackerQueue'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('leadsQueue')}</FormLabel>
+                <FormControl>
+                  <Input {...field} autoComplete='off' />
+                </FormControl>
+                <FormDescription>{t('leadsQueueHint')}</FormDescription>
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name='trackerTypeRegistration'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('typeRegistration')}</FormLabel>
+                <FormControl>
+                  <Input {...field} autoComplete='off' />
+                </FormControl>
+                <FormDescription>{t('typeHint')}</FormDescription>
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name='trackerTypeRequest'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('typeRequest')}</FormLabel>
+                <FormControl>
+                  <Input {...field} autoComplete='off' />
+                </FormControl>
+                <FormDescription>{t('typeHint')}</FormDescription>
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name='trackerTypeError'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('typeError')}</FormLabel>
+                <FormControl>
+                  <Input {...field} autoComplete='off' />
+                </FormControl>
+                <FormDescription>{t('typeHint')}</FormDescription>
+              </FormItem>
+            )}
+          />
+          <Button type='button' disabled={mutation.isPending} onClick={onSave}>
+            {mutation.isPending ? <Spinner className='size-4' /> : t('save')}
+          </Button>
+        </TabsContent>
+        <TabsContent value='support' className='mt-6 space-y-6'>
+          <p className='text-muted-foreground text-sm'>{t('supportIntro')}</p>
+          <FormField
+            control={form.control}
+            name='supportTrackerQueue'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('supportQueue')}</FormLabel>
+                <FormControl>
+                  <Input {...field} autoComplete='off' />
+                </FormControl>
+                <FormDescription>{t('supportQueueHint')}</FormDescription>
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name='trackerTypeSupport'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('typeSupport')}</FormLabel>
+                <FormControl>
+                  <Input {...field} autoComplete='off' />
+                </FormControl>
+                <FormDescription>{t('typeHint')}</FormDescription>
+              </FormItem>
+            )}
+          />
+          <Button type='button' disabled={mutation.isPending} onClick={onSave}>
+            {mutation.isPending ? <Spinner className='size-4' /> : t('save')}
+          </Button>
+        </TabsContent>
+      </Tabs>
+    </Form>
+  );
+}
 
 export default function PlatformIntegrationsPage() {
   const t = useTranslations('platform.integrations');
-  const queryClient = useQueryClient();
   const q = useQuery({
     queryKey: getGetPlatformIntegrationsQueryKey(),
     queryFn: async () => {
@@ -29,53 +209,6 @@ export default function PlatformIntegrationsPage() {
       }
       return res.data;
     }
-  });
-
-  const [form, setForm] = useState<HandlersPlatformIntegrationsResponse>({
-    leadsTrackerQueue: '',
-    trackerTypeRegistration: '',
-    trackerTypeRequest: '',
-    trackerTypeError: '',
-    supportTrackerQueue: '',
-    trackerTypeSupport: ''
-  });
-
-  useEffect(() => {
-    if (q.data) {
-      // Sync local fields after GET; controlled form from query alone would overwrite on every keystroke.
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- form defaults from server load
-      setForm({
-        leadsTrackerQueue: q.data.leadsTrackerQueue ?? '',
-        trackerTypeRegistration: q.data.trackerTypeRegistration ?? '',
-        trackerTypeRequest: q.data.trackerTypeRequest ?? '',
-        trackerTypeError: q.data.trackerTypeError ?? '',
-        supportTrackerQueue: q.data.supportTrackerQueue ?? '',
-        trackerTypeSupport: q.data.trackerTypeSupport ?? ''
-      });
-    }
-  }, [q.data]);
-
-  const mutation = useMutation({
-    mutationFn: async () =>
-      patchPlatformIntegrations({
-        leadsTrackerQueue: form.leadsTrackerQueue ?? '',
-        trackerTypeRegistration: form.trackerTypeRegistration ?? '',
-        trackerTypeRequest: form.trackerTypeRequest ?? '',
-        trackerTypeError: form.trackerTypeError ?? '',
-        supportTrackerQueue: form.supportTrackerQueue ?? '',
-        trackerTypeSupport: form.trackerTypeSupport ?? ''
-      } satisfies HandlersPlatformIntegrationsResponse),
-    onSuccess: (res) => {
-      if (res.status === 200 && res.data) {
-        toast.success(t('saved'));
-        void queryClient.invalidateQueries({
-          queryKey: getGetPlatformIntegrationsQueryKey()
-        });
-      } else {
-        toast.error(t('saveError'));
-      }
-    },
-    onError: () => toast.error(t('saveError'))
   });
 
   if (q.isLoading) {
@@ -90,122 +223,16 @@ export default function PlatformIntegrationsPage() {
     return <p className='text-destructive text-sm'>{t('loadError')}</p>;
   }
 
+  if (!q.data) {
+    return null;
+  }
+
   return (
     <div>
       <h1 className='mb-2 text-3xl font-bold'>{t('title')}</h1>
       <p className='text-muted-foreground mb-8 max-w-2xl'>{t('subtitle')}</p>
 
-      <Tabs defaultValue='tracker' className='max-w-2xl'>
-        <TabsList className='grid w-full max-w-md grid-cols-2'>
-          <TabsTrigger value='tracker'>{t('tabTracker')}</TabsTrigger>
-          <TabsTrigger value='support'>{t('tabSupport')}</TabsTrigger>
-        </TabsList>
-        <TabsContent value='tracker' className='mt-6 space-y-6'>
-          <p className='text-muted-foreground text-sm'>{t('trackerIntro')}</p>
-          <div className='space-y-2'>
-            <Label htmlFor='leads-queue'>{t('leadsQueue')}</Label>
-            <Input
-              id='leads-queue'
-              value={form.leadsTrackerQueue ?? ''}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, leadsTrackerQueue: e.target.value }))
-              }
-              autoComplete='off'
-            />
-            <p className='text-muted-foreground text-xs'>
-              {t('leadsQueueHint')}
-            </p>
-          </div>
-          <div className='space-y-2'>
-            <Label htmlFor='type-reg'>{t('typeRegistration')}</Label>
-            <Input
-              id='type-reg'
-              value={form.trackerTypeRegistration ?? ''}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  trackerTypeRegistration: e.target.value
-                }))
-              }
-              autoComplete='off'
-            />
-            <p className='text-muted-foreground text-xs'>{t('typeHint')}</p>
-          </div>
-          <div className='space-y-2'>
-            <Label htmlFor='type-req'>{t('typeRequest')}</Label>
-            <Input
-              id='type-req'
-              value={form.trackerTypeRequest ?? ''}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, trackerTypeRequest: e.target.value }))
-              }
-              autoComplete='off'
-            />
-            <p className='text-muted-foreground text-xs'>{t('typeHint')}</p>
-          </div>
-          <div className='space-y-2'>
-            <Label htmlFor='type-err'>{t('typeError')}</Label>
-            <Input
-              id='type-err'
-              value={form.trackerTypeError ?? ''}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, trackerTypeError: e.target.value }))
-              }
-              autoComplete='off'
-            />
-            <p className='text-muted-foreground text-xs'>{t('typeHint')}</p>
-          </div>
-          <Button
-            type='button'
-            disabled={mutation.isPending}
-            onClick={() => mutation.mutate()}
-          >
-            {mutation.isPending ? <Spinner className='size-4' /> : t('save')}
-          </Button>
-        </TabsContent>
-        <TabsContent value='support' className='mt-6 space-y-6'>
-          <p className='text-muted-foreground text-sm'>{t('supportIntro')}</p>
-          <div className='space-y-2'>
-            <Label htmlFor='support-queue'>{t('supportQueue')}</Label>
-            <Input
-              id='support-queue'
-              value={form.supportTrackerQueue ?? ''}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  supportTrackerQueue: e.target.value
-                }))
-              }
-              autoComplete='off'
-            />
-            <p className='text-muted-foreground text-xs'>
-              {t('supportQueueHint')}
-            </p>
-          </div>
-          <div className='space-y-2'>
-            <Label htmlFor='type-support'>{t('typeSupport')}</Label>
-            <Input
-              id='type-support'
-              value={form.trackerTypeSupport ?? ''}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  trackerTypeSupport: e.target.value
-                }))
-              }
-              autoComplete='off'
-            />
-            <p className='text-muted-foreground text-xs'>{t('typeHint')}</p>
-          </div>
-          <Button
-            type='button'
-            disabled={mutation.isPending}
-            onClick={() => mutation.mutate()}
-          >
-            {mutation.isPending ? <Spinner className='size-4' /> : t('save')}
-          </Button>
-        </TabsContent>
-      </Tabs>
+      <PlatformIntegrationsForm data={q.data} />
     </div>
   );
 }

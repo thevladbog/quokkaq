@@ -26,8 +26,8 @@ func NewLeadHandler(leadIssues *services.LeadIssueService) *LeadHandler {
 
 // PublicLeadRequestBody is JSON for POST /public/leads/request.
 type PublicLeadRequestBody struct {
-	Name     string `json:"name"`
-	Email    string `json:"email"`
+	Name     string `json:"name" binding:"required"`
+	Email    string `json:"email" binding:"required" format:"email"`
 	Company  string `json:"company"`
 	Message  string `json:"message"`
 	Source   string `json:"source"`
@@ -39,15 +39,17 @@ type PublicLeadRequestBody struct {
 // PostPublicLeadRequest godoc
 // @ID           postPublicLeadRequest
 // @Summary      Submit a marketing / sales lead (Yandex Tracker)
-// @Description  Public endpoint; creates a Tracker issue when leads queue and Tracker credentials are configured.
+// @Description  Public endpoint; creates a Tracker issue when leads queue and Tracker credentials are configured. The JSON body is read via `http.MaxBytesReader` with a cap of `MaxPublicLeadRequestBodyBytes` (see `PublicLeadRequestBody`); if the client sends more than that, `io.ReadAll` returns an error and the handler responds with 413 Request Entity Too Large.
 // @Tags         leads
 // @Accept       json
 // @Produce      json
 // @Param        body  body      PublicLeadRequestBody  true  "Lead payload"
 // @Success      201   {object}  map[string]string  "Created"
 // @Failure      400   {string}  string  "Bad request"
-// @Failure      503   {string}  string  "Leads or Tracker not configured"
+// @Failure      413   {string}  string  "Request entity too large"
+// @Failure      500   {string}  string  "Failed to verify configuration"
 // @Failure      502   {string}  string  "Upstream Tracker error"
+// @Failure      503   {string}  string  "Leads or Tracker not configured"
 // @Router       /public/leads/request [post]
 func (h *LeadHandler) PostPublicLeadRequest(w http.ResponseWriter, r *http.Request) {
 	if h.leadIssues == nil {

@@ -139,20 +139,22 @@ func mapTerminalToJSON(t *models.DesktopTerminal) DesktopTerminalJSON {
 }
 
 // Create godoc
+// @ID           createDesktopTerminal
 // @Summary      Create desktop terminal
 // @Description  Admin creates a paired kiosk/counter terminal and receives a one-time pairing code.
 // @Tags         DesktopTerminal
 // @Accept       json
 // @Produce      json
+// @Param        X-Company-Id header string false "Tenant company UUID when the user belongs to multiple organizations"
 // @Param        body  body      CreateDesktopTerminalRequest  true  "Create payload"
 // @Success      201   {object}  CreateDesktopTerminalResponse
-// @Failure      400   {string}  string  "Bad request"
+// @Failure      400   {string}  string  "Bad request or company context required"
 // @Failure      401   {string}  string  "Unauthorized"
 // @Failure      403   {string}  string  "Forbidden"
+// @Failure      404   {string}  string  "Not found"
 // @Failure      500   {string}  string  "Internal Server Error"
 // @Router       /desktop-terminals [post]
 // @Security     BearerAuth
-// @ID           createDesktopTerminal
 func (h *DesktopTerminalHandler) Create(w http.ResponseWriter, r *http.Request) {
 	_, companyID, ok := h.resolveViewerCompany(w, r)
 	if !ok {
@@ -226,15 +228,19 @@ func (h *DesktopTerminalHandler) Create(w http.ResponseWriter, r *http.Request) 
 }
 
 // List godoc
+// @ID           listDesktopTerminals
 // @Summary      List desktop terminals
 // @Description  Returns every paired desktop terminal for the tenant (admin JWT). Each row includes effective `kind` (kiosk, counter_guest_survey, counter_board) and optional counter metadata.
 // @Tags         DesktopTerminal
 // @Produce      json
+// @Param        X-Company-Id header string false "Tenant company UUID when the user belongs to multiple organizations"
 // @Success      200  {array}   DesktopTerminalJSON
+// @Failure      400  {string}  string  "Company context required"
+// @Failure      401  {string}  string  "Unauthorized"
+// @Failure      403  {string}  string  "Forbidden"
 // @Failure      500  {string}  string  "Internal Server Error"
 // @Router       /desktop-terminals [get]
 // @Security     BearerAuth
-// @ID           listDesktopTerminals
 func (h *DesktopTerminalHandler) List(w http.ResponseWriter, r *http.Request) {
 	_, companyID, ok := h.resolveViewerCompany(w, r)
 	if !ok {
@@ -254,19 +260,21 @@ func (h *DesktopTerminalHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetByID godoc
+// @ID           getDesktopTerminalByID
 // @Summary      Get desktop terminal by ID
 // @Description  Returns one terminal by id, including effective `kind` and hydrated `counterName`/`unitName` when present.
 // @Tags         DesktopTerminal
 // @Produce      json
 // @Param        id   path      string  true  "Terminal ID"
+// @Param        X-Company-Id header string false "Tenant company UUID when the user belongs to multiple organizations"
 // @Success      200  {object}  DesktopTerminalJSON
+// @Failure      400  {string}  string  "Company context required"
 // @Failure      401  {string}  string  "Unauthorized"
 // @Failure      403  {string}  string  "Forbidden"
 // @Failure      404  {string}  string  "Not found"
 // @Failure      500  {string}  string  "Internal Server Error"
 // @Router       /desktop-terminals/{id} [get]
 // @Security     BearerAuth
-// @ID           getDesktopTerminalByID
 func (h *DesktopTerminalHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	viewerID, companyID, ok := h.resolveViewerCompany(w, r)
 	if !ok {
@@ -284,22 +292,23 @@ func (h *DesktopTerminalHandler) GetByID(w http.ResponseWriter, r *http.Request)
 }
 
 // Update godoc
+// @ID           updateDesktopTerminal
 // @Summary      Update desktop terminal
 // @Description  Patches name, locale, kiosk fullscreen, and optionally counter binding. Body may include `kind` (kiosk | counter_guest_survey | counter_board) with `counterId`/`contextUnitId` when changing bindings; metadata-only updates omit counter fields.
 // @Tags         DesktopTerminal
 // @Accept       json
 // @Produce      json
-// @Param        id    path      string                      true  "Terminal ID"
+// @Param        id    path      string                        true  "Terminal ID"
+// @Param        X-Company-Id header string false "Tenant company UUID when the user belongs to multiple organizations"
 // @Param        body  body      UpdateDesktopTerminalRequest  true  "Update payload"
 // @Success      204   "No Content"
-// @Failure      400   {string}  string  "Bad request"
+// @Failure      400   {string}  string  "Bad request or company context required"
 // @Failure      401   {string}  string  "Unauthorized"
 // @Failure      403   {string}  string  "Forbidden"
 // @Failure      404   {string}  string  "Not found"
 // @Failure      500   {string}  string  "Internal Server Error"
 // @Router       /desktop-terminals/{id} [patch]
 // @Security     BearerAuth
-// @ID           updateDesktopTerminal
 func (h *DesktopTerminalHandler) Update(w http.ResponseWriter, r *http.Request) {
 	viewerID, companyID, ok := h.resolveViewerCompany(w, r)
 	if !ok {
@@ -373,18 +382,20 @@ func (h *DesktopTerminalHandler) Update(w http.ResponseWriter, r *http.Request) 
 }
 
 // Revoke godoc
+// @ID           revokeDesktopTerminal
 // @Summary      Revoke desktop terminal
 // @Description  Marks the terminal as revoked; the pairing code stops working immediately.
 // @Tags         DesktopTerminal
 // @Param        id   path      string  true  "Terminal ID"
+// @Param        X-Company-Id header string false "Tenant company UUID when the user belongs to multiple organizations"
 // @Success      204  "No Content"
+// @Failure      400  {string}  string  "Company context required"
 // @Failure      401  {string}  string  "Unauthorized"
 // @Failure      403  {string}  string  "Forbidden"
 // @Failure      404  {string}  string  "Not found"
 // @Failure      500  {string}  string  "Internal Server Error"
 // @Router       /desktop-terminals/{id}/revoke [post]
 // @Security     BearerAuth
-// @ID           revokeDesktopTerminal
 func (h *DesktopTerminalHandler) Revoke(w http.ResponseWriter, r *http.Request) {
 	viewerID, companyID, ok := h.resolveViewerCompany(w, r)
 	if !ok {

@@ -383,8 +383,8 @@ export interface HandlersTenantRoleUnitJSON {
 
 export interface HandlersCreateTenantRoleJSON {
   description?: string;
-  name?: string;
-  slug?: string;
+  name: string;
+  slug: string;
   units?: HandlersTenantRoleUnitJSON[];
 }
 
@@ -419,7 +419,8 @@ export interface HandlersCreateTicketRequestKiosk {
 export type HandlersCreateTicketRequest = HandlersCreateTicketRequestAnonymous | HandlersCreateTicketRequestStaff | HandlersCreateTicketRequestKiosk;
 
 export interface HandlersCustomTermsLeadRequestBody {
-  comment?: string;
+  /** @minLength 1 */
+  comment: string;
 }
 
 export interface HandlersDaDataFindPartyByInnRequest {
@@ -635,7 +636,8 @@ export interface HandlersPickRequest {
 }
 
 export interface HandlersPlanChangeRequestBody {
-  requestedPlanCode?: string;
+  /** @minLength 1 */
+  requestedPlanCode: string;
 }
 
 export interface HandlersPlatformCreateSubscriptionBody {
@@ -675,12 +677,12 @@ export interface HandlersPlatformCreateSubscriptionPlanBody {
 }
 
 export interface HandlersPlatformIntegrationsResponse {
-  leadsTrackerQueue?: string;
-  supportTrackerQueue?: string;
-  trackerTypeError?: string;
-  trackerTypeRegistration?: string;
-  trackerTypeRequest?: string;
-  trackerTypeSupport?: string;
+  leadsTrackerQueue: string;
+  supportTrackerQueue: string;
+  trackerTypeError: string;
+  trackerTypeRegistration: string;
+  trackerTypeRequest: string;
+  trackerTypeSupport: string;
 }
 
 export type HandlersPlatformUpdateSubscriptionPlanBodyFeatures = {[key: string]: boolean};
@@ -709,10 +711,10 @@ export interface HandlersPlatformUpdateSubscriptionPlanBody {
 
 export interface HandlersPublicLeadRequestBody {
   company?: string;
-  email?: string;
+  email: string;
   locale?: string;
   message?: string;
-  name?: string;
+  name: string;
   planCode?: string;
   referrer?: string;
   source?: string;
@@ -1724,6 +1726,15 @@ export interface ServicesCreateCalendarIntegrationRequest {
   timezone?: string;
   unitId: string;
   username: string;
+}
+
+export interface ServicesDeploymentSaaSSettingsPatch {
+  leadsTrackerQueue?: string;
+  supportTrackerQueue?: string;
+  trackerTypeError?: string;
+  trackerTypeRegistration?: string;
+  trackerTypeRequest?: string;
+  trackerTypeSupport?: string;
 }
 
 export interface ServicesEmployeeRadarResponse {

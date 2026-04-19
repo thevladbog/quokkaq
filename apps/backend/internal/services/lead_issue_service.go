@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -79,11 +80,33 @@ func (s *LeadIssueService) LeadsConfigured(_ context.Context) (bool, error) {
 	return true, nil
 }
 
-// NotifyTrialRegistration best-effort after successful signup.
-func (s *LeadIssueService) NotifyTrialRegistration(ctx context.Context, companyName, companySlug, userName, userEmail, planCode string) {
+// leadIssueTrackerHTTPTimeout bounds outbound Tracker HTTP for best-effort notifications.
+const leadIssueTrackerHTTPTimeout = 2 * time.Second
+
+func loggerPrintfLeadIssueErr(kind string, err error) {
+	logger.Printf("lead issue [%s]: tracker create failed: %v", kind, err)
+}
+
+// logSignupFailureInternal logs the full server error and trace ID for correlation (not sent to Tracker).
+func logSignupFailureInternal(traceID, errText string) {
+	logger.Printf("lead issue [signup failure]: trace_id=%s full_error=%s", traceID, errText)
+}
+
+// NotifyTrialRegistration best-effort after successful signup. Non-blocking; uses a short timeout for the Tracker call.
+func (s *LeadIssueService) NotifyTrialRegistration(_ context.Context, companyName, companySlug, userName, userEmail, planCode string) {
 	if s == nil || s.settingsRepo == nil || s.tracker == nil {
 		return
 	}
+	li := s
+	cn, cs, un, ue, pc := companyName, companySlug, userName, userEmail, planCode
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), leadIssueTrackerHTTPTimeout)
+		defer cancel()
+		li.notifyTrialRegistrationSync(ctx, cn, cs, un, ue, pc)
+	}()
+}
+
+func (s *LeadIssueService) notifyTrialRegistrationSync(ctx context.Context, companyName, companySlug, userName, userEmail, planCode string) {
 	st, err := s.settingsRepo.Get()
 	if err != nil {
 		return
@@ -120,15 +143,24 @@ func (s *LeadIssueService) NotifyTrialRegistration(ctx context.Context, companyN
 	}
 }
 
-func loggerPrintfLeadIssueErr(kind string, err error) {
-	logger.Printf("lead issue [%s]: tracker create failed: %v", kind, err)
-}
-
-// NotifySignupFailure best-effort when signup returns 500.
-func (s *LeadIssueService) NotifySignupFailure(ctx context.Context, companyName, userEmail, planCode, errText string) {
+// NotifySignupFailure best-effort when signup returns 500. Non-blocking; does not send raw errors to Tracker.
+func (s *LeadIssueService) NotifySignupFailure(_ context.Context, companyName, userEmail, planCode, errText string) {
 	if s == nil || s.settingsRepo == nil || s.tracker == nil {
 		return
 	}
+	li := s
+	cn, ue, pc, et := companyName, userEmail, planCode, errText
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), leadIssueTrackerHTTPTimeout)
+		defer cancel()
+		li.notifySignupFailureSync(ctx, cn, ue, pc, et)
+	}()
+}
+
+func (s *LeadIssueService) notifySignupFailureSync(ctx context.Context, companyName, userEmail, planCode, errText string) {
+	traceID := uuid.New().String()
+	logSignupFailureInternal(traceID, errText)
+
 	st, err := s.settingsRepo.Get()
 	if err != nil {
 		return
@@ -143,9 +175,8 @@ func (s *LeadIssueService) NotifySignupFailure(ctx context.Context, companyName,
 	fmt.Fprintf(&b, "- **Company (requested)**: %s\n", companyName)
 	fmt.Fprintf(&b, "- **Email (requested)**: %s\n", userEmail)
 	fmt.Fprintf(&b, "- **Plan code**: %s\n", planCode)
-	fmt.Fprintf(&b, "- **Error**: %s\n", errText)
-	traceID := uuid.New().String()
-	diag, _ := json.Marshal(map[string]string{"kind": "signup_failure"})
+	fmt.Fprintf(&b, "- **Error summary**: Internal server error during registration. Full details were logged internally; use the trace ID in the diagnostics block for correlation.\n")
+	diag, _ := json.Marshal(map[string]string{"kind": "signup_failure", "traceId": traceID})
 	desc := BuildSupportDescriptionMarkdown(b.String(), diag, traceID)
 	extras := SupportReportTicketCreateExtras{
 		ApplicantsEmail:     strings.TrimSpace(userEmail),
@@ -157,7 +188,7 @@ func (s *LeadIssueService) NotifySignupFailure(ctx context.Context, companyName,
 	}
 	_, _, _, err = s.tracker.CreateWorkItemWithOpts(ctx, uuid.New().String(), title, desc, extras, opts)
 	if err != nil {
-		loggerPrintfLeadIssueErr("signup failure", err)
+		logger.Printf("lead issue [signup failure]: trace_id=%s tracker create failed: %v", traceID, err)
 	}
 }
 

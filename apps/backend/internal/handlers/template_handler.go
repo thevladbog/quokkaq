@@ -41,6 +41,7 @@ func (h *TemplateHandler) resolveViewerCompany(w http.ResponseWriter, r *http.Re
 }
 
 // CreateTemplate godoc
+// @ID           CreateTemplate
 // @Summary      Create a new template
 // @Description  Creates a new message template for the resolved tenant company (JWT admin + X-Company-Id when applicable).
 // @Tags         templates
@@ -76,6 +77,7 @@ func (h *TemplateHandler) CreateTemplate(w http.ResponseWriter, r *http.Request)
 }
 
 // GetAllTemplates godoc
+// @ID           ListTemplates
 // @Summary      Get all templates
 // @Description  Lists message templates for the resolved tenant company only.
 // @Tags         templates
@@ -102,6 +104,7 @@ func (h *TemplateHandler) GetAllTemplates(w http.ResponseWriter, r *http.Request
 }
 
 // GetTemplateByID godoc
+// @ID           GetTemplateByID
 // @Summary      Get a template by ID
 // @Description  Retrieves a template by ID within the resolved tenant company.
 // @Tags         templates
@@ -134,6 +137,7 @@ func (h *TemplateHandler) GetTemplateByID(w http.ResponseWriter, r *http.Request
 }
 
 // UpdateTemplate godoc
+// @ID           UpdateTemplateByID
 // @Summary      Update a template
 // @Description  Updates an existing template within the resolved tenant company.
 // @Tags         templates
@@ -176,6 +180,7 @@ func (h *TemplateHandler) UpdateTemplate(w http.ResponseWriter, r *http.Request)
 }
 
 // DeleteTemplate godoc
+// @ID           DeleteTemplateByID
 // @Summary      Delete a template
 // @Description  Deletes a template by its ID within the resolved tenant company.
 // @Tags         templates

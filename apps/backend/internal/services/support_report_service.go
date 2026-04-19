@@ -162,6 +162,35 @@ func (s *SupportReportService) activeCreateClient() SupportReportTicketClient {
 	}
 }
 
+// trackerPatcherForExistingIssue returns the Yandex Tracker client for PATCH-style calls on existing issues
+// (e.g. apiAccessToTheTicket). It does not use Enabled(), which requires the default env queue; outbound calls
+// may still work when the queue comes from deployment settings and credentials are ready.
+func (s *SupportReportService) trackerPatcherForExistingIssue() supportReportTrackerAccessPatcher {
+	if s.tracker == nil {
+		return nil
+	}
+	patcher, ok := s.tracker.(supportReportTrackerAccessPatcher)
+	if !ok || patcher == nil {
+		return nil
+	}
+	return patcher
+}
+
+// supportReportTicketClientReadyForExistingIssue is true when cli can sync or comment on an existing external ticket.
+// For Yandex Tracker it uses CredentialsReady() instead of Enabled() so operations work when the queue is supplied via DB settings.
+func (s *SupportReportService) supportReportTicketClientReadyForExistingIssue(backend string, cli SupportReportTicketClient) bool {
+	if cli == nil {
+		return false
+	}
+	switch normalizeTicketBackend(backend) {
+	case models.TicketBackendYandexTracker:
+		yt, ok := cli.(*YandexTrackerClient)
+		return ok && yt != nil && yt.CredentialsReady()
+	default:
+		return cli.Enabled()
+	}
+}
+
 // CreateReportInput is validated user input for a new report.
 type CreateReportInput struct {
 	Title       string
@@ -228,6 +257,10 @@ func (s *SupportReportService) Create(ctx context.Context, userID string, in Cre
 		var errAccess error
 		extras.ApiAccessToTicket, errAccess = s.supportReportAPIAccessorUserIDsCSVForReport(row)
 		if errAccess != nil {
+			logger.Printf("support report: supportReportAPIAccessorUserIDsCSVForReport failed after DB insert id=%s: %v", row.ID, errAccess)
+			if delErr := s.repo.DeleteByID(row.ID); delErr != nil {
+				logger.Printf("support report: cleanup DeleteByID after accessor CSV failure id=%s: %v", row.ID, delErr)
+			}
 			return nil, errAccess
 		}
 		if u, err := s.userRepo.FindByID(ctx, userID); err == nil && u != nil && u.Email != nil {
@@ -391,11 +424,8 @@ func (s *SupportReportService) syncYandexAPIAccessToTicket(ctx context.Context, 
 	if ext == "" {
 		return nil
 	}
-	if s.tracker == nil || !s.tracker.Enabled() {
-		return nil
-	}
-	patcher, ok := s.tracker.(supportReportTrackerAccessPatcher)
-	if !ok || patcher == nil {
+	patcher := s.trackerPatcherForExistingIssue()
+	if patcher == nil {
 		return nil
 	}
 	csv, err := s.supportReportAPIAccessorUserIDsCSVForReport(row)
@@ -769,7 +799,7 @@ func (s *SupportReportService) List(ctx context.Context, userID string) ([]model
 	var candidates []cand
 	for i := range rows {
 		cli := s.clientForBackend(rows[i].TicketBackend)
-		if cli == nil || !cli.Enabled() {
+		if !s.supportReportTicketClientReadyForExistingIssue(rows[i].TicketBackend, cli) {
 			continue
 		}
 		if rows[i].PlaneWorkItemID == "" {
@@ -797,7 +827,7 @@ func (s *SupportReportService) List(ctx context.Context, userID string) ([]model
 		g.Go(func() error {
 			i := c.idx
 			cli := s.clientForBackend(rows[i].TicketBackend)
-			if cli == nil || !cli.Enabled() {
+			if !s.supportReportTicketClientReadyForExistingIssue(rows[i].TicketBackend, cli) {
 				return nil
 			}
 			callCtx, cancel := context.WithTimeout(syncCtx, ticketGetWorkItemTimeout)
@@ -839,7 +869,7 @@ func (s *SupportReportService) GetByID(ctx context.Context, userID, reportID str
 		return nil, gorm.ErrRecordNotFound
 	}
 	cli := s.clientForBackend(row.TicketBackend)
-	if cli != nil && cli.Enabled() && row.PlaneWorkItemID != "" {
+	if s.supportReportTicketClientReadyForExistingIssue(row.TicketBackend, cli) && row.PlaneWorkItemID != "" {
 		syncCtx, cancel := context.WithTimeout(ctx, ticketGetWorkItemTimeout)
 		seq, st, err := cli.GetWorkItem(syncCtx, row.PlaneWorkItemID)
 		cancel()
@@ -886,7 +916,7 @@ func (s *SupportReportService) MarkIrrelevant(ctx context.Context, userID, repor
 	}
 	comment := s.cancelComment
 	cli := s.clientForBackend(row.TicketBackend)
-	if cli != nil && cli.Enabled() && strings.TrimSpace(row.PlaneWorkItemID) != "" {
+	if s.supportReportTicketClientReadyForExistingIssue(row.TicketBackend, cli) && strings.TrimSpace(row.PlaneWorkItemID) != "" {
 		if err := cli.AddComment(ctx, strings.TrimSpace(row.PlaneWorkItemID), comment); err != nil {
 			if errors.Is(err, ErrPlaneCommentsUnsupported) {
 				logger.Printf("support report: MarkIrrelevant skipping external cancel comment (backend does not support posting this comment) reportID=%s workItemID=%s", reportID, strings.TrimSpace(row.PlaneWorkItemID))

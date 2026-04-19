@@ -20,13 +20,18 @@ const pillSecondaryClass =
 export function LandingFooterCta({ locale, copy, appBaseUrl }: Props) {
   const year = new Date().getFullYear();
   const salesHref = 'mailto:sales@quokkaq.com';
-  /** Product app registration (new tab); same base as hero/pricing signup links. */
-  const signupHref =
+  const normalizedAppBase =
     appBaseUrl != null && String(appBaseUrl).trim() !== ''
-      ? `${String(appBaseUrl).replace(/\/$/, '')}/${locale}/signup`
+      ? String(appBaseUrl).trim().replace(/\/$/, '')
       : null;
-  /** Without app URL, primary CTA scrolls to this anchor. */
-  const trialHref = `/${locale}#book-demo`;
+  /** Product app registration (new tab); same base as hero/pricing signup links. */
+  const signupHref = normalizedAppBase
+    ? `${normalizedAppBase}/${locale}/signup`
+    : null;
+  /** Without app URL, primary CTA scrolls to this anchor on the marketing site. */
+  const trialHref = normalizedAppBase
+    ? `${normalizedAppBase}/${locale}#book-demo`
+    : `/${locale}#book-demo`;
   const privacyHref = `/${locale}/privacy`;
   const termsHref = `/${locale}/terms`;
 
@@ -62,12 +67,12 @@ export function LandingFooterCta({ locale, copy, appBaseUrl }: Props) {
                 {copy.footer.cta}
               </Link>
             )}
-            {appBaseUrl ? (
+            {normalizedAppBase ? (
               <LeadRequestCta
                 locale={locale}
                 source='footer_secondary'
                 lead={copy.leadForm}
-                appBaseUrl={appBaseUrl}
+                appBaseUrl={normalizedAppBase}
                 className={pillSecondaryClass}
               >
                 {copy.footer.ctaSecondary}

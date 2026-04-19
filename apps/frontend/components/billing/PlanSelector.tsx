@@ -101,7 +101,7 @@ export function PlanSelector({
           <Card
             key={plan.id}
             className={cn(
-              'relative h-full',
+              'relative flex h-full flex-col',
               isPromotedPlan(plan) &&
                 'border-primary dark:border-primary border-2 shadow-xl',
               isCurrentPlan(plan.id) &&

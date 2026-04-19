@@ -1,9 +1,12 @@
 package repository
 
 import (
+	"errors"
+	"strings"
+	"time"
+
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/pkg/database"
-	"time"
 
 	"gorm.io/gorm"
 )
@@ -17,7 +20,7 @@ type InvitationRepository interface {
 	// FindActiveByCompanyAndEmail returns an active, non-expired invitation for this tenant and email, if any.
 	FindActiveByCompanyAndEmail(companyID, email string) (*models.Invitation, error)
 	Update(invitation *models.Invitation) error
-	Delete(id string) error
+	Delete(id, companyID string) error
 }
 
 type invitationRepository struct {
@@ -77,9 +80,29 @@ func (r *invitationRepository) FindActiveByCompanyAndEmail(companyID, email stri
 }
 
 func (r *invitationRepository) Update(invitation *models.Invitation) error {
-	return r.db.Save(invitation).Error
+	if invitation == nil || strings.TrimSpace(invitation.CompanyID) == "" {
+		return errors.New("invitation: company_id required for update")
+	}
+	result := r.db.Where("id = ? AND company_id = ?", invitation.ID, invitation.CompanyID).Save(invitation)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
-func (r *invitationRepository) Delete(id string) error {
-	return r.db.Delete(&models.Invitation{}, "id = ?", id).Error
+func (r *invitationRepository) Delete(id, companyID string) error {
+	if strings.TrimSpace(companyID) == "" {
+		return errors.New("invitation delete: company_id required")
+	}
+	result := r.db.Where("id = ? AND company_id = ?", id, companyID).Delete(&models.Invitation{})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
