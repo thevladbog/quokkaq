@@ -139,7 +139,11 @@ func (r *userRepository) ListUsersForCompany(companyID string, search string, in
 	args = append(args, companyID)
 	if strings.TrimSpace(search) != "" {
 		term := "%" + search + "%"
-		q += ` AND (u.name ILIKE ? OR COALESCE(u.email, '') ILIKE ?)`
+		if r.db.Name() == "postgres" {
+			q += ` AND (u.name ILIKE ? OR COALESCE(u.email, '') ILIKE ?)`
+		} else {
+			q += ` AND (LOWER(u.name) LIKE LOWER(?) OR LOWER(COALESCE(u.email, '')) LIKE LOWER(?))`
+		}
 		args = append(args, term, term)
 	}
 	if err := r.db.Raw(q, args...).Scan(&ids).Error; err != nil {
@@ -449,8 +453,19 @@ func (r *userRepository) HasCompanyAccess(userID, companyID string) (bool, error
 	if err != nil {
 		return false, err
 	}
+	if count > 0 {
+		return true, nil
+	}
 
-	return count > 0, nil
+	// Tenant-only membership (no user_units yet): same visibility as ListUsersForCompany UNION branch.
+	var utrCount int64
+	err = r.db.Model(&models.UserTenantRole{}).
+		Where("user_id = ? AND company_id = ?", userID, companyID).
+		Count(&utrCount).Error
+	if err != nil {
+		return false, err
+	}
+	return utrCount > 0, nil
 }
 
 // IsCompanyOwner checks if user is the owner of the company

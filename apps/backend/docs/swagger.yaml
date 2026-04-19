@@ -49,6 +49,27 @@ components:
         nextCursor:
           type: string
       type: object
+    handlers.CompanyUserListItem:
+      properties:
+        createdAt:
+          type: string
+        email:
+          type: string
+        id:
+          type: string
+        isActive:
+          type: boolean
+        name:
+          type: string
+        photoUrl:
+          type: string
+        tenantRoles:
+          items:
+            $ref: '#/components/schemas/handlers.TenantRoleBriefResponse'
+          type: array
+        type:
+          type: string
+      type: object
     handlers.CounterCallNextRequest:
       properties:
         serviceId:
@@ -822,44 +843,6 @@ components:
           example: https://app.example.com
           type: string
       type: object
-    handlers.companyUserListItem:
-      properties:
-        createdAt:
-          type: string
-        email:
-          type: string
-        exemptFromSsoSync:
-          description: ExemptFromSSOSync when true, SSO directory reconcile does not change this user's global roles, unit assignments, or tenant role mappings (IdP group sync).
-          type: boolean
-        id:
-          type: string
-        isActive:
-          type: boolean
-        name:
-          type: string
-        phone:
-          type: string
-        photoUrl:
-          type: string
-        roles:
-          description: Relations
-          items:
-            $ref: '#/components/schemas/models.UserRole'
-          type: array
-        ssoProfileSyncOptOut:
-          description: 'SSOProfileSyncOptOut: when true, skip name/email updates from IdP on SSO login.'
-          type: boolean
-        tenantRoles:
-          items:
-            $ref: '#/components/schemas/handlers.TenantRoleBriefResponse'
-          type: array
-        type:
-          type: string
-        units:
-          items:
-            $ref: '#/components/schemas/models.UserUnit'
-          type: array
-      type: object
     handlers.createSupportReportRequest:
       properties:
         description:
@@ -1292,7 +1275,7 @@ components:
         idpGroupId:
           type: string
         legacyRoleName:
-          description: e.g. staff, admin
+          description: 'legacy global role: staff | supervisor | operator (not admin)'
           type: string
         tenantRoleId:
           type: string
@@ -2967,18 +2950,6 @@ components:
       in: cookie
       name: quokkaq_refresh
       description: HttpOnly refresh JWT cookie (same-origin /api). When present, POST /auth/refresh does not require Authorization. POST /auth/logout clears this cookie (and the access cookie) via Set-Cookie. Legacy clients may still send Bearer refresh.
-    QuokkaQLogicalScopes:
-      type: oauth2
-      description: 'Logical scopes for company-wide tenant settings (documentation). Clients still send `Authorization: Bearer` JWT; the server maps these labels to `users.roles` and tenant RBAC. For `models.CompanyPatch.ssoAccessSource`, the operation requires scope `company.settings.ssoAccessSource`, satisfied when the principal matches any of `global.role.admin`, `global.role.platform_admin`, or `company.tenant_role.system_admin`. Scope `unit.tenant.admin` (unit-only `tenant.admin` permission) is not sufficient alone.'
-      flows:
-        implicit:
-          authorizationUrl: https://quokkaq.local/.well-known/openapi-logical-scopes
-          scopes:
-            company.settings.ssoAccessSource: Change company SSO access provisioning (`manual` vs `sso_groups`). Equivalent to any of global.role.admin, global.role.platform_admin, company.tenant_role.system_admin (not unit.tenant.admin alone).
-            global.role.admin: Global administrator (role name `admin`).
-            global.role.platform_admin: Platform administrator (role `platform_admin`).
-            company.tenant_role.system_admin: Company tenant role slug `system_admin`.
-            unit.tenant.admin: Unit-scoped `tenant.admin` permission — NOT sufficient for ssoAccessSource alone.
 info:
   contact:
     email: support@swagger.io
@@ -3993,7 +3964,7 @@ paths:
       tags:
       - companies
     patch:
-      description: 'Partial update: JSON body matches models.CompanyPatch at the root (not wrapped in a "company" property). Only send fields to change. Cannot combine clearBillingAddress with billingAddress (same for counterparty). If the body includes `ssoAccessSource`, the caller must satisfy logical scope `company.settings.ssoAccessSource`, which the server grants when the principal matches any of: `global.role.admin`, `global.role.platform_admin`, or `company.tenant_role.system_admin`. Unit-scoped permission `tenant.admin` alone (scope `unit.tenant.admin`) is not sufficient. Other fields still require global `admin` unless the body only contains `ssoAccessSource` and the caller is authorized as above. See OpenAPI `components.securitySchemes.QuokkaQLogicalScopes` and operation `security` for PatchMyCompany.'
+      description: 'Partial update: JSON body matches models.CompanyPatch at the root (not wrapped in a "company" property). Only send fields to change. Cannot combine clearBillingAddress with billingAddress (same for counterparty). If the body includes `ssoAccessSource`, the caller must satisfy logical scope `company.settings.ssoAccessSource`, which the server grants when the principal matches any of: `global.role.admin`, `global.role.platform_admin`, or `company.tenant_role.system_admin`. Unit-scoped permission `tenant.admin` alone (scope `unit.tenant.admin`) is not sufficient. Other fields still require global `admin` unless the body only contains `ssoAccessSource` and the caller is authorized as above. See the PatchMyCompany operation `x-logical-scopes` extension in OpenAPI for the documented scope labels (runtime auth remains Bearer JWT only).'
       parameters:
       - description: Tenant company UUID when the user belongs to multiple organizations
         in: header
@@ -4047,11 +4018,17 @@ paths:
           description: Internal Server Error
       security:
       - BearerAuth: []
-        QuokkaQLogicalScopes:
-        - company.settings.ssoAccessSource
       summary: Update current user's company (tenant admin)
       tags:
       - companies
+      x-logical-scopes:
+        description: 'Logical scopes for company-wide tenant settings (documentation only). Clients send `Authorization: Bearer` JWT; the server enforces these rules in code. For `models.CompanyPatch.ssoAccessSource`, the caller must match scope `company.settings.ssoAccessSource`, satisfied when the principal matches any of `global.role.admin`, `global.role.platform_admin`, or `company.tenant_role.system_admin`. Scope `unit.tenant.admin` (unit-only `tenant.admin` permission) is not sufficient alone.'
+        scopes:
+          company.settings.ssoAccessSource: Change company SSO access provisioning (`manual` vs `sso_groups`). Equivalent to any of global.role.admin, global.role.platform_admin, company.tenant_role.system_admin (not unit.tenant.admin alone).
+          global.role.admin: Global administrator (role name `admin`).
+          global.role.platform_admin: Platform administrator (role `platform_admin`).
+          company.tenant_role.system_admin: Company tenant role slug `system_admin`.
+          unit.tenant.admin: Unit-scoped `tenant.admin` permission — NOT sufficient for ssoAccessSource alone.
   /companies/me/calendar-integrations:
     get:
       operationId: calendarIntegrationListMine
@@ -5063,7 +5040,7 @@ paths:
             application/json:
               schema:
                 items:
-                  $ref: '#/components/schemas/handlers.companyUserListItem'
+                  $ref: '#/components/schemas/handlers.CompanyUserListItem'
                 type: array
           description: OK
         '401':
@@ -5119,10 +5096,6 @@ paths:
                 $ref: '#/components/schemas/models.UserExternalIdentity'
           description: OK
         '204':
-          content:
-            application/json:
-              schema:
-                type: string
           description: No linked external identity
         '401':
           content:
@@ -5274,7 +5247,7 @@ paths:
       - companies
   /companies/me/users/{userId}/tenant-roles:
     patch:
-      description: Sets the user’s tenant-defined roles for the company; replaces existing rows (ReplaceUserTenantRoles then SyncUserUnitsFromTenantRoles, which uses RebuildUserUnitsFromTenantRoles). Sending an empty tenantRoleIds list removes all tenant roles and unit access for this company unless confirmRemoveAllTenantRoles is true. The reserved system role (slug `system_admin`) is mutually exclusive with other tenant roles. Adding or removing that role requires the caller to be a global admin/platform admin or a tenant system administrator in this company.
+      description: Sets the user’s tenant-defined roles for the company; replaces existing rows (ReplaceUserTenantRoles then SyncUserUnitsFromTenantRoles, which uses RebuildUserUnitsFromTenantRoles). An empty tenantRoleIds list removes all tenant roles and unit access for this company only when confirmRemoveAllTenantRoles is true; if tenantRoleIds is empty and confirmRemoveAllTenantRoles is not true, the request is rejected (400). The reserved system role (slug `system_admin`) is mutually exclusive with other tenant roles. Adding or removing that role requires the caller to be a global admin/platform admin or a tenant system administrator in this company.
       operationId: PatchUserTenantRoles
       parameters:
       - description: Tenant company UUID when the user belongs to multiple organizations

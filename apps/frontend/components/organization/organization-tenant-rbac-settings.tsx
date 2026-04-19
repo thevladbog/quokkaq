@@ -76,6 +76,9 @@ export function OrganizationTenantRbacSettings({
     });
   };
 
+  const [newMapIdp, setNewMapIdp] = useState('');
+  const [newMapRole, setNewMapRole] = useState('');
+
   const upsertMapping = useUpsertGroupMapping({
     mutation: {
       onSuccess: (res) => {
@@ -101,9 +104,6 @@ export function OrganizationTenantRbacSettings({
       onError: () => toast.error(t('mapping_delete_error'))
     }
   });
-
-  const [newMapIdp, setNewMapIdp] = useState('');
-  const [newMapRole, setNewMapRole] = useState('');
 
   const submitMapping = () => {
     const idp = newMapIdp.trim();

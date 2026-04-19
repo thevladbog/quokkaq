@@ -298,6 +298,23 @@ export interface HandlersClientVisitsResponse {
   nextCursor?: string;
 }
 
+export interface HandlersTenantRoleBriefResponse {
+  id?: string;
+  name?: string;
+  slug?: string;
+}
+
+export interface HandlersCompanyUserListItem {
+  createdAt?: string;
+  email?: string;
+  id?: string;
+  isActive?: boolean;
+  name?: string;
+  photoUrl?: string;
+  tenantRoles?: HandlersTenantRoleBriefResponse[];
+  type?: string;
+}
+
 export interface HandlersCounterCallNextRequest {
   serviceId?: string;
   serviceIds?: string[];
@@ -562,12 +579,6 @@ export interface HandlersPatchUserTenantRolesJSON {
   clear user_tenant_roles and trigger RebuildUserUnitsFromTenantRoles mass-removal of user_units by mistake. */
   confirmRemoveAllTenantRoles?: boolean;
   tenantRoleIds: string[];
-}
-
-export interface HandlersTenantRoleBriefResponse {
-  id?: string;
-  name?: string;
-  slug?: string;
 }
 
 export interface HandlersPatchUserTenantRolesResponse {
@@ -1037,25 +1048,6 @@ export interface HandlersCompanyMeResponse {
   publicAppUrl?: string;
 }
 
-export interface HandlersCompanyUserListItem {
-  createdAt?: string;
-  email?: string;
-  /** ExemptFromSSOSync when true, SSO directory reconcile does not change this user's global roles, unit assignments, or tenant role mappings (IdP group sync). */
-  exemptFromSsoSync?: boolean;
-  id?: string;
-  isActive?: boolean;
-  name?: string;
-  phone?: string;
-  photoUrl?: string;
-  /** Relations */
-  roles?: ModelsUserRole[];
-  /** SSOProfileSyncOptOut: when true, skip name/email updates from IdP on SSO login. */
-  ssoProfileSyncOptOut?: boolean;
-  tenantRoles?: HandlersTenantRoleBriefResponse[];
-  type?: string;
-  units?: ModelsUserUnit[];
-}
-
 export type HandlersCreateSupportReportRequestDiagnostics = { [key: string]: unknown };
 
 export interface HandlersCreateSupportReportRequest {
@@ -1267,7 +1259,7 @@ export interface ModelsCompanySSOGroupMapping {
   createdAt?: string;
   id?: string;
   idpGroupId?: string;
-  /** e.g. staff, admin */
+  /** legacy global role: staff | supervisor | operator (not admin) */
   legacyRoleName?: string;
   tenantRoleId?: string;
   updatedAt?: string;
@@ -3801,7 +3793,7 @@ export function useGetCompaniesMe<TData = Awaited<ReturnType<typeof getCompanies
 
 
 /**
- * Partial update: JSON body matches models.CompanyPatch at the root (not wrapped in a "company" property). Only send fields to change. Cannot combine clearBillingAddress with billingAddress (same for counterparty). If the body includes `ssoAccessSource`, the caller must satisfy logical scope `company.settings.ssoAccessSource`, which the server grants when the principal matches any of: `global.role.admin`, `global.role.platform_admin`, or `company.tenant_role.system_admin`. Unit-scoped permission `tenant.admin` alone (scope `unit.tenant.admin`) is not sufficient. Other fields still require global `admin` unless the body only contains `ssoAccessSource` and the caller is authorized as above. See OpenAPI `components.securitySchemes.QuokkaQLogicalScopes` and operation `security` for PatchMyCompany.
+ * Partial update: JSON body matches models.CompanyPatch at the root (not wrapped in a "company" property). Only send fields to change. Cannot combine clearBillingAddress with billingAddress (same for counterparty). If the body includes `ssoAccessSource`, the caller must satisfy logical scope `company.settings.ssoAccessSource`, which the server grants when the principal matches any of: `global.role.admin`, `global.role.platform_admin`, or `company.tenant_role.system_admin`. Unit-scoped permission `tenant.admin` alone (scope `unit.tenant.admin`) is not sufficient. Other fields still require global `admin` unless the body only contains `ssoAccessSource` and the caller is authorized as above. See the PatchMyCompany operation `x-logical-scopes` extension in OpenAPI for the documented scope labels (runtime auth remains Bearer JWT only).
  * @summary Update current user's company (tenant admin)
  */
 export type patchCompaniesMeResponse200 = {
@@ -5493,7 +5485,7 @@ export type getExternalIdentityResponse200 = {
 }
 
 export type getExternalIdentityResponse204 = {
-  data: string
+  data: void
   status: 204
 }
 
@@ -5839,7 +5831,7 @@ export const usePatchUserSSOFlags = <TError = string,
     }
 
 /**
- * Sets the user’s tenant-defined roles for the company; replaces existing rows (ReplaceUserTenantRoles then SyncUserUnitsFromTenantRoles, which uses RebuildUserUnitsFromTenantRoles). Sending an empty tenantRoleIds list removes all tenant roles and unit access for this company unless confirmRemoveAllTenantRoles is true. The reserved system role (slug `system_admin`) is mutually exclusive with other tenant roles. Adding or removing that role requires the caller to be a global admin/platform admin or a tenant system administrator in this company.
+ * Sets the user’s tenant-defined roles for the company; replaces existing rows (ReplaceUserTenantRoles then SyncUserUnitsFromTenantRoles, which uses RebuildUserUnitsFromTenantRoles). An empty tenantRoleIds list removes all tenant roles and unit access for this company only when confirmRemoveAllTenantRoles is true; if tenantRoleIds is empty and confirmRemoveAllTenantRoles is not true, the request is rejected (400). The reserved system role (slug `system_admin`) is mutually exclusive with other tenant roles. Adding or removing that role requires the caller to be a global admin/platform admin or a tenant system administrator in this company.
  * @summary Replace tenant role assignments for a user
  */
 export type patchUserTenantRolesResponse200 = {

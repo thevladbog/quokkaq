@@ -141,8 +141,8 @@ export default async function PricingPage({
   const plansFromApi = apiPlans ?? [];
 
   return (
-    <div className='min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 px-4 py-12 sm:px-6 lg:px-8'>
-      <div className='mx-auto max-w-7xl'>
+    <div className='min-h-screen min-w-0 overflow-x-hidden bg-gradient-to-br from-blue-50 to-indigo-100 px-4 py-12 sm:px-6 lg:px-8'>
+      <div className='mx-auto w-full max-w-7xl min-w-0'>
         {/* Header */}
         <div className='mb-16 text-center'>
           <h1 className='mb-4 text-4xl font-bold text-gray-900'>
@@ -153,8 +153,8 @@ export default async function PricingPage({
           </p>
         </div>
 
-        {/* Pricing Cards */}
-        <div className='mb-12 grid gap-8 md:grid-cols-3'>
+        {/* Pricing: auto-fit columns — up to 3 in one row when the main area is wide enough; narrower → 2 or 1. pt-7 leaves room for the "popular" badge sitting on the top border. */}
+        <div className='mb-12 grid w-full min-w-0 [grid-template-columns:repeat(auto-fit,minmax(min(100%,15rem),1fr))] gap-6 pt-7 sm:gap-8'>
           {plansFromApi.length > 0
             ? await Promise.all(
                 plansFromApi.map((plan) => (
@@ -258,28 +258,29 @@ async function PricingCardApi({
 
   return (
     <Card
-      className={`relative ${popular ? 'border-2 border-blue-500 shadow-xl' : ''}`}
+      className={`relative min-w-0 overflow-visible ${popular ? 'z-10 border-2 border-blue-500 shadow-xl' : ''}`}
     >
       {popular && (
-        <div className='absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 transform'>
-          <span className='rounded-full bg-blue-500 px-4 py-1 text-sm font-semibold text-white'>
+        <div className='pointer-events-none absolute top-0 left-1/2 z-20 -translate-x-1/2 -translate-y-1/2'>
+          <span className='pointer-events-auto rounded-full bg-blue-500 px-4 py-1 text-sm font-semibold whitespace-nowrap text-white shadow-sm'>
             {t('popularChoice')}
           </span>
         </div>
       )}
-
       <CardHeader className='pt-8 pb-8 text-center'>
-        <CardTitle className='mb-2 text-2xl font-bold'>{planHeading}</CardTitle>
+        <CardTitle className='mb-2 text-2xl font-bold break-words'>
+          {planHeading}
+        </CardTitle>
         <div className='mt-6'>
           {showCustomPricingLabel ? (
             <div className='text-3xl font-bold'>{t('customPricing')}</div>
           ) : (
-            <div className='inline-flex max-w-full flex-nowrap items-baseline justify-center gap-x-2 leading-tight whitespace-nowrap'>
+            <div className='flex max-w-full flex-wrap items-baseline justify-center gap-x-2 gap-y-1 leading-tight'>
               <span
                 className={
                   locale.startsWith('en')
-                    ? 'text-4xl font-extrabold tabular-nums sm:text-5xl'
-                    : 'text-5xl font-extrabold tabular-nums'
+                    ? 'text-3xl font-extrabold tabular-nums sm:text-4xl xl:text-5xl'
+                    : 'text-3xl font-extrabold tabular-nums sm:text-4xl xl:text-5xl'
                 }
               >
                 {enSplitCurrency
@@ -359,22 +360,23 @@ async function PricingCardLegacy({
   const t = await getTranslations({ locale, namespace: 'pricing' });
   return (
     <Card
-      className={`relative ${plan.popular ? 'border-2 border-blue-500 shadow-xl' : ''}`}
+      className={`relative min-w-0 overflow-visible ${plan.popular ? 'z-10 border-2 border-blue-500 shadow-xl' : ''}`}
     >
       {plan.popular && (
-        <div className='absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 transform'>
-          <span className='rounded-full bg-blue-500 px-4 py-1 text-sm font-semibold text-white'>
+        <div className='pointer-events-none absolute top-0 left-1/2 z-20 -translate-x-1/2 -translate-y-1/2'>
+          <span className='pointer-events-auto rounded-full bg-blue-500 px-4 py-1 text-sm font-semibold whitespace-nowrap text-white shadow-sm'>
             {t('popularChoice')}
           </span>
         </div>
       )}
-
       <CardHeader className='pt-8 pb-8 text-center'>
-        <CardTitle className='mb-2 text-2xl font-bold'>{plan.name}</CardTitle>
+        <CardTitle className='mb-2 text-2xl font-bold break-words'>
+          {plan.name}
+        </CardTitle>
         <div className='mt-6'>
           {plan.price != null ? (
-            <div className='flex items-baseline justify-center'>
-              <span className='text-5xl font-extrabold'>
+            <div className='flex flex-wrap items-baseline justify-center gap-x-1'>
+              <span className='text-3xl font-extrabold tabular-nums sm:text-4xl xl:text-5xl'>
                 {plan.price.toLocaleString(intlLocale)}
               </span>
               <span className='ml-2 text-2xl font-medium text-gray-500'>₽</span>

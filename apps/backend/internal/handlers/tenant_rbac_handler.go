@@ -586,7 +586,7 @@ type PatchExternalIdentityJSON struct {
 // @Param        userId path string true "Target user id"
 // @Security     BearerAuth
 // @Success      200  {object}  models.UserExternalIdentity
-// @Success      204  {string}  string "No linked external identity"
+// @Success      204  "No linked external identity"
 // @Failure      401  {string}  string "Unauthorized"
 // @Failure      403  {string}  string "Forbidden"
 // @Failure      500  {string}  string "Internal Server Error"
@@ -690,11 +690,6 @@ func (h *TenantRBACHTTP) PatchExternalIdentity(w http.ResponseWriter, r *http.Re
 	_ = json.NewEncoder(w).Encode(ext)
 }
 
-type companyUserListItem struct {
-	models.User
-	TenantRoles []TenantRoleBriefResponse `json:"tenantRoles,omitempty"`
-}
-
 // PatchUserTenantRolesJSON is the body for PATCH /companies/me/users/{userId}/tenant-roles.
 type PatchUserTenantRolesJSON struct {
 	TenantRoleIDs []string `json:"tenantRoleIds"`
@@ -717,7 +712,7 @@ type PatchUserTenantRolesResponse struct {
 // @Param        X-Company-Id header string false "Tenant company UUID when the user belongs to multiple organizations"
 // @Param        search query string false "Filter by name or email (ILIKE)"
 // @Security     BearerAuth
-// @Success      200  {array}   companyUserListItem
+// @Success      200  {array}   CompanyUserListItem
 // @Failure      401  {string}  string "Unauthorized"
 // @Failure      403  {string}  string "Forbidden"
 // @Failure      404  {string}  string "No company found"
@@ -766,14 +761,14 @@ func (h *TenantRBACHTTP) ListCompanyUsers(w http.ResponseWriter, r *http.Request
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-	out := make([]companyUserListItem, 0, len(users))
+	out := make([]CompanyUserListItem, 0, len(users))
 	for i := range users {
 		u := users[i]
 		brief := make([]TenantRoleBriefResponse, 0)
 		for _, tr := range trByUser[u.ID] {
 			brief = append(brief, TenantRoleBriefResponse{ID: tr.ID, Name: tr.Name, Slug: tr.Slug})
 		}
-		out = append(out, companyUserListItem{User: u, TenantRoles: brief})
+		out = append(out, userToCompanyUserListItem(u, brief))
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(out)
@@ -782,7 +777,7 @@ func (h *TenantRBACHTTP) ListCompanyUsers(w http.ResponseWriter, r *http.Request
 // PatchUserTenantRoles godoc
 // @ID           PatchUserTenantRoles
 // @Summary      Replace tenant role assignments for a user
-// @Description  Sets the user’s tenant-defined roles for the company; replaces existing rows (ReplaceUserTenantRoles then SyncUserUnitsFromTenantRoles, which uses RebuildUserUnitsFromTenantRoles). Sending an empty tenantRoleIds list removes all tenant roles and unit access for this company unless confirmRemoveAllTenantRoles is true. The reserved system role (slug `system_admin`) is mutually exclusive with other tenant roles. Adding or removing that role requires the caller to be a global admin/platform admin or a tenant system administrator in this company.
+// @Description  Sets the user’s tenant-defined roles for the company; replaces existing rows (ReplaceUserTenantRoles then SyncUserUnitsFromTenantRoles, which uses RebuildUserUnitsFromTenantRoles). An empty tenantRoleIds list removes all tenant roles and unit access for this company only when confirmRemoveAllTenantRoles is true; if tenantRoleIds is empty and confirmRemoveAllTenantRoles is not true, the request is rejected (400). The reserved system role (slug `system_admin`) is mutually exclusive with other tenant roles. Adding or removing that role requires the caller to be a global admin/platform admin or a tenant system administrator in this company.
 // @Tags         companies
 // @Accept       json
 // @Produce      json

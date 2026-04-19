@@ -279,6 +279,23 @@ export interface HandlersClientVisitsResponse {
   nextCursor?: string;
 }
 
+export interface HandlersTenantRoleBriefResponse {
+  id?: string;
+  name?: string;
+  slug?: string;
+}
+
+export interface HandlersCompanyUserListItem {
+  createdAt?: string;
+  email?: string;
+  id?: string;
+  isActive?: boolean;
+  name?: string;
+  photoUrl?: string;
+  tenantRoles?: HandlersTenantRoleBriefResponse[];
+  type?: string;
+}
+
 export interface HandlersCounterCallNextRequest {
   serviceId?: string;
   serviceIds?: string[];
@@ -543,12 +560,6 @@ export interface HandlersPatchUserTenantRolesJSON {
   clear user_tenant_roles and trigger RebuildUserUnitsFromTenantRoles mass-removal of user_units by mistake. */
   confirmRemoveAllTenantRoles?: boolean;
   tenantRoleIds: string[];
-}
-
-export interface HandlersTenantRoleBriefResponse {
-  id?: string;
-  name?: string;
-  slug?: string;
 }
 
 export interface HandlersPatchUserTenantRolesResponse {
@@ -1018,25 +1029,6 @@ export interface HandlersCompanyMeResponse {
   publicAppUrl?: string;
 }
 
-export interface HandlersCompanyUserListItem {
-  createdAt?: string;
-  email?: string;
-  /** ExemptFromSSOSync when true, SSO directory reconcile does not change this user's global roles, unit assignments, or tenant role mappings (IdP group sync). */
-  exemptFromSsoSync?: boolean;
-  id?: string;
-  isActive?: boolean;
-  name?: string;
-  phone?: string;
-  photoUrl?: string;
-  /** Relations */
-  roles?: ModelsUserRole[];
-  /** SSOProfileSyncOptOut: when true, skip name/email updates from IdP on SSO login. */
-  ssoProfileSyncOptOut?: boolean;
-  tenantRoles?: HandlersTenantRoleBriefResponse[];
-  type?: string;
-  units?: ModelsUserUnit[];
-}
-
 export type HandlersCreateSupportReportRequestDiagnostics = { [key: string]: unknown };
 
 export interface HandlersCreateSupportReportRequest {
@@ -1248,7 +1240,7 @@ export interface ModelsCompanySSOGroupMapping {
   createdAt?: string;
   id?: string;
   idpGroupId?: string;
-  /** e.g. staff, admin */
+  /** legacy global role: staff | supervisor | operator (not admin) */
   legacyRoleName?: string;
   tenantRoleId?: string;
   updatedAt?: string;

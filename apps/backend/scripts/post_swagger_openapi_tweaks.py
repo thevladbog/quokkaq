@@ -642,47 +642,39 @@ def apply_openapi_tweaks(doc: dict[str, Any]) -> None:
     _patch_models_update_user_input(comp)
 
     _patch_company_me_patch_sso_access_security(doc)
+    _patch_get_external_identity_204_no_body(doc)
+
+
+def _patch_get_external_identity_204_no_body(doc: dict[str, Any]) -> None:
+    """GET /companies/me/users/{userId}/external-identity: 204 must not declare a response body."""
+    paths = doc.get("paths")
+    if not isinstance(paths, dict):
+        return
+    ext = paths.get("/companies/me/users/{userId}/external-identity")
+    if not isinstance(ext, dict):
+        return
+    get = ext.get("get")
+    if not isinstance(get, dict):
+        return
+    responses = get.get("responses")
+    if not isinstance(responses, dict):
+        return
+    r204 = responses.get("204")
+    if isinstance(r204, dict):
+        r204.pop("content", None)
 
 
 def _patch_company_me_patch_sso_access_security(doc: dict[str, Any]) -> None:
-    """Add QuokkaQLogicalScopes + AND security on PATCH /companies/me for ssoAccessSource docs."""
+    """Bearer-only security on PATCH /companies/me; logical SSO scope rules live in x-logical-scopes (doc-only)."""
     comp = _components(doc)
-    schemes = comp.setdefault("securitySchemes", {})
+    schemes = comp.get("securitySchemes")
     if not isinstance(schemes, dict):
         sys.exit("post_swagger_openapi_tweaks: components.securitySchemes not an object")
+    schemes.pop("QuokkaQLogicalScopes", None)
     if "BearerAuth" not in schemes:
         sys.exit(
             "post_swagger_openapi_tweaks: BearerAuth missing (cannot patch PATCH /companies/me security)"
         )
-    schemes["QuokkaQLogicalScopes"] = {
-        "type": "oauth2",
-        "description": (
-            "Logical scopes for company-wide tenant settings (documentation). "
-            "Clients still send `Authorization: Bearer` JWT; the server maps these labels to "
-            "`users.roles` and tenant RBAC. For `models.CompanyPatch.ssoAccessSource`, the operation "
-            "requires scope `company.settings.ssoAccessSource`, satisfied when the principal matches "
-            "any of `global.role.admin`, `global.role.platform_admin`, or `company.tenant_role.system_admin`. "
-            "Scope `unit.tenant.admin` (unit-only `tenant.admin` permission) is not sufficient alone."
-        ),
-        "flows": {
-            "implicit": {
-                "authorizationUrl": "https://quokkaq.local/.well-known/openapi-logical-scopes",
-                "scopes": {
-                    "company.settings.ssoAccessSource": (
-                        "Change company SSO access provisioning (`manual` vs `sso_groups`). "
-                        "Equivalent to any of global.role.admin, global.role.platform_admin, "
-                        "company.tenant_role.system_admin (not unit.tenant.admin alone)."
-                    ),
-                    "global.role.admin": "Global administrator (role name `admin`).",
-                    "global.role.platform_admin": "Platform administrator (role `platform_admin`).",
-                    "company.tenant_role.system_admin": "Company tenant role slug `system_admin`.",
-                    "unit.tenant.admin": (
-                        "Unit-scoped `tenant.admin` permission — NOT sufficient for ssoAccessSource alone."
-                    ),
-                },
-            }
-        },
-    }
     paths = doc.get("paths")
     if not isinstance(paths, dict):
         sys.exit("post_swagger_openapi_tweaks: paths missing")
@@ -692,12 +684,30 @@ def _patch_company_me_patch_sso_access_security(doc: dict[str, Any]) -> None:
     patch = me.get("patch")
     if not isinstance(patch, dict):
         sys.exit("post_swagger_openapi_tweaks: PATCH /companies/me missing (swag/kin drift)")
-    patch["security"] = [
-        {
-            "BearerAuth": [],
-            "QuokkaQLogicalScopes": ["company.settings.ssoAccessSource"],
-        }
-    ]
+    patch["security"] = [{"BearerAuth": []}]
+    patch["x-logical-scopes"] = {
+        "description": (
+            "Logical scopes for company-wide tenant settings (documentation only). "
+            "Clients send `Authorization: Bearer` JWT; the server enforces these rules in code. "
+            "For `models.CompanyPatch.ssoAccessSource`, the caller must match scope "
+            "`company.settings.ssoAccessSource`, satisfied when the principal matches any of "
+            "`global.role.admin`, `global.role.platform_admin`, or `company.tenant_role.system_admin`. "
+            "Scope `unit.tenant.admin` (unit-only `tenant.admin` permission) is not sufficient alone."
+        ),
+        "scopes": {
+            "company.settings.ssoAccessSource": (
+                "Change company SSO access provisioning (`manual` vs `sso_groups`). "
+                "Equivalent to any of global.role.admin, global.role.platform_admin, "
+                "company.tenant_role.system_admin (not unit.tenant.admin alone)."
+            ),
+            "global.role.admin": "Global administrator (role name `admin`).",
+            "global.role.platform_admin": "Platform administrator (role `platform_admin`).",
+            "company.tenant_role.system_admin": "Company tenant role slug `system_admin`.",
+            "unit.tenant.admin": (
+                "Unit-scoped `tenant.admin` permission — NOT sufficient for ssoAccessSource alone."
+            ),
+        },
+    }
 
 
 def _patch_upsert_group_mapping_json(components: dict[str, Any]) -> None:

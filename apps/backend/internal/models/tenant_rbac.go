@@ -79,7 +79,7 @@ type CompanySSOGroupMapping struct {
 	CompanyID      string    `gorm:"not null;uniqueIndex:ux_company_sso_group" json:"companyId"`
 	IdpGroupID     string    `gorm:"not null;size:512;uniqueIndex:ux_company_sso_group" json:"idpGroupId"`
 	TenantRoleID   *string   `gorm:"index" json:"tenantRoleId,omitempty"`
-	LegacyRoleName *string   `gorm:"size:64" json:"legacyRoleName,omitempty"` // e.g. staff, admin
+	LegacyRoleName *string   `gorm:"size:64" json:"legacyRoleName,omitempty"` // legacy global role: staff | supervisor | operator (not admin)
 	CreatedAt      time.Time `gorm:"autoCreateTime" json:"createdAt"`
 	UpdatedAt      time.Time `gorm:"autoUpdateTime" json:"updatedAt"`
 }

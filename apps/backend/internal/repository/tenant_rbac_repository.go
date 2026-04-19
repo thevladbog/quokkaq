@@ -12,6 +12,7 @@ import (
 	"quokkaq-go-backend/pkg/database"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // TenantRBACRepository persists tenant-scoped roles and SSO group mappings.
@@ -253,17 +254,21 @@ func (r *tenantRBACRepository) UpdateTenantRole(role *models.TenantRole, units [
 
 func (r *tenantRBACRepository) DeleteTenantRole(companyID, roleID string) error {
 	return database.DB.Transaction(func(tx *gorm.DB) error {
+		var tr models.TenantRole
+		if err := tx.Where("id = ? AND company_id = ?", roleID, companyID).First(&tr).Error; err != nil {
+			return err
+		}
 		uids, err := userIDsAssignedToTenantRole(tx, companyID, roleID)
 		if err != nil {
 			return err
 		}
-		if err := tx.Where("tenant_role_id = ?", roleID).Delete(&models.UserTenantRole{}).Error; err != nil {
+		if err := tx.Where("company_id = ? AND tenant_role_id = ?", companyID, roleID).Delete(&models.UserTenantRole{}).Error; err != nil {
 			return err
 		}
-		if err := tx.Where("tenant_role_id = ?", roleID).Delete(&models.TenantRoleUnit{}).Error; err != nil {
+		if err := tx.Where("tenant_role_id = ?", tr.ID).Delete(&models.TenantRoleUnit{}).Error; err != nil {
 			return err
 		}
-		if err := tx.Where("company_id = ? AND id = ?", companyID, roleID).Delete(&models.TenantRole{}).Error; err != nil {
+		if err := tx.Where("company_id = ? AND id = ?", companyID, tr.ID).Delete(&models.TenantRole{}).Error; err != nil {
 			return err
 		}
 		return resyncUserUnitsForUsers(tx, companyID, uids)
@@ -276,35 +281,81 @@ func (r *tenantRBACRepository) ListGroupMappings(ctx context.Context, companyID 
 	return rows, err
 }
 
-func (r *tenantRBACRepository) UpsertGroupMapping(m *models.CompanySSOGroupMapping) (*models.CompanySSOGroupMapping, bool, error) {
-	if m.TenantRoleID != nil && strings.TrimSpace(*m.TenantRoleID) != "" {
-		if err := ensureTenantRoleInCompany(database.DB, m.CompanyID, *m.TenantRoleID); err != nil {
-			return nil, false, err
-		}
-	}
-	var existing models.CompanySSOGroupMapping
-	err := database.DB.Where("company_id = ? AND idp_group_id = ?", m.CompanyID, m.IdpGroupID).First(&existing).Error
+func isLikelyUniqueConstraintError(err error) bool {
 	if err == nil {
-		if err := database.DB.Model(&models.CompanySSOGroupMapping{}).Where("id = ?", existing.ID).Updates(map[string]interface{}{
-			"tenant_role_id":   m.TenantRoleID,
-			"legacy_role_name": m.LegacyRoleName,
-			"updated_at":       time.Now(),
-		}).Error; err != nil {
-			return nil, false, err
+		return false
+	}
+	if errors.Is(err, gorm.ErrDuplicatedKey) {
+		return true
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "unique constraint") ||
+		strings.Contains(msg, "duplicate") ||
+		strings.Contains(msg, "23505")
+}
+
+func (r *tenantRBACRepository) UpsertGroupMapping(m *models.CompanySSOGroupMapping) (*models.CompanySSOGroupMapping, bool, error) {
+	var out *models.CompanySSOGroupMapping
+	var created bool
+	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		if m.TenantRoleID != nil && strings.TrimSpace(*m.TenantRoleID) != "" {
+			if err := ensureTenantRoleInCompany(tx, m.CompanyID, *m.TenantRoleID); err != nil {
+				return err
+			}
 		}
-		var out models.CompanySSOGroupMapping
-		if err := database.DB.Where("id = ?", existing.ID).First(&out).Error; err != nil {
-			return nil, false, err
+		q := tx.Session(&gorm.Session{}).Where("company_id = ? AND idp_group_id = ?", m.CompanyID, m.IdpGroupID)
+		if tx.Name() == "postgres" {
+			q = q.Clauses(clause.Locking{Strength: "UPDATE"})
 		}
-		return &out, false, nil
-	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, false, err
-	}
-	if err := database.DB.Create(m).Error; err != nil {
-		return nil, false, err
-	}
-	return m, true, nil
+		var existing models.CompanySSOGroupMapping
+		err := q.First(&existing).Error
+		if err == nil {
+			if err := tx.Model(&models.CompanySSOGroupMapping{}).Where("id = ?", existing.ID).Updates(map[string]interface{}{
+				"tenant_role_id":   m.TenantRoleID,
+				"legacy_role_name": m.LegacyRoleName,
+				"updated_at":       time.Now(),
+			}).Error; err != nil {
+				return err
+			}
+			var reread models.CompanySSOGroupMapping
+			if err := tx.Where("id = ?", existing.ID).First(&reread).Error; err != nil {
+				return err
+			}
+			out = &reread
+			created = false
+			return nil
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		if err := tx.Create(m).Error; err != nil {
+			if !isLikelyUniqueConstraintError(err) {
+				return err
+			}
+			var raced models.CompanySSOGroupMapping
+			if err2 := tx.Where("company_id = ? AND idp_group_id = ?", m.CompanyID, m.IdpGroupID).First(&raced).Error; err2 != nil {
+				return err
+			}
+			if err := tx.Model(&models.CompanySSOGroupMapping{}).Where("id = ?", raced.ID).Updates(map[string]interface{}{
+				"tenant_role_id":   m.TenantRoleID,
+				"legacy_role_name": m.LegacyRoleName,
+				"updated_at":       time.Now(),
+			}).Error; err != nil {
+				return err
+			}
+			var reread models.CompanySSOGroupMapping
+			if err := tx.Where("id = ?", raced.ID).First(&reread).Error; err != nil {
+				return err
+			}
+			out = &reread
+			created = false
+			return nil
+		}
+		out = m
+		created = true
+		return nil
+	})
+	return out, created, err
 }
 
 func (r *tenantRBACRepository) DeleteGroupMapping(companyID, mappingID string) error {
@@ -389,6 +440,9 @@ func (r *tenantRBACRepository) GetTenantRoleBySlug(companyID, slug string) (*mod
 }
 
 func (r *tenantRBACRepository) FullTenantRoleUnitsForSystemRole(companyID, roleID string) ([]models.TenantRoleUnit, error) {
+	if err := ensureTenantRoleInCompany(database.DB, companyID, roleID); err != nil {
+		return nil, err
+	}
 	var unitIDs []string
 	if err := database.DB.Model(&models.Unit{}).Where("company_id = ?", companyID).Pluck("id", &unitIDs).Error; err != nil {
 		return nil, err

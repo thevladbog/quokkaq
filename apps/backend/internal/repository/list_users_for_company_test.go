@@ -131,3 +131,34 @@ func TestListUsersForCompany_includesCompanyOwnerWithoutUnits(t *testing.T) {
 		t.Fatalf("users = %#v, want one user %q", got, ownerID)
 	}
 }
+
+func TestHasCompanyAccess_userTenantRolesWithoutUnits(t *testing.T) {
+	t.Parallel()
+	db := newListUsersForCompanyTestDB(t)
+	repo := &userRepository{db: db}
+	now := time.Now().UTC()
+
+	const (
+		companyID = "c-utr"
+		userID    = "user-tenant-only"
+		roleID    = "tr-1"
+	)
+	if err := db.Exec(`INSERT INTO users (id, name, email, created_at) VALUES (?, 'U', 'u@x', ?)`, userID, now).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec(`INSERT INTO companies (id, name, owner_user_id) VALUES (?, 'Co', NULL)`, companyID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec(`INSERT INTO user_tenant_roles (id, user_id, company_id, tenant_role_id, created_at) VALUES ('utr1', ?, ?, ?, ?)`,
+		userID, companyID, roleID, now).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	ok, err := repo.HasCompanyAccess(userID, companyID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("HasCompanyAccess: want true when user has user_tenant_roles row but no user_units")
+	}
+}

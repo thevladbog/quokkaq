@@ -1356,6 +1356,10 @@ func RunVersionedMigrations(models ...interface{}) error {
 		if err := db.Exec(`ALTER TABLE users ADD COLUMN IF NOT EXISTS sso_profile_sync_opt_out BOOLEAN NOT NULL DEFAULT false`).Error; err != nil {
 			return err
 		}
+		// Ensure table exists before ALTER/INDEX on user_external_identities (fresh DBs may not have run earlier AutoMigrate yet).
+		if err := db.AutoMigrate(&dbmodels.UserExternalIdentity{}); err != nil {
+			return err
+		}
 		if err := db.Exec(`ALTER TABLE user_external_identities ADD COLUMN IF NOT EXISTS external_object_id TEXT`).Error; err != nil {
 			return err
 		}

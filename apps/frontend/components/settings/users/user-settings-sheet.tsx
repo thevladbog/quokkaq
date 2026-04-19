@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import type { Unit, User } from '@quokkaq/shared-types';
@@ -232,15 +232,24 @@ function UserSettingsSheetBody({
     }
   });
 
+  const hydratedExtIdentityRef = useRef(false);
   useEffect(() => {
+    hydratedExtIdentityRef.current = false;
+  }, [user.id]);
+
+  useEffect(() => {
+    if (hydratedExtIdentityRef.current) {
+      return;
+    }
     const res = extIdentityQ.data;
     if (!res || res.status !== 200 || !res.data) {
       return;
     }
     const d = res.data;
-    setExtIssuer((prev) => (prev === '' ? (d.issuer ?? '') : prev));
-    setExtSubject((prev) => (prev === '' ? (d.subject ?? '') : prev));
-    setExtOid((prev) => (prev === '' ? (d.externalObjectId ?? '') : prev));
+    setExtIssuer(d.issuer ?? '');
+    setExtSubject(d.subject ?? '');
+    setExtOid(d.externalObjectId ?? '');
+    hydratedExtIdentityRef.current = true;
   }, [extIdentityQ.data]);
 
   const userUnits = useMemo(() => {
