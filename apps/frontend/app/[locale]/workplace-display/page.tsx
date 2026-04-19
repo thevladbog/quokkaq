@@ -15,10 +15,6 @@ import {
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
-  AdScreenConfigSchema,
-  type AdScreenConfig
-} from '@quokkaq/shared-types';
-import {
   ApiHttpError,
   COUNTER_BOARD_LOCALE_KEY,
   COUNTER_BOARD_STORAGE_CHANGED_EVENT,
@@ -39,20 +35,14 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { resolveCounterDisplayAppearance } from '@/lib/guest-survey-counter-display-theme';
 import {
+  parseAdScreen,
+  pathWithQueryNoCode
+} from '@/lib/workplace-display-utils';
+import {
   CounterDisplaySessionIntlProvider,
   useCounterDisplaySessionLocale
 } from '../counter-display/counter-display-session-intl';
 import { type Locale, locales } from '@/i18n';
-
-function parseAdScreen(
-  unitConfig: Record<string, unknown> | undefined
-): Partial<AdScreenConfig> | undefined {
-  if (!unitConfig?.adScreen || typeof unitConfig.adScreen !== 'object') {
-    return undefined;
-  }
-  const parsed = AdScreenConfigSchema.partial().safeParse(unitConfig.adScreen);
-  return parsed.success ? parsed.data : undefined;
-}
 
 function readStoredCounterBoardLocale(): Locale | null {
   if (typeof window === 'undefined') return null;
@@ -60,17 +50,6 @@ function readStoredCounterBoardLocale(): Locale | null {
   const loc = localStorage.getItem(COUNTER_BOARD_LOCALE_KEY);
   if (!tok || !loc) return null;
   return locales.includes(loc as Locale) ? (loc as Locale) : null;
-}
-
-/** Preserve query string minus `code` after pairing bootstrap. */
-function pathWithQueryNoCode(
-  pathname: string,
-  searchParams: ReturnType<typeof useSearchParams>
-): string {
-  const sp = new URLSearchParams(searchParams.toString());
-  sp.delete('code');
-  const qs = sp.toString();
-  return qs ? `${pathname}?${qs}` : pathname;
 }
 
 const WORKPLACE_DISPLAY_EASE = [0.22, 1, 0.36, 1] as const;
@@ -168,7 +147,7 @@ function WorkplaceDisplayPageInner() {
         setUnitId(res.unitId);
         setPairCode('');
         window.dispatchEvent(new Event(COUNTER_BOARD_STORAGE_CHANGED_EVENT));
-        router.replace(pathWithQueryNoCode(pathname, searchParams));
+        router.replace(pathWithQueryNoCode(pathname, searchParams.toString()));
       } catch (err) {
         if (err instanceof ApiHttpError && err.status === 403) {
           toast.error(t('feature_locked'));
@@ -189,7 +168,7 @@ function WorkplaceDisplayPageInner() {
     void pairWithCode(q).finally(() => {
       if (!localStorage.getItem(COUNTER_BOARD_TOKEN_KEY)) {
         queryPairAttemptedRef.current = false;
-        router.replace(pathWithQueryNoCode(pathname, searchParams));
+        router.replace(pathWithQueryNoCode(pathname, searchParams.toString()));
       }
     });
   }, [hydrated, token, searchParams, pathname, router, pairWithCode]);

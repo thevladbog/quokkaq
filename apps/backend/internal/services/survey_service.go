@@ -842,6 +842,28 @@ func (s *surveyService) GuestSession(ctx context.Context, unitID, terminalID str
 	return out, nil
 }
 
+// buildCounterBoardSessionPayload maps counter, unit, and optional active ticket into the counter-board API DTO.
+func buildCounterBoardSessionPayload(counter *models.Counter, u *models.Unit, ticket *models.Ticket) *CounterBoardSession {
+	staffed := counter.AssignedTo != nil
+	out := &CounterBoardSession{
+		CounterID:      counter.ID,
+		CounterName:    counter.Name,
+		CounterStaffed: staffed,
+		OnBreak:        counter.OnBreak,
+	}
+	if len(u.Config) > 0 {
+		out.UnitConfig = u.Config
+	}
+	if ticket != nil {
+		out.ActiveTicket = &GuestSurveySessionTicket{
+			ID:          ticket.ID,
+			QueueNumber: ticket.QueueNumber,
+			Status:      ticket.Status,
+		}
+	}
+	return out
+}
+
 func (s *surveyService) CounterBoardSession(ctx context.Context, unitID, terminalID string) (*CounterBoardSession, error) {
 	unitID = strings.ToLower(strings.TrimSpace(unitID))
 	terminalID = strings.ToLower(strings.TrimSpace(terminalID))
@@ -878,30 +900,12 @@ func (s *surveyService) CounterBoardSession(ctx context.Context, unitID, termina
 		return nil, err
 	}
 
-	staffed := counter.AssignedTo != nil
-	out := &CounterBoardSession{
-		CounterID:      counter.ID,
-		CounterName:    counter.Name,
-		CounterStaffed: staffed,
-		OnBreak:        counter.OnBreak,
-	}
-	if len(u.Config) > 0 {
-		out.UnitConfig = u.Config
-	}
-
 	ticket, err := s.ticketRepo.GetActiveTicketByCounter(counter.ID)
 	if err != nil {
 		return nil, err
 	}
-	if ticket != nil {
-		out.ActiveTicket = &GuestSurveySessionTicket{
-			ID:          ticket.ID,
-			QueueNumber: ticket.QueueNumber,
-			Status:      ticket.Status,
-		}
-	}
 
-	return out, nil
+	return buildCounterBoardSessionPayload(counter, u, ticket), nil
 }
 
 func (s *surveyService) SubmitGuestResponse(ctx context.Context, unitID, terminalID, ticketID, surveyID string, answers json.RawMessage) error {

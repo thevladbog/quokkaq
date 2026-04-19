@@ -62,22 +62,8 @@ import {
   type DesktopTerminal,
   type Unit
 } from '@/lib/api';
+import { filterCountersForContext } from '@/lib/desktop-terminal-filters';
 import { getUnitDisplayName } from '@/lib/unit-display';
-
-function filterCountersForContext(unit: Unit, counters: Counter[]): Counter[] {
-  if (unit.kind === 'subdivision') {
-    return counters.filter((c) => c.unitId === unit.id);
-  }
-  if (unit.kind === 'service_zone') {
-    return counters.filter(
-      (c) =>
-        !c.serviceZoneId ||
-        String(c.serviceZoneId).trim() === '' ||
-        c.serviceZoneId === unit.id
-    );
-  }
-  return [];
-}
 
 /** Radix Select requires `value` to match a `SelectItem`; empty string is not a valid item value here. */
 const SELECT_UNSET = '__unset__';
