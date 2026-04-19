@@ -553,6 +553,27 @@ def _patch_models_update_user_input(components: dict[str, Any]) -> None:
             )
 
 
+def _patch_root_tag_counter_board(doc: dict[str, Any]) -> None:
+    """Declare counter-board in root OpenAPI tags so Swagger UI lists a description for the tag."""
+    name = "counter-board"
+    description = (
+        "Above-counter ticket display for paired counter_board terminals (terminal JWT). "
+        "Session for workplace display; separate from guest-survey survey flows."
+    )
+    tags = doc.get("tags")
+    if tags is None:
+        doc["tags"] = []
+        tags = doc["tags"]
+    if not isinstance(tags, list):
+        return
+    for t in tags:
+        if isinstance(t, dict) and t.get("name") == name:
+            if not t.get("description"):
+                t["description"] = description
+            return
+    tags.append({"name": name, "description": description})
+
+
 def apply_openapi_tweaks(doc: dict[str, Any]) -> None:
     """Apply extra schema constraints by path under components.schemas.
 
@@ -560,6 +581,7 @@ def apply_openapi_tweaks(doc: dict[str, Any]) -> None:
     changing JSON key order or indentation. If swag or kin rename models or drop schemas, this
     fails fast with a clear message — adjust the schema names or fields above.
     """
+    _patch_root_tag_counter_board(doc)
     comp = _components(doc)
 
     _patch_plan_json_object_maps(comp)

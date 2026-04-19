@@ -54,6 +54,10 @@ function readStoredCounterBoardLocale(): Locale | null {
 
 const WORKPLACE_DISPLAY_EASE = [0.22, 1, 0.36, 1] as const;
 
+/** Hidden unpair: number of quick taps on the top band (counter name area). */
+const RESET_TAP_TARGET = 5;
+const RESET_TAP_WINDOW_MS = 4000;
+
 function WorkplaceDisplayPageInner() {
   const reduceMotion = useReducedMotion();
   const t = useTranslations('counter_board');
@@ -67,7 +71,7 @@ function WorkplaceDisplayPageInner() {
   const [token, setToken] = useState<string | null>(null);
   const [unitId, setUnitId] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
-  const [resetTapCount, setResetTapCount] = useState(0);
+  const resetTapCountRef = useRef(0);
   const resetTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const queryPairAttemptedRef = useRef(false);
 
@@ -187,7 +191,7 @@ function WorkplaceDisplayPageInner() {
       clearTimeout(resetTapTimerRef.current);
       resetTapTimerRef.current = null;
     }
-    setResetTapCount(0);
+    resetTapCountRef.current = 0;
     localStorage.removeItem(COUNTER_BOARD_TOKEN_KEY);
     localStorage.removeItem(COUNTER_BOARD_UNIT_KEY);
     localStorage.removeItem(COUNTER_BOARD_LOCALE_KEY);
@@ -198,30 +202,26 @@ function WorkplaceDisplayPageInner() {
     qc.removeQueries({ queryKey: ['counter-board-session'] });
   }, [qc, resetSessionLocale]);
 
-  const RESET_TAP_TARGET = 5;
-  const RESET_TAP_WINDOW_MS = 4000;
-
   /** Hidden unpair: 5 quick taps on the top band (counter name area). */
   const handleTopBandResetTap = useCallback(() => {
-    const next = resetTapCount + 1;
-    if (next >= RESET_TAP_TARGET) {
+    resetTapCountRef.current += 1;
+    if (resetTapCountRef.current >= RESET_TAP_TARGET) {
       if (resetTapTimerRef.current) {
         clearTimeout(resetTapTimerRef.current);
         resetTapTimerRef.current = null;
       }
-      setResetTapCount(0);
+      resetTapCountRef.current = 0;
       handleReset();
       return;
     }
-    setResetTapCount(next);
     if (resetTapTimerRef.current) {
       clearTimeout(resetTapTimerRef.current);
     }
     resetTapTimerRef.current = setTimeout(() => {
-      setResetTapCount(0);
+      resetTapCountRef.current = 0;
       resetTapTimerRef.current = null;
     }, RESET_TAP_WINDOW_MS);
-  }, [resetTapCount, handleReset]);
+  }, [handleReset]);
 
   if (!hydrated) {
     return (

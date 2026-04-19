@@ -620,125 +620,134 @@ export default function DesktopTerminalsPage() {
               <p className='text-muted-foreground mb-3 text-sm'>
                 {t('table_scroll_hint')}
               </p>
-              <Table className='min-w-[56rem]'>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className='max-w-[14rem]'>
-                      {t('table.name')}
-                    </TableHead>
-                    <TableHead className='max-w-[14rem]'>
-                      {t('table.unit')}
-                    </TableHead>
-                    <TableHead>{t('table.kind')}</TableHead>
-                    <TableHead className='max-w-[12rem]'>
-                      {t('table.counter')}
-                    </TableHead>
-                    <TableHead className='h-auto min-h-10 w-[5rem] max-w-[5rem] px-1 py-2 text-center align-middle text-xs leading-tight whitespace-normal'>
-                      {t('table.locale')}
-                    </TableHead>
-                    <TableHead>{t('table.kiosk_fullscreen')}</TableHead>
-                    <TableHead>{t('table.status')}</TableHead>
-                    <TableHead className='min-w-[10rem]'>
-                      {t('table.last_seen')}
-                    </TableHead>
-                    <TableHead className='bg-card sticky right-0 z-30 border-l text-right shadow-[-6px_0_12px_-4px_rgba(0,0,0,0.08)] dark:shadow-[-6px_0_12px_-4px_rgba(0,0,0,0.3)]'>
-                      {t('table.actions')}
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((row) => (
-                    <TableRow key={row.id} className='group'>
-                      <TableCell className='max-w-[14rem] truncate font-medium'>
-                        {row.name?.trim() || '—'}
-                      </TableCell>
-                      <TableCell className='max-w-[14rem] truncate'>
-                        {row.unitName ?? row.unitId}
-                      </TableCell>
-                      <TableCell>
-                        {row.kind === 'counter_board'
-                          ? t('device_counter_board')
-                          : row.kind === 'counter_guest_survey'
-                            ? t('device_counter_display')
-                            : t('device_kiosk')}
-                      </TableCell>
-                      <TableCell className='max-w-[12rem] truncate'>
-                        {row.counterId
-                          ? row.counterName?.trim() || row.counterId
-                          : '—'}
-                      </TableCell>
-                      <TableCell className='w-[5rem] max-w-[5rem] text-center'>
-                        {row.defaultLocale}
-                      </TableCell>
-                      <TableCell>
-                        {row.kioskFullscreen ? (
-                          <Badge variant='default'>{t('fullscreen_on')}</Badge>
-                        ) : (
-                          <span className='text-muted-foreground text-sm'>
-                            {t('fullscreen_off')}
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {row.revokedAt ? (
-                          <Badge variant='destructive'>
-                            {t('status_revoked')}
-                          </Badge>
-                        ) : (
-                          <Badge variant='secondary'>
-                            {t('status_active')}
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className='text-muted-foreground max-w-[13rem] min-w-[10rem] truncate text-sm'>
-                        {formatAppDateTime(row.lastSeenAt, intlLocale)}
-                      </TableCell>
-                      <TableCell className='bg-card group-hover:bg-muted/50 sticky right-0 z-20 border-l text-right shadow-[-6px_0_12px_-4px_rgba(0,0,0,0.08)] dark:shadow-[-6px_0_12px_-4px_rgba(0,0,0,0.3)]'>
-                        <div className='flex items-center justify-end gap-0.5'>
-                          <Button
-                            variant='outline'
-                            size='icon'
-                            className='size-8 shrink-0'
-                            disabled={!!row.revokedAt}
-                            onClick={() => openEdit(row)}
-                            title={
-                              row.revokedAt
-                                ? t('actions_unavailable_revoked')
-                                : t('action_edit')
-                            }
-                            aria-label={
-                              row.revokedAt
-                                ? t('actions_unavailable_revoked')
-                                : t('action_edit_aria')
-                            }
-                          >
-                            <Pencil className='h-4 w-4' />
-                          </Button>
-                          <Button
-                            variant='outline'
-                            size='icon'
-                            className='size-8 shrink-0'
-                            disabled={!!row.revokedAt}
-                            onClick={() => setRevokeTarget(row)}
-                            title={
-                              row.revokedAt
-                                ? t('actions_unavailable_revoked')
-                                : t('action_revoke')
-                            }
-                            aria-label={
-                              row.revokedAt
-                                ? t('actions_unavailable_revoked')
-                                : t('action_revoke_aria')
-                            }
-                          >
-                            <Trash2 className='h-4 w-4' />
-                          </Button>
-                        </div>
-                      </TableCell>
+              <div className='overflow-x-auto'>
+                <Table className='min-w-[56rem]'>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className='max-w-[14rem]'>
+                        {t('table.name')}
+                      </TableHead>
+                      <TableHead className='max-w-[14rem]'>
+                        {t('table.unit')}
+                      </TableHead>
+                      <TableHead>{t('table.kind')}</TableHead>
+                      <TableHead className='max-w-[12rem]'>
+                        {t('table.counter')}
+                      </TableHead>
+                      <TableHead className='h-auto min-h-10 w-[5rem] max-w-[5rem] px-1 py-2 text-center align-middle text-xs leading-tight whitespace-normal'>
+                        {t('table.locale')}
+                      </TableHead>
+                      <TableHead>{t('table.kiosk_fullscreen')}</TableHead>
+                      <TableHead>{t('table.status')}</TableHead>
+                      <TableHead className='min-w-[10rem]'>
+                        {t('table.last_seen')}
+                      </TableHead>
+                      <TableHead className='bg-card sticky right-0 z-30 border-l text-right shadow-[-6px_0_12px_-4px_rgba(0,0,0,0.08)] dark:shadow-[-6px_0_12px_-4px_rgba(0,0,0,0.3)]'>
+                        {t('table.actions')}
+                      </TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {rows.map((row) => {
+                      const effectiveKind =
+                        row.kind ||
+                        (row.counterId ? 'counter_guest_survey' : undefined);
+                      return (
+                        <TableRow key={row.id} className='group'>
+                          <TableCell className='max-w-[14rem] truncate font-medium'>
+                            {row.name?.trim() || '—'}
+                          </TableCell>
+                          <TableCell className='max-w-[14rem] truncate'>
+                            {row.unitName ?? row.unitId}
+                          </TableCell>
+                          <TableCell>
+                            {effectiveKind === 'counter_board'
+                              ? t('device_counter_board')
+                              : effectiveKind === 'counter_guest_survey'
+                                ? t('device_counter_display')
+                                : t('device_kiosk')}
+                          </TableCell>
+                          <TableCell className='max-w-[12rem] truncate'>
+                            {row.counterId
+                              ? row.counterName?.trim() || row.counterId
+                              : '—'}
+                          </TableCell>
+                          <TableCell className='w-[5rem] max-w-[5rem] text-center'>
+                            {row.defaultLocale}
+                          </TableCell>
+                          <TableCell>
+                            {row.kioskFullscreen ? (
+                              <Badge variant='default'>
+                                {t('fullscreen_on')}
+                              </Badge>
+                            ) : (
+                              <span className='text-muted-foreground text-sm'>
+                                {t('fullscreen_off')}
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {row.revokedAt ? (
+                              <Badge variant='destructive'>
+                                {t('status_revoked')}
+                              </Badge>
+                            ) : (
+                              <Badge variant='secondary'>
+                                {t('status_active')}
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className='text-muted-foreground max-w-[13rem] min-w-[10rem] truncate text-sm'>
+                            {formatAppDateTime(row.lastSeenAt, intlLocale)}
+                          </TableCell>
+                          <TableCell className='bg-card group-hover:bg-muted/50 sticky right-0 z-20 border-l text-right shadow-[-6px_0_12px_-4px_rgba(0,0,0,0.08)] dark:shadow-[-6px_0_12px_-4px_rgba(0,0,0,0.3)]'>
+                            <div className='flex items-center justify-end gap-0.5'>
+                              <Button
+                                variant='outline'
+                                size='icon'
+                                className='size-8 shrink-0'
+                                disabled={!!row.revokedAt}
+                                onClick={() => openEdit(row)}
+                                title={
+                                  row.revokedAt
+                                    ? t('actions_unavailable_revoked')
+                                    : t('action_edit')
+                                }
+                                aria-label={
+                                  row.revokedAt
+                                    ? t('actions_unavailable_revoked')
+                                    : t('action_edit_aria')
+                                }
+                              >
+                                <Pencil className='h-4 w-4' />
+                              </Button>
+                              <Button
+                                variant='outline'
+                                size='icon'
+                                className='size-8 shrink-0'
+                                disabled={!!row.revokedAt}
+                                onClick={() => setRevokeTarget(row)}
+                                title={
+                                  row.revokedAt
+                                    ? t('actions_unavailable_revoked')
+                                    : t('action_revoke')
+                                }
+                                aria-label={
+                                  row.revokedAt
+                                    ? t('actions_unavailable_revoked')
+                                    : t('action_revoke_aria')
+                                }
+                              >
+                                <Trash2 className='h-4 w-4' />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
             </>
           )}
         </CardContent>

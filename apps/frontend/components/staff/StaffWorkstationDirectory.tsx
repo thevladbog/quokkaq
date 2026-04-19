@@ -57,11 +57,24 @@ export default function StaffWorkstationDirectory({ restrictUnitId }: Props) {
   >('all');
   const [search, setSearch] = useState('');
 
+  const filteredProfileUnitIds = useMemo(() => {
+    if (!user?.units?.length) return [] as string[];
+    return [
+      ...new Set(
+        user.units
+          .filter((u: { unit?: { kind?: string } | null }) =>
+            isUnitSelectableInSidebar(u.unit?.kind)
+          )
+          .map((u: { unitId: string }) => u.unitId)
+      )
+    ];
+  }, [user]);
+
   const staffNeedsTenantAdminSnapshot =
     (user?.tenantRoles?.some((r) => isTenantSystemAdminSlug(r.slug)) ??
       false) &&
     !!activeCompanyId?.trim() &&
-    !user?.units?.length;
+    filteredProfileUnitIds.length === 0;
 
   const { data: tenantAdminSnapshot, isPending: tenantAdminSnapshotLoading } =
     useTenantSystemAdminCompanyUnitSnapshot(
@@ -70,23 +83,15 @@ export default function StaffWorkstationDirectory({ restrictUnitId }: Props) {
     );
 
   const seedUnitIds = useMemo(() => {
-    const fromProfile = user?.units?.length
-      ? [
-          ...new Set(
-            user.units
-              .filter((u: { unit?: { kind?: string } | null }) =>
-                isUnitSelectableInSidebar(u.unit?.kind)
-              )
-              .map((u: { unitId: string }) => u.unitId)
-          )
-        ]
+    const fromProfile = filteredProfileUnitIds.length
+      ? filteredProfileUnitIds
       : (tenantAdminSnapshot?.rootIds ?? []);
     if (restrictUnitId && fromProfile.includes(restrictUnitId)) {
       return [restrictUnitId];
     }
     if (restrictUnitId) return [];
     return fromProfile;
-  }, [user, restrictUnitId, tenantAdminSnapshot?.rootIds]);
+  }, [filteredProfileUnitIds, restrictUnitId, tenantAdminSnapshot?.rootIds]);
 
   const { rows, isLoading: bootstrapLoading } = useWorkstationBootstrap({
     authLoading,

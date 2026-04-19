@@ -79,9 +79,7 @@ async function expandSeedUnitsForCounters(
         result.push(trimmed);
         return;
       }
-      for (const c of children) {
-        await expandOne(c.id, depth + 1);
-      }
+      await Promise.all(children.map((c) => expandOne(c.id, depth + 1)));
       return;
     }
 
@@ -90,9 +88,7 @@ async function expandSeedUnitsForCounters(
       result.push(trimmed);
       return;
     }
-    for (const c of children) {
-      await expandOne(c.id, depth + 1);
-    }
+    await Promise.all(children.map((c) => expandOne(c.id, depth + 1)));
     result.push(trimmed);
   }
 
@@ -243,6 +239,11 @@ async function fetchWorkstationBootstrap(
   for (const counter of flat) {
     const workplaceUnit = unitsById.get(counter.unitId);
     if (!workplaceUnit) {
+      logger.warn(
+        'Workstation bootstrap: counter unit not in map',
+        counter.id,
+        counter.unitId
+      );
       continue;
     }
     const { zoneFilterKey, zoneLabel } = resolveWorkstationZone(

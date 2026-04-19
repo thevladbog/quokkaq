@@ -753,6 +753,8 @@ func (s *surveyService) resolveActiveSurveyForCounter(ctx context.Context, count
 }
 
 func (s *surveyService) GuestSession(ctx context.Context, unitID, terminalID string) (*GuestSurveySession, error) {
+	unitID = strings.ToLower(strings.TrimSpace(unitID))
+	terminalID = strings.ToLower(strings.TrimSpace(terminalID))
 	tm, err := s.terminalRepo.FindByID(terminalID)
 	if err != nil {
 		if repository.IsNotFound(err) {
@@ -763,7 +765,7 @@ func (s *surveyService) GuestSession(ctx context.Context, unitID, terminalID str
 	if tm.RevokedAt != nil {
 		return nil, ErrSurveyForbidden
 	}
-	if tm.UnitID != unitID {
+	if strings.ToLower(strings.TrimSpace(tm.UnitID)) != unitID {
 		return nil, ErrSurveyForbidden
 	}
 	if tm.CounterID == nil || *tm.CounterID == "" {
@@ -892,11 +894,17 @@ func (s *surveyService) CounterBoardSession(ctx context.Context, unitID, termina
 
 	counter, err := s.counterRepo.FindByID(*tm.CounterID)
 	if err != nil {
+		if repository.IsNotFound(err) {
+			return nil, ErrSurveyNotFound
+		}
 		return nil, err
 	}
 
 	u, err := s.unitRepo.FindByIDLight(unitID)
 	if err != nil {
+		if repository.IsNotFound(err) {
+			return nil, ErrSurveyNotFound
+		}
 		return nil, err
 	}
 
@@ -912,6 +920,8 @@ func (s *surveyService) SubmitGuestResponse(ctx context.Context, unitID, termina
 	if len(answers) == 0 || !json.Valid(answers) {
 		return ErrSurveyBadRequest
 	}
+	unitID = strings.ToLower(strings.TrimSpace(unitID))
+	terminalID = strings.ToLower(strings.TrimSpace(terminalID))
 	tm, err := s.terminalRepo.FindByID(terminalID)
 	if err != nil {
 		if repository.IsNotFound(err) {
@@ -919,7 +929,7 @@ func (s *surveyService) SubmitGuestResponse(ctx context.Context, unitID, termina
 		}
 		return err
 	}
-	if tm.RevokedAt != nil || tm.UnitID != unitID {
+	if tm.RevokedAt != nil || strings.ToLower(strings.TrimSpace(tm.UnitID)) != unitID {
 		return ErrSurveyForbidden
 	}
 	if tm.CounterID == nil || *tm.CounterID == "" {
@@ -942,7 +952,7 @@ func (s *surveyService) SubmitGuestResponse(ctx context.Context, unitID, termina
 	if ticket.Status != "in_service" || ticket.CounterID == nil || *ticket.CounterID != *tm.CounterID {
 		return ErrSurveyBadRequest
 	}
-	if ticket.UnitID != unitID {
+	if strings.ToLower(strings.TrimSpace(ticket.UnitID)) != unitID {
 		return ErrSurveyForbidden
 	}
 

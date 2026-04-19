@@ -136,6 +136,22 @@ func TestCounterBoardHandler_Session_BadRequest(t *testing.T) {
 	}
 }
 
+func TestCounterBoardHandler_Session_NotFound(t *testing.T) {
+	t.Parallel()
+	h := NewCounterBoardHandler(&stubSurveyServiceCounterBoard{
+		counterBoardSession: func(context.Context, string, string) (*services.CounterBoardSession, error) {
+			return nil, services.ErrSurveyNotFound
+		},
+	})
+	rec := httptest.NewRecorder()
+	h.Session(rec, counterBoardSessionRequest("unit-1", "term-1"))
+	res := rec.Result()
+	t.Cleanup(func() { _ = res.Body.Close() })
+	if res.StatusCode != http.StatusNotFound {
+		t.Fatalf("status %d want %d", res.StatusCode, http.StatusNotFound)
+	}
+}
+
 func TestCounterBoardHandler_Session_FeatureLocked(t *testing.T) {
 	t.Parallel()
 	h := NewCounterBoardHandler(&stubSurveyServiceCounterBoard{

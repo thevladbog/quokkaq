@@ -323,8 +323,10 @@
 .workplace-display-called-card {
   --workplace-called-ink: oklch(0.98 0.01 145);
   --workplace-called-ink-muted: oklch(0.9 0.04 145);
+
   position: relative;
   isolation: isolate;
+
   display: flex;
   overflow: hidden;
   width: 100%;
@@ -334,29 +336,35 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
+
   border-radius: clamp(1rem, 3.5cqmin, 2.25rem);
   padding: clamp(0.75rem, 4cqmin, 2.5rem);
+
   background: linear-gradient(
     155deg,
     oklch(0.44 0.17 148) 0%,
     oklch(0.38 0.16 152) 100%
   );
+
   /* Soft green glow — no black */
   box-shadow:
     0 0.5em 1.8em color-mix(in oklch, oklch(0.35 0.12 148) 32%, transparent),
     inset 0 1px 0 color-mix(in oklch, white 18%, transparent);
+
   animation: workplace-display-called-card-pulse 2s ease-in-out infinite;
 }
 
 /* Glass-like moving highlight (above bg, below ticket text) */
 .workplace-display-called-card::after {
   content: '';
+
   position: absolute;
   top: -55%;
   bottom: -55%;
   left: -20%;
   z-index: 1;
   width: 48%;
+
   background: linear-gradient(
     100deg,
     transparent 0%,
@@ -365,8 +373,10 @@
     color-mix(in oklch, white 0%, transparent) 64%,
     transparent 100%
   );
+
   opacity: 0.42;
   transform: translateX(-160%) skewX(-16deg);
+
   animation: workplace-display-called-glass-sweep 5.5s ease-in-out infinite;
   pointer-events: none;
 }
@@ -379,11 +389,13 @@
 .dark .workplace-display-called-card {
   --workplace-called-ink: oklch(0.97 0.02 145);
   --workplace-called-ink-muted: oklch(0.88 0.06 145);
+
   background: linear-gradient(
     155deg,
     oklch(0.5 0.15 148) 0%,
     oklch(0.42 0.14 152) 100%
   );
+
   box-shadow:
     0 0.45em 1.5em color-mix(in oklch, oklch(0.2 0.08 148) 45%, transparent),
     inset 0 1px 0 color-mix(in oklch, white 12%, transparent);
@@ -391,6 +403,7 @@
 
 .dark .workplace-display-called-card::after {
   opacity: 0.28;
+
   background: linear-gradient(
     100deg,
     transparent 0%,

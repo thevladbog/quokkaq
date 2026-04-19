@@ -143,7 +143,7 @@ export default defineConfig({
       target: '../backend/docs/swagger.json',
       filters: {
         mode: 'include',
-        tags: ['guest-survey']
+        tags: ['guest-survey', 'counter-board']
       }
     },
     output: {

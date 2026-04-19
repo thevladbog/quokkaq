@@ -1659,7 +1659,7 @@
     "session_error": "Could not load session",
     "reset": "Reset device pairing",
     "feature_locked": "This feature is not enabled for your organization.",
-    "wrong_terminal_type": "This code is for a ticket kiosk. Create a desktop terminal of type counter survey display bound to this counter.",
+    "wrong_terminal_type": "This code is for a ticket kiosk. In Settings → Desktop terminals, create a counter board terminal (kind counter_board) bound to this counter.",
     "reset_icon_aria": "Device options. Tap five times within a few seconds to reset pairing.",
     "switch_to_en": "Switch to English",
     "switch_to_ru": "Switch to Russian",

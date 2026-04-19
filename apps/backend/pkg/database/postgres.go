@@ -1520,6 +1520,24 @@ func RunVersionedMigrations(models ...interface{}) error {
 		return fmt.Errorf("failed to run v1.3.7_system_admin_user_units_all_units migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.3.8_desktop_terminal_kind_counter_normalize", func(db *gorm.DB) error {
+		// Match models.EffectiveTerminalKind for rows bound to a counter: normalize casing for
+		// counter_board / counter_guest_survey; map legacy kiosk, empty kind, and unknown values to counter_guest_survey.
+		return db.Exec(`
+			UPDATE desktop_terminals
+			SET kind = CASE
+				WHEN lower(trim(coalesce(kind, ''))) = 'counter_board' THEN 'counter_board'
+				WHEN lower(trim(coalesce(kind, ''))) = 'counter_guest_survey' THEN 'counter_guest_survey'
+				ELSE 'counter_guest_survey'
+			END
+			WHERE counter_id IS NOT NULL
+			  AND length(trim(counter_id::text)) > 0
+		`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.3.8_desktop_terminal_kind_counter_normalize migration: %w", err)
+	}
+
 	fmt.Println("✅ All migrations completed successfully")
 	return nil
 }

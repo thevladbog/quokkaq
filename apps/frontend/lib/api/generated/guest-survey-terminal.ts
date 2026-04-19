@@ -329,6 +329,39 @@ export interface HandlersCreateCheckoutResponse {
   sessionId?: string;
 }
 
+export interface HandlersCreateDesktopTerminalRequest {
+  /** ContextUnitID: subdivision or service_zone selected in the pairing wizard (required with counterId). */
+  contextUnitId?: string;
+  counterId?: string;
+  defaultLocale?: string;
+  /** Kind: kiosk | counter_guest_survey | counter_board (required semantics: counter_* need counterId). */
+  kind?: string;
+  kioskFullscreen?: boolean;
+  name?: string;
+  unitId?: string;
+}
+
+export interface HandlersDesktopTerminalJSON {
+  counterId?: string;
+  counterName?: string;
+  createdAt?: string;
+  defaultLocale?: string;
+  id?: string;
+  kind?: string;
+  kioskFullscreen?: boolean;
+  lastSeenAt?: string;
+  name?: string;
+  revokedAt?: string;
+  unitId?: string;
+  unitName?: string;
+  updatedAt?: string;
+}
+
+export interface HandlersCreateDesktopTerminalResponse {
+  pairingCode?: string;
+  terminal?: HandlersDesktopTerminalJSON;
+}
+
 export type HandlersCreateInvitationRequestTargetRoles = { [key: string]: unknown };
 
 export type HandlersCreateInvitationRequestTargetUnits = { [key: string]: unknown };
@@ -706,6 +739,20 @@ export interface HandlersSignupRequest {
   planCode?: string;
 }
 
+export interface HandlersTerminalBootstrapRequest {
+  code?: string;
+}
+
+export interface HandlersTerminalBootstrapResponse {
+  appBaseUrl?: string;
+  counterId?: string;
+  defaultLocale?: string;
+  kioskFullscreen?: boolean;
+  terminalKind?: string;
+  token?: string;
+  unitId?: string;
+}
+
 export interface HandlersTransferRequest {
   /** @nullable */
   operatorComment?: string | null;
@@ -726,6 +773,16 @@ export interface HandlersUnitSummaryDTO {
 export interface HandlersUpdateCounterRequest {
   name?: string;
   serviceZoneId?: string;
+}
+
+export interface HandlersUpdateDesktopTerminalRequest {
+  contextUnitId?: string;
+  counterId?: string;
+  defaultLocale?: string;
+  kind?: string;
+  kioskFullscreen?: boolean;
+  name?: string;
+  unitId?: string;
 }
 
 export interface HandlersUpdateStatusRequest {
@@ -1948,6 +2005,11 @@ export type counterBoardSessionResponse403 = {
   status: 403
 }
 
+export type counterBoardSessionResponse404 = {
+  data: string
+  status: 404
+}
+
 export type counterBoardSessionResponse500 = {
   data: string
   status: 500
@@ -1956,7 +2018,7 @@ export type counterBoardSessionResponse500 = {
 export type counterBoardSessionResponseSuccess = (counterBoardSessionResponse200) & {
   headers: Headers;
 };
-export type counterBoardSessionResponseError = (counterBoardSessionResponse400 | counterBoardSessionResponse401 | counterBoardSessionResponse403 | counterBoardSessionResponse500) & {
+export type counterBoardSessionResponseError = (counterBoardSessionResponse400 | counterBoardSessionResponse401 | counterBoardSessionResponse403 | counterBoardSessionResponse404 | counterBoardSessionResponse500) & {
   headers: Headers;
 };
 

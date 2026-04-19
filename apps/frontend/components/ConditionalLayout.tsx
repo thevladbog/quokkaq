@@ -50,7 +50,10 @@ const ConditionalLayout = ({ children }: ConditionalLayoutProps) => {
       return { useSidebar: false, protected: false };
     }
 
-    if (pathWithoutLocale.startsWith('/workplace-display')) {
+    if (
+      pathWithoutLocale === '/workplace-display' ||
+      pathWithoutLocale.startsWith('/workplace-display/')
+    ) {
       return { useSidebar: false, protected: false };
     }
 
@@ -171,7 +174,8 @@ const ConditionalLayout = ({ children }: ConditionalLayoutProps) => {
     pathWithoutLocale !== '/login' &&
     !pathWithoutLocale.startsWith('/kiosk') &&
     !pathWithoutLocale.startsWith('/counter-display') &&
-    !pathWithoutLocale.startsWith('/workplace-display') &&
+    pathWithoutLocale !== '/workplace-display' &&
+    !pathWithoutLocale.startsWith('/workplace-display/') &&
     !pathWithoutLocale.startsWith('/screen') &&
     !pathWithoutLocale.startsWith('/ticket');
 

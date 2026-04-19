@@ -20,6 +20,9 @@ func CompanyHasCounterBoardFeature(companyID string) (bool, error) {
 	if err != nil || ok {
 		return ok, err
 	}
+	// TODO: Remove this fallback once migrations v1.3.4/v1.3.6 are validated in production and every
+	// subscription plan row reliably has PlanFeatureCounterBoard ("counter_board") in JSON — older plans
+	// used CompanyHasPlanFeature(companyID, "websocket_updates") only; see CompanyHasCounterBoardFeature.
 	return CompanyHasPlanFeature(companyID, "websocket_updates")
 }
 

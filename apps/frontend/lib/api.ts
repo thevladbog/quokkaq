@@ -36,6 +36,7 @@ import type {
   Booking,
   Counter,
   DesktopTerminal,
+  DesktopTerminalKind,
   Material,
   PreRegistration,
   UsageMetrics,
@@ -55,6 +56,7 @@ import {
   BookingModelSchema,
   CounterModelSchema,
   DesktopTerminalSchema,
+  DesktopTerminalKindSchema,
   CreateDesktopTerminalResponseSchema,
   UsageMetricsSchema,
   SubscriptionSchema,
@@ -380,7 +382,7 @@ export const desktopTerminalsApi = {
     kioskFullscreen?: boolean;
     contextUnitId?: string;
     counterId?: string;
-    kind?: string;
+    kind?: DesktopTerminalKind;
   }) =>
     apiRequest<{ terminal: DesktopTerminal; pairingCode: string }>(
       '/desktop-terminals',
@@ -400,7 +402,7 @@ export const desktopTerminalsApi = {
       kioskFullscreen?: boolean;
       contextUnitId?: string;
       counterId?: string;
-      kind?: string;
+      kind?: DesktopTerminalKind;
     }
   ) =>
     apiRequest<void>(`/desktop-terminals/${id}`, {
@@ -437,9 +439,7 @@ const TerminalBootstrapResponseSchema = z.object({
   token: z.string(),
   unitId: z.string(),
   counterId: z.string().nullable().optional(),
-  terminalKind: z
-    .enum(['kiosk', 'counter_guest_survey', 'counter_board'])
-    .optional(),
+  terminalKind: DesktopTerminalKindSchema,
   defaultLocale: z.string(),
   appBaseUrl: z.string(),
   kioskFullscreen: z.boolean()

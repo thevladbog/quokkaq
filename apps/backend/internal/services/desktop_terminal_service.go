@@ -23,14 +23,18 @@ const (
 )
 
 var (
-	ErrInvalidTerminalCode       = errors.New("invalid terminal code")
-	ErrInvalidLocale             = errors.New("locale must be en or ru")
-	ErrTerminalCounterContext    = errors.New("contextUnitId is required when counterId is set")
-	ErrTerminalCounterMismatch   = errors.New("counter does not match selected organizational unit")
-	ErrUnitNotFound              = errors.New("unit not found")
-	ErrCounterNotFound           = errors.New("counter not found")
-	ErrContextUnitNotFound       = errors.New("context unit not found")
-	ErrCounterBoardFeatureLocked = errors.New("counter board is not enabled for your subscription")
+	ErrInvalidTerminalCode           = errors.New("invalid terminal code")
+	ErrInvalidLocale                 = errors.New("locale must be en or ru")
+	ErrInvalidTerminalKind           = errors.New("invalid terminal kind")
+	ErrCounterIDRequired             = errors.New("counter terminal requires counterId")
+	ErrInvalidKindForCounter         = errors.New("invalid kind for counter terminal")
+	ErrTerminalKindRequiresRebinding = errors.New("terminal kind cannot be changed without updating counter binding")
+	ErrTerminalCounterContext        = errors.New("contextUnitId is required when counterId is set")
+	ErrTerminalCounterMismatch       = errors.New("counter does not match selected organizational unit")
+	ErrUnitNotFound                  = errors.New("unit not found")
+	ErrCounterNotFound               = errors.New("counter not found")
+	ErrContextUnitNotFound           = errors.New("context unit not found")
+	ErrCounterBoardFeatureLocked     = errors.New("counter board is not enabled for your subscription")
 )
 
 type DesktopTerminalService interface {
@@ -117,7 +121,7 @@ func (s *desktopTerminalService) resolveCounterBinding(unitID string, contextUni
 	}
 	k := normalizeTerminalKindInput(kind)
 	if k == "" {
-		return "", nil, "", errors.New("invalid terminal kind")
+		return "", nil, "", ErrInvalidTerminalKind
 	}
 	// Legacy API: counter binding without explicit kind → guest survey screen.
 	if cid != "" && k == models.DesktopTerminalKindKiosk {
@@ -126,7 +130,7 @@ func (s *desktopTerminalService) resolveCounterBinding(unitID string, contextUni
 
 	if cid == "" {
 		if k != models.DesktopTerminalKindKiosk {
-			return "", nil, "", errors.New("counter terminal requires counterId")
+			return "", nil, "", ErrCounterIDRequired
 		}
 		if _, e := s.unitRepo.FindByIDLight(unitID); e != nil {
 			if repository.IsNotFound(e) {
@@ -138,7 +142,7 @@ func (s *desktopTerminalService) resolveCounterBinding(unitID string, contextUni
 	}
 
 	if k != models.DesktopTerminalKindCounterGuestSurvey && k != models.DesktopTerminalKindCounterBoard {
-		return "", nil, "", errors.New("invalid kind for counter terminal")
+		return "", nil, "", ErrInvalidKindForCounter
 	}
 
 	if contextUnitID == nil || strings.TrimSpace(*contextUnitID) == "" {
@@ -257,6 +261,12 @@ func (s *desktopTerminalService) Update(id string, name *string, unitID, default
 
 	// Omitting counterId/contextUnitId in JSON leaves both nil: keep existing guest counter binding, only refresh metadata.
 	if contextUnitID == nil && counterID == nil && t.CounterID != nil && *t.CounterID != "" {
+		eff := models.EffectiveTerminalKind(t)
+		if kind != nil && strings.TrimSpace(*kind) != "" {
+			if strings.ToLower(strings.TrimSpace(*kind)) != eff {
+				return ErrTerminalKindRequiresRebinding
+			}
+		}
 		t.Name = name
 		t.DefaultLocale = strings.ToLower(strings.TrimSpace(defaultLocale))
 		t.KioskFullscreen = kioskFullscreen

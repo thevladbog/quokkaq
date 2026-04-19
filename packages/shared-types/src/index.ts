@@ -622,6 +622,8 @@ export const DesktopTerminalKindSchema = z.enum([
   'counter_board'
 ]);
 
+export type DesktopTerminalKind = z.infer<typeof DesktopTerminalKindSchema>;
+
 export const DesktopTerminalSchema = z.object({
   id: z.string(),
   unitId: z.string(),

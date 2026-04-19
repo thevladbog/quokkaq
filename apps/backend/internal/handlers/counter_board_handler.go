@@ -23,7 +23,7 @@ func NewCounterBoardHandler(survey services.SurveyService) *CounterBoardHandler 
 // Session godoc
 // @Summary      Counter board session (terminal)
 // @Description  Above-counter ticket display only. Does not load guest survey definitions and does not require the counter guest survey subscription feature.
-// @Tags         guest-survey
+// @Tags         counter-board
 // @Produce      json
 // @Security     BearerAuth
 // @Param        unitId path string true "Subdivision unit id (queue scope)"
@@ -31,6 +31,7 @@ func NewCounterBoardHandler(survey services.SurveyService) *CounterBoardHandler 
 // @Failure      400  {string}  string "Bad request"
 // @Failure      401  {string}  string "Unauthorized"
 // @Failure      403  {string}  string "Forbidden"
+// @Failure      404  {string}  string "Not Found"
 // @Failure      500  {string}  string "Internal Server Error"
 // @ID           counterBoardSession
 // @Router       /units/{unitId}/counter-board/session [get]
@@ -53,6 +54,10 @@ func (h *CounterBoardHandler) Session(w http.ResponseWriter, r *http.Request) {
 		}
 		if errors.Is(err, services.ErrSurveyFeatureLocked) {
 			http.Error(w, "Feature not enabled", http.StatusForbidden)
+			return
+		}
+		if errors.Is(err, services.ErrSurveyNotFound) {
+			http.Error(w, "Not found", http.StatusNotFound)
 			return
 		}
 		logger.PrintfCtx(r.Context(), "counter board session: %v", err)
