@@ -11,6 +11,12 @@ import (
 )
 
 func main() {
+	if err := run(); err != nil {
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	// Try loading .env from current directory first (if running from root)
 	if err := godotenv.Load(); err != nil {
 		// If failed, try loading from two levels up (if running from cmd/debug_email)
@@ -66,17 +72,18 @@ func main() {
 
 		fmt.Println("[1/4] Connecting to server...")
 		// Connect to the server without TLS first
-		c, err := smtp.Dial(addr)
-		if err != nil {
-			fmt.Printf("   ❌ Connection to %s failed: %v\n", addr, err)
-			logger.Fatal("all connection attempts failed")
+		c, dialErr := smtp.Dial(addr)
+		if dialErr != nil {
+			fmt.Printf("   ❌ Connection to %s failed: %v\n", addr, dialErr)
+			logger.Error("all connection attempts failed", "err", dialErr)
+			return fmt.Errorf("all connection attempts failed: %w", dialErr)
 		}
 		fmt.Println("   ✅ Connected to server!")
 
 		// Send EHLO
 		if err := c.Hello("localhost"); err != nil {
 			fmt.Printf("   ❌ Hello failed: %v\n", err)
-			return
+			return fmt.Errorf("smtp Hello: %w", err)
 		}
 
 		// Start TLS
@@ -85,7 +92,7 @@ func main() {
 			fmt.Println("   > Server supports STARTTLS, upgrading...")
 			if err := c.StartTLS(tlsConfig); err != nil {
 				fmt.Printf("   ❌ StartTLS failed: %v\n", err)
-				return
+				return fmt.Errorf("smtp StartTLS: %w", err)
 			}
 			fmt.Println("   ✅ TLS upgrade successful!")
 		} else {
@@ -106,7 +113,7 @@ func main() {
 	auth := smtp.PlainAuth("", user, pass, host)
 	if err := client.Auth(auth); err != nil {
 		fmt.Printf("❌ Authentication failed: %v\n", err)
-		return
+		return fmt.Errorf("smtp Auth: %w", err)
 	}
 	fmt.Println("✅ Authentication successful!")
 
@@ -114,16 +121,16 @@ func main() {
 	fmt.Println("[4/4] Sending test email...")
 	if err := client.Mail(from); err != nil {
 		fmt.Printf("❌ MAIL FROM failed: %v\n", err)
-		return
+		return fmt.Errorf("smtp Mail: %w", err)
 	}
 	if err := client.Rcpt(user); err != nil {
 		fmt.Printf("❌ RCPT TO failed: %v\n", err)
-		return
+		return fmt.Errorf("smtp Rcpt: %w", err)
 	}
 	wc, err := client.Data()
 	if err != nil {
 		fmt.Printf("❌ DATA command failed: %v\n", err)
-		return
+		return fmt.Errorf("smtp Data: %w", err)
 	}
 
 	msg := []byte("To: " + user + "\r\n" +
@@ -133,12 +140,13 @@ func main() {
 
 	if _, err = wc.Write(msg); err != nil {
 		fmt.Printf("❌ Writing body failed: %v\n", err)
-		return
+		return fmt.Errorf("write body: %w", err)
 	}
 	if err = wc.Close(); err != nil {
 		fmt.Printf("❌ Closing data failed: %v\n", err)
-		return
+		return fmt.Errorf("close data writer: %w", err)
 	}
 
 	fmt.Println("✅ Email sent successfully!")
+	return nil
 }

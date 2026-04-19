@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"quokkaq-go-backend/internal/config"
 	"quokkaq-go-backend/internal/logger"
 	"quokkaq-go-backend/internal/models"
@@ -42,7 +43,10 @@ func planSeedAllowInstantPurchase(code string) bool {
 func main() {
 	config.Load()
 	logger.Init()
-	database.Connect()
+	if err := database.Connect(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 
 	fmt.Println("Seeding subscription plans...")
 

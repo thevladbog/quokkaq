@@ -343,8 +343,6 @@ export default function LoginPage() {
                 {subStep === 'email' ? (
                   <form
                     className='space-y-4'
-                    method='post'
-                    action='#'
                     onSubmit={(e) => {
                       e.preventDefault();
                       void continueFromEmail();

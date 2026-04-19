@@ -245,6 +245,7 @@ func (h *PlatformHandler) upsertDraftInvoiceInTx(tx *gorm.DB, invoiceID string, 
 }
 
 // CreateInvoice godoc
+// @ID           PlatformCreateInvoice
 // @Summary      Create draft invoice (platform)
 // @Description  Creates a multi-line draft invoice for a company. companyId and dueDate (RFC3339) are required; at least one line.
 // @Tags         platform
@@ -330,6 +331,7 @@ func (h *PlatformHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 }
 
 // PatchInvoiceDraft godoc
+// @ID           PlatformPatchInvoiceDraft
 // @Summary      Update draft invoice (platform)
 // @Description  Replaces header and lines for a draft invoice. companyId in body is ignored; taken from the existing invoice.
 // @Tags         platform
@@ -378,6 +380,7 @@ func (h *PlatformHandler) PatchInvoiceDraft(w http.ResponseWriter, r *http.Reque
 }
 
 // IssueInvoice godoc
+// @ID           PlatformIssueInvoice
 // @Summary      Issue invoice (platform)
 // @Description  Assigns document number, sets status to open, and stores buyer snapshot from the company.
 // @Tags         platform
@@ -478,6 +481,7 @@ func (h *PlatformHandler) IssueInvoice(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetPlatformInvoice godoc
+// @ID           PlatformGetPlatformInvoice
 // @Summary      Get invoice by ID (platform)
 // @Description  Returns the invoice with lines and related preloads.
 // @Tags         platform

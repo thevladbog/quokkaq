@@ -110,7 +110,7 @@ func (h *TenantRBACHTTP) ListGroupMappings(w http.ResponseWriter, r *http.Reques
 	}
 	rows, err := h.tenantRBAC.ListGroupMappings(r.Context(), cid)
 	if err != nil {
-		logger.PrintfCtx(r.Context(), "ListGroupMappings: %v", err)
+		logger.ErrorfCtx(r.Context(), "ListGroupMappings: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -194,7 +194,7 @@ func (h *TenantRBACHTTP) UpsertGroupMapping(w http.ResponseWriter, r *http.Reque
 	}
 	out, inserted, err := h.tenantRBAC.UpsertGroupMapping(m)
 	if err != nil {
-		logger.PrintfCtx(r.Context(), "UpsertGroupMapping: %v", err)
+		logger.ErrorfCtx(r.Context(), "UpsertGroupMapping: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -232,7 +232,7 @@ func (h *TenantRBACHTTP) DeleteGroupMapping(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	if err := h.tenantRBAC.DeleteGroupMapping(cid, id); err != nil {
-		logger.PrintfCtx(r.Context(), "DeleteGroupMapping: %v", err)
+		logger.ErrorfCtx(r.Context(), "DeleteGroupMapping: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -259,7 +259,7 @@ func (h *TenantRBACHTTP) ListTenantRoles(w http.ResponseWriter, r *http.Request)
 	}
 	rows, err := h.tenantRBAC.ListTenantRoles(cid)
 	if err != nil {
-		logger.PrintfCtx(r.Context(), "ListTenantRoles: %v", err)
+		logger.ErrorfCtx(r.Context(), "ListTenantRoles: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -335,7 +335,7 @@ func (h *TenantRBACHTTP) CreateTenantRole(w http.ResponseWriter, r *http.Request
 		})
 	}
 	if err := h.tenantRBAC.CreateTenantRole(role, units); err != nil {
-		logger.PrintfCtx(r.Context(), "CreateTenantRole: %v", err)
+		logger.ErrorfCtx(r.Context(), "CreateTenantRole: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -382,7 +382,7 @@ func (h *TenantRBACHTTP) PatchTenantRole(w http.ResponseWriter, r *http.Request)
 			http.Error(w, "Not found", http.StatusNotFound)
 			return
 		}
-		logger.PrintfCtx(r.Context(), "GetTenantRole: %v", err)
+		logger.ErrorfCtx(r.Context(), "GetTenantRole: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -412,7 +412,7 @@ func (h *TenantRBACHTTP) PatchTenantRole(w http.ResponseWriter, r *http.Request)
 		var ferr error
 		units, ferr = h.tenantRBAC.FullTenantRoleUnitsForSystemRole(cid, rid)
 		if ferr != nil {
-			logger.PrintfCtx(r.Context(), "FullTenantRoleUnitsForSystemRole: %v", ferr)
+			logger.ErrorfCtx(r.Context(), "FullTenantRoleUnitsForSystemRole: %v", ferr)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -434,7 +434,7 @@ func (h *TenantRBACHTTP) PatchTenantRole(w http.ResponseWriter, r *http.Request)
 			http.Error(w, "Not found", http.StatusNotFound)
 			return
 		}
-		logger.PrintfCtx(r.Context(), "UpdateTenantRole: %v", err)
+		logger.ErrorfCtx(r.Context(), "UpdateTenantRole: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -478,7 +478,7 @@ func (h *TenantRBACHTTP) DeleteTenantRole(w http.ResponseWriter, r *http.Request
 			http.Error(w, "Not found", http.StatusNotFound)
 			return
 		}
-		logger.PrintfCtx(r.Context(), "GetTenantRole: %v", err)
+		logger.ErrorfCtx(r.Context(), "GetTenantRole: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -487,7 +487,7 @@ func (h *TenantRBACHTTP) DeleteTenantRole(w http.ResponseWriter, r *http.Request
 		return
 	}
 	if err := h.tenantRBAC.DeleteTenantRole(cid, rid); err != nil {
-		logger.PrintfCtx(r.Context(), "DeleteTenantRole: %v", err)
+		logger.ErrorfCtx(r.Context(), "DeleteTenantRole: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -531,7 +531,7 @@ func (h *TenantRBACHTTP) PatchUserSSOFlags(w http.ResponseWriter, r *http.Reques
 	}
 	okAccess, err := h.userRepo.HasCompanyAccess(targetID, cid)
 	if err != nil {
-		logger.PrintfCtx(r.Context(), "PatchUserSSOFlags userRepo.HasCompanyAccess(%q, %q): %v", targetID, cid, err)
+		logger.ErrorfCtx(r.Context(), "PatchUserSSOFlags userRepo.HasCompanyAccess(%q, %q): %v", targetID, cid, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -556,7 +556,7 @@ func (h *TenantRBACHTTP) PatchUserSSOFlags(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	if err := h.userRepo.UpdateFields(r.Context(), targetID, updates); err != nil {
-		logger.PrintfCtx(r.Context(), "PatchUserSSOFlags: %v", err)
+		logger.ErrorfCtx(r.Context(), "PatchUserSSOFlags: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -603,7 +603,7 @@ func (h *TenantRBACHTTP) GetExternalIdentity(w http.ResponseWriter, r *http.Requ
 	}
 	okAccess, err := h.userRepo.HasCompanyAccess(targetID, cid)
 	if err != nil {
-		logger.PrintfCtx(r.Context(), "GetExternalIdentity userRepo.HasCompanyAccess(%q, %q): %v", targetID, cid, err)
+		logger.ErrorfCtx(r.Context(), "GetExternalIdentity userRepo.HasCompanyAccess(%q, %q): %v", targetID, cid, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -617,7 +617,7 @@ func (h *TenantRBACHTTP) GetExternalIdentity(w http.ResponseWriter, r *http.Requ
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
-		logger.PrintfCtx(r.Context(), "GetExternalIdentity: %v", err)
+		logger.ErrorfCtx(r.Context(), "GetExternalIdentity: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -655,7 +655,7 @@ func (h *TenantRBACHTTP) PatchExternalIdentity(w http.ResponseWriter, r *http.Re
 	}
 	okAccess, err := h.userRepo.HasCompanyAccess(targetID, cid)
 	if err != nil {
-		logger.PrintfCtx(r.Context(), "PatchExternalIdentity userRepo.HasCompanyAccess(%q, %q): %v", targetID, cid, err)
+		logger.ErrorfCtx(r.Context(), "PatchExternalIdentity userRepo.HasCompanyAccess(%q, %q): %v", targetID, cid, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -677,7 +677,7 @@ func (h *TenantRBACHTTP) PatchExternalIdentity(w http.ResponseWriter, r *http.Re
 			http.Error(w, "external identity not found", http.StatusNotFound)
 			return
 		}
-		logger.PrintfCtx(r.Context(), "PatchExternalIdentity: %v", err)
+		logger.ErrorfCtx(r.Context(), "PatchExternalIdentity: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -734,20 +734,20 @@ func (h *TenantRBACHTTP) ListCompanyUsers(w http.ResponseWriter, r *http.Request
 			http.Error(w, "Not found", http.StatusNotFound)
 			return
 		}
-		logger.PrintfCtx(r.Context(), "ListCompanyUsers ResolveCompanyIDForRequest: %v", err)
+		logger.ErrorfCtx(r.Context(), "ListCompanyUsers ResolveCompanyIDForRequest: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 	includeGlobalRoleUsers, err := h.viewerIsGlobalAdminOrPlatformAdmin(userID)
 	if err != nil {
-		logger.PrintfCtx(r.Context(), "ListCompanyUsers viewerIsGlobalAdminOrPlatformAdmin(%q): %v", userID, err)
+		logger.ErrorfCtx(r.Context(), "ListCompanyUsers viewerIsGlobalAdminOrPlatformAdmin(%q): %v", userID, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 	search := strings.TrimSpace(r.URL.Query().Get("search"))
 	users, err := h.userRepo.ListUsersForCompany(cid, search, includeGlobalRoleUsers)
 	if err != nil {
-		logger.PrintfCtx(r.Context(), "ListUsersForCompany: %v", err)
+		logger.ErrorfCtx(r.Context(), "ListUsersForCompany: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -757,7 +757,7 @@ func (h *TenantRBACHTTP) ListCompanyUsers(w http.ResponseWriter, r *http.Request
 	}
 	trByUser, err := h.tenantRBAC.MapTenantRolesByUserForCompany(cid, ids)
 	if err != nil {
-		logger.PrintfCtx(r.Context(), "MapTenantRolesByUserForCompany: %v", err)
+		logger.ErrorfCtx(r.Context(), "MapTenantRolesByUserForCompany: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -809,7 +809,7 @@ func (h *TenantRBACHTTP) PatchUserTenantRoles(w http.ResponseWriter, r *http.Req
 	}
 	okAccess, err := h.userRepo.HasCompanyAccess(targetID, cid)
 	if err != nil {
-		logger.PrintfCtx(r.Context(), "PatchUserTenantRoles userRepo.HasCompanyAccess(%q, %q): %v", targetID, cid, err)
+		logger.ErrorfCtx(r.Context(), "PatchUserTenantRoles userRepo.HasCompanyAccess(%q, %q): %v", targetID, cid, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -828,7 +828,7 @@ func (h *TenantRBACHTTP) PatchUserTenantRoles(w http.ResponseWriter, r *http.Req
 			http.Error(w, "system tenant role not configured for this company", http.StatusBadRequest)
 			return
 		}
-		logger.PrintfCtx(r.Context(), "GetTenantRoleBySlug: %v", err)
+		logger.ErrorfCtx(r.Context(), "GetTenantRoleBySlug: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -849,7 +849,7 @@ func (h *TenantRBACHTTP) PatchUserTenantRoles(w http.ResponseWriter, r *http.Req
 	if len(clean) > 0 {
 		existing, err := h.tenantRBAC.ListTenantRolesByIDs(cid, clean)
 		if err != nil {
-			logger.PrintfCtx(r.Context(), "ListTenantRolesByIDs: %v", err)
+			logger.ErrorfCtx(r.Context(), "ListTenantRolesByIDs: %v", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -877,7 +877,7 @@ func (h *TenantRBACHTTP) PatchUserTenantRoles(w http.ResponseWriter, r *http.Req
 	}
 	prevIDs, err := h.tenantRBAC.ListUserTenantRoleIDs(targetID, cid)
 	if err != nil {
-		logger.PrintfCtx(r.Context(), "ListUserTenantRoleIDs: %v", err)
+		logger.ErrorfCtx(r.Context(), "ListUserTenantRoleIDs: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -891,7 +891,7 @@ func (h *TenantRBACHTTP) PatchUserTenantRoles(w http.ResponseWriter, r *http.Req
 	if prevHadSys != hasSysInClean {
 		can, err := h.actorCanAssignSystemTenantRole(actorID, cid)
 		if err != nil {
-			logger.PrintfCtx(r.Context(), "actorCanAssignSystemTenantRole: %v", err)
+			logger.ErrorfCtx(r.Context(), "actorCanAssignSystemTenantRole: %v", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -918,7 +918,7 @@ func (h *TenantRBACHTTP) PatchUserTenantRoles(w http.ResponseWriter, r *http.Req
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		logger.PrintfCtx(r.Context(), "PatchUserTenantRoles tx (ReplaceUserTenantRoles/SyncUserUnits/RecomputeUserIsActive): %v", err)
+		logger.ErrorfCtx(r.Context(), "PatchUserTenantRoles tx (ReplaceUserTenantRoles/SyncUserUnits/RecomputeUserIsActive): %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}

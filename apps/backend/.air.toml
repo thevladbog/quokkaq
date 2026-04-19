@@ -14,7 +14,7 @@ exclude_regex = ["_test\\.go"]
 delay = 500
 stop_on_error = true
 send_interrupt = true
-# Give the HTTP server time to release :PORT before the next binary starts (avoids bind "address already in use" → exit 1).
+# Grace period before SIGKILL if the child ignores SIGINT (distinct from Air’s ~5s wait when stopping the runner).
 kill_delay = "3s"
 
 [build.windows]

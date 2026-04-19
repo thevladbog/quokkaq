@@ -53,6 +53,7 @@ logs/
 log/
 
 # Temporary files
+# Air (hot reload tool) — build output under tmp/
 tmp/
 temp/
 *.tmp
@@ -73,9 +74,6 @@ s3-data/
 
 # Redis dump
 dump.rdb
-
-# Air (hot reload tool) — build output under tmp/
-tmp/
 
 # Generated documentation (optional - comment out if you want to track it)
 # docs/swagger.json

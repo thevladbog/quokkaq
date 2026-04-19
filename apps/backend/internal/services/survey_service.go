@@ -405,7 +405,7 @@ func (s *surveyService) deleteOrphanIdleMedia(ctx context.Context, companyID str
 		}
 		cnt, err := s.surveyRepo.CountDefinitionsReferencingIdleMediaFile(ctx, companyID, n)
 		if err != nil {
-			logger.Printf("idle_screen orphan count %s: %v", n, err)
+			logger.ErrorfCtx(ctx, "idle_screen orphan count %s: %v", n, err)
 			continue
 		}
 		if cnt > 0 {
@@ -413,7 +413,7 @@ func (s *surveyService) deleteOrphanIdleMedia(ctx context.Context, companyID str
 		}
 		key := fmt.Sprintf("tenants/%s/%s/%s", companyID, GuestSurveyIdleMediaCategory, n)
 		if err := s.storage.DeleteFile(ctx, key); err != nil {
-			logger.Printf("idle_screen orphan delete %s: %v", key, err)
+			logger.ErrorfCtx(ctx, "idle_screen orphan delete %s: %v", key, err)
 		}
 	}
 }

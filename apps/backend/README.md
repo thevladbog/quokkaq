@@ -199,6 +199,11 @@ AWS_ENDPOINT=http://localhost:9000
 SMTP_HOST=smtp.example.com
 SMTP_PORT=587
 SMTP_USER=your-email@example.com
+SMTP_PASS=your-app-password
+SMTP_FROM=noreply@example.com
+SMTP_SECURE=false
+
+```
 
 ### Development Mode
 

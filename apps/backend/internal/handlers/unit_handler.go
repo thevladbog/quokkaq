@@ -86,6 +86,7 @@ func (h *UnitHandler) GetAllUnits(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetUnitByID godoc
+// @ID           GetUnitByID
 // @Summary      Get a unit by ID
 // @Description  Retrieves a specific unit by its ID
 // @Tags         units

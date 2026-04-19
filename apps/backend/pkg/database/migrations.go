@@ -69,11 +69,11 @@ func (m *MigrationManager) RunMigration(version string, migrationFunc func(*gorm
 			return fmt.Errorf("failed to check migration status: %w", err)
 		}
 		if count > 0 {
-			slog.Info(fmt.Sprintf("⏭️ Migration %s already applied, skipping", version))
+			slog.Info("⏭️ Migration already applied, skipping", slog.String("version", version))
 			return nil
 		}
 
-		slog.Info(fmt.Sprintf("🔄 Applying migration %s...", version))
+		slog.Info("🔄 Applying migration", slog.String("version", version))
 		if err := migrationFunc(tx); err != nil {
 			return fmt.Errorf("failed to apply migration %s: %w", version, err)
 		}
@@ -86,7 +86,7 @@ func (m *MigrationManager) RunMigration(version string, migrationFunc func(*gorm
 			return fmt.Errorf("failed to mark migration %s as applied: %w", version, err)
 		}
 
-		slog.Info(fmt.Sprintf("✅ Migration %s applied successfully", version))
+		slog.Info("✅ Migration applied successfully", slog.String("version", version))
 		return nil
 	})
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,6 +18,37 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	"go.opentelemetry.io/otel/trace/noop"
 )
+
+func tracerSamplerFromEnv() sdktrace.Sampler {
+	name := strings.ToLower(strings.TrimSpace(os.Getenv("OTEL_TRACES_SAMPLER")))
+	arg := strings.TrimSpace(os.Getenv("OTEL_TRACES_SAMPLER_ARG"))
+
+	var root sdktrace.Sampler
+	switch name {
+	case "always_off":
+		root = sdktrace.NeverSample()
+	case "always_on":
+		root = sdktrace.AlwaysSample()
+	case "traceidratio":
+		ratio := 1.0
+		if arg != "" {
+			if r, err := strconv.ParseFloat(arg, 64); err == nil {
+				if r < 0 {
+					r = 0
+				} else if r > 1 {
+					r = 1
+				}
+				ratio = r
+			}
+		}
+		root = sdktrace.TraceIDRatioBased(ratio)
+	default:
+		// Unset or unknown: sample everything (matches prior implicit behavior).
+		root = sdktrace.AlwaysSample()
+	}
+
+	return sdktrace.ParentBased(root)
+}
 
 // Setup configures the global TracerProvider and W3C TraceContext/Baggage propagators.
 // When OTEL_EXPORTER_OTLP_ENDPOINT is unset, uses a noop tracer (no export) but still propagates incoming traceparent.
@@ -70,6 +102,7 @@ func Setup(ctx context.Context) (func(context.Context) error, error) {
 	}
 
 	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithSampler(tracerSamplerFromEnv()),
 		sdktrace.WithBatcher(exporter),
 		sdktrace.WithResource(res),
 	)

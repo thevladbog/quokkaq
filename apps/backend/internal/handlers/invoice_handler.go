@@ -55,6 +55,7 @@ func NewInvoiceHandler(
 }
 
 // GetMyInvoices godoc
+// @ID           GetMyInvoices
 // @Summary      Get Current User's Invoices
 // @Description  Returns invoices for the authenticated user's company
 // @Tags         invoices
@@ -101,6 +102,7 @@ func (h *InvoiceHandler) GetMyInvoices(w http.ResponseWriter, r *http.Request) {
 }
 
 // DownloadInvoice godoc
+// @ID           DownloadInvoice
 // @Summary      Download invoice PDF
 // @Description  Returns application/pdf (A4 счёт на оплату with ST00012 QR). 422 if SaaS operator bank details cannot form a valid QR.
 // @Tags         invoices

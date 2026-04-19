@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -52,9 +54,17 @@ import (
 // @in header
 // @name Authorization
 func main() {
+	if err := run(); err != nil {
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	config.Load()
 	logger.Init()
-	database.Connect()
+	if err := database.Connect(); err != nil {
+		return err
+	}
 
 	runAutoMigrate := true
 	if v := os.Getenv("RUN_AUTO_MIGRATE"); v != "" {
@@ -121,7 +131,8 @@ func main() {
 			&models.SupportReport{},
 		)
 		if err != nil {
-			logger.Fatal("failed to run migrations", "err", err)
+			logger.Error("failed to run migrations", "err", err)
+			return fmt.Errorf("failed to run migrations: %w", err)
 		}
 	}
 
@@ -157,7 +168,9 @@ func main() {
 	operatorIntervalRepo := repository.NewOperatorIntervalRepository()
 
 	jobWorker := jobs.NewJobWorker(ttsService, ticketRepo)
-	jobWorker.Start()
+	if err := jobWorker.Start(); err != nil {
+		return err
+	}
 	defer jobWorker.Stop()
 
 	userService := services.NewUserService(userRepo)
@@ -165,7 +178,8 @@ func main() {
 	tenantRBACRepo := repository.NewTenantRBACRepository()
 	authService, err := services.NewAuthService(userRepo, companyRepo, mailService, subscriptionRepo, tenantRBACRepo)
 	if err != nil {
-		logger.Fatal("auth service", "err", err)
+		logger.Error("auth service", "err", err)
+		return fmt.Errorf("auth service: %w", err)
 	}
 	ssoRepo := repository.NewSSORepository()
 	ssoService := services.NewSSOService(companyRepo, userRepo, ssoRepo, unitRepo, tenantRBACRepo, authService)
@@ -761,9 +775,11 @@ func main() {
 		})
 	})
 
-	shutdownOtel, err := telemetry.Setup(context.Background())
+	ctx := context.Background()
+	shutdownOtel, err := telemetry.Setup(ctx)
 	if err != nil {
-		logger.Fatal("telemetry setup", "err", err)
+		logger.Error("telemetry setup", "err", err)
+		shutdownOtel = func(context.Context) error { return nil }
 	}
 	defer func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -791,7 +807,9 @@ func main() {
 
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- srv.ListenAndServe()
+		// Air's runner stops the old binary with a 5s wait, while srv.Shutdown below allows up to 30s.
+		// The next process can start while the previous release is still in progress → EADDRINUSE.
+		errCh <- listenAndServeWithBindRetry(srv, 35*time.Second)
 	}()
 
 	quit := make(chan os.Signal, 1)
@@ -807,14 +825,51 @@ func main() {
 			shCtx, shCancel := context.WithTimeout(context.Background(), 10*time.Second)
 			_ = shutdownOtel(shCtx)
 			shCancel()
-			logger.Fatal("ListenAndServe", "err", err)
+			logger.Error("http server", "err", err)
+			return fmt.Errorf("http server: %w", err)
 		}
+		return nil
 	case <-quit:
 		refreshCancel()
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		if err := srv.Shutdown(ctx); err != nil {
 			slog.Error("server shutdown", "err", err)
+			return fmt.Errorf("server shutdown: %w", err)
 		}
+		return nil
+	}
+}
+
+func isAddrInUse(err error) bool {
+	var opErr *net.OpError
+	if !errors.As(err, &opErr) {
+		return false
+	}
+	return errors.Is(opErr.Err, syscall.EADDRINUSE)
+}
+
+// listenAndServeWithBindRetry mirrors http.Server.ListenAndServe but retries when the listen address
+// is still held by a previous instance (hot reload / overlapping shutdown).
+func listenAndServeWithBindRetry(srv *http.Server, retryFor time.Duration) error {
+	addr := srv.Addr
+	if addr == "" {
+		addr = ":http"
+	}
+	deadline := time.Now().Add(retryFor)
+	warned := false
+	for {
+		ln, err := net.Listen("tcp", addr)
+		if err == nil {
+			return srv.Serve(ln)
+		}
+		if !isAddrInUse(err) || time.Now().After(deadline) {
+			return err
+		}
+		if !warned {
+			slog.Info("listen: address in use, retrying (previous instance still shutting down)", "addr", addr)
+			warned = true
+		}
+		time.Sleep(250 * time.Millisecond)
 	}
 }

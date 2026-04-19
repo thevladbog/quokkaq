@@ -270,7 +270,7 @@ func (h *AuthHandler) PatchMe(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		logger.PrintfCtx(r.Context(), "PatchMe: UpdateUser error: %v", err)
+		logger.ErrorfCtx(r.Context(), "PatchMe: UpdateUser error: %v", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -278,11 +278,11 @@ func (h *AuthHandler) PatchMe(w http.ResponseWriter, r *http.Request) {
 	user, err := h.service.GetMe(userID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			logger.PrintfCtx(r.Context(), "PatchMe: GetMe after update: user not found: %v", err)
+			logger.ErrorfCtx(r.Context(), "PatchMe: GetMe after update: user not found: %v", err)
 			http.Error(w, "User not found", http.StatusNotFound)
 			return
 		}
-		logger.PrintfCtx(r.Context(), "PatchMe: GetMe after update error: %v", err)
+		logger.ErrorfCtx(r.Context(), "PatchMe: GetMe after update error: %v", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -348,7 +348,7 @@ func (h *AuthHandler) ListAccessibleCompanies(w http.ResponseWriter, r *http.Req
 	q := r.URL.Query().Get("q")
 	rows, err := h.userRepo.ListAccessibleCompanies(userID, q)
 	if err != nil {
-		logger.PrintfCtx(r.Context(), "ListAccessibleCompanies: %v", err)
+		logger.ErrorfCtx(r.Context(), "ListAccessibleCompanies: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -484,7 +484,7 @@ func (h *AuthHandler) Signup(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusServiceUnavailable)
 			return
 		}
-		logger.PrintfCtx(r.Context(), "Signup: %v", err)
+		logger.ErrorfCtx(r.Context(), "Signup: %v", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}

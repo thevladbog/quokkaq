@@ -4473,6 +4473,7 @@ paths:
   /companies/me/complete-onboarding:
     post:
       description: Marks onboarding as complete for the user's company
+      operationId: companiesMeCompleteOnboarding
       responses:
         '200':
           content:
@@ -5598,6 +5599,7 @@ paths:
   /counters/{id}/occupy:
     post:
       description: Sets a counter as occupied by the current user
+      operationId: OccupyCounter
       parameters:
       - description: Counter ID
         in: path
@@ -5925,6 +5927,7 @@ paths:
   /invoices/{id}/download:
     get:
       description: Returns application/pdf (A4 счёт на оплату with ST00012 QR). 422 if SaaS operator bank details cannot form a valid QR.
+      operationId: DownloadInvoice
       parameters:
       - description: Invoice ID
         in: path
@@ -6068,6 +6071,7 @@ paths:
   /invoices/me:
     get:
       description: Returns invoices for the authenticated user's company
+      operationId: GetMyInvoices
       parameters:
       - description: Tenant company UUID when the user belongs to multiple organizations
         in: header
@@ -6385,7 +6389,7 @@ paths:
       - platform
   /platform/companies:
     get:
-      operationId: platformListCompanies
+      operationId: ListCompanies
       parameters:
       - description: Filter by name
         in: query
@@ -6416,6 +6420,7 @@ paths:
       - platform
   /platform/companies/{id}:
     get:
+      operationId: GetCompany
       parameters:
       - description: Company ID
         in: path
@@ -6436,6 +6441,7 @@ paths:
       tags:
       - platform
     patch:
+      operationId: PatchCompany
       parameters:
       - description: Company ID
         in: path
@@ -6737,6 +6743,7 @@ paths:
       - dadata
   /platform/features:
     get:
+      operationId: GetFeatures
       responses:
         '200':
           content:
@@ -6751,6 +6758,7 @@ paths:
       - platform
   /platform/invoices:
     get:
+      operationId: ListInvoices
       parameters:
       - description: Filter by company
         in: query
@@ -6781,6 +6789,7 @@ paths:
       - platform
     post:
       description: Creates a multi-line draft invoice for a company. companyId and dueDate (RFC3339) are required; at least one line.
+      operationId: PlatformCreateInvoice
       requestBody:
         content:
           application/json:
@@ -6834,6 +6843,7 @@ paths:
   /platform/invoices/{id}:
     get:
       description: Returns the invoice with lines and related preloads.
+      operationId: PlatformGetPlatformInvoice
       parameters:
       - description: Invoice ID
         in: path
@@ -6878,6 +6888,7 @@ paths:
       tags:
       - platform
     patch:
+      operationId: PatchInvoice
       parameters:
       - description: Invoice ID
         in: path
@@ -6908,6 +6919,7 @@ paths:
   /platform/invoices/{id}/draft:
     patch:
       description: Replaces header and lines for a draft invoice. companyId in body is ignored; taken from the existing invoice.
+      operationId: PlatformPatchInvoiceDraft
       parameters:
       - description: Invoice ID
         in: path
@@ -6974,6 +6986,7 @@ paths:
   /platform/invoices/{id}/issue:
     post:
       description: Assigns document number, sets status to open, and stores buyer snapshot from the company.
+      operationId: PlatformIssueInvoice
       parameters:
       - description: Invoice ID
         in: path
@@ -7031,6 +7044,7 @@ paths:
       - platform
   /platform/saas-operator-company:
     get:
+      operationId: GetSaaSOperatorCompany
       responses:
         '200':
           content:
@@ -7051,6 +7065,7 @@ paths:
       - platform
   /platform/subscription-plans:
     get:
+      operationId: ListSubscriptionPlans
       responses:
         '200':
           content:
@@ -7066,6 +7081,7 @@ paths:
       tags:
       - platform
     post:
+      operationId: CreateSubscriptionPlan
       requestBody:
         content:
           application/json:
@@ -7088,6 +7104,7 @@ paths:
       - platform
   /platform/subscription-plans/{id}:
     put:
+      operationId: UpdateSubscriptionPlan
       parameters:
       - description: Plan ID
         in: path
@@ -7117,7 +7134,7 @@ paths:
       - platform
   /platform/subscriptions:
     get:
-      operationId: platformListSubscriptions
+      operationId: ListSubscriptions
       parameters:
       - description: Page size (max 100)
         in: query
@@ -7142,7 +7159,7 @@ paths:
       tags:
       - platform
     post:
-      operationId: platformCreateSubscription
+      operationId: CreateSubscription
       requestBody:
         content:
           application/json:
@@ -7183,7 +7200,7 @@ paths:
       - platform
   /platform/subscriptions/{id}:
     patch:
-      operationId: platformPatchSubscription
+      operationId: PatchSubscription
       parameters:
       - description: Subscription ID
         in: path
@@ -8831,6 +8848,7 @@ paths:
       - units
     get:
       description: Retrieves a specific unit by its ID
+      operationId: GetUnitByID
       parameters:
       - description: Unit ID
         in: path

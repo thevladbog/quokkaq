@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -52,18 +53,18 @@ const (
 	calendarIntMsgActivePreRegsBlock = "Active pre-registrations reference this calendar integration"
 )
 
-func logCalendarIntegration(op string, err error) {
-	logger.Printf("calendar integration handler %s: %v", op, err)
+func logCalendarIntegration(ctx context.Context, op string, err error) {
+	logger.ErrorfCtx(ctx, "calendar integration handler %s: %v", op, err)
 }
 
-func writeJSONDecodeError(w http.ResponseWriter, op string, err error) {
-	logCalendarIntegration(op+": json decode", err)
+func writeJSONDecodeError(ctx context.Context, w http.ResponseWriter, op string, err error) {
+	logCalendarIntegration(ctx, op+": json decode", err)
 	http.Error(w, calendarIntMsgInvalidJSON, http.StatusBadRequest)
 }
 
 // respondCalendarIntegrationError maps service/repository errors to safe HTTP responses and logs details.
-func respondCalendarIntegrationError(w http.ResponseWriter, op string, err error) {
-	logCalendarIntegration(op, err)
+func respondCalendarIntegrationError(ctx context.Context, w http.ResponseWriter, op string, err error) {
+	logCalendarIntegration(ctx, op, err)
 	switch {
 	case errors.Is(err, services.ErrCalendarIntegrationLimit):
 		http.Error(w, services.ErrCalendarIntegrationLimit.Error(), http.StatusConflict)
@@ -92,8 +93,8 @@ func respondCalendarIntegrationError(w http.ResponseWriter, op string, err error
 	}
 }
 
-func respondCalendarIntegrationDeleteError(w http.ResponseWriter, op string, err error) {
-	logCalendarIntegration(op, err)
+func respondCalendarIntegrationDeleteError(ctx context.Context, w http.ResponseWriter, op string, err error) {
+	logCalendarIntegration(ctx, op, err)
 	switch {
 	case errors.Is(err, gorm.ErrRecordNotFound):
 		http.Error(w, calendarIntMsgNotFound, http.StatusNotFound)
@@ -130,7 +131,7 @@ func (h *CalendarIntegrationHandler) Get(w http.ResponseWriter, r *http.Request)
 	unitID := chi.URLParam(r, "unitId")
 	pub, err := h.svc.GetPublic(unitID, companyID)
 	if err != nil {
-		respondCalendarIntegrationError(w, "Get", err)
+		respondCalendarIntegrationError(r.Context(), w, "Get", err)
 		return
 	}
 	RespondJSON(w, pub)
@@ -161,13 +162,13 @@ func (h *CalendarIntegrationHandler) Put(w http.ResponseWriter, r *http.Request)
 	}
 	var req services.UpsertIntegrationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSONDecodeError(w, "Put", err)
+		writeJSONDecodeError(r.Context(), w, "Put", err)
 		return
 	}
 	unitID := chi.URLParam(r, "unitId")
 	pub, err := h.svc.UpsertIntegration(unitID, companyID, &req)
 	if err != nil {
-		respondCalendarIntegrationError(w, "Put", err)
+		respondCalendarIntegrationError(r.Context(), w, "Put", err)
 		return
 	}
 	RespondJSON(w, pub)
@@ -195,7 +196,7 @@ func (h *CalendarIntegrationHandler) ListMine(w http.ResponseWriter, r *http.Req
 	}
 	list, err := h.svc.ListPublicForCompany(companyID)
 	if err != nil {
-		respondCalendarIntegrationError(w, "ListMine", err)
+		respondCalendarIntegrationError(r.Context(), w, "ListMine", err)
 		return
 	}
 	if list == nil {
@@ -228,12 +229,12 @@ func (h *CalendarIntegrationHandler) CreateMine(w http.ResponseWriter, r *http.R
 	}
 	var req services.CreateCalendarIntegrationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSONDecodeError(w, "CreateMine", err)
+		writeJSONDecodeError(r.Context(), w, "CreateMine", err)
 		return
 	}
 	pub, err := h.svc.CreateIntegration(companyID, &req)
 	if err != nil {
-		respondCalendarIntegrationError(w, "CreateMine", err)
+		respondCalendarIntegrationError(r.Context(), w, "CreateMine", err)
 		return
 	}
 	RespondJSON(w, pub)
@@ -265,12 +266,12 @@ func (h *CalendarIntegrationHandler) PutMine(w http.ResponseWriter, r *http.Requ
 	integrationID := chi.URLParam(r, "integrationId")
 	var req services.UpdateCalendarIntegrationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSONDecodeError(w, "PutMine", err)
+		writeJSONDecodeError(r.Context(), w, "PutMine", err)
 		return
 	}
 	pub, err := h.svc.UpdateIntegration(companyID, integrationID, &req)
 	if err != nil {
-		respondCalendarIntegrationError(w, "PutMine", err)
+		respondCalendarIntegrationError(r.Context(), w, "PutMine", err)
 		return
 	}
 	RespondJSON(w, pub)
@@ -298,7 +299,7 @@ func (h *CalendarIntegrationHandler) DeleteMine(w http.ResponseWriter, r *http.R
 	}
 	integrationID := chi.URLParam(r, "integrationId")
 	if err := h.svc.DeleteIntegration(companyID, integrationID); err != nil {
-		respondCalendarIntegrationDeleteError(w, "DeleteMine", err)
+		respondCalendarIntegrationDeleteError(r.Context(), w, "DeleteMine", err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -315,8 +316,8 @@ type GoogleCalendarOAuthStartResponse struct {
 	URL string `json:"url" binding:"required"`
 }
 
-func respondGoogleOAuthStartError(w http.ResponseWriter, op string, err error) {
-	logCalendarIntegration(op, err)
+func respondGoogleOAuthStartError(ctx context.Context, w http.ResponseWriter, op string, err error) {
+	logCalendarIntegration(ctx, op, err)
 	switch {
 	case errors.Is(err, services.ErrGoogleCalendarOAuthNotConfigured):
 		http.Error(w, services.ErrGoogleCalendarOAuthNotConfigured.Error(), http.StatusServiceUnavailable)
@@ -381,12 +382,12 @@ func (h *CalendarIntegrationHandler) GoogleOAuthStart(w http.ResponseWriter, r *
 	}
 	var req GoogleCalendarOAuthStartRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSONDecodeError(w, "GoogleOAuthStart", err)
+		writeJSONDecodeError(r.Context(), w, "GoogleOAuthStart", err)
 		return
 	}
 	authURL, err := h.svc.StartGoogleCalendarOAuth(r.Context(), companyID, req.UnitID, req.ReturnPath)
 	if err != nil {
-		respondGoogleOAuthStartError(w, "GoogleOAuthStart", err)
+		respondGoogleOAuthStartError(r.Context(), w, "GoogleOAuthStart", err)
 		return
 	}
 	RespondJSON(w, GoogleCalendarOAuthStartResponse{URL: authURL})
@@ -450,12 +451,12 @@ func (h *CalendarIntegrationHandler) GooglePickListCalendars(w http.ResponseWrit
 	}
 	var req GoogleCalendarPickListRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSONDecodeError(w, "GooglePickListCalendars", err)
+		writeJSONDecodeError(r.Context(), w, "GooglePickListCalendars", err)
 		return
 	}
 	cals, err := h.svc.ListGooglePickCalendars(r.Context(), companyID, req.PickToken)
 	if err != nil {
-		respondCalendarIntegrationError(w, "GooglePickListCalendars", err)
+		respondCalendarIntegrationError(r.Context(), w, "GooglePickListCalendars", err)
 		return
 	}
 	if cals == nil {
@@ -489,12 +490,12 @@ func (h *CalendarIntegrationHandler) GooglePickComplete(w http.ResponseWriter, r
 	}
 	var req GoogleCalendarPickCompleteRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSONDecodeError(w, "GooglePickComplete", err)
+		writeJSONDecodeError(r.Context(), w, "GooglePickComplete", err)
 		return
 	}
 	out, err := h.svc.CompleteGoogleCalendarPick(r.Context(), companyID, req.PickToken, req.CalendarID)
 	if err != nil {
-		respondCalendarIntegrationError(w, "GooglePickComplete", err)
+		respondCalendarIntegrationError(r.Context(), w, "GooglePickComplete", err)
 		return
 	}
 	RespondJSON(w, out)

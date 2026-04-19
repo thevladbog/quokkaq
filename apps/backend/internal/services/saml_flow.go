@@ -182,13 +182,13 @@ func (s *SSOService) buildSAMLServiceProvider(c *models.Company, conn *models.Co
 func (s *SSOService) BeginSAMLAuth(ctx context.Context, w http.ResponseWriter, r *http.Request, c *models.Company, conn *models.CompanySSOConnection) error {
 	sp, err := s.buildSAMLServiceProvider(c, conn)
 	if err != nil {
-		logger.Printf("saml sp: %v", err)
+		logger.ErrorfCtx(ctx, "saml buildSAMLServiceProvider failed companyId=%s connectionId=%s err=%v", c.ID, conn.ID, err)
 		http.Error(w, "SAML not configured", http.StatusBadRequest)
 		return err
 	}
 	authnReq, err := sp.MakeAuthenticationRequest(sp.GetSSOBindingLocation(saml.HTTPRedirectBinding), saml.HTTPRedirectBinding, saml.HTTPPostBinding)
 	if err != nil {
-		logger.Printf("saml MakeAuthenticationRequest: %v", err)
+		logger.ErrorfCtx(ctx, "saml MakeAuthenticationRequest failed companyId=%s connectionId=%s binding=%s err=%v", c.ID, conn.ID, saml.HTTPRedirectBinding, err)
 		http.Error(w, "SAML error", http.StatusInternalServerError)
 		return err
 	}
@@ -333,12 +333,13 @@ func (s *SSOService) HandleSAMLACS(ctx context.Context, w http.ResponseWriter, r
 	}
 	sp, err := s.buildSAMLServiceProvider(c, conn)
 	if err != nil {
+		logger.ErrorfCtx(ctx, "saml buildSAMLServiceProvider failed (ACS) companyId=%s connectionId=%s err=%v", c.ID, conn.ID, err)
 		http.Error(w, "SAML error", http.StatusInternalServerError)
 		return
 	}
 	assertion, err := sp.ParseResponse(r, []string{payload.RequestID})
 	if err != nil {
-		logger.Printf("saml ParseResponse: %v", err)
+		logger.ErrorfCtx(ctx, "saml ParseResponse failed companyId=%s connectionId=%s err=%v", c.ID, conn.ID, err)
 		http.Error(w, "invalid SAML response", http.StatusBadRequest)
 		return
 	}
@@ -369,7 +370,7 @@ func (s *SSOService) HandleSAMLACS(ctx context.Context, w http.ResponseWriter, r
 
 	user, err := s.resolveSSOUser(ctx, c, conn, iss, sub, email, displayName, true, "")
 	if err != nil {
-		logger.Printf("saml resolve user: %v", err)
+		logger.ErrorfCtx(ctx, "saml resolve user failed companyId=%s connectionId=%s err=%v", c.ID, conn.ID, err)
 		code := ssoErrorQueryCode(err)
 		cid := c.ID
 		s.redirectLoginSSOError(ctx, w, r, &cid, code, "saml_acs_denied:"+code, payload.UILocale)
@@ -377,7 +378,7 @@ func (s *SSOService) HandleSAMLACS(ctx context.Context, w http.ResponseWriter, r
 	}
 
 	if err := s.ApplyPostSSOLogin(ctx, c, user, displayName, email, true, groups, "", iss, sub, false); err != nil {
-		logger.Printf("saml ApplyPostSSOLogin: %v", err)
+		logger.ErrorfCtx(ctx, "saml ApplyPostSSOLogin failed companyId=%s connectionId=%s err=%v", c.ID, conn.ID, err)
 		cid := c.ID
 		s.redirectLoginSSOError(ctx, w, r, &cid, "access_sync_failed", "saml_acs_denied:access_sync_failed", payload.UILocale)
 		return

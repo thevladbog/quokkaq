@@ -106,7 +106,7 @@ func (s *storageService) UploadFile(ctx context.Context, fileBytes []byte, fileN
 	})
 
 	if err != nil {
-		logger.Printf("Failed to upload file to S3: %v", err)
+		logger.PrintfCtx(ctx, "Failed to upload file to S3: %v", err)
 		return "", "", err
 	}
 
@@ -153,7 +153,7 @@ func (s *storageService) UploadTenantAsset(ctx context.Context, tenantID, catego
 		ContentType: aws.String(contentType),
 	})
 	if err != nil {
-		logger.Printf("Failed to upload tenant asset to S3: %v", err)
+		logger.PrintfCtx(ctx, "Failed to upload tenant asset to S3: %v", err)
 		return "", err
 	}
 	return key, nil
@@ -208,7 +208,7 @@ func (s *storageService) DeleteFile(ctx context.Context, key string) error {
 	})
 
 	if err != nil {
-		logger.Printf("Failed to delete file from S3: %v", err)
+		logger.PrintfCtx(ctx, "Failed to delete file from S3: %v", err)
 		return err
 	}
 

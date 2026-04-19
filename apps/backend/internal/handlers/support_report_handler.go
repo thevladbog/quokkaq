@@ -116,12 +116,12 @@ func (h *SupportReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if errors.Is(err, services.ErrSupportReportPersistence) {
-			logger.PrintfCtx(r.Context(), "support report Create: %v", err)
+			logger.ErrorfCtx(r.Context(), "support report Create: %v", err)
 			http.Error(w, "Failed to save support report", http.StatusInternalServerError)
 			return
 		}
 		if _, ok := services.TicketIntegrationHTTPStatus(err); ok {
-			writeSupportReportUpstreamHTTPError(w, err, "support report Create: upstream ticket error: %v", "Failed to create external support ticket")
+			writeSupportReportUpstreamHTTPError(r.Context(), w, err, "support report Create: upstream ticket error: %v", "Failed to create external support ticket")
 			return
 		}
 		http.Error(w, "Failed to create external support ticket", http.StatusBadGateway)
@@ -243,12 +243,12 @@ func (h *SupportReportHandler) MarkIrrelevant(w http.ResponseWriter, r *http.Req
 			return
 		}
 		if errors.Is(err, services.ErrSupportReportPersistence) {
-			logger.PrintfCtx(r.Context(), "support report MarkIrrelevant: %v", err)
+			logger.ErrorfCtx(r.Context(), "support report MarkIrrelevant: %v", err)
 			http.Error(w, "Failed to save support report", http.StatusInternalServerError)
 			return
 		}
 		if _, ok := services.TicketIntegrationHTTPStatus(err); ok {
-			writeSupportReportUpstreamHTTPError(w, err, "support report MarkIrrelevant: upstream ticket error: %v", "Failed to post comment on external ticket")
+			writeSupportReportUpstreamHTTPError(r.Context(), w, err, "support report MarkIrrelevant: upstream ticket error: %v", "Failed to post comment on external ticket")
 			return
 		}
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -429,12 +429,12 @@ func (h *SupportReportHandler) AddShare(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 		if errors.Is(err, services.ErrSupportReportPersistence) {
-			logger.PrintfCtx(r.Context(), "support report AddShare: %v", err)
+			logger.ErrorfCtx(r.Context(), "support report AddShare: %v", err)
 			http.Error(w, "Failed to save share", http.StatusInternalServerError)
 			return
 		}
 		if _, ok := services.TicketIntegrationHTTPStatus(err); ok {
-			writeSupportReportUpstreamHTTPError(w, err, "support report AddShare: upstream ticket error: %v", "Failed to update external ticket")
+			writeSupportReportUpstreamHTTPError(r.Context(), w, err, "support report AddShare: upstream ticket error: %v", "Failed to update external ticket")
 			return
 		}
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -496,12 +496,12 @@ func (h *SupportReportHandler) RemoveShare(w http.ResponseWriter, r *http.Reques
 			return
 		}
 		if errors.Is(err, services.ErrSupportReportPersistence) {
-			logger.PrintfCtx(r.Context(), "support report RemoveShare: %v", err)
+			logger.ErrorfCtx(r.Context(), "support report RemoveShare: %v", err)
 			http.Error(w, "Failed to update share", http.StatusInternalServerError)
 			return
 		}
 		if _, ok := services.TicketIntegrationHTTPStatus(err); ok {
-			writeSupportReportUpstreamHTTPError(w, err, "support report RemoveShare: upstream ticket error: %v", "Failed to update external ticket")
+			writeSupportReportUpstreamHTTPError(r.Context(), w, err, "support report RemoveShare: upstream ticket error: %v", "Failed to update external ticket")
 			return
 		}
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -572,7 +572,7 @@ func (h *SupportReportHandler) ListComments(w http.ResponseWriter, r *http.Reque
 			return
 		}
 		if _, stOK := services.TicketIntegrationHTTPStatus(err); stOK {
-			writeSupportReportUpstreamHTTPError(w, err, "support report ListComments: upstream ticket error: %v", "Failed to load comments from external ticket")
+			writeSupportReportUpstreamHTTPError(r.Context(), w, err, "support report ListComments: upstream ticket error: %v", "Failed to load comments from external ticket")
 			return
 		}
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -660,7 +660,7 @@ func (h *SupportReportHandler) PostComment(w http.ResponseWriter, r *http.Reques
 			return
 		}
 		if _, stOK := services.TicketIntegrationHTTPStatus(err); stOK {
-			writeSupportReportUpstreamHTTPError(w, err, "support report PostComment: upstream ticket error: %v", "Failed to post comment on external ticket")
+			writeSupportReportUpstreamHTTPError(r.Context(), w, err, "support report PostComment: upstream ticket error: %v", "Failed to post comment on external ticket")
 			return
 		}
 		http.Error(w, "Internal server error", http.StatusInternalServerError)

@@ -252,7 +252,7 @@ func (s *SSOService) BeginAuthorize(ctx context.Context, w http.ResponseWriter, 
 
 	provider, err := oidc.NewProvider(ctx, strings.TrimSpace(conn.IssuerURL))
 	if err != nil {
-		logger.Printf("oidc NewProvider: %v", err)
+		logger.ErrorfCtx(ctx, "oidc NewProvider: %v", err)
 		http.Error(w, "SSO configuration error", http.StatusInternalServerError)
 		return err
 	}
@@ -282,7 +282,7 @@ func (s *SSOService) BeginAuthorize(ctx context.Context, w http.ResponseWriter, 
 		return errors.New("redis")
 	}
 	if err := redisstore.SetJSON(ctx, redisstore.KeyOAuthState(state), payload, 15*time.Minute); err != nil {
-		logger.Printf("redis set oauth state: %v", err)
+		logger.ErrorfCtx(ctx, "redis set oauth state: %v", err)
 		http.Error(w, "SSO store error", http.StatusServiceUnavailable)
 		return err
 	}
@@ -416,7 +416,7 @@ func (s *SSOService) HandleCallback(ctx context.Context, w http.ResponseWriter, 
 
 	tok, err := oauth2Config.Exchange(ctx, code, oauth2.VerifierOption(payload.CodeVerifier))
 	if err != nil {
-		logger.Printf("oauth2 exchange: %v", err)
+		logger.ErrorfCtx(ctx, "oauth2 exchange: %v", err)
 		http.Error(w, "token exchange failed", http.StatusBadRequest)
 		return
 	}
@@ -430,7 +430,7 @@ func (s *SSOService) HandleCallback(ctx context.Context, w http.ResponseWriter, 
 	verifier := provider.Verifier(oidcConfig)
 	idToken, err := verifier.Verify(ctx, rawIDToken)
 	if err != nil {
-		logger.Printf("id token verify: %v", err)
+		logger.ErrorfCtx(ctx, "id token verify: %v", err)
 		http.Error(w, "invalid id_token", http.StatusBadRequest)
 		return
 	}
@@ -466,7 +466,7 @@ func (s *SSOService) HandleCallback(ctx context.Context, w http.ResponseWriter, 
 
 	user, err := s.resolveSSOUser(ctx, company, conn, idToken.Issuer, idToken.Subject, extClaims.Email, extClaims.Name, emailVerified, extClaims.ObjectID)
 	if err != nil {
-		logger.Printf("sso resolve user: %v", err)
+		logger.ErrorfCtx(ctx, "sso resolve user: %v", err)
 		code := ssoErrorQueryCode(err)
 		cid := payload.CompanyID
 		s.redirectLoginSSOError(ctx, w, r, &cid, code, "oidc_callback_denied:"+code, payload.UILocale)
@@ -474,7 +474,7 @@ func (s *SSOService) HandleCallback(ctx context.Context, w http.ResponseWriter, 
 	}
 
 	if err := s.ApplyPostSSOLogin(ctx, company, user, extClaims.Name, extClaims.Email, emailVerified, extClaims.Groups, extClaims.ObjectID, idToken.Issuer, idToken.Subject, deferGroupReconcile); err != nil {
-		logger.Printf("oidc ApplyPostSSOLogin: %v", err)
+		logger.ErrorfCtx(ctx, "oidc ApplyPostSSOLogin: %v", err)
 		cid := payload.CompanyID
 		s.redirectLoginSSOError(ctx, w, r, &cid, "access_sync_failed", "oidc_callback_denied:access_sync_failed", payload.UILocale)
 		return
@@ -521,7 +521,7 @@ func (s *SSOService) resolveSSOUser(ctx context.Context, company *models.Company
 					ext.Issuer = iss
 					ext.Subject = sub
 					if err := s.ssoRepo.UpdateExternalIdentity(ctx, ext); err != nil {
-						logger.Printf("sso update external identity iss/sub: %v", err)
+						logger.ErrorfCtx(ctx, "sso update external identity iss/sub: %v", err)
 					}
 				}
 				return u, nil
@@ -549,7 +549,7 @@ func (s *SSOService) resolveSSOUser(ctx context.Context, company *models.Company
 					oid := externalObjectID
 					ext.ExternalObjectID = &oid
 					if err := s.ssoRepo.UpdateExternalIdentity(ctx, ext); err != nil {
-						logger.Printf("sso update external identity external_object_id: %v", err)
+						logger.ErrorfCtx(ctx, "sso update external identity external_object_id: %v", err)
 					}
 				}
 			}
@@ -583,7 +583,8 @@ func (s *SSOService) resolveSSOUser(ctx context.Context, company *models.Company
 			eid.ExternalObjectID = &oid
 		}
 		if err := s.ssoRepo.CreateExternalIdentity(eid); err != nil {
-			logger.Printf(
+			logger.ErrorfCtx(
+				ctx,
 				"sso create external identity: user=%s company=%s iss=%s sub=%s: %v",
 				user.ID, company.ID, iss, sub, err,
 			)
@@ -704,7 +705,7 @@ func (s *SSOService) persistSSOAudit(ctx context.Context, companyID *string, use
 		Detail:    d,
 	}
 	if err := s.ssoRepo.InsertSSOAudit(ctx, e); err != nil {
-		logger.Printf("sso audit insert: %v", err)
+		logger.ErrorfCtx(ctx, "sso audit insert: %v", err)
 	}
 }
 

@@ -15,9 +15,18 @@ import (
 )
 
 func main() {
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	config.Load()
 	logger.Init()
-	database.Connect()
+	if err := database.Connect(); err != nil {
+		return err
+	}
 
 	var migrationFailures int
 
@@ -30,13 +39,15 @@ func main() {
 
 	var companies []models.Company
 	if err := db.Where("subscription_id IS NULL").Find(&companies).Error; err != nil {
-		logger.Fatalf("Failed to fetch companies: %v", err)
+		logger.Error("Failed to fetch companies", "err", err)
+		return fmt.Errorf("failed to fetch companies: %w", err)
 	}
 
 	// Find or create grandfathered plan
 	var grandfatheredPlan models.SubscriptionPlan
 	if err := db.Where("code = ?", "grandfathered").First(&grandfatheredPlan).Error; err != nil {
-		logger.Fatalf("Grandfathered plan not found. Please run seed-plans first: %v", err)
+		logger.Error("grandfathered plan not found; run seed-plans first", "err", err)
+		return fmt.Errorf("grandfathered plan not found (run seed-plans first): %w", err)
 	}
 
 	for _, company := range companies {
@@ -198,8 +209,9 @@ func main() {
 
 	if migrationFailures > 0 {
 		fmt.Printf("\n✗ SaaS migration finished with %d error(s); see logs above for details.\n", migrationFailures)
-		os.Exit(1)
+		return fmt.Errorf("migration completed with %d error(s)", migrationFailures)
 	}
 	fmt.Println("\n✓ SaaS migration completed successfully!")
 	fmt.Printf("Migrated %d companies to SaaS model\n", len(companies))
+	return nil
 }

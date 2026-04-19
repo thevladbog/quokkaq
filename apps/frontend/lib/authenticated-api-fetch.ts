@@ -84,23 +84,42 @@ function isMultipartBody(body: unknown): boolean {
   );
 }
 
+/**
+ * Merges injected headers with caller headers using the Fetch Headers API (names are case-insensitive).
+ * Injected `authHeaders` are applied first; caller values win on conflicts (same as prior object-spread behavior).
+ */
 function mergeRequestInitHeaders(
   callerHeaders: HeadersInit | undefined,
   authHeaders: Record<string, string>
 ): Record<string, string> {
-  const fromCaller: Record<string, string> = {};
-  if (callerHeaders instanceof Headers) {
-    callerHeaders.forEach((value, key) => {
-      fromCaller[key] = value;
-    });
-  } else if (Array.isArray(callerHeaders)) {
-    for (const pair of callerHeaders) {
-      if (pair.length >= 2) fromCaller[pair[0]] = String(pair[1]);
-    }
-  } else if (callerHeaders && typeof callerHeaders === 'object') {
-    Object.assign(fromCaller, callerHeaders as Record<string, string>);
+  const h = new Headers();
+  for (const [name, value] of Object.entries(authHeaders)) {
+    h.set(name, value);
   }
-  return { ...authHeaders, ...fromCaller };
+  if (callerHeaders !== undefined && callerHeaders !== null) {
+    if (callerHeaders instanceof Headers) {
+      callerHeaders.forEach((value, key) => {
+        h.set(key, value);
+      });
+    } else if (Array.isArray(callerHeaders)) {
+      for (const pair of callerHeaders) {
+        if (pair.length >= 2) {
+          h.set(String(pair[0]), String(pair[1]));
+        }
+      }
+    } else if (typeof callerHeaders === 'object') {
+      for (const [k, v] of Object.entries(
+        callerHeaders as Record<string, string>
+      )) {
+        h.set(k, String(v));
+      }
+    }
+  }
+  const out: Record<string, string> = {};
+  h.forEach((value, key) => {
+    out[key] = value;
+  });
+  return out;
 }
 
 function getRequestIdFromCallerHeaders(

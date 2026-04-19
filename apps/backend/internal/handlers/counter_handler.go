@@ -214,6 +214,7 @@ func (h *CounterHandler) DeleteCounter(w http.ResponseWriter, r *http.Request) {
 }
 
 // Occupy godoc
+// @ID           OccupyCounter
 // @Summary      Occupy counter
 // @Description  Sets a counter as occupied by the current user
 // @Tags         counters

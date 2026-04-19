@@ -11,6 +11,12 @@ import (
 )
 
 func main() {
+	if err := run(); err != nil {
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	// Load .env file
 	if err := godotenv.Load("../../.env"); err != nil {
 		fmt.Fprintln(os.Stderr, "Warning: .env file not found or could not be loaded. Using environment variables.")
@@ -30,13 +36,15 @@ func main() {
 	fmt.Println("-------------------------------")
 
 	if host == "" {
-		logger.Fatal("SMTP_HOST is not set")
+		logger.Error("SMTP_HOST is not set")
+		return fmt.Errorf("SMTP_HOST is not set")
 	}
 
 	// Align with NewMailService(): STARTTLS / port 587 setups need explicit opt-in for self-signed certs.
 	if secureStr == "false" && os.Getenv("SMTP_TLS_INSECURE_SKIP_VERIFY") == "" {
 		if err := os.Setenv("SMTP_TLS_INSECURE_SKIP_VERIFY", "true"); err != nil {
-			logger.Fatalf("set SMTP_TLS_INSECURE_SKIP_VERIFY: %v", err)
+			logger.Error("set SMTP_TLS_INSECURE_SKIP_VERIFY", "err", err)
+			return fmt.Errorf("set SMTP_TLS_INSECURE_SKIP_VERIFY: %w", err)
 		}
 		logger.Println("SMTP_SECURE=false: set SMTP_TLS_INSECURE_SKIP_VERIFY=true for this run (dev/self-signed SMTP). For production use a proper CA or set the flag explicitly in .env.")
 	}
@@ -50,8 +58,10 @@ func main() {
 
 	fmt.Println("Attempting to send test email...")
 	if err := mail.SendMail(user, "QuokkaQ SMTP Test", "If you received this, your SMTP configuration is correct!"); err != nil {
-		logger.Fatalf("Failed to send email: %v", err)
+		logger.Error("Failed to send email", "err", err)
+		return fmt.Errorf("failed to send email: %w", err)
 	}
 
 	fmt.Println("SUCCESS! Email sent successfully.")
+	return nil
 }

@@ -19,7 +19,7 @@ import (
 
 var DB *gorm.DB
 
-func Connect() {
+func Connect() error {
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
 		host := os.Getenv("DB_HOST")
@@ -43,7 +43,8 @@ func Connect() {
 	}
 
 	if dsn == "" {
-		applogger.Fatal("DATABASE_URL or DB_* environment variables are not set")
+		applogger.Error("DATABASE_URL or DB_* environment variables are not set")
+		return fmt.Errorf("DATABASE_URL or DB_* environment variables are not set")
 	}
 
 	var err error
@@ -52,10 +53,12 @@ func Connect() {
 		DisableForeignKeyConstraintWhenMigrating: true,                                          // Disable FK constraints during migration
 	})
 	if err != nil {
-		applogger.Fatal("failed to connect to database", "err", err)
+		applogger.Error("failed to connect to database", "err", err)
+		return fmt.Errorf("failed to connect to database: %w", err)
 	}
 
 	slog.Info("database connected")
+	return nil
 }
 
 // requirePostgresAtLeastVersionNum fails if server_version_num < minNum (e.g. 160000 = PostgreSQL 16.0).
@@ -89,12 +92,14 @@ func Ping(ctx context.Context) error {
 
 // AutoMigrate runs auto-migrations for the given models
 // This is kept for backward compatibility but should be replaced with versioned migrations
-func AutoMigrate(models ...interface{}) {
+func AutoMigrate(models ...interface{}) error {
 	err := DB.AutoMigrate(models...)
 	if err != nil {
-		applogger.Fatal("failed to migrate database", "err", err)
+		applogger.Error("failed to migrate database", "err", err)
+		return fmt.Errorf("failed to migrate database: %w", err)
 	}
 	slog.Info("database migration completed")
+	return nil
 }
 
 // RunVersionedMigrations initializes migration tracking and runs all migrations

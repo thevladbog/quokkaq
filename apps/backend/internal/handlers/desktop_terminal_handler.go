@@ -157,7 +157,7 @@ func (h *DesktopTerminalHandler) List(w http.ResponseWriter, r *http.Request) {
 func (h *DesktopTerminalHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	row, err := h.service.GetByID(id)
-	if middleware.RespondRepoFindError(w, err, "GetDesktopTerminal") {
+	if middleware.RespondRepoFindError(w, r.Context(), err, "GetDesktopTerminal") {
 		return
 	}
 	_ = json.NewEncoder(w).Encode(mapTerminalToJSON(row))
@@ -193,7 +193,7 @@ func (h *DesktopTerminalHandler) Update(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if err != nil {
-		if middleware.RespondRepoFindError(w, err, "UpdateDesktopTerminal") {
+		if middleware.RespondRepoFindError(w, r.Context(), err, "UpdateDesktopTerminal") {
 			return
 		}
 		logger.PrintfCtx(r.Context(), "desktop terminal update: %v", err)
@@ -205,7 +205,7 @@ func (h *DesktopTerminalHandler) Update(w http.ResponseWriter, r *http.Request) 
 
 func (h *DesktopTerminalHandler) Revoke(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	if err := h.service.Revoke(id); middleware.RespondRepoFindError(w, err, "RevokeDesktopTerminal") {
+	if err := h.service.Revoke(id); middleware.RespondRepoFindError(w, r.Context(), err, "RevokeDesktopTerminal") {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

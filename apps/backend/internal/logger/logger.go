@@ -97,10 +97,29 @@ func (h *reqIDHandler) WithGroup(name string) slog.Handler {
 	return &reqIDHandler{inner: h.inner.WithGroup(name)}
 }
 
-// Fatal logs at error level and exits with code 1 (structured key/value args).
+// InfoContext logs at info level with context (structured key/value args). Uses slog.Default (Chi request_id when ctx carries it).
+func InfoContext(ctx context.Context, msg string, args ...any) {
+	slog.InfoContext(ctx, msg, args...)
+}
+
+// WarnContext logs at warn level with context (structured key/value args).
+func WarnContext(ctx context.Context, msg string, args ...any) {
+	slog.WarnContext(ctx, msg, args...)
+}
+
+// Error logs at error level (structured key/value args).
+func Error(msg string, args ...any) {
+	slog.Error(msg, args...)
+}
+
+// Fatal logs at error level (structured key/value args). It does not exit; callers should return the error and let main os.Exit after defers.
 func Fatal(msg string, args ...any) {
 	slog.Error(msg, args...)
-	os.Exit(1)
+}
+
+// Debugf logs a line built with fmt.Sprintf at debug level.
+func Debugf(format string, args ...any) {
+	slog.Debug(fmt.Sprintf(format, args...))
 }
 
 // Printf logs a line built with fmt.Sprintf at info level. Prefer PrintfCtx from HTTP handlers so request_id is attached.
@@ -113,13 +132,17 @@ func PrintfCtx(ctx context.Context, format string, args ...any) {
 	slog.InfoContext(ctx, fmt.Sprintf(format, args...))
 }
 
+// ErrorfCtx logs a line built with fmt.Sprintf at error level. Prefer from HTTP handlers so request_id is attached.
+func ErrorfCtx(ctx context.Context, format string, args ...any) {
+	slog.ErrorContext(ctx, fmt.Sprintf(format, args...))
+}
+
 // Println logs fmt.Sprint(args...) at info level.
 func Println(args ...any) {
 	slog.Info(fmt.Sprint(args...))
 }
 
-// Fatalf logs fmt.Sprintf(format, args...) at error level and exits with code 1.
+// Fatalf logs fmt.Sprintf(format, args...) at error level. It does not exit; callers should return the error and let main os.Exit after defers.
 func Fatalf(format string, args ...any) {
 	slog.Error(fmt.Sprintf(format, args...))
-	os.Exit(1)
 }

@@ -512,7 +512,7 @@ func (s *shiftService) ExecuteEndOfDay(ctx context.Context, unitID string, userI
 		return nil
 	})
 	if err != nil {
-		logger.Printf("shift eod transaction failed unitId=%s err=%v", unitID, err)
+		logger.PrintfCtx(ctx, "shift eod transaction failed unitId=%s err=%v", unitID, err)
 		return nil, err
 	}
 

@@ -1,10 +1,13 @@
 package services
 
 import (
+	"crypto/sha256"
 	"crypto/tls"
+	"encoding/hex"
 	"os"
 	"quokkaq-go-backend/internal/logger"
 	"strconv"
+	"strings"
 
 	"gopkg.in/gomail.v2"
 )
@@ -59,9 +62,19 @@ func NewMailService() MailService {
 	return &mailService{dialer: d, from: from}
 }
 
+// recipientLogRef is a stable short hex digest for correlating logs without logging the raw address.
+func recipientLogRef(email string) string {
+	s := strings.TrimSpace(strings.ToLower(email))
+	if s == "" {
+		return "(empty)"
+	}
+	sum := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(sum[:8])
+}
+
 func (s *mailService) SendMail(to string, subject string, html string) error {
 	if s.dialer == nil {
-		logger.Printf("Mock Send Mail -> To: %s, Subject: %s, Body: %s\n", to, subject, html)
+		logger.Printf("Mock Send Mail -> to_ref=%s, Subject: %s, Body: %s\n", recipientLogRef(to), subject, html)
 		return nil
 	}
 
@@ -80,6 +93,6 @@ func (s *mailService) SendMail(to string, subject string, html string) error {
 		return err
 	}
 
-	logger.Printf("Email sent to %s\n", to)
+	logger.Debugf("Email sent to_ref=%s\n", recipientLogRef(to))
 	return nil
 }

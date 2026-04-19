@@ -23,7 +23,10 @@ const (
 func main() {
 	fmt.Println("Starting database seeding...")
 	config.Load()
-	database.Connect()
+	if err := database.Connect(); err != nil {
+		fmt.Printf("database connect: %v\n", err)
+		os.Exit(1)
+	}
 
 	if err := runSeed(); err != nil {
 		fmt.Printf("Seeding failed: %v\n", err)

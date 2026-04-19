@@ -24,6 +24,7 @@ func NewCompanyHandler(companyRepo repository.CompanyRepository, userRepo reposi
 }
 
 // CompleteOnboarding godoc
+// @ID           companiesMeCompleteOnboarding
 // @Summary      Complete Onboarding
 // @Description  Marks onboarding as complete for the user's company
 // @Tags         companies

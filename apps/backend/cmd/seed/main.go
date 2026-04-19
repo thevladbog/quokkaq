@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"quokkaq-go-backend/internal/config"
@@ -13,12 +14,21 @@ import (
 )
 
 func main() {
+	if err := run(); err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	fmt.Println("Starting database seeding...")
 
 	// Load config and connect to database
 	config.Load()
 	logger.Init()
-	database.Connect()
+	if err := database.Connect(); err != nil {
+		return err
+	}
 
 	// Drop all tables
 	fmt.Println("Dropping existing tables...")
@@ -60,7 +70,7 @@ func main() {
 	// Recreate tables with auto-migration
 	fmt.Println("Creating tables...")
 
-	database.AutoMigrate(
+	if err := database.AutoMigrate(
 		&models.Company{},
 		&models.SubscriptionPlan{},
 		&models.Subscription{},
@@ -91,7 +101,9 @@ func main() {
 		&models.ServiceSlot{},
 		&models.DaySchedule{},
 		&models.PasswordResetToken{},
-	)
+	); err != nil {
+		return err
+	}
 
 	// Create seed data
 	fmt.Println("Seeding data...")
@@ -101,7 +113,10 @@ func main() {
 		Name:           "QuokkaQ Demo",
 		IsSaaSOperator: true,
 	}
-	database.DB.Create(&company)
+	if err := database.DB.Create(&company).Error; err != nil {
+		logger.Fatalf("seed: create company: %v", err)
+		return fmt.Errorf("seed: create company: %w", err)
+	}
 	fmt.Printf("Created company: %s (ID: %s)\n", company.Name, company.ID)
 
 	// Root subdivision (branch): queues, kiosk, counters attach to this unitId.
@@ -112,7 +127,10 @@ func main() {
 		Kind:      models.UnitKindSubdivision,
 		Timezone:  "Europe/Moscow",
 	}
-	database.DB.Create(&unit)
+	if err := database.DB.Create(&unit).Error; err != nil {
+		logger.Fatalf("seed: create unit: %v", err)
+		return fmt.Errorf("seed: create unit: %w", err)
+	}
 	fmt.Printf("Created unit: %s (ID: %s)\n", unit.Name, unit.ID)
 
 	anonymousClient := models.UnitClient{
@@ -123,7 +141,8 @@ func main() {
 		IsAnonymous: true,
 	}
 	if err := database.DB.Create(&anonymousClient).Error; err != nil {
-		logger.Fatalf("seed: create anonymous unit client: %v", err)
+		logger.Error("seed: create anonymous unit client", "err", err)
+		return fmt.Errorf("seed: create anonymous unit client: %w", err)
 	}
 	fmt.Println("Created anonymous unit client for kiosk tickets")
 
@@ -132,10 +151,22 @@ func main() {
 	supervisorRole := models.Role{Name: "supervisor"}
 	operatorRole := models.Role{Name: "operator"}
 	platformAdminRole := models.Role{Name: "platform_admin"}
-	database.DB.Create(&adminRole)
-	database.DB.Create(&supervisorRole)
-	database.DB.Create(&operatorRole)
-	database.DB.Create(&platformAdminRole)
+	if err := database.DB.Create(&adminRole).Error; err != nil {
+		logger.Fatalf("seed: create admin role: %v", err)
+		return fmt.Errorf("seed: create admin role: %w", err)
+	}
+	if err := database.DB.Create(&supervisorRole).Error; err != nil {
+		logger.Fatalf("seed: create supervisor role: %v", err)
+		return fmt.Errorf("seed: create supervisor role: %w", err)
+	}
+	if err := database.DB.Create(&operatorRole).Error; err != nil {
+		logger.Fatalf("seed: create operator role: %v", err)
+		return fmt.Errorf("seed: create operator role: %w", err)
+	}
+	if err := database.DB.Create(&platformAdminRole).Error; err != nil {
+		logger.Fatalf("seed: create platform_admin role: %v", err)
+		return fmt.Errorf("seed: create platform_admin role: %w", err)
+	}
 	fmt.Println("Created roles: admin, supervisor, operator, platform_admin")
 
 	// Create admin user
@@ -147,26 +178,38 @@ func main() {
 		Email:    &adminEmail,
 		Password: &hashedPasswordStr,
 	}
-	database.DB.Create(&adminUser)
+	if err := database.DB.Create(&adminUser).Error; err != nil {
+		logger.Fatalf("seed: create admin user: %v", err)
+		return fmt.Errorf("seed: create admin user: %w", err)
+	}
 	fmt.Printf("Created admin user: %s (ID: %s, password: admin123)\n", adminUser.Name, adminUser.ID)
 
 	// Assign admin role
-	database.DB.Create(&models.UserRole{
+	if err := database.DB.Create(&models.UserRole{
 		UserID: adminUser.ID,
 		RoleID: adminRole.ID,
-	})
+	}).Error; err != nil {
+		logger.Fatalf("seed: assign admin user role (admin): %v", err)
+		return fmt.Errorf("seed: assign admin user role (admin): %w", err)
+	}
 
 	// SaaS operator UI/API (`/platform/*`); no env hacks needed for local demo admin
-	database.DB.Create(&models.UserRole{
+	if err := database.DB.Create(&models.UserRole{
 		UserID: adminUser.ID,
 		RoleID: platformAdminRole.ID,
-	})
+	}).Error; err != nil {
+		logger.Fatalf("seed: assign admin user role (platform_admin): %v", err)
+		return fmt.Errorf("seed: assign admin user role (platform_admin): %w", err)
+	}
 
 	// Assign user to unit
-	database.DB.Create(&models.UserUnit{
+	if err := database.DB.Create(&models.UserUnit{
 		UserID: adminUser.ID,
 		UnitID: unit.ID,
-	})
+	}).Error; err != nil {
+		logger.Fatalf("seed: assign admin user unit: %v", err)
+		return fmt.Errorf("seed: assign admin user unit: %w", err)
+	}
 
 	// Create operator user
 	operatorPassword, _ := bcrypt.GenerateFromPassword([]byte("operator123"), bcrypt.DefaultCost)
@@ -177,20 +220,29 @@ func main() {
 		Email:    &operatorEmail,
 		Password: &operatorPasswordStr,
 	}
-	database.DB.Create(&operatorUser)
+	if err := database.DB.Create(&operatorUser).Error; err != nil {
+		logger.Fatalf("seed: create operator user: %v", err)
+		return fmt.Errorf("seed: create operator user: %w", err)
+	}
 	fmt.Printf("Created operator user: %s (ID: %s, password: operator123)\n", operatorUser.Name, operatorUser.ID)
 
 	// Assign operator role
-	database.DB.Create(&models.UserRole{
+	if err := database.DB.Create(&models.UserRole{
 		UserID: operatorUser.ID,
 		RoleID: operatorRole.ID,
-	})
+	}).Error; err != nil {
+		logger.Fatalf("seed: assign operator user role: %v", err)
+		return fmt.Errorf("seed: assign operator user role: %w", err)
+	}
 
 	// Assign operator to unit
-	database.DB.Create(&models.UserUnit{
+	if err := database.DB.Create(&models.UserUnit{
 		UserID: operatorUser.ID,
 		UnitID: unit.ID,
-	})
+	}).Error; err != nil {
+		logger.Fatalf("seed: assign operator user unit: %v", err)
+		return fmt.Errorf("seed: assign operator user unit: %w", err)
+	}
 
 	// Create services
 	serviceA := models.Service{
@@ -203,7 +255,10 @@ func main() {
 		Duration:    intPtr(15),
 		IsLeaf:      true,
 	}
-	database.DB.Create(&serviceA)
+	if err := database.DB.Create(&serviceA).Error; err != nil {
+		logger.Fatalf("seed: create service A: %v", err)
+		return fmt.Errorf("seed: create service A: %w", err)
+	}
 	fmt.Printf("Created service: %s (ID: %s)\n", serviceA.Name, serviceA.ID)
 
 	serviceB := models.Service{
@@ -216,7 +271,10 @@ func main() {
 		Duration:    intPtr(30),
 		IsLeaf:      true,
 	}
-	database.DB.Create(&serviceB)
+	if err := database.DB.Create(&serviceB).Error; err != nil {
+		logger.Fatalf("seed: create service B: %v", err)
+		return fmt.Errorf("seed: create service B: %w", err)
+	}
 	fmt.Printf("Created service: %s (ID: %s)\n", serviceB.Name, serviceB.ID)
 
 	// Create counters
@@ -224,14 +282,20 @@ func main() {
 		UnitID: unit.ID,
 		Name:   "Counter 1",
 	}
-	database.DB.Create(&counter1)
+	if err := database.DB.Create(&counter1).Error; err != nil {
+		logger.Fatalf("seed: create counter1: %v", err)
+		return fmt.Errorf("seed: create counter1: %w", err)
+	}
 	fmt.Printf("Created counter: %s (ID: %s)\n", counter1.Name, counter1.ID)
 
 	counter2 := models.Counter{
 		UnitID: unit.ID,
 		Name:   "Counter 2",
 	}
-	database.DB.Create(&counter2)
+	if err := database.DB.Create(&counter2).Error; err != nil {
+		logger.Fatalf("seed: create counter2: %v", err)
+		return fmt.Errorf("seed: create counter2: %w", err)
+	}
 	fmt.Printf("Created counter: %s (ID: %s)\n", counter2.Name, counter2.ID)
 
 	// Create sample tickets
@@ -245,7 +309,8 @@ func main() {
 		ClientID:    &anonymousClient.ID,
 	}
 	if err := database.DB.Create(&ticket1).Error; err != nil {
-		logger.Fatalf("seed: create sample ticket %s: %v", ticket1.QueueNumber, err)
+		logger.Error("seed: create sample ticket", "queue", ticket1.QueueNumber, "err", err)
+		return fmt.Errorf("seed: create sample ticket %s: %w", ticket1.QueueNumber, err)
 	}
 
 	ticket2 := models.Ticket{
@@ -257,7 +322,8 @@ func main() {
 		ClientID:    &anonymousClient.ID,
 	}
 	if err := database.DB.Create(&ticket2).Error; err != nil {
-		logger.Fatalf("seed: create sample ticket %s: %v", ticket2.QueueNumber, err)
+		logger.Error("seed: create sample ticket", "queue", ticket2.QueueNumber, "err", err)
+		return fmt.Errorf("seed: create sample ticket %s: %w", ticket2.QueueNumber, err)
 	}
 
 	ticket3 := models.Ticket{
@@ -269,7 +335,8 @@ func main() {
 		ClientID:    &anonymousClient.ID,
 	}
 	if err := database.DB.Create(&ticket3).Error; err != nil {
-		logger.Fatalf("seed: create sample ticket %s: %v", ticket3.QueueNumber, err)
+		logger.Error("seed: create sample ticket", "queue", ticket3.QueueNumber, "err", err)
+		return fmt.Errorf("seed: create sample ticket %s: %w", ticket3.QueueNumber, err)
 	}
 
 	fmt.Println("Created 3 sample tickets")
@@ -281,13 +348,17 @@ func main() {
 		Content:   "Hello {{name}}, welcome to our queue management system!",
 		IsDefault: true,
 	}
-	database.DB.Create(&template)
+	if err := database.DB.Create(&template).Error; err != nil {
+		logger.Fatalf("seed: create message template: %v", err)
+		return fmt.Errorf("seed: create message template: %w", err)
+	}
 	fmt.Println("Created default message template")
 
 	fmt.Println("\n✅ Database seeding completed successfully!")
 	fmt.Println("\nTest credentials:")
 	fmt.Println("  Admin: admin@quokkaq.com / admin123 (tenant admin + platform_admin)")
 	fmt.Println("  Operator: operator@quokkaq.com / operator123")
+	return nil
 }
 
 func stringPtr(s string) *string {
