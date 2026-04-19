@@ -5443,7 +5443,7 @@ export const usePatchTenantRole = <TError = string,
     }
 
 /**
- * Users are included if they have a unit in the company, a user_tenant_roles row, or are the company owner. Global admin/platform_admin users are listed only when the caller is a global admin or platform admin. Includes tenantRoles (id, name, slug) per user.
+ * Users are included if they have a unit in the company, a user_tenant_roles row, or are the company owner. Global admin/platform_admin users without tenant membership in this company are not listed. Includes tenantRoles (id, name, slug) per user.
  * @summary List users in the current company with tenant roles
  */
 export type listCompanyUsersResponse200 = {

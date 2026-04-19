@@ -14,6 +14,14 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog';
 import { useLogin } from '@/lib/hooks';
 import { useLocale, useTranslations } from 'next-intl';
 import { useAuthContext } from '@/contexts/AuthContext';
@@ -32,19 +40,13 @@ import {
   type AuthSSOAuthorizeParams,
   type HandlersAccessibleCompanyItem
 } from '@/lib/api/generated/auth';
-import { CircleHelp, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger
-} from '@/components/ui/tooltip';
 import { getWordmarkSrc } from '@/lib/wordmark-src';
 import { TENANT_SLUG_MIN_LEN } from '@quokkaq/shared-types';
 
-/** Minimum slug length before fetching public tenant (aligned with tenant slug validation). */
 const MIN_TENANT_SLUG_LENGTH = TENANT_SLUG_MIN_LEN;
 
 function toAuthSSOAuthorizeLocale(
@@ -75,7 +77,7 @@ function normalizeSsoErrorCode(raw: string | null): SSOErrorCode | null {
 }
 
 type Step = 'form' | 'company';
-type SubStep = 'email' | 'password';
+type SubStep = 'pick_method' | 'password';
 
 export default function LoginPage() {
   const t = useTranslations('login');
@@ -84,10 +86,7 @@ export default function LoginPage() {
   const wordmarkSrc = getWordmarkSrc(locale);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [tenantSlugManual, setTenantSlugManual] = useState('');
-  const [subStep, setSubStep] = useState<SubStep>('email');
-  const [hintNext, setHintNext] = useState<string | null>(null);
-  const [hintSso, setHintSso] = useState(false);
+  const [subStep, setSubStep] = useState<SubStep>('pick_method');
   const [hintSlug, setHintSlug] = useState<string | null>(null);
   const [hintDisplay, setHintDisplay] = useState<string | null>(null);
   const [tenantBanner, setTenantBanner] = useState<string | null>(null);
@@ -96,6 +95,10 @@ export default function LoginPage() {
   const [companySearch, setCompanySearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [ssoErrorCode, setSsoErrorCode] = useState<SSOErrorCode | null>(null);
+  const [ssoModalOpen, setSsoModalOpen] = useState(false);
+  const [ssoModalSlug, setSsoModalSlug] = useState('');
+  const [debouncedSsoModalSlug, setDebouncedSsoModalSlug] = useState('');
+  const [ssoModalPrepareLoading, setSsoModalPrepareLoading] = useState(false);
   const legacySessionRecoveryAttemptedRef = useRef(false);
   const router = useRouter();
   const loginMutation = useLogin();
@@ -108,19 +111,18 @@ export default function LoginPage() {
   } = useAuthContext();
   const { setActiveCompanyId } = useActiveCompany();
 
-  const effectiveSlug = useMemo(
-    () => (hintSlug || '').trim() || tenantSlugManual.trim() || '',
-    [hintSlug, tenantSlugManual]
+  const passwordTenantSlug = useMemo(
+    () => (hintSlug || '').trim() || undefined,
+    [hintSlug]
   );
 
-  const [debouncedEffectiveSlug, setDebouncedEffectiveSlug] = useState('');
   useEffect(() => {
     const timer = setTimeout(
-      () => setDebouncedEffectiveSlug(effectiveSlug.trim()),
+      () => setDebouncedSsoModalSlug(ssoModalSlug.trim()),
       300
     );
     return () => clearTimeout(timer);
-  }, [effectiveSlug]);
+  }, [ssoModalSlug]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(companySearch), 300);
@@ -155,6 +157,26 @@ export default function LoginPage() {
     }
   });
 
+  const publicTenantForSso = usePublicTenantBySlug(debouncedSsoModalSlug, {
+    query: {
+      enabled:
+        ssoModalOpen && debouncedSsoModalSlug.length >= MIN_TENANT_SLUG_LENGTH,
+      staleTime: 60_000
+    }
+  });
+
+  const publicTenantPayload =
+    publicTenantForSso.data?.status === 200 &&
+    publicTenantForSso.data.data &&
+    typeof publicTenantForSso.data.data === 'object'
+      ? publicTenantForSso.data.data
+      : undefined;
+
+  const ssoTenantResolved = !!publicTenantPayload;
+  const ssoReady = !!(
+    publicTenantPayload && publicTenantPayload.ssoAvailable === true
+  );
+
   useEffect(() => {
     const tenant = searchParams.get('tenant')?.trim();
     const loginToken = searchParams.get('login_token')?.trim();
@@ -165,7 +187,6 @@ export default function LoginPage() {
           if (res.status === 200 && res.data) {
             setTenantBanner(res.data.displayName ?? res.data.slug ?? '');
             setHintSlug(res.data.slug ?? null);
-            setHintSso(!!res.data.ssoAvailable);
             setSubStep('password');
           }
         } catch {
@@ -181,7 +202,6 @@ export default function LoginPage() {
           if (res.status === 200 && res.data) {
             setTenantBanner(res.data.displayName ?? tenant);
             setHintSlug(res.data.slug ?? tenant);
-            setHintSso(!!res.data.ssoAvailable);
             setSubStep('password');
           }
         } catch {
@@ -191,10 +211,10 @@ export default function LoginPage() {
     }
   }, [searchParams]);
 
-  const continueFromEmail = async () => {
+  const startPasswordFlow = async () => {
     const trimmed = email.trim();
     if (!trimmed) {
-      toast.error(t('email'));
+      toast.error(t('emailRequired'));
       return;
     }
     setHintLoading(true);
@@ -204,8 +224,6 @@ export default function LoginPage() {
         throw new Error('hint');
       }
       const d = res.data;
-      setHintNext(d.next ?? null);
-      setHintSso(!!d.ssoAvailable);
       setHintSlug(d.tenantSlug ?? null);
       setHintDisplay(d.displayName ?? null);
       if (d.displayName) {
@@ -219,20 +237,37 @@ export default function LoginPage() {
     }
   };
 
-  const publicTenantQ = usePublicTenantBySlug(debouncedEffectiveSlug, {
-    query: {
-      enabled:
-        subStep === 'password' &&
-        debouncedEffectiveSlug.length >= MIN_TENANT_SLUG_LENGTH,
-      staleTime: 60_000
+  const openSsoModal = async () => {
+    const trimmed = email.trim();
+    if (!trimmed) {
+      toast.error(t('emailRequired'));
+      return;
     }
-  });
-
-  const ssoAvailableFromPublicTenant =
-    publicTenantQ.data?.status === 200 &&
-    publicTenantQ.data.data?.ssoAvailable === true;
-
-  const showSsoButton = hintSso || ssoAvailableFromPublicTenant;
+    setSsoModalPrepareLoading(true);
+    try {
+      const res = await authTenantHint({ email: trimmed });
+      let initial = '';
+      if (res.status === 200 && res.data) {
+        const d = res.data;
+        initial = (d.tenantSlug ?? '').trim();
+        if (d.displayName) {
+          setTenantBanner(d.displayName);
+        }
+        setHintSlug(d.tenantSlug ?? null);
+      }
+      if (!initial) {
+        initial = (hintSlug || '').trim();
+      }
+      setSsoModalSlug(initial);
+      setSsoModalOpen(true);
+    } catch {
+      setSsoModalSlug((hintSlug || '').trim());
+      setSsoModalOpen(true);
+      toast.error(t('error'));
+    } finally {
+      setSsoModalPrepareLoading(false);
+    }
+  };
 
   const sessionResolving = Boolean(token && !user);
 
@@ -243,7 +278,6 @@ export default function LoginPage() {
     }
   }, [isAuthenticated, user, router, ssoErrorCode]);
 
-  /** If initial GET /auth/me failed (e.g. transient error) but legacy access_token remains, retry via login(). */
   useEffect(() => {
     if (ssoErrorCode) return;
     if (isAuthLoading || sessionResolving) return;
@@ -273,25 +307,30 @@ export default function LoginPage() {
     );
   }
 
-  const startSso = () => {
-    if (!effectiveSlug) {
-      toast.error(t('tenantSlug'));
+  const confirmSsoRedirect = () => {
+    const slug = ssoModalSlug.trim();
+    if (!slug) {
+      toast.error(t('ssoSlugRequired'));
+      return;
+    }
+    if (!ssoReady) {
+      toast.error(t('ssoNotEnabled'));
       return;
     }
     window.location.href =
       '/api' +
       getAuthSSOAuthorizeUrl({
-        tenant: effectiveSlug,
+        tenant: slug,
         locale: toAuthSSOAuthorizeLocale(locale)
       });
   };
 
-  const backToEmailStep = () => {
-    setSubStep('email');
-    setHintNext(null);
-    setHintSso(false);
+  const backToPickMethod = () => {
+    setSubStep('pick_method');
+    setPassword('');
     setHintSlug(null);
     setHintDisplay(null);
+    setHintLoading(false);
     if (
       !searchParams.get('tenant')?.trim() &&
       !searchParams.get('login_token')?.trim()
@@ -307,7 +346,7 @@ export default function LoginPage() {
       const response = await loginMutation.mutateAsync({
         email,
         password,
-        tenantSlug: effectiveSlug || undefined
+        tenantSlug: passwordTenantSlug
       });
 
       if (response && response.accessToken) {
@@ -386,14 +425,11 @@ export default function LoginPage() {
                     </AlertDescription>
                   </Alert>
                 ) : null}
-                {subStep === 'email' ? (
-                  <form
-                    className='space-y-4'
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      void continueFromEmail();
-                    }}
-                  >
+                {subStep === 'pick_method' ? (
+                  <div className='space-y-4'>
+                    <p className='text-muted-foreground text-center text-sm'>
+                      {t('pickMethodDescription')}
+                    </p>
                     <div className='grid gap-2'>
                       <Label htmlFor='email'>{t('workEmail')}</Label>
                       <Input
@@ -409,68 +445,36 @@ export default function LoginPage() {
                       />
                     </div>
                     <Button
-                      type='submit'
+                      type='button'
                       className='w-full'
-                      disabled={hintLoading}
+                      disabled={hintLoading || ssoModalPrepareLoading}
+                      onClick={() => void startPasswordFlow()}
                     >
                       {hintLoading ? (
                         <Loader2 className='size-4 animate-spin' />
                       ) : (
-                        t('continue')
+                        t('signInWithPassword')
                       )}
                     </Button>
-                  </form>
+                    <Button
+                      type='button'
+                      variant='outline'
+                      className='w-full'
+                      disabled={hintLoading || ssoModalPrepareLoading}
+                      onClick={() => void openSsoModal()}
+                    >
+                      {ssoModalPrepareLoading ? (
+                        <Loader2 className='size-4 animate-spin' />
+                      ) : (
+                        t('signInWithSso')
+                      )}
+                    </Button>
+                  </div>
                 ) : (
                   <form onSubmit={handleSubmit} className='space-y-4'>
                     {tenantBanner ? (
                       <div className='bg-muted/50 text-muted-foreground rounded-md px-3 py-2 text-sm'>
                         {tenantBanner}
-                      </div>
-                    ) : null}
-
-                    {hintNext === 'choose_slug' && !hintSlug?.trim() ? (
-                      <div className='grid gap-2'>
-                        <div className='flex items-center gap-1.5'>
-                          <Label htmlFor='tenant-slug'>{t('tenantSlug')}</Label>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                type='button'
-                                className='text-muted-foreground hover:text-foreground inline-flex shrink-0 rounded-sm p-0.5 transition-colors'
-                                aria-label={t('tenantSlugHintHelpAria')}
-                              >
-                                <CircleHelp className='size-4' aria-hidden />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent side='top' className='max-w-sm'>
-                              {t('tenantHintDomainUnknown')}
-                            </TooltipContent>
-                          </Tooltip>
-                        </div>
-                        <span id='tenant-slug-desc' className='sr-only'>
-                          {t('tenantHintDomainUnknown')}
-                        </span>
-                        <Input
-                          id='tenant-slug'
-                          aria-describedby='tenant-slug-desc'
-                          value={tenantSlugManual}
-                          onChange={(e) => setTenantSlugManual(e.target.value)}
-                          placeholder={t('tenantSlugHint')}
-                          autoComplete='organization'
-                        />
-                      </div>
-                    ) : hintSlug?.trim() ? (
-                      <div className='grid gap-2'>
-                        <Label htmlFor='tenant-slug-resolved'>
-                          {t('tenantSlug')}
-                        </Label>
-                        <Input
-                          id='tenant-slug-resolved'
-                          readOnly
-                          value={hintSlug}
-                          className='bg-muted/50'
-                          autoComplete='organization'
-                        />
                       </div>
                     ) : null}
 
@@ -512,17 +516,6 @@ export default function LoginPage() {
                       </Link>
                     </div>
 
-                    {showSsoButton ? (
-                      <Button
-                        type='button'
-                        variant='outline'
-                        className='w-full'
-                        onClick={startSso}
-                      >
-                        {t('continueSso')}
-                      </Button>
-                    ) : null}
-
                     {loginMutation.isError && (
                       <div className='text-sm text-red-600'>{t('error')}</div>
                     )}
@@ -538,7 +531,7 @@ export default function LoginPage() {
                     <button
                       type='button'
                       className='text-muted-foreground hover:text-primary w-full text-center text-sm underline-offset-4 hover:underline'
-                      onClick={backToEmailStep}
+                      onClick={backToPickMethod}
                     >
                       {t('changeEmail')}
                     </button>
@@ -607,6 +600,79 @@ export default function LoginPage() {
           )}
         </Card>
       </div>
+
+      <Dialog
+        open={ssoModalOpen}
+        onOpenChange={(open) => {
+          setSsoModalOpen(open);
+          if (!open) {
+            setSsoModalSlug('');
+            setDebouncedSsoModalSlug('');
+          }
+        }}
+      >
+        <DialogContent className='sm:max-w-md'>
+          <DialogHeader>
+            <DialogTitle>{t('ssoDialogTitle')}</DialogTitle>
+            <DialogDescription>{t('ssoDialogDescription')}</DialogDescription>
+          </DialogHeader>
+          <div className='grid gap-2'>
+            <Label htmlFor='sso-modal-slug'>{t('tenantSlug')}</Label>
+            <Input
+              id='sso-modal-slug'
+              value={ssoModalSlug}
+              onChange={(e) => setSsoModalSlug(e.target.value)}
+              placeholder={t('tenantSlugHint')}
+              autoComplete='organization'
+              disabled={ssoModalPrepareLoading}
+            />
+            {debouncedSsoModalSlug.length >= MIN_TENANT_SLUG_LENGTH ? (
+              <p className='text-muted-foreground min-h-[1.25rem] text-sm'>
+                {publicTenantForSso.isLoading ? (
+                  <span className='inline-flex items-center gap-2'>
+                    <Loader2 className='size-3.5 animate-spin' />…
+                  </span>
+                ) : ssoTenantResolved ? (
+                  <>
+                    <span className='text-foreground font-medium'>
+                      {publicTenantPayload?.displayName}
+                    </span>
+                    {!publicTenantPayload?.ssoAvailable ? (
+                      <span className='text-destructive block'>
+                        {t('ssoNotEnabled')}
+                      </span>
+                    ) : null}
+                  </>
+                ) : (
+                  <span className='text-destructive'>
+                    {t('ssoTenantNotFound')}
+                  </span>
+                )}
+              </p>
+            ) : null}
+          </div>
+          <DialogFooter className='gap-2 sm:gap-0'>
+            <Button
+              type='button'
+              variant='outline'
+              onClick={() => setSsoModalOpen(false)}
+            >
+              {t('ssoDialogCancel')}
+            </Button>
+            <Button
+              type='button'
+              disabled={
+                ssoModalPrepareLoading ||
+                !ssoReady ||
+                debouncedSsoModalSlug.length < MIN_TENANT_SLUG_LENGTH
+              }
+              onClick={confirmSsoRedirect}
+            >
+              {t('continueSso')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className='relative hidden min-h-dvh flex-col items-center justify-center overflow-hidden lg:flex'>
         <div

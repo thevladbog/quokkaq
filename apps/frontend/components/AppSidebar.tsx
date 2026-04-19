@@ -359,7 +359,7 @@ const AppSidebar = () => {
                         </DropdownMenuSubTrigger>
                         <DropdownMenuSubContent
                           sideOffset={8}
-                          className='min-w-[10rem] p-2'
+                          className='min-w-[13.5rem] p-2'
                           collisionPadding={{ left: 16, right: 12 }}
                         >
                           <ThemeSwitcher />

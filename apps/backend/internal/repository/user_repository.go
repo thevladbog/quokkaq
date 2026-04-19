@@ -24,7 +24,7 @@ type UserRepository interface {
 	CreateTx(tx *gorm.DB, user *models.User) error
 	FindAll(search string) ([]models.User, error)
 	// ListUsersForCompany returns users visible for the tenant: unit members, tenant-role assignments,
-	// the company owner, and optionally users with global admin/platform_admin (only when includeGlobalRoleUsers is true — for tenant viewers omit this so global staff are not listed in every org). Optional name/email search.
+	// the company owner, and optionally users with global admin/platform_admin (only when includeGlobalRoleUsers is true; GET /companies/me/users always passes false). Optional name/email search.
 	ListUsersForCompany(companyID string, search string, includeGlobalRoleUsers bool) ([]models.User, error)
 	FindByID(ctx context.Context, id string) (*models.User, error)
 	FindByIDTx(tx *gorm.DB, id string) (*models.User, error)

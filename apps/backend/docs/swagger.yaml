@@ -5227,7 +5227,7 @@ paths:
       - companies
   /companies/me/users:
     get:
-      description: Users are included if they have a unit in the company, a user_tenant_roles row, or are the company owner. Global admin/platform_admin users are listed only when the caller is a global admin or platform admin. Includes tenantRoles (id, name, slug) per user.
+      description: Users are included if they have a unit in the company, a user_tenant_roles row, or are the company owner. Global admin/platform_admin users without tenant membership in this company are not listed. Includes tenantRoles (id, name, slug) per user.
       operationId: ListCompanyUsers
       parameters:
       - description: Tenant company UUID when the user belongs to multiple organizations
