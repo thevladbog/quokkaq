@@ -13,7 +13,8 @@ function getFocusableElements(root: HTMLElement): HTMLElement[] {
   const selector =
     'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
   return [...root.querySelectorAll<HTMLElement>(selector)].filter(
-    (el) => !el.hasAttribute('disabled') && el.getAttribute('aria-hidden') !== 'true'
+    (el) =>
+      !el.hasAttribute('disabled') && el.getAttribute('aria-hidden') !== 'true'
   );
 }
 
@@ -65,7 +66,9 @@ export function LeadRequestModal({
         return;
       }
       if (success) {
-        root.querySelector<HTMLElement>('[data-lead-modal-success-close]')?.focus();
+        root
+          .querySelector<HTMLElement>('[data-lead-modal-success-close]')
+          ?.focus();
       } else {
         root.querySelector<HTMLElement>('#lead-name')?.focus();
       }

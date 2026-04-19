@@ -373,8 +373,8 @@ export interface HandlersTenantRoleUnitJSON {
 
 export interface HandlersCreateTenantRoleJSON {
   description?: string;
-  name?: string;
-  slug?: string;
+  name: string;
+  slug: string;
   units?: HandlersTenantRoleUnitJSON[];
 }
 
@@ -409,7 +409,8 @@ export interface HandlersCreateTicketRequestKiosk {
 export type HandlersCreateTicketRequest = HandlersCreateTicketRequestAnonymous | HandlersCreateTicketRequestStaff | HandlersCreateTicketRequestKiosk;
 
 export interface HandlersCustomTermsLeadRequestBody {
-  comment?: string;
+  /** @minLength 1 */
+  comment: string;
 }
 
 export interface HandlersDaDataFindPartyByInnRequest {
@@ -625,7 +626,8 @@ export interface HandlersPickRequest {
 }
 
 export interface HandlersPlanChangeRequestBody {
-  requestedPlanCode?: string;
+  /** @minLength 1 */
+  requestedPlanCode: string;
 }
 
 export interface HandlersPlatformCreateSubscriptionBody {
@@ -665,12 +667,12 @@ export interface HandlersPlatformCreateSubscriptionPlanBody {
 }
 
 export interface HandlersPlatformIntegrationsResponse {
-  leadsTrackerQueue?: string;
-  supportTrackerQueue?: string;
-  trackerTypeError?: string;
-  trackerTypeRegistration?: string;
-  trackerTypeRequest?: string;
-  trackerTypeSupport?: string;
+  leadsTrackerQueue: string;
+  supportTrackerQueue: string;
+  trackerTypeError: string;
+  trackerTypeRegistration: string;
+  trackerTypeRequest: string;
+  trackerTypeSupport: string;
 }
 
 export type HandlersPlatformUpdateSubscriptionPlanBodyFeatures = {[key: string]: boolean};
@@ -699,10 +701,10 @@ export interface HandlersPlatformUpdateSubscriptionPlanBody {
 
 export interface HandlersPublicLeadRequestBody {
   company?: string;
-  email?: string;
+  email: string;
   locale?: string;
   message?: string;
-  name?: string;
+  name: string;
   planCode?: string;
   referrer?: string;
   source?: string;
@@ -1716,6 +1718,15 @@ export interface ServicesCreateCalendarIntegrationRequest {
   username: string;
 }
 
+export interface ServicesDeploymentSaaSSettingsPatch {
+  leadsTrackerQueue?: string;
+  supportTrackerQueue?: string;
+  trackerTypeError?: string;
+  trackerTypeRegistration?: string;
+  trackerTypeRequest?: string;
+  trackerTypeSupport?: string;
+}
+
 export interface ServicesEmployeeRadarResponse {
   computedAt?: string;
   rating?: number;
@@ -2010,7 +2021,7 @@ export interface HandlersLoginLinkResponse {
 export type PostPublicLeadRequest201 = {[key: string]: string};
 
 /**
- * Public endpoint; creates a Tracker issue when leads queue and Tracker credentials are configured.
+ * Public endpoint; creates a Tracker issue when leads queue and Tracker credentials are configured. The JSON body is read via `http.MaxBytesReader` with a cap of `MaxPublicLeadRequestBodyBytes` (see `PublicLeadRequestBody`); if the client sends more than that, `io.ReadAll` returns an error and the handler responds with 413 Request Entity Too Large.
  * @summary Submit a marketing / sales lead (Yandex Tracker)
  */
 export type postPublicLeadRequestResponse201 = {
@@ -2021,6 +2032,16 @@ export type postPublicLeadRequestResponse201 = {
 export type postPublicLeadRequestResponse400 = {
   data: string
   status: 400
+}
+
+export type postPublicLeadRequestResponse413 = {
+  data: string
+  status: 413
+}
+
+export type postPublicLeadRequestResponse500 = {
+  data: string
+  status: 500
 }
 
 export type postPublicLeadRequestResponse502 = {
@@ -2036,7 +2057,7 @@ export type postPublicLeadRequestResponse503 = {
 export type postPublicLeadRequestResponseSuccess = (postPublicLeadRequestResponse201) & {
   headers: Headers;
 };
-export type postPublicLeadRequestResponseError = (postPublicLeadRequestResponse400 | postPublicLeadRequestResponse502 | postPublicLeadRequestResponse503) & {
+export type postPublicLeadRequestResponseError = (postPublicLeadRequestResponse400 | postPublicLeadRequestResponse413 | postPublicLeadRequestResponse500 | postPublicLeadRequestResponse502 | postPublicLeadRequestResponse503) & {
   headers: Headers;
 };
 

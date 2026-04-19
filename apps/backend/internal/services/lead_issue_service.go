@@ -93,16 +93,18 @@ func logSignupFailureInternal(traceID, errText string) {
 }
 
 // NotifyTrialRegistration best-effort after successful signup. Non-blocking; uses a short timeout for the Tracker call.
-func (s *LeadIssueService) NotifyTrialRegistration(_ context.Context, companyName, companySlug, userName, userEmail, planCode string) {
+func (s *LeadIssueService) NotifyTrialRegistration(ctx context.Context, companyName, companySlug, userName, userEmail, planCode string) {
 	if s == nil || s.settingsRepo == nil || s.tracker == nil {
 		return
 	}
 	li := s
 	cn, cs, un, ue, pc := companyName, companySlug, userName, userEmail, planCode
+	parentCtx := ctx
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), leadIssueTrackerHTTPTimeout)
+		// WithoutCancel: outbound Tracker call must not be cut off when the HTTP handler returns.
+		runCtx, cancel := context.WithTimeout(context.WithoutCancel(parentCtx), leadIssueTrackerHTTPTimeout)
 		defer cancel()
-		li.notifyTrialRegistrationSync(ctx, cn, cs, un, ue, pc)
+		li.notifyTrialRegistrationSync(runCtx, cn, cs, un, ue, pc)
 	}()
 }
 
@@ -144,16 +146,17 @@ func (s *LeadIssueService) notifyTrialRegistrationSync(ctx context.Context, comp
 }
 
 // NotifySignupFailure best-effort when signup returns 500. Non-blocking; does not send raw errors to Tracker.
-func (s *LeadIssueService) NotifySignupFailure(_ context.Context, companyName, userEmail, planCode, errText string) {
+func (s *LeadIssueService) NotifySignupFailure(ctx context.Context, companyName, userEmail, planCode, errText string) {
 	if s == nil || s.settingsRepo == nil || s.tracker == nil {
 		return
 	}
 	li := s
 	cn, ue, pc, et := companyName, userEmail, planCode, errText
+	parentCtx := ctx
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), leadIssueTrackerHTTPTimeout)
+		runCtx, cancel := context.WithTimeout(context.WithoutCancel(parentCtx), leadIssueTrackerHTTPTimeout)
 		defer cancel()
-		li.notifySignupFailureSync(ctx, cn, ue, pc, et)
+		li.notifySignupFailureSync(runCtx, cn, ue, pc, et)
 	}()
 }
 

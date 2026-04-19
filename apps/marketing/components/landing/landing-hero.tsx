@@ -21,9 +21,7 @@ type Props = {
 
 export function LandingHero({ locale, copy, appBaseUrl }: Props) {
   const normalized = appBaseUrl?.trim();
-  const normalizedAppBase = normalized
-    ? normalized.replace(/\/$/, '')
-    : null;
+  const normalizedAppBase = normalized ? normalized.replace(/\/$/, '') : null;
   const signupHref = normalizedAppBase
     ? `${normalizedAppBase}/${locale}/signup`
     : null;
