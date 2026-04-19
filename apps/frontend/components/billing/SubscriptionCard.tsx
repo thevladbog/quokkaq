@@ -26,6 +26,8 @@ interface SubscriptionCardProps {
   subscription: Subscription;
   onUpgrade?: () => void;
   onCancel?: () => void;
+  /** Opens payment methods (trial CTA). Omit on pages where adding a card is not offered. */
+  onAddPaymentMethod?: () => void;
   onManageBilling?: () => void;
 }
 
@@ -33,6 +35,7 @@ export function SubscriptionCard({
   subscription,
   onUpgrade,
   onCancel,
+  onAddPaymentMethod,
   onManageBilling
 }: SubscriptionCardProps) {
   const t = useTranslations('organization.billing');
@@ -83,6 +86,21 @@ export function SubscriptionCard({
     );
     return Math.max(0, raw);
   }, [subscription.trialEnd, nowMs]);
+
+  const showFooter = useMemo(() => {
+    const s = subscription;
+    if (s.status === 'trial' && onAddPaymentMethod) return true;
+    if (
+      s.status === 'active' &&
+      !s.cancelAtPeriodEnd &&
+      (onUpgrade || onCancel)
+    ) {
+      return true;
+    }
+    if (s.cancelAtPeriodEnd && onManageBilling) return true;
+    if (s.status === 'past_due' && onManageBilling) return true;
+    return false;
+  }, [subscription, onAddPaymentMethod, onUpgrade, onCancel, onManageBilling]);
 
   return (
     <Card className='w-full'>
@@ -219,47 +237,49 @@ export function SubscriptionCard({
         )}
       </CardContent>
 
-      <CardFooter className='flex gap-3'>
-        {subscription.status === 'trial' && onManageBilling && (
-          <Button onClick={onManageBilling} className='flex-1'>
-            <CreditCard className='mr-2 h-4 w-4' />
-            {t('addPaymentMethod')}
-          </Button>
-        )}
-
-        {subscription.status === 'active' &&
-          !subscription.cancelAtPeriodEnd &&
-          onUpgrade && (
-            <Button onClick={onUpgrade} className='flex-1'>
-              <TrendingUp className='mr-2 h-4 w-4' />
-              {t('upgradePlan')}
+      {showFooter ? (
+        <CardFooter className='flex gap-3'>
+          {subscription.status === 'trial' && onAddPaymentMethod && (
+            <Button onClick={onAddPaymentMethod} className='flex-1'>
+              <CreditCard className='mr-2 h-4 w-4' />
+              {t('addPaymentMethod')}
             </Button>
           )}
 
-        {subscription.status === 'active' &&
-          !subscription.cancelAtPeriodEnd &&
-          onCancel && (
-            <Button onClick={onCancel} variant='outline' className='flex-1'>
-              {t('cancelSubscription')}
+          {subscription.status === 'active' &&
+            !subscription.cancelAtPeriodEnd &&
+            onUpgrade && (
+              <Button onClick={onUpgrade} className='flex-1'>
+                <TrendingUp className='mr-2 h-4 w-4' />
+                {t('upgradePlan')}
+              </Button>
+            )}
+
+          {subscription.status === 'active' &&
+            !subscription.cancelAtPeriodEnd &&
+            onCancel && (
+              <Button onClick={onCancel} variant='outline' className='flex-1'>
+                {t('cancelSubscription')}
+              </Button>
+            )}
+
+          {subscription.cancelAtPeriodEnd && onManageBilling && (
+            <Button onClick={onManageBilling} className='flex-1'>
+              {t('manageBilling')}
             </Button>
           )}
 
-        {subscription.cancelAtPeriodEnd && onManageBilling && (
-          <Button onClick={onManageBilling} className='flex-1'>
-            {t('manageBilling')}
-          </Button>
-        )}
-
-        {subscription.status === 'past_due' && onManageBilling && (
-          <Button
-            onClick={onManageBilling}
-            variant='destructive'
-            className='flex-1'
-          >
-            {t('manageBilling')}
-          </Button>
-        )}
-      </CardFooter>
+          {subscription.status === 'past_due' && onManageBilling && (
+            <Button
+              onClick={onManageBilling}
+              variant='destructive'
+              className='flex-1'
+            >
+              {t('manageBilling')}
+            </Button>
+          )}
+        </CardFooter>
+      ) : null}
     </Card>
   );
 }

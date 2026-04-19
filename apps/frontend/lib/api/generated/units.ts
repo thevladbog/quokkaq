@@ -454,6 +454,10 @@ export interface HandlersCreateTicketRequestKiosk {
 
 export type HandlersCreateTicketRequest = HandlersCreateTicketRequestAnonymous | HandlersCreateTicketRequestStaff | HandlersCreateTicketRequestKiosk;
 
+export interface HandlersCustomTermsLeadRequestBody {
+  comment?: string;
+}
+
 export interface HandlersDaDataFindPartyByInnRequest {
   inn: string;
   kpp?: string;
@@ -664,6 +668,10 @@ export interface HandlersPeriodResponse {
 
 export interface HandlersPickRequest {
   counterId?: string;
+}
+
+export interface HandlersPlanChangeRequestBody {
+  requestedPlanCode?: string;
 }
 
 export interface HandlersPlatformCreateSubscriptionBody {

@@ -214,3 +214,117 @@ func (s *LeadIssueService) CreateLeadRequest(ctx context.Context, name, email, c
 	_, _, _, err = s.tracker.CreateWorkItemWithOpts(ctx, uuid.New().String(), title, desc, extras, opts)
 	return err
 }
+
+// CreatePlanChangeRequest creates a Tracker issue when an authenticated tenant user requests a subscription plan change.
+// Uses the same leads queue and request issue type as marketing leads ([REQ] / LeadIssueRequest).
+func (s *LeadIssueService) CreatePlanChangeRequest(ctx context.Context,
+	companyID, companyName, companySlug string,
+	userDisplayName, userEmail string,
+	currentPlanCode, requestedPlanCode string,
+) error {
+	if s == nil || s.settingsRepo == nil || s.tracker == nil {
+		return fmt.Errorf("lead issue service not configured")
+	}
+	st, err := s.settingsRepo.Get()
+	if err != nil {
+		return err
+	}
+	queue := ResolveLeadsTrackerQueue(st)
+	if queue == "" {
+		return fmt.Errorf("leads queue is not configured")
+	}
+	if !s.tracker.CredentialsReady() {
+		return fmt.Errorf("yandex tracker is not configured")
+	}
+	cn := strings.TrimSpace(companyName)
+	if cn == "" {
+		cn = "(unknown company)"
+	}
+	cs := strings.TrimSpace(companySlug)
+	req := strings.TrimSpace(requestedPlanCode)
+	cur := strings.TrimSpace(currentPlanCode)
+	title := fmt.Sprintf("[PLAN] Change plan → %s", req)
+	if cs != "" {
+		title = fmt.Sprintf("[PLAN] %s: change plan → %s", cs, req)
+	}
+	var b strings.Builder
+	b.WriteString("Tenant user requested a subscription plan change. Apply after review in Tracker.\n\n")
+	fmt.Fprintf(&b, "- **Company**: %s\n", cn)
+	if cs != "" {
+		fmt.Fprintf(&b, "- **Tenant slug**: `%s`\n", strings.ReplaceAll(cs, "`", "'"))
+	}
+	fmt.Fprintf(&b, "- **Company ID**: `%s`\n", strings.ReplaceAll(strings.TrimSpace(companyID), "`", "'"))
+	fmt.Fprintf(&b, "- **Requested by**: %s\n", strings.TrimSpace(userDisplayName))
+	fmt.Fprintf(&b, "- **Email**: %s\n", strings.TrimSpace(userEmail))
+	fmt.Fprintf(&b, "- **Current plan code**: %s\n", cur)
+	fmt.Fprintf(&b, "- **Requested plan code**: %s\n", req)
+	traceID := uuid.New().String()
+	diag, _ := json.Marshal(map[string]string{"kind": "plan_change_request"})
+	desc := BuildSupportDescriptionMarkdown(b.String(), diag, traceID)
+	extras := SupportReportTicketCreateExtras{
+		ApplicantsEmail:     strings.TrimSpace(userEmail),
+		CompanyTrackerLabel: cn,
+	}
+	opts := YandexTrackerIssueCreateOpts{
+		QueueKey: queue,
+		TypeRaw:  strings.TrimSpace(leadIssueTypeRaw(st, LeadIssueRequest)),
+	}
+	_, _, _, err = s.tracker.CreateWorkItemWithOpts(ctx, uuid.New().String(), title, desc, extras, opts)
+	return err
+}
+
+// CreateTenantCustomTermsLeadRequest creates a [REQ] Tracker issue when an authenticated tenant user asks for individual pricing / custom terms (Settings → Pricing).
+func (s *LeadIssueService) CreateTenantCustomTermsLeadRequest(ctx context.Context,
+	companyID, companyName, companySlug string,
+	userDisplayName, userEmail, comment string,
+) error {
+	if s == nil || s.settingsRepo == nil || s.tracker == nil {
+		return fmt.Errorf("lead issue service not configured")
+	}
+	st, err := s.settingsRepo.Get()
+	if err != nil {
+		return err
+	}
+	queue := ResolveLeadsTrackerQueue(st)
+	if queue == "" {
+		return fmt.Errorf("leads queue is not configured")
+	}
+	if !s.tracker.CredentialsReady() {
+		return fmt.Errorf("yandex tracker is not configured")
+	}
+	cn := strings.TrimSpace(companyName)
+	if cn == "" {
+		cn = "(unknown company)"
+	}
+	cs := strings.TrimSpace(companySlug)
+	title := "[REQ] " + cn
+	var b strings.Builder
+	msg := strings.TrimSpace(comment)
+	if msg == "" {
+		msg = "(no message)"
+	}
+	b.WriteString(msg)
+	b.WriteString("\n\n")
+	b.WriteString("Individual pricing / custom terms request from **Settings → Pricing**.\n\n")
+	fmt.Fprintf(&b, "- **Company**: %s\n", cn)
+	if cs != "" {
+		fmt.Fprintf(&b, "- **Tenant slug**: `%s`\n", strings.ReplaceAll(cs, "`", "'"))
+	}
+	fmt.Fprintf(&b, "- **Company ID**: `%s`\n", strings.ReplaceAll(strings.TrimSpace(companyID), "`", "'"))
+	fmt.Fprintf(&b, "- **Requested by**: %s\n", strings.TrimSpace(userDisplayName))
+	fmt.Fprintf(&b, "- **Email**: %s\n", strings.TrimSpace(userEmail))
+	fmt.Fprintf(&b, "- **Source**: %s\n", "tenant_settings_pricing")
+	traceID := uuid.New().String()
+	diag, _ := json.Marshal(map[string]string{"kind": "tenant_custom_terms", "source": "tenant_settings_pricing"})
+	desc := BuildSupportDescriptionMarkdown(b.String(), diag, traceID)
+	extras := SupportReportTicketCreateExtras{
+		ApplicantsEmail:     strings.TrimSpace(userEmail),
+		CompanyTrackerLabel: cn,
+	}
+	opts := YandexTrackerIssueCreateOpts{
+		QueueKey: queue,
+		TypeRaw:  strings.TrimSpace(leadIssueTypeRaw(st, LeadIssueRequest)),
+	}
+	_, _, _, err = s.tracker.CreateWorkItemWithOpts(ctx, uuid.New().String(), title, desc, extras, opts)
+	return err
+}

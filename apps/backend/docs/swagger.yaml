@@ -150,6 +150,11 @@ components:
       - $ref: '#/components/schemas/handlers.CreateTicketRequestAnonymous'
       - $ref: '#/components/schemas/handlers.CreateTicketRequestStaff'
       - $ref: '#/components/schemas/handlers.CreateTicketRequestKiosk'
+    handlers.CustomTermsLeadRequestBody:
+      properties:
+        comment:
+          type: string
+      type: object
     handlers.DaDataFindPartyByInnRequest:
       properties:
         inn:
@@ -530,6 +535,11 @@ components:
     handlers.PickRequest:
       properties:
         counterId:
+          type: string
+      type: object
+    handlers.PlanChangeRequestBody:
+      properties:
+        requestedPlanCode:
           type: string
       type: object
     handlers.PlatformCreateSubscriptionBody:
@@ -8171,6 +8181,74 @@ paths:
       summary: Create Checkout Session
       tags:
       - subscriptions
+  /subscriptions/custom-terms-lead-request:
+    post:
+      description: Authenticated company owner or billing admin; comment required. User and company are taken from the session.
+      operationId: postSubscriptionCustomTermsLeadRequest
+      parameters:
+      - description: Tenant company UUID when the user belongs to multiple organizations
+        in: header
+        name: X-Company-Id
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/handlers.CustomTermsLeadRequestBody'
+        description: Comment for sales
+        required: true
+        x-originalParamName: body
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  type: string
+                type: object
+          description: Created
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: No company
+        '502':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Tracker error
+        '503':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Tracker not configured
+      security:
+      - BearerAuth: []
+      summary: Request individual pricing (marketing-style REQ ticket)
+      tags:
+      - subscriptions
   /subscriptions/me:
     get:
       description: Returns subscription for the authenticated user's company
@@ -8215,6 +8293,116 @@ paths:
       security:
       - BearerAuth: []
       summary: Get Current User's Subscription
+      tags:
+      - subscriptions
+  /subscriptions/me/plans:
+    get:
+      description: Active public plans plus this company's current and pending plans even when those plans are not public (assigned by platform).
+      operationId: getMySubscriptionPlans
+      parameters:
+      - description: Tenant company UUID when the user belongs to multiple organizations
+        in: header
+        name: X-Company-Id
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/models.SubscriptionPlan'
+                type: array
+          description: OK
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: Subscription plans for tenant catalog
+      tags:
+      - subscriptions
+  /subscriptions/plan-change-request:
+    post:
+      description: Authenticated company owner or billing admin; creates a Tracker work item. Plan switch is applied after manual processing.
+      operationId: postSubscriptionPlanChangeRequest
+      parameters:
+      - description: Tenant company UUID when the user belongs to multiple organizations
+        in: header
+        name: X-Company-Id
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/handlers.PlanChangeRequestBody'
+        description: Requested plan code
+        required: true
+        x-originalParamName: body
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  type: string
+                type: object
+          description: Created
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: No subscription or company
+        '502':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Tracker error
+        '503':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Tracker not configured
+      security:
+      - BearerAuth: []
+      summary: Request subscription plan change (Tracker ticket)
       tags:
       - subscriptions
   /subscriptions/plans:

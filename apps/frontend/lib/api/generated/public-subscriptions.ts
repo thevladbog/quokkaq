@@ -408,6 +408,10 @@ export interface HandlersCreateTicketRequestKiosk {
 
 export type HandlersCreateTicketRequest = HandlersCreateTicketRequestAnonymous | HandlersCreateTicketRequestStaff | HandlersCreateTicketRequestKiosk;
 
+export interface HandlersCustomTermsLeadRequestBody {
+  comment?: string;
+}
+
 export interface HandlersDaDataFindPartyByInnRequest {
   inn: string;
   kpp?: string;
@@ -618,6 +622,10 @@ export interface HandlersPeriodResponse {
 
 export interface HandlersPickRequest {
   counterId?: string;
+}
+
+export interface HandlersPlanChangeRequestBody {
+  requestedPlanCode?: string;
 }
 
 export interface HandlersPlatformCreateSubscriptionBody {
@@ -1999,6 +2007,10 @@ export interface HandlersLoginLinkResponse {
   exampleUrl: string;
 }
 
+export type PostSubscriptionCustomTermsLeadRequest201 = {[key: string]: string};
+
+export type PostSubscriptionPlanChangeRequest201 = {[key: string]: string};
+
 /**
  * Creates a checkout session for subscription upgrade
  * @summary Create Checkout Session
@@ -2075,6 +2087,76 @@ export const createCheckout = async (handlersCreateCheckoutRequest: HandlersCrea
 
 
 /**
+ * Authenticated company owner or billing admin; comment required. User and company are taken from the session.
+ * @summary Request individual pricing (marketing-style REQ ticket)
+ */
+export type postSubscriptionCustomTermsLeadRequestResponse201 = {
+  data: PostSubscriptionCustomTermsLeadRequest201
+  status: 201
+}
+
+export type postSubscriptionCustomTermsLeadRequestResponse400 = {
+  data: string
+  status: 400
+}
+
+export type postSubscriptionCustomTermsLeadRequestResponse401 = {
+  data: string
+  status: 401
+}
+
+export type postSubscriptionCustomTermsLeadRequestResponse403 = {
+  data: string
+  status: 403
+}
+
+export type postSubscriptionCustomTermsLeadRequestResponse404 = {
+  data: string
+  status: 404
+}
+
+export type postSubscriptionCustomTermsLeadRequestResponse502 = {
+  data: string
+  status: 502
+}
+
+export type postSubscriptionCustomTermsLeadRequestResponse503 = {
+  data: string
+  status: 503
+}
+
+export type postSubscriptionCustomTermsLeadRequestResponseSuccess = (postSubscriptionCustomTermsLeadRequestResponse201) & {
+  headers: Headers;
+};
+export type postSubscriptionCustomTermsLeadRequestResponseError = (postSubscriptionCustomTermsLeadRequestResponse400 | postSubscriptionCustomTermsLeadRequestResponse401 | postSubscriptionCustomTermsLeadRequestResponse403 | postSubscriptionCustomTermsLeadRequestResponse404 | postSubscriptionCustomTermsLeadRequestResponse502 | postSubscriptionCustomTermsLeadRequestResponse503) & {
+  headers: Headers;
+};
+
+export type postSubscriptionCustomTermsLeadRequestResponse = (postSubscriptionCustomTermsLeadRequestResponseSuccess | postSubscriptionCustomTermsLeadRequestResponseError)
+
+export const getPostSubscriptionCustomTermsLeadRequestUrl = () => {
+
+
+
+
+  return `/subscriptions/custom-terms-lead-request`
+}
+
+export const postSubscriptionCustomTermsLeadRequest = async (handlersCustomTermsLeadRequestBody: HandlersCustomTermsLeadRequestBody, options?: RequestInit): Promise<postSubscriptionCustomTermsLeadRequestResponse> => {
+
+  return publicBackendOrvalMutator<postSubscriptionCustomTermsLeadRequestResponse>(getPostSubscriptionCustomTermsLeadRequestUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersCustomTermsLeadRequestBody,)
+  }
+);}
+
+
+
+/**
  * Returns subscription for the authenticated user's company
  * @summary Get Current User's Subscription
  */
@@ -2128,6 +2210,130 @@ export const getMySubscription = async ( options?: RequestInit): Promise<getMySu
     method: 'GET'
 
 
+  }
+);}
+
+
+
+/**
+ * Active public plans plus this company's current and pending plans even when those plans are not public (assigned by platform).
+ * @summary Subscription plans for tenant catalog
+ */
+export type getMySubscriptionPlansResponse200 = {
+  data: ModelsSubscriptionPlan[]
+  status: 200
+}
+
+export type getMySubscriptionPlansResponse401 = {
+  data: string
+  status: 401
+}
+
+export type getMySubscriptionPlansResponse403 = {
+  data: string
+  status: 403
+}
+
+export type getMySubscriptionPlansResponse500 = {
+  data: string
+  status: 500
+}
+
+export type getMySubscriptionPlansResponseSuccess = (getMySubscriptionPlansResponse200) & {
+  headers: Headers;
+};
+export type getMySubscriptionPlansResponseError = (getMySubscriptionPlansResponse401 | getMySubscriptionPlansResponse403 | getMySubscriptionPlansResponse500) & {
+  headers: Headers;
+};
+
+export type getMySubscriptionPlansResponse = (getMySubscriptionPlansResponseSuccess | getMySubscriptionPlansResponseError)
+
+export const getGetMySubscriptionPlansUrl = () => {
+
+
+
+
+  return `/subscriptions/me/plans`
+}
+
+export const getMySubscriptionPlans = async ( options?: RequestInit): Promise<getMySubscriptionPlansResponse> => {
+
+  return publicBackendOrvalMutator<getMySubscriptionPlansResponse>(getGetMySubscriptionPlansUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+/**
+ * Authenticated company owner or billing admin; creates a Tracker work item. Plan switch is applied after manual processing.
+ * @summary Request subscription plan change (Tracker ticket)
+ */
+export type postSubscriptionPlanChangeRequestResponse201 = {
+  data: PostSubscriptionPlanChangeRequest201
+  status: 201
+}
+
+export type postSubscriptionPlanChangeRequestResponse400 = {
+  data: string
+  status: 400
+}
+
+export type postSubscriptionPlanChangeRequestResponse401 = {
+  data: string
+  status: 401
+}
+
+export type postSubscriptionPlanChangeRequestResponse403 = {
+  data: string
+  status: 403
+}
+
+export type postSubscriptionPlanChangeRequestResponse404 = {
+  data: string
+  status: 404
+}
+
+export type postSubscriptionPlanChangeRequestResponse502 = {
+  data: string
+  status: 502
+}
+
+export type postSubscriptionPlanChangeRequestResponse503 = {
+  data: string
+  status: 503
+}
+
+export type postSubscriptionPlanChangeRequestResponseSuccess = (postSubscriptionPlanChangeRequestResponse201) & {
+  headers: Headers;
+};
+export type postSubscriptionPlanChangeRequestResponseError = (postSubscriptionPlanChangeRequestResponse400 | postSubscriptionPlanChangeRequestResponse401 | postSubscriptionPlanChangeRequestResponse403 | postSubscriptionPlanChangeRequestResponse404 | postSubscriptionPlanChangeRequestResponse502 | postSubscriptionPlanChangeRequestResponse503) & {
+  headers: Headers;
+};
+
+export type postSubscriptionPlanChangeRequestResponse = (postSubscriptionPlanChangeRequestResponseSuccess | postSubscriptionPlanChangeRequestResponseError)
+
+export const getPostSubscriptionPlanChangeRequestUrl = () => {
+
+
+
+
+  return `/subscriptions/plan-change-request`
+}
+
+export const postSubscriptionPlanChangeRequest = async (handlersPlanChangeRequestBody: HandlersPlanChangeRequestBody, options?: RequestInit): Promise<postSubscriptionPlanChangeRequestResponse> => {
+
+  return publicBackendOrvalMutator<postSubscriptionPlanChangeRequestResponse>(getPostSubscriptionPlanChangeRequestUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersPlanChangeRequestBody,)
   }
 );}
 

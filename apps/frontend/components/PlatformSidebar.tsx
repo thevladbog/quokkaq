@@ -36,12 +36,6 @@ export default function PlatformSidebar() {
 
   const items = [
     {
-      href: '/platform/integrations',
-      label: t('integrations', { defaultValue: 'Integrations' }),
-      icon: Plug,
-      match: (p: string) => p.includes('/platform/integrations')
-    },
-    {
       href: '/platform',
       label: t('overview', { defaultValue: 'Overview' }),
       icon: Home,
@@ -79,6 +73,12 @@ export default function PlatformSidebar() {
       label: t('invoices', { defaultValue: 'Invoices' }),
       icon: FileText,
       match: (p: string) => p.includes('/platform/invoices')
+    },
+    {
+      href: '/platform/integrations',
+      label: t('integrations', { defaultValue: 'Integrations' }),
+      icon: Plug,
+      match: (p: string) => p.includes('/platform/integrations')
     }
   ];
 

@@ -288,7 +288,7 @@ func run() error {
 			paymentProvider = services.NewStripeProvider(stripeKey, strings.TrimSpace(os.Getenv("STRIPE_WEBHOOK_SECRET")))
 		}
 	}
-	subscriptionHandler := handlers.NewSubscriptionHandler(subscriptionRepo, userRepo, paymentProvider)
+	subscriptionHandler := handlers.NewSubscriptionHandler(subscriptionRepo, userRepo, companyRepo, paymentProvider, leadIssueService)
 	yShop := strings.TrimSpace(os.Getenv("YOOKASSA_SHOP_ID"))
 	ySecret := strings.TrimSpace(os.Getenv("YOOKASSA_SECRET_KEY"))
 	yWebhook := strings.TrimSpace(os.Getenv("YOOKASSA_WEBHOOK_SECRET"))
@@ -731,8 +731,11 @@ func run() error {
 	r.Route("/subscriptions", func(r chi.Router) {
 		r.Group(func(r chi.Router) {
 			r.Use(authmiddleware.JWTAuth)
+			r.Get("/me/plans", subscriptionHandler.GetMySubscriptionPlans)
 			r.Get("/me", subscriptionHandler.GetMySubscription)
 			r.Post("/checkout", subscriptionHandler.CreateCheckout)
+			r.Post("/plan-change-request", subscriptionHandler.PostPlanChangeRequest)
+			r.Post("/custom-terms-lead-request", subscriptionHandler.PostCustomTermsLeadRequest)
 			r.Post("/{id}/cancel", subscriptionHandler.CancelSubscription)
 		})
 		r.Get("/plans", subscriptionHandler.GetPlans)

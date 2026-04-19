@@ -12,7 +12,7 @@ import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import type { SubscriptionPlan } from '@quokkaq/shared-types';
 import {
-  getGetSubscriptionPlansQueryKey,
+  getGetMySubscriptionPlansQueryKey,
   getGetMySubscriptionQueryKey
 } from '@/lib/api/generated/tenant-billing';
 import { subscriptionsApi } from '@/lib/api';
@@ -32,7 +32,7 @@ export function OrganizationBillingContent() {
   });
 
   const { data: plans, isLoading: plansLoading } = useQuery({
-    queryKey: getGetSubscriptionPlansQueryKey(),
+    queryKey: getGetMySubscriptionPlansQueryKey(),
     queryFn: () => subscriptionsApi.getPlans()
   });
 
@@ -102,6 +102,7 @@ export function OrganizationBillingContent() {
           subscription={subscription}
           onUpgrade={handleUpgrade}
           onCancel={handleCancel}
+          onAddPaymentMethod={handleManageBilling}
           onManageBilling={handleManageBilling}
         />
       )}

@@ -1331,8 +1331,9 @@ export const subscriptionsApi = {
     return SubscriptionSchema.parse(res.data);
   },
 
+  /** Tenant catalog: public active plans plus the current org's plan (even if not public). */
   getPlans: async () => {
-    const res = await orvalTenantBilling.getSubscriptionPlans();
+    const res = await orvalTenantBilling.getMySubscriptionPlans();
     return z.array(SubscriptionPlanSchema).parse(res.data ?? []);
   },
 
@@ -1354,6 +1355,20 @@ export const subscriptionsApi = {
       { method: 'POST' }
     );
     return SubscriptionSchema.parse(res.data);
+  },
+
+  /** Creates a Yandex Tracker ticket; plan switch applies after support processing. */
+  requestPlanChange: async (requestedPlanCode: string) => {
+    await orvalTenantBilling.postSubscriptionPlanChangeRequest({
+      requestedPlanCode
+    });
+  },
+
+  /** Marketing-style [REQ] ticket for individual pricing (comment + session user/company). */
+  requestCustomTermsLead: async (comment: string) => {
+    await orvalTenantBilling.postSubscriptionCustomTermsLeadRequest({
+      comment
+    });
   }
 };
 
