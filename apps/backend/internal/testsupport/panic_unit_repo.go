@@ -15,7 +15,10 @@ func (PanicUnitRepo) Transaction(func(*gorm.DB) error) error { panic("unexpected
 func (PanicUnitRepo) CreateTx(*gorm.DB, *models.Unit) error  { panic("unexpected") }
 func (PanicUnitRepo) Create(*models.Unit) error              { panic("unexpected") }
 func (PanicUnitRepo) FindAll() ([]models.Unit, error)        { panic("unexpected") }
-func (PanicUnitRepo) FindByID(string) (*models.Unit, error)  { panic("unexpected") }
+func (PanicUnitRepo) FindAllByCompanyID(string) ([]models.Unit, error) {
+	panic("unexpected")
+}
+func (PanicUnitRepo) FindByID(string) (*models.Unit, error) { panic("unexpected") }
 func (PanicUnitRepo) FindByIDLight(string) (*models.Unit, error) {
 	panic("unexpected")
 }

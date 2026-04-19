@@ -1558,6 +1558,219 @@ func RunVersionedMigrations(models ...interface{}) error {
 		return fmt.Errorf("failed to run v1.3.10_deployment_saas_support_tracker migration: %w", err)
 	}
 
+	// Tenant-scoped invitations and email templates (company_id + FK). Backfill legacy rows to oldest company when possible.
+	// company_id must be TEXT to match companies.id (GORM string PK) and other tenant FK columns — not UUID.
+	err = manager.RunMigration("v1.3.11_invitations_templates_company_id", func(db *gorm.DB) error {
+		if err := db.Exec(`
+DO $$
+BEGIN
+	IF NOT EXISTS (
+		SELECT 1 FROM information_schema.columns
+		WHERE table_schema = current_schema() AND table_name = 'invitations' AND column_name = 'company_id'
+	) THEN
+		ALTER TABLE invitations ADD COLUMN company_id TEXT;
+	ELSIF EXISTS (
+		SELECT 1 FROM information_schema.columns
+		WHERE table_schema = current_schema() AND table_name = 'invitations' AND column_name = 'company_id'
+		  AND udt_name = 'uuid'
+	) THEN
+		ALTER TABLE invitations ALTER COLUMN company_id TYPE TEXT USING company_id::text;
+	END IF;
+END $$;
+`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+DO $$
+BEGIN
+	IF NOT EXISTS (
+		SELECT 1 FROM information_schema.columns
+		WHERE table_schema = current_schema() AND table_name = 'message_templates' AND column_name = 'company_id'
+	) THEN
+		ALTER TABLE message_templates ADD COLUMN company_id TEXT;
+	ELSIF EXISTS (
+		SELECT 1 FROM information_schema.columns
+		WHERE table_schema = current_schema() AND table_name = 'message_templates' AND column_name = 'company_id'
+		  AND udt_name = 'uuid'
+	) THEN
+		ALTER TABLE message_templates ALTER COLUMN company_id TYPE TEXT USING company_id::text;
+	END IF;
+END $$;
+`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			UPDATE invitations i
+			SET company_id = c.id
+			FROM (SELECT id FROM companies ORDER BY created_at ASC LIMIT 1) AS c
+			WHERE i.company_id IS NULL
+			  AND EXISTS (SELECT 1 FROM companies LIMIT 1)
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			UPDATE message_templates t
+			SET company_id = c.id
+			FROM (SELECT id FROM companies ORDER BY created_at ASC LIMIT 1) AS c
+			WHERE t.company_id IS NULL
+			  AND EXISTS (SELECT 1 FROM companies LIMIT 1)
+		`).Error; err != nil {
+			return err
+		}
+		// Rows we could not attach to any company: remove (orphan data).
+		if err := db.Exec(`DELETE FROM invitations WHERE company_id IS NULL`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`DELETE FROM message_templates WHERE company_id IS NULL`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			ALTER TABLE invitations ALTER COLUMN company_id SET NOT NULL
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			ALTER TABLE message_templates ALTER COLUMN company_id SET NOT NULL
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			DO $$
+			BEGIN
+				IF NOT EXISTS (
+					SELECT 1 FROM pg_constraint WHERE conname = 'fk_invitations_company'
+				) THEN
+					ALTER TABLE invitations
+					ADD CONSTRAINT fk_invitations_company
+					FOREIGN KEY (company_id) REFERENCES companies(id) ON UPDATE CASCADE ON DELETE CASCADE;
+				END IF;
+				IF NOT EXISTS (
+					SELECT 1 FROM pg_constraint WHERE conname = 'fk_message_templates_company'
+				) THEN
+					ALTER TABLE message_templates
+					ADD CONSTRAINT fk_message_templates_company
+					FOREIGN KEY (company_id) REFERENCES companies(id) ON UPDATE CASCADE ON DELETE CASCADE;
+				END IF;
+			END $$
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_invitations_company_email ON invitations (company_id, email)`).Error; err != nil {
+			return err
+		}
+		return db.AutoMigrate(&dbmodels.Invitation{}, &dbmodels.MessageTemplate{})
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.3.11_invitations_templates_company_id migration: %w", err)
+	}
+
+	// Repair path: v1.3.11 is skipped once marked applied, so fixes shipped after first apply must live here.
+	// Converts mistaken UUID company_id to TEXT (matches companies.id), idempotent on healthy DBs.
+	err = manager.RunMigration("v1.3.12_invitations_templates_company_id_text_repair", func(db *gorm.DB) error {
+		if err := db.Exec(`
+DO $$
+BEGIN
+	IF EXISTS (
+		SELECT 1 FROM information_schema.columns
+		WHERE table_schema = current_schema() AND table_name = 'invitations' AND column_name = 'company_id'
+		  AND udt_name = 'uuid'
+	) THEN
+		ALTER TABLE invitations ALTER COLUMN company_id TYPE TEXT USING company_id::text;
+	END IF;
+END $$;
+`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+DO $$
+BEGIN
+	IF EXISTS (
+		SELECT 1 FROM information_schema.columns
+		WHERE table_schema = current_schema() AND table_name = 'message_templates' AND column_name = 'company_id'
+		  AND udt_name = 'uuid'
+	) THEN
+		ALTER TABLE message_templates ALTER COLUMN company_id TYPE TEXT USING company_id::text;
+	END IF;
+END $$;
+`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			UPDATE invitations i
+			SET company_id = c.id
+			FROM (SELECT id FROM companies ORDER BY created_at ASC LIMIT 1) AS c
+			WHERE i.company_id IS NULL
+			  AND EXISTS (SELECT 1 FROM companies LIMIT 1)
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			UPDATE message_templates t
+			SET company_id = c.id
+			FROM (SELECT id FROM companies ORDER BY created_at ASC LIMIT 1) AS c
+			WHERE t.company_id IS NULL
+			  AND EXISTS (SELECT 1 FROM companies LIMIT 1)
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`DELETE FROM invitations WHERE company_id IS NULL`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`DELETE FROM message_templates WHERE company_id IS NULL`).Error; err != nil {
+			return err
+		}
+		// NOT NULL only when column exists and still allows nulls (skip error if already NOT NULL).
+		if err := db.Exec(`
+DO $$
+BEGIN
+	IF EXISTS (
+		SELECT 1 FROM information_schema.columns
+		WHERE table_schema = current_schema() AND table_name = 'invitations' AND column_name = 'company_id'
+		  AND is_nullable = 'YES'
+	) THEN
+		ALTER TABLE invitations ALTER COLUMN company_id SET NOT NULL;
+	END IF;
+	IF EXISTS (
+		SELECT 1 FROM information_schema.columns
+		WHERE table_schema = current_schema() AND table_name = 'message_templates' AND column_name = 'company_id'
+		  AND is_nullable = 'YES'
+	) THEN
+		ALTER TABLE message_templates ALTER COLUMN company_id SET NOT NULL;
+	END IF;
+END $$;
+`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			DO $$
+			BEGIN
+				IF NOT EXISTS (
+					SELECT 1 FROM pg_constraint WHERE conname = 'fk_invitations_company'
+				) THEN
+					ALTER TABLE invitations
+					ADD CONSTRAINT fk_invitations_company
+					FOREIGN KEY (company_id) REFERENCES companies(id) ON UPDATE CASCADE ON DELETE CASCADE;
+				END IF;
+				IF NOT EXISTS (
+					SELECT 1 FROM pg_constraint WHERE conname = 'fk_message_templates_company'
+				) THEN
+					ALTER TABLE message_templates
+					ADD CONSTRAINT fk_message_templates_company
+					FOREIGN KEY (company_id) REFERENCES companies(id) ON UPDATE CASCADE ON DELETE CASCADE;
+				END IF;
+			END $$
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_invitations_company_email ON invitations (company_id, email)`).Error; err != nil {
+			return err
+		}
+		return db.AutoMigrate(&dbmodels.Invitation{}, &dbmodels.MessageTemplate{})
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.3.12_invitations_templates_company_id_text_repair migration: %w", err)
+	}
+
 	fmt.Println("✅ All migrations completed successfully")
 	return nil
 }

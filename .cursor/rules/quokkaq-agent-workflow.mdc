@@ -8,7 +8,7 @@ alwaysApply: true
 ## Before finishing a task that changes code
 
 1. **Run linters** and fix all reported issues. Do not leave the workspace in a failing lint state.
-2. **Restart local dev stands yourself** after changes that affect runtime (backend and/or frontend): stop whatever is listening on `localhost:3000` and `localhost:3001`, then start `pnpm nx run backend:serve` and `pnpm nx run frontend:dev` again in the background from the repo root. Do this **without asking** the user to restart—treat it as part of handing off the task. **Skip entirely** if the user has explicitly asked not to touch running processes in this session (do not send signals to those PIDs). **Backend:** `pnpm nx run backend:serve` runs **Air** ([`apps/backend/.air.toml`](../../apps/backend/.air.toml)); after edits to `.go` files you do **not** need a manual API restart unless the user is not using Air or you changed `.env`, migrations, `go.mod`, or other inputs that do not trigger an Air rebuild—then restart the API yourself.
+2. **Restart local dev stands yourself** after changes that affect runtime (backend and/or frontend): stop whatever is listening on `localhost:3000` and `localhost:3001`, then start `pnpm nx run backend:serve` and `pnpm nx run frontend:dev` again in the background from the repo root. Do this **without asking** the user to restart—treat it as part of handing off the task. **Skip entirely** if the user has explicitly asked not to touch running processes in this session (do not send signals to those PIDs). **Backend:** `pnpm nx run backend:serve` runs `go run ./cmd/api` via [`apps/backend/scripts/run-backend-dev.js`](../../apps/backend/scripts/run-backend-dev.js) (no hot reload). **After edits to `.go` files, restart the API yourself** so the new code runs; also restart when you changed `.env`, migrations, `go.mod`, or anything the running binary does not pick up live.
 
 ## Lint & format commands (repository root: `pnpm nx …`)
 
@@ -31,12 +31,12 @@ alwaysApply: true
 
 ## Restart API + Next.js (default local ports)
 
-After frontend changes, or backend changes that **Air does not reload** (`.env`, migrations, dependency updates, or when the API process is not Air), **run the restart yourself**—even if you are unsure whether the user still has dev servers open. For ordinary `.go` edits with `pnpm nx run backend:serve` (Air), a manual backend restart is usually unnecessary.
+After frontend changes, or **any backend code / config change** that requires a new process (`.go`, `.env`, migrations, `go.mod`, etc.), **run the restart yourself**—even if you are unsure whether the user still has dev servers open.
 
 Prefer a **scoped, graceful** shutdown (not an immediate `kill -9` on every listener):
 
 1. For each port **3000** and **3001**, resolve the listening PID (`lsof -tiTCP:$PORT -sTCP:LISTEN`).
-2. **Verify** the process looks like this repo’s dev servers (command line mentions e.g. `next dev`, `nx run frontend:dev`, `go run`, `cmd/api`, `air-verse/air`, or the workspace path). If it does not match, **do not kill it**—leave that port alone.
+2. **Verify** the process looks like this repo’s dev servers (command line mentions e.g. `next dev`, `nx run frontend:dev`, `go run`, `cmd/api`, `run-backend-dev.js`, or the workspace path). If it does not match, **do not kill it**—leave that port alone.
 3. Send **SIGTERM** to the matched PID, wait up to a few seconds, and re-check the port. If it is still listening and the process still matches, escalate to **SIGKILL** only then.
 
 Then start again in the background from repo root: `pnpm nx run backend:serve`, then `pnpm nx run frontend:dev` (short delay between starts is fine).
@@ -50,7 +50,7 @@ graceful_port() {
   [ -z "$pid" ] && return 0
   args="$(ps -p "$pid" -o args= 2>/dev/null || true)"
   case "$args" in
-    *next*dev*|*nx*run*frontend:dev*|*go*run*|*cmd/api*|*air-verse*air*)
+    *next*dev*|*nx*run*frontend:dev*|*go*run*|*cmd/api*|*run-backend-dev*)
       ;;
     *)
       echo "Port $port: skip PID $pid (not recognized as repo dev server)"
@@ -75,6 +75,6 @@ sleep 1
 
 - **Backend DB migrations** (`apps/backend/pkg/database/postgres.go`): never rewrite already-committed migration steps; add a **new** `RunMigration("v…", …)` version instead (see [`apps/backend/AGENTS.md`](../../apps/backend/AGENTS.md)).
 - Run commands yourself; do not only suggest that the user run lint or restart servers.
-- **Dev stands:** proactively restart the frontend and the backend when needed (see Air note above); do not end the turn with “please restart” unless the user opted out of restarts.
+- **Dev stands:** proactively restart the frontend and the backend when needed (restart backend after `.go` or env/migration changes); do not end the turn with “please restart” unless the user opted out of restarts.
 - Prefer `nx run-many -t lint --all` before handing off a multi-area change.
 - If you only touched one app, you may scope lint to that project to save time, but run the full matrix before merge-ready work.

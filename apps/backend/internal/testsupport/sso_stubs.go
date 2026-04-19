@@ -92,6 +92,7 @@ func (PanicUserRepo) GetCompanyIDByUserID(string) (string, error)               
 func (PanicUserRepo) ResolveCompanyIDForRequest(string, string) (string, error) {
 	panic("unexpected")
 }
+func (PanicUserRepo) IsUserMemberOfCompanyTenant(string, string) (bool, error) { panic("unexpected") }
 func (PanicUserRepo) ListAccessibleCompanies(string, string) ([]repository.AccessibleCompanySummary, error) {
 	panic("unexpected")
 }

@@ -52,8 +52,7 @@ test-results/
 logs/
 log/
 
-# Temporary files
-# Air (hot reload tool) — build output under tmp/
+# Temporary files (build/cache under apps/backend/tmp)
 tmp/
 temp/
 *.tmp

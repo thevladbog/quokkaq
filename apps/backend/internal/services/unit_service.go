@@ -23,7 +23,7 @@ var (
 
 type UnitService interface {
 	CreateUnit(unit *models.Unit) error
-	GetAllUnits() ([]models.Unit, error)
+	GetUnitsForCompany(companyID string) ([]models.Unit, error)
 	GetUnitByID(id string) (*models.Unit, error)
 	GetChildSubdivisions(parentID string) ([]models.Unit, error)
 	GetChildUnits(parentID string) ([]models.Unit, error)
@@ -169,8 +169,11 @@ func (s *unitService) CreateUnit(unit *models.Unit) error {
 	})
 }
 
-func (s *unitService) GetAllUnits() ([]models.Unit, error) {
-	return s.repo.FindAll()
+func (s *unitService) GetUnitsForCompany(companyID string) ([]models.Unit, error) {
+	if companyID == "" {
+		return nil, errors.New("companyId is required")
+	}
+	return s.repo.FindAllByCompanyID(companyID)
 }
 
 func (s *unitService) GetUnitByID(id string) (*models.Unit, error) {

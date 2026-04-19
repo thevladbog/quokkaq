@@ -3,7 +3,6 @@ import type { User } from '@quokkaq/shared-types';
 /** Whether /platform may be opened by tenant `admin` (not only `platform_admin`). */
 export function platformRouteAllowsTenantAdmin(): boolean {
   return (
-    process.env.NODE_ENV === 'development' ||
     process.env.NEXT_PUBLIC_PLATFORM_ALLOW_TENANT_ADMIN === 'true' ||
     process.env.NEXT_PUBLIC_PLATFORM_ALLOW_TENANT_ADMIN === '1'
   );

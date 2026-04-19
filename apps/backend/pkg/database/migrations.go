@@ -69,7 +69,14 @@ func (m *MigrationManager) RunMigration(version string, migrationFunc func(*gorm
 			return fmt.Errorf("failed to check migration status: %w", err)
 		}
 		if count > 0 {
-			slog.Info("⏭️ Migration already applied, skipping", slog.String("version", version))
+			var existing Migration
+			if err := tx.Where("version = ?", version).First(&existing).Error; err != nil {
+				return fmt.Errorf("migration %s: applied row exists but could not be read: %w", version, err)
+			}
+			// If recorded_at is very recent vs process start, suspect double startup (e.g. air reload) not “phantom apply”.
+			slog.Info("⏭️ Migration already applied, skipping",
+				slog.String("version", version),
+				slog.Time("recorded_at", existing.AppliedAt))
 			return nil
 		}
 

@@ -63,6 +63,8 @@ type UserRepository interface {
 	GetCompanyIDByUserID(userID string) (companyID string, err error)
 	// ResolveCompanyIDForRequest uses X-Company-Id when present and allowed; otherwise GetCompanyIDByUserID.
 	ResolveCompanyIDForRequest(userID string, headerCompanyID string) (companyID string, err error)
+	// IsUserMemberOfCompanyTenant is true when the user belongs to the tenant via units, tenant roles, or company ownership (not global admin alone).
+	IsUserMemberOfCompanyTenant(userID, companyID string) (bool, error)
 	// ListAccessibleCompanies returns tenants the user may access (units + ownership), optional search q.
 	ListAccessibleCompanies(userID string, q string) ([]AccessibleCompanySummary, error)
 	// GetFirstUserUnit returns the first user_units row joined to units for the user (same shape as legacy usage handler query).
@@ -113,6 +115,39 @@ func (r *userRepository) FindAll(search string) ([]models.User, error) {
 
 	err := query.Find(&users).Error
 	return users, err
+}
+
+func (r *userRepository) IsUserMemberOfCompanyTenant(userID, companyID string) (bool, error) {
+	userID = strings.TrimSpace(userID)
+	companyID = strings.TrimSpace(companyID)
+	if userID == "" || companyID == "" {
+		return false, nil
+	}
+	var ok bool
+	err := r.db.Raw(`
+SELECT (
+  EXISTS (
+    SELECT 1 FROM user_units uu
+    INNER JOIN units un ON un.id = uu.unit_id AND un.company_id = ?
+    WHERE uu.user_id = ?
+  )
+  OR EXISTS (
+    SELECT 1 FROM user_tenant_roles utr
+    WHERE utr.company_id = ? AND utr.user_id = ?
+  )
+  OR EXISTS (
+    SELECT 1 FROM companies c
+    WHERE c.id = ? AND c.owner_user_id = ?
+  )
+)`,
+		companyID, userID,
+		companyID, userID,
+		companyID, userID,
+	).Scan(&ok).Error
+	if err != nil {
+		return false, err
+	}
+	return ok, nil
 }
 
 func (r *userRepository) ListUsersForCompany(companyID string, search string, includeGlobalRoleUsers bool) ([]models.User, error) {

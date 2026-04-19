@@ -2212,6 +2212,9 @@
             },
             "models.Invitation": {
                 "properties": {
+                    "companyId": {
+                        "type": "string"
+                    },
                     "createdAt": {
                         "type": "string"
                     },
@@ -2414,6 +2417,9 @@
             },
             "models.MessageTemplate": {
                 "properties": {
+                    "companyId": {
+                        "type": "string"
+                    },
                     "content": {
                         "type": "string"
                     },
@@ -9644,7 +9650,17 @@
         },
         "/invitations": {
             "get": {
-                "description": "Retrieves all invitations",
+                "description": "Lists invitations for the resolved tenant company only.",
+                "parameters": [
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "content": {
@@ -9659,6 +9675,36 @@
                         },
                         "description": "OK"
                     },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
                     "500": {
                         "content": {
                             "application/json": {
@@ -9670,13 +9716,28 @@
                         "description": "Internal Server Error"
                     }
                 },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "summary": "Get all invitations",
                 "tags": [
                     "invitations"
                 ]
             },
             "post": {
-                "description": "Creates a new invitation for a user with optional pre-assigned units and roles",
+                "description": "Creates a new invitation for the resolved tenant company. Organization for the invitee is determined by the invitation token on acceptance, not by email alone.",
+                "parameters": [
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
                 "requestBody": {
                     "content": {
                         "application/json": {
@@ -9710,6 +9771,26 @@
                         },
                         "description": "Bad Request"
                     },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
                     "500": {
                         "content": {
                             "application/json": {
@@ -9721,6 +9802,11 @@
                         "description": "Internal Server Error"
                     }
                 },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "summary": "Create a new invitation",
                 "tags": [
                     "invitations"
@@ -9834,8 +9920,16 @@
         },
         "/invitations/{id}": {
             "delete": {
-                "description": "Deletes an invitation by its ID",
+                "description": "Deletes an invitation by its ID within the resolved tenant company.",
                 "parameters": [
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     {
                         "description": "Invitation ID",
                         "in": "path",
@@ -9850,6 +9944,36 @@
                     "204": {
                         "description": "No Content"
                     },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
                     "500": {
                         "content": {
                             "application/json": {
@@ -9861,6 +9985,11 @@
                         "description": "Internal Server Error"
                     }
                 },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "summary": "Delete an invitation",
                 "tags": [
                     "invitations"
@@ -9869,8 +9998,16 @@
         },
         "/invitations/{id}/resend": {
             "patch": {
-                "description": "Resends an active invitation by its ID",
+                "description": "Resends an active invitation by its ID within the resolved tenant company.",
                 "parameters": [
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     {
                         "description": "Invitation ID",
                         "in": "path",
@@ -9895,6 +10032,26 @@
                         },
                         "description": "Bad Request"
                     },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
                     "500": {
                         "content": {
                             "application/json": {
@@ -9906,6 +10063,11 @@
                         "description": "Internal Server Error"
                     }
                 },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "summary": "Resend an invitation",
                 "tags": [
                     "invitations"
@@ -13997,7 +14159,17 @@
         },
         "/templates": {
             "get": {
-                "description": "Retrieves all message templates",
+                "description": "Lists message templates for the resolved tenant company only.",
+                "parameters": [
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "content": {
@@ -14012,6 +14184,36 @@
                         },
                         "description": "OK"
                     },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
                     "500": {
                         "content": {
                             "application/json": {
@@ -14023,13 +14225,28 @@
                         "description": "Internal Server Error"
                     }
                 },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "summary": "Get all templates",
                 "tags": [
                     "templates"
                 ]
             },
             "post": {
-                "description": "Creates a new message template",
+                "description": "Creates a new message template for the resolved tenant company (JWT admin + X-Company-Id when applicable).",
+                "parameters": [
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
                 "requestBody": {
                     "content": {
                         "application/json": {
@@ -14063,6 +14280,26 @@
                         },
                         "description": "Bad Request"
                     },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
                     "500": {
                         "content": {
                             "application/json": {
@@ -14074,6 +14311,11 @@
                         "description": "Internal Server Error"
                     }
                 },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "summary": "Create a new template",
                 "tags": [
                     "templates"
@@ -14082,8 +14324,16 @@
         },
         "/templates/{id}": {
             "delete": {
-                "description": "Deletes a template by its ID",
+                "description": "Deletes a template by its ID within the resolved tenant company.",
                 "parameters": [
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     {
                         "description": "Template ID",
                         "in": "path",
@@ -14098,6 +14348,46 @@
                     "204": {
                         "description": "No Content"
                     },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Template not found"
+                    },
                     "500": {
                         "content": {
                             "application/json": {
@@ -14109,14 +14399,27 @@
                         "description": "Internal Server Error"
                     }
                 },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "summary": "Delete a template",
                 "tags": [
                     "templates"
                 ]
             },
             "get": {
-                "description": "Retrieves a specific template by its ID",
+                "description": "Retrieves a template by ID within the resolved tenant company.",
                 "parameters": [
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     {
                         "description": "Template ID",
                         "in": "path",
@@ -14138,6 +14441,36 @@
                         },
                         "description": "OK"
                     },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
                     "404": {
                         "content": {
                             "application/json": {
@@ -14149,14 +14482,27 @@
                         "description": "Template not found"
                     }
                 },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "summary": "Get a template by ID",
                 "tags": [
                     "templates"
                 ]
             },
             "put": {
-                "description": "Updates an existing template",
+                "description": "Updates an existing template within the resolved tenant company.",
                 "parameters": [
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     {
                         "description": "Template ID",
                         "in": "path",
@@ -14200,6 +14546,36 @@
                         },
                         "description": "Bad Request"
                     },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Template not found"
+                    },
                     "500": {
                         "content": {
                             "application/json": {
@@ -14211,6 +14587,11 @@
                         "description": "Internal Server Error"
                     }
                 },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "summary": "Update a template",
                 "tags": [
                     "templates"
@@ -14844,7 +15225,17 @@
         },
         "/units": {
             "get": {
-                "description": "Retrieves a list of all units",
+                "description": "Returns units for the resolved company (JWT + X-Company-Id when applicable). Never returns units from other tenants.",
+                "parameters": [
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "content": {
@@ -14859,6 +15250,36 @@
                         },
                         "description": "OK"
                     },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
                     "500": {
                         "content": {
                             "application/json": {
@@ -14870,7 +15291,12 @@
                         "description": "Internal Server Error"
                     }
                 },
-                "summary": "Get all units",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List units for the current tenant",
                 "tags": [
                     "units"
                 ]
@@ -14973,6 +15399,14 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 ],
                 "responses": {
@@ -14997,6 +15431,11 @@
                         "description": "Unit not found"
                     }
                 },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "summary": "Get a unit by ID",
                 "tags": [
                     "units"

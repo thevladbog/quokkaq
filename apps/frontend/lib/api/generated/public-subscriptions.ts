@@ -1386,6 +1386,7 @@ export type ModelsInvitationTargetRoles = { [key: string]: unknown };
 export type ModelsInvitationTargetUnits = { [key: string]: unknown };
 
 export interface ModelsInvitation {
+  companyId?: string;
   createdAt?: string;
   email?: string;
   expiresAt?: string;
@@ -1400,6 +1401,7 @@ export interface ModelsInvitation {
 }
 
 export interface ModelsMessageTemplate {
+  companyId?: string;
   content?: string;
   createdAt?: string;
   id?: string;

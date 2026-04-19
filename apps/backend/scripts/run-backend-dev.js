@@ -1,23 +1,22 @@
 /**
- * Ensures github.com/air-verse/air is installed into apps/backend/bin, then runs it.
- * Used by Nx `backend:serve` so dev reload works on Windows without bash/Git Bash.
+ * Runs `go run ./cmd/api` for local dev. Used by Nx `backend:serve`.
+ * Node wrapper: frees PORT from a prior backend instance, maps SIGINT to exit 0 so Nx does not show "failed" on Ctrl+C.
  */
-const { existsSync, mkdirSync } = require('fs');
 const path = require('path');
-const { spawnSync, spawn, execSync } = require('child_process');
+const { spawn, execSync } = require('child_process');
 
 const isWin = process.platform === 'win32';
 
-/** Only kill listeners that look like our Go/API dev server or air, not random processes on the port. */
+/** Only kill listeners that look like our Go/API dev server, not random processes on the port. */
 function processLooksLikeBackendDevServer(argsLine) {
   if (!argsLine || typeof argsLine !== 'string') return false;
   const a = argsLine.trim();
   return (
-    /\bair\b/i.test(a) ||
+    /\bgo\b.*\brun\b/i.test(a) ||
     /\/main(\s|$)/.test(a) ||
     /\/api(\s|$)/.test(a) ||
-    /quokkaq-go-backend/.test(a) ||
-    /tmp\/air\b/.test(a)
+    /cmd\/api/.test(a) ||
+    /quokkaq-go-backend/.test(a)
   );
 }
 
@@ -43,9 +42,8 @@ function sleepMs(ms) {
 }
 
 /**
- * Frees PORT before Air starts so a leftover `main` from a crashed/stopped session
- * does not block the new listener. Set BACKEND_SERVE_NO_KILL_PORT=1 to skip.
- * Windows: no-op (use Task Manager / netstat if needed).
+ * Frees PORT before start so a leftover listener does not block.
+ * Set BACKEND_SERVE_NO_KILL_PORT=1 to skip. Windows: no-op.
  */
 function killStaleListenerOnPort() {
   if (isWin || process.env.BACKEND_SERVE_NO_KILL_PORT === '1') {
@@ -57,10 +55,9 @@ function killStaleListenerOnPort() {
   }
   let pids = [];
   try {
-    const out = execSync(
-      `lsof -t -iTCP:${port} -sTCP:LISTEN 2>/dev/null`,
-      { encoding: 'utf8' }
-    );
+    const out = execSync(`lsof -t -iTCP:${port} -sTCP:LISTEN 2>/dev/null`, {
+      encoding: 'utf8',
+    });
     pids = out
       .split(/\s+/)
       .map((s) => parseInt(s.trim(), 10))
@@ -72,7 +69,7 @@ function killStaleListenerOnPort() {
     let argsLine = '';
     try {
       argsLine = execSync(`ps -p ${pid} -o args= 2>/dev/null`, {
-        encoding: 'utf8'
+        encoding: 'utf8',
       });
     } catch {
       continue;
@@ -100,32 +97,10 @@ function killStaleListenerOnPort() {
 }
 
 const root = path.resolve(__dirname, '..');
-const binDir = path.join(root, 'bin');
-const airBin = path.join(binDir, isWin ? 'air.exe' : 'air');
-
-mkdirSync(binDir, { recursive: true });
-
-if (!existsSync(airBin)) {
-  const env = { ...process.env, GOBIN: binDir };
-  const install = spawnSync('go', ['install', 'github.com/air-verse/air@v1.65.1'], {
-    cwd: root,
-    env,
-    stdio: 'inherit',
-  });
-  if (install.error) {
-    console.error(install.error);
-    process.exit(1);
-  }
-  if (install.status !== 0) {
-    process.exit(install.status ?? 1);
-  }
-}
 
 killStaleListenerOnPort();
 
-// Use spawn (not spawnSync) so we can handle SIGINT/SIGTERM: with spawnSync, Node often
-// exits with 130 before we map the child's exit code — Nx then shows "failed".
-const child = spawn(airBin, [], {
+const child = spawn('go', ['run', './cmd/api'], {
   cwd: root,
   stdio: 'inherit',
   env: process.env,
@@ -133,6 +108,8 @@ const child = spawn(airBin, [], {
 
 const GRACE_MS = 12000;
 let shutdownTimer = null;
+/** Set when user sends SIGINT/SIGTERM to this wrapper. Go often exits with code 1 and signal=null after handling the signal, which would otherwise make Nx report failure. */
+let shutdownRequestedByUser = false;
 
 function clearShutdownTimer() {
   if (shutdownTimer !== null) {
@@ -149,6 +126,9 @@ child.on('error', (err) => {
 
 function mapChildExitToNx(code, signal) {
   clearShutdownTimer();
+  if (shutdownRequestedByUser) {
+    process.exit(0);
+  }
   if (signal === 'SIGINT' || signal === 'SIGTERM') {
     process.exit(0);
   }
@@ -165,6 +145,7 @@ child.on('exit', (code, signal) => {
 
 ['SIGINT', 'SIGTERM'].forEach((sig) => {
   process.on(sig, () => {
+    shutdownRequestedByUser = true;
     try {
       if (child.pid && !child.killed) {
         child.kill(sig);

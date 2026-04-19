@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"path/filepath"
 	"quokkaq-go-backend/internal/logger"
+	authmiddleware "quokkaq-go-backend/internal/middleware"
+	"quokkaq-go-backend/internal/repository"
 	"strings"
 
 	"quokkaq-go-backend/internal/models"
@@ -31,13 +33,15 @@ type UnitHandler struct {
 	service        services.UnitService
 	storageService services.StorageService
 	operational    *services.OperationalService
+	userRepo       repository.UserRepository
 }
 
-func NewUnitHandler(service services.UnitService, storageService services.StorageService, operational *services.OperationalService) *UnitHandler {
+func NewUnitHandler(service services.UnitService, storageService services.StorageService, operational *services.OperationalService, userRepo repository.UserRepository) *UnitHandler {
 	return &UnitHandler{
 		service:        service,
 		storageService: storageService,
 		operational:    operational,
+		userRepo:       userRepo,
 	}
 }
 
@@ -69,15 +73,34 @@ func (h *UnitHandler) CreateUnit(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetAllUnits godoc
-// @Summary      Get all units
-// @Description  Retrieves a list of all units
+// @Summary      List units for the current tenant
+// @Description  Returns units for the resolved company (JWT + X-Company-Id when applicable). Never returns units from other tenants.
 // @Tags         units
 // @Produce      json
+// @Security     BearerAuth
+// @Param        X-Company-Id header string false "Tenant company UUID when the user belongs to multiple organizations"
 // @Success      200  {array}   models.Unit
+// @Failure      400  {string}  string "Bad Request"
+// @Failure      401  {string}  string "Unauthorized"
+// @Failure      403  {string}  string "Forbidden"
 // @Failure      500  {string}  string "Internal Server Error"
 // @Router       /units [get]
 func (h *UnitHandler) GetAllUnits(w http.ResponseWriter, r *http.Request) {
-	units, err := h.service.GetAllUnits()
+	userID, ok := authmiddleware.GetUserIDFromContext(r.Context())
+	if !ok || userID == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	companyID, err := h.userRepo.ResolveCompanyIDForRequest(userID, r.Header.Get("X-Company-Id"))
+	if err != nil {
+		if errors.Is(err, repository.ErrCompanyAccessDenied) {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+		http.Error(w, "Company context required", http.StatusBadRequest)
+		return
+	}
+	units, err := h.service.GetUnitsForCompany(companyID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -92,15 +115,42 @@ func (h *UnitHandler) GetAllUnits(w http.ResponseWriter, r *http.Request) {
 // @Tags         units
 // @Produce      json
 // @Param        id   path      string  true  "Unit ID"
+// @Security     BearerAuth
+// @Param        X-Company-Id header string false "Tenant company UUID when the user belongs to multiple organizations"
 // @Success      200  {object}  models.Unit
 // @Failure      404  {string}  string "Unit not found"
 // @Router       /units/{id} [get]
 func (h *UnitHandler) GetUnitByID(w http.ResponseWriter, r *http.Request) {
+	userID, ok := authmiddleware.GetUserIDFromContext(r.Context())
+	if !ok || userID == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
 	id := chi.URLParam(r, "id")
 	unit, err := h.service.GetUnitByID(id)
 	if err != nil {
 		http.Error(w, "Unit not found", http.StatusNotFound)
 		return
+	}
+	platform, err := h.userRepo.IsPlatformAdmin(userID)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if !platform {
+		companyID, err := h.userRepo.ResolveCompanyIDForRequest(userID, r.Header.Get("X-Company-Id"))
+		if err != nil {
+			if errors.Is(err, repository.ErrCompanyAccessDenied) {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+			http.Error(w, "Company context required", http.StatusBadRequest)
+			return
+		}
+		if unit.CompanyID != companyID {
+			http.Error(w, "Unit not found", http.StatusNotFound)
+			return
+		}
 	}
 	if h.operational != nil {
 		snap, snapErr := h.operational.GetPublicSnapshot(unit.ID)

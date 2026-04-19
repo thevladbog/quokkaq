@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	authmiddleware "quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/models"
+	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
 
 	"github.com/go-chi/chi/v5"
@@ -12,11 +14,53 @@ import (
 )
 
 type UserHandler struct {
-	service services.UserService
+	service  services.UserService
+	userRepo repository.UserRepository
+	unitRepo repository.UnitRepository
 }
 
-func NewUserHandler(service services.UserService) *UserHandler {
-	return &UserHandler{service: service}
+func NewUserHandler(service services.UserService, userRepo repository.UserRepository, unitRepo repository.UnitRepository) *UserHandler {
+	return &UserHandler{service: service, userRepo: userRepo, unitRepo: unitRepo}
+}
+
+func (h *UserHandler) resolveViewerCompany(w http.ResponseWriter, r *http.Request) (viewerID, companyID string, ok bool) {
+	userID, authOk := authmiddleware.GetUserIDFromContext(r.Context())
+	if !authOk || userID == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return "", "", false
+	}
+	cid, err := h.userRepo.ResolveCompanyIDForRequest(userID, r.Header.Get("X-Company-Id"))
+	if err != nil {
+		if errors.Is(err, repository.ErrCompanyAccessDenied) {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+		} else {
+			http.Error(w, "Company context required", http.StatusBadRequest)
+		}
+		return "", "", false
+	}
+	return userID, cid, true
+}
+
+// allowUserOpOnTarget allows platform_admin always; otherwise target must belong to the resolved tenant.
+func (h *UserHandler) allowUserOpOnTarget(w http.ResponseWriter, viewerID, targetUserID, companyID string) bool {
+	pf, err := h.userRepo.IsPlatformAdmin(viewerID)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return false
+	}
+	if pf {
+		return true
+	}
+	ok, err := h.userRepo.IsUserMemberOfCompanyTenant(targetUserID, companyID)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return false
+	}
+	if !ok {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return false
+	}
+	return true
 }
 
 // CreateUser godoc
@@ -55,8 +99,12 @@ func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 // @Failure      500  {string}  string "Internal Server Error"
 // @Router       /users [get]
 func (h *UserHandler) GetAllUsers(w http.ResponseWriter, r *http.Request) {
+	_, companyID, ok := h.resolveViewerCompany(w, r)
+	if !ok {
+		return
+	}
 	search := r.URL.Query().Get("search")
-	users, err := h.service.GetAllUsers(search)
+	users, err := h.service.ListUsersForCompany(companyID, search, false)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -74,11 +122,33 @@ func (h *UserHandler) GetAllUsers(w http.ResponseWriter, r *http.Request) {
 // @Failure      404  {string}  string "User not found"
 // @Router       /users/{id} [get]
 func (h *UserHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
+	viewerID, companyID, ok := h.resolveViewerCompany(w, r)
+	if !ok {
+		return
+	}
 	id := chi.URLParam(r, "id")
 	user, err := h.service.GetUserByID(id)
 	if err != nil {
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
+	}
+	if !h.allowUserOpOnTarget(w, viewerID, id, companyID) {
+		return
+	}
+	pf, err := h.userRepo.IsPlatformAdmin(viewerID)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if !pf && user.Units != nil {
+		filtered := user.Units[:0]
+		for i := range user.Units {
+			uu := user.Units[i]
+			if uu.Unit.ID != "" && uu.Unit.CompanyID == companyID {
+				filtered = append(filtered, uu)
+			}
+		}
+		user.Units = filtered
 	}
 	RespondJSON(w, user)
 }
@@ -92,7 +162,14 @@ func (h *UserHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 // @Failure      500  {string}  string "Internal Server Error"
 // @Router       /users/{id} [delete]
 func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	viewerID, companyID, ok := h.resolveViewerCompany(w, r)
+	if !ok {
+		return
+	}
 	id := chi.URLParam(r, "id")
+	if !h.allowUserOpOnTarget(w, viewerID, id, companyID) {
+		return
+	}
 	if err := h.service.DeleteUser(id); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -115,7 +192,14 @@ func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 // @Failure      500   {string}  string "Internal Server Error"
 // @Router       /users/{id} [patch]
 func (h *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
+	viewerID, companyID, ok := h.resolveViewerCompany(w, r)
+	if !ok {
+		return
+	}
 	id := chi.URLParam(r, "id")
+	if !h.allowUserOpOnTarget(w, viewerID, id, companyID) {
+		return
+	}
 	var input models.UpdateUserInput
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -161,10 +245,30 @@ type AssignUnitRequest struct {
 // @Failure      500      {string}  string "Internal Server Error"
 // @Router       /users/{id}/units/assign [post]
 func (h *UserHandler) AssignUnit(w http.ResponseWriter, r *http.Request) {
+	viewerID, companyID, ok := h.resolveViewerCompany(w, r)
+	if !ok {
+		return
+	}
 	id := chi.URLParam(r, "id")
+	if !h.allowUserOpOnTarget(w, viewerID, id, companyID) {
+		return
+	}
 	var req AssignUnitRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	un, err := h.unitRepo.FindByIDLight(req.UnitID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "Unit not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if un.CompanyID != companyID {
+		http.Error(w, "Unit not found", http.StatusNotFound)
 		return
 	}
 
@@ -193,10 +297,30 @@ type RemoveUnitRequest struct {
 // @Failure      500      {string}  string "Internal Server Error"
 // @Router       /users/{id}/units/remove [post]
 func (h *UserHandler) RemoveUnit(w http.ResponseWriter, r *http.Request) {
+	viewerID, companyID, ok := h.resolveViewerCompany(w, r)
+	if !ok {
+		return
+	}
 	id := chi.URLParam(r, "id")
+	if !h.allowUserOpOnTarget(w, viewerID, id, companyID) {
+		return
+	}
 	var req RemoveUnitRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	un, err := h.unitRepo.FindByIDLight(req.UnitID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "Unit not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if un.CompanyID != companyID {
+		http.Error(w, "Unit not found", http.StatusNotFound)
 		return
 	}
 
@@ -218,13 +342,36 @@ func (h *UserHandler) RemoveUnit(w http.ResponseWriter, r *http.Request) {
 // @Failure      404  {string}  string "User not found"
 // @Router       /users/{id}/units [get]
 func (h *UserHandler) GetUserUnits(w http.ResponseWriter, r *http.Request) {
+	viewerID, companyID, ok := h.resolveViewerCompany(w, r)
+	if !ok {
+		return
+	}
 	id := chi.URLParam(r, "id")
+	if !h.allowUserOpOnTarget(w, viewerID, id, companyID) {
+		return
+	}
 	user, err := h.service.GetUserByID(id)
 	if err != nil {
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
-	RespondJSON(w, user.Units)
+	pf, err := h.userRepo.IsPlatformAdmin(viewerID)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	units := user.Units
+	if !pf && units != nil {
+		filtered := units[:0]
+		for i := range units {
+			uu := units[i]
+			if uu.Unit.ID != "" && uu.Unit.CompanyID == companyID {
+				filtered = append(filtered, uu)
+			}
+		}
+		units = filtered
+	}
+	RespondJSON(w, units)
 }
 
 // GetSystemStatus godoc

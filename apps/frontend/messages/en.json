@@ -496,7 +496,7 @@
       "profile_name_label": "Display name",
       "save_profile": "Save name",
       "operator_photo_label": "Operator photo",
-      "operator_photo_hint": "Shown in staff-facing views. Uses the same secure upload as logos.",
+      "operator_photo_hint": "Shown in staff-facing views.",
       "operator_photo_upload": "Profile photo",
       "tenant_roles_section": "Tenant roles",
       "search_tenant_roles": "Search roles…",

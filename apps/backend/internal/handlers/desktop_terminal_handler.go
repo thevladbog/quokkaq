@@ -5,22 +5,59 @@ import (
 	"errors"
 	"net/http"
 	"quokkaq-go-backend/internal/logger"
+	"quokkaq-go-backend/internal/middleware"
+	"quokkaq-go-backend/internal/models"
+	"quokkaq-go-backend/internal/repository"
+	"quokkaq-go-backend/internal/services"
 	"strings"
 	"time"
 
-	"quokkaq-go-backend/internal/middleware"
-	"quokkaq-go-backend/internal/models"
-	"quokkaq-go-backend/internal/services"
-
 	"github.com/go-chi/chi/v5"
+	"gorm.io/gorm"
 )
 
 type DesktopTerminalHandler struct {
-	service services.DesktopTerminalService
+	service  services.DesktopTerminalService
+	userRepo repository.UserRepository
+	unitRepo repository.UnitRepository
 }
 
-func NewDesktopTerminalHandler(service services.DesktopTerminalService) *DesktopTerminalHandler {
-	return &DesktopTerminalHandler{service: service}
+func NewDesktopTerminalHandler(service services.DesktopTerminalService, userRepo repository.UserRepository, unitRepo repository.UnitRepository) *DesktopTerminalHandler {
+	return &DesktopTerminalHandler{service: service, userRepo: userRepo, unitRepo: unitRepo}
+}
+
+func (h *DesktopTerminalHandler) resolveViewerCompany(w http.ResponseWriter, r *http.Request) (viewerID, companyID string, ok bool) {
+	userID, authOk := middleware.GetUserIDFromContext(r.Context())
+	if !authOk || userID == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return "", "", false
+	}
+	cid, err := h.userRepo.ResolveCompanyIDForRequest(userID, r.Header.Get("X-Company-Id"))
+	if err != nil {
+		if errors.Is(err, repository.ErrCompanyAccessDenied) {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+		} else {
+			http.Error(w, "Company context required", http.StatusBadRequest)
+		}
+		return "", "", false
+	}
+	return userID, cid, true
+}
+
+func (h *DesktopTerminalHandler) terminalAllowed(w http.ResponseWriter, viewerID, companyID string, row *models.DesktopTerminal) bool {
+	pf, err := h.userRepo.IsPlatformAdmin(viewerID)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return false
+	}
+	if pf {
+		return true
+	}
+	if row.Unit.CompanyID == "" || row.Unit.CompanyID != companyID {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return false
+	}
+	return true
 }
 
 // CreateDesktopTerminalRequest is the body for POST /desktop-terminals.
@@ -117,6 +154,10 @@ func mapTerminalToJSON(t *models.DesktopTerminal) DesktopTerminalJSON {
 // @Security     BearerAuth
 // @ID           createDesktopTerminal
 func (h *DesktopTerminalHandler) Create(w http.ResponseWriter, r *http.Request) {
+	_, companyID, ok := h.resolveViewerCompany(w, r)
+	if !ok {
+		return
+	}
 	var req CreateDesktopTerminalRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -124,6 +165,19 @@ func (h *DesktopTerminalHandler) Create(w http.ResponseWriter, r *http.Request) 
 	}
 	if req.UnitID == "" || req.DefaultLocale == "" {
 		http.Error(w, "unitId and defaultLocale are required", http.StatusBadRequest)
+		return
+	}
+	u, err := h.unitRepo.FindByIDLight(req.UnitID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "Unit not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if u.CompanyID != companyID {
+		http.Error(w, "Unit not found", http.StatusNotFound)
 		return
 	}
 
@@ -182,7 +236,11 @@ func (h *DesktopTerminalHandler) Create(w http.ResponseWriter, r *http.Request) 
 // @Security     BearerAuth
 // @ID           listDesktopTerminals
 func (h *DesktopTerminalHandler) List(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.service.List()
+	_, companyID, ok := h.resolveViewerCompany(w, r)
+	if !ok {
+		return
+	}
+	rows, err := h.service.ListForCompany(companyID)
 	if err != nil {
 		logger.PrintfCtx(r.Context(), "desktop terminal list: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -210,9 +268,16 @@ func (h *DesktopTerminalHandler) List(w http.ResponseWriter, r *http.Request) {
 // @Security     BearerAuth
 // @ID           getDesktopTerminalByID
 func (h *DesktopTerminalHandler) GetByID(w http.ResponseWriter, r *http.Request) {
+	viewerID, companyID, ok := h.resolveViewerCompany(w, r)
+	if !ok {
+		return
+	}
 	id := chi.URLParam(r, "id")
 	row, err := h.service.GetByID(id)
 	if middleware.RespondRepoFindError(r.Context(), w, err, "GetDesktopTerminal") {
+		return
+	}
+	if !h.terminalAllowed(w, viewerID, companyID, row) {
 		return
 	}
 	_ = json.NewEncoder(w).Encode(mapTerminalToJSON(row))
@@ -236,7 +301,18 @@ func (h *DesktopTerminalHandler) GetByID(w http.ResponseWriter, r *http.Request)
 // @Security     BearerAuth
 // @ID           updateDesktopTerminal
 func (h *DesktopTerminalHandler) Update(w http.ResponseWriter, r *http.Request) {
+	viewerID, companyID, ok := h.resolveViewerCompany(w, r)
+	if !ok {
+		return
+	}
 	id := chi.URLParam(r, "id")
+	existing, err := h.service.GetByID(id)
+	if middleware.RespondRepoFindError(r.Context(), w, err, "UpdateDesktopTerminal") {
+		return
+	}
+	if !h.terminalAllowed(w, viewerID, companyID, existing) {
+		return
+	}
 	var req UpdateDesktopTerminalRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -246,8 +322,21 @@ func (h *DesktopTerminalHandler) Update(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "unitId and defaultLocale are required", http.StatusBadRequest)
 		return
 	}
+	u, err := h.unitRepo.FindByIDLight(req.UnitID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "Unit not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if u.CompanyID != companyID {
+		http.Error(w, "Unit not found", http.StatusNotFound)
+		return
+	}
 
-	err := h.service.Update(id, req.Name, req.UnitID, req.DefaultLocale, req.KioskFullscreen, req.ContextUnitID, req.CounterID, req.Kind)
+	err = h.service.Update(id, req.Name, req.UnitID, req.DefaultLocale, req.KioskFullscreen, req.ContextUnitID, req.CounterID, req.Kind)
 	if errors.Is(err, services.ErrInvalidLocale) ||
 		errors.Is(err, services.ErrInvalidTerminalKind) ||
 		errors.Is(err, services.ErrCounterIDRequired) ||
@@ -297,7 +386,18 @@ func (h *DesktopTerminalHandler) Update(w http.ResponseWriter, r *http.Request) 
 // @Security     BearerAuth
 // @ID           revokeDesktopTerminal
 func (h *DesktopTerminalHandler) Revoke(w http.ResponseWriter, r *http.Request) {
+	viewerID, companyID, ok := h.resolveViewerCompany(w, r)
+	if !ok {
+		return
+	}
 	id := chi.URLParam(r, "id")
+	existing, err := h.service.GetByID(id)
+	if middleware.RespondRepoFindError(r.Context(), w, err, "RevokeDesktopTerminal") {
+		return
+	}
+	if !h.terminalAllowed(w, viewerID, companyID, existing) {
+		return
+	}
 	if err := h.service.Revoke(id); middleware.RespondRepoFindError(r.Context(), w, err, "RevokeDesktopTerminal") {
 		return
 	}

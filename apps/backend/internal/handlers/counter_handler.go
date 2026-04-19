@@ -26,10 +26,12 @@ type CounterHandler struct {
 	service     services.CounterService
 	counterRepo repository.CounterRepository
 	operational *services.OperationalService
+	userRepo    repository.UserRepository
+	unitRepo    repository.UnitRepository
 }
 
-func NewCounterHandler(service services.CounterService, counterRepo repository.CounterRepository, operational *services.OperationalService) *CounterHandler {
-	return &CounterHandler{service: service, counterRepo: counterRepo, operational: operational}
+func NewCounterHandler(service services.CounterService, counterRepo repository.CounterRepository, operational *services.OperationalService, userRepo repository.UserRepository, unitRepo repository.UnitRepository) *CounterHandler {
+	return &CounterHandler{service: service, counterRepo: counterRepo, operational: operational, userRepo: userRepo, unitRepo: unitRepo}
 }
 
 func writeCounterServiceError(w http.ResponseWriter, err error) {
@@ -105,11 +107,41 @@ func (h *CounterHandler) GetCountersByUnit(w http.ResponseWriter, r *http.Reques
 // @Failure      404  {string}  string "Counter not found"
 // @Router       /counters/{id} [get]
 func (h *CounterHandler) GetCounterByID(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok || userID == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
 	id := chi.URLParam(r, "id")
 	counter, err := h.service.GetCounterByID(id)
 	if err != nil {
 		writeCounterServiceError(w, err)
 		return
+	}
+	pf, err := h.userRepo.IsPlatformAdmin(userID)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if !pf {
+		companyID, err := h.userRepo.ResolveCompanyIDForRequest(userID, r.Header.Get("X-Company-Id"))
+		if err != nil {
+			if errors.Is(err, repository.ErrCompanyAccessDenied) {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+			http.Error(w, "Company context required", http.StatusBadRequest)
+			return
+		}
+		unit, err := h.unitRepo.FindByIDLight(counter.UnitID)
+		if err != nil {
+			writeCounterServiceError(w, err)
+			return
+		}
+		if unit.CompanyID != companyID {
+			http.Error(w, "Counter not found", http.StatusNotFound)
+			return
+		}
 	}
 	RespondJSON(w, counter)
 }

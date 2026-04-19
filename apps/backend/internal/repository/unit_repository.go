@@ -15,6 +15,8 @@ type UnitRepository interface {
 	CreateTx(tx *gorm.DB, unit *models.Unit) error
 	Create(unit *models.Unit) error
 	FindAll() ([]models.Unit, error)
+	// FindAllByCompanyID returns units for one tenant (company).
+	FindAllByCompanyID(companyID string) ([]models.Unit, error)
 	FindByID(id string) (*models.Unit, error)
 	// FindByIDLight loads only the unit row (no relations). Use for updates/auth checks; use FindByID for API responses that need nested data.
 	FindByIDLight(id string) (*models.Unit, error)
@@ -57,6 +59,12 @@ func (r *unitRepository) Create(unit *models.Unit) error {
 func (r *unitRepository) FindAll() ([]models.Unit, error) {
 	var units []models.Unit
 	err := r.db.Find(&units).Error
+	return units, err
+}
+
+func (r *unitRepository) FindAllByCompanyID(companyID string) ([]models.Unit, error) {
+	var units []models.Unit
+	err := r.db.Where("company_id = ?", companyID).Find(&units).Error
 	return units, err
 }
 

@@ -210,25 +210,25 @@ go build -o quokkaq-backend cmd/api/main.go
 ./quokkaq-backend
 ```
 
-### Использование Air (горячая перезагрузка)
+### Запуск из монорепо (`nx run backend:serve`)
 
-Стандартная команда из корня монорепо — Air с закоммиченным [`.air.toml`](./.air.toml):
+Команда из корня запускает `go run ./cmd/api` через [`scripts/run-backend-dev.js`](./scripts/run-backend-dev.js): при необходимости освобождает `PORT` от предыдущего процесса API и маппит **Ctrl+C** в код выхода **0**, чтобы Nx не помечал задачу как failed (у «голого» `go run` при прерывании часто код **1**).
 
 ```bash
 pnpm nx run backend:serve
 ```
 
-Nx `serve` ставит Air в `tmp/air` через `go install` и запускает через `exec` (не `go run`): при **Ctrl+C** у `go run` в Go toolchain часто получается код **1** независимо от приложения, из‑за чего Nx помечает задачу как failed даже при корректном останове.
-
 Без Nx из `apps/backend`:
 
 ```bash
-mkdir -p tmp && GOBIN="$PWD/tmp" go install github.com/air-verse/air@v1.65.1 && exec ./tmp/air
+node scripts/run-backend-dev.js
+# или
+go run ./cmd/api
 ```
 
-По желанию: глобально установить бинарник (`go install github.com/air-verse/air@v1.65.1`) и запускать `air` в `apps/backend`.
+После правок в `.go` перезапустите процесс вручную (hot reload нет).
 
-Если Air пишет **`Process Exit with Code: 1`** сразу после `Server starting on port …`, процесс API завершился с ошибкой — чаще всего в логе выше есть **`ListenAndServe: … bind: address already in use`**: порт `PORT` (по умолчанию **3001**) уже занят другим процессом или старым экземпляром после перезапуска. Остановите лишний процесс (`lsof -iTCP:3001 -sTCP:LISTEN`) или увеличьте `kill_delay` в `.air.toml`, если это ловится только при hot reload.
+Если процесс сразу падает после **`Server starting on port …`**, смотрите строки выше — часто **`ListenAndServe: … bind: address already in use`**: порт `PORT` (по умолчанию **3001**) занят. Остановите лишний процесс (`lsof -iTCP:3001 -sTCP:LISTEN`) или задайте другой `PORT`.
 
 ---
 
