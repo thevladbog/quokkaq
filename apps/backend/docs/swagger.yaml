@@ -591,6 +591,21 @@ components:
         price:
           type: integer
       type: object
+    handlers.PlatformIntegrationsResponse:
+      properties:
+        leadsTrackerQueue:
+          type: string
+        supportTrackerQueue:
+          type: string
+        trackerTypeError:
+          type: string
+        trackerTypeRegistration:
+          type: string
+        trackerTypeRequest:
+          type: string
+        trackerTypeSupport:
+          type: string
+      type: object
     handlers.PlatformUpdateSubscriptionPlanBody:
       properties:
         allowInstantPurchase:
@@ -628,6 +643,25 @@ components:
           type: string
         price:
           type: integer
+      type: object
+    handlers.PublicLeadRequestBody:
+      properties:
+        company:
+          type: string
+        email:
+          type: string
+        locale:
+          type: string
+        message:
+          type: string
+        name:
+          type: string
+        planCode:
+          type: string
+        referrer:
+          type: string
+        source:
+          type: string
       type: object
     handlers.RefreshResponse:
       properties:
@@ -7172,6 +7206,62 @@ paths:
       summary: UI capability flags (DaData, etc.)
       tags:
       - platform
+  /platform/integrations:
+    get:
+      description: 'SaaS operator: Yandex Tracker queue and issue type mappings for leads flows.'
+      operationId: getPlatformIntegrations
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/handlers.PlatformIntegrationsResponse'
+          description: OK
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: Get deployment integration settings
+      tags:
+      - platform
+    patch:
+      operationId: patchPlatformIntegrations
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/handlers.PlatformIntegrationsResponse'
+        description: Integration settings
+        required: true
+        x-originalParamName: body
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/handlers.PlatformIntegrationsResponse'
+          description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad request
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: Update deployment integration settings
+      tags:
+      - platform
   /platform/invoices:
     get:
       operationId: ListInvoices
@@ -7644,6 +7734,48 @@ paths:
       summary: Update subscription fields (platform; may diverge from Stripe)
       tags:
       - platform
+  /public/leads/request:
+    post:
+      description: Public endpoint; creates a Tracker issue when leads queue and Tracker credentials are configured.
+      operationId: postPublicLeadRequest
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/handlers.PublicLeadRequestBody'
+        description: Lead payload
+        required: true
+        x-originalParamName: body
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  type: string
+                type: object
+          description: Created
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad request
+        '502':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Upstream Tracker error
+        '503':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Leads or Tracker not configured
+      summary: Submit a marketing / sales lead (Yandex Tracker)
+      tags:
+      - leads
   /public/tenants/{slug}:
     get:
       operationId: publicTenantBySlug

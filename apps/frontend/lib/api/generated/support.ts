@@ -675,6 +675,15 @@ export interface HandlersPlatformCreateSubscriptionPlanBody {
   price?: number;
 }
 
+export interface HandlersPlatformIntegrationsResponse {
+  leadsTrackerQueue?: string;
+  supportTrackerQueue?: string;
+  trackerTypeError?: string;
+  trackerTypeRegistration?: string;
+  trackerTypeRequest?: string;
+  trackerTypeSupport?: string;
+}
+
 export type HandlersPlatformUpdateSubscriptionPlanBodyFeatures = {[key: string]: boolean};
 
 export type HandlersPlatformUpdateSubscriptionPlanBodyLimits = {[key: string]: number};
@@ -697,6 +706,17 @@ export interface HandlersPlatformUpdateSubscriptionPlanBody {
   name?: string;
   nameEn?: string;
   price?: number;
+}
+
+export interface HandlersPublicLeadRequestBody {
+  company?: string;
+  email?: string;
+  locale?: string;
+  message?: string;
+  name?: string;
+  planCode?: string;
+  referrer?: string;
+  source?: string;
 }
 
 export interface HandlersRefreshResponse {

@@ -45,13 +45,14 @@ type SupportReportPlaneClient = SupportReportTicketClient
 
 // SupportReportService creates support reports and syncs status from the configured ticket backend.
 type SupportReportService struct {
-	repo           repository.SupportReportRepository
-	shareRepo      repository.SupportReportShareRepository
-	plane          SupportReportTicketClient
-	tracker        SupportReportTicketClient
-	createPlatform string
-	userRepo       repository.UserRepository
-	companyRepo    repository.CompanyRepository
+	repo               repository.SupportReportRepository
+	shareRepo          repository.SupportReportShareRepository
+	plane              SupportReportTicketClient
+	tracker            SupportReportTicketClient
+	deploymentSettings repository.DeploymentSaaSSettingsRepository
+	createPlatform     string
+	userRepo           repository.UserRepository
+	companyRepo        repository.CompanyRepository
 	// cancelComment is SUPPORT_REPORT_CANCEL_COMMENT (trimmed) or the default applicant-facing Russian line.
 	cancelComment string
 }
@@ -64,20 +65,22 @@ type supportReportTrackerAccessPatcher interface {
 // NewSupportReportService constructs SupportReportService.
 // createPlatform is models.TicketBackendPlane, models.TicketBackendYandexTracker, or SupportReportPlatformNone.
 // companyRepo may be nil (Yandex Tracker company field on create will be left empty).
-func NewSupportReportService(repo repository.SupportReportRepository, shareRepo repository.SupportReportShareRepository, plane, tracker SupportReportTicketClient, createPlatform string, userRepo repository.UserRepository, companyRepo repository.CompanyRepository) *SupportReportService {
+// deploymentSettings may be nil (tests); when set, support ticket queue/type can be read from DB with env fallback.
+func NewSupportReportService(repo repository.SupportReportRepository, shareRepo repository.SupportReportShareRepository, plane, tracker SupportReportTicketClient, deploymentSettings repository.DeploymentSaaSSettingsRepository, createPlatform string, userRepo repository.UserRepository, companyRepo repository.CompanyRepository) *SupportReportService {
 	cc := strings.TrimSpace(os.Getenv("SUPPORT_REPORT_CANCEL_COMMENT"))
 	if cc == "" {
 		cc = "Спасибо, что написали нам. Это обращение закрыто в QuokkaQ. Если снова понадобится помощь — обращайтесь, мы на связи."
 	}
 	return &SupportReportService{
-		repo:           repo,
-		shareRepo:      shareRepo,
-		plane:          plane,
-		tracker:        tracker,
-		createPlatform: createPlatform,
-		userRepo:       userRepo,
-		companyRepo:    companyRepo,
-		cancelComment:  cc,
+		repo:               repo,
+		shareRepo:          shareRepo,
+		plane:              plane,
+		tracker:            tracker,
+		deploymentSettings: deploymentSettings,
+		createPlatform:     createPlatform,
+		userRepo:           userRepo,
+		companyRepo:        companyRepo,
+		cancelComment:      cc,
 	}
 }
 
@@ -111,10 +114,33 @@ func (s *SupportReportService) reportMatchesConfiguredPlatform(row *models.Suppo
 	return normalizeTicketBackend(row.TicketBackend) == s.createPlatform
 }
 
+func (s *SupportReportService) yandexTrackerUsableForSupport() bool {
+	if s.tracker == nil {
+		return false
+	}
+	yt, ok := s.tracker.(*YandexTrackerClient)
+	if !ok {
+		return false
+	}
+	if !yt.CredentialsReady() {
+		return false
+	}
+	if s.deploymentSettings != nil {
+		st, err := s.deploymentSettings.Get()
+		if err != nil {
+			return false
+		}
+		if ResolveSupportTrackerQueue(st) != "" {
+			return true
+		}
+	}
+	return yt.Enabled()
+}
+
 func (s *SupportReportService) clientForBackend(backend string) SupportReportTicketClient {
 	switch normalizeTicketBackend(backend) {
 	case models.TicketBackendYandexTracker:
-		if s.tracker != nil && s.tracker.Enabled() {
+		if s.yandexTrackerUsableForSupport() {
 			return s.tracker
 		}
 	case models.TicketBackendPlane:
@@ -209,7 +235,32 @@ func (s *SupportReportService) Create(ctx context.Context, userID string, in Cre
 		}
 		extras.CompanyTrackerLabel = strings.TrimSpace(s.buildTrackerCompanyLabel(userID))
 	}
-	extID, seq, stateName, err := client.CreateWorkItem(ctx, row.ID, title, descPayload, extras)
+	var extID string
+	var seq *int
+	var stateName string
+	if s.createPlatform == models.TicketBackendYandexTracker {
+		yt, ok := client.(*YandexTrackerClient)
+		if !ok {
+			return nil, fmt.Errorf("support report: internal: expected Yandex Tracker client")
+		}
+		var st *models.DeploymentSaaSSettings
+		if s.deploymentSettings != nil {
+			var getErr error
+			st, getErr = s.deploymentSettings.Get()
+			if getErr != nil {
+				return nil, fmt.Errorf("%w: deployment settings: %v", ErrSupportReportPersistence, getErr)
+			}
+		}
+		queue := ResolveSupportTrackerQueue(st)
+		typeRaw := ""
+		if st != nil {
+			typeRaw = strings.TrimSpace(st.TrackerTypeSupport)
+		}
+		opts := YandexTrackerIssueCreateOpts{QueueKey: queue, TypeRaw: typeRaw}
+		extID, seq, stateName, err = yt.CreateWorkItemWithOpts(ctx, row.ID, title, descPayload, extras, opts)
+	} else {
+		extID, seq, stateName, err = client.CreateWorkItem(ctx, row.ID, title, descPayload, extras)
+	}
 	if err != nil {
 		logger.Printf("support report: CreateWorkItem failed after DB insert id=%s: %v", row.ID, err)
 		if delErr := s.repo.DeleteByID(row.ID); delErr != nil {

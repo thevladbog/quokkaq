@@ -26,5 +26,18 @@ export default defineConfig({
       ...marketingPublicFetchOutput,
       target: './lib/api/generated/subscriptions.ts'
     }
+  },
+  quokkaqMarketingLeads: {
+    input: {
+      target: '../backend/docs/swagger.json',
+      filters: {
+        mode: 'include',
+        tags: ['leads']
+      }
+    },
+    output: {
+      ...marketingPublicFetchOutput,
+      target: './lib/api/generated/leads.ts'
+    }
   }
 });

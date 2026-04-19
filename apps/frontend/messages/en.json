@@ -2169,8 +2169,30 @@
       "plans": "Plans",
       "invoices": "Invoices",
       "catalog": "Catalog",
+      "integrations": "Integrations",
       "backToApp": "Main app",
       "logout": "Log out"
+    },
+    "integrations": {
+      "title": "Integrations",
+      "subtitle": "Connect external systems",
+      "tabTracker": "Leads & signup",
+      "tabSupport": "Support",
+      "trackerIntro": "Yandex Tracker: queue and issue types for marketing leads and signup notifications.",
+      "leadsQueue": "Leads queue",
+      "leadsQueueHint": "Queue key for tickets created from the marketing site and registration flows. Also set YANDEX_TRACKER_LEADS_QUEUE when not using the database value.",
+      "typeRegistration": "Issue type — registration",
+      "typeRequest": "Issue type — request",
+      "typeError": "Issue type — error",
+      "typeHint": "Issue type key or numeric id. Leave empty to omit the type field when creating an issue.",
+      "supportIntro": "In-app support reports (SUPPORT_REPORT_PLATFORM=yandex_tracker): queue and optional issue type. Values here override YANDEX_TRACKER_QUEUE when set.",
+      "supportQueue": "Support queue",
+      "supportQueueHint": "Queue key for tickets created from support reports. If empty, the API uses YANDEX_TRACKER_QUEUE from the server environment.",
+      "typeSupport": "Issue type — support",
+      "save": "Save",
+      "saved": "Settings saved",
+      "loadError": "Could not load integration settings.",
+      "saveError": "Could not save settings."
     },
     "overview": {
       "title": "Platform",
@@ -2566,7 +2588,8 @@
     "statistics": "Statistics - QuokkaQ",
     "help": "Help - QuokkaQ",
     "platform": {
-      "root": "Platform - QuokkaQ"
+      "root": "Platform - QuokkaQ",
+      "integrations": "Integrations - QuokkaQ"
     },
     "workstations": "Workstations - QuokkaQ"
   },

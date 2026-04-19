@@ -10,6 +10,7 @@ import {
 
 import type { AppLocale, HomeMessages } from '@/src/messages';
 import { formatPricingRowLabel } from '@/lib/format-pricing-row-label';
+import { LeadRequestCta } from '@/components/landing/lead-request-cta';
 
 function intlLocaleFromAppLocale(locale: AppLocale): string {
   return locale === 'ru' ? 'ru-RU' : 'en-US';
@@ -34,9 +35,6 @@ export function LandingPricing({
     (p) => p.isPublic !== false && p.isActive !== false
   );
   const useApi = apiPlans.length > 0;
-  const contactHref = appBaseUrl
-    ? `${appBaseUrl}/${locale}/contact`
-    : 'mailto:sales@quokkaq.com';
 
   return (
     <section
@@ -67,17 +65,11 @@ export function LandingPricing({
                 const sellable =
                   !isCustom && plan.allowInstantPurchase !== false;
                 const href = (() => {
-                  if (appBaseUrl) {
-                    if (!sellable) {
-                      return contactHref;
-                    }
-                    if (plan.price > 0) {
-                      return `${appBaseUrl}/${locale}/signup?plan=${encodeURIComponent(plan.code)}`;
-                    }
-                    return `${appBaseUrl}/${locale}/register`;
+                  if (appBaseUrl && sellable) {
+                    return `${appBaseUrl}/${locale}/signup?plan=${encodeURIComponent(plan.code)}`;
                   }
                   if (!sellable) {
-                    return contactHref;
+                    return '';
                   }
                   return `/${locale}/docs`;
                 })();
@@ -177,17 +169,34 @@ export function LandingPricing({
                       ))}
                     </ul>
 
-                    <Link
-                      href={href}
-                      prefetch={false}
-                      className={`focus-ring relative mt-auto inline-flex w-full items-center justify-center rounded-xl px-6 py-3 font-semibold transition ${
-                        isPopular
-                          ? 'z-[3] min-h-12 bg-gradient-to-r from-[color:var(--color-primary)] to-[color:var(--color-primary-hover)] text-base font-bold text-white shadow-lg shadow-[color:var(--color-primary)]/35 hover:from-[color:var(--color-primary-hover)] hover:to-[color:var(--color-primary-hover)] hover:shadow-xl hover:shadow-[color:var(--color-primary)]/45'
-                          : 'z-[1] min-h-11 border-2 border-[color:var(--color-border)] bg-[color:var(--color-surface)] text-sm text-[color:var(--color-text)] hover:border-[color:var(--color-primary)] hover:text-[color:var(--color-primary)]'
-                      }`}
-                    >
-                      {ctaLabel}
-                    </Link>
+                    {sellable ? (
+                      <Link
+                        href={href}
+                        prefetch={false}
+                        className={`focus-ring relative mt-auto inline-flex w-full items-center justify-center rounded-xl px-6 py-3 font-semibold transition ${
+                          isPopular
+                            ? 'z-[3] min-h-12 bg-gradient-to-r from-[color:var(--color-primary)] to-[color:var(--color-primary-hover)] text-base font-bold text-white shadow-lg shadow-[color:var(--color-primary)]/35 hover:from-[color:var(--color-primary-hover)] hover:to-[color:var(--color-primary-hover)] hover:shadow-xl hover:shadow-[color:var(--color-primary)]/45'
+                            : 'z-[1] min-h-11 border-2 border-[color:var(--color-border)] bg-[color:var(--color-surface)] text-sm text-[color:var(--color-text)] hover:border-[color:var(--color-primary)] hover:text-[color:var(--color-primary)]'
+                        }`}
+                      >
+                        {ctaLabel}
+                      </Link>
+                    ) : (
+                      <LeadRequestCta
+                        locale={locale}
+                        source={`pricing_plan_${plan.code}`}
+                        lead={copy.leadForm}
+                        appBaseUrl={appBaseUrl}
+                        planCode={plan.code}
+                        className={`focus-ring relative mt-auto inline-flex w-full items-center justify-center rounded-xl px-6 py-3 font-semibold transition ${
+                          isPopular
+                            ? 'z-[3] min-h-12 bg-gradient-to-r from-[color:var(--color-primary)] to-[color:var(--color-primary-hover)] text-base font-bold text-white shadow-lg shadow-[color:var(--color-primary)]/35 hover:from-[color:var(--color-primary-hover)] hover:to-[color:var(--color-primary-hover)] hover:shadow-xl hover:shadow-[color:var(--color-primary)]/45'
+                            : 'z-[1] min-h-11 border-2 border-[color:var(--color-border)] bg-[color:var(--color-surface)] text-sm text-[color:var(--color-text)] hover:border-[color:var(--color-primary)] hover:text-[color:var(--color-primary)]'
+                        }`}
+                      >
+                        {ctaLabel}
+                      </LeadRequestCta>
+                    )}
 
                     {isPopular && (
                       <div
@@ -327,9 +336,11 @@ export function LandingPricing({
                 </p>
               </div>
             </div>
-            <Link
-              href={contactHref}
-              prefetch={false}
+            <LeadRequestCta
+              locale={locale}
+              source='pricing_custom_terms'
+              lead={copy.leadForm}
+              appBaseUrl={appBaseUrl}
               className='focus-ring group inline-flex min-h-12 w-full shrink-0 items-center justify-center gap-2 self-center rounded-xl bg-[color:var(--color-primary)] px-7 py-3.5 text-base font-semibold text-white shadow-lg shadow-[color:var(--color-primary)]/35 transition hover:bg-[color:var(--color-primary-hover)] hover:shadow-xl hover:shadow-[color:var(--color-primary)]/40 sm:w-auto sm:self-stretch sm:px-8 lg:self-center'
             >
               <span>{copy.pricingFromApi.requestQuote}</span>
@@ -347,7 +358,7 @@ export function LandingPricing({
                   d='M13 7l5 5m0 0l-5 5m5-5H6'
                 />
               </svg>
-            </Link>
+            </LeadRequestCta>
           </div>
         </div>
       </div>

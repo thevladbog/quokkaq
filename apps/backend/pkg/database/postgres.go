@@ -1538,6 +1538,26 @@ func RunVersionedMigrations(models ...interface{}) error {
 		return fmt.Errorf("failed to run v1.3.8_desktop_terminal_kind_counter_normalize migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.3.9_deployment_saas_settings", func(db *gorm.DB) error {
+		if err := db.AutoMigrate(&dbmodels.DeploymentSaaSSettings{}); err != nil {
+			return err
+		}
+		return db.Exec(`
+			INSERT INTO deployment_saas_settings (id) VALUES ('default')
+			ON CONFLICT (id) DO NOTHING
+		`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.3.9_deployment_saas_settings migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.3.10_deployment_saas_support_tracker", func(db *gorm.DB) error {
+		return db.AutoMigrate(&dbmodels.DeploymentSaaSSettings{})
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.3.10_deployment_saas_support_tracker migration: %w", err)
+	}
+
 	fmt.Println("✅ All migrations completed successfully")
 	return nil
 }

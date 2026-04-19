@@ -22,6 +22,15 @@ import {
 import { intlLocaleFromAppLocale } from '@/lib/format-datetime';
 import type { SubscriptionPlan } from '@quokkaq/shared-types';
 
+/** Opens marketing footer CTA anchor where the lead request modal can be triggered (see NEXT_PUBLIC_MARKETING_URL). */
+function marketingContactHref(locale: string): string {
+  const base = process.env.NEXT_PUBLIC_MARKETING_URL?.trim().replace(/\/$/, '');
+  if (base) {
+    return `${base}/${locale}#book-demo`;
+  }
+  return 'mailto:sales@quokkaq.com';
+}
+
 export async function generateMetadata({
   params
 }: {
@@ -330,10 +339,8 @@ async function PricingCardApi({
           <Link
             href={
               salesOnly
-                ? `/${locale}/contact`
-                : showPaidPrice
-                  ? `/${locale}/signup?plan=${encodeURIComponent(plan.code)}`
-                  : `/${locale}/register`
+                ? marketingContactHref(locale)
+                : `/${locale}/signup?plan=${encodeURIComponent(plan.code)}`
             }
           >
             {salesOnly
@@ -423,7 +430,7 @@ async function PricingCardLegacy({
             href={
               plan.price != null
                 ? `/${locale}/signup?plan=${encodeURIComponent(plan.code)}`
-                : `/${locale}/contact`
+                : marketingContactHref(locale)
             }
           >
             {plan.price != null ? t('startTrial') : t('contactUs')}

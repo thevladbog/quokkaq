@@ -1,5 +1,6 @@
 import Link from 'next/link';
 
+import { LeadRequestCta } from '@/components/landing/lead-request-cta';
 import { TextLogoImg } from '@/components/landing/text-logo-img';
 import type { AppLocale, HomeMessages } from '@/src/messages';
 
@@ -18,9 +19,7 @@ const pillSecondaryClass =
 
 export function LandingFooterCta({ locale, copy, appBaseUrl }: Props) {
   const year = new Date().getFullYear();
-  const salesHref = appBaseUrl
-    ? `${appBaseUrl}/${locale}/contact`
-    : 'mailto:sales@quokkaq.com';
+  const salesHref = 'mailto:sales@quokkaq.com';
   /** Without app URL, keep the primary trial CTA (`copy.footer.cta`) on a conversion path — not docs. */
   const trialHref = appBaseUrl
     ? `${appBaseUrl}/${locale}/signup`
@@ -61,14 +60,15 @@ export function LandingFooterCta({ locale, copy, appBaseUrl }: Props) {
               </Link>
             )}
             {appBaseUrl ? (
-              <a
-                href={salesHref}
-                target='_blank'
-                rel='noopener noreferrer'
+              <LeadRequestCta
+                locale={locale}
+                source='footer_secondary'
+                lead={copy.leadForm}
+                appBaseUrl={appBaseUrl}
                 className={pillSecondaryClass}
               >
                 {copy.footer.ctaSecondary}
-              </a>
+              </LeadRequestCta>
             ) : (
               <a href={salesHref} className={pillSecondaryClass}>
                 {copy.footer.ctaSecondary}

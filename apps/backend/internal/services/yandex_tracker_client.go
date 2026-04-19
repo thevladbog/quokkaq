@@ -130,6 +130,17 @@ func (c *YandexTrackerClient) trackerAPIRequestURL(absPath string) (string, erro
 }
 
 func (c *YandexTrackerClient) yandexTrackerIntegrationReady() (ok bool, reason string) {
+	if ok, r := c.yandexTrackerCredentialsReady(); !ok {
+		return false, r
+	}
+	if strings.TrimSpace(c.queueKey) == "" {
+		return false, "YANDEX_TRACKER_QUEUE is missing or empty"
+	}
+	return true, ""
+}
+
+// yandexTrackerCredentialsReady is true when org/token/base are set; does not require default queue.
+func (c *YandexTrackerClient) yandexTrackerCredentialsReady() (ok bool, reason string) {
 	if c == nil {
 		return false, "internal: Yandex Tracker client is nil"
 	}
@@ -138,9 +149,6 @@ func (c *YandexTrackerClient) yandexTrackerIntegrationReady() (ok bool, reason s
 	}
 	if strings.TrimSpace(c.orgID) == "" {
 		return false, "YANDEX_TRACKER_ORG_ID is missing or empty"
-	}
-	if strings.TrimSpace(c.queueKey) == "" {
-		return false, "YANDEX_TRACKER_QUEUE is missing or empty"
 	}
 	if c.iam != nil {
 		if !c.iam.keyFileOK() {
@@ -154,7 +162,13 @@ func (c *YandexTrackerClient) yandexTrackerIntegrationReady() (ok bool, reason s
 	return true, ""
 }
 
-// Enabled is true when required settings are present.
+// CredentialsReady is true when Tracker API auth and org are configured (queue may be supplied per request).
+func (c *YandexTrackerClient) CredentialsReady() bool {
+	ok, _ := c.yandexTrackerCredentialsReady()
+	return ok
+}
+
+// Enabled is true when required settings are present for the default support queue flow.
 func (c *YandexTrackerClient) Enabled() bool {
 	ok, _ := c.yandexTrackerIntegrationReady()
 	return ok
@@ -262,18 +276,28 @@ const (
 	yandexTrackerFieldCompany            = "company"
 )
 
-// CreateWorkItem creates a Tracker issue; descriptionPayload should be markdown when using markupType md.
-// extras populate optional Tracker local fields (apiAccessToTheTicket, applicantsEmailApi, company).
-func (c *YandexTrackerClient) CreateWorkItem(ctx context.Context, externalID, title, descriptionPayload string, extras SupportReportTicketCreateExtras) (workItemID string, sequenceID *int, stateName string, err error) {
-	if !c.Enabled() {
-		return "", nil, "", fmt.Errorf("yandex tracker integration is not configured")
+// YandexTrackerIssueCreateOpts optional per-request queue and issue type (Tracker "type" field).
+// TypeRaw: empty after trim omits "type" from the JSON body; numeric string uses issue type id.
+type YandexTrackerIssueCreateOpts struct {
+	QueueKey string
+	TypeRaw  string
+}
+
+func appendYandexTrackerIssueTypeField(payload map[string]interface{}, typeRaw string) {
+	t := strings.TrimSpace(typeRaw)
+	if t == "" {
+		return
 	}
-	u, err := c.trackerAPIRequestURL("/v3/issues/")
-	if err != nil {
-		return "", nil, "", err
+	if n, err := strconv.ParseInt(t, 10, 64); err == nil && strings.TrimSpace(typeRaw) == strconv.FormatInt(n, 10) {
+		payload["type"] = n
+		return
 	}
+	payload["type"] = t
+}
+
+func (c *YandexTrackerClient) buildIssueCreatePayload(queueKey, externalID, title, descriptionPayload string, extras SupportReportTicketCreateExtras, typeRaw string) map[string]interface{} {
 	payload := map[string]interface{}{
-		"queue":       c.queueKey,
+		"queue":       queueKey,
 		"summary":     title,
 		"description": descriptionPayload,
 		"markupType":  "md",
@@ -289,6 +313,15 @@ func (c *YandexTrackerClient) CreateWorkItem(ctx context.Context, externalID, ti
 	}
 	if strings.TrimSpace(externalID) != "" {
 		payload["unique"] = externalID
+	}
+	appendYandexTrackerIssueTypeField(payload, typeRaw)
+	return payload
+}
+
+func (c *YandexTrackerClient) postCreateIssue(ctx context.Context, payload map[string]interface{}) (workItemID string, sequenceID *int, stateName string, err error) {
+	u, err := c.trackerAPIRequestURL("/v3/issues/")
+	if err != nil {
+		return "", nil, "", err
 	}
 	buf, err := json.Marshal(payload)
 	if err != nil {
@@ -321,8 +354,34 @@ func (c *YandexTrackerClient) CreateWorkItem(ctx context.Context, externalID, ti
 	return iss.Key, seq, strings.TrimSpace(iss.Status.Display), nil
 }
 
-func (c *YandexTrackerClient) issueGETBytes(ctx context.Context, workItemID string) ([]byte, error) {
+// CreateWorkItem creates a Tracker issue; descriptionPayload should be markdown when using markupType md.
+// extras populate optional Tracker local fields (apiAccessToTheTicket, applicantsEmailApi, company).
+func (c *YandexTrackerClient) CreateWorkItem(ctx context.Context, externalID, title, descriptionPayload string, extras SupportReportTicketCreateExtras) (workItemID string, sequenceID *int, stateName string, err error) {
 	if !c.Enabled() {
+		return "", nil, "", fmt.Errorf("yandex tracker integration is not configured")
+	}
+	payload := c.buildIssueCreatePayload(c.queueKey, externalID, title, descriptionPayload, extras, "")
+	return c.postCreateIssue(ctx, payload)
+}
+
+// CreateWorkItemWithOpts creates an issue with optional queue and type overrides (for leads / non-support flows).
+func (c *YandexTrackerClient) CreateWorkItemWithOpts(ctx context.Context, externalID, title, descriptionPayload string, extras SupportReportTicketCreateExtras, opts YandexTrackerIssueCreateOpts) (workItemID string, sequenceID *int, stateName string, err error) {
+	if !c.CredentialsReady() {
+		return "", nil, "", fmt.Errorf("yandex tracker integration is not configured")
+	}
+	queue := strings.TrimSpace(opts.QueueKey)
+	if queue == "" {
+		queue = strings.TrimSpace(c.queueKey)
+	}
+	if queue == "" {
+		return "", nil, "", fmt.Errorf("yandex tracker: queue is required")
+	}
+	payload := c.buildIssueCreatePayload(queue, externalID, title, descriptionPayload, extras, opts.TypeRaw)
+	return c.postCreateIssue(ctx, payload)
+}
+
+func (c *YandexTrackerClient) issueGETBytes(ctx context.Context, workItemID string) ([]byte, error) {
+	if !c.CredentialsReady() {
 		return nil, fmt.Errorf("yandex tracker integration is not configured")
 	}
 	workItemID = strings.TrimSpace(workItemID)
@@ -508,7 +567,7 @@ type ytCommentWire struct {
 
 // ListComments returns issue comments from Tracker (newest last or as returned by API; caller may sort).
 func (c *YandexTrackerClient) ListComments(ctx context.Context, workItemID string) ([]YandexTrackerIssueComment, error) {
-	if !c.Enabled() {
+	if !c.CredentialsReady() {
 		return nil, fmt.Errorf("yandex tracker integration is not configured")
 	}
 	workItemID = strings.TrimSpace(workItemID)
@@ -602,7 +661,7 @@ func (c *YandexTrackerClient) ListComments(ctx context.Context, workItemID strin
 
 // AddComment posts a standard comment on the issue (id or key).
 func (c *YandexTrackerClient) AddComment(ctx context.Context, workItemID, text string) error {
-	if !c.Enabled() {
+	if !c.CredentialsReady() {
 		return fmt.Errorf("yandex tracker integration is not configured")
 	}
 	workItemID = strings.TrimSpace(workItemID)

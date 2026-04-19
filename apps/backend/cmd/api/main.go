@@ -129,6 +129,7 @@ func run() error {
 			&models.StatisticsDailyBucket{},
 			&models.StatisticsSurveyDaily{},
 			&models.SupportReport{},
+			&models.DeploymentSaaSSettings{},
 		)
 		if err != nil {
 			logger.Error("failed to run migrations", "err", err)
@@ -176,7 +177,10 @@ func run() error {
 	userService := services.NewUserService(userRepo)
 	mailService := services.NewMailService()
 	tenantRBACRepo := repository.NewTenantRBACRepository()
-	authService, err := services.NewAuthService(userRepo, companyRepo, mailService, subscriptionRepo, tenantRBACRepo)
+	deploymentSaaSSettingsRepo := repository.NewDeploymentSaaSSettingsRepository()
+	trackerClient := services.NewYandexTrackerClientFromEnv()
+	leadIssueService := services.NewLeadIssueService(deploymentSaaSSettingsRepo, trackerClient)
+	authService, err := services.NewAuthService(userRepo, companyRepo, mailService, subscriptionRepo, tenantRBACRepo, leadIssueService)
 	if err != nil {
 		logger.Error("auth service", "err", err)
 		return fmt.Errorf("auth service: %w", err)
@@ -237,7 +241,9 @@ func run() error {
 	quotaService := services.NewQuotaService()
 
 	userHandler := handlers.NewUserHandler(userService)
-	authHandler := handlers.NewAuthHandler(authService, userService, userRepo, tenantRBACRepo)
+	authHandler := handlers.NewAuthHandler(authService, userService, userRepo, tenantRBACRepo, leadIssueService)
+	integrationsHandler := handlers.NewIntegrationsHandler(deploymentSaaSSettingsRepo)
+	leadHandler := handlers.NewLeadHandler(leadIssueService)
 	ssoHandler := handlers.NewSSOHandler(ssoService)
 	companySSOHTTP := handlers.NewCompanySSOHTTP(ssoService, userRepo, companyRepo)
 	tenantRBACHTTP := handlers.NewTenantRBACHTTP(tenantRBACRepo, userRepo, ssoService)
@@ -266,9 +272,8 @@ func run() error {
 	supportReportRepo := repository.NewSupportReportRepository()
 	supportReportShareRepo := repository.NewSupportReportShareRepository()
 	planeClient := services.NewPlaneClientFromEnv()
-	trackerClient := services.NewYandexTrackerClientFromEnv()
 	supportReportCreatePlatform := services.ParseSupportReportCreatePlatform()
-	supportReportService := services.NewSupportReportService(supportReportRepo, supportReportShareRepo, planeClient, trackerClient, supportReportCreatePlatform, userRepo, companyRepo)
+	supportReportService := services.NewSupportReportService(supportReportRepo, supportReportShareRepo, planeClient, trackerClient, deploymentSaaSSettingsRepo, supportReportCreatePlatform, userRepo, companyRepo)
 	supportReportHandler := handlers.NewSupportReportHandler(supportReportService)
 
 	var paymentProvider services.PaymentProvider
@@ -333,6 +338,8 @@ func run() error {
 		allowedOrigins = []string{
 			"http://localhost:3000",
 			"http://127.0.0.1:3000",
+			"http://localhost:3010",
+			"http://127.0.0.1:3010",
 			"http://localhost:3001",
 			"http://127.0.0.1:3001",
 			"https://quokkaq.v-b.tech",
@@ -364,6 +371,7 @@ func run() error {
 	r.Route("/public", func(r chi.Router) {
 		r.Use(authmiddleware.SSOPublicRateLimit)
 		r.Get("/tenants/{slug}", ssoHandler.PublicTenant)
+		r.Post("/leads/request", leadHandler.PostPublicLeadRequest)
 	})
 
 	r.Get("/ws", func(w http.ResponseWriter, r *http.Request) {
@@ -738,6 +746,8 @@ func run() error {
 		r.Use(authmiddleware.JWTAuth)
 		r.Use(authmiddleware.RequirePlatformAdmin(userRepo))
 		r.Get("/features", platformHandler.GetFeatures)
+		r.Get("/integrations", integrationsHandler.GetPlatformIntegrations)
+		r.Patch("/integrations", integrationsHandler.PatchPlatformIntegrations)
 		r.Get("/saas-operator-company", platformHandler.GetSaaSOperatorCompany)
 		r.Get("/companies", platformHandler.ListCompanies)
 		r.Get("/companies/{id}", platformHandler.GetCompany)

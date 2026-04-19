@@ -2169,8 +2169,30 @@
       "plans": "Тарифы",
       "invoices": "Счета",
       "catalog": "Номенклатура",
+      "integrations": "Интеграции",
       "backToApp": "В приложение",
       "logout": "Выйти"
+    },
+    "integrations": {
+      "title": "Интеграции",
+      "subtitle": "Подключение внешних систем",
+      "tabTracker": "Заявки и регистрация",
+      "tabSupport": "Поддержка",
+      "trackerIntro": "Яндекс Трекер: очередь и типы задач для заявок с маркетинга и уведомлений о регистрации.",
+      "leadsQueue": "Очередь для заявок",
+      "leadsQueueHint": "Ключ очереди для тикетов с маркетингового сайта и при регистрации. При пустом значении в БД можно задать YANDEX_TRACKER_LEADS_QUEUE.",
+      "typeRegistration": "Тип задачи — регистрация",
+      "typeRequest": "Тип задачи — заявка",
+      "typeError": "Тип задачи — ошибка",
+      "typeHint": "Ключ типа задачи или числовой id. Оставьте пустым, чтобы не передавать поле type при создании.",
+      "supportIntro": "Обращения из приложения (SUPPORT_REPORT_PLATFORM=yandex_tracker): очередь и необязательный тип задачи. Ненулевые значения здесь заменяют YANDEX_TRACKER_QUEUE.",
+      "supportQueue": "Очередь поддержки",
+      "supportQueueHint": "Ключ очереди для тикетов из обращений поддержки. Если пусто, API берёт YANDEX_TRACKER_QUEUE из окружения сервера.",
+      "typeSupport": "Тип задачи — поддержка",
+      "save": "Сохранить",
+      "saved": "Настройки сохранены",
+      "loadError": "Не удалось загрузить настройки интеграций.",
+      "saveError": "Не удалось сохранить настройки."
     },
     "overview": {
       "title": "Платформа",
@@ -2566,7 +2588,8 @@
     "statistics": "Статистика - QuokkaQ",
     "help": "Справка - QuokkaQ",
     "platform": {
-      "root": "Платформа - QuokkaQ"
+      "root": "Платформа - QuokkaQ",
+      "integrations": "Интеграции - QuokkaQ"
     },
     "workstations": "Рабочие места - QuokkaQ"
   },

@@ -18,7 +18,8 @@ import {
   FileText,
   Home,
   Layers,
-  Package
+  Package,
+  Plug
 } from 'lucide-react';
 import Image from 'next/image';
 import { Link, usePathname } from '@/src/i18n/navigation';
@@ -34,6 +35,12 @@ export default function PlatformSidebar() {
   const t = useTranslations('platform.nav');
 
   const items = [
+    {
+      href: '/platform/integrations',
+      label: t('integrations', { defaultValue: 'Integrations' }),
+      icon: Plug,
+      match: (p: string) => p.includes('/platform/integrations')
+    },
     {
       href: '/platform',
       label: t('overview', { defaultValue: 'Overview' }),

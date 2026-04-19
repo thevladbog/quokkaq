@@ -73,6 +73,7 @@ type authService struct {
 	mailService      MailService
 	subscriptionRepo repository.SubscriptionRepository
 	tenantRBAC       repository.TenantRBACRepository
+	leadIssues       *LeadIssueService
 }
 
 func NewAuthService(
@@ -81,6 +82,7 @@ func NewAuthService(
 	mailService MailService,
 	subscriptionRepo repository.SubscriptionRepository,
 	tenantRBAC repository.TenantRBACRepository,
+	leadIssues *LeadIssueService,
 ) (AuthService, error) {
 	if tenantRBAC == nil {
 		return nil, ErrTenantRBACNotConfigured
@@ -91,6 +93,7 @@ func NewAuthService(
 		mailService:      mailService,
 		subscriptionRepo: subscriptionRepo,
 		tenantRBAC:       tenantRBAC,
+		leadIssues:       leadIssues,
 	}, nil
 }
 
@@ -403,6 +406,9 @@ func (s *authService) Signup(name, email, password, companyName, planCode string
 	})
 	if err != nil {
 		return nil, err
+	}
+	if s.leadIssues != nil {
+		s.leadIssues.NotifyTrialRegistration(context.Background(), company.Name, company.Slug, name, email, plan.Code)
 	}
 	return pair, nil
 }
