@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useRouter, Link } from '@/src/i18n/navigation';
 import Image from 'next/image';
@@ -96,9 +96,16 @@ export default function LoginPage() {
   const [companySearch, setCompanySearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [ssoErrorCode, setSsoErrorCode] = useState<SSOErrorCode | null>(null);
+  const legacySessionRecoveryAttemptedRef = useRef(false);
   const router = useRouter();
   const loginMutation = useLogin();
-  const { login } = useAuthContext();
+  const {
+    login,
+    isAuthenticated,
+    user,
+    token,
+    isLoading: isAuthLoading
+  } = useAuthContext();
   const { setActiveCompanyId } = useActiveCompany();
 
   const effectiveSlug = useMemo(
@@ -227,6 +234,45 @@ export default function LoginPage() {
 
   const showSsoButton = hintSso || ssoAvailableFromPublicTenant;
 
+  const sessionResolving = Boolean(token && !user);
+
+  useEffect(() => {
+    if (ssoErrorCode) return;
+    if (isAuthenticated && user) {
+      router.replace('/');
+    }
+  }, [isAuthenticated, user, router, ssoErrorCode]);
+
+  /** If initial GET /auth/me failed (e.g. transient error) but legacy access_token remains, retry via login(). */
+  useEffect(() => {
+    if (ssoErrorCode) return;
+    if (isAuthLoading || sessionResolving) return;
+    if (isAuthenticated && user) return;
+    if (legacySessionRecoveryAttemptedRef.current) return;
+    if (typeof window === 'undefined') return;
+    const at = localStorage.getItem('access_token')?.trim();
+    if (!at) return;
+    legacySessionRecoveryAttemptedRef.current = true;
+    void login(at).catch(() => {
+      legacySessionRecoveryAttemptedRef.current = false;
+    });
+  }, [
+    isAuthLoading,
+    sessionResolving,
+    isAuthenticated,
+    user,
+    login,
+    ssoErrorCode
+  ]);
+
+  if (isAuthLoading || sessionResolving || (isAuthenticated && user)) {
+    return (
+      <div className='bg-background flex min-h-dvh items-center justify-center'>
+        <Loader2 className='text-primary h-8 w-8 animate-spin' />
+      </div>
+    );
+  }
+
   const startSso = () => {
     if (!effectiveSlug) {
       toast.error(t('tenantSlug'));
@@ -278,7 +324,7 @@ export default function LoginPage() {
         if (companies.length === 1 && companies[0].id) {
           setActiveCompanyId(companies[0].id);
         }
-        router.push('/');
+        router.replace('/');
       }
     } catch (error) {
       logger.error('Login failed:', error);
@@ -292,7 +338,7 @@ export default function LoginPage() {
       return;
     }
     setActiveCompanyId(c.id);
-    router.push('/');
+    router.replace('/');
   };
 
   return (
