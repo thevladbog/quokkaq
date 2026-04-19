@@ -125,7 +125,7 @@ func (h *StatisticsHandler) GetTimeseries(w http.ResponseWriter, r *http.Request
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	user, err := h.userRepo.FindByID(viewerID)
+	user, err := h.userRepo.FindByID(r.Context(), viewerID)
 	if err != nil {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
@@ -186,7 +186,7 @@ func (h *StatisticsHandler) GetSLADeviations(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	user, err := h.userRepo.FindByID(viewerID)
+	user, err := h.userRepo.FindByID(r.Context(), viewerID)
 	if err != nil {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
@@ -242,7 +242,7 @@ func (h *StatisticsHandler) GetSurveyScores(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	user, err := h.userRepo.FindByID(viewerID)
+	user, err := h.userRepo.FindByID(r.Context(), viewerID)
 	if err != nil {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
@@ -303,7 +303,7 @@ func (h *StatisticsHandler) GetLoad(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	user, err := h.userRepo.FindByID(viewerID)
+	user, err := h.userRepo.FindByID(r.Context(), viewerID)
 	if err != nil {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
@@ -358,7 +358,7 @@ func (h *StatisticsHandler) GetUtilization(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	user, err := h.userRepo.FindByID(viewerID)
+	user, err := h.userRepo.FindByID(r.Context(), viewerID)
 	if err != nil {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
@@ -414,7 +414,7 @@ func (h *StatisticsHandler) GetTicketsByService(w http.ResponseWriter, r *http.R
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	user, err := h.userRepo.FindByID(viewerID)
+	user, err := h.userRepo.FindByID(r.Context(), viewerID)
 	if err != nil {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
@@ -471,7 +471,7 @@ func (h *StatisticsHandler) GetSlaSummary(w http.ResponseWriter, r *http.Request
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	user, err := h.userRepo.FindByID(viewerID)
+	user, err := h.userRepo.FindByID(r.Context(), viewerID)
 	if err != nil {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
@@ -525,7 +525,7 @@ func (h *StatisticsHandler) GetEmployeeRadar(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	user, err := h.userRepo.FindByID(viewerID)
+	user, err := h.userRepo.FindByID(r.Context(), viewerID)
 	if err != nil {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return

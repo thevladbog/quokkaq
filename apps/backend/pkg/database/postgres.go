@@ -1384,6 +1384,68 @@ func RunVersionedMigrations(models ...interface{}) error {
 		return fmt.Errorf("failed to run v1.3.1_system_tenant_admin_role migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.3.2_company_sso_group_mappings_xor_timestamps", func(db *gorm.DB) error {
+		if err := db.Exec(`
+			ALTER TABLE company_sso_group_mappings
+			ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			ALTER TABLE company_sso_group_mappings
+			ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		`).Error; err != nil {
+			return err
+		}
+		// Normalize empty strings so XOR matches intent.
+		if err := db.Exec(`
+			UPDATE company_sso_group_mappings
+			SET tenant_role_id = NULL
+			WHERE tenant_role_id IS NOT NULL AND length(btrim(tenant_role_id::text)) = 0
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			UPDATE company_sso_group_mappings
+			SET legacy_role_name = NULL
+			WHERE legacy_role_name IS NOT NULL AND length(btrim(legacy_role_name)) = 0
+		`).Error; err != nil {
+			return err
+		}
+		// Invalid: no target.
+		if err := db.Exec(`
+			DELETE FROM company_sso_group_mappings
+			WHERE tenant_role_id IS NULL AND legacy_role_name IS NULL
+		`).Error; err != nil {
+			return err
+		}
+		// Both set: prefer tenant role (IdP RBAC); drop legacy so CHECK passes.
+		if err := db.Exec(`
+			UPDATE company_sso_group_mappings
+			SET legacy_role_name = NULL
+			WHERE tenant_role_id IS NOT NULL AND legacy_role_name IS NOT NULL
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			ALTER TABLE company_sso_group_mappings
+			DROP CONSTRAINT IF EXISTS chk_company_sso_group_mappings_tenant_xor_legacy
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			ALTER TABLE company_sso_group_mappings
+			ADD CONSTRAINT chk_company_sso_group_mappings_tenant_xor_legacy
+			CHECK ((tenant_role_id IS NOT NULL) <> (legacy_role_name IS NOT NULL))
+		`).Error; err != nil {
+			return err
+		}
+		return db.AutoMigrate(&dbmodels.CompanySSOGroupMapping{})
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.3.2_company_sso_group_mappings_xor_timestamps migration: %w", err)
+	}
+
 	fmt.Println("✅ All migrations completed successfully")
 	return nil
 }

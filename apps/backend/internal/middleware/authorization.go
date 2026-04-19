@@ -76,23 +76,14 @@ func RequireAdmin(userRepo repository.UserRepository) func(http.Handler) http.Ha
 	}
 }
 
-// RequireAdminOrTenantPermission allows global role "admin" users, or users who have the given tenant RBAC
-// permission on at least one unit in the resolved company (see X-Company-Id).
+// RequireAdminOrTenantPermission allows global role "admin" users who have resolved tenant context, or users who have the given tenant RBAC
+// permission on at least one unit in the resolved company (see X-Company-Id). Company resolution runs first so global admins cannot skip tenant checks.
 func RequireAdminOrTenantPermission(userRepo repository.UserRepository, tr repository.TenantRBACRepository, permission string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			userID, ok := GetUserIDFromContext(r.Context())
 			if !ok {
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
-				return
-			}
-			allowed, err := userRepo.IsAdmin(userID)
-			if err != nil {
-				http.Error(w, "Internal server error", http.StatusInternalServerError)
-				return
-			}
-			if allowed {
-				next.ServeHTTP(w, r)
 				return
 			}
 			cid, err := userRepo.ResolveCompanyIDForRequest(userID, r.Header.Get("X-Company-Id"))
@@ -106,6 +97,15 @@ func RequireAdminOrTenantPermission(userRepo repository.UserRepository, tr repos
 					return
 				}
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+			allowed, err := userRepo.IsAdmin(userID)
+			if err != nil {
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+			if allowed {
+				next.ServeHTTP(w, r)
 				return
 			}
 			okPerm, err := tr.UserHasPermissionInCompany(userID, cid, permission)

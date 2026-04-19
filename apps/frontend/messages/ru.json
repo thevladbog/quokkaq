@@ -526,7 +526,9 @@
       "sso_external_saved": "Внешняя идентичность обновлена",
       "sso_external_not_found": "Для этого пользователя нет записи внешней идентичности SSO.",
       "sso_external_error": "Не удалось обновить внешнюю идентичность",
-      "sso_external_empty": "Заполните хотя бы одно поле."
+      "sso_external_empty": "Заполните хотя бы одно поле.",
+      "sso_external_loading": "Загрузка идентичности…",
+      "sso_external_fetch_error": "Не удалось загрузить внешнюю идентичность."
     },
     "reports": {
       "title": "Отчеты",

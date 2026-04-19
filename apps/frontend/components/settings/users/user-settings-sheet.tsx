@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import type { Unit, User } from '@quokkaq/shared-types';
@@ -37,10 +37,12 @@ import {
   useUserUnits
 } from '@/lib/hooks';
 import {
+  getGetExternalIdentityQueryKey,
   useCompaniesMeSSOGet,
-  useGetCompaniesMeTenantRoles,
-  usePatchCompaniesMeUsersUserIdExternalIdentity,
-  usePatchCompaniesMeUsersUserIdSsoDirectory
+  useGetExternalIdentity,
+  useListTenantRoles,
+  usePatchExternalIdentity,
+  usePatchUserSSOFlags
 } from '@/lib/api/generated/auth';
 import { UNIT_PERMISSIONS } from '@/lib/unit-permissions';
 import { cn } from '@/lib/utils';
@@ -71,6 +73,15 @@ function UserSettingsSheetBody({
   const locale = useLocale();
   const qc = useQueryClient();
   const { data: currentUser } = useCurrentUser();
+  const viewerIsGlobalAdmin = currentUser?.roles?.includes('admin');
+  const ssoSettingsQ = useCompaniesMeSSOGet({
+    query: { enabled: open && !!viewerIsGlobalAdmin }
+  });
+  const showSsoDirectoryBlock =
+    !!viewerIsGlobalAdmin &&
+    ssoSettingsQ.data?.status === 200 &&
+    ssoSettingsQ.data.data?.enabled === true;
+
   const [editName, setEditName] = useState(user.name);
   const [searchAvailable, setSearchAvailable] = useState('');
   const [searchTenantRoles, setSearchTenantRoles] = useState('');
@@ -89,7 +100,7 @@ function UserSettingsSheetBody({
   const updateUserMutation = useUpdateUser();
   const patchTenantRoles = usePatchUserTenantRoles();
 
-  const rolesCatalogQ = useGetCompaniesMeTenantRoles({
+  const rolesCatalogQ = useListTenantRoles({
     query: { enabled: open }
   });
   const tenantRolesCatalog = useMemo(
@@ -162,7 +173,7 @@ function UserSettingsSheetBody({
     }
   };
 
-  const patchSsoFlags = usePatchCompaniesMeUsersUserIdSsoDirectory({
+  const patchSsoFlags = usePatchUserSSOFlags({
     mutation: {
       onSuccess: (res) => {
         if (res.status === 200) {
@@ -176,11 +187,14 @@ function UserSettingsSheetBody({
     }
   });
 
-  const patchExternalId = usePatchCompaniesMeUsersUserIdExternalIdentity({
+  const patchExternalId = usePatchExternalIdentity({
     mutation: {
       onSuccess: (res) => {
         if (res.status === 200) {
           void qc.invalidateQueries({ queryKey: ['users'] });
+          void qc.invalidateQueries({
+            queryKey: getGetExternalIdentityQueryKey(user.id)
+          });
           toast.success(t('sso_external_saved'));
           if (res.data) {
             setExtIssuer(res.data.issuer ?? '');
@@ -206,6 +220,28 @@ function UserSettingsSheetBody({
   const [extIssuer, setExtIssuer] = useState('');
   const [extSubject, setExtSubject] = useState('');
   const [extOid, setExtOid] = useState('');
+  const [ssoExternalAccordion, setSsoExternalAccordion] = useState<string>('');
+
+  const extIdentityQ = useGetExternalIdentity(user.id, {
+    query: {
+      enabled:
+        showSsoDirectoryBlock &&
+        open &&
+        !!user.id &&
+        ssoExternalAccordion === 'sso-external'
+    }
+  });
+
+  useEffect(() => {
+    const res = extIdentityQ.data;
+    if (!res || res.status !== 200 || !res.data) {
+      return;
+    }
+    const d = res.data;
+    setExtIssuer((prev) => (prev === '' ? (d.issuer ?? '') : prev));
+    setExtSubject((prev) => (prev === '' ? (d.subject ?? '') : prev));
+    setExtOid((prev) => (prev === '' ? (d.externalObjectId ?? '') : prev));
+  }, [extIdentityQ.data]);
 
   const userUnits = useMemo(() => {
     const raw = ((userUnitsRaw ?? []) as SheetUserUnit[]).map((uu) => ({
@@ -271,15 +307,6 @@ function UserSettingsSheetBody({
   /** Tenant roles drive user_units via sync; manual per-unit permissions would collide. */
   const hasTenantRoles = (user.tenantRoles?.length ?? 0) > 0;
   const unitManualAccessLocked = isFullAccessGlobalRole || hasTenantRoles;
-  const viewerIsGlobalAdmin = currentUser?.roles?.includes('admin');
-
-  const ssoSettingsQ = useCompaniesMeSSOGet({
-    query: { enabled: open && !!viewerIsGlobalAdmin }
-  });
-  const showSsoDirectoryBlock =
-    !!viewerIsGlobalAdmin &&
-    ssoSettingsQ.data?.status === 200 &&
-    ssoSettingsQ.data.data?.enabled === true;
 
   const getPermissionLabel = (permissionId: string) =>
     (t as (key: string) => string)(`permissions_list.${permissionId}`) ||
@@ -759,6 +786,8 @@ function UserSettingsSheetBody({
               <Accordion
                 type='single'
                 collapsible
+                value={ssoExternalAccordion}
+                onValueChange={setSsoExternalAccordion}
                 className='bg-muted/20 rounded-lg border'
               >
                 <AccordionItem value='sso-external' className='border-0'>
@@ -767,6 +796,16 @@ function UserSettingsSheetBody({
                   </AccordionTrigger>
                   <AccordionContent className='text-muted-foreground space-y-4 px-4 pb-4'>
                     <p className='text-xs'>{t('sso_external_hint')}</p>
+                    {extIdentityQ.isFetching ? (
+                      <p className='text-muted-foreground text-xs'>
+                        {t('sso_external_loading')}
+                      </p>
+                    ) : null}
+                    {extIdentityQ.isError ? (
+                      <p className='text-destructive text-xs'>
+                        {t('sso_external_fetch_error')}
+                      </p>
+                    ) : null}
                     <div className='flex flex-col gap-4'>
                       <div className='space-y-2'>
                         <Label htmlFor={`ext-iss-${user.id}`}>

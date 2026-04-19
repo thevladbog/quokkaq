@@ -29,11 +29,13 @@ const (
 // tenantRBACUserRepo embeds PanicUserRepo and overrides only methods used by tenant RBAC handlers.
 type tenantRBACUserRepo struct {
 	testsupport.PanicUserRepo
-	resolveCompanyID    func(userID, headerCompanyID string) (string, error)
-	hasCompanyAccess    func(userID, companyID string) (bool, error)
-	isPlatformAdmin     func(userID string) (bool, error)
-	isAdmin             func(userID string) (bool, error)
-	recomputeUserActive func(userID string) error
+	resolveCompanyID      func(userID, headerCompanyID string) (string, error)
+	hasCompanyAccess      func(userID, companyID string) (bool, error)
+	isPlatformAdmin       func(userID string) (bool, error)
+	isAdmin               func(userID string) (bool, error)
+	recomputeUserActive   func(userID string) error
+	recomputeUserActiveTx func(tx *gorm.DB, userID string) error
+	transaction           func(ctx context.Context, fn func(tx *gorm.DB) error) error
 }
 
 func (m tenantRBACUserRepo) ResolveCompanyIDForRequest(userID, headerCompanyID string) (string, error) {
@@ -64,11 +66,28 @@ func (m tenantRBACUserRepo) IsAdmin(userID string) (bool, error) {
 	return m.PanicUserRepo.IsAdmin(userID)
 }
 
-func (m tenantRBACUserRepo) RecomputeUserIsActive(userID string) error {
+func (m tenantRBACUserRepo) RecomputeUserIsActive(ctx context.Context, userID string) error {
 	if m.recomputeUserActive != nil {
 		return m.recomputeUserActive(userID)
 	}
-	return m.PanicUserRepo.RecomputeUserIsActive(userID)
+	return m.PanicUserRepo.RecomputeUserIsActive(ctx, userID)
+}
+
+func (m tenantRBACUserRepo) RecomputeUserIsActiveTx(tx *gorm.DB, userID string) error {
+	if m.recomputeUserActiveTx != nil {
+		return m.recomputeUserActiveTx(tx, userID)
+	}
+	if m.recomputeUserActive != nil {
+		return m.recomputeUserActive(userID)
+	}
+	return m.PanicUserRepo.RecomputeUserIsActiveTx(tx, userID)
+}
+
+func (m tenantRBACUserRepo) Transaction(ctx context.Context, fn func(tx *gorm.DB) error) error {
+	if m.transaction != nil {
+		return m.transaction(ctx, fn)
+	}
+	return fn(nil)
 }
 
 // stubTenantRBAC implements repository.TenantRBACRepository for handler tests.
@@ -79,7 +98,7 @@ type stubTenantRBAC struct {
 	getTenantRoleBySlug      func(companyID, slug string) (*models.TenantRole, error)
 	deleteTenantRole         func(companyID, roleID string) error
 	listUserTenantRoleIDs    func(userID, companyID string) ([]string, error)
-	replaceUserTenantRoles   func(userID, companyID string, tenantRoleIDs []string) error
+	replaceUserTenantRoles   func(userID, companyID string, tenantRoleIDs []string, allowEmpty bool) error
 	syncUserUnits            func(userID, companyID string) error
 	mapTenantRolesByUser     func(companyID string, userIDs []string) (map[string][]models.TenantRole, error)
 	userHasTenantSystemAdmin func(userID, companyID string) (bool, error)
@@ -105,6 +124,25 @@ func (s *stubTenantRBAC) GetTenantRole(companyID, roleID string) (*models.Tenant
 	}
 	return s.defaultGetTenantRole(companyID, roleID)
 }
+
+func (s *stubTenantRBAC) ListTenantRolesByIDs(companyID string, roleIDs []string) ([]models.TenantRole, error) {
+	if len(roleIDs) == 0 {
+		return nil, nil
+	}
+	out := make([]models.TenantRole, 0, len(roleIDs))
+	for _, id := range roleIDs {
+		tr, err := s.GetTenantRole(companyID, id)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				continue
+			}
+			return nil, err
+		}
+		out = append(out, *tr)
+	}
+	return out, nil
+}
+
 func (s *stubTenantRBAC) CreateTenantRole(*models.TenantRole, []models.TenantRoleUnit) error {
 	panic("unexpected")
 }
@@ -117,20 +155,23 @@ func (s *stubTenantRBAC) DeleteTenantRole(companyID, roleID string) error {
 	}
 	panic("unexpected")
 }
-func (s *stubTenantRBAC) ListGroupMappings(string) ([]models.CompanySSOGroupMapping, error) {
+func (s *stubTenantRBAC) ListGroupMappings(context.Context, string) ([]models.CompanySSOGroupMapping, error) {
 	panic("unexpected")
 }
-func (s *stubTenantRBAC) UpsertGroupMapping(*models.CompanySSOGroupMapping) error {
+func (s *stubTenantRBAC) UpsertGroupMapping(*models.CompanySSOGroupMapping) (*models.CompanySSOGroupMapping, bool, error) {
 	panic("unexpected")
 }
 func (s *stubTenantRBAC) DeleteGroupMapping(string, string) error { panic("unexpected") }
-func (s *stubTenantRBAC) ReplaceUserTenantRoles(userID, companyID string, tenantRoleIDs []string) error {
+func (s *stubTenantRBAC) ReplaceUserTenantRoles(userID, companyID string, tenantRoleIDs []string, allowEmpty bool) error {
 	if s.replaceUserTenantRoles != nil {
-		return s.replaceUserTenantRoles(userID, companyID, tenantRoleIDs)
+		return s.replaceUserTenantRoles(userID, companyID, tenantRoleIDs, allowEmpty)
 	}
 	panic("unexpected")
 }
-func (s *stubTenantRBAC) ReplaceUserTenantRolesTx(*gorm.DB, string, string, []string) error {
+func (s *stubTenantRBAC) ReplaceUserTenantRolesTx(_ *gorm.DB, userID, companyID string, tenantRoleIDs []string, allowEmpty bool) error {
+	if s.replaceUserTenantRoles != nil {
+		return s.replaceUserTenantRoles(userID, companyID, tenantRoleIDs, allowEmpty)
+	}
 	panic("unexpected")
 }
 func (s *stubTenantRBAC) ListUserTenantRoleIDs(userID, companyID string) ([]string, error) {
@@ -151,7 +192,10 @@ func (s *stubTenantRBAC) SyncUserUnitsFromTenantRoles(userID, companyID string) 
 	}
 	panic("unexpected")
 }
-func (s *stubTenantRBAC) SyncUserUnitsFromTenantRolesTx(*gorm.DB, string, string) error {
+func (s *stubTenantRBAC) SyncUserUnitsFromTenantRolesTx(_ *gorm.DB, userID, companyID string) error {
+	if s.syncUserUnits != nil {
+		return s.syncUserUnits(userID, companyID)
+	}
 	panic("unexpected")
 }
 func (s *stubTenantRBAC) EnsureSystemTenantRole(string) (string, error) { panic("unexpected") }
@@ -289,6 +333,85 @@ func TestTenantRBACHTTP_PatchUserTenantRoles_mutuallyExclusive400(t *testing.T) 
 	}
 }
 
+func TestTenantRBACHTTP_PatchUserTenantRoles_emptyWithoutConfirm400(t *testing.T) {
+	t.Parallel()
+	tr := &stubTenantRBAC{
+		getTenantRoleBySlug: func(companyID, slug string) (*models.TenantRole, error) {
+			return &models.TenantRole{ID: testSysRoleID, CompanyID: companyID, Slug: slug}, nil
+		},
+		listUserTenantRoleIDs: func(_, _ string) ([]string, error) {
+			return []string{testOtherRole}, nil
+		},
+	}
+	ur := tenantRBACUserRepo{
+		resolveCompanyID: func(_, _ string) (string, error) { return testCompanyID, nil },
+		hasCompanyAccess: func(_, _ string) (bool, error) { return true, nil },
+	}
+	h := NewTenantRBACHTTP(tr, ur, nil)
+	body := map[string][]string{"tenantRoleIds": {}}
+	b, _ := json.Marshal(body)
+
+	r := chi.NewRouter()
+	r.Patch("/users/{userId}/tenant-roles", h.PatchUserTenantRoles)
+	req := httptest.NewRequest(http.MethodPatch, "/users/"+testTargetID+"/tenant-roles", bytes.NewReader(b))
+	req.Header.Set("Content-Type", "application/json")
+	req = ctxWithUserID(req, testActorID)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status %d body %q", w.Code, w.Body.String())
+	}
+}
+
+func TestTenantRBACHTTP_PatchUserTenantRoles_emptyWithConfirm200(t *testing.T) {
+	t.Parallel()
+	var gotAllowEmpty bool
+	tr := &stubTenantRBAC{
+		getTenantRoleBySlug: func(companyID, slug string) (*models.TenantRole, error) {
+			return &models.TenantRole{ID: testSysRoleID, CompanyID: companyID, Slug: slug}, nil
+		},
+		listUserTenantRoleIDs: func(_, _ string) ([]string, error) {
+			return []string{testOtherRole}, nil
+		},
+		replaceUserTenantRoles: func(userID, companyID string, ids []string, allowEmpty bool) error {
+			gotAllowEmpty = allowEmpty
+			if len(ids) != 0 {
+				t.Fatalf("ids %v", ids)
+			}
+			if !allowEmpty {
+				t.Fatal("expected allowEmpty")
+			}
+			return nil
+		},
+		syncUserUnits: func(_, _ string) error { return nil },
+		mapTenantRolesByUser: func(_ string, userIDs []string) (map[string][]models.TenantRole, error) {
+			return map[string][]models.TenantRole{testTargetID: {}}, nil
+		},
+	}
+	ur := tenantRBACUserRepo{
+		resolveCompanyID:    func(_, _ string) (string, error) { return testCompanyID, nil },
+		hasCompanyAccess:    func(_, _ string) (bool, error) { return true, nil },
+		recomputeUserActive: func(string) error { return nil },
+	}
+	h := NewTenantRBACHTTP(tr, ur, nil)
+	body := map[string]any{"tenantRoleIds": []string{}, "confirmRemoveAllTenantRoles": true}
+	b, _ := json.Marshal(body)
+
+	r := chi.NewRouter()
+	r.Patch("/users/{userId}/tenant-roles", h.PatchUserTenantRoles)
+	req := httptest.NewRequest(http.MethodPatch, "/users/"+testTargetID+"/tenant-roles", bytes.NewReader(b))
+	req.Header.Set("Content-Type", "application/json")
+	req = ctxWithUserID(req, testActorID)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status %d body %q", w.Code, w.Body.String())
+	}
+	if !gotAllowEmpty {
+		t.Fatal("ReplaceUserTenantRolesTx should use allowEmpty for empty list")
+	}
+}
+
 func TestTenantRBACHTTP_PatchUserTenantRoles_addSystemForbidden403(t *testing.T) {
 	t.Parallel()
 	tr := &stubTenantRBAC{
@@ -338,7 +461,7 @@ func TestTenantRBACHTTP_PatchUserTenantRoles_addSystemPlatformAdmin200(t *testin
 		listUserTenantRoleIDs: func(_, _ string) ([]string, error) {
 			return []string{}, nil
 		},
-		replaceUserTenantRoles: func(userID, companyID string, ids []string) error {
+		replaceUserTenantRoles: func(userID, companyID string, ids []string, allowEmpty bool) error {
 			replaced = append([]string(nil), ids...)
 			if userID != testTargetID || companyID != testCompanyID {
 				t.Fatalf("replace user %s company %s", userID, companyID)
@@ -375,11 +498,11 @@ func TestTenantRBACHTTP_PatchUserTenantRoles_addSystemPlatformAdmin200(t *testin
 	if len(replaced) != 1 || replaced[0] != testSysRoleID {
 		t.Fatalf("replaced = %v", replaced)
 	}
-	var resp map[string][]tenantRoleBrief
+	var resp PatchUserTenantRolesResponse
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatal(err)
 	}
-	if len(resp["tenantRoles"]) != 1 || resp["tenantRoles"][0].Slug != rbac.TenantRoleSlugSystemAdmin {
+	if len(resp.TenantRoles) != 1 || resp.TenantRoles[0].Slug != rbac.TenantRoleSlugSystemAdmin {
 		t.Fatalf("resp %#v", resp)
 	}
 }

@@ -80,6 +80,11 @@ func main() {
 			&models.User{},
 			&models.UserRole{},
 			&models.UserUnit{},
+			// Tenant RBAC & IdP group mappings (tenant = Company). Order: TenantRole → role-unit/user rows → optional TenantRole FK on group mapping.
+			&models.TenantRole{},
+			&models.TenantRoleUnit{},
+			&models.UserTenantRole{},
+			&models.CompanySSOGroupMapping{},
 			&models.Service{},
 			&models.Counter{},
 			&models.CounterOperatorInterval{},
@@ -154,7 +159,10 @@ func main() {
 	userService := services.NewUserService(userRepo)
 	mailService := services.NewMailService()
 	tenantRBACRepo := repository.NewTenantRBACRepository()
-	authService := services.NewAuthService(userRepo, companyRepo, mailService, subscriptionRepo, tenantRBACRepo)
+	authService, err := services.NewAuthService(userRepo, companyRepo, mailService, subscriptionRepo, tenantRBACRepo)
+	if err != nil {
+		log.Fatalf("auth service: %v", err)
+	}
 	ssoRepo := repository.NewSSORepository()
 	ssoService := services.NewSSOService(companyRepo, userRepo, ssoRepo, unitRepo, tenantRBACRepo, authService)
 	unitClientRepo := repository.NewUnitClientRepository()
@@ -283,7 +291,7 @@ func main() {
 		yReturn,
 		pubApp,
 	)
-	companyHandler := handlers.NewCompanyHandler(companyRepo, userRepo)
+	companyHandler := handlers.NewCompanyHandler(companyRepo, userRepo, tenantRBACRepo)
 	platformHandler := handlers.NewPlatformHandler(companyRepo, subscriptionRepo, invoiceRepo, catalogRepo)
 	dadataHandler := handlers.NewDaDataHandler()
 
@@ -645,6 +653,7 @@ func main() {
 			r.Get("/me/users", tenantRBACHTTP.ListCompanyUsers)
 			r.Patch("/me/users/{userId}/tenant-roles", tenantRBACHTTP.PatchUserTenantRoles)
 			r.Patch("/me/users/{userId}/sso-directory", tenantRBACHTTP.PatchUserSSOFlags)
+			r.Get("/me/users/{userId}/external-identity", tenantRBACHTTP.GetExternalIdentity)
 			r.Patch("/me/users/{userId}/external-identity", tenantRBACHTTP.PatchExternalIdentity)
 		})
 		r.Post("/me/complete-onboarding", companyHandler.CompleteOnboarding)

@@ -17,7 +17,7 @@ import (
 
 type extNotFoundSSORepo struct{ testsupport.SSORepoNoopAudit }
 
-func (extNotFoundSSORepo) FindExternalIdentity(string, string) (*models.UserExternalIdentity, error) {
+func (extNotFoundSSORepo) FindExternalIdentity(context.Context, string, string) (*models.UserExternalIdentity, error) {
 	return nil, gorm.ErrRecordNotFound
 }
 
@@ -29,11 +29,13 @@ func (extNotFoundSSORepo) FindExternalIdentityByUserAndCompany(string, string) (
 	return nil, gorm.ErrRecordNotFound
 }
 
-func (extNotFoundSSORepo) UpdateExternalIdentity(*models.UserExternalIdentity) error { return nil }
+func (extNotFoundSSORepo) UpdateExternalIdentity(context.Context, *models.UserExternalIdentity) error {
+	return nil
+}
 
 type noTenantAccessUserRepo struct{ testsupport.PanicUserRepo }
 
-func (noTenantAccessUserRepo) FindByEmail(string) (*models.User, error) {
+func (noTenantAccessUserRepo) FindByEmail(context.Context, string) (*models.User, error) {
 	return &models.User{ID: "u1"}, nil
 }
 

@@ -42,6 +42,10 @@ import {
   TooltipTrigger
 } from '@/components/ui/tooltip';
 import { getWordmarkSrc } from '@/lib/wordmark-src';
+import { TENANT_SLUG_MIN_LEN } from '@quokkaq/shared-types';
+
+/** Minimum slug length before fetching public tenant (aligned with tenant slug validation). */
+const MIN_TENANT_SLUG_LENGTH = TENANT_SLUG_MIN_LEN;
 
 function toAuthSSOAuthorizeLocale(
   loc: string
@@ -96,6 +100,20 @@ export default function LoginPage() {
   const loginMutation = useLogin();
   const { login } = useAuthContext();
   const { setActiveCompanyId } = useActiveCompany();
+
+  const effectiveSlug = useMemo(
+    () => (hintSlug || '').trim() || tenantSlugManual.trim() || '',
+    [hintSlug, tenantSlugManual]
+  );
+
+  const [debouncedEffectiveSlug, setDebouncedEffectiveSlug] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(
+      () => setDebouncedEffectiveSlug(effectiveSlug.trim()),
+      300
+    );
+    return () => clearTimeout(timer);
+  }, [effectiveSlug]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(companySearch), 300);
@@ -194,12 +212,11 @@ export default function LoginPage() {
     }
   };
 
-  const effectiveSlug =
-    (hintSlug || '').trim() || tenantSlugManual.trim() || '';
-
-  const publicTenantQ = usePublicTenantBySlug(effectiveSlug, {
+  const publicTenantQ = usePublicTenantBySlug(debouncedEffectiveSlug, {
     query: {
-      enabled: subStep === 'password' && effectiveSlug.length > 0,
+      enabled:
+        subStep === 'password' &&
+        debouncedEffectiveSlug.length >= MIN_TENANT_SLUG_LENGTH,
       staleTime: 60_000
     }
   });

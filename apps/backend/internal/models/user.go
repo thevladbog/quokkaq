@@ -65,7 +65,7 @@ type User struct {
 	PhotoURL *string `gorm:"column:photo_url" json:"photoUrl,omitempty"`
 	Password *string `json:"-"` // Never expose password in JSON
 	IsActive bool    `gorm:"default:true" json:"isActive"`
-	// ExemptFromSSOSync: when true, SSO directory reconcile does not change this user's roles/units.
+	// ExemptFromSSOSync when true, SSO directory reconcile does not change this user's global roles, unit assignments, or tenant role mappings (IdP group sync).
 	ExemptFromSSOSync bool `gorm:"column:exempt_from_sso_sync;not null;default:false" json:"exemptFromSsoSync"`
 	// SSOProfileSyncOptOut: when true, skip name/email updates from IdP on SSO login.
 	SSOProfileSyncOptOut bool      `gorm:"column:sso_profile_sync_opt_out;not null;default:false" json:"ssoProfileSyncOptOut"`

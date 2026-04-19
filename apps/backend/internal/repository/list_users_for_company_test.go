@@ -90,12 +90,19 @@ func TestListUsersForCompany_includesGlobalAdminWithoutUnitsOrTenantRoles(t *tes
 		t.Fatal(err)
 	}
 
-	got, err := repo.ListUsersForCompany(companyID, "")
+	got, err := repo.ListUsersForCompany(companyID, "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(got) != 1 || got[0].ID != adminID {
 		t.Fatalf("users = %#v, want one user %q", got, adminID)
+	}
+	gotNoGlobal, err := repo.ListUsersForCompany(companyID, "", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(gotNoGlobal) != 0 {
+		t.Fatalf("with includeGlobalRoleUsers=false, want no users, got %#v", gotNoGlobal)
 	}
 }
 
@@ -116,7 +123,7 @@ func TestListUsersForCompany_includesCompanyOwnerWithoutUnits(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := repo.ListUsersForCompany(companyID, "")
+	got, err := repo.ListUsersForCompany(companyID, "", false)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -435,10 +435,11 @@ func (s *SSOService) HandleCallback(ctx context.Context, w http.ResponseWriter, 
 		return
 	}
 	extClaims, err := ParseOIDCClaimsFromIDToken(idToken)
-	if err != nil {
+	if err != nil && !errors.Is(err, ErrOIDCGroupsClaimOverage) {
 		http.Error(w, "invalid claims", http.StatusBadRequest)
 		return
 	}
+	deferGroupReconcile := errors.Is(err, ErrOIDCGroupsClaimOverage)
 	if strings.TrimSpace(payload.Nonce) != "" {
 		if strings.TrimSpace(extClaims.Nonce) == "" {
 			http.Error(w, "missing nonce in id_token", http.StatusBadRequest)
@@ -472,7 +473,12 @@ func (s *SSOService) HandleCallback(ctx context.Context, w http.ResponseWriter, 
 		return
 	}
 
-	s.ApplyPostSSOLogin(ctx, company, user, extClaims.Name, extClaims.Email, emailVerified, extClaims.Groups, extClaims.ObjectID, idToken.Issuer, idToken.Subject)
+	if err := s.ApplyPostSSOLogin(ctx, company, user, extClaims.Name, extClaims.Email, emailVerified, extClaims.Groups, extClaims.ObjectID, idToken.Issuer, idToken.Subject, deferGroupReconcile); err != nil {
+		log.Printf("oidc ApplyPostSSOLogin: %v", err)
+		cid := payload.CompanyID
+		s.redirectLoginSSOError(ctx, w, r, &cid, "access_sync_failed", "oidc_callback_denied:access_sync_failed", payload.UILocale)
+		return
+	}
 
 	finish := randomHex(16)
 	if err := redisstore.SetJSON(ctx, redisstore.KeyExchange(finish), map[string]string{
@@ -501,7 +507,7 @@ func (s *SSOService) resolveSSOUser(ctx context.Context, company *models.Company
 	externalObjectID = strings.TrimSpace(externalObjectID)
 	if externalObjectID != "" {
 		if ext, err := s.ssoRepo.FindExternalIdentityByCompanyAndObjectID(company.ID, externalObjectID); err == nil && ext.CompanyID == company.ID {
-			u, err := s.userRepo.FindByID(ext.UserID)
+			u, err := s.userRepo.FindByID(ctx, ext.UserID)
 			if err != nil {
 				return nil, err
 			}
@@ -514,7 +520,7 @@ func (s *SSOService) resolveSSOUser(ctx context.Context, company *models.Company
 				if ext.Issuer != iss || ext.Subject != sub {
 					ext.Issuer = iss
 					ext.Subject = sub
-					if err := s.ssoRepo.UpdateExternalIdentity(ext); err != nil {
+					if err := s.ssoRepo.UpdateExternalIdentity(ctx, ext); err != nil {
 						log.Printf("sso update external identity iss/sub: %v", err)
 					}
 				}
@@ -522,8 +528,8 @@ func (s *SSOService) resolveSSOUser(ctx context.Context, company *models.Company
 			}
 		}
 	}
-	if ext, err := s.ssoRepo.FindExternalIdentity(iss, sub); err == nil && ext.CompanyID == company.ID {
-		u, err := s.userRepo.FindByID(ext.UserID)
+	if ext, err := s.ssoRepo.FindExternalIdentity(ctx, iss, sub); err == nil && ext.CompanyID == company.ID {
+		u, err := s.userRepo.FindByID(ctx, ext.UserID)
 		if err != nil {
 			return nil, err
 		}
@@ -532,6 +538,21 @@ func (s *SSOService) resolveSSOUser(ctx context.Context, company *models.Company
 			return nil, err
 		}
 		if ok {
+			// Row was matched by issuer/subject only; persist stable directory id when the token includes it so
+			// FindExternalIdentityByCompanyAndObjectID works on later logins.
+			if externalObjectID != "" {
+				prev := ""
+				if ext.ExternalObjectID != nil {
+					prev = strings.TrimSpace(*ext.ExternalObjectID)
+				}
+				if prev != externalObjectID {
+					oid := externalObjectID
+					ext.ExternalObjectID = &oid
+					if err := s.ssoRepo.UpdateExternalIdentity(ctx, ext); err != nil {
+						log.Printf("sso update external identity external_object_id: %v", err)
+					}
+				}
+			}
 			return u, nil
 		}
 		// Identity row exists but user lost access, or stale link — fall through.
@@ -539,7 +560,7 @@ func (s *SSOService) resolveSSOUser(ctx context.Context, company *models.Company
 	if email == "" || !emailVerified {
 		return nil, ErrSSOEmailRequired
 	}
-	user, err := s.userRepo.FindByEmail(strings.TrimSpace(email))
+	user, err := s.userRepo.FindByEmail(ctx, strings.TrimSpace(email))
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
@@ -623,7 +644,7 @@ func (s *SSOService) resolveSSOUser(ctx context.Context, company *models.Company
 	if err != nil {
 		return nil, err
 	}
-	return s.userRepo.FindByID(newUser.ID)
+	return s.userRepo.FindByID(ctx, newUser.ID)
 }
 
 // ExchangeFinishCode returns JWT pair for a one-time code from the OIDC callback redirect.
@@ -850,7 +871,7 @@ func (s *SSOService) AdminPatchExternalIdentity(companyID, targetUserID string, 
 			ext.ExternalObjectID = &t
 		}
 	}
-	return s.ssoRepo.UpdateExternalIdentity(ext)
+	return s.ssoRepo.UpdateExternalIdentity(context.Background(), ext)
 }
 
 // GetExternalIdentityForUser returns the SSO external identity row for a user in a company.

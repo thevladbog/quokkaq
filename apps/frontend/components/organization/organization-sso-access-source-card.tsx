@@ -20,7 +20,10 @@ import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { KeyRound } from 'lucide-react';
 import type { Company } from '@quokkaq/shared-types';
-import { usePatchCompaniesMe } from '@/lib/api/generated/auth';
+import {
+  usePatchCompaniesMe,
+  type ModelsCompanyPatchSsoAccessSource
+} from '@/lib/api/generated/auth';
 
 type OrganizationSsoAccessSourceCardProps = {
   company: Company;
@@ -65,7 +68,9 @@ export function OrganizationSsoAccessSourceCard({
           disabled={patch.isPending}
           onValueChange={(v) => {
             patch.mutate({
-              data: { ssoAccessSource: v }
+              data: {
+                ssoAccessSource: v as ModelsCompanyPatchSsoAccessSource
+              }
             });
           }}
         >

@@ -67,7 +67,8 @@ CREATE TABLE tenant_role_units (
 	id TEXT PRIMARY KEY,
 	tenant_role_id TEXT NOT NULL,
 	unit_id TEXT NOT NULL,
-	permissions TEXT
+	permissions TEXT,
+	UNIQUE (tenant_role_id, unit_id)
 );
 CREATE TABLE user_tenant_roles (
 	id TEXT PRIMARY KEY,

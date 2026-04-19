@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"quokkaq-go-backend/internal/models"
@@ -16,10 +17,10 @@ type SSORepository interface {
 	GetConnectionByCompanyID(companyID string) (*models.CompanySSOConnection, error)
 	UpsertConnection(conn *models.CompanySSOConnection) error
 	FindCompaniesByEmailDomain(domain string) ([]models.Company, []models.CompanySSOConnection, error)
-	FindExternalIdentity(issuer, subject string) (*models.UserExternalIdentity, error)
+	FindExternalIdentity(ctx context.Context, issuer, subject string) (*models.UserExternalIdentity, error)
 	FindExternalIdentityByCompanyAndObjectID(companyID, externalObjectID string) (*models.UserExternalIdentity, error)
 	FindExternalIdentityByUserAndCompany(userID, companyID string) (*models.UserExternalIdentity, error)
-	UpdateExternalIdentity(id *models.UserExternalIdentity) error
+	UpdateExternalIdentity(ctx context.Context, id *models.UserExternalIdentity) error
 	CreateExternalIdentity(id *models.UserExternalIdentity) error
 	CreateExternalIdentityTx(tx *gorm.DB, id *models.UserExternalIdentity) error
 	FindLoginLinkByHash(tokenHash string) (*models.TenantLoginLink, error)
@@ -111,9 +112,9 @@ func (r *ssoRepository) FindCompaniesByEmailDomain(domain string) ([]models.Comp
 	return outCompanies, outConns, nil
 }
 
-func (r *ssoRepository) FindExternalIdentity(issuer, subject string) (*models.UserExternalIdentity, error) {
+func (r *ssoRepository) FindExternalIdentity(ctx context.Context, issuer, subject string) (*models.UserExternalIdentity, error) {
 	var u models.UserExternalIdentity
-	err := database.DB.Where("issuer = ? AND subject = ?", issuer, subject).First(&u).Error
+	err := database.DB.WithContext(ctx).Where("issuer = ? AND subject = ?", issuer, subject).First(&u).Error
 	if err != nil {
 		return nil, err
 	}
@@ -121,6 +122,11 @@ func (r *ssoRepository) FindExternalIdentity(issuer, subject string) (*models.Us
 }
 
 func (r *ssoRepository) FindExternalIdentityByUserAndCompany(userID, companyID string) (*models.UserExternalIdentity, error) {
+	userID = strings.TrimSpace(userID)
+	companyID = strings.TrimSpace(companyID)
+	if userID == "" || companyID == "" {
+		return nil, gorm.ErrRecordNotFound
+	}
 	var u models.UserExternalIdentity
 	err := database.DB.Where("user_id = ? AND company_id = ?", userID, companyID).First(&u).Error
 	if err != nil {
@@ -142,12 +148,27 @@ func (r *ssoRepository) FindExternalIdentityByCompanyAndObjectID(companyID, exte
 	return &u, nil
 }
 
-func (r *ssoRepository) UpdateExternalIdentity(id *models.UserExternalIdentity) error {
-	return database.DB.Model(&models.UserExternalIdentity{}).Where("id = ?", id.ID).Updates(map[string]interface{}{
-		"issuer":             id.Issuer,
-		"subject":            id.Subject,
-		"external_object_id": id.ExternalObjectID,
-	}).Error
+func (r *ssoRepository) UpdateExternalIdentity(ctx context.Context, id *models.UserExternalIdentity) error {
+	if id == nil {
+		return errors.New("UpdateExternalIdentity: nil identity")
+	}
+	if strings.TrimSpace(id.ID) == "" || strings.TrimSpace(id.CompanyID) == "" || strings.TrimSpace(id.UserID) == "" {
+		return errors.New("UpdateExternalIdentity: id, companyId, and userId are required")
+	}
+	result := database.DB.WithContext(ctx).Model(&models.UserExternalIdentity{}).
+		Where("id = ? AND company_id = ? AND user_id = ?", id.ID, id.CompanyID, id.UserID).
+		Updates(map[string]interface{}{
+			"issuer":             id.Issuer,
+			"subject":            id.Subject,
+			"external_object_id": id.ExternalObjectID,
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 func (r *ssoRepository) CreateExternalIdentity(id *models.UserExternalIdentity) error {

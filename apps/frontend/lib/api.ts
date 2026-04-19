@@ -39,6 +39,7 @@ import type {
   PreRegistration,
   UsageMetrics,
   Company,
+  SsoAccessSource,
   SaasVendor,
   CompanyMeResponse,
   PaymentAccount,
@@ -291,7 +292,12 @@ export const usersApi = {
       `/companies/me/users/${userId}/tenant-roles`,
       {
         method: 'PATCH',
-        body: JSON.stringify({ tenantRoleIds })
+        body: JSON.stringify({
+          tenantRoleIds,
+          ...(tenantRoleIds.length === 0
+            ? { confirmRemoveAllTenantRoles: true }
+            : {})
+        })
       },
       PatchUserTenantRolesResponseSchema
     ),
@@ -1401,8 +1407,7 @@ export const companiesApiExt = {
     clearCounterparty?: boolean;
     /** Shape matches PaymentAccountsSchema in @quokkaq/shared-types; validate client-side when needed. */
     paymentAccounts?: PaymentAccount[];
-    /** "manual" | "sso_groups" */
-    ssoAccessSource?: string;
+    ssoAccessSource?: SsoAccessSource;
   }) =>
     apiRequest<Company>(
       `/companies/me`,

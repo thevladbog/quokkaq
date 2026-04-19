@@ -37,6 +37,16 @@ export default function UsersPage() {
     [units]
   );
 
+  const unitPick = useMemo(
+    () =>
+      (units as Unit[]).map((u) => ({
+        id: u.id,
+        name: u.name,
+        nameEn: u.nameEn
+      })),
+    [units]
+  );
+
   const selectedUser = useMemo(
     () => (users as User[]).find((u) => u.id === selectedUserId) ?? null,
     [users, selectedUserId]
@@ -54,12 +64,6 @@ export default function UsersPage() {
       </div>
     );
   }
-
-  const unitPick = (units as Unit[]).map((u) => ({
-    id: u.id,
-    name: u.name,
-    nameEn: u.nameEn
-  }));
 
   return (
     <div className='container mx-auto max-w-6xl p-4'>

@@ -88,6 +88,16 @@ export function IntegrationsSettingsContent() {
     );
   }, [unitsQuery.data, locale]);
 
+  const unitOptionsForProps = useMemo(
+    () =>
+      unitOptions.map((u) => ({
+        id: u.id,
+        name: u.name,
+        nameEn: u.nameEn
+      })),
+    [unitOptions]
+  );
+
   /** Optional filter: `?unit=` from URL (e.g. deep link from a unit page). */
   const filterUnitId = useMemo(() => {
     return resolveUnitFilterFromQuery(
@@ -254,11 +264,7 @@ export function IntegrationsSettingsContent() {
                   </div>
                   <CalendarIntegrationsPanel
                     filterUnitId={filterUnitId}
-                    unitOptions={unitOptions.map((u) => ({
-                      id: u.id,
-                      name: u.name,
-                      nameEn: u.nameEn
-                    }))}
+                    unitOptions={unitOptionsForProps}
                   />
                 </>
               )}
@@ -289,13 +295,7 @@ export function IntegrationsSettingsContent() {
                 publicApiUrl={companyMe.data?.publicApiUrl}
               />
             )}
-          <OrganizationTenantRbacSettings
-            units={unitOptions.map((u) => ({
-              id: u.id,
-              name: u.name,
-              nameEn: u.nameEn
-            }))}
-          />
+          <OrganizationTenantRbacSettings units={unitOptionsForProps} />
         </TabsContent>
       </Tabs>
     </>

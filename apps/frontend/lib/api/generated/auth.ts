@@ -216,7 +216,7 @@ export interface ModelsUserUnit {
 export interface ModelsUser {
   createdAt?: string;
   email?: string;
-  /** ExemptFromSSOSync: when true, SSO directory reconcile does not change this user's roles/units. */
+  /** ExemptFromSSOSync when true, SSO directory reconcile does not change this user's global roles, unit assignments, or tenant role mappings (IdP group sync). */
   exemptFromSsoSync?: boolean;
   id?: string;
   isActive?: boolean;
@@ -551,12 +551,27 @@ export interface HandlersPatchUnitKioskConfigRequest {
 }
 
 export interface HandlersPatchUserSSOFlagsJSON {
+  /** ExemptFromSSOSync when true, SSO directory reconcile does not change this user's global roles, unit assignments, or tenant role mappings (IdP group sync). */
   exemptFromSsoSync?: boolean;
+  /** SSOProfileSyncOptOut when true, skip name/email updates from IdP on SSO login. */
   ssoProfileSyncOptOut?: boolean;
 }
 
 export interface HandlersPatchUserTenantRolesJSON {
-  tenantRoleIds?: string[];
+  /** ConfirmRemoveAllTenantRoles must be true when tenantRoleIds is empty after trimming, so ReplaceUserTenantRoles does not
+  clear user_tenant_roles and trigger RebuildUserUnitsFromTenantRoles mass-removal of user_units by mistake. */
+  confirmRemoveAllTenantRoles?: boolean;
+  tenantRoleIds: string[];
+}
+
+export interface HandlersTenantRoleBriefResponse {
+  id?: string;
+  name?: string;
+  slug?: string;
+}
+
+export interface HandlersPatchUserTenantRolesResponse {
+  tenantRoles: HandlersTenantRoleBriefResponse[];
 }
 
 export interface HandlersPeriodResponse {
@@ -680,12 +695,6 @@ export interface HandlersSignupRequest {
   planCode?: string;
 }
 
-export interface HandlersTenantRoleBriefResponse {
-  id?: string;
-  name?: string;
-  slug?: string;
-}
-
 export interface HandlersTransferRequest {
   /** @nullable */
   operatorComment?: string | null;
@@ -724,11 +733,29 @@ export interface HandlersUploadSurveyIdleMediaResponse {
   url: string;
 }
 
-export interface HandlersUpsertGroupMappingJSON {
-  idpGroupId?: string;
-  legacyRoleName?: string;
-  tenantRoleId?: string;
-}
+/**
+ * Map an IdP group to exactly one target: a tenant role id, or a legacy global role name. Send idpGroupId plus either tenantRoleId or legacyRoleName (not both).
+ */
+export type HandlersUpsertGroupMappingJSON = {
+  /**
+     * IdP group identifier (e.g. Azure AD group object id).
+     * @minLength 1
+     */
+  idpGroupId: string;
+  /**
+     * Tenant role UUID in this company. Mutually exclusive with legacyRoleName.
+     * @minLength 1
+     */
+  tenantRoleId: string;
+} | {
+  /**
+     * IdP group identifier (e.g. Azure AD group object id).
+     * @minLength 1
+     */
+  idpGroupId: string;
+  /** Legacy global role name applied by SSO group sync. Mutually exclusive with tenantRoleId. */
+  legacyRoleName: 'staff' | 'supervisor' | 'operator';
+};
 
 export interface HandlersUsageMetricInfoResponse {
   current?: number;
@@ -916,6 +943,17 @@ export interface ModelsInvoice {
   yookassaPaymentId?: string;
 }
 
+/**
+ * SsoAccessSource: "manual" (default) or "sso_groups" — IdP groups are source of truth for access when set.
+ */
+export type ModelsCompanySsoAccessSource = typeof ModelsCompanySsoAccessSource[keyof typeof ModelsCompanySsoAccessSource];
+
+
+export const ModelsCompanySsoAccessSource = {
+  manual: 'manual',
+  sso_groups: 'sso_groups',
+} as const;
+
 export interface ModelsUsageRecord {
   /** month for aggregation (first day of month) */
   billingMonth?: string;
@@ -978,7 +1016,7 @@ export interface ModelsCompany {
   /** public tenant slug for login URLs */
   slug?: string;
   /** SsoAccessSource: "manual" (default) or "sso_groups" — IdP groups are source of truth for access when set. */
-  ssoAccessSource?: string;
+  ssoAccessSource?: ModelsCompanySsoAccessSource;
   /** SsoJitProvisioning: allow creating a user on first successful SSO when policy permits. */
   ssoJitProvisioning?: boolean;
   /** StrictPublicTenantResolve: SaaS-enabled — GET /public/tenants/{slug} does not expose org metadata for slug guessing. */
@@ -999,16 +1037,10 @@ export interface HandlersCompanyMeResponse {
   publicAppUrl?: string;
 }
 
-export interface HandlersTenantRoleBrief {
-  id?: string;
-  name?: string;
-  slug?: string;
-}
-
 export interface HandlersCompanyUserListItem {
   createdAt?: string;
   email?: string;
-  /** ExemptFromSSOSync: when true, SSO directory reconcile does not change this user's roles/units. */
+  /** ExemptFromSSOSync when true, SSO directory reconcile does not change this user's global roles, unit assignments, or tenant role mappings (IdP group sync). */
   exemptFromSsoSync?: boolean;
   id?: string;
   isActive?: boolean;
@@ -1019,7 +1051,7 @@ export interface HandlersCompanyUserListItem {
   roles?: ModelsUserRole[];
   /** SSOProfileSyncOptOut: when true, skip name/email updates from IdP on SSO login. */
   ssoProfileSyncOptOut?: boolean;
-  tenantRoles?: HandlersTenantRoleBrief[];
+  tenantRoles?: HandlersTenantRoleBriefResponse[];
   type?: string;
   units?: ModelsUserUnit[];
 }
@@ -1205,6 +1237,17 @@ export type ModelsCompanyPatchCounterparty = { [key: string]: unknown };
 
 export type ModelsCompanyPatchPaymentAccountsItem = { [key: string]: unknown };
 
+/**
+ * SsoAccessSource sets SSO access provisioning (`manual` | `sso_groups`). Changing this field via PatchMyCompany requires logical scope `company.settings.ssoAccessSource` (any of `global.role.admin`, `global.role.platform_admin`, `company.tenant_role.system_admin`; not `unit.tenant.admin` alone).
+ */
+export type ModelsCompanyPatchSsoAccessSource = typeof ModelsCompanyPatchSsoAccessSource[keyof typeof ModelsCompanyPatchSsoAccessSource];
+
+
+export const ModelsCompanyPatchSsoAccessSource = {
+  manual: 'manual',
+  sso_groups: 'sso_groups',
+} as const;
+
 export interface ModelsCompanyPatch {
   billingAddress?: ModelsCompanyPatchBillingAddress;
   billingEmail?: string;
@@ -1215,17 +1258,19 @@ export interface ModelsCompanyPatch {
   /** items: @quokkaq/shared-types PaymentAccountSchema */
   paymentAccounts?: ModelsCompanyPatchPaymentAccountsItem[];
   slug?: string;
-  /** "manual" | "sso_groups" */
-  ssoAccessSource?: string;
+  /** SsoAccessSource sets SSO access provisioning (`manual` | `sso_groups`). Changing this field via PatchMyCompany requires logical scope `company.settings.ssoAccessSource` (any of `global.role.admin`, `global.role.platform_admin`, `company.tenant_role.system_admin`; not `unit.tenant.admin` alone). */
+  ssoAccessSource?: ModelsCompanyPatchSsoAccessSource;
 }
 
 export interface ModelsCompanySSOGroupMapping {
   companyId?: string;
+  createdAt?: string;
   id?: string;
   idpGroupId?: string;
   /** e.g. staff, admin */
   legacyRoleName?: string;
   tenantRoleId?: string;
+  updatedAt?: string;
 }
 
 export interface ModelsServiceSlot {
@@ -1931,14 +1976,12 @@ state: string;
 
 export type PostCompaniesMeCompleteOnboarding200 = {[key: string]: boolean};
 
-export type GetCompaniesMeUsersParams = {
+export type ListCompanyUsersParams = {
 /**
  * Filter by name or email (ILIKE)
  */
 search?: string;
 };
-
-export type PatchCompaniesMeUsersUserIdTenantRoles200 = {[key: string]: HandlersTenantRoleBrief[]};
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
@@ -2559,31 +2602,31 @@ export const useAuthLogout = <TError = unknown,
  * Returns the currently authenticated user's information
  * @summary Get current user
  */
-export type getAuthMeResponse200 = {
+export type authGetMeResponse200 = {
   data: HandlersUserResponse
   status: 200
 }
 
-export type getAuthMeResponse401 = {
+export type authGetMeResponse401 = {
   data: string
   status: 401
 }
 
-export type getAuthMeResponse404 = {
+export type authGetMeResponse404 = {
   data: string
   status: 404
 }
 
-export type getAuthMeResponseSuccess = (getAuthMeResponse200) & {
+export type authGetMeResponseSuccess = (authGetMeResponse200) & {
   headers: Headers;
 };
-export type getAuthMeResponseError = (getAuthMeResponse401 | getAuthMeResponse404) & {
+export type authGetMeResponseError = (authGetMeResponse401 | authGetMeResponse404) & {
   headers: Headers;
 };
 
-export type getAuthMeResponse = (getAuthMeResponseSuccess | getAuthMeResponseError)
+export type authGetMeResponse = (authGetMeResponseSuccess | authGetMeResponseError)
 
-export const getGetAuthMeUrl = () => {
+export const getAuthGetMeUrl = () => {
 
 
 
@@ -2591,9 +2634,9 @@ export const getGetAuthMeUrl = () => {
   return `/auth/me`
 }
 
-export const getAuthMe = async ( options?: RequestInit): Promise<getAuthMeResponse> => {
+export const authGetMe = async ( options?: RequestInit): Promise<authGetMeResponse> => {
 
-  return orvalMutator<getAuthMeResponse>(getGetAuthMeUrl(),
+  return orvalMutator<authGetMeResponse>(getAuthGetMeUrl(),
   {
     ...options,
     method: 'GET'
@@ -2606,69 +2649,69 @@ export const getAuthMe = async ( options?: RequestInit): Promise<getAuthMeRespon
 
 
 
-export const getGetAuthMeQueryKey = () => {
+export const getAuthGetMeQueryKey = () => {
     return [
     `/auth/me`
     ] as const;
     }
 
 
-export const getGetAuthMeQueryOptions = <TData = Awaited<ReturnType<typeof getAuthMe>>, TError = string>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAuthMe>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export const getAuthGetMeQueryOptions = <TData = Awaited<ReturnType<typeof authGetMe>>, TError = string>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authGetMe>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetAuthMeQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getAuthGetMeQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAuthMe>>> = ({ signal }) => getAuthMe({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof authGetMe>>> = ({ signal }) => authGetMe({ signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAuthMe>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof authGetMe>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type GetAuthMeQueryResult = NonNullable<Awaited<ReturnType<typeof getAuthMe>>>
-export type GetAuthMeQueryError = string
+export type AuthGetMeQueryResult = NonNullable<Awaited<ReturnType<typeof authGetMe>>>
+export type AuthGetMeQueryError = string
 
 
-export function useGetAuthMe<TData = Awaited<ReturnType<typeof getAuthMe>>, TError = string>(
-  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAuthMe>>, TError, TData>> & Pick<
+export function useAuthGetMe<TData = Awaited<ReturnType<typeof authGetMe>>, TError = string>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof authGetMe>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getAuthMe>>,
+          Awaited<ReturnType<typeof authGetMe>>,
           TError,
-          Awaited<ReturnType<typeof getAuthMe>>
+          Awaited<ReturnType<typeof authGetMe>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetAuthMe<TData = Awaited<ReturnType<typeof getAuthMe>>, TError = string>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAuthMe>>, TError, TData>> & Pick<
+export function useAuthGetMe<TData = Awaited<ReturnType<typeof authGetMe>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authGetMe>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getAuthMe>>,
+          Awaited<ReturnType<typeof authGetMe>>,
           TError,
-          Awaited<ReturnType<typeof getAuthMe>>
+          Awaited<ReturnType<typeof authGetMe>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetAuthMe<TData = Awaited<ReturnType<typeof getAuthMe>>, TError = string>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAuthMe>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useAuthGetMe<TData = Awaited<ReturnType<typeof authGetMe>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authGetMe>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get current user
  */
 
-export function useGetAuthMe<TData = Awaited<ReturnType<typeof getAuthMe>>, TError = string>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAuthMe>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useAuthGetMe<TData = Awaited<ReturnType<typeof authGetMe>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof authGetMe>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetAuthMeQueryOptions(options)
+  const queryOptions = getAuthGetMeQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -3758,7 +3801,7 @@ export function useGetCompaniesMe<TData = Awaited<ReturnType<typeof getCompanies
 
 
 /**
- * Partial update: JSON body matches models.CompanyPatch at the root (not wrapped in a "company" property). Only send fields to change. Cannot combine clearBillingAddress with billingAddress (same for counterparty). Users who are not global admins may only send `ssoAccessSource` (tenant RBAC `tenant.admin` on any unit).
+ * Partial update: JSON body matches models.CompanyPatch at the root (not wrapped in a "company" property). Only send fields to change. Cannot combine clearBillingAddress with billingAddress (same for counterparty). If the body includes `ssoAccessSource`, the caller must satisfy logical scope `company.settings.ssoAccessSource`, which the server grants when the principal matches any of: `global.role.admin`, `global.role.platform_admin`, or `company.tenant_role.system_admin`. Unit-scoped permission `tenant.admin` alone (scope `unit.tenant.admin`) is not sufficient. Other fields still require global `admin` unless the body only contains `ssoAccessSource` and the caller is authorized as above. See OpenAPI `components.securitySchemes.QuokkaQLogicalScopes` and operation `security` for PatchMyCompany.
  * @summary Update current user's company (tenant admin)
  */
 export type patchCompaniesMeResponse200 = {
@@ -4059,41 +4102,41 @@ export const useCompaniesMeLoginLinkPost = <TError = unknown,
  * Returns the canonical permission strings shared by all tenants; used when defining tenant roles.
  * @summary List global permission keys (tenant RBAC catalog)
  */
-export type getCompaniesMeRbacPermissionsResponse200 = {
+export type getPermissionCatalogResponse200 = {
   data: string[]
   status: 200
 }
 
-export type getCompaniesMeRbacPermissionsResponse401 = {
+export type getPermissionCatalogResponse401 = {
   data: string
   status: 401
 }
 
-export type getCompaniesMeRbacPermissionsResponse403 = {
+export type getPermissionCatalogResponse403 = {
   data: string
   status: 403
 }
 
-export type getCompaniesMeRbacPermissionsResponse404 = {
+export type getPermissionCatalogResponse404 = {
   data: string
   status: 404
 }
 
-export type getCompaniesMeRbacPermissionsResponse500 = {
+export type getPermissionCatalogResponse500 = {
   data: string
   status: 500
 }
 
-export type getCompaniesMeRbacPermissionsResponseSuccess = (getCompaniesMeRbacPermissionsResponse200) & {
+export type getPermissionCatalogResponseSuccess = (getPermissionCatalogResponse200) & {
   headers: Headers;
 };
-export type getCompaniesMeRbacPermissionsResponseError = (getCompaniesMeRbacPermissionsResponse401 | getCompaniesMeRbacPermissionsResponse403 | getCompaniesMeRbacPermissionsResponse404 | getCompaniesMeRbacPermissionsResponse500) & {
+export type getPermissionCatalogResponseError = (getPermissionCatalogResponse401 | getPermissionCatalogResponse403 | getPermissionCatalogResponse404 | getPermissionCatalogResponse500) & {
   headers: Headers;
 };
 
-export type getCompaniesMeRbacPermissionsResponse = (getCompaniesMeRbacPermissionsResponseSuccess | getCompaniesMeRbacPermissionsResponseError)
+export type getPermissionCatalogResponse = (getPermissionCatalogResponseSuccess | getPermissionCatalogResponseError)
 
-export const getGetCompaniesMeRbacPermissionsUrl = () => {
+export const getGetPermissionCatalogUrl = () => {
 
 
 
@@ -4101,9 +4144,9 @@ export const getGetCompaniesMeRbacPermissionsUrl = () => {
   return `/companies/me/rbac/permissions`
 }
 
-export const getCompaniesMeRbacPermissions = async ( options?: RequestInit): Promise<getCompaniesMeRbacPermissionsResponse> => {
+export const getPermissionCatalog = async ( options?: RequestInit): Promise<getPermissionCatalogResponse> => {
 
-  return orvalMutator<getCompaniesMeRbacPermissionsResponse>(getGetCompaniesMeRbacPermissionsUrl(),
+  return orvalMutator<getPermissionCatalogResponse>(getGetPermissionCatalogUrl(),
   {
     ...options,
     method: 'GET'
@@ -4116,69 +4159,69 @@ export const getCompaniesMeRbacPermissions = async ( options?: RequestInit): Pro
 
 
 
-export const getGetCompaniesMeRbacPermissionsQueryKey = () => {
+export const getGetPermissionCatalogQueryKey = () => {
     return [
     `/companies/me/rbac/permissions`
     ] as const;
     }
 
 
-export const getGetCompaniesMeRbacPermissionsQueryOptions = <TData = Awaited<ReturnType<typeof getCompaniesMeRbacPermissions>>, TError = string>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeRbacPermissions>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export const getGetPermissionCatalogQueryOptions = <TData = Awaited<ReturnType<typeof getPermissionCatalog>>, TError = string>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPermissionCatalog>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetCompaniesMeRbacPermissionsQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetPermissionCatalogQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCompaniesMeRbacPermissions>>> = ({ signal }) => getCompaniesMeRbacPermissions({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPermissionCatalog>>> = ({ signal }) => getPermissionCatalog({ signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeRbacPermissions>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPermissionCatalog>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type GetCompaniesMeRbacPermissionsQueryResult = NonNullable<Awaited<ReturnType<typeof getCompaniesMeRbacPermissions>>>
-export type GetCompaniesMeRbacPermissionsQueryError = string
+export type GetPermissionCatalogQueryResult = NonNullable<Awaited<ReturnType<typeof getPermissionCatalog>>>
+export type GetPermissionCatalogQueryError = string
 
 
-export function useGetCompaniesMeRbacPermissions<TData = Awaited<ReturnType<typeof getCompaniesMeRbacPermissions>>, TError = string>(
-  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeRbacPermissions>>, TError, TData>> & Pick<
+export function useGetPermissionCatalog<TData = Awaited<ReturnType<typeof getPermissionCatalog>>, TError = string>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPermissionCatalog>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getCompaniesMeRbacPermissions>>,
+          Awaited<ReturnType<typeof getPermissionCatalog>>,
           TError,
-          Awaited<ReturnType<typeof getCompaniesMeRbacPermissions>>
+          Awaited<ReturnType<typeof getPermissionCatalog>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetCompaniesMeRbacPermissions<TData = Awaited<ReturnType<typeof getCompaniesMeRbacPermissions>>, TError = string>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeRbacPermissions>>, TError, TData>> & Pick<
+export function useGetPermissionCatalog<TData = Awaited<ReturnType<typeof getPermissionCatalog>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPermissionCatalog>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getCompaniesMeRbacPermissions>>,
+          Awaited<ReturnType<typeof getPermissionCatalog>>,
           TError,
-          Awaited<ReturnType<typeof getCompaniesMeRbacPermissions>>
+          Awaited<ReturnType<typeof getPermissionCatalog>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetCompaniesMeRbacPermissions<TData = Awaited<ReturnType<typeof getCompaniesMeRbacPermissions>>, TError = string>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeRbacPermissions>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useGetPermissionCatalog<TData = Awaited<ReturnType<typeof getPermissionCatalog>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPermissionCatalog>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List global permission keys (tenant RBAC catalog)
  */
 
-export function useGetCompaniesMeRbacPermissions<TData = Awaited<ReturnType<typeof getCompaniesMeRbacPermissions>>, TError = string>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeRbacPermissions>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useGetPermissionCatalog<TData = Awaited<ReturnType<typeof getPermissionCatalog>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPermissionCatalog>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetCompaniesMeRbacPermissionsQueryOptions(options)
+  const queryOptions = getGetPermissionCatalogQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -4474,41 +4517,41 @@ export const useCompaniesMeSSOPatch = <TError = unknown,
  * Returns SSO group id mappings to tenant roles or legacy global role names for the current company.
  * @summary List IdP group to role mappings
  */
-export type getCompaniesMeSsoGroupMappingsResponse200 = {
+export type listGroupMappingsResponse200 = {
   data: ModelsCompanySSOGroupMapping[]
   status: 200
 }
 
-export type getCompaniesMeSsoGroupMappingsResponse401 = {
+export type listGroupMappingsResponse401 = {
   data: string
   status: 401
 }
 
-export type getCompaniesMeSsoGroupMappingsResponse403 = {
+export type listGroupMappingsResponse403 = {
   data: string
   status: 403
 }
 
-export type getCompaniesMeSsoGroupMappingsResponse404 = {
+export type listGroupMappingsResponse404 = {
   data: string
   status: 404
 }
 
-export type getCompaniesMeSsoGroupMappingsResponse500 = {
+export type listGroupMappingsResponse500 = {
   data: string
   status: 500
 }
 
-export type getCompaniesMeSsoGroupMappingsResponseSuccess = (getCompaniesMeSsoGroupMappingsResponse200) & {
+export type listGroupMappingsResponseSuccess = (listGroupMappingsResponse200) & {
   headers: Headers;
 };
-export type getCompaniesMeSsoGroupMappingsResponseError = (getCompaniesMeSsoGroupMappingsResponse401 | getCompaniesMeSsoGroupMappingsResponse403 | getCompaniesMeSsoGroupMappingsResponse404 | getCompaniesMeSsoGroupMappingsResponse500) & {
+export type listGroupMappingsResponseError = (listGroupMappingsResponse401 | listGroupMappingsResponse403 | listGroupMappingsResponse404 | listGroupMappingsResponse500) & {
   headers: Headers;
 };
 
-export type getCompaniesMeSsoGroupMappingsResponse = (getCompaniesMeSsoGroupMappingsResponseSuccess | getCompaniesMeSsoGroupMappingsResponseError)
+export type listGroupMappingsResponse = (listGroupMappingsResponseSuccess | listGroupMappingsResponseError)
 
-export const getGetCompaniesMeSsoGroupMappingsUrl = () => {
+export const getListGroupMappingsUrl = () => {
 
 
 
@@ -4516,9 +4559,9 @@ export const getGetCompaniesMeSsoGroupMappingsUrl = () => {
   return `/companies/me/sso/group-mappings`
 }
 
-export const getCompaniesMeSsoGroupMappings = async ( options?: RequestInit): Promise<getCompaniesMeSsoGroupMappingsResponse> => {
+export const listGroupMappings = async ( options?: RequestInit): Promise<listGroupMappingsResponse> => {
 
-  return orvalMutator<getCompaniesMeSsoGroupMappingsResponse>(getGetCompaniesMeSsoGroupMappingsUrl(),
+  return orvalMutator<listGroupMappingsResponse>(getListGroupMappingsUrl(),
   {
     ...options,
     method: 'GET'
@@ -4531,69 +4574,69 @@ export const getCompaniesMeSsoGroupMappings = async ( options?: RequestInit): Pr
 
 
 
-export const getGetCompaniesMeSsoGroupMappingsQueryKey = () => {
+export const getListGroupMappingsQueryKey = () => {
     return [
     `/companies/me/sso/group-mappings`
     ] as const;
     }
 
 
-export const getGetCompaniesMeSsoGroupMappingsQueryOptions = <TData = Awaited<ReturnType<typeof getCompaniesMeSsoGroupMappings>>, TError = string>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeSsoGroupMappings>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export const getListGroupMappingsQueryOptions = <TData = Awaited<ReturnType<typeof listGroupMappings>>, TError = string>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listGroupMappings>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetCompaniesMeSsoGroupMappingsQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getListGroupMappingsQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCompaniesMeSsoGroupMappings>>> = ({ signal }) => getCompaniesMeSsoGroupMappings({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listGroupMappings>>> = ({ signal }) => listGroupMappings({ signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeSsoGroupMappings>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listGroupMappings>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type GetCompaniesMeSsoGroupMappingsQueryResult = NonNullable<Awaited<ReturnType<typeof getCompaniesMeSsoGroupMappings>>>
-export type GetCompaniesMeSsoGroupMappingsQueryError = string
+export type ListGroupMappingsQueryResult = NonNullable<Awaited<ReturnType<typeof listGroupMappings>>>
+export type ListGroupMappingsQueryError = string
 
 
-export function useGetCompaniesMeSsoGroupMappings<TData = Awaited<ReturnType<typeof getCompaniesMeSsoGroupMappings>>, TError = string>(
-  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeSsoGroupMappings>>, TError, TData>> & Pick<
+export function useListGroupMappings<TData = Awaited<ReturnType<typeof listGroupMappings>>, TError = string>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listGroupMappings>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getCompaniesMeSsoGroupMappings>>,
+          Awaited<ReturnType<typeof listGroupMappings>>,
           TError,
-          Awaited<ReturnType<typeof getCompaniesMeSsoGroupMappings>>
+          Awaited<ReturnType<typeof listGroupMappings>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetCompaniesMeSsoGroupMappings<TData = Awaited<ReturnType<typeof getCompaniesMeSsoGroupMappings>>, TError = string>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeSsoGroupMappings>>, TError, TData>> & Pick<
+export function useListGroupMappings<TData = Awaited<ReturnType<typeof listGroupMappings>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listGroupMappings>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getCompaniesMeSsoGroupMappings>>,
+          Awaited<ReturnType<typeof listGroupMappings>>,
           TError,
-          Awaited<ReturnType<typeof getCompaniesMeSsoGroupMappings>>
+          Awaited<ReturnType<typeof listGroupMappings>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetCompaniesMeSsoGroupMappings<TData = Awaited<ReturnType<typeof getCompaniesMeSsoGroupMappings>>, TError = string>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeSsoGroupMappings>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useListGroupMappings<TData = Awaited<ReturnType<typeof listGroupMappings>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listGroupMappings>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List IdP group to role mappings
  */
 
-export function useGetCompaniesMeSsoGroupMappings<TData = Awaited<ReturnType<typeof getCompaniesMeSsoGroupMappings>>, TError = string>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeSsoGroupMappings>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useListGroupMappings<TData = Awaited<ReturnType<typeof listGroupMappings>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listGroupMappings>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetCompaniesMeSsoGroupMappingsQueryOptions(options)
+  const queryOptions = getListGroupMappingsQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -4607,49 +4650,54 @@ export function useGetCompaniesMeSsoGroupMappings<TData = Awaited<ReturnType<typ
 
 
 /**
- * Maps an IdP group id (e.g. Azure object id) to a tenant role and/or a legacy role name (staff, supervisor, ...).
+ * Maps an IdP group id (e.g. Azure object id) to exactly one of: a tenant role id or legacy global role name staff | supervisor | operator. Not both; global admin is not assignable via group mapping.
  * @summary Create or update IdP group mapping
  */
-export type postCompaniesMeSsoGroupMappingsResponse201 = {
+export type upsertGroupMappingResponse200 = {
+  data: ModelsCompanySSOGroupMapping
+  status: 200
+}
+
+export type upsertGroupMappingResponse201 = {
   data: ModelsCompanySSOGroupMapping
   status: 201
 }
 
-export type postCompaniesMeSsoGroupMappingsResponse400 = {
+export type upsertGroupMappingResponse400 = {
   data: string
   status: 400
 }
 
-export type postCompaniesMeSsoGroupMappingsResponse401 = {
+export type upsertGroupMappingResponse401 = {
   data: string
   status: 401
 }
 
-export type postCompaniesMeSsoGroupMappingsResponse403 = {
+export type upsertGroupMappingResponse403 = {
   data: string
   status: 403
 }
 
-export type postCompaniesMeSsoGroupMappingsResponse404 = {
+export type upsertGroupMappingResponse404 = {
   data: string
   status: 404
 }
 
-export type postCompaniesMeSsoGroupMappingsResponse500 = {
+export type upsertGroupMappingResponse500 = {
   data: string
   status: 500
 }
 
-export type postCompaniesMeSsoGroupMappingsResponseSuccess = (postCompaniesMeSsoGroupMappingsResponse201) & {
+export type upsertGroupMappingResponseSuccess = (upsertGroupMappingResponse200 | upsertGroupMappingResponse201) & {
   headers: Headers;
 };
-export type postCompaniesMeSsoGroupMappingsResponseError = (postCompaniesMeSsoGroupMappingsResponse400 | postCompaniesMeSsoGroupMappingsResponse401 | postCompaniesMeSsoGroupMappingsResponse403 | postCompaniesMeSsoGroupMappingsResponse404 | postCompaniesMeSsoGroupMappingsResponse500) & {
+export type upsertGroupMappingResponseError = (upsertGroupMappingResponse400 | upsertGroupMappingResponse401 | upsertGroupMappingResponse403 | upsertGroupMappingResponse404 | upsertGroupMappingResponse500) & {
   headers: Headers;
 };
 
-export type postCompaniesMeSsoGroupMappingsResponse = (postCompaniesMeSsoGroupMappingsResponseSuccess | postCompaniesMeSsoGroupMappingsResponseError)
+export type upsertGroupMappingResponse = (upsertGroupMappingResponseSuccess | upsertGroupMappingResponseError)
 
-export const getPostCompaniesMeSsoGroupMappingsUrl = () => {
+export const getUpsertGroupMappingUrl = () => {
 
 
 
@@ -4657,9 +4705,9 @@ export const getPostCompaniesMeSsoGroupMappingsUrl = () => {
   return `/companies/me/sso/group-mappings`
 }
 
-export const postCompaniesMeSsoGroupMappings = async (handlersUpsertGroupMappingJSON: HandlersUpsertGroupMappingJSON, options?: RequestInit): Promise<postCompaniesMeSsoGroupMappingsResponse> => {
+export const upsertGroupMapping = async (handlersUpsertGroupMappingJSON: HandlersUpsertGroupMappingJSON, options?: RequestInit): Promise<upsertGroupMappingResponse> => {
 
-  return orvalMutator<postCompaniesMeSsoGroupMappingsResponse>(getPostCompaniesMeSsoGroupMappingsUrl(),
+  return orvalMutator<upsertGroupMappingResponse>(getUpsertGroupMappingUrl(),
   {
     ...options,
     method: 'POST',
@@ -4672,11 +4720,11 @@ export const postCompaniesMeSsoGroupMappings = async (handlersUpsertGroupMapping
 
 
 
-export const getPostCompaniesMeSsoGroupMappingsMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postCompaniesMeSsoGroupMappings>>, TError,{data: HandlersUpsertGroupMappingJSON}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof postCompaniesMeSsoGroupMappings>>, TError,{data: HandlersUpsertGroupMappingJSON}, TContext> => {
+export const getUpsertGroupMappingMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertGroupMapping>>, TError,{data: HandlersUpsertGroupMappingJSON}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof upsertGroupMapping>>, TError,{data: HandlersUpsertGroupMappingJSON}, TContext> => {
 
-const mutationKey = ['postCompaniesMeSsoGroupMappings'];
+const mutationKey = ['upsertGroupMapping'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -4686,10 +4734,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postCompaniesMeSsoGroupMappings>>, {data: HandlersUpsertGroupMappingJSON}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof upsertGroupMapping>>, {data: HandlersUpsertGroupMappingJSON}> = (props) => {
           const {data} = props ?? {};
 
-          return  postCompaniesMeSsoGroupMappings(data,requestOptions)
+          return  upsertGroupMapping(data,requestOptions)
         }
 
 
@@ -4699,67 +4747,67 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PostCompaniesMeSsoGroupMappingsMutationResult = NonNullable<Awaited<ReturnType<typeof postCompaniesMeSsoGroupMappings>>>
-    export type PostCompaniesMeSsoGroupMappingsMutationBody = HandlersUpsertGroupMappingJSON
-    export type PostCompaniesMeSsoGroupMappingsMutationError = string
+    export type UpsertGroupMappingMutationResult = NonNullable<Awaited<ReturnType<typeof upsertGroupMapping>>>
+    export type UpsertGroupMappingMutationBody = HandlersUpsertGroupMappingJSON
+    export type UpsertGroupMappingMutationError = string
 
     /**
  * @summary Create or update IdP group mapping
  */
-export const usePostCompaniesMeSsoGroupMappings = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postCompaniesMeSsoGroupMappings>>, TError,{data: HandlersUpsertGroupMappingJSON}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const useUpsertGroupMapping = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertGroupMapping>>, TError,{data: HandlersUpsertGroupMappingJSON}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof postCompaniesMeSsoGroupMappings>>,
+        Awaited<ReturnType<typeof upsertGroupMapping>>,
         TError,
         {data: HandlersUpsertGroupMappingJSON},
         TContext
       > => {
-      return useMutation(getPostCompaniesMeSsoGroupMappingsMutationOptions(options), queryClient);
+      return useMutation(getUpsertGroupMappingMutationOptions(options), queryClient);
     }
 
 /**
  * @summary Delete IdP group mapping
  */
-export type deleteCompaniesMeSsoGroupMappingsMappingIdResponse204 = {
+export type deleteGroupMappingResponse204 = {
   data: void
   status: 204
 }
 
-export type deleteCompaniesMeSsoGroupMappingsMappingIdResponse400 = {
+export type deleteGroupMappingResponse400 = {
   data: string
   status: 400
 }
 
-export type deleteCompaniesMeSsoGroupMappingsMappingIdResponse401 = {
+export type deleteGroupMappingResponse401 = {
   data: string
   status: 401
 }
 
-export type deleteCompaniesMeSsoGroupMappingsMappingIdResponse403 = {
+export type deleteGroupMappingResponse403 = {
   data: string
   status: 403
 }
 
-export type deleteCompaniesMeSsoGroupMappingsMappingIdResponse404 = {
+export type deleteGroupMappingResponse404 = {
   data: string
   status: 404
 }
 
-export type deleteCompaniesMeSsoGroupMappingsMappingIdResponse500 = {
+export type deleteGroupMappingResponse500 = {
   data: string
   status: 500
 }
 
-export type deleteCompaniesMeSsoGroupMappingsMappingIdResponseSuccess = (deleteCompaniesMeSsoGroupMappingsMappingIdResponse204) & {
+export type deleteGroupMappingResponseSuccess = (deleteGroupMappingResponse204) & {
   headers: Headers;
 };
-export type deleteCompaniesMeSsoGroupMappingsMappingIdResponseError = (deleteCompaniesMeSsoGroupMappingsMappingIdResponse400 | deleteCompaniesMeSsoGroupMappingsMappingIdResponse401 | deleteCompaniesMeSsoGroupMappingsMappingIdResponse403 | deleteCompaniesMeSsoGroupMappingsMappingIdResponse404 | deleteCompaniesMeSsoGroupMappingsMappingIdResponse500) & {
+export type deleteGroupMappingResponseError = (deleteGroupMappingResponse400 | deleteGroupMappingResponse401 | deleteGroupMappingResponse403 | deleteGroupMappingResponse404 | deleteGroupMappingResponse500) & {
   headers: Headers;
 };
 
-export type deleteCompaniesMeSsoGroupMappingsMappingIdResponse = (deleteCompaniesMeSsoGroupMappingsMappingIdResponseSuccess | deleteCompaniesMeSsoGroupMappingsMappingIdResponseError)
+export type deleteGroupMappingResponse = (deleteGroupMappingResponseSuccess | deleteGroupMappingResponseError)
 
-export const getDeleteCompaniesMeSsoGroupMappingsMappingIdUrl = (mappingId: string,) => {
+export const getDeleteGroupMappingUrl = (mappingId: string,) => {
 
 
 
@@ -4767,9 +4815,9 @@ export const getDeleteCompaniesMeSsoGroupMappingsMappingIdUrl = (mappingId: stri
   return `/companies/me/sso/group-mappings/${mappingId}`
 }
 
-export const deleteCompaniesMeSsoGroupMappingsMappingId = async (mappingId: string, options?: RequestInit): Promise<deleteCompaniesMeSsoGroupMappingsMappingIdResponse> => {
+export const deleteGroupMapping = async (mappingId: string, options?: RequestInit): Promise<deleteGroupMappingResponse> => {
 
-  return orvalMutator<deleteCompaniesMeSsoGroupMappingsMappingIdResponse>(getDeleteCompaniesMeSsoGroupMappingsMappingIdUrl(mappingId),
+  return orvalMutator<deleteGroupMappingResponse>(getDeleteGroupMappingUrl(mappingId),
   {
     ...options,
     method: 'DELETE'
@@ -4781,11 +4829,11 @@ export const deleteCompaniesMeSsoGroupMappingsMappingId = async (mappingId: stri
 
 
 
-export const getDeleteCompaniesMeSsoGroupMappingsMappingIdMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCompaniesMeSsoGroupMappingsMappingId>>, TError,{mappingId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof deleteCompaniesMeSsoGroupMappingsMappingId>>, TError,{mappingId: string}, TContext> => {
+export const getDeleteGroupMappingMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteGroupMapping>>, TError,{mappingId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteGroupMapping>>, TError,{mappingId: string}, TContext> => {
 
-const mutationKey = ['deleteCompaniesMeSsoGroupMappingsMappingId'];
+const mutationKey = ['deleteGroupMapping'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -4795,10 +4843,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteCompaniesMeSsoGroupMappingsMappingId>>, {mappingId: string}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteGroupMapping>>, {mappingId: string}> = (props) => {
           const {mappingId} = props ?? {};
 
-          return  deleteCompaniesMeSsoGroupMappingsMappingId(mappingId,requestOptions)
+          return  deleteGroupMapping(mappingId,requestOptions)
         }
 
 
@@ -4808,62 +4856,62 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type DeleteCompaniesMeSsoGroupMappingsMappingIdMutationResult = NonNullable<Awaited<ReturnType<typeof deleteCompaniesMeSsoGroupMappingsMappingId>>>
+    export type DeleteGroupMappingMutationResult = NonNullable<Awaited<ReturnType<typeof deleteGroupMapping>>>
 
-    export type DeleteCompaniesMeSsoGroupMappingsMappingIdMutationError = string
+    export type DeleteGroupMappingMutationError = string
 
     /**
  * @summary Delete IdP group mapping
  */
-export const useDeleteCompaniesMeSsoGroupMappingsMappingId = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCompaniesMeSsoGroupMappingsMappingId>>, TError,{mappingId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const useDeleteGroupMapping = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteGroupMapping>>, TError,{mappingId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof deleteCompaniesMeSsoGroupMappingsMappingId>>,
+        Awaited<ReturnType<typeof deleteGroupMapping>>,
         TError,
         {mappingId: string},
         TContext
       > => {
-      return useMutation(getDeleteCompaniesMeSsoGroupMappingsMappingIdMutationOptions(options), queryClient);
+      return useMutation(getDeleteGroupMappingMutationOptions(options), queryClient);
     }
 
 /**
  * @summary List tenant-defined roles
  */
-export type getCompaniesMeTenantRolesResponse200 = {
+export type listTenantRolesResponse200 = {
   data: ModelsTenantRole[]
   status: 200
 }
 
-export type getCompaniesMeTenantRolesResponse401 = {
+export type listTenantRolesResponse401 = {
   data: string
   status: 401
 }
 
-export type getCompaniesMeTenantRolesResponse403 = {
+export type listTenantRolesResponse403 = {
   data: string
   status: 403
 }
 
-export type getCompaniesMeTenantRolesResponse404 = {
+export type listTenantRolesResponse404 = {
   data: string
   status: 404
 }
 
-export type getCompaniesMeTenantRolesResponse500 = {
+export type listTenantRolesResponse500 = {
   data: string
   status: 500
 }
 
-export type getCompaniesMeTenantRolesResponseSuccess = (getCompaniesMeTenantRolesResponse200) & {
+export type listTenantRolesResponseSuccess = (listTenantRolesResponse200) & {
   headers: Headers;
 };
-export type getCompaniesMeTenantRolesResponseError = (getCompaniesMeTenantRolesResponse401 | getCompaniesMeTenantRolesResponse403 | getCompaniesMeTenantRolesResponse404 | getCompaniesMeTenantRolesResponse500) & {
+export type listTenantRolesResponseError = (listTenantRolesResponse401 | listTenantRolesResponse403 | listTenantRolesResponse404 | listTenantRolesResponse500) & {
   headers: Headers;
 };
 
-export type getCompaniesMeTenantRolesResponse = (getCompaniesMeTenantRolesResponseSuccess | getCompaniesMeTenantRolesResponseError)
+export type listTenantRolesResponse = (listTenantRolesResponseSuccess | listTenantRolesResponseError)
 
-export const getGetCompaniesMeTenantRolesUrl = () => {
+export const getListTenantRolesUrl = () => {
 
 
 
@@ -4871,9 +4919,9 @@ export const getGetCompaniesMeTenantRolesUrl = () => {
   return `/companies/me/tenant-roles`
 }
 
-export const getCompaniesMeTenantRoles = async ( options?: RequestInit): Promise<getCompaniesMeTenantRolesResponse> => {
+export const listTenantRoles = async ( options?: RequestInit): Promise<listTenantRolesResponse> => {
 
-  return orvalMutator<getCompaniesMeTenantRolesResponse>(getGetCompaniesMeTenantRolesUrl(),
+  return orvalMutator<listTenantRolesResponse>(getListTenantRolesUrl(),
   {
     ...options,
     method: 'GET'
@@ -4886,69 +4934,69 @@ export const getCompaniesMeTenantRoles = async ( options?: RequestInit): Promise
 
 
 
-export const getGetCompaniesMeTenantRolesQueryKey = () => {
+export const getListTenantRolesQueryKey = () => {
     return [
     `/companies/me/tenant-roles`
     ] as const;
     }
 
 
-export const getGetCompaniesMeTenantRolesQueryOptions = <TData = Awaited<ReturnType<typeof getCompaniesMeTenantRoles>>, TError = string>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeTenantRoles>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export const getListTenantRolesQueryOptions = <TData = Awaited<ReturnType<typeof listTenantRoles>>, TError = string>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTenantRoles>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetCompaniesMeTenantRolesQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getListTenantRolesQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCompaniesMeTenantRoles>>> = ({ signal }) => getCompaniesMeTenantRoles({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTenantRoles>>> = ({ signal }) => listTenantRoles({ signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeTenantRoles>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTenantRoles>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type GetCompaniesMeTenantRolesQueryResult = NonNullable<Awaited<ReturnType<typeof getCompaniesMeTenantRoles>>>
-export type GetCompaniesMeTenantRolesQueryError = string
+export type ListTenantRolesQueryResult = NonNullable<Awaited<ReturnType<typeof listTenantRoles>>>
+export type ListTenantRolesQueryError = string
 
 
-export function useGetCompaniesMeTenantRoles<TData = Awaited<ReturnType<typeof getCompaniesMeTenantRoles>>, TError = string>(
-  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeTenantRoles>>, TError, TData>> & Pick<
+export function useListTenantRoles<TData = Awaited<ReturnType<typeof listTenantRoles>>, TError = string>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTenantRoles>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getCompaniesMeTenantRoles>>,
+          Awaited<ReturnType<typeof listTenantRoles>>,
           TError,
-          Awaited<ReturnType<typeof getCompaniesMeTenantRoles>>
+          Awaited<ReturnType<typeof listTenantRoles>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetCompaniesMeTenantRoles<TData = Awaited<ReturnType<typeof getCompaniesMeTenantRoles>>, TError = string>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeTenantRoles>>, TError, TData>> & Pick<
+export function useListTenantRoles<TData = Awaited<ReturnType<typeof listTenantRoles>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTenantRoles>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getCompaniesMeTenantRoles>>,
+          Awaited<ReturnType<typeof listTenantRoles>>,
           TError,
-          Awaited<ReturnType<typeof getCompaniesMeTenantRoles>>
+          Awaited<ReturnType<typeof listTenantRoles>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetCompaniesMeTenantRoles<TData = Awaited<ReturnType<typeof getCompaniesMeTenantRoles>>, TError = string>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeTenantRoles>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useListTenantRoles<TData = Awaited<ReturnType<typeof listTenantRoles>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTenantRoles>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List tenant-defined roles
  */
 
-export function useGetCompaniesMeTenantRoles<TData = Awaited<ReturnType<typeof getCompaniesMeTenantRoles>>, TError = string>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeTenantRoles>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useListTenantRoles<TData = Awaited<ReturnType<typeof listTenantRoles>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTenantRoles>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetCompaniesMeTenantRolesQueryOptions(options)
+  const queryOptions = getListTenantRolesQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -4964,46 +5012,46 @@ export function useGetCompaniesMeTenantRoles<TData = Awaited<ReturnType<typeof g
 /**
  * @summary Create tenant role
  */
-export type postCompaniesMeTenantRolesResponse201 = {
+export type createTenantRoleResponse201 = {
   data: ModelsTenantRole
   status: 201
 }
 
-export type postCompaniesMeTenantRolesResponse400 = {
+export type createTenantRoleResponse400 = {
   data: string
   status: 400
 }
 
-export type postCompaniesMeTenantRolesResponse401 = {
+export type createTenantRoleResponse401 = {
   data: string
   status: 401
 }
 
-export type postCompaniesMeTenantRolesResponse403 = {
+export type createTenantRoleResponse403 = {
   data: string
   status: 403
 }
 
-export type postCompaniesMeTenantRolesResponse404 = {
+export type createTenantRoleResponse404 = {
   data: string
   status: 404
 }
 
-export type postCompaniesMeTenantRolesResponse500 = {
+export type createTenantRoleResponse500 = {
   data: string
   status: 500
 }
 
-export type postCompaniesMeTenantRolesResponseSuccess = (postCompaniesMeTenantRolesResponse201) & {
+export type createTenantRoleResponseSuccess = (createTenantRoleResponse201) & {
   headers: Headers;
 };
-export type postCompaniesMeTenantRolesResponseError = (postCompaniesMeTenantRolesResponse400 | postCompaniesMeTenantRolesResponse401 | postCompaniesMeTenantRolesResponse403 | postCompaniesMeTenantRolesResponse404 | postCompaniesMeTenantRolesResponse500) & {
+export type createTenantRoleResponseError = (createTenantRoleResponse400 | createTenantRoleResponse401 | createTenantRoleResponse403 | createTenantRoleResponse404 | createTenantRoleResponse500) & {
   headers: Headers;
 };
 
-export type postCompaniesMeTenantRolesResponse = (postCompaniesMeTenantRolesResponseSuccess | postCompaniesMeTenantRolesResponseError)
+export type createTenantRoleResponse = (createTenantRoleResponseSuccess | createTenantRoleResponseError)
 
-export const getPostCompaniesMeTenantRolesUrl = () => {
+export const getCreateTenantRoleUrl = () => {
 
 
 
@@ -5011,9 +5059,9 @@ export const getPostCompaniesMeTenantRolesUrl = () => {
   return `/companies/me/tenant-roles`
 }
 
-export const postCompaniesMeTenantRoles = async (handlersCreateTenantRoleJSON: HandlersCreateTenantRoleJSON, options?: RequestInit): Promise<postCompaniesMeTenantRolesResponse> => {
+export const createTenantRole = async (handlersCreateTenantRoleJSON: HandlersCreateTenantRoleJSON, options?: RequestInit): Promise<createTenantRoleResponse> => {
 
-  return orvalMutator<postCompaniesMeTenantRolesResponse>(getPostCompaniesMeTenantRolesUrl(),
+  return orvalMutator<createTenantRoleResponse>(getCreateTenantRoleUrl(),
   {
     ...options,
     method: 'POST',
@@ -5026,11 +5074,11 @@ export const postCompaniesMeTenantRoles = async (handlersCreateTenantRoleJSON: H
 
 
 
-export const getPostCompaniesMeTenantRolesMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postCompaniesMeTenantRoles>>, TError,{data: HandlersCreateTenantRoleJSON}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof postCompaniesMeTenantRoles>>, TError,{data: HandlersCreateTenantRoleJSON}, TContext> => {
+export const getCreateTenantRoleMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTenantRole>>, TError,{data: HandlersCreateTenantRoleJSON}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof createTenantRole>>, TError,{data: HandlersCreateTenantRoleJSON}, TContext> => {
 
-const mutationKey = ['postCompaniesMeTenantRoles'];
+const mutationKey = ['createTenantRole'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -5040,10 +5088,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postCompaniesMeTenantRoles>>, {data: HandlersCreateTenantRoleJSON}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createTenantRole>>, {data: HandlersCreateTenantRoleJSON}> = (props) => {
           const {data} = props ?? {};
 
-          return  postCompaniesMeTenantRoles(data,requestOptions)
+          return  createTenantRole(data,requestOptions)
         }
 
 
@@ -5053,68 +5101,68 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PostCompaniesMeTenantRolesMutationResult = NonNullable<Awaited<ReturnType<typeof postCompaniesMeTenantRoles>>>
-    export type PostCompaniesMeTenantRolesMutationBody = HandlersCreateTenantRoleJSON
-    export type PostCompaniesMeTenantRolesMutationError = string
+    export type CreateTenantRoleMutationResult = NonNullable<Awaited<ReturnType<typeof createTenantRole>>>
+    export type CreateTenantRoleMutationBody = HandlersCreateTenantRoleJSON
+    export type CreateTenantRoleMutationError = string
 
     /**
  * @summary Create tenant role
  */
-export const usePostCompaniesMeTenantRoles = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postCompaniesMeTenantRoles>>, TError,{data: HandlersCreateTenantRoleJSON}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const useCreateTenantRole = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTenantRole>>, TError,{data: HandlersCreateTenantRoleJSON}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof postCompaniesMeTenantRoles>>,
+        Awaited<ReturnType<typeof createTenantRole>>,
         TError,
         {data: HandlersCreateTenantRoleJSON},
         TContext
       > => {
-      return useMutation(getPostCompaniesMeTenantRolesMutationOptions(options), queryClient);
+      return useMutation(getCreateTenantRoleMutationOptions(options), queryClient);
     }
 
 /**
  * Deletes a tenant-defined role. The reserved system role (`system_admin`) cannot be deleted.
  * @summary Delete tenant role
  */
-export type deleteCompaniesMeTenantRolesRoleIdResponse204 = {
+export type deleteTenantRoleResponse204 = {
   data: void
   status: 204
 }
 
-export type deleteCompaniesMeTenantRolesRoleIdResponse400 = {
+export type deleteTenantRoleResponse400 = {
   data: string
   status: 400
 }
 
-export type deleteCompaniesMeTenantRolesRoleIdResponse401 = {
+export type deleteTenantRoleResponse401 = {
   data: string
   status: 401
 }
 
-export type deleteCompaniesMeTenantRolesRoleIdResponse403 = {
+export type deleteTenantRoleResponse403 = {
   data: string
   status: 403
 }
 
-export type deleteCompaniesMeTenantRolesRoleIdResponse404 = {
+export type deleteTenantRoleResponse404 = {
   data: string
   status: 404
 }
 
-export type deleteCompaniesMeTenantRolesRoleIdResponse500 = {
+export type deleteTenantRoleResponse500 = {
   data: string
   status: 500
 }
 
-export type deleteCompaniesMeTenantRolesRoleIdResponseSuccess = (deleteCompaniesMeTenantRolesRoleIdResponse204) & {
+export type deleteTenantRoleResponseSuccess = (deleteTenantRoleResponse204) & {
   headers: Headers;
 };
-export type deleteCompaniesMeTenantRolesRoleIdResponseError = (deleteCompaniesMeTenantRolesRoleIdResponse400 | deleteCompaniesMeTenantRolesRoleIdResponse401 | deleteCompaniesMeTenantRolesRoleIdResponse403 | deleteCompaniesMeTenantRolesRoleIdResponse404 | deleteCompaniesMeTenantRolesRoleIdResponse500) & {
+export type deleteTenantRoleResponseError = (deleteTenantRoleResponse400 | deleteTenantRoleResponse401 | deleteTenantRoleResponse403 | deleteTenantRoleResponse404 | deleteTenantRoleResponse500) & {
   headers: Headers;
 };
 
-export type deleteCompaniesMeTenantRolesRoleIdResponse = (deleteCompaniesMeTenantRolesRoleIdResponseSuccess | deleteCompaniesMeTenantRolesRoleIdResponseError)
+export type deleteTenantRoleResponse = (deleteTenantRoleResponseSuccess | deleteTenantRoleResponseError)
 
-export const getDeleteCompaniesMeTenantRolesRoleIdUrl = (roleId: string,) => {
+export const getDeleteTenantRoleUrl = (roleId: string,) => {
 
 
 
@@ -5122,9 +5170,9 @@ export const getDeleteCompaniesMeTenantRolesRoleIdUrl = (roleId: string,) => {
   return `/companies/me/tenant-roles/${roleId}`
 }
 
-export const deleteCompaniesMeTenantRolesRoleId = async (roleId: string, options?: RequestInit): Promise<deleteCompaniesMeTenantRolesRoleIdResponse> => {
+export const deleteTenantRole = async (roleId: string, options?: RequestInit): Promise<deleteTenantRoleResponse> => {
 
-  return orvalMutator<deleteCompaniesMeTenantRolesRoleIdResponse>(getDeleteCompaniesMeTenantRolesRoleIdUrl(roleId),
+  return orvalMutator<deleteTenantRoleResponse>(getDeleteTenantRoleUrl(roleId),
   {
     ...options,
     method: 'DELETE'
@@ -5136,11 +5184,11 @@ export const deleteCompaniesMeTenantRolesRoleId = async (roleId: string, options
 
 
 
-export const getDeleteCompaniesMeTenantRolesRoleIdMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCompaniesMeTenantRolesRoleId>>, TError,{roleId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof deleteCompaniesMeTenantRolesRoleId>>, TError,{roleId: string}, TContext> => {
+export const getDeleteTenantRoleMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTenantRole>>, TError,{roleId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteTenantRole>>, TError,{roleId: string}, TContext> => {
 
-const mutationKey = ['deleteCompaniesMeTenantRolesRoleId'];
+const mutationKey = ['deleteTenantRole'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -5150,10 +5198,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteCompaniesMeTenantRolesRoleId>>, {roleId: string}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteTenantRole>>, {roleId: string}> = (props) => {
           const {roleId} = props ?? {};
 
-          return  deleteCompaniesMeTenantRolesRoleId(roleId,requestOptions)
+          return  deleteTenantRole(roleId,requestOptions)
         }
 
 
@@ -5163,67 +5211,67 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type DeleteCompaniesMeTenantRolesRoleIdMutationResult = NonNullable<Awaited<ReturnType<typeof deleteCompaniesMeTenantRolesRoleId>>>
+    export type DeleteTenantRoleMutationResult = NonNullable<Awaited<ReturnType<typeof deleteTenantRole>>>
 
-    export type DeleteCompaniesMeTenantRolesRoleIdMutationError = string
+    export type DeleteTenantRoleMutationError = string
 
     /**
  * @summary Delete tenant role
  */
-export const useDeleteCompaniesMeTenantRolesRoleId = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCompaniesMeTenantRolesRoleId>>, TError,{roleId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const useDeleteTenantRole = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTenantRole>>, TError,{roleId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof deleteCompaniesMeTenantRolesRoleId>>,
+        Awaited<ReturnType<typeof deleteTenantRole>>,
         TError,
         {roleId: string},
         TContext
       > => {
-      return useMutation(getDeleteCompaniesMeTenantRolesRoleIdMutationOptions(options), queryClient);
+      return useMutation(getDeleteTenantRoleMutationOptions(options), queryClient);
     }
 
 /**
  * @summary Update tenant role
  */
-export type patchCompaniesMeTenantRolesRoleIdResponse200 = {
+export type patchTenantRoleResponse200 = {
   data: ModelsTenantRole
   status: 200
 }
 
-export type patchCompaniesMeTenantRolesRoleIdResponse400 = {
+export type patchTenantRoleResponse400 = {
   data: string
   status: 400
 }
 
-export type patchCompaniesMeTenantRolesRoleIdResponse401 = {
+export type patchTenantRoleResponse401 = {
   data: string
   status: 401
 }
 
-export type patchCompaniesMeTenantRolesRoleIdResponse403 = {
+export type patchTenantRoleResponse403 = {
   data: string
   status: 403
 }
 
-export type patchCompaniesMeTenantRolesRoleIdResponse404 = {
+export type patchTenantRoleResponse404 = {
   data: string
   status: 404
 }
 
-export type patchCompaniesMeTenantRolesRoleIdResponse500 = {
+export type patchTenantRoleResponse500 = {
   data: string
   status: 500
 }
 
-export type patchCompaniesMeTenantRolesRoleIdResponseSuccess = (patchCompaniesMeTenantRolesRoleIdResponse200) & {
+export type patchTenantRoleResponseSuccess = (patchTenantRoleResponse200) & {
   headers: Headers;
 };
-export type patchCompaniesMeTenantRolesRoleIdResponseError = (patchCompaniesMeTenantRolesRoleIdResponse400 | patchCompaniesMeTenantRolesRoleIdResponse401 | patchCompaniesMeTenantRolesRoleIdResponse403 | patchCompaniesMeTenantRolesRoleIdResponse404 | patchCompaniesMeTenantRolesRoleIdResponse500) & {
+export type patchTenantRoleResponseError = (patchTenantRoleResponse400 | patchTenantRoleResponse401 | patchTenantRoleResponse403 | patchTenantRoleResponse404 | patchTenantRoleResponse500) & {
   headers: Headers;
 };
 
-export type patchCompaniesMeTenantRolesRoleIdResponse = (patchCompaniesMeTenantRolesRoleIdResponseSuccess | patchCompaniesMeTenantRolesRoleIdResponseError)
+export type patchTenantRoleResponse = (patchTenantRoleResponseSuccess | patchTenantRoleResponseError)
 
-export const getPatchCompaniesMeTenantRolesRoleIdUrl = (roleId: string,) => {
+export const getPatchTenantRoleUrl = (roleId: string,) => {
 
 
 
@@ -5231,10 +5279,10 @@ export const getPatchCompaniesMeTenantRolesRoleIdUrl = (roleId: string,) => {
   return `/companies/me/tenant-roles/${roleId}`
 }
 
-export const patchCompaniesMeTenantRolesRoleId = async (roleId: string,
-    handlersCreateTenantRoleJSON: HandlersCreateTenantRoleJSON, options?: RequestInit): Promise<patchCompaniesMeTenantRolesRoleIdResponse> => {
+export const patchTenantRole = async (roleId: string,
+    handlersCreateTenantRoleJSON: HandlersCreateTenantRoleJSON, options?: RequestInit): Promise<patchTenantRoleResponse> => {
 
-  return orvalMutator<patchCompaniesMeTenantRolesRoleIdResponse>(getPatchCompaniesMeTenantRolesRoleIdUrl(roleId),
+  return orvalMutator<patchTenantRoleResponse>(getPatchTenantRoleUrl(roleId),
   {
     ...options,
     method: 'PATCH',
@@ -5247,11 +5295,11 @@ export const patchCompaniesMeTenantRolesRoleId = async (roleId: string,
 
 
 
-export const getPatchCompaniesMeTenantRolesRoleIdMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchCompaniesMeTenantRolesRoleId>>, TError,{roleId: string;data: HandlersCreateTenantRoleJSON}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof patchCompaniesMeTenantRolesRoleId>>, TError,{roleId: string;data: HandlersCreateTenantRoleJSON}, TContext> => {
+export const getPatchTenantRoleMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchTenantRole>>, TError,{roleId: string;data: HandlersCreateTenantRoleJSON}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof patchTenantRole>>, TError,{roleId: string;data: HandlersCreateTenantRoleJSON}, TContext> => {
 
-const mutationKey = ['patchCompaniesMeTenantRolesRoleId'];
+const mutationKey = ['patchTenantRole'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -5261,10 +5309,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchCompaniesMeTenantRolesRoleId>>, {roleId: string;data: HandlersCreateTenantRoleJSON}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchTenantRole>>, {roleId: string;data: HandlersCreateTenantRoleJSON}> = (props) => {
           const {roleId,data} = props ?? {};
 
-          return  patchCompaniesMeTenantRolesRoleId(roleId,data,requestOptions)
+          return  patchTenantRole(roleId,data,requestOptions)
         }
 
 
@@ -5274,63 +5322,63 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PatchCompaniesMeTenantRolesRoleIdMutationResult = NonNullable<Awaited<ReturnType<typeof patchCompaniesMeTenantRolesRoleId>>>
-    export type PatchCompaniesMeTenantRolesRoleIdMutationBody = HandlersCreateTenantRoleJSON
-    export type PatchCompaniesMeTenantRolesRoleIdMutationError = string
+    export type PatchTenantRoleMutationResult = NonNullable<Awaited<ReturnType<typeof patchTenantRole>>>
+    export type PatchTenantRoleMutationBody = HandlersCreateTenantRoleJSON
+    export type PatchTenantRoleMutationError = string
 
     /**
  * @summary Update tenant role
  */
-export const usePatchCompaniesMeTenantRolesRoleId = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchCompaniesMeTenantRolesRoleId>>, TError,{roleId: string;data: HandlersCreateTenantRoleJSON}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const usePatchTenantRole = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchTenantRole>>, TError,{roleId: string;data: HandlersCreateTenantRoleJSON}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof patchCompaniesMeTenantRolesRoleId>>,
+        Awaited<ReturnType<typeof patchTenantRole>>,
         TError,
         {roleId: string;data: HandlersCreateTenantRoleJSON},
         TContext
       > => {
-      return useMutation(getPatchCompaniesMeTenantRolesRoleIdMutationOptions(options), queryClient);
+      return useMutation(getPatchTenantRoleMutationOptions(options), queryClient);
     }
 
 /**
- * Users are included if they have a unit in the company, a user_tenant_roles row, global admin/platform_admin, or are the company owner. Includes tenantRoles (id, name, slug) per user.
+ * Users are included if they have a unit in the company, a user_tenant_roles row, or are the company owner. Global admin/platform_admin users are listed only when the caller is a global admin or platform admin. Includes tenantRoles (id, name, slug) per user.
  * @summary List users in the current company with tenant roles
  */
-export type getCompaniesMeUsersResponse200 = {
+export type listCompanyUsersResponse200 = {
   data: HandlersCompanyUserListItem[]
   status: 200
 }
 
-export type getCompaniesMeUsersResponse401 = {
+export type listCompanyUsersResponse401 = {
   data: string
   status: 401
 }
 
-export type getCompaniesMeUsersResponse403 = {
+export type listCompanyUsersResponse403 = {
   data: string
   status: 403
 }
 
-export type getCompaniesMeUsersResponse404 = {
+export type listCompanyUsersResponse404 = {
   data: string
   status: 404
 }
 
-export type getCompaniesMeUsersResponse500 = {
+export type listCompanyUsersResponse500 = {
   data: string
   status: 500
 }
 
-export type getCompaniesMeUsersResponseSuccess = (getCompaniesMeUsersResponse200) & {
+export type listCompanyUsersResponseSuccess = (listCompanyUsersResponse200) & {
   headers: Headers;
 };
-export type getCompaniesMeUsersResponseError = (getCompaniesMeUsersResponse401 | getCompaniesMeUsersResponse403 | getCompaniesMeUsersResponse404 | getCompaniesMeUsersResponse500) & {
+export type listCompanyUsersResponseError = (listCompanyUsersResponse401 | listCompanyUsersResponse403 | listCompanyUsersResponse404 | listCompanyUsersResponse500) & {
   headers: Headers;
 };
 
-export type getCompaniesMeUsersResponse = (getCompaniesMeUsersResponseSuccess | getCompaniesMeUsersResponseError)
+export type listCompanyUsersResponse = (listCompanyUsersResponseSuccess | listCompanyUsersResponseError)
 
-export const getGetCompaniesMeUsersUrl = (params?: GetCompaniesMeUsersParams,) => {
+export const getListCompanyUsersUrl = (params?: ListCompanyUsersParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -5345,9 +5393,9 @@ export const getGetCompaniesMeUsersUrl = (params?: GetCompaniesMeUsersParams,) =
   return stringifiedParams.length > 0 ? `/companies/me/users?${stringifiedParams}` : `/companies/me/users`
 }
 
-export const getCompaniesMeUsers = async (params?: GetCompaniesMeUsersParams, options?: RequestInit): Promise<getCompaniesMeUsersResponse> => {
+export const listCompanyUsers = async (params?: ListCompanyUsersParams, options?: RequestInit): Promise<listCompanyUsersResponse> => {
 
-  return orvalMutator<getCompaniesMeUsersResponse>(getGetCompaniesMeUsersUrl(params),
+  return orvalMutator<listCompanyUsersResponse>(getListCompanyUsersUrl(params),
   {
     ...options,
     method: 'GET'
@@ -5360,69 +5408,205 @@ export const getCompaniesMeUsers = async (params?: GetCompaniesMeUsersParams, op
 
 
 
-export const getGetCompaniesMeUsersQueryKey = (params?: GetCompaniesMeUsersParams,) => {
+export const getListCompanyUsersQueryKey = (params?: ListCompanyUsersParams,) => {
     return [
     `/companies/me/users`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetCompaniesMeUsersQueryOptions = <TData = Awaited<ReturnType<typeof getCompaniesMeUsers>>, TError = string>(params?: GetCompaniesMeUsersParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeUsers>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export const getListCompanyUsersQueryOptions = <TData = Awaited<ReturnType<typeof listCompanyUsers>>, TError = string>(params?: ListCompanyUsersParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCompanyUsers>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetCompaniesMeUsersQueryKey(params);
+  const queryKey =  queryOptions?.queryKey ?? getListCompanyUsersQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCompaniesMeUsers>>> = ({ signal }) => getCompaniesMeUsers(params, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCompanyUsers>>> = ({ signal }) => listCompanyUsers(params, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeUsers>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCompanyUsers>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type GetCompaniesMeUsersQueryResult = NonNullable<Awaited<ReturnType<typeof getCompaniesMeUsers>>>
-export type GetCompaniesMeUsersQueryError = string
+export type ListCompanyUsersQueryResult = NonNullable<Awaited<ReturnType<typeof listCompanyUsers>>>
+export type ListCompanyUsersQueryError = string
 
 
-export function useGetCompaniesMeUsers<TData = Awaited<ReturnType<typeof getCompaniesMeUsers>>, TError = string>(
- params: undefined |  GetCompaniesMeUsersParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeUsers>>, TError, TData>> & Pick<
+export function useListCompanyUsers<TData = Awaited<ReturnType<typeof listCompanyUsers>>, TError = string>(
+ params: undefined |  ListCompanyUsersParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCompanyUsers>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getCompaniesMeUsers>>,
+          Awaited<ReturnType<typeof listCompanyUsers>>,
           TError,
-          Awaited<ReturnType<typeof getCompaniesMeUsers>>
+          Awaited<ReturnType<typeof listCompanyUsers>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetCompaniesMeUsers<TData = Awaited<ReturnType<typeof getCompaniesMeUsers>>, TError = string>(
- params?: GetCompaniesMeUsersParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeUsers>>, TError, TData>> & Pick<
+export function useListCompanyUsers<TData = Awaited<ReturnType<typeof listCompanyUsers>>, TError = string>(
+ params?: ListCompanyUsersParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCompanyUsers>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getCompaniesMeUsers>>,
+          Awaited<ReturnType<typeof listCompanyUsers>>,
           TError,
-          Awaited<ReturnType<typeof getCompaniesMeUsers>>
+          Awaited<ReturnType<typeof listCompanyUsers>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetCompaniesMeUsers<TData = Awaited<ReturnType<typeof getCompaniesMeUsers>>, TError = string>(
- params?: GetCompaniesMeUsersParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeUsers>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useListCompanyUsers<TData = Awaited<ReturnType<typeof listCompanyUsers>>, TError = string>(
+ params?: ListCompanyUsersParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCompanyUsers>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List users in the current company with tenant roles
  */
 
-export function useGetCompaniesMeUsers<TData = Awaited<ReturnType<typeof getCompaniesMeUsers>>, TError = string>(
- params?: GetCompaniesMeUsersParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompaniesMeUsers>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useListCompanyUsers<TData = Awaited<ReturnType<typeof listCompanyUsers>>, TError = string>(
+ params?: ListCompanyUsersParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCompanyUsers>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetCompaniesMeUsersQueryOptions(params,options)
+  const queryOptions = getListCompanyUsersQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * Returns the linked OIDC issuer, subject, and optional directory object id for SSO (tenant admin).
+ * @summary Get user external SSO identity
+ */
+export type getExternalIdentityResponse200 = {
+  data: ModelsUserExternalIdentity
+  status: 200
+}
+
+export type getExternalIdentityResponse204 = {
+  data: string
+  status: 204
+}
+
+export type getExternalIdentityResponse401 = {
+  data: string
+  status: 401
+}
+
+export type getExternalIdentityResponse403 = {
+  data: string
+  status: 403
+}
+
+export type getExternalIdentityResponse500 = {
+  data: string
+  status: 500
+}
+
+export type getExternalIdentityResponseSuccess = (getExternalIdentityResponse200 | getExternalIdentityResponse204) & {
+  headers: Headers;
+};
+export type getExternalIdentityResponseError = (getExternalIdentityResponse401 | getExternalIdentityResponse403 | getExternalIdentityResponse500) & {
+  headers: Headers;
+};
+
+export type getExternalIdentityResponse = (getExternalIdentityResponseSuccess | getExternalIdentityResponseError)
+
+export const getGetExternalIdentityUrl = (userId: string,) => {
+
+
+
+
+  return `/companies/me/users/${userId}/external-identity`
+}
+
+export const getExternalIdentity = async (userId: string, options?: RequestInit): Promise<getExternalIdentityResponse> => {
+
+  return orvalMutator<getExternalIdentityResponse>(getGetExternalIdentityUrl(userId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetExternalIdentityQueryKey = (userId: string,) => {
+    return [
+    `/companies/me/users/${userId}/external-identity`
+    ] as const;
+    }
+
+
+export const getGetExternalIdentityQueryOptions = <TData = Awaited<ReturnType<typeof getExternalIdentity>>, TError = string>(userId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getExternalIdentity>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetExternalIdentityQueryKey(userId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getExternalIdentity>>> = ({ signal }) => getExternalIdentity(userId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(userId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getExternalIdentity>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetExternalIdentityQueryResult = NonNullable<Awaited<ReturnType<typeof getExternalIdentity>>>
+export type GetExternalIdentityQueryError = string
+
+
+export function useGetExternalIdentity<TData = Awaited<ReturnType<typeof getExternalIdentity>>, TError = string>(
+ userId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getExternalIdentity>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getExternalIdentity>>,
+          TError,
+          Awaited<ReturnType<typeof getExternalIdentity>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetExternalIdentity<TData = Awaited<ReturnType<typeof getExternalIdentity>>, TError = string>(
+ userId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getExternalIdentity>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getExternalIdentity>>,
+          TError,
+          Awaited<ReturnType<typeof getExternalIdentity>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetExternalIdentity<TData = Awaited<ReturnType<typeof getExternalIdentity>>, TError = string>(
+ userId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getExternalIdentity>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get user external SSO identity
+ */
+
+export function useGetExternalIdentity<TData = Awaited<ReturnType<typeof getExternalIdentity>>, TError = string>(
+ userId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getExternalIdentity>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetExternalIdentityQueryOptions(userId,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -5439,46 +5623,46 @@ export function useGetCompaniesMeUsers<TData = Awaited<ReturnType<typeof getComp
  * Admin repair for issuer/subject/oid when IdP metadata or user domain changes.
  * @summary Patch user external SSO identity
  */
-export type patchCompaniesMeUsersUserIdExternalIdentityResponse200 = {
+export type patchExternalIdentityResponse200 = {
   data: ModelsUserExternalIdentity
   status: 200
 }
 
-export type patchCompaniesMeUsersUserIdExternalIdentityResponse400 = {
+export type patchExternalIdentityResponse400 = {
   data: string
   status: 400
 }
 
-export type patchCompaniesMeUsersUserIdExternalIdentityResponse401 = {
+export type patchExternalIdentityResponse401 = {
   data: string
   status: 401
 }
 
-export type patchCompaniesMeUsersUserIdExternalIdentityResponse403 = {
+export type patchExternalIdentityResponse403 = {
   data: string
   status: 403
 }
 
-export type patchCompaniesMeUsersUserIdExternalIdentityResponse404 = {
+export type patchExternalIdentityResponse404 = {
   data: string
   status: 404
 }
 
-export type patchCompaniesMeUsersUserIdExternalIdentityResponse500 = {
+export type patchExternalIdentityResponse500 = {
   data: string
   status: 500
 }
 
-export type patchCompaniesMeUsersUserIdExternalIdentityResponseSuccess = (patchCompaniesMeUsersUserIdExternalIdentityResponse200) & {
+export type patchExternalIdentityResponseSuccess = (patchExternalIdentityResponse200) & {
   headers: Headers;
 };
-export type patchCompaniesMeUsersUserIdExternalIdentityResponseError = (patchCompaniesMeUsersUserIdExternalIdentityResponse400 | patchCompaniesMeUsersUserIdExternalIdentityResponse401 | patchCompaniesMeUsersUserIdExternalIdentityResponse403 | patchCompaniesMeUsersUserIdExternalIdentityResponse404 | patchCompaniesMeUsersUserIdExternalIdentityResponse500) & {
+export type patchExternalIdentityResponseError = (patchExternalIdentityResponse400 | patchExternalIdentityResponse401 | patchExternalIdentityResponse403 | patchExternalIdentityResponse404 | patchExternalIdentityResponse500) & {
   headers: Headers;
 };
 
-export type patchCompaniesMeUsersUserIdExternalIdentityResponse = (patchCompaniesMeUsersUserIdExternalIdentityResponseSuccess | patchCompaniesMeUsersUserIdExternalIdentityResponseError)
+export type patchExternalIdentityResponse = (patchExternalIdentityResponseSuccess | patchExternalIdentityResponseError)
 
-export const getPatchCompaniesMeUsersUserIdExternalIdentityUrl = (userId: string,) => {
+export const getPatchExternalIdentityUrl = (userId: string,) => {
 
 
 
@@ -5486,10 +5670,10 @@ export const getPatchCompaniesMeUsersUserIdExternalIdentityUrl = (userId: string
   return `/companies/me/users/${userId}/external-identity`
 }
 
-export const patchCompaniesMeUsersUserIdExternalIdentity = async (userId: string,
-    handlersPatchExternalIdentityJSON: HandlersPatchExternalIdentityJSON, options?: RequestInit): Promise<patchCompaniesMeUsersUserIdExternalIdentityResponse> => {
+export const patchExternalIdentity = async (userId: string,
+    handlersPatchExternalIdentityJSON: HandlersPatchExternalIdentityJSON, options?: RequestInit): Promise<patchExternalIdentityResponse> => {
 
-  return orvalMutator<patchCompaniesMeUsersUserIdExternalIdentityResponse>(getPatchCompaniesMeUsersUserIdExternalIdentityUrl(userId),
+  return orvalMutator<patchExternalIdentityResponse>(getPatchExternalIdentityUrl(userId),
   {
     ...options,
     method: 'PATCH',
@@ -5502,11 +5686,11 @@ export const patchCompaniesMeUsersUserIdExternalIdentity = async (userId: string
 
 
 
-export const getPatchCompaniesMeUsersUserIdExternalIdentityMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchCompaniesMeUsersUserIdExternalIdentity>>, TError,{userId: string;data: HandlersPatchExternalIdentityJSON}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof patchCompaniesMeUsersUserIdExternalIdentity>>, TError,{userId: string;data: HandlersPatchExternalIdentityJSON}, TContext> => {
+export const getPatchExternalIdentityMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchExternalIdentity>>, TError,{userId: string;data: HandlersPatchExternalIdentityJSON}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof patchExternalIdentity>>, TError,{userId: string;data: HandlersPatchExternalIdentityJSON}, TContext> => {
 
-const mutationKey = ['patchCompaniesMeUsersUserIdExternalIdentity'];
+const mutationKey = ['patchExternalIdentity'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -5516,10 +5700,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchCompaniesMeUsersUserIdExternalIdentity>>, {userId: string;data: HandlersPatchExternalIdentityJSON}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchExternalIdentity>>, {userId: string;data: HandlersPatchExternalIdentityJSON}> = (props) => {
           const {userId,data} = props ?? {};
 
-          return  patchCompaniesMeUsersUserIdExternalIdentity(userId,data,requestOptions)
+          return  patchExternalIdentity(userId,data,requestOptions)
         }
 
 
@@ -5529,63 +5713,63 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PatchCompaniesMeUsersUserIdExternalIdentityMutationResult = NonNullable<Awaited<ReturnType<typeof patchCompaniesMeUsersUserIdExternalIdentity>>>
-    export type PatchCompaniesMeUsersUserIdExternalIdentityMutationBody = HandlersPatchExternalIdentityJSON
-    export type PatchCompaniesMeUsersUserIdExternalIdentityMutationError = string
+    export type PatchExternalIdentityMutationResult = NonNullable<Awaited<ReturnType<typeof patchExternalIdentity>>>
+    export type PatchExternalIdentityMutationBody = HandlersPatchExternalIdentityJSON
+    export type PatchExternalIdentityMutationError = string
 
     /**
  * @summary Patch user external SSO identity
  */
-export const usePatchCompaniesMeUsersUserIdExternalIdentity = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchCompaniesMeUsersUserIdExternalIdentity>>, TError,{userId: string;data: HandlersPatchExternalIdentityJSON}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const usePatchExternalIdentity = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchExternalIdentity>>, TError,{userId: string;data: HandlersPatchExternalIdentityJSON}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof patchCompaniesMeUsersUserIdExternalIdentity>>,
+        Awaited<ReturnType<typeof patchExternalIdentity>>,
         TError,
         {userId: string;data: HandlersPatchExternalIdentityJSON},
         TContext
       > => {
-      return useMutation(getPatchCompaniesMeUsersUserIdExternalIdentityMutationOptions(options), queryClient);
+      return useMutation(getPatchExternalIdentityMutationOptions(options), queryClient);
     }
 
 /**
- * Sets exemptFromSsoSync (skip group reconcile) and/or ssoProfileSyncOptOut (skip name/email sync from IdP).
+ * Sets exemptFromSsoSync (skip IdP directory reconcile for global roles, units, and tenant role mappings) and/or ssoProfileSyncOptOut (skip name/email sync from IdP).
  * @summary Patch user SSO directory flags
  */
-export type patchCompaniesMeUsersUserIdSsoDirectoryResponse200 = {
+export type patchUserSSOFlagsResponse200 = {
   data: ModelsUser
   status: 200
 }
 
-export type patchCompaniesMeUsersUserIdSsoDirectoryResponse400 = {
+export type patchUserSSOFlagsResponse400 = {
   data: string
   status: 400
 }
 
-export type patchCompaniesMeUsersUserIdSsoDirectoryResponse401 = {
+export type patchUserSSOFlagsResponse401 = {
   data: string
   status: 401
 }
 
-export type patchCompaniesMeUsersUserIdSsoDirectoryResponse403 = {
+export type patchUserSSOFlagsResponse403 = {
   data: string
   status: 403
 }
 
-export type patchCompaniesMeUsersUserIdSsoDirectoryResponse500 = {
+export type patchUserSSOFlagsResponse500 = {
   data: string
   status: 500
 }
 
-export type patchCompaniesMeUsersUserIdSsoDirectoryResponseSuccess = (patchCompaniesMeUsersUserIdSsoDirectoryResponse200) & {
+export type patchUserSSOFlagsResponseSuccess = (patchUserSSOFlagsResponse200) & {
   headers: Headers;
 };
-export type patchCompaniesMeUsersUserIdSsoDirectoryResponseError = (patchCompaniesMeUsersUserIdSsoDirectoryResponse400 | patchCompaniesMeUsersUserIdSsoDirectoryResponse401 | patchCompaniesMeUsersUserIdSsoDirectoryResponse403 | patchCompaniesMeUsersUserIdSsoDirectoryResponse500) & {
+export type patchUserSSOFlagsResponseError = (patchUserSSOFlagsResponse400 | patchUserSSOFlagsResponse401 | patchUserSSOFlagsResponse403 | patchUserSSOFlagsResponse500) & {
   headers: Headers;
 };
 
-export type patchCompaniesMeUsersUserIdSsoDirectoryResponse = (patchCompaniesMeUsersUserIdSsoDirectoryResponseSuccess | patchCompaniesMeUsersUserIdSsoDirectoryResponseError)
+export type patchUserSSOFlagsResponse = (patchUserSSOFlagsResponseSuccess | patchUserSSOFlagsResponseError)
 
-export const getPatchCompaniesMeUsersUserIdSsoDirectoryUrl = (userId: string,) => {
+export const getPatchUserSSOFlagsUrl = (userId: string,) => {
 
 
 
@@ -5593,10 +5777,10 @@ export const getPatchCompaniesMeUsersUserIdSsoDirectoryUrl = (userId: string,) =
   return `/companies/me/users/${userId}/sso-directory`
 }
 
-export const patchCompaniesMeUsersUserIdSsoDirectory = async (userId: string,
-    handlersPatchUserSSOFlagsJSON: HandlersPatchUserSSOFlagsJSON, options?: RequestInit): Promise<patchCompaniesMeUsersUserIdSsoDirectoryResponse> => {
+export const patchUserSSOFlags = async (userId: string,
+    handlersPatchUserSSOFlagsJSON: HandlersPatchUserSSOFlagsJSON, options?: RequestInit): Promise<patchUserSSOFlagsResponse> => {
 
-  return orvalMutator<patchCompaniesMeUsersUserIdSsoDirectoryResponse>(getPatchCompaniesMeUsersUserIdSsoDirectoryUrl(userId),
+  return orvalMutator<patchUserSSOFlagsResponse>(getPatchUserSSOFlagsUrl(userId),
   {
     ...options,
     method: 'PATCH',
@@ -5609,11 +5793,11 @@ export const patchCompaniesMeUsersUserIdSsoDirectory = async (userId: string,
 
 
 
-export const getPatchCompaniesMeUsersUserIdSsoDirectoryMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchCompaniesMeUsersUserIdSsoDirectory>>, TError,{userId: string;data: HandlersPatchUserSSOFlagsJSON}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof patchCompaniesMeUsersUserIdSsoDirectory>>, TError,{userId: string;data: HandlersPatchUserSSOFlagsJSON}, TContext> => {
+export const getPatchUserSSOFlagsMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchUserSSOFlags>>, TError,{userId: string;data: HandlersPatchUserSSOFlagsJSON}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof patchUserSSOFlags>>, TError,{userId: string;data: HandlersPatchUserSSOFlagsJSON}, TContext> => {
 
-const mutationKey = ['patchCompaniesMeUsersUserIdSsoDirectory'];
+const mutationKey = ['patchUserSSOFlags'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -5623,10 +5807,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchCompaniesMeUsersUserIdSsoDirectory>>, {userId: string;data: HandlersPatchUserSSOFlagsJSON}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchUserSSOFlags>>, {userId: string;data: HandlersPatchUserSSOFlagsJSON}> = (props) => {
           const {userId,data} = props ?? {};
 
-          return  patchCompaniesMeUsersUserIdSsoDirectory(userId,data,requestOptions)
+          return  patchUserSSOFlags(userId,data,requestOptions)
         }
 
 
@@ -5636,68 +5820,68 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PatchCompaniesMeUsersUserIdSsoDirectoryMutationResult = NonNullable<Awaited<ReturnType<typeof patchCompaniesMeUsersUserIdSsoDirectory>>>
-    export type PatchCompaniesMeUsersUserIdSsoDirectoryMutationBody = HandlersPatchUserSSOFlagsJSON
-    export type PatchCompaniesMeUsersUserIdSsoDirectoryMutationError = string
+    export type PatchUserSSOFlagsMutationResult = NonNullable<Awaited<ReturnType<typeof patchUserSSOFlags>>>
+    export type PatchUserSSOFlagsMutationBody = HandlersPatchUserSSOFlagsJSON
+    export type PatchUserSSOFlagsMutationError = string
 
     /**
  * @summary Patch user SSO directory flags
  */
-export const usePatchCompaniesMeUsersUserIdSsoDirectory = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchCompaniesMeUsersUserIdSsoDirectory>>, TError,{userId: string;data: HandlersPatchUserSSOFlagsJSON}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const usePatchUserSSOFlags = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchUserSSOFlags>>, TError,{userId: string;data: HandlersPatchUserSSOFlagsJSON}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof patchCompaniesMeUsersUserIdSsoDirectory>>,
+        Awaited<ReturnType<typeof patchUserSSOFlags>>,
         TError,
         {userId: string;data: HandlersPatchUserSSOFlagsJSON},
         TContext
       > => {
-      return useMutation(getPatchCompaniesMeUsersUserIdSsoDirectoryMutationOptions(options), queryClient);
+      return useMutation(getPatchUserSSOFlagsMutationOptions(options), queryClient);
     }
 
 /**
- * Sets the user’s tenant-defined roles for the company; replaces existing rows. Rebuilds user_units from role grants. The reserved system role (slug `system_admin`) is mutually exclusive with other tenant roles. Adding or removing that role requires the caller to be a global admin/platform admin or a tenant system administrator in this company.
+ * Sets the user’s tenant-defined roles for the company; replaces existing rows (ReplaceUserTenantRoles then SyncUserUnitsFromTenantRoles, which uses RebuildUserUnitsFromTenantRoles). Sending an empty tenantRoleIds list removes all tenant roles and unit access for this company unless confirmRemoveAllTenantRoles is true. The reserved system role (slug `system_admin`) is mutually exclusive with other tenant roles. Adding or removing that role requires the caller to be a global admin/platform admin or a tenant system administrator in this company.
  * @summary Replace tenant role assignments for a user
  */
-export type patchCompaniesMeUsersUserIdTenantRolesResponse200 = {
-  data: PatchCompaniesMeUsersUserIdTenantRoles200
+export type patchUserTenantRolesResponse200 = {
+  data: HandlersPatchUserTenantRolesResponse
   status: 200
 }
 
-export type patchCompaniesMeUsersUserIdTenantRolesResponse400 = {
+export type patchUserTenantRolesResponse400 = {
   data: string
   status: 400
 }
 
-export type patchCompaniesMeUsersUserIdTenantRolesResponse401 = {
+export type patchUserTenantRolesResponse401 = {
   data: string
   status: 401
 }
 
-export type patchCompaniesMeUsersUserIdTenantRolesResponse403 = {
+export type patchUserTenantRolesResponse403 = {
   data: string
   status: 403
 }
 
-export type patchCompaniesMeUsersUserIdTenantRolesResponse404 = {
+export type patchUserTenantRolesResponse404 = {
   data: string
   status: 404
 }
 
-export type patchCompaniesMeUsersUserIdTenantRolesResponse500 = {
+export type patchUserTenantRolesResponse500 = {
   data: string
   status: 500
 }
 
-export type patchCompaniesMeUsersUserIdTenantRolesResponseSuccess = (patchCompaniesMeUsersUserIdTenantRolesResponse200) & {
+export type patchUserTenantRolesResponseSuccess = (patchUserTenantRolesResponse200) & {
   headers: Headers;
 };
-export type patchCompaniesMeUsersUserIdTenantRolesResponseError = (patchCompaniesMeUsersUserIdTenantRolesResponse400 | patchCompaniesMeUsersUserIdTenantRolesResponse401 | patchCompaniesMeUsersUserIdTenantRolesResponse403 | patchCompaniesMeUsersUserIdTenantRolesResponse404 | patchCompaniesMeUsersUserIdTenantRolesResponse500) & {
+export type patchUserTenantRolesResponseError = (patchUserTenantRolesResponse400 | patchUserTenantRolesResponse401 | patchUserTenantRolesResponse403 | patchUserTenantRolesResponse404 | patchUserTenantRolesResponse500) & {
   headers: Headers;
 };
 
-export type patchCompaniesMeUsersUserIdTenantRolesResponse = (patchCompaniesMeUsersUserIdTenantRolesResponseSuccess | patchCompaniesMeUsersUserIdTenantRolesResponseError)
+export type patchUserTenantRolesResponse = (patchUserTenantRolesResponseSuccess | patchUserTenantRolesResponseError)
 
-export const getPatchCompaniesMeUsersUserIdTenantRolesUrl = (userId: string,) => {
+export const getPatchUserTenantRolesUrl = (userId: string,) => {
 
 
 
@@ -5705,10 +5889,10 @@ export const getPatchCompaniesMeUsersUserIdTenantRolesUrl = (userId: string,) =>
   return `/companies/me/users/${userId}/tenant-roles`
 }
 
-export const patchCompaniesMeUsersUserIdTenantRoles = async (userId: string,
-    handlersPatchUserTenantRolesJSON: HandlersPatchUserTenantRolesJSON, options?: RequestInit): Promise<patchCompaniesMeUsersUserIdTenantRolesResponse> => {
+export const patchUserTenantRoles = async (userId: string,
+    handlersPatchUserTenantRolesJSON: HandlersPatchUserTenantRolesJSON, options?: RequestInit): Promise<patchUserTenantRolesResponse> => {
 
-  return orvalMutator<patchCompaniesMeUsersUserIdTenantRolesResponse>(getPatchCompaniesMeUsersUserIdTenantRolesUrl(userId),
+  return orvalMutator<patchUserTenantRolesResponse>(getPatchUserTenantRolesUrl(userId),
   {
     ...options,
     method: 'PATCH',
@@ -5721,11 +5905,11 @@ export const patchCompaniesMeUsersUserIdTenantRoles = async (userId: string,
 
 
 
-export const getPatchCompaniesMeUsersUserIdTenantRolesMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchCompaniesMeUsersUserIdTenantRoles>>, TError,{userId: string;data: HandlersPatchUserTenantRolesJSON}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof patchCompaniesMeUsersUserIdTenantRoles>>, TError,{userId: string;data: HandlersPatchUserTenantRolesJSON}, TContext> => {
+export const getPatchUserTenantRolesMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchUserTenantRoles>>, TError,{userId: string;data: HandlersPatchUserTenantRolesJSON}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof patchUserTenantRoles>>, TError,{userId: string;data: HandlersPatchUserTenantRolesJSON}, TContext> => {
 
-const mutationKey = ['patchCompaniesMeUsersUserIdTenantRoles'];
+const mutationKey = ['patchUserTenantRoles'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -5735,10 +5919,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchCompaniesMeUsersUserIdTenantRoles>>, {userId: string;data: HandlersPatchUserTenantRolesJSON}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchUserTenantRoles>>, {userId: string;data: HandlersPatchUserTenantRolesJSON}> = (props) => {
           const {userId,data} = props ?? {};
 
-          return  patchCompaniesMeUsersUserIdTenantRoles(userId,data,requestOptions)
+          return  patchUserTenantRoles(userId,data,requestOptions)
         }
 
 
@@ -5748,22 +5932,22 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PatchCompaniesMeUsersUserIdTenantRolesMutationResult = NonNullable<Awaited<ReturnType<typeof patchCompaniesMeUsersUserIdTenantRoles>>>
-    export type PatchCompaniesMeUsersUserIdTenantRolesMutationBody = HandlersPatchUserTenantRolesJSON
-    export type PatchCompaniesMeUsersUserIdTenantRolesMutationError = string
+    export type PatchUserTenantRolesMutationResult = NonNullable<Awaited<ReturnType<typeof patchUserTenantRoles>>>
+    export type PatchUserTenantRolesMutationBody = HandlersPatchUserTenantRolesJSON
+    export type PatchUserTenantRolesMutationError = string
 
     /**
  * @summary Replace tenant role assignments for a user
  */
-export const usePatchCompaniesMeUsersUserIdTenantRoles = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchCompaniesMeUsersUserIdTenantRoles>>, TError,{userId: string;data: HandlersPatchUserTenantRolesJSON}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const usePatchUserTenantRoles = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchUserTenantRoles>>, TError,{userId: string;data: HandlersPatchUserTenantRolesJSON}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof patchCompaniesMeUsersUserIdTenantRoles>>,
+        Awaited<ReturnType<typeof patchUserTenantRoles>>,
         TError,
         {userId: string;data: HandlersPatchUserTenantRolesJSON},
         TContext
       > => {
-      return useMutation(getPatchCompaniesMeUsersUserIdTenantRolesMutationOptions(options), queryClient);
+      return useMutation(getPatchUserTenantRolesMutationOptions(options), queryClient);
     }
 
 /**

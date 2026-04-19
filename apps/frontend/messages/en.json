@@ -526,7 +526,9 @@
       "sso_external_saved": "External identity updated",
       "sso_external_not_found": "No SSO external identity found for this user.",
       "sso_external_error": "Could not update external identity",
-      "sso_external_empty": "Enter at least one field."
+      "sso_external_empty": "Enter at least one field.",
+      "sso_external_loading": "Loading identity…",
+      "sso_external_fetch_error": "Could not load external identity."
     },
     "reports": {
       "title": "Reports",

@@ -40,7 +40,7 @@ type Company struct {
 	// SsoJitProvisioning: allow creating a user on first successful SSO when policy permits.
 	SsoJitProvisioning bool `gorm:"column:sso_jit_provisioning;not null;default:false" json:"ssoJitProvisioning"`
 	// SsoAccessSource: "manual" (default) or "sso_groups" — IdP groups are source of truth for access when set.
-	SsoAccessSource string    `gorm:"column:sso_access_source;size:32;not null;default:manual" json:"ssoAccessSource"`
+	SsoAccessSource string    `gorm:"column:sso_access_source;size:32;not null;default:manual" json:"ssoAccessSource" enums:"manual,sso_groups"`
 	CreatedAt       time.Time `gorm:"autoCreateTime" json:"createdAt"`
 	UpdatedAt       time.Time `gorm:"autoUpdateTime" json:"updatedAt"`
 
@@ -70,7 +70,8 @@ type CompanyPatch struct {
 	ClearBillingAddress *bool            `json:"clearBillingAddress,omitempty"`
 	PaymentAccounts     *json.RawMessage `json:"paymentAccounts,omitempty" swaggertype:"array,object"` // items: @quokkaq/shared-types PaymentAccountSchema
 	Slug                *string          `json:"slug,omitempty"`
-	SsoAccessSource     *string          `json:"ssoAccessSource,omitempty"` // "manual" | "sso_groups"
+	// SsoAccessSource sets SSO access provisioning (`manual` | `sso_groups`). Changing this field via PatchMyCompany requires logical scope `company.settings.ssoAccessSource` (any of `global.role.admin`, `global.role.platform_admin`, `company.tenant_role.system_admin`; not `unit.tenant.admin` alone).
+	SsoAccessSource *string `json:"ssoAccessSource,omitempty" enums:"manual,sso_groups"`
 }
 
 type Unit struct {

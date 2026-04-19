@@ -29,6 +29,7 @@ func NewTenantRBACHTTP(tr repository.TenantRBACRepository, ur repository.UserRep
 }
 
 // GetPermissionCatalog godoc
+// @ID           GetPermissionCatalog
 // @Summary      List global permission keys (tenant RBAC catalog)
 // @Description  Returns the canonical permission strings shared by all tenants; used when defining tenant roles.
 // @Tags         companies
@@ -80,7 +81,16 @@ func (h *TenantRBACHTTP) resolveCompany(w http.ResponseWriter, r *http.Request) 
 	return cid, true
 }
 
+func (h *TenantRBACHTTP) viewerIsGlobalAdminOrPlatformAdmin(userID string) (bool, error) {
+	ok, err := h.userRepo.IsAdmin(userID)
+	if err != nil || ok {
+		return ok, err
+	}
+	return h.userRepo.IsPlatformAdmin(userID)
+}
+
 // ListGroupMappings godoc
+// @ID           ListGroupMappings
 // @Summary      List IdP group to role mappings
 // @Description  Returns SSO group id mappings to tenant roles or legacy global role names for the current company.
 // @Tags         companies
@@ -98,7 +108,7 @@ func (h *TenantRBACHTTP) ListGroupMappings(w http.ResponseWriter, r *http.Reques
 	if !ok {
 		return
 	}
-	rows, err := h.tenantRBAC.ListGroupMappings(cid)
+	rows, err := h.tenantRBAC.ListGroupMappings(r.Context(), cid)
 	if err != nil {
 		log.Printf("ListGroupMappings: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -109,22 +119,26 @@ func (h *TenantRBACHTTP) ListGroupMappings(w http.ResponseWriter, r *http.Reques
 }
 
 // UpsertGroupMappingJSON is the body for POST /companies/me/sso/group-mappings.
+// Exactly one of tenantRoleId or legacyRoleName is required (see OpenAPI oneOf). For legacyRoleName,
+// only staff, supervisor, and operator are accepted — the same set SSO reconciliation applies for IdP groups.
 type UpsertGroupMappingJSON struct {
 	IdpGroupID     string  `json:"idpGroupId"`
-	TenantRoleID   *string `json:"tenantRoleId"`
-	LegacyRoleName *string `json:"legacyRoleName"`
+	TenantRoleID   *string `json:"tenantRoleId"`   // mutually exclusive with legacyRoleName
+	LegacyRoleName *string `json:"legacyRoleName"` // mutually exclusive with tenantRoleId
 }
 
 // UpsertGroupMapping godoc
+// @ID           UpsertGroupMapping
 // @Summary      Create or update IdP group mapping
-// @Description  Maps an IdP group id (e.g. Azure object id) to a tenant role and/or a legacy role name (staff, supervisor, ...).
+// @Description  Maps an IdP group id (e.g. Azure object id) to exactly one of: a tenant role id or legacy global role name staff | supervisor | operator. Not both; global admin is not assignable via group mapping.
 // @Tags         companies
 // @Accept       json
 // @Produce      json
 // @Param        X-Company-Id header string false "Tenant company UUID when the user belongs to multiple organizations"
 // @Param        body body UpsertGroupMappingJSON true "Mapping payload"
 // @Security     BearerAuth
-// @Success      201  {object}  models.CompanySSOGroupMapping
+// @Success      201  {object}  models.CompanySSOGroupMapping "Created new mapping"
+// @Success      200  {object}  models.CompanySSOGroupMapping "Updated existing mapping"
 // @Failure      400  {string}  string "Bad request"
 // @Failure      401  {string}  string "Unauthorized"
 // @Failure      403  {string}  string "Forbidden"
@@ -152,35 +166,49 @@ func (h *TenantRBACHTTP) UpsertGroupMapping(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "tenantRoleId or legacyRoleName required", http.StatusBadRequest)
 		return
 	}
+	if hasTenant && hasLegacy {
+		http.Error(w, "tenantRoleId and legacyRoleName are mutually exclusive", http.StatusBadRequest)
+		return
+	}
+	var tenantID *string
+	var legacyName *string
+	if hasTenant {
+		t := strings.TrimSpace(*body.TenantRoleID)
+		tenantID = &t
+	}
+	if hasLegacy {
+		ln := strings.ToLower(strings.TrimSpace(*body.LegacyRoleName))
+		switch ln {
+		case "staff", "supervisor", "operator":
+			legacyName = &ln
+		default:
+			http.Error(w, "legacyRoleName must be one of: staff, supervisor, operator", http.StatusBadRequest)
+			return
+		}
+	}
 	m := &models.CompanySSOGroupMapping{
 		CompanyID:      cid,
 		IdpGroupID:     body.IdpGroupID,
-		TenantRoleID:   body.TenantRoleID,
-		LegacyRoleName: body.LegacyRoleName,
+		TenantRoleID:   tenantID,
+		LegacyRoleName: legacyName,
 	}
-	if err := h.tenantRBAC.UpsertGroupMapping(m); err != nil {
+	out, inserted, err := h.tenantRBAC.UpsertGroupMapping(m)
+	if err != nil {
 		log.Printf("UpsertGroupMapping: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-	rows, err := h.tenantRBAC.ListGroupMappings(cid)
-	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	var out *models.CompanySSOGroupMapping
-	for i := range rows {
-		if rows[i].IdpGroupID == body.IdpGroupID {
-			out = &rows[i]
-			break
-		}
-	}
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
+	if inserted {
+		w.WriteHeader(http.StatusCreated)
+	} else {
+		w.WriteHeader(http.StatusOK)
+	}
 	_ = json.NewEncoder(w).Encode(out)
 }
 
 // DeleteGroupMapping godoc
+// @ID           DeleteGroupMapping
 // @Summary      Delete IdP group mapping
 // @Tags         companies
 // @Param        X-Company-Id header string false "Tenant company UUID when the user belongs to multiple organizations"
@@ -212,6 +240,7 @@ func (h *TenantRBACHTTP) DeleteGroupMapping(w http.ResponseWriter, r *http.Reque
 }
 
 // ListTenantRoles godoc
+// @ID           ListTenantRoles
 // @Summary      List tenant-defined roles
 // @Tags         companies
 // @Produce      json
@@ -253,6 +282,7 @@ type CreateTenantRoleJSON struct {
 }
 
 // CreateTenantRole godoc
+// @ID           CreateTenantRole
 // @Summary      Create tenant role
 // @Tags         companies
 // @Accept       json
@@ -320,6 +350,7 @@ func (h *TenantRBACHTTP) CreateTenantRole(w http.ResponseWriter, r *http.Request
 }
 
 // PatchTenantRole godoc
+// @ID           PatchTenantRole
 // @Summary      Update tenant role
 // @Tags         companies
 // @Accept       json
@@ -417,6 +448,7 @@ func (h *TenantRBACHTTP) PatchTenantRole(w http.ResponseWriter, r *http.Request)
 }
 
 // DeleteTenantRole godoc
+// @ID           DeleteTenantRole
 // @Summary      Delete tenant role
 // @Description  Deletes a tenant-defined role. The reserved system role (`system_admin`) cannot be deleted.
 // @Tags         companies
@@ -464,13 +496,16 @@ func (h *TenantRBACHTTP) DeleteTenantRole(w http.ResponseWriter, r *http.Request
 
 // PatchUserSSOFlagsJSON updates break-glass and profile sync opt-out flags.
 type PatchUserSSOFlagsJSON struct {
-	ExemptFromSSOSync    *bool `json:"exemptFromSsoSync"`
+	// ExemptFromSSOSync when true, SSO directory reconcile does not change this user's global roles, unit assignments, or tenant role mappings (IdP group sync).
+	ExemptFromSSOSync *bool `json:"exemptFromSsoSync"`
+	// SSOProfileSyncOptOut when true, skip name/email updates from IdP on SSO login.
 	SSOProfileSyncOptOut *bool `json:"ssoProfileSyncOptOut"`
 }
 
 // PatchUserSSOFlags godoc
+// @ID           PatchUserSSOFlags
 // @Summary      Patch user SSO directory flags
-// @Description  Sets exemptFromSsoSync (skip group reconcile) and/or ssoProfileSyncOptOut (skip name/email sync from IdP).
+// @Description  Sets exemptFromSsoSync (skip IdP directory reconcile for global roles, units, and tenant role mappings) and/or ssoProfileSyncOptOut (skip name/email sync from IdP).
 // @Tags         companies
 // @Accept       json
 // @Produce      json
@@ -495,7 +530,12 @@ func (h *TenantRBACHTTP) PatchUserSSOFlags(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	okAccess, err := h.userRepo.HasCompanyAccess(targetID, cid)
-	if err != nil || !okAccess {
+	if err != nil {
+		log.Printf("PatchUserSSOFlags userRepo.HasCompanyAccess(%q, %q): %v", targetID, cid, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if !okAccess {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
@@ -515,12 +555,12 @@ func (h *TenantRBACHTTP) PatchUserSSOFlags(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "no fields", http.StatusBadRequest)
 		return
 	}
-	if err := h.userRepo.UpdateFields(targetID, updates); err != nil {
+	if err := h.userRepo.UpdateFields(r.Context(), targetID, updates); err != nil {
 		log.Printf("PatchUserSSOFlags: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-	u, err := h.userRepo.FindByID(targetID)
+	u, err := h.userRepo.FindByID(r.Context(), targetID)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
@@ -536,7 +576,57 @@ type PatchExternalIdentityJSON struct {
 	ExternalObjectID *string `json:"externalObjectId"`
 }
 
+// GetExternalIdentity godoc
+// @ID           GetExternalIdentity
+// @Summary      Get user external SSO identity
+// @Description  Returns the linked OIDC issuer, subject, and optional directory object id for SSO (tenant admin).
+// @Tags         companies
+// @Produce      json
+// @Param        X-Company-Id header string false "Tenant company UUID when the user belongs to multiple organizations"
+// @Param        userId path string true "Target user id"
+// @Security     BearerAuth
+// @Success      200  {object}  models.UserExternalIdentity
+// @Success      204  {string}  string "No linked external identity"
+// @Failure      401  {string}  string "Unauthorized"
+// @Failure      403  {string}  string "Forbidden"
+// @Failure      500  {string}  string "Internal Server Error"
+// @Router       /companies/me/users/{userId}/external-identity [get]
+func (h *TenantRBACHTTP) GetExternalIdentity(w http.ResponseWriter, r *http.Request) {
+	cid, ok := h.resolveCompany(w, r)
+	if !ok {
+		return
+	}
+	targetID := strings.TrimSpace(chi.URLParam(r, "userId"))
+	if targetID == "" {
+		http.Error(w, "missing user id", http.StatusBadRequest)
+		return
+	}
+	okAccess, err := h.userRepo.HasCompanyAccess(targetID, cid)
+	if err != nil {
+		log.Printf("GetExternalIdentity userRepo.HasCompanyAccess(%q, %q): %v", targetID, cid, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if !okAccess {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+	ext, err := h.sso.GetExternalIdentityForUser(cid, targetID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		log.Printf("GetExternalIdentity: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(ext)
+}
+
 // PatchExternalIdentity godoc
+// @ID           PatchExternalIdentity
 // @Summary      Patch user external SSO identity
 // @Description  Admin repair for issuer/subject/oid when IdP metadata or user domain changes.
 // @Tags         companies
@@ -564,13 +654,22 @@ func (h *TenantRBACHTTP) PatchExternalIdentity(w http.ResponseWriter, r *http.Re
 		return
 	}
 	okAccess, err := h.userRepo.HasCompanyAccess(targetID, cid)
-	if err != nil || !okAccess {
+	if err != nil {
+		log.Printf("PatchExternalIdentity userRepo.HasCompanyAccess(%q, %q): %v", targetID, cid, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if !okAccess {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 	var body PatchExternalIdentityJSON
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if body.Issuer == nil && body.Subject == nil && body.ExternalObjectID == nil {
+		http.Error(w, "no fields", http.StatusBadRequest)
 		return
 	}
 	if err := h.sso.AdminPatchExternalIdentity(cid, targetID, body.Issuer, body.Subject, body.ExternalObjectID); err != nil {
@@ -591,25 +690,28 @@ func (h *TenantRBACHTTP) PatchExternalIdentity(w http.ResponseWriter, r *http.Re
 	_ = json.NewEncoder(w).Encode(ext)
 }
 
-type tenantRoleBrief struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	Slug string `json:"slug"`
-}
-
 type companyUserListItem struct {
 	models.User
-	TenantRoles []tenantRoleBrief `json:"tenantRoles,omitempty"`
+	TenantRoles []TenantRoleBriefResponse `json:"tenantRoles,omitempty"`
 }
 
 // PatchUserTenantRolesJSON is the body for PATCH /companies/me/users/{userId}/tenant-roles.
 type PatchUserTenantRolesJSON struct {
 	TenantRoleIDs []string `json:"tenantRoleIds"`
+	// ConfirmRemoveAllTenantRoles must be true when tenantRoleIds is empty after trimming, so ReplaceUserTenantRoles does not
+	// clear user_tenant_roles and trigger RebuildUserUnitsFromTenantRoles mass-removal of user_units by mistake.
+	ConfirmRemoveAllTenantRoles bool `json:"confirmRemoveAllTenantRoles"`
+}
+
+// PatchUserTenantRolesResponse is the JSON body for PATCH /companies/me/users/{userId}/tenant-roles 200 OK.
+type PatchUserTenantRolesResponse struct {
+	TenantRoles []TenantRoleBriefResponse `json:"tenantRoles"`
 }
 
 // ListCompanyUsers godoc
+// @ID           ListCompanyUsers
 // @Summary      List users in the current company with tenant roles
-// @Description  Users are included if they have a unit in the company, a user_tenant_roles row, global admin/platform_admin, or are the company owner. Includes tenantRoles (id, name, slug) per user.
+// @Description  Users are included if they have a unit in the company, a user_tenant_roles row, or are the company owner. Global admin/platform_admin users are listed only when the caller is a global admin or platform admin. Includes tenantRoles (id, name, slug) per user.
 // @Tags         companies
 // @Produce      json
 // @Param        X-Company-Id header string false "Tenant company UUID when the user belongs to multiple organizations"
@@ -622,12 +724,33 @@ type PatchUserTenantRolesJSON struct {
 // @Failure      500  {string}  string "Internal Server Error"
 // @Router       /companies/me/users [get]
 func (h *TenantRBACHTTP) ListCompanyUsers(w http.ResponseWriter, r *http.Request) {
-	cid, ok := h.resolveCompany(w, r)
+	userID, ok := middleware.GetUserIDFromContext(r.Context())
 	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	cid, err := h.userRepo.ResolveCompanyIDForRequest(userID, r.Header.Get("X-Company-Id"))
+	if err != nil {
+		if errors.Is(err, repository.ErrCompanyAccessDenied) {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+		if repository.IsNotFound(err) {
+			http.Error(w, "Not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("ListCompanyUsers ResolveCompanyIDForRequest: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	includeGlobalRoleUsers, err := h.viewerIsGlobalAdminOrPlatformAdmin(userID)
+	if err != nil {
+		log.Printf("ListCompanyUsers viewerIsGlobalAdminOrPlatformAdmin(%q): %v", userID, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 	search := strings.TrimSpace(r.URL.Query().Get("search"))
-	users, err := h.userRepo.ListUsersForCompany(cid, search)
+	users, err := h.userRepo.ListUsersForCompany(cid, search, includeGlobalRoleUsers)
 	if err != nil {
 		log.Printf("ListUsersForCompany: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -646,9 +769,9 @@ func (h *TenantRBACHTTP) ListCompanyUsers(w http.ResponseWriter, r *http.Request
 	out := make([]companyUserListItem, 0, len(users))
 	for i := range users {
 		u := users[i]
-		brief := make([]tenantRoleBrief, 0)
+		brief := make([]TenantRoleBriefResponse, 0)
 		for _, tr := range trByUser[u.ID] {
-			brief = append(brief, tenantRoleBrief{ID: tr.ID, Name: tr.Name, Slug: tr.Slug})
+			brief = append(brief, TenantRoleBriefResponse{ID: tr.ID, Name: tr.Name, Slug: tr.Slug})
 		}
 		out = append(out, companyUserListItem{User: u, TenantRoles: brief})
 	}
@@ -657,8 +780,9 @@ func (h *TenantRBACHTTP) ListCompanyUsers(w http.ResponseWriter, r *http.Request
 }
 
 // PatchUserTenantRoles godoc
+// @ID           PatchUserTenantRoles
 // @Summary      Replace tenant role assignments for a user
-// @Description  Sets the user’s tenant-defined roles for the company; replaces existing rows. Rebuilds user_units from role grants. The reserved system role (slug `system_admin`) is mutually exclusive with other tenant roles. Adding or removing that role requires the caller to be a global admin/platform admin or a tenant system administrator in this company.
+// @Description  Sets the user’s tenant-defined roles for the company; replaces existing rows (ReplaceUserTenantRoles then SyncUserUnitsFromTenantRoles, which uses RebuildUserUnitsFromTenantRoles). Sending an empty tenantRoleIds list removes all tenant roles and unit access for this company unless confirmRemoveAllTenantRoles is true. The reserved system role (slug `system_admin`) is mutually exclusive with other tenant roles. Adding or removing that role requires the caller to be a global admin/platform admin or a tenant system administrator in this company.
 // @Tags         companies
 // @Accept       json
 // @Produce      json
@@ -666,7 +790,7 @@ func (h *TenantRBACHTTP) ListCompanyUsers(w http.ResponseWriter, r *http.Request
 // @Param        userId path string true "Target user id"
 // @Param        body body PatchUserTenantRolesJSON true "Tenant role ids"
 // @Security     BearerAuth
-// @Success      200  {object}  map[string][]tenantRoleBrief
+// @Success      200  {object}  PatchUserTenantRolesResponse
 // @Failure      400  {string}  string "Bad request"
 // @Failure      401  {string}  string "Unauthorized"
 // @Failure      403  {string}  string "Forbidden"
@@ -689,7 +813,12 @@ func (h *TenantRBACHTTP) PatchUserTenantRoles(w http.ResponseWriter, r *http.Req
 		return
 	}
 	okAccess, err := h.userRepo.HasCompanyAccess(targetID, cid)
-	if err != nil || !okAccess {
+	if err != nil {
+		log.Printf("PatchUserTenantRoles userRepo.HasCompanyAccess(%q, %q): %v", targetID, cid, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if !okAccess {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
@@ -720,16 +849,25 @@ func (h *TenantRBACHTTP) PatchUserTenantRoles(w http.ResponseWriter, r *http.Req
 			continue
 		}
 		seen[id] = struct{}{}
-		if _, err := h.tenantRBAC.GetTenantRole(cid, id); err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				http.Error(w, "unknown tenant role: "+id, http.StatusBadRequest)
-				return
-			}
-			log.Printf("GetTenantRole: %v", err)
+		clean = append(clean, id)
+	}
+	if len(clean) > 0 {
+		existing, err := h.tenantRBAC.ListTenantRolesByIDs(cid, clean)
+		if err != nil {
+			log.Printf("ListTenantRolesByIDs: %v", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		clean = append(clean, id)
+		existSet := make(map[string]struct{}, len(existing))
+		for i := range existing {
+			existSet[existing[i].ID] = struct{}{}
+		}
+		for _, id := range clean {
+			if _, ok := existSet[id]; !ok {
+				http.Error(w, "unknown tenant role: "+id, http.StatusBadRequest)
+				return
+			}
+		}
 	}
 	var hasSysInClean bool
 	for _, id := range clean {
@@ -767,18 +905,25 @@ func (h *TenantRBACHTTP) PatchUserTenantRoles(w http.ResponseWriter, r *http.Req
 			return
 		}
 	}
-	if err := h.tenantRBAC.ReplaceUserTenantRoles(targetID, cid, clean); err != nil {
-		log.Printf("ReplaceUserTenantRoles: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	if len(clean) == 0 && !body.ConfirmRemoveAllTenantRoles {
+		http.Error(w, "tenantRoleIds is empty: set confirmRemoveAllTenantRoles to true to remove all tenant roles and unit access for this company", http.StatusBadRequest)
 		return
 	}
-	if err := h.tenantRBAC.SyncUserUnitsFromTenantRoles(targetID, cid); err != nil {
-		log.Printf("SyncUserUnitsFromTenantRoles: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	if err := h.userRepo.RecomputeUserIsActive(targetID); err != nil {
-		log.Printf("RecomputeUserIsActive: %v", err)
+	allowEmpty := len(clean) == 0
+	if err := h.userRepo.Transaction(r.Context(), func(tx *gorm.DB) error {
+		if err := h.tenantRBAC.ReplaceUserTenantRolesTx(tx, targetID, cid, clean, allowEmpty); err != nil {
+			return err
+		}
+		if err := h.tenantRBAC.SyncUserUnitsFromTenantRolesTx(tx, targetID, cid); err != nil {
+			return err
+		}
+		return h.userRepo.RecomputeUserIsActiveTx(tx, targetID)
+	}); err != nil {
+		if errors.Is(err, repository.ErrEmptyTenantRoleAssignmentNotAllowed) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		log.Printf("PatchUserTenantRoles tx (ReplaceUserTenantRoles/SyncUserUnits/RecomputeUserIsActive): %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -787,11 +932,11 @@ func (h *TenantRBACHTTP) PatchUserTenantRoles(w http.ResponseWriter, r *http.Req
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-	trBrief := make([]tenantRoleBrief, 0)
+	trBrief := make([]TenantRoleBriefResponse, 0)
 	for _, tr := range trByUser[targetID] {
-		trBrief = append(trBrief, tenantRoleBrief{ID: tr.ID, Name: tr.Name, Slug: tr.Slug})
+		trBrief = append(trBrief, TenantRoleBriefResponse{ID: tr.ID, Name: tr.Name, Slug: tr.Slug})
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string][]tenantRoleBrief{"tenantRoles": trBrief})
+	_ = json.NewEncoder(w).Encode(PatchUserTenantRolesResponse{TenantRoles: trBrief})
 }

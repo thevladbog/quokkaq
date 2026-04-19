@@ -16,15 +16,12 @@ func BackfillAllCompanies(db *gorm.DB) error {
 		return err
 	}
 	for _, c := range companies {
-		var ownerID string
-		var roleID string
 		if err := db.Transaction(func(tx *gorm.DB) error {
 			rid, err := EnsureSystemTenantRole(tx, c.ID)
 			if err != nil {
 				return err
 			}
-			roleID = rid
-			ownerID = strings.TrimSpace(c.OwnerUserID)
+			ownerID := strings.TrimSpace(c.OwnerUserID)
 			if ownerID == "" {
 				return nil
 			}
@@ -40,16 +37,12 @@ func BackfillAllCompanies(db *gorm.DB) error {
 				CompanyID:    c.ID,
 				TenantRoleID: rid,
 			}
-			return tx.Create(row).Error
-		}); err != nil {
-			return err
-		}
-		if ownerID != "" && roleID != "" {
-			if err := db.Transaction(func(tx *gorm.DB) error {
-				return RebuildUserUnitsFromTenantRoles(tx, ownerID, c.ID)
-			}); err != nil {
+			if err := tx.Create(row).Error; err != nil {
 				return err
 			}
+			return RebuildUserUnitsFromTenantRoles(tx, ownerID, c.ID)
+		}); err != nil {
+			return err
 		}
 	}
 	return nil

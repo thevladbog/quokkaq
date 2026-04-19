@@ -1182,6 +1182,10 @@ export const SaasVendorSchema = z.object({
 
 export type SaasVendor = z.infer<typeof SaasVendorSchema>;
 
+/** SSO access provisioning mode (matches backend `models.SsoAccessSource` / `SsoAccessSourceManual` | `SsoAccessSourceSSOGroups`). */
+export const SsoAccessSourceSchema = z.enum(['manual', 'sso_groups']);
+export type SsoAccessSource = z.infer<typeof SsoAccessSourceSchema>;
+
 export const CompanySchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -1198,8 +1202,8 @@ export const CompanySchema = z.object({
   counterparty: CounterpartySchema.optional(),
   settings: z.record(z.string(), z.any()).optional(),
   onboardingState: z.record(z.string(), z.any()).optional(),
-  /** "manual" | "sso_groups" — IdP group mappings drive access when "sso_groups". */
-  ssoAccessSource: z.string().optional(),
+  /** IdP group mappings drive access when `sso_groups`; otherwise manual tenant RBAC. */
+  ssoAccessSource: SsoAccessSourceSchema.optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
   subscription: SubscriptionSchema.optional(),

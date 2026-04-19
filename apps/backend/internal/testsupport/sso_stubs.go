@@ -52,13 +52,15 @@ func (StrictPublicTenantCompanyRepo) IsSlugTakenByOther(string, string) (bool, e
 // PanicUserRepo satisfies repository.UserRepository and panics on any call.
 type PanicUserRepo struct{}
 
-func (PanicUserRepo) Create(*models.User) error                                 { panic("unexpected") }
-func (PanicUserRepo) CreateTx(*gorm.DB, *models.User) error                     { panic("unexpected") }
-func (PanicUserRepo) FindAll(string) ([]models.User, error)                     { panic("unexpected") }
-func (PanicUserRepo) ListUsersForCompany(string, string) ([]models.User, error) { panic("unexpected") }
-func (PanicUserRepo) FindByID(string) (*models.User, error)                     { panic("unexpected") }
+func (PanicUserRepo) Create(*models.User) error             { panic("unexpected") }
+func (PanicUserRepo) CreateTx(*gorm.DB, *models.User) error { panic("unexpected") }
+func (PanicUserRepo) FindAll(string) ([]models.User, error) { panic("unexpected") }
+func (PanicUserRepo) ListUsersForCompany(string, string, bool) ([]models.User, error) {
+	panic("unexpected")
+}
+func (PanicUserRepo) FindByID(context.Context, string) (*models.User, error)    { panic("unexpected") }
 func (PanicUserRepo) FindByIDTx(*gorm.DB, string) (*models.User, error)         { panic("unexpected") }
-func (PanicUserRepo) FindByEmail(string) (*models.User, error)                  { panic("unexpected") }
+func (PanicUserRepo) FindByEmail(context.Context, string) (*models.User, error) { panic("unexpected") }
 func (PanicUserRepo) Update(*models.User) error                                 { panic("unexpected") }
 func (PanicUserRepo) UpdateTx(*gorm.DB, *models.User) error                     { panic("unexpected") }
 func (PanicUserRepo) Delete(string) error                                       { panic("unexpected") }
@@ -80,6 +82,7 @@ func (PanicUserRepo) EnsureRoleExists(string) (*models.Role, error)             
 func (PanicUserRepo) EnsureRoleExistsTx(*gorm.DB, string) (*models.Role, error) { panic("unexpected") }
 func (PanicUserRepo) IsAdmin(string) (bool, error)                              { panic("unexpected") }
 func (PanicUserRepo) ListUserIDsByRoleNames([]string) ([]string, error)         { panic("unexpected") }
+func (PanicUserRepo) ListUserRoleNamesTx(*gorm.DB, string) ([]string, error)    { panic("unexpected") }
 func (PanicUserRepo) HasSupportReportAccess(string) (bool, error)               { panic("unexpected") }
 func (PanicUserRepo) IsPlatformAdmin(string) (bool, error)                      { panic("unexpected") }
 func (PanicUserRepo) IsAdminOrHasUnitAccess(string, string) (bool, error)       { panic("unexpected") }
@@ -107,9 +110,13 @@ func (PanicUserRepo) ShiftJournalSeesAllActivity(string, string) (bool, error) {
 func (PanicUserRepo) HasUnitBranchAccess(string, string) (bool, error) {
 	panic("unexpected")
 }
-func (PanicUserRepo) UserHasEffectiveAccess(string) (bool, error)       { panic("unexpected") }
-func (PanicUserRepo) RecomputeUserIsActive(string) error                { panic("unexpected") }
-func (PanicUserRepo) UpdateFields(string, map[string]interface{}) error { panic("unexpected") }
+func (PanicUserRepo) UserHasEffectiveAccess(string) (bool, error)             { panic("unexpected") }
+func (PanicUserRepo) RecomputeUserIsActive(context.Context, string) error     { panic("unexpected") }
+func (PanicUserRepo) Transaction(context.Context, func(*gorm.DB) error) error { panic("unexpected") }
+func (PanicUserRepo) RecomputeUserIsActiveTx(*gorm.DB, string) error          { panic("unexpected") }
+func (PanicUserRepo) UpdateFields(context.Context, string, map[string]interface{}) error {
+	panic("unexpected")
+}
 
 // PanicSSORepo satisfies repository.SSORepository and panics on any call.
 type PanicSSORepo struct{}
@@ -121,7 +128,7 @@ func (PanicSSORepo) UpsertConnection(*models.CompanySSOConnection) error { panic
 func (PanicSSORepo) FindCompaniesByEmailDomain(string) ([]models.Company, []models.CompanySSOConnection, error) {
 	panic("unexpected")
 }
-func (PanicSSORepo) FindExternalIdentity(string, string) (*models.UserExternalIdentity, error) {
+func (PanicSSORepo) FindExternalIdentity(context.Context, string, string) (*models.UserExternalIdentity, error) {
 	panic("unexpected")
 }
 func (PanicSSORepo) FindExternalIdentityByCompanyAndObjectID(string, string) (*models.UserExternalIdentity, error) {
@@ -130,7 +137,9 @@ func (PanicSSORepo) FindExternalIdentityByCompanyAndObjectID(string, string) (*m
 func (PanicSSORepo) FindExternalIdentityByUserAndCompany(string, string) (*models.UserExternalIdentity, error) {
 	panic("unexpected")
 }
-func (PanicSSORepo) UpdateExternalIdentity(*models.UserExternalIdentity) error { panic("unexpected") }
+func (PanicSSORepo) UpdateExternalIdentity(context.Context, *models.UserExternalIdentity) error {
+	panic("unexpected")
+}
 func (PanicSSORepo) CreateExternalIdentity(*models.UserExternalIdentity) error { panic("unexpected") }
 func (PanicSSORepo) CreateExternalIdentityTx(*gorm.DB, *models.UserExternalIdentity) error {
 	panic("unexpected")

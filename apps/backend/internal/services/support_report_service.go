@@ -203,7 +203,7 @@ func (s *SupportReportService) Create(ctx context.Context, userID string, in Cre
 		if errAccess != nil {
 			return nil, errAccess
 		}
-		if u, err := s.userRepo.FindByID(userID); err == nil && u != nil && u.Email != nil {
+		if u, err := s.userRepo.FindByID(context.Background(), userID); err == nil && u != nil && u.Email != nil {
 			extras.ApplicantsEmail = strings.TrimSpace(*u.Email)
 		}
 		extras.CompanyTrackerLabel = strings.TrimSpace(s.buildTrackerCompanyLabel(userID))
@@ -736,7 +736,7 @@ func (s *SupportReportService) GetByID(ctx context.Context, userID, reportID str
 		}
 	}
 	if s.userRepo != nil {
-		if u, err := s.userRepo.FindByID(row.CreatedByUserID); err == nil && u != nil {
+		if u, err := s.userRepo.FindByID(context.Background(), row.CreatedByUserID); err == nil && u != nil {
 			row.CreatedByName = strings.TrimSpace(u.Name)
 		}
 	}

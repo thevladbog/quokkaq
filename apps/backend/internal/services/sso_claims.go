@@ -2,10 +2,16 @@ package services
 
 import (
 	"encoding/json"
+	"errors"
 	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 )
+
+// ErrOIDCGroupsClaimOverage is returned when the IdP omitted the "groups" claim due to size limits
+// (e.g. Microsoft Entra overage: hasgroups / _claim_names / _claim_sources). Callers must not treat
+// an empty group list as authoritative; defer reconciliation or fetch groups via Graph API.
+var ErrOIDCGroupsClaimOverage = errors.New("oidc: groups claim omitted (token overage); group reconciliation deferred")
 
 // OIDCUserClaims holds optional fields used for directory sync beyond basic email/name.
 type OIDCUserClaims struct {
@@ -18,11 +24,17 @@ type OIDCUserClaims struct {
 }
 
 // ParseOIDCClaimsFromIDToken extracts groups and oid after successful verification.
+// If Microsoft Entra omitted "groups" due to overage (hasgroups / _claim_names / _claim_sources),
+// returns ErrOIDCGroupsClaimOverage together with a populated OIDCUserClaims (groups left empty).
 func ParseOIDCClaimsFromIDToken(idToken *oidc.IDToken) (*OIDCUserClaims, error) {
 	var raw map[string]interface{}
 	if err := idToken.Claims(&raw); err != nil {
 		return nil, err
 	}
+	return parseOIDCUserClaimsFromRawMap(raw)
+}
+
+func parseOIDCUserClaimsFromRawMap(raw map[string]interface{}) (*OIDCUserClaims, error) {
 	out := &OIDCUserClaims{}
 	if v, ok := raw["email"].(string); ok {
 		out.Email = v
@@ -42,8 +54,39 @@ func ParseOIDCClaimsFromIDToken(idToken *oidc.IDToken) (*OIDCUserClaims, error) 
 	if v, ok := raw["oid"].(string); ok {
 		out.ObjectID = strings.TrimSpace(v)
 	}
-	out.Groups = extractGroupsFromClaimRaw(raw["groups"])
+	groups := extractGroupsFromClaimRaw(raw["groups"])
+	if len(groups) == 0 && entraGroupsClaimOverageIndicators(raw) {
+		return out, ErrOIDCGroupsClaimOverage
+	}
+	out.Groups = groups
 	return out, nil
+}
+
+func entraGroupsClaimOverageIndicators(raw map[string]interface{}) bool {
+	if claimIsTruthy(raw["hasgroups"]) {
+		return true
+	}
+	if v, ok := raw["_claim_names"]; ok && v != nil {
+		return true
+	}
+	if v, ok := raw["_claim_sources"]; ok && v != nil {
+		return true
+	}
+	return false
+}
+
+func claimIsTruthy(v interface{}) bool {
+	if v == nil {
+		return false
+	}
+	switch t := v.(type) {
+	case bool:
+		return t
+	case string:
+		return strings.EqualFold(strings.TrimSpace(t), "true")
+	default:
+		return false
+	}
 }
 
 func extractGroupsFromClaimRaw(v interface{}) []string {

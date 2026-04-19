@@ -12,12 +12,14 @@ import (
 type CompanyHandler struct {
 	companyRepo repository.CompanyRepository
 	userRepo    repository.UserRepository
+	tenantRBAC  repository.TenantRBACRepository
 }
 
-func NewCompanyHandler(companyRepo repository.CompanyRepository, userRepo repository.UserRepository) *CompanyHandler {
+func NewCompanyHandler(companyRepo repository.CompanyRepository, userRepo repository.UserRepository, tenantRBAC repository.TenantRBACRepository) *CompanyHandler {
 	return &CompanyHandler{
 		companyRepo: companyRepo,
 		userRepo:    userRepo,
+		tenantRBAC:  tenantRBAC,
 	}
 }
 

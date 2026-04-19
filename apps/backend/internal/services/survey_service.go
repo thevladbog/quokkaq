@@ -665,7 +665,7 @@ func (s *surveyService) ListResponses(ctx context.Context, actorUserID, unitID s
 	if err := s.ensureUnitAccess(actorUserID, unitID); err != nil {
 		return nil, err
 	}
-	u, err := s.userRepo.FindByID(actorUserID)
+	u, err := s.userRepo.FindByID(context.Background(), actorUserID)
 	if err != nil {
 		return nil, err
 	}
@@ -679,7 +679,7 @@ func (s *surveyService) ListResponsesForClient(ctx context.Context, actorUserID,
 	if err := s.ensureUnitAccess(actorUserID, unitID); err != nil {
 		return nil, err
 	}
-	u, err := s.userRepo.FindByID(actorUserID)
+	u, err := s.userRepo.FindByID(context.Background(), actorUserID)
 	if err != nil {
 		return nil, err
 	}

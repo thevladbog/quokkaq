@@ -1,12 +1,12 @@
 /**
  * Auth flows via Orval-generated clients ({@link ./api/generated/auth.ts}) + shared-types validation.
  */
-import { authLogin, getAuthMe } from '@/lib/api/generated/auth';
+import { authGetMe, authLogin } from '@/lib/api/generated/auth';
 import type { User } from '@quokkaq/shared-types';
 import { UserModelSchema } from '@quokkaq/shared-types';
 
 export async function fetchCurrentUser(): Promise<User> {
-  const res = await getAuthMe();
+  const res = await authGetMe();
   if (res.status !== 200) {
     throw new Error(`auth_me_${res.status}`);
   }

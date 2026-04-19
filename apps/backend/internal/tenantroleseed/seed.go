@@ -10,19 +10,22 @@ import (
 	"quokkaq-go-backend/internal/rbac"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 func upsertTRU(tx *gorm.DB, roleID, unitID string, perms models.StringArray) error {
-	var tru models.TenantRoleUnit
-	err := tx.Where("tenant_role_id = ? AND unit_id = ?", roleID, unitID).First(&tru).Error
-	if err == nil {
-		return tx.Model(&tru).Update("permissions", perms).Error
+	tru := models.TenantRoleUnit{
+		TenantRoleID: roleID,
+		UnitID:       unitID,
+		Permissions:  perms,
 	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return err
-	}
-	tru = models.TenantRoleUnit{TenantRoleID: roleID, UnitID: unitID, Permissions: perms}
-	return tx.Create(&tru).Error
+	return tx.Clauses(clause.OnConflict{
+		Columns: []clause.Column{
+			{Name: "tenant_role_id"},
+			{Name: "unit_id"},
+		},
+		DoUpdates: clause.AssignmentColumns([]string{"permissions"}),
+	}).Create(&tru).Error
 }
 
 func ensureSystemTenantRoleRow(tx *gorm.DB, companyID string) (*models.TenantRole, error) {
@@ -92,6 +95,7 @@ func RebuildUserUnitsFromTenantRoles(tx *gorm.DB, userID, companyID string) erro
 	if err := tx.Where("user_id = ? AND company_id = ?", userID, companyID).Find(&utr).Error; err != nil {
 		return err
 	}
+	// No user_tenant_roles: remove user_units for this company's units (destructive). Callers must not reach this via accidental empty ReplaceUserTenantRoles without explicit allowEmpty.
 	if len(utr) == 0 {
 		return tx.Where("user_id = ? AND unit_id IN ?", userID, unitIDs).Delete(&models.UserUnit{}).Error
 	}

@@ -35,13 +35,13 @@ import type { Unit } from '@quokkaq/shared-types';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import {
-  getGetCompaniesMeRbacPermissionsQueryKey,
-  getGetCompaniesMeTenantRolesQueryKey,
-  useDeleteCompaniesMeTenantRolesRoleId,
-  useGetCompaniesMeRbacPermissions,
-  useGetCompaniesMeTenantRoles,
-  usePatchCompaniesMeTenantRolesRoleId,
-  usePostCompaniesMeTenantRoles,
+  getGetPermissionCatalogQueryKey,
+  getListTenantRolesQueryKey,
+  useCreateTenantRole,
+  useDeleteTenantRole,
+  useGetPermissionCatalog,
+  useListTenantRoles,
+  usePatchTenantRole,
   type HandlersCreateTenantRoleJSON,
   type ModelsTenantRole
 } from '@/lib/api/generated/auth';
@@ -100,8 +100,8 @@ export function TenantRolesManager({
   const locale = useLocale();
   const qc = useQueryClient();
 
-  const permQ = useGetCompaniesMeRbacPermissions();
-  const rolesQ = useGetCompaniesMeTenantRoles();
+  const permQ = useGetPermissionCatalog();
+  const rolesQ = useListTenantRoles();
 
   const permissions = useMemo(
     () => (permQ.data?.status === 200 ? (permQ.data.data ?? []) : []),
@@ -115,14 +115,14 @@ export function TenantRolesManager({
 
   const invalidateTenantRoles = () => {
     void qc.invalidateQueries({
-      queryKey: getGetCompaniesMeRbacPermissionsQueryKey()
+      queryKey: getGetPermissionCatalogQueryKey()
     });
     void qc.invalidateQueries({
-      queryKey: getGetCompaniesMeTenantRolesQueryKey()
+      queryKey: getListTenantRolesQueryKey()
     });
   };
 
-  const createRole = usePostCompaniesMeTenantRoles({
+  const createRole = useCreateTenantRole({
     mutation: {
       onSuccess: (res) => {
         if (res.status === 201) {
@@ -136,7 +136,7 @@ export function TenantRolesManager({
     }
   });
 
-  const patchRole = usePatchCompaniesMeTenantRolesRoleId({
+  const patchRole = usePatchTenantRole({
     mutation: {
       onSuccess: (res) => {
         if (res.status === 200) {
@@ -150,7 +150,7 @@ export function TenantRolesManager({
     }
   });
 
-  const deleteRole = useDeleteCompaniesMeTenantRolesRoleId({
+  const deleteRole = useDeleteTenantRole({
     mutation: {
       onSuccess: (res) => {
         if (res.status === 204) {
@@ -254,183 +254,192 @@ export function TenantRolesManager({
   const editingIsReservedSystem = isTenantSystemAdminSlug(editingRole?.slug);
 
   const loading = permQ.isLoading || rolesQ.isLoading;
+  const loadError =
+    !loading &&
+    (permQ.isError ||
+      rolesQ.isError ||
+      permQ.data?.status !== 200 ||
+      rolesQ.data?.status !== 200);
 
-  if (loading) {
-    return (
-      <div className='text-muted-foreground flex items-center gap-2 text-sm'>
-        <Loader2 className='h-4 w-4 animate-spin' />
-        {t('loading')}
-      </div>
-    );
+  if (variant === 'plain') {
+    if (loading) {
+      return (
+        <div className='text-muted-foreground flex items-center gap-2 text-sm'>
+          <Loader2 className='h-4 w-4 animate-spin' />
+          {t('loading')}
+        </div>
+      );
+    }
+    if (loadError) {
+      return <p className='text-destructive text-sm'>{t('load_error')}</p>;
+    }
   }
 
-  if (
-    permQ.isError ||
-    rolesQ.isError ||
-    permQ.data?.status !== 200 ||
-    rolesQ.data?.status !== 200
-  ) {
-    return <p className='text-destructive text-sm'>{t('load_error')}</p>;
-  }
-
-  const toolbarAndTable = (
-    <div className='space-y-4'>
-      <div className='flex flex-wrap items-center gap-2'>
-        <Button type='button' size='sm' onClick={openCreateRole}>
-          <Plus className='mr-1 h-4 w-4' />
-          {t('add_role')}
-        </Button>
-      </div>
-      {roles.length === 0 ? (
-        <p className='text-muted-foreground py-8 text-center text-sm'>
-          {t('no_roles')}
-        </p>
-      ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className='w-[22%] min-w-[10rem]'>
-                {t('roles_table_role')}
-              </TableHead>
-              <TableHead className='w-[26%] min-w-[8rem]'>
-                {t('col_description')}
-              </TableHead>
-              <TableHead className='w-[32%] min-w-[10rem]'>
-                {t('col_units')}
-              </TableHead>
-              <TableHead className='w-[20%] min-w-[6rem] text-right'>
-                {t('roles_table_actions')}
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {roles.map((r) => (
-              <TableRow
-                key={r.id}
-                data-state={
-                  roleOpen && editingRoleId === r.id ? 'selected' : undefined
-                }
-                className={cn(
-                  'cursor-pointer',
-                  roleOpen && editingRoleId === r.id && 'bg-muted/50'
-                )}
-                onClick={() => openEditRole(r)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    openEditRole(r);
+  const toolbarAndTable =
+    !loading && !loadError ? (
+      <div className='space-y-4'>
+        <div className='flex flex-wrap items-center gap-2'>
+          <Button type='button' size='sm' onClick={openCreateRole}>
+            <Plus className='mr-1 h-4 w-4' />
+            {t('add_role')}
+          </Button>
+        </div>
+        {roles.length === 0 ? (
+          <p className='text-muted-foreground py-8 text-center text-sm'>
+            {t('no_roles')}
+          </p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className='w-[22%] min-w-[10rem]'>
+                  {t('roles_table_role')}
+                </TableHead>
+                <TableHead className='w-[26%] min-w-[8rem]'>
+                  {t('col_description')}
+                </TableHead>
+                <TableHead className='w-[32%] min-w-[10rem]'>
+                  {t('col_units')}
+                </TableHead>
+                <TableHead className='w-[20%] min-w-[6rem] text-right'>
+                  {t('roles_table_actions')}
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {roles.map((r) => (
+                <TableRow
+                  key={r.id}
+                  data-state={
+                    roleOpen && editingRoleId === r.id ? 'selected' : undefined
                   }
-                }}
-                tabIndex={0}
-                role='button'
-                aria-label={t('roles_row_edit_aria', {
-                  name: r.name ?? r.slug ?? ''
-                })}
-              >
-                <TableCell className='align-top'>
-                  <div className='flex min-w-0 items-start gap-3'>
-                    <Avatar size='sm' className='shrink-0'>
-                      <AvatarFallback className='bg-primary/10'>
-                        <Shield className='text-primary size-4' />
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className='min-w-0'>
-                      <div className='truncate font-medium'>
-                        {r.name ?? '—'}
-                      </div>
-                      <div className='text-muted-foreground truncate font-mono text-xs'>
-                        {r.slug ?? '—'}
+                  className={cn(
+                    'cursor-pointer',
+                    roleOpen && editingRoleId === r.id && 'bg-muted/50'
+                  )}
+                  onClick={() => openEditRole(r)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      openEditRole(r);
+                    }
+                  }}
+                  tabIndex={0}
+                  role='button'
+                  aria-label={t('roles_row_edit_aria', {
+                    name: r.name ?? r.slug ?? ''
+                  })}
+                >
+                  <TableCell className='align-top'>
+                    <div className='flex min-w-0 items-start gap-3'>
+                      <Avatar size='sm' className='shrink-0'>
+                        <AvatarFallback className='bg-primary/10'>
+                          <Shield className='text-primary size-4' />
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className='min-w-0'>
+                        <div className='truncate font-medium'>
+                          {r.name ?? '—'}
+                        </div>
+                        <div className='text-muted-foreground truncate font-mono text-xs'>
+                          {r.slug ?? '—'}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </TableCell>
-                <TableCell className='align-top'>
-                  {r.description?.trim() ? (
-                    <p className='text-muted-foreground line-clamp-3 text-sm leading-snug'>
-                      {r.description.trim()}
-                    </p>
-                  ) : (
-                    <span className='text-muted-foreground text-sm'>—</span>
-                  )}
-                </TableCell>
-                <TableCell className='align-top'>
-                  {(() => {
-                    const entries = tenantRoleUnitTagEntries(r, units, locale);
-                    if (entries.length === 0) {
-                      return (
-                        <span className='text-muted-foreground text-sm'>—</span>
+                  </TableCell>
+                  <TableCell className='align-top'>
+                    {r.description?.trim() ? (
+                      <p className='text-muted-foreground line-clamp-3 text-sm leading-snug'>
+                        {r.description.trim()}
+                      </p>
+                    ) : (
+                      <span className='text-muted-foreground text-sm'>—</span>
+                    )}
+                  </TableCell>
+                  <TableCell className='align-top'>
+                    {(() => {
+                      const entries = tenantRoleUnitTagEntries(
+                        r,
+                        units,
+                        locale
                       );
-                    }
-                    const visible = entries.slice(0, MAX_VISIBLE_UNIT_TAGS);
-                    const extra = entries.length - visible.length;
-                    return (
-                      <div className='flex flex-wrap items-center gap-1.5'>
-                        {visible.map(({ unitId, label }) => (
-                          <Badge
-                            key={unitId}
-                            variant='outline'
-                            className='border-primary/30 bg-primary/10 text-foreground dark:border-primary/40 dark:bg-primary/15 max-w-[min(100%,11rem)] truncate font-normal shadow-none'
-                            title={label}
-                          >
-                            <span className='truncate'>{label}</span>
-                          </Badge>
-                        ))}
-                        {extra > 0 ? (
-                          <Badge
-                            variant='outline'
-                            className='border-primary/20 bg-primary/5 text-muted-foreground dark:border-primary/30 dark:bg-primary/10 shrink-0 font-normal shadow-none'
-                          >
-                            +{extra}
-                          </Badge>
-                        ) : null}
-                      </div>
-                    );
-                  })()}
-                </TableCell>
-                <TableCell className='text-right align-top'>
-                  <Button
-                    type='button'
-                    variant='ghost'
-                    size='icon'
-                    aria-label={t('edit')}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openEditRole(r);
-                    }}
-                  >
-                    <Pencil className='h-4 w-4' />
-                  </Button>
-                  {isTenantSystemAdminSlug(r.slug) ? null : (
+                      if (entries.length === 0) {
+                        return (
+                          <span className='text-muted-foreground text-sm'>
+                            —
+                          </span>
+                        );
+                      }
+                      const visible = entries.slice(0, MAX_VISIBLE_UNIT_TAGS);
+                      const extra = entries.length - visible.length;
+                      return (
+                        <div className='flex flex-wrap items-center gap-1.5'>
+                          {visible.map(({ unitId, label }) => (
+                            <Badge
+                              key={unitId}
+                              variant='outline'
+                              className='border-primary/30 bg-primary/10 text-foreground dark:border-primary/40 dark:bg-primary/15 max-w-[min(100%,11rem)] truncate font-normal shadow-none'
+                              title={label}
+                            >
+                              <span className='truncate'>{label}</span>
+                            </Badge>
+                          ))}
+                          {extra > 0 ? (
+                            <Badge
+                              variant='outline'
+                              className='border-primary/20 bg-primary/5 text-muted-foreground dark:border-primary/30 dark:bg-primary/10 shrink-0 font-normal shadow-none'
+                            >
+                              +{extra}
+                            </Badge>
+                          ) : null}
+                        </div>
+                      );
+                    })()}
+                  </TableCell>
+                  <TableCell className='text-right align-top'>
                     <Button
                       type='button'
                       variant='ghost'
                       size='icon'
-                      className='text-destructive'
-                      aria-label={t('delete')}
-                      disabled={deleteRole.isPending}
+                      aria-label={t('edit')}
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (!r.id) return;
-                        if (
-                          typeof window !== 'undefined' &&
-                          !window.confirm(t('confirm_delete_role'))
-                        ) {
-                          return;
-                        }
-                        deleteRole.mutate({ roleId: r.id });
+                        openEditRole(r);
                       }}
                     >
-                      <Trash2 className='h-4 w-4' />
+                      <Pencil className='h-4 w-4' />
                     </Button>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
-    </div>
-  );
+                    {isTenantSystemAdminSlug(r.slug) ? null : (
+                      <Button
+                        type='button'
+                        variant='ghost'
+                        size='icon'
+                        className='text-destructive'
+                        aria-label={t('delete')}
+                        disabled={deleteRole.isPending}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!r.id) return;
+                          if (
+                            typeof window !== 'undefined' &&
+                            !window.confirm(t('confirm_delete_role'))
+                          ) {
+                            return;
+                          }
+                          deleteRole.mutate({ roleId: r.id });
+                        }}
+                      >
+                        <Trash2 className='h-4 w-4' />
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </div>
+    ) : null;
 
   return (
     <>
@@ -443,7 +452,18 @@ export function TenantRolesManager({
             </CardTitle>
             <CardDescription>{t('tenant_roles_description')}</CardDescription>
           </CardHeader>
-          <CardContent className='space-y-4'>{toolbarAndTable}</CardContent>
+          <CardContent className='space-y-4'>
+            {loading ? (
+              <div className='text-muted-foreground flex items-center gap-2 text-sm'>
+                <Loader2 className='h-4 w-4 animate-spin' />
+                {t('loading')}
+              </div>
+            ) : loadError ? (
+              <p className='text-destructive text-sm'>{t('load_error')}</p>
+            ) : (
+              toolbarAndTable
+            )}
+          </CardContent>
         </Card>
       ) : (
         toolbarAndTable

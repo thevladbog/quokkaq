@@ -376,7 +376,12 @@ func (s *SSOService) HandleSAMLACS(ctx context.Context, w http.ResponseWriter, r
 		return
 	}
 
-	s.ApplyPostSSOLogin(ctx, c, user, displayName, email, true, groups, "", iss, sub)
+	if err := s.ApplyPostSSOLogin(ctx, c, user, displayName, email, true, groups, "", iss, sub, false); err != nil {
+		log.Printf("saml ApplyPostSSOLogin: %v", err)
+		cid := c.ID
+		s.redirectLoginSSOError(ctx, w, r, &cid, "access_sync_failed", "saml_acs_denied:access_sync_failed", payload.UILocale)
+		return
+	}
 
 	finish := randomHex(16)
 	if err := redisstore.SetJSON(ctx, redisstore.KeyExchange(finish), map[string]string{

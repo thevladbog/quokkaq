@@ -189,6 +189,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetMe godoc
+// @ID           authGetMe
 // @Summary      Get current user
 // @Description  Returns the currently authenticated user's information
 // @Tags         auth
@@ -477,6 +478,10 @@ func (h *AuthHandler) Signup(w http.ResponseWriter, r *http.Request) {
 		}
 		if errors.Is(err, services.ErrCompanySlugTaken) {
 			http.Error(w, "Company slug is already taken", http.StatusConflict)
+			return
+		}
+		if errors.Is(err, services.ErrTenantRBACNotConfigured) {
+			http.Error(w, err.Error(), http.StatusServiceUnavailable)
 			return
 		}
 		log.Printf("Signup: %v", err)

@@ -32,12 +32,12 @@ import { toast } from 'sonner';
 import { Loader2, Trash2, Users } from 'lucide-react';
 import type { Unit } from '@quokkaq/shared-types';
 import {
-  getGetCompaniesMeSsoGroupMappingsQueryKey,
-  getGetCompaniesMeTenantRolesQueryKey,
-  useDeleteCompaniesMeSsoGroupMappingsMappingId,
-  useGetCompaniesMeSsoGroupMappings,
-  useGetCompaniesMeTenantRoles,
-  usePostCompaniesMeSsoGroupMappings
+  getListGroupMappingsQueryKey,
+  getListTenantRolesQueryKey,
+  useDeleteGroupMapping,
+  useListGroupMappings,
+  useListTenantRoles,
+  useUpsertGroupMapping
 } from '@/lib/api/generated/auth';
 import { TenantRolesManager } from '@/components/settings/tenant-roles-manager';
 
@@ -54,8 +54,8 @@ export function OrganizationTenantRbacSettings({
   const locale = useLocale();
   const qc = useQueryClient();
 
-  const rolesQ = useGetCompaniesMeTenantRoles();
-  const mapsQ = useGetCompaniesMeSsoGroupMappings();
+  const rolesQ = useListTenantRoles();
+  const mapsQ = useListGroupMappings();
 
   const roles = useMemo(
     () => (rolesQ.data?.status === 200 ? (rolesQ.data.data ?? []) : []),
@@ -69,17 +69,17 @@ export function OrganizationTenantRbacSettings({
 
   const invalidateRbac = () => {
     void qc.invalidateQueries({
-      queryKey: getGetCompaniesMeTenantRolesQueryKey()
+      queryKey: getListTenantRolesQueryKey()
     });
     void qc.invalidateQueries({
-      queryKey: getGetCompaniesMeSsoGroupMappingsQueryKey()
+      queryKey: getListGroupMappingsQueryKey()
     });
   };
 
-  const upsertMapping = usePostCompaniesMeSsoGroupMappings({
+  const upsertMapping = useUpsertGroupMapping({
     mutation: {
       onSuccess: (res) => {
-        if (res.status === 201) {
+        if (res.status === 200 || res.status === 201) {
           toast.success(t('mapping_saved'));
           invalidateRbac();
           setNewMapIdp('');
@@ -90,7 +90,7 @@ export function OrganizationTenantRbacSettings({
     }
   });
 
-  const deleteMapping = useDeleteCompaniesMeSsoGroupMappingsMappingId({
+  const deleteMapping = useDeleteGroupMapping({
     mutation: {
       onSuccess: (res) => {
         if (res.status === 204) {

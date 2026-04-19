@@ -243,7 +243,7 @@ export interface ModelsUserUnit {
 export interface ModelsUser {
   createdAt?: string;
   email?: string;
-  /** ExemptFromSSOSync: when true, SSO directory reconcile does not change this user's roles/units. */
+  /** ExemptFromSSOSync when true, SSO directory reconcile does not change this user's global roles, unit assignments, or tenant role mappings (IdP group sync). */
   exemptFromSsoSync?: boolean;
   id?: string;
   isActive?: boolean;
@@ -578,12 +578,27 @@ export interface HandlersPatchUnitKioskConfigRequest {
 }
 
 export interface HandlersPatchUserSSOFlagsJSON {
+  /** ExemptFromSSOSync when true, SSO directory reconcile does not change this user's global roles, unit assignments, or tenant role mappings (IdP group sync). */
   exemptFromSsoSync?: boolean;
+  /** SSOProfileSyncOptOut when true, skip name/email updates from IdP on SSO login. */
   ssoProfileSyncOptOut?: boolean;
 }
 
 export interface HandlersPatchUserTenantRolesJSON {
-  tenantRoleIds?: string[];
+  /** ConfirmRemoveAllTenantRoles must be true when tenantRoleIds is empty after trimming, so ReplaceUserTenantRoles does not
+  clear user_tenant_roles and trigger RebuildUserUnitsFromTenantRoles mass-removal of user_units by mistake. */
+  confirmRemoveAllTenantRoles?: boolean;
+  tenantRoleIds: string[];
+}
+
+export interface HandlersTenantRoleBriefResponse {
+  id?: string;
+  name?: string;
+  slug?: string;
+}
+
+export interface HandlersPatchUserTenantRolesResponse {
+  tenantRoles: HandlersTenantRoleBriefResponse[];
 }
 
 export interface HandlersPeriodResponse {
@@ -707,12 +722,6 @@ export interface HandlersSignupRequest {
   planCode?: string;
 }
 
-export interface HandlersTenantRoleBriefResponse {
-  id?: string;
-  name?: string;
-  slug?: string;
-}
-
 export interface HandlersTransferRequest {
   /** @nullable */
   operatorComment?: string | null;
@@ -751,11 +760,29 @@ export interface HandlersUploadSurveyIdleMediaResponse {
   url: string;
 }
 
-export interface HandlersUpsertGroupMappingJSON {
-  idpGroupId?: string;
-  legacyRoleName?: string;
-  tenantRoleId?: string;
-}
+/**
+ * Map an IdP group to exactly one target: a tenant role id, or a legacy global role name. Send idpGroupId plus either tenantRoleId or legacyRoleName (not both).
+ */
+export type HandlersUpsertGroupMappingJSON = {
+  /**
+     * IdP group identifier (e.g. Azure AD group object id).
+     * @minLength 1
+     */
+  idpGroupId: string;
+  /**
+     * Tenant role UUID in this company. Mutually exclusive with legacyRoleName.
+     * @minLength 1
+     */
+  tenantRoleId: string;
+} | {
+  /**
+     * IdP group identifier (e.g. Azure AD group object id).
+     * @minLength 1
+     */
+  idpGroupId: string;
+  /** Legacy global role name applied by SSO group sync. Mutually exclusive with tenantRoleId. */
+  legacyRoleName: 'staff' | 'supervisor' | 'operator';
+};
 
 export interface HandlersUsageMetricInfoResponse {
   current?: number;
@@ -943,6 +970,17 @@ export interface ModelsInvoice {
   yookassaPaymentId?: string;
 }
 
+/**
+ * SsoAccessSource: "manual" (default) or "sso_groups" — IdP groups are source of truth for access when set.
+ */
+export type ModelsCompanySsoAccessSource = typeof ModelsCompanySsoAccessSource[keyof typeof ModelsCompanySsoAccessSource];
+
+
+export const ModelsCompanySsoAccessSource = {
+  manual: 'manual',
+  sso_groups: 'sso_groups',
+} as const;
+
 export interface ModelsUsageRecord {
   /** month for aggregation (first day of month) */
   billingMonth?: string;
@@ -1005,7 +1043,7 @@ export interface ModelsCompany {
   /** public tenant slug for login URLs */
   slug?: string;
   /** SsoAccessSource: "manual" (default) or "sso_groups" — IdP groups are source of truth for access when set. */
-  ssoAccessSource?: string;
+  ssoAccessSource?: ModelsCompanySsoAccessSource;
   /** SsoJitProvisioning: allow creating a user on first successful SSO when policy permits. */
   ssoJitProvisioning?: boolean;
   /** StrictPublicTenantResolve: SaaS-enabled — GET /public/tenants/{slug} does not expose org metadata for slug guessing. */
@@ -1026,16 +1064,10 @@ export interface HandlersCompanyMeResponse {
   publicAppUrl?: string;
 }
 
-export interface HandlersTenantRoleBrief {
-  id?: string;
-  name?: string;
-  slug?: string;
-}
-
 export interface HandlersCompanyUserListItem {
   createdAt?: string;
   email?: string;
-  /** ExemptFromSSOSync: when true, SSO directory reconcile does not change this user's roles/units. */
+  /** ExemptFromSSOSync when true, SSO directory reconcile does not change this user's global roles, unit assignments, or tenant role mappings (IdP group sync). */
   exemptFromSsoSync?: boolean;
   id?: string;
   isActive?: boolean;
@@ -1046,7 +1078,7 @@ export interface HandlersCompanyUserListItem {
   roles?: ModelsUserRole[];
   /** SSOProfileSyncOptOut: when true, skip name/email updates from IdP on SSO login. */
   ssoProfileSyncOptOut?: boolean;
-  tenantRoles?: HandlersTenantRoleBrief[];
+  tenantRoles?: HandlersTenantRoleBriefResponse[];
   type?: string;
   units?: ModelsUserUnit[];
 }
@@ -1232,6 +1264,17 @@ export type ModelsCompanyPatchCounterparty = { [key: string]: unknown };
 
 export type ModelsCompanyPatchPaymentAccountsItem = { [key: string]: unknown };
 
+/**
+ * SsoAccessSource sets SSO access provisioning (`manual` | `sso_groups`). Changing this field via PatchMyCompany requires logical scope `company.settings.ssoAccessSource` (any of `global.role.admin`, `global.role.platform_admin`, `company.tenant_role.system_admin`; not `unit.tenant.admin` alone).
+ */
+export type ModelsCompanyPatchSsoAccessSource = typeof ModelsCompanyPatchSsoAccessSource[keyof typeof ModelsCompanyPatchSsoAccessSource];
+
+
+export const ModelsCompanyPatchSsoAccessSource = {
+  manual: 'manual',
+  sso_groups: 'sso_groups',
+} as const;
+
 export interface ModelsCompanyPatch {
   billingAddress?: ModelsCompanyPatchBillingAddress;
   billingEmail?: string;
@@ -1242,17 +1285,19 @@ export interface ModelsCompanyPatch {
   /** items: @quokkaq/shared-types PaymentAccountSchema */
   paymentAccounts?: ModelsCompanyPatchPaymentAccountsItem[];
   slug?: string;
-  /** "manual" | "sso_groups" */
-  ssoAccessSource?: string;
+  /** SsoAccessSource sets SSO access provisioning (`manual` | `sso_groups`). Changing this field via PatchMyCompany requires logical scope `company.settings.ssoAccessSource` (any of `global.role.admin`, `global.role.platform_admin`, `company.tenant_role.system_admin`; not `unit.tenant.admin` alone). */
+  ssoAccessSource?: ModelsCompanyPatchSsoAccessSource;
 }
 
 export interface ModelsCompanySSOGroupMapping {
   companyId?: string;
+  createdAt?: string;
   id?: string;
   idpGroupId?: string;
   /** e.g. staff, admin */
   legacyRoleName?: string;
   tenantRoleId?: string;
+  updatedAt?: string;
 }
 
 export interface ModelsServiceSlot {

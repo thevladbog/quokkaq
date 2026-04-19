@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -153,7 +154,7 @@ func TestRecomputeUserIsActive_setsInactive(t *testing.T) {
 	if err := db.Exec(`INSERT INTO users (id, name, created_at, is_active) VALUES (?, 'E', ?, 1)`, uid, now).Error; err != nil {
 		t.Fatal(err)
 	}
-	if err := repo.RecomputeUserIsActive(uid); err != nil {
+	if err := repo.RecomputeUserIsActive(context.Background(), uid); err != nil {
 		t.Fatal(err)
 	}
 	var active int

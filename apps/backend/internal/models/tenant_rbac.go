@@ -73,13 +73,15 @@ func (u *UserTenantRole) BeforeCreate(tx *gorm.DB) error {
 }
 
 // CompanySSOGroupMapping maps an IdP group id (e.g. Azure object id) to access.
-// Either TenantRoleID or LegacyRoleName must be set.
+// Exactly one of TenantRoleID or LegacyRoleName must be set (enforced in API and DB).
 type CompanySSOGroupMapping struct {
-	ID             string  `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
-	CompanyID      string  `gorm:"not null;uniqueIndex:ux_company_sso_group" json:"companyId"`
-	IdpGroupID     string  `gorm:"not null;size:512;uniqueIndex:ux_company_sso_group" json:"idpGroupId"`
-	TenantRoleID   *string `gorm:"index" json:"tenantRoleId,omitempty"`
-	LegacyRoleName *string `gorm:"size:64" json:"legacyRoleName,omitempty"` // e.g. staff, admin
+	ID             string    `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
+	CompanyID      string    `gorm:"not null;uniqueIndex:ux_company_sso_group" json:"companyId"`
+	IdpGroupID     string    `gorm:"not null;size:512;uniqueIndex:ux_company_sso_group" json:"idpGroupId"`
+	TenantRoleID   *string   `gorm:"index" json:"tenantRoleId,omitempty"`
+	LegacyRoleName *string   `gorm:"size:64" json:"legacyRoleName,omitempty"` // e.g. staff, admin
+	CreatedAt      time.Time `gorm:"autoCreateTime" json:"createdAt"`
+	UpdatedAt      time.Time `gorm:"autoUpdateTime" json:"updatedAt"`
 }
 
 func (c *CompanySSOGroupMapping) BeforeCreate(tx *gorm.DB) error {
