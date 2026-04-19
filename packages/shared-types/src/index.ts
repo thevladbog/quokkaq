@@ -19,7 +19,11 @@ export const UserModelSchema = z.object({
   name: z.string(),
   email: z.string().nullable().optional(),
   photoUrl: z.string().nullable().optional(),
+  /** When false, login is denied until access is restored. */
+  isActive: z.boolean().optional().default(true),
   createdAt: z.string().nullable().optional(),
+  exemptFromSsoSync: z.boolean().optional(),
+  ssoProfileSyncOptOut: z.boolean().optional(),
   unitIds: z.array(z.string()).optional(),
   roles: z
     .union([
@@ -61,7 +65,18 @@ export const UserModelSchema = z.object({
           .optional()
       })
     )
-    .optional()
+    .optional(),
+  /** Tenant-defined roles for the active company (from GET /companies/me/users). */
+  tenantRoles: z
+    .array(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+        slug: z.string()
+      })
+    )
+    .nullish()
+    .transform((v) => v ?? [])
 });
 
 // Service Model Schema (recursive)
@@ -1183,6 +1198,8 @@ export const CompanySchema = z.object({
   counterparty: CounterpartySchema.optional(),
   settings: z.record(z.string(), z.any()).optional(),
   onboardingState: z.record(z.string(), z.any()).optional(),
+  /** "manual" | "sso_groups" — IdP group mappings drive access when "sso_groups". */
+  ssoAccessSource: z.string().optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
   subscription: SubscriptionSchema.optional(),

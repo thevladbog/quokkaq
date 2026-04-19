@@ -15,6 +15,15 @@ import (
 	"quokkaq-go-backend/internal/services"
 )
 
+// companyPatchOnlySsoAccessSource is true when the patch only updates ssoAccessSource (tenant RBAC admins).
+func companyPatchOnlySsoAccessSource(p models.CompanyPatch) bool {
+	if p.SsoAccessSource == nil {
+		return false
+	}
+	return p.Name == nil && p.BillingEmail == nil && p.Counterparty == nil && p.ClearCounterparty == nil &&
+		p.BillingAddress == nil && p.ClearBillingAddress == nil && p.PaymentAccounts == nil && p.Slug == nil
+}
+
 // companyMeResponse is returned by GET /companies/me.
 type companyMeResponse struct {
 	Company      *models.Company `json:"company"`
@@ -96,7 +105,7 @@ func (h *CompanyHandler) GetMyCompany(w http.ResponseWriter, r *http.Request) {
 
 // PatchMyCompany godoc
 // @Summary      Update current user's company (tenant admin)
-// @Description  Partial update: JSON body matches models.CompanyPatch at the root (not wrapped in a "company" property). Only send fields to change. Cannot combine clearBillingAddress with billingAddress (same for counterparty).
+// @Description  Partial update: JSON body matches models.CompanyPatch at the root (not wrapped in a "company" property). Only send fields to change. Cannot combine clearBillingAddress with billingAddress (same for counterparty). Users who are not global admins may only send `ssoAccessSource` (tenant RBAC `tenant.admin` on any unit).
 // @Tags         companies
 // @Accept       json
 // @Produce      json
@@ -160,6 +169,17 @@ func (h *CompanyHandler) PatchMyCompany(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	isGlobalAdmin, err := h.userRepo.IsAdmin(userID)
+	if err != nil {
+		log.Printf("PatchMyCompany IsAdmin: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if !isGlobalAdmin && !companyPatchOnlySsoAccessSource(body) {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
 	if body.ClearBillingAddress != nil && *body.ClearBillingAddress && body.BillingAddress != nil {
 		http.Error(w, "cannot set billingAddress and clearBillingAddress together", http.StatusBadRequest)
 		return
@@ -211,6 +231,14 @@ func (h *CompanyHandler) PatchMyCompany(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 		company.PaymentAccounts = out
+	}
+	if body.SsoAccessSource != nil {
+		v := strings.ToLower(strings.TrimSpace(*body.SsoAccessSource))
+		if v != models.SsoAccessSourceManual && v != models.SsoAccessSourceSSOGroups {
+			http.Error(w, "invalid ssoAccessSource", http.StatusBadRequest)
+			return
+		}
+		company.SsoAccessSource = v
 	}
 
 	if err := h.companyRepo.Update(company); err != nil {

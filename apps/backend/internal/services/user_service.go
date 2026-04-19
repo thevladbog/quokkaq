@@ -125,7 +125,7 @@ func (s *userService) UpdateUser(id string, input *models.UpdateUserInput) error
 
 	wantsAdmin := slices.Contains(input.Roles, "admin")
 
-	return database.DB.Transaction(func(tx *gorm.DB) error {
+	err = database.DB.Transaction(func(tx *gorm.DB) error {
 		if err := s.repo.UpdateTx(tx, existing); err != nil {
 			return err
 		}
@@ -147,6 +147,10 @@ func (s *userService) UpdateUser(id string, input *models.UpdateUserInput) error
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	return s.repo.RecomputeUserIsActive(id)
 }
 
 func (s *userService) DeleteUser(id string) error {
@@ -154,7 +158,10 @@ func (s *userService) DeleteUser(id string) error {
 }
 
 func (s *userService) AssignUnit(userID, unitID string, permissions []string) error {
-	return s.repo.AssignUnit(userID, unitID, permissions)
+	if err := s.repo.AssignUnit(userID, unitID, permissions); err != nil {
+		return err
+	}
+	return s.repo.RecomputeUserIsActive(userID)
 }
 
 func (s *userService) AssignRole(userID, roleID string) error {
@@ -162,7 +169,10 @@ func (s *userService) AssignRole(userID, roleID string) error {
 }
 
 func (s *userService) RemoveUnit(userID, unitID string) error {
-	return s.repo.RemoveUnit(userID, unitID)
+	if err := s.repo.RemoveUnit(userID, unitID); err != nil {
+		return err
+	}
+	return s.repo.RecomputeUserIsActive(userID)
 }
 
 func (s *userService) IsSystemInitialized() (bool, error) {

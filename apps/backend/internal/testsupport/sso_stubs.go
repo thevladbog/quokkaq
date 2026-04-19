@@ -55,6 +55,7 @@ type PanicUserRepo struct{}
 func (PanicUserRepo) Create(*models.User) error                                 { panic("unexpected") }
 func (PanicUserRepo) CreateTx(*gorm.DB, *models.User) error                     { panic("unexpected") }
 func (PanicUserRepo) FindAll(string) ([]models.User, error)                     { panic("unexpected") }
+func (PanicUserRepo) ListUsersForCompany(string, string) ([]models.User, error) { panic("unexpected") }
 func (PanicUserRepo) FindByID(string) (*models.User, error)                     { panic("unexpected") }
 func (PanicUserRepo) FindByIDTx(*gorm.DB, string) (*models.User, error)         { panic("unexpected") }
 func (PanicUserRepo) FindByEmail(string) (*models.User, error)                  { panic("unexpected") }
@@ -106,6 +107,9 @@ func (PanicUserRepo) ShiftJournalSeesAllActivity(string, string) (bool, error) {
 func (PanicUserRepo) HasUnitBranchAccess(string, string) (bool, error) {
 	panic("unexpected")
 }
+func (PanicUserRepo) UserHasEffectiveAccess(string) (bool, error)       { panic("unexpected") }
+func (PanicUserRepo) RecomputeUserIsActive(string) error                { panic("unexpected") }
+func (PanicUserRepo) UpdateFields(string, map[string]interface{}) error { panic("unexpected") }
 
 // PanicSSORepo satisfies repository.SSORepository and panics on any call.
 type PanicSSORepo struct{}
@@ -120,6 +124,13 @@ func (PanicSSORepo) FindCompaniesByEmailDomain(string) ([]models.Company, []mode
 func (PanicSSORepo) FindExternalIdentity(string, string) (*models.UserExternalIdentity, error) {
 	panic("unexpected")
 }
+func (PanicSSORepo) FindExternalIdentityByCompanyAndObjectID(string, string) (*models.UserExternalIdentity, error) {
+	panic("unexpected")
+}
+func (PanicSSORepo) FindExternalIdentityByUserAndCompany(string, string) (*models.UserExternalIdentity, error) {
+	panic("unexpected")
+}
+func (PanicSSORepo) UpdateExternalIdentity(*models.UserExternalIdentity) error { panic("unexpected") }
 func (PanicSSORepo) CreateExternalIdentity(*models.UserExternalIdentity) error { panic("unexpected") }
 func (PanicSSORepo) CreateExternalIdentityTx(*gorm.DB, *models.UserExternalIdentity) error {
 	panic("unexpected")

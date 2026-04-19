@@ -18,6 +18,20 @@ describe('UserModelSchema', () => {
     expect(r.success).toBe(true);
     if (r.success) {
       expect(r.data.roles).toEqual([]);
+      expect(r.data.tenantRoles).toEqual([]);
+      expect(r.data.isActive).toBe(true);
+    }
+  });
+
+  it('treats tenantRoles null as empty list', () => {
+    const r = UserModelSchema.safeParse({
+      id: 'u1',
+      name: 'Ada',
+      tenantRoles: null
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.tenantRoles).toEqual([]);
     }
   });
 });

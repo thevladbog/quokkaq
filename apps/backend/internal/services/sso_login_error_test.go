@@ -21,6 +21,16 @@ func (extNotFoundSSORepo) FindExternalIdentity(string, string) (*models.UserExte
 	return nil, gorm.ErrRecordNotFound
 }
 
+func (extNotFoundSSORepo) FindExternalIdentityByCompanyAndObjectID(string, string) (*models.UserExternalIdentity, error) {
+	return nil, gorm.ErrRecordNotFound
+}
+
+func (extNotFoundSSORepo) FindExternalIdentityByUserAndCompany(string, string) (*models.UserExternalIdentity, error) {
+	return nil, gorm.ErrRecordNotFound
+}
+
+func (extNotFoundSSORepo) UpdateExternalIdentity(*models.UserExternalIdentity) error { return nil }
+
 type noTenantAccessUserRepo struct{ testsupport.PanicUserRepo }
 
 func (noTenantAccessUserRepo) FindByEmail(string) (*models.User, error) {
@@ -70,11 +80,12 @@ func TestResolveSSOUser_NoCompanyAccessSentinel(t *testing.T) {
 		&noTenantAccessUserRepo{},
 		&extNotFoundSSORepo{},
 		testsupport.PanicUnitRepo{},
+		nil,
 		fakeAuthExchange{},
 	)
 	company := &models.Company{ID: "c1", SsoJitProvisioning: true}
 	conn := &models.CompanySSOConnection{}
-	_, err := svc.resolveSSOUser(context.Background(), company, conn, "iss", "sub", "a@b.com", "n", true)
+	_, err := svc.resolveSSOUser(context.Background(), company, conn, "iss", "sub", "a@b.com", "n", true, "")
 	if !errors.Is(err, ErrSSONoCompanyAccess) {
 		t.Fatalf("want ErrSSONoCompanyAccess, got %v", err)
 	}
@@ -114,7 +125,7 @@ func TestRedirectLoginSSOError_AuditAndLocation(t *testing.T) {
 	t.Setenv("PUBLIC_APP_URL", "http://app.test")
 	t.Setenv("LOGIN_REDIRECT_LOCALE", "en")
 	repo := &captureAuditSSORepo{}
-	svc := NewSSOService(testsupport.PanicCompanyRepo{}, testsupport.PanicUserRepo{}, repo, testsupport.PanicUnitRepo{}, fakeAuthExchange{})
+	svc := NewSSOService(testsupport.PanicCompanyRepo{}, testsupport.PanicUserRepo{}, repo, testsupport.PanicUnitRepo{}, nil, fakeAuthExchange{})
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
 	cid := "co-1"
