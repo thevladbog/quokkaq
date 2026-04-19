@@ -35,7 +35,7 @@ describe('filterCountersForContext', () => {
   });
 
   it('returns empty for unit kinds other than subdivision or service_zone', () => {
-    const u = { id: 'x', kind: 'branch' } as Unit;
+    const u = { id: 'x', kind: 'branch' } as unknown as Unit;
     expect(
       filterCountersForContext(u, [counter({ id: 'c', unitId: 'x' })])
     ).toEqual([]);
