@@ -1495,6 +1495,10 @@
     "selectUnit": "Please select a unit",
     "selectUnitButton": "Select Unit",
     "select_unit_aria": "Open kiosk for {unit}",
+    "unit_selection_empty": {
+      "title": "No units available",
+      "body": "There are no units available at this location."
+    },
     "noServicesAvailable": "No services available at this level",
     "servicesUnavailableTitle": "Services unavailable",
     "servicesUnavailableMessage": "We could not load this unit's services. Check the connection and try again.",

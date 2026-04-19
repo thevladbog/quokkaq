@@ -118,6 +118,15 @@ func (PanicUserRepo) RecomputeUserIsActiveTx(*gorm.DB, string) error          { 
 func (PanicUserRepo) UpdateFields(context.Context, string, map[string]interface{}) error {
 	panic("unexpected")
 }
+func (PanicUserRepo) HasTenantSystemAdminRoleInCompany(string, string) (bool, error) {
+	panic("unexpected")
+}
+func (PanicUserRepo) ListCompanyIDsForSupportReportTenantWideAccess(string) ([]string, error) {
+	panic("unexpected")
+}
+func (PanicUserRepo) ListUserIDsWithTenantSystemAdminInCompany(string) ([]string, error) {
+	panic("unexpected")
+}
 
 // PanicSSORepo satisfies repository.SSORepository and panics on any call.
 type PanicSSORepo struct{}

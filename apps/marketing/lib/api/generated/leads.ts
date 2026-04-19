@@ -408,6 +408,10 @@ export interface HandlersCreateTicketRequestKiosk {
 
 export type HandlersCreateTicketRequest = HandlersCreateTicketRequestAnonymous | HandlersCreateTicketRequestStaff | HandlersCreateTicketRequestKiosk;
 
+export interface HandlersCustomTermsLeadRequestBody {
+  comment?: string;
+}
+
 export interface HandlersDaDataFindPartyByInnRequest {
   inn: string;
   kpp?: string;
@@ -618,6 +622,10 @@ export interface HandlersPeriodResponse {
 
 export interface HandlersPickRequest {
   counterId?: string;
+}
+
+export interface HandlersPlanChangeRequestBody {
+  requestedPlanCode?: string;
 }
 
 export interface HandlersPlatformCreateSubscriptionBody {
@@ -1386,6 +1394,7 @@ export type ModelsInvitationTargetRoles = { [key: string]: unknown };
 export type ModelsInvitationTargetUnits = { [key: string]: unknown };
 
 export interface ModelsInvitation {
+  companyId?: string;
   createdAt?: string;
   email?: string;
   expiresAt?: string;
@@ -1400,6 +1409,7 @@ export interface ModelsInvitation {
 }
 
 export interface ModelsMessageTemplate {
+  companyId?: string;
   content?: string;
   createdAt?: string;
   id?: string;

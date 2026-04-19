@@ -288,11 +288,28 @@ func (s *SupportReportService) Create(ctx context.Context, userID string, in Cre
 }
 
 // supportReportAPIAccessorUserIDsCSV lists QuokkaQ user ids who may read this support report via the API:
-// the author plus every user with tenant role "admin" (same visibility as List with isAdmin / GetByID for non-authors).
+// the author, tenant system_admin users and the company owner in the author's company, and platform_admin users
+// (SaaS operators). Global role "admin" is not included — it is not tenant-scoped.
 func (s *SupportReportService) supportReportAPIAccessorUserIDsCSV(authorUserID string) (string, error) {
-	adminIDs, err := s.userRepo.ListUserIDsByRoleNames([]string{"admin"})
+	authorUserID = strings.TrimSpace(authorUserID)
+	if authorUserID == "" {
+		return "", fmt.Errorf("support report: empty author user id")
+	}
+	companyID, err := s.userRepo.GetCompanyIDByUserID(authorUserID)
 	if err != nil {
-		return "", fmt.Errorf("support report: list admin user ids: %w", err)
+		return "", fmt.Errorf("support report: author company: %w", err)
+	}
+	companyID = strings.TrimSpace(companyID)
+	if companyID == "" {
+		return "", fmt.Errorf("support report: author has no company")
+	}
+	tenantAdmins, err := s.userRepo.ListUserIDsWithTenantSystemAdminInCompany(companyID)
+	if err != nil {
+		return "", fmt.Errorf("support report: list tenant system admins: %w", err)
+	}
+	platformAdmins, err := s.userRepo.ListUserIDsByRoleNames([]string{"platform_admin"})
+	if err != nil {
+		return "", fmt.Errorf("support report: list platform admins: %w", err)
 	}
 	seen := make(map[string]struct{})
 	var out []string
@@ -308,8 +325,19 @@ func (s *SupportReportService) supportReportAPIAccessorUserIDsCSV(authorUserID s
 		out = append(out, id)
 	}
 	add(authorUserID)
-	for _, id := range adminIDs {
+	for _, id := range tenantAdmins {
 		add(id)
+	}
+	for _, id := range platformAdmins {
+		add(id)
+	}
+	if s.companyRepo != nil {
+		comp, err := s.companyRepo.FindByID(companyID)
+		if err == nil && comp != nil {
+			if oid := strings.TrimSpace(comp.OwnerUserID); oid != "" {
+				add(oid)
+			}
+		}
 	}
 	return strings.Join(out, ","), nil
 }
@@ -399,13 +427,7 @@ func (s *SupportReportService) requireYandexComments(row *models.SupportReport) 
 }
 
 func (s *SupportReportService) canManageSupportReportShares(viewerID string, row *models.SupportReport) (bool, error) {
-	if row == nil {
-		return false, nil
-	}
-	if row.CreatedByUserID == viewerID {
-		return true, nil
-	}
-	return s.userRepo.IsAdmin(viewerID)
+	return s.supportReportManagerAccess(viewerID, row)
 }
 
 // SupportReportShareListItem is one persisted share row for API responses.
@@ -637,7 +659,43 @@ func (s *SupportReportService) buildTrackerCompanyLabel(userID string) string {
 	return short
 }
 
-// canViewSupportReport is true for author, tenant admin, or users granted a share.
+// supportReportManagerAccess is true for the author, platform_admin, or tenant-wide managers for the author's company
+// (system_admin tenant role or company owner).
+func (s *SupportReportService) supportReportManagerAccess(viewerID string, row *models.SupportReport) (bool, error) {
+	if row == nil {
+		return false, nil
+	}
+	if row.CreatedByUserID == viewerID {
+		return true, nil
+	}
+	pf, err := s.userRepo.IsPlatformAdmin(viewerID)
+	if err != nil {
+		return false, err
+	}
+	if pf {
+		return true, nil
+	}
+	authorCompany, err := s.userRepo.GetCompanyIDByUserID(row.CreatedByUserID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
+		return false, err
+	}
+	if strings.TrimSpace(authorCompany) == "" {
+		return false, nil
+	}
+	ok, err := s.userRepo.HasTenantSystemAdminRoleInCompany(viewerID, authorCompany)
+	if err != nil {
+		return false, err
+	}
+	if ok {
+		return true, nil
+	}
+	return s.userRepo.IsCompanyOwner(viewerID, authorCompany)
+}
+
+// canViewSupportReport is true for author, tenant-wide managers, or users granted a share.
 func (s *SupportReportService) canViewSupportReport(viewerID string, row *models.SupportReport) (bool, error) {
 	if row == nil {
 		return false, nil
@@ -645,11 +703,11 @@ func (s *SupportReportService) canViewSupportReport(viewerID string, row *models
 	if row.CreatedByUserID == viewerID {
 		return true, nil
 	}
-	isAdmin, err := s.userRepo.IsAdmin(viewerID)
+	okMgr, err := s.supportReportManagerAccess(viewerID, row)
 	if err != nil {
 		return false, err
 	}
-	if isAdmin {
+	if okMgr {
 		return true, nil
 	}
 	if s.shareRepo == nil {
@@ -680,13 +738,25 @@ func (s *SupportReportService) resolveUnitIDForCreate(userID string, unitID *str
 	return &u, nil
 }
 
-// List returns reports visible to the user (all if admin).
+// List returns reports visible to the user: own reports and shares; all reports in a company when the user is
+// owner or system_admin there; all reports in the deployment only for platform_admin.
 func (s *SupportReportService) List(ctx context.Context, userID string) ([]models.SupportReport, error) {
-	isAdmin, err := s.userRepo.IsAdmin(userID)
+	pf, err := s.userRepo.IsPlatformAdmin(userID)
 	if err != nil {
 		return nil, err
 	}
-	rows, err := s.repo.ListForUser(userID, isAdmin)
+	var tenantCompanies []string
+	if !pf {
+		tenantCompanies, err = s.userRepo.ListCompanyIDsForSupportReportTenantWideAccess(userID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	scope := repository.SupportReportListScope{
+		PlatformWide:     pf,
+		TenantCompanyIDs: tenantCompanies,
+	}
+	rows, err := s.repo.ListForUser(userID, scope)
 	if err != nil {
 		return nil, err
 	}
@@ -801,11 +871,11 @@ func (s *SupportReportService) MarkIrrelevant(ctx context.Context, userID, repor
 	if err != nil {
 		return nil, err
 	}
-	isAdmin, err := s.userRepo.IsAdmin(userID)
+	ok, err := s.supportReportManagerAccess(userID, row)
 	if err != nil {
 		return nil, err
 	}
-	if row.CreatedByUserID != userID && !isAdmin {
+	if !ok {
 		return nil, ErrSupportReportForbidden
 	}
 	if !s.reportMatchesConfiguredPlatform(row) {

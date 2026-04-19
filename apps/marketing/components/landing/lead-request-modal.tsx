@@ -148,7 +148,9 @@ export function LeadRequestModal({
         </p>
         {success ? (
           <div className='space-y-4'>
-            <p className='text-sm text-[color:var(--color-text)]'>{lead.success}</p>
+            <p className='text-sm text-[color:var(--color-text)]'>
+              {lead.success}
+            </p>
             <button
               type='button'
               className='focus-ring rounded-xl bg-[color:var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-white'
@@ -160,7 +162,10 @@ export function LeadRequestModal({
         ) : (
           <form onSubmit={(e) => void handleSubmit(e)} className='space-y-4'>
             <div className='grid gap-2'>
-              <label htmlFor='lead-name' className='text-sm font-medium text-[color:var(--color-text)]'>
+              <label
+                htmlFor='lead-name'
+                className='text-sm font-medium text-[color:var(--color-text)]'
+              >
                 {lead.name}
               </label>
               <input
@@ -173,7 +178,10 @@ export function LeadRequestModal({
               />
             </div>
             <div className='grid gap-2'>
-              <label htmlFor='lead-email' className='text-sm font-medium text-[color:var(--color-text)]'>
+              <label
+                htmlFor='lead-email'
+                className='text-sm font-medium text-[color:var(--color-text)]'
+              >
                 {lead.email}
               </label>
               <input
@@ -187,7 +195,10 @@ export function LeadRequestModal({
               />
             </div>
             <div className='grid gap-2'>
-              <label htmlFor='lead-company' className='text-sm font-medium text-[color:var(--color-text)]'>
+              <label
+                htmlFor='lead-company'
+                className='text-sm font-medium text-[color:var(--color-text)]'
+              >
                 {lead.company}
               </label>
               <input
@@ -199,7 +210,10 @@ export function LeadRequestModal({
               />
             </div>
             <div className='grid gap-2'>
-              <label htmlFor='lead-message' className='text-sm font-medium text-[color:var(--color-text)]'>
+              <label
+                htmlFor='lead-message'
+                className='text-sm font-medium text-[color:var(--color-text)]'
+              >
                 {lead.message}
               </label>
               <textarea
@@ -212,7 +226,9 @@ export function LeadRequestModal({
             </div>
             {error ? (
               <div className='space-y-1' role='alert'>
-                <p className='text-sm text-red-600 dark:text-red-400'>{lead.error}</p>
+                <p className='text-sm text-red-600 dark:text-red-400'>
+                  {lead.error}
+                </p>
                 {errorDetail ? (
                   <p className='font-mono text-xs break-words text-red-600/90 dark:text-red-400/90'>
                     {errorDetail}

@@ -36,7 +36,7 @@ func (s stubSupportReportRepo) FindByID(string) (*models.SupportReport, error) {
 	return s.findRes, s.findErr
 }
 
-func (s stubSupportReportRepo) ListForUser(string, bool) ([]models.SupportReport, error) {
+func (s stubSupportReportRepo) ListForUser(string, repository.SupportReportListScope) ([]models.SupportReport, error) {
 	if s.listErr != nil {
 		return nil, s.listErr
 	}
@@ -57,8 +57,30 @@ func (stubSupportUserRepo) FindByID(_ context.Context, id string) (*models.User,
 	return &models.User{ID: id, Name: "Report Author"}, nil
 }
 
+func (stubSupportUserRepo) GetCompanyIDByUserID(string) (string, error) {
+	return "company-test", nil
+}
+
+func (stubSupportUserRepo) IsCompanyOwner(string, string) (bool, error) {
+	return false, nil
+}
+
 func (stubSupportUserRepo) IsAdmin(string) (bool, error) {
 	return false, nil
+}
+
+func (stubSupportUserRepo) IsPlatformAdmin(string) (bool, error) { return false, nil }
+
+func (stubSupportUserRepo) ListCompanyIDsForSupportReportTenantWideAccess(string) ([]string, error) {
+	return nil, nil
+}
+
+func (stubSupportUserRepo) HasTenantSystemAdminRoleInCompany(string, string) (bool, error) {
+	return false, nil
+}
+
+func (stubSupportUserRepo) ListUserIDsWithTenantSystemAdminInCompany(string) ([]string, error) {
+	return nil, nil
 }
 
 func (stubSupportUserRepo) HasSupportReportAccess(string) (bool, error) {
@@ -81,7 +103,7 @@ func newTestSupportReportHandlerWithPlane(repo repository.SupportReportRepositor
 
 type stubSupportUserRepoAdmin struct{ stubSupportUserRepo }
 
-func (stubSupportUserRepoAdmin) IsAdmin(string) (bool, error) {
+func (stubSupportUserRepoAdmin) IsPlatformAdmin(string) (bool, error) {
 	return true, nil
 }
 
@@ -113,13 +135,18 @@ func (m *memSupportReportRepo) FindByID(id string) (*models.SupportReport, error
 	return &cp, nil
 }
 
-func (m *memSupportReportRepo) ListForUser(userID string, all bool) ([]models.SupportReport, error) {
+func (m *memSupportReportRepo) ListForUser(userID string, scope repository.SupportReportListScope) ([]models.SupportReport, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	var out []models.SupportReport
 	for _, row := range m.m {
-		if all || row.CreatedByUserID == userID {
-			cp := *row
+		cp := *row
+		if scope.PlatformWide || row.CreatedByUserID == userID {
+			out = append(out, cp)
+			continue
+		}
+		if len(scope.TenantCompanyIDs) > 0 {
+			// Mem store has no company on rows; include all rows when tenant-wide scope is active (tenant admin list).
 			out = append(out, cp)
 		}
 	}
