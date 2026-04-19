@@ -8701,8 +8701,16 @@
                 ]
             },
             "get": {
-                "description": "Retrieves a specific counter by its ID",
+                "description": "Requires a Bearer token. Platform admins may read any counter; other callers must resolve a tenant via X-Company-Id when applicable, and the counter's unit must belong to that company (otherwise 404).",
                 "parameters": [
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     {
                         "description": "Counter ID",
                         "in": "path",
@@ -8724,6 +8732,36 @@
                         },
                         "description": "OK"
                     },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Company context required"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
                     "404": {
                         "content": {
                             "application/json": {
@@ -8733,9 +8771,24 @@
                             }
                         },
                         "description": "Counter not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
                     }
                 },
-                "summary": "Get a counter by ID",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get a counter by ID (authenticated)",
                 "tags": [
                     "counters"
                 ]
@@ -21882,7 +21935,17 @@
         },
         "/users": {
             "get": {
-                "description": "Retrieves a list of all users",
+                "description": "Returns users belonging to the tenant company resolved from the JWT and optional X-Company-Id header.",
+                "parameters": [
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "content": {
@@ -21897,6 +21960,36 @@
                         },
                         "description": "OK"
                     },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Company context required"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
                     "500": {
                         "content": {
                             "application/json": {
@@ -21908,7 +22001,12 @@
                         "description": "Internal Server Error"
                     }
                 },
-                "summary": "Get all users",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List users for the current tenant company",
                 "tags": [
                     "users"
                 ]

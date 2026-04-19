@@ -98,13 +98,19 @@ func (h *CounterHandler) GetCountersByUnit(w http.ResponseWriter, r *http.Reques
 }
 
 // GetCounterByID godoc
-// @Summary      Get a counter by ID
-// @Description  Retrieves a specific counter by its ID
+// @Summary      Get a counter by ID (authenticated)
+// @Description  Requires a Bearer token. Platform admins may read any counter; other callers must resolve a tenant via X-Company-Id when applicable, and the counter's unit must belong to that company (otherwise 404).
 // @Tags         counters
 // @Produce      json
+// @Param        X-Company-Id header string false "Tenant company UUID when the user belongs to multiple organizations"
 // @Param        id   path      string  true  "Counter ID"
+// @Security     BearerAuth
 // @Success      200  {object}  models.Counter
+// @Failure      400  {string}  string "Company context required"
+// @Failure      401  {string}  string "Unauthorized"
+// @Failure      403  {string}  string "Forbidden"
 // @Failure      404  {string}  string "Counter not found"
+// @Failure      500  {string}  string "Internal Server Error"
 // @Router       /counters/{id} [get]
 func (h *CounterHandler) GetCounterByID(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserIDFromContext(r.Context())

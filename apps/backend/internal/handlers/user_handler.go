@@ -91,11 +91,16 @@ func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetAllUsers godoc
-// @Summary      Get all users
-// @Description  Retrieves a list of all users
+// @Summary      List users for the current tenant company
+// @Description  Returns users belonging to the tenant company resolved from the JWT and optional X-Company-Id header.
 // @Tags         users
 // @Produce      json
+// @Param        X-Company-Id header string false "Tenant company UUID when the user belongs to multiple organizations"
+// @Security     BearerAuth
 // @Success      200  {array}   models.User
+// @Failure      400  {string}  string "Company context required"
+// @Failure      401  {string}  string "Unauthorized"
+// @Failure      403  {string}  string "Forbidden"
 // @Failure      500  {string}  string "Internal Server Error"
 // @Router       /users [get]
 func (h *UserHandler) GetAllUsers(w http.ResponseWriter, r *http.Request) {

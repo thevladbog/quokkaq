@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import {
@@ -8,6 +8,14 @@ import {
   type HandlersPublicLeadRequestBody
 } from '@/lib/api/generated/leads';
 import type { AppLocale, HomeMessages } from '@/src/messages';
+
+function getFocusableElements(root: HTMLElement): HTMLElement[] {
+  const selector =
+    'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  return [...root.querySelectorAll<HTMLElement>(selector)].filter(
+    (el) => !el.hasAttribute('disabled') && el.getAttribute('aria-hidden') !== 'true'
+  );
+}
 
 export type LeadRequestModalProps = {
   open: boolean;
@@ -35,6 +43,35 @@ export function LeadRequestModal({
   const [error, setError] = useState(false);
   /** Filled when API returns JSON { detail } (dev / PUBLIC_LEAD_DEBUG). */
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const previous = document.activeElement as HTMLElement | null;
+    return () => {
+      previous?.focus?.();
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const id = requestAnimationFrame(() => {
+      const root = dialogRef.current;
+      if (!root) {
+        return;
+      }
+      if (success) {
+        root.querySelector<HTMLElement>('[data-lead-modal-success-close]')?.focus();
+      } else {
+        root.querySelector<HTMLElement>('#lead-name')?.focus();
+      }
+    });
+    return () => cancelAnimationFrame(id);
+  }, [open, success]);
 
   useEffect(() => {
     if (!open) {
@@ -123,12 +160,47 @@ export function LeadRequestModal({
     }
   };
 
+  const handleDialogKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Escape') {
+      e.stopPropagation();
+      onClose();
+      return;
+    }
+    if (e.key !== 'Tab' || !dialogRef.current) {
+      return;
+    }
+    const focusables = getFocusableElements(dialogRef.current);
+    if (focusables.length === 0) {
+      return;
+    }
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    const active = document.activeElement;
+    if (!active || !focusables.includes(active as HTMLElement)) {
+      e.preventDefault();
+      first.focus();
+      return;
+    }
+    if (e.shiftKey) {
+      if (active === first) {
+        e.preventDefault();
+        last.focus();
+      }
+    } else if (active === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  };
+
   return createPortal(
     <div
+      ref={dialogRef}
       className='fixed inset-0 z-[200] flex items-center justify-center p-4'
       role='dialog'
       aria-modal='true'
       aria-labelledby='lead-modal-title'
+      tabIndex={-1}
+      onKeyDown={handleDialogKeyDown}
     >
       <button
         type='button'
@@ -153,6 +225,7 @@ export function LeadRequestModal({
             </p>
             <button
               type='button'
+              data-lead-modal-success-close
               className='focus-ring rounded-xl bg-[color:var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-white'
               onClick={onClose}
             >
