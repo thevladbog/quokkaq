@@ -1,5 +1,55 @@
 import { describe, expect, it } from 'vitest';
-import { BookingModelSchema, UnitKindSchema, UserModelSchema } from './index';
+import {
+  BookingModelSchema,
+  DesktopTerminalSchema,
+  UnitKindSchema,
+  UserModelSchema
+} from './index';
+
+const desktopTerminalMinimal = {
+  id: 't1',
+  unitId: 'u1',
+  defaultLocale: 'en',
+  createdAt: '2020-01-01T00:00:00Z',
+  updatedAt: '2020-01-01T00:00:00Z'
+};
+
+describe('DesktopTerminalSchema', () => {
+  it('treats omitted kind with counterId as counter_guest_survey', () => {
+    const r = DesktopTerminalSchema.safeParse({
+      ...desktopTerminalMinimal,
+      counterId: 'c1'
+    });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.kind).toBe('counter_guest_survey');
+  });
+
+  it('keeps kiosk when no counter binding', () => {
+    const r = DesktopTerminalSchema.safeParse({ ...desktopTerminalMinimal });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.kind).toBe('kiosk');
+  });
+
+  it('maps explicit kiosk with counterId to counter_guest_survey', () => {
+    const r = DesktopTerminalSchema.safeParse({
+      ...desktopTerminalMinimal,
+      kind: 'kiosk',
+      counterId: 'c1'
+    });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.kind).toBe('counter_guest_survey');
+  });
+
+  it('preserves counter_board', () => {
+    const r = DesktopTerminalSchema.safeParse({
+      ...desktopTerminalMinimal,
+      kind: 'counter_board',
+      counterId: 'c1'
+    });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.kind).toBe('counter_board');
+  });
+});
 
 describe('UnitKindSchema', () => {
   it('accepts allowed enum values', () => {

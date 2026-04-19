@@ -12,6 +12,12 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// normalizeUnitIDParam canonicalizes URL unit ids for comparison with JWT terminal claims
+// (jwtStringClaim lowercases unit_id).
+func normalizeUnitIDParam(s string) string {
+	return strings.ToLower(strings.TrimSpace(s))
+}
+
 // RespondRepoFindError writes 404 for missing rows (GORM not found) or 500 + log for other failures. Returns true if the handler should stop.
 func RespondRepoFindError(ctx context.Context, w http.ResponseWriter, err error, op string) bool {
 	if err == nil {
@@ -183,8 +189,8 @@ func RequirePlatformAdmin(userRepo repository.UserRepository) func(http.Handler)
 func RequireAdminTerminalOrUnitMemberForUnit(userRepo repository.UserRepository, urlUnitIDParam string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			unitID := chi.URLParam(r, urlUnitIDParam)
-			if strings.TrimSpace(unitID) == "" {
+			unitID := normalizeUnitIDParam(chi.URLParam(r, urlUnitIDParam))
+			if unitID == "" {
 				http.Error(w, "Unit ID required", http.StatusBadRequest)
 				return
 			}
@@ -415,8 +421,8 @@ func RequireCounterUnit(userRepo repository.UserRepository, counterRepo reposito
 func RequireGuestSurveyCompletionImageRead(userRepo repository.UserRepository, urlUnitIDParam string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			unitID := chi.URLParam(r, urlUnitIDParam)
-			if strings.TrimSpace(unitID) == "" {
+			unitID := normalizeUnitIDParam(chi.URLParam(r, urlUnitIDParam))
+			if unitID == "" {
 				http.Error(w, "Unit ID required", http.StatusBadRequest)
 				return
 			}

@@ -624,21 +624,45 @@ export const DesktopTerminalKindSchema = z.enum([
 
 export type DesktopTerminalKind = z.infer<typeof DesktopTerminalKindSchema>;
 
-export const DesktopTerminalSchema = z.object({
-  id: z.string(),
-  unitId: z.string(),
-  counterId: z.string().nullable().optional(),
-  counterName: z.string().optional(),
-  kind: DesktopTerminalKindSchema.optional().default('kiosk'),
-  name: z.string().nullable().optional(),
-  defaultLocale: z.string(),
-  kioskFullscreen: z.boolean().optional().default(false),
-  revokedAt: z.string().nullable().optional(),
-  lastSeenAt: z.string().nullable().optional(),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-  unitName: z.string().optional()
-});
+/** Mirrors backend models.EffectiveTerminalKind for API payloads. */
+export function effectiveDesktopTerminalKind(input: {
+  kind?: DesktopTerminalKind | undefined;
+  counterId?: string | null | undefined;
+}): DesktopTerminalKind {
+  const hasCounter =
+    input.counterId != null && String(input.counterId).trim() !== '';
+  const raw = input.kind;
+  const k =
+    raw === undefined || raw === null ? '' : String(raw).toLowerCase().trim();
+  if (!k) {
+    return hasCounter ? 'counter_guest_survey' : 'kiosk';
+  }
+  if (k === 'counter_board') return 'counter_board';
+  if (k === 'counter_guest_survey') return 'counter_guest_survey';
+  if (hasCounter) return 'counter_guest_survey';
+  return 'kiosk';
+}
+
+export const DesktopTerminalSchema = z
+  .object({
+    id: z.string(),
+    unitId: z.string(),
+    counterId: z.string().nullable().optional(),
+    counterName: z.string().optional(),
+    kind: DesktopTerminalKindSchema.optional(),
+    name: z.string().nullable().optional(),
+    defaultLocale: z.string(),
+    kioskFullscreen: z.boolean().optional().default(false),
+    revokedAt: z.string().nullable().optional(),
+    lastSeenAt: z.string().nullable().optional(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+    unitName: z.string().optional()
+  })
+  .transform((row) => ({
+    ...row,
+    kind: effectiveDesktopTerminalKind(row)
+  }));
 
 export const CreateDesktopTerminalResponseSchema = z.object({
   terminal: DesktopTerminalSchema,

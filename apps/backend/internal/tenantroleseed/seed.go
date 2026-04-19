@@ -135,13 +135,17 @@ func RebuildUserUnitsFromTenantRoles(tx *gorm.DB, userID, companyID string) erro
 	// Reserved system administrator: grant full permission catalog on every unit in the company,
 	// independent of tenant_role_units gaps (new units, legacy data).
 	if hasSystemAdmin {
+		fullPerms := make(map[string]struct{})
+		for _, p := range rbac.All() {
+			p = strings.TrimSpace(p)
+			if p != "" {
+				fullPerms[p] = struct{}{}
+			}
+		}
 		for _, uid := range unitIDs {
-			m := make(map[string]struct{})
-			for _, p := range rbac.All() {
-				p = strings.TrimSpace(p)
-				if p != "" {
-					m[p] = struct{}{}
-				}
+			m := make(map[string]struct{}, len(fullPerms))
+			for p := range fullPerms {
+				m[p] = struct{}{}
 			}
 			permByUnit[uid] = m
 		}
