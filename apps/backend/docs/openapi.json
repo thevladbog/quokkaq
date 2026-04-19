@@ -3604,6 +3604,7 @@
                         "type": "string"
                     },
                     "counterStaffed": {
+                        "description": "false when no operator has taken the counter",
                         "type": "boolean"
                     },
                     "onBreak": {

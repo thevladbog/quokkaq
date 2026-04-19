@@ -1597,6 +1597,7 @@ export interface ServicesCounterBoardSession {
   activeTicket?: ServicesGuestSurveySessionTicket;
   counterId?: string;
   counterName?: string;
+  /** false when no operator has taken the counter */
   counterStaffed?: boolean;
   onBreak?: boolean;
   unitConfig?: ServicesCounterBoardSessionUnitConfig;

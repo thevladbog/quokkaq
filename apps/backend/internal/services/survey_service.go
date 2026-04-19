@@ -53,9 +53,10 @@ type GuestSurveySessionSurvey struct {
 // CounterBoardSession is for above-counter ticket displays only (counter_board terminals).
 // It does not load survey definitions and does not require the guest survey subscription feature.
 type CounterBoardSession struct {
-	CounterID      string                    `json:"counterId"`
-	CounterName    string                    `json:"counterName"`
-	CounterStaffed bool                      `json:"counterStaffed"` // false when no operator has taken the counter
+	CounterID   string `json:"counterId"`
+	CounterName string `json:"counterName"`
+	// false when no operator has taken the counter
+	CounterStaffed bool                      `json:"counterStaffed"`
 	OnBreak        bool                      `json:"onBreak"`
 	UnitConfig     json.RawMessage           `json:"unitConfig,omitempty" swaggertype:"object"`
 	ActiveTicket   *GuestSurveySessionTicket `json:"activeTicket,omitempty"`
