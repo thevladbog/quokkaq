@@ -5,7 +5,7 @@ import {
   getListInvoicesQueryKey,
   getListSubscriptionPlansQueryKey,
   getListSubscriptionsQueryKey,
-  getPlatformGetPlatformInvoiceQueryKey
+  getPlatformGetInvoiceQueryKey
 } from '@/lib/api/generated/platform';
 
 describe('platform query keys', () => {
@@ -28,7 +28,7 @@ describe('platform query keys', () => {
     ]);
 
     expect(getGetCompanyQueryKey('co-1')).toEqual(['/platform/companies/co-1']);
-    expect(getPlatformGetPlatformInvoiceQueryKey('inv-1')).toEqual([
+    expect(getPlatformGetInvoiceQueryKey('inv-1')).toEqual([
       '/platform/invoices/inv-1'
     ]);
   });

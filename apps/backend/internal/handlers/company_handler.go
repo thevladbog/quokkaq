@@ -24,7 +24,7 @@ func NewCompanyHandler(companyRepo repository.CompanyRepository, userRepo reposi
 }
 
 // CompleteOnboarding godoc
-// @ID           companiesMeCompleteOnboarding
+// @ID           CompleteCompanyOnboarding
 // @Summary      Complete Onboarding
 // @Description  Marks onboarding as complete for the user's company
 // @Tags         companies
@@ -54,7 +54,7 @@ func (h *CompanyHandler) CompleteOnboarding(w http.ResponseWriter, r *http.Reque
 			http.Error(w, "User has no associated company", http.StatusNotFound)
 			return
 		}
-		logger.PrintfCtx(r.Context(), "company CompleteOnboarding: ResolveCompanyIDForRequest: %v", err)
+		logger.ErrorfCtx(r.Context(), "company CompleteOnboarding: ResolveCompanyIDForRequest: %v", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -65,7 +65,7 @@ func (h *CompanyHandler) CompleteOnboarding(w http.ResponseWriter, r *http.Reque
 			http.Error(w, "Company not found", http.StatusNotFound)
 			return
 		}
-		logger.PrintfCtx(r.Context(), "company CompleteOnboarding: FindByID: %v", err)
+		logger.ErrorfCtx(r.Context(), "company CompleteOnboarding: FindByID: %v", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -77,14 +77,14 @@ func (h *CompanyHandler) CompleteOnboarding(w http.ResponseWriter, r *http.Reque
 
 	onboardingJSON, err := json.Marshal(onboardingState)
 	if err != nil {
-		logger.PrintfCtx(r.Context(), "company CompleteOnboarding: json.Marshal onboarding state: %v", err)
+		logger.ErrorfCtx(r.Context(), "company CompleteOnboarding: json.Marshal onboarding state: %v", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 	company.OnboardingState = onboardingJSON
 
 	if err := h.companyRepo.Update(company); err != nil {
-		logger.PrintfCtx(r.Context(), "company CompleteOnboarding: Update: %v", err)
+		logger.ErrorfCtx(r.Context(), "company CompleteOnboarding: Update: %v", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}

@@ -3226,41 +3226,41 @@ export const usePlatformCreateInvoice = <TError = string,
  * Returns the invoice with lines and related preloads.
  * @summary Get invoice by ID (platform)
  */
-export type platformGetPlatformInvoiceResponse200 = {
+export type platformGetInvoiceResponse200 = {
   data: ModelsInvoice
   status: 200
 }
 
-export type platformGetPlatformInvoiceResponse401 = {
+export type platformGetInvoiceResponse401 = {
   data: string
   status: 401
 }
 
-export type platformGetPlatformInvoiceResponse403 = {
+export type platformGetInvoiceResponse403 = {
   data: string
   status: 403
 }
 
-export type platformGetPlatformInvoiceResponse404 = {
+export type platformGetInvoiceResponse404 = {
   data: string
   status: 404
 }
 
-export type platformGetPlatformInvoiceResponse500 = {
+export type platformGetInvoiceResponse500 = {
   data: string
   status: 500
 }
 
-export type platformGetPlatformInvoiceResponseSuccess = (platformGetPlatformInvoiceResponse200) & {
+export type platformGetInvoiceResponseSuccess = (platformGetInvoiceResponse200) & {
   headers: Headers;
 };
-export type platformGetPlatformInvoiceResponseError = (platformGetPlatformInvoiceResponse401 | platformGetPlatformInvoiceResponse403 | platformGetPlatformInvoiceResponse404 | platformGetPlatformInvoiceResponse500) & {
+export type platformGetInvoiceResponseError = (platformGetInvoiceResponse401 | platformGetInvoiceResponse403 | platformGetInvoiceResponse404 | platformGetInvoiceResponse500) & {
   headers: Headers;
 };
 
-export type platformGetPlatformInvoiceResponse = (platformGetPlatformInvoiceResponseSuccess | platformGetPlatformInvoiceResponseError)
+export type platformGetInvoiceResponse = (platformGetInvoiceResponseSuccess | platformGetInvoiceResponseError)
 
-export const getPlatformGetPlatformInvoiceUrl = (id: string,) => {
+export const getPlatformGetInvoiceUrl = (id: string,) => {
 
 
 
@@ -3268,9 +3268,9 @@ export const getPlatformGetPlatformInvoiceUrl = (id: string,) => {
   return `/platform/invoices/${id}`
 }
 
-export const platformGetPlatformInvoice = async (id: string, options?: RequestInit): Promise<platformGetPlatformInvoiceResponse> => {
+export const platformGetInvoice = async (id: string, options?: RequestInit): Promise<platformGetInvoiceResponse> => {
 
-  return orvalMutator<platformGetPlatformInvoiceResponse>(getPlatformGetPlatformInvoiceUrl(id),
+  return orvalMutator<platformGetInvoiceResponse>(getPlatformGetInvoiceUrl(id),
   {
     ...options,
     method: 'GET'
@@ -3283,69 +3283,69 @@ export const platformGetPlatformInvoice = async (id: string, options?: RequestIn
 
 
 
-export const getPlatformGetPlatformInvoiceQueryKey = (id: string,) => {
+export const getPlatformGetInvoiceQueryKey = (id: string,) => {
     return [
     `/platform/invoices/${id}`
     ] as const;
     }
 
 
-export const getPlatformGetPlatformInvoiceQueryOptions = <TData = Awaited<ReturnType<typeof platformGetPlatformInvoice>>, TError = string>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof platformGetPlatformInvoice>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export const getPlatformGetInvoiceQueryOptions = <TData = Awaited<ReturnType<typeof platformGetInvoice>>, TError = string>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof platformGetInvoice>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getPlatformGetPlatformInvoiceQueryKey(id);
+  const queryKey =  queryOptions?.queryKey ?? getPlatformGetInvoiceQueryKey(id);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof platformGetPlatformInvoice>>> = ({ signal }) => platformGetPlatformInvoice(id, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof platformGetInvoice>>> = ({ signal }) => platformGetInvoice(id, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof platformGetPlatformInvoice>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof platformGetInvoice>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type PlatformGetPlatformInvoiceQueryResult = NonNullable<Awaited<ReturnType<typeof platformGetPlatformInvoice>>>
-export type PlatformGetPlatformInvoiceQueryError = string
+export type PlatformGetInvoiceQueryResult = NonNullable<Awaited<ReturnType<typeof platformGetInvoice>>>
+export type PlatformGetInvoiceQueryError = string
 
 
-export function usePlatformGetPlatformInvoice<TData = Awaited<ReturnType<typeof platformGetPlatformInvoice>>, TError = string>(
- id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof platformGetPlatformInvoice>>, TError, TData>> & Pick<
+export function usePlatformGetInvoice<TData = Awaited<ReturnType<typeof platformGetInvoice>>, TError = string>(
+ id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof platformGetInvoice>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof platformGetPlatformInvoice>>,
+          Awaited<ReturnType<typeof platformGetInvoice>>,
           TError,
-          Awaited<ReturnType<typeof platformGetPlatformInvoice>>
+          Awaited<ReturnType<typeof platformGetInvoice>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function usePlatformGetPlatformInvoice<TData = Awaited<ReturnType<typeof platformGetPlatformInvoice>>, TError = string>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof platformGetPlatformInvoice>>, TError, TData>> & Pick<
+export function usePlatformGetInvoice<TData = Awaited<ReturnType<typeof platformGetInvoice>>, TError = string>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof platformGetInvoice>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof platformGetPlatformInvoice>>,
+          Awaited<ReturnType<typeof platformGetInvoice>>,
           TError,
-          Awaited<ReturnType<typeof platformGetPlatformInvoice>>
+          Awaited<ReturnType<typeof platformGetInvoice>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function usePlatformGetPlatformInvoice<TData = Awaited<ReturnType<typeof platformGetPlatformInvoice>>, TError = string>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof platformGetPlatformInvoice>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function usePlatformGetInvoice<TData = Awaited<ReturnType<typeof platformGetInvoice>>, TError = string>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof platformGetInvoice>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get invoice by ID (platform)
  */
 
-export function usePlatformGetPlatformInvoice<TData = Awaited<ReturnType<typeof platformGetPlatformInvoice>>, TError = string>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof platformGetPlatformInvoice>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function usePlatformGetInvoice<TData = Awaited<ReturnType<typeof platformGetInvoice>>, TError = string>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof platformGetInvoice>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getPlatformGetPlatformInvoiceQueryOptions(id,options)
+  const queryOptions = getPlatformGetInvoiceQueryOptions(id,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

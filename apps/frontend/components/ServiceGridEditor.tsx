@@ -1469,7 +1469,7 @@ const ServiceGridEditor: React.FC<ServiceGridEditorProps> = ({
   const { data: gridContextUnit } = useQuery({
     queryKey: activeUnitId
       ? getGetUnitByIDQueryKey(activeUnitId)
-      : (['getUnitByID', 'disabled'] as const),
+      : (['/units/__disabled__'] as const),
     queryFn: () => unitsApi.getById(activeUnitId!),
     enabled: !!activeUnitId
   });
@@ -1498,7 +1498,7 @@ const ServiceGridEditor: React.FC<ServiceGridEditorProps> = ({
   const { data: zoneLabelChildUnitsRaw } = useQuery({
     queryKey: zoneLabelsParentId
       ? getGetUnitsUnitIdChildUnitsQueryKey(zoneLabelsParentId)
-      : (['getUnitsUnitIdChildUnits', 'disabled'] as const),
+      : (['/units/__disabled__/child-units'] as const),
     queryFn: () => unitsApi.getChildUnits(zoneLabelsParentId!),
     enabled: !!zoneLabelsParentId
   });

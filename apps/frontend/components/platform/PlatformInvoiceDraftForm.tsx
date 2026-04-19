@@ -13,12 +13,12 @@ import type {
 import {
   getGetPlatformCatalogItemsQueryKey,
   getGetCompanyQueryKey,
-  getPlatformGetPlatformInvoiceQueryKey,
+  getPlatformGetInvoiceQueryKey,
   getListInvoicesQueryKey,
   getListSubscriptionPlansQueryKey,
   getPlatformCatalogItems,
   getCompany,
-  platformGetPlatformInvoice,
+  platformGetInvoice,
   listSubscriptionPlans,
   getListCompaniesQueryKey,
   platformPatchInvoiceDraft,
@@ -428,7 +428,7 @@ export function PlatformInvoiceDraftForm({
       });
       if (initialInvoice?.id) {
         void qc.invalidateQueries({
-          queryKey: getPlatformGetPlatformInvoiceQueryKey(initialInvoice.id)
+          queryKey: getPlatformGetInvoiceQueryKey(initialInvoice.id)
         });
       }
     },
@@ -452,7 +452,7 @@ export function PlatformInvoiceDraftForm({
         intlLocale
       );
 
-      const snapshotRes = await platformGetPlatformInvoice(id);
+      const snapshotRes = await platformGetInvoice(id);
       const snapshot = snapshotRes.data as Invoice;
       const originalBody = invoiceToDraftUpsertBody(snapshot);
 
@@ -494,7 +494,7 @@ export function PlatformInvoiceDraftForm({
       });
       if (initialInvoice?.id) {
         await qc.invalidateQueries({
-          queryKey: getPlatformGetPlatformInvoiceQueryKey(initialInvoice.id)
+          queryKey: getPlatformGetInvoiceQueryKey(initialInvoice.id)
         });
       }
     },
@@ -505,7 +505,7 @@ export function PlatformInvoiceDraftForm({
       });
       if (initialInvoice?.id) {
         void qc.invalidateQueries({
-          queryKey: getPlatformGetPlatformInvoiceQueryKey(initialInvoice.id)
+          queryKey: getPlatformGetInvoiceQueryKey(initialInvoice.id)
         });
       }
     }

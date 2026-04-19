@@ -6,6 +6,7 @@ import type {
   ModelsInvoice
 } from '@/lib/api/generated/platform';
 import {
+  getGetCompanyQueryKey,
   getListInvoicesQueryKey,
   getListCompaniesQueryKey,
   getListSubscriptionsQueryKey,
@@ -276,12 +277,11 @@ export default function PlatformSubscriptionsPage() {
       qc.invalidateQueries({
         queryKey: getListCompaniesQueryKey()
       });
-      qc.invalidateQueries({
-        predicate: (q) =>
-          Array.isArray(q.queryKey) &&
-          typeof q.queryKey[0] === 'string' &&
-          /^\/platform\/companies\/[^/]+$/.test(q.queryKey[0])
-      });
+      if (companyId.trim() !== '') {
+        qc.invalidateQueries({
+          queryKey: getGetCompanyQueryKey(companyId)
+        });
+      }
       qc.invalidateQueries({
         queryKey: getListInvoicesQueryKey()
       });

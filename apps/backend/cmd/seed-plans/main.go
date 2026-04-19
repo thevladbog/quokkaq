@@ -55,13 +55,13 @@ func main() {
 	for _, planDef := range plans.Plans {
 		limitsJSON, err := planDef.LimitsJSON()
 		if err != nil {
-			logger.Printf("Failed to marshal limits for plan %s: %v", planDef.Code, err)
+			logger.Error("failed to marshal limits for plan", "plan", planDef.Code, "err", err)
 			continue
 		}
 
 		featuresJSON, err := planDef.FeaturesJSON()
 		if err != nil {
-			logger.Printf("Failed to marshal features for plan %s: %v", planDef.Code, err)
+			logger.Error("failed to marshal features for plan", "plan", planDef.Code, "err", err)
 			continue
 		}
 
@@ -85,14 +85,14 @@ func main() {
 				AllowInstantPurchase: planSeedAllowInstantPurchase(planDef.Code),
 			}
 			if err := db.Create(plan).Error; err != nil {
-				logger.Printf("Failed to create plan %s: %v", planDef.Code, err)
+				logger.Error("failed to create plan", "plan", planDef.Code, "err", err)
 				continue
 			}
 			fmt.Printf("✓ Created plan: %s (%s)\n", planDef.Name, planDef.Code)
 			continue
 		}
 		if err != nil {
-			logger.Printf("Failed to look up plan %s: %v", planDef.Code, err)
+			logger.Error("failed to look up plan", "plan", planDef.Code, "err", err)
 			continue
 		}
 
@@ -113,7 +113,7 @@ func main() {
 			existing.LimitsNegotiable = json.RawMessage("{}")
 		}
 		if err := db.Save(&existing).Error; err != nil {
-			logger.Printf("Failed to update plan %s: %v", planDef.Code, err)
+			logger.Error("failed to update plan", "plan", planDef.Code, "err", err)
 			continue
 		}
 		fmt.Printf("✓ Updated plan: %s (%s)\n", planDef.Name, planDef.Code)

@@ -85,14 +85,14 @@ func (h *InvoiceHandler) GetMyInvoices(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "User has no associated company", http.StatusNotFound)
 			return
 		}
-		logger.PrintfCtx(r.Context(), "GetMyInvoices userRepo.ResolveCompanyIDForRequest: %v", err)
+		logger.ErrorfCtx(r.Context(), "GetMyInvoices userRepo.ResolveCompanyIDForRequest: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	invoices, err := h.invoiceRepo.FindByCompanyIDNonDraft(companyID)
 	if err != nil {
-		logger.PrintfCtx(r.Context(), "GetMyInvoices invoiceRepo.FindByCompanyID: %v", err)
+		logger.ErrorfCtx(r.Context(), "GetMyInvoices invoiceRepo.FindByCompanyIDNonDraft: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -128,7 +128,7 @@ func (h *InvoiceHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request)
 
 	platformAdmin, err := h.userRepo.IsPlatformAdmin(userID)
 	if err != nil {
-		logger.PrintfCtx(r.Context(), "DownloadInvoice IsPlatformAdmin: %v", err)
+		logger.ErrorfCtx(r.Context(), "DownloadInvoice IsPlatformAdmin: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -139,7 +139,7 @@ func (h *InvoiceHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request)
 			http.Error(w, "Invoice not found", http.StatusNotFound)
 			return
 		}
-		logger.PrintfCtx(r.Context(), "DownloadInvoice invoiceRepo.FindByIDWithLines(%s): %v", invoiceID, err)
+		logger.ErrorfCtx(r.Context(), "DownloadInvoice invoiceRepo.FindByIDWithLines(%s): %v", invoiceID, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -157,7 +157,7 @@ func (h *InvoiceHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request)
 	if invoice.CompanyID != nil && *invoice.CompanyID != "" {
 		hasAccess, err = h.userRepo.HasCompanyAccess(userID, *invoice.CompanyID)
 		if err != nil {
-			logger.PrintfCtx(r.Context(), "DownloadInvoice userRepo.HasCompanyAccess: %v", err)
+			logger.ErrorfCtx(r.Context(), "DownloadInvoice userRepo.HasCompanyAccess: %v", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -176,7 +176,7 @@ func (h *InvoiceHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request)
 
 	vendor, err := h.companyRepo.FindSaaSOperatorCompany()
 	if err != nil {
-		logger.PrintfCtx(r.Context(), "DownloadInvoice FindSaaSOperatorCompany: %v", err)
+		logger.ErrorfCtx(r.Context(), "DownloadInvoice FindSaaSOperatorCompany: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -191,14 +191,14 @@ func (h *InvoiceHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if err != nil {
-		logger.PrintfCtx(r.Context(), "DownloadInvoice BuildInvoicePDF: %v", err)
+		logger.ErrorfCtx(r.Context(), "DownloadInvoice BuildInvoicePDF: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	suffix, err := services.InvoicePDFDownloadSuffix()
 	if err != nil {
-		logger.PrintfCtx(r.Context(), "DownloadInvoice InvoicePDFDownloadSuffix: %v", err)
+		logger.ErrorfCtx(r.Context(), "DownloadInvoice InvoicePDFDownloadSuffix: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -209,6 +209,6 @@ func (h *InvoiceHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request)
 	w.Header().Set("Content-Type", "application/pdf")
 	w.WriteHeader(http.StatusOK)
 	if _, err := w.Write(pdfBytes); err != nil {
-		logger.PrintfCtx(r.Context(), "DownloadInvoice write body: %v", err)
+		logger.ErrorfCtx(r.Context(), "DownloadInvoice write body: %v", err)
 	}
 }

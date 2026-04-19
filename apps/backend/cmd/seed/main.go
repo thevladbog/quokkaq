@@ -114,7 +114,7 @@ func run() error {
 		IsSaaSOperator: true,
 	}
 	if err := database.DB.Create(&company).Error; err != nil {
-		logger.Fatalf("seed: create company: %v", err)
+		logger.Errorf("seed: create company: %v", err)
 		return fmt.Errorf("seed: create company: %w", err)
 	}
 	fmt.Printf("Created company: %s (ID: %s)\n", company.Name, company.ID)
@@ -128,7 +128,7 @@ func run() error {
 		Timezone:  "Europe/Moscow",
 	}
 	if err := database.DB.Create(&unit).Error; err != nil {
-		logger.Fatalf("seed: create unit: %v", err)
+		logger.Errorf("seed: create unit: %v", err)
 		return fmt.Errorf("seed: create unit: %w", err)
 	}
 	fmt.Printf("Created unit: %s (ID: %s)\n", unit.Name, unit.ID)
@@ -152,19 +152,19 @@ func run() error {
 	operatorRole := models.Role{Name: "operator"}
 	platformAdminRole := models.Role{Name: "platform_admin"}
 	if err := database.DB.Create(&adminRole).Error; err != nil {
-		logger.Fatalf("seed: create admin role: %v", err)
+		logger.Errorf("seed: create admin role: %v", err)
 		return fmt.Errorf("seed: create admin role: %w", err)
 	}
 	if err := database.DB.Create(&supervisorRole).Error; err != nil {
-		logger.Fatalf("seed: create supervisor role: %v", err)
+		logger.Errorf("seed: create supervisor role: %v", err)
 		return fmt.Errorf("seed: create supervisor role: %w", err)
 	}
 	if err := database.DB.Create(&operatorRole).Error; err != nil {
-		logger.Fatalf("seed: create operator role: %v", err)
+		logger.Errorf("seed: create operator role: %v", err)
 		return fmt.Errorf("seed: create operator role: %w", err)
 	}
 	if err := database.DB.Create(&platformAdminRole).Error; err != nil {
-		logger.Fatalf("seed: create platform_admin role: %v", err)
+		logger.Errorf("seed: create platform_admin role: %v", err)
 		return fmt.Errorf("seed: create platform_admin role: %w", err)
 	}
 	fmt.Println("Created roles: admin, supervisor, operator, platform_admin")
@@ -179,7 +179,7 @@ func run() error {
 		Password: &hashedPasswordStr,
 	}
 	if err := database.DB.Create(&adminUser).Error; err != nil {
-		logger.Fatalf("seed: create admin user: %v", err)
+		logger.Errorf("seed: create admin user: %v", err)
 		return fmt.Errorf("seed: create admin user: %w", err)
 	}
 	fmt.Printf("Created admin user: %s (ID: %s, password: admin123)\n", adminUser.Name, adminUser.ID)
@@ -189,7 +189,7 @@ func run() error {
 		UserID: adminUser.ID,
 		RoleID: adminRole.ID,
 	}).Error; err != nil {
-		logger.Fatalf("seed: assign admin user role (admin): %v", err)
+		logger.Errorf("seed: assign admin user role (admin): %v", err)
 		return fmt.Errorf("seed: assign admin user role (admin): %w", err)
 	}
 
@@ -198,7 +198,7 @@ func run() error {
 		UserID: adminUser.ID,
 		RoleID: platformAdminRole.ID,
 	}).Error; err != nil {
-		logger.Fatalf("seed: assign admin user role (platform_admin): %v", err)
+		logger.Errorf("seed: assign admin user role (platform_admin): %v", err)
 		return fmt.Errorf("seed: assign admin user role (platform_admin): %w", err)
 	}
 
@@ -207,7 +207,7 @@ func run() error {
 		UserID: adminUser.ID,
 		UnitID: unit.ID,
 	}).Error; err != nil {
-		logger.Fatalf("seed: assign admin user unit: %v", err)
+		logger.Errorf("seed: assign admin user unit: %v", err)
 		return fmt.Errorf("seed: assign admin user unit: %w", err)
 	}
 
@@ -221,7 +221,7 @@ func run() error {
 		Password: &operatorPasswordStr,
 	}
 	if err := database.DB.Create(&operatorUser).Error; err != nil {
-		logger.Fatalf("seed: create operator user: %v", err)
+		logger.Errorf("seed: create operator user: %v", err)
 		return fmt.Errorf("seed: create operator user: %w", err)
 	}
 	fmt.Printf("Created operator user: %s (ID: %s, password: operator123)\n", operatorUser.Name, operatorUser.ID)
@@ -231,7 +231,7 @@ func run() error {
 		UserID: operatorUser.ID,
 		RoleID: operatorRole.ID,
 	}).Error; err != nil {
-		logger.Fatalf("seed: assign operator user role: %v", err)
+		logger.Errorf("seed: assign operator user role: %v", err)
 		return fmt.Errorf("seed: assign operator user role: %w", err)
 	}
 
@@ -240,7 +240,7 @@ func run() error {
 		UserID: operatorUser.ID,
 		UnitID: unit.ID,
 	}).Error; err != nil {
-		logger.Fatalf("seed: assign operator user unit: %v", err)
+		logger.Errorf("seed: assign operator user unit: %v", err)
 		return fmt.Errorf("seed: assign operator user unit: %w", err)
 	}
 
@@ -256,7 +256,7 @@ func run() error {
 		IsLeaf:      true,
 	}
 	if err := database.DB.Create(&serviceA).Error; err != nil {
-		logger.Fatalf("seed: create service A: %v", err)
+		logger.Errorf("seed: create service A: %v", err)
 		return fmt.Errorf("seed: create service A: %w", err)
 	}
 	fmt.Printf("Created service: %s (ID: %s)\n", serviceA.Name, serviceA.ID)
@@ -272,7 +272,7 @@ func run() error {
 		IsLeaf:      true,
 	}
 	if err := database.DB.Create(&serviceB).Error; err != nil {
-		logger.Fatalf("seed: create service B: %v", err)
+		logger.Errorf("seed: create service B: %v", err)
 		return fmt.Errorf("seed: create service B: %w", err)
 	}
 	fmt.Printf("Created service: %s (ID: %s)\n", serviceB.Name, serviceB.ID)
@@ -283,7 +283,7 @@ func run() error {
 		Name:   "Counter 1",
 	}
 	if err := database.DB.Create(&counter1).Error; err != nil {
-		logger.Fatalf("seed: create counter1: %v", err)
+		logger.Errorf("seed: create counter1: %v", err)
 		return fmt.Errorf("seed: create counter1: %w", err)
 	}
 	fmt.Printf("Created counter: %s (ID: %s)\n", counter1.Name, counter1.ID)
@@ -293,7 +293,7 @@ func run() error {
 		Name:   "Counter 2",
 	}
 	if err := database.DB.Create(&counter2).Error; err != nil {
-		logger.Fatalf("seed: create counter2: %v", err)
+		logger.Errorf("seed: create counter2: %v", err)
 		return fmt.Errorf("seed: create counter2: %w", err)
 	}
 	fmt.Printf("Created counter: %s (ID: %s)\n", counter2.Name, counter2.ID)
@@ -349,7 +349,7 @@ func run() error {
 		IsDefault: true,
 	}
 	if err := database.DB.Create(&template).Error; err != nil {
-		logger.Fatalf("seed: create message template: %v", err)
+		logger.Errorf("seed: create message template: %v", err)
 		return fmt.Errorf("seed: create message template: %w", err)
 	}
 	fmt.Println("Created default message template")

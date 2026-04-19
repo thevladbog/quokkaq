@@ -4473,7 +4473,7 @@ paths:
   /companies/me/complete-onboarding:
     post:
       description: Marks onboarding as complete for the user's company
-      operationId: companiesMeCompleteOnboarding
+      operationId: CompleteCompanyOnboarding
       responses:
         '200':
           content:
@@ -6843,7 +6843,7 @@ paths:
   /platform/invoices/{id}:
     get:
       description: Returns the invoice with lines and related preloads.
-      operationId: PlatformGetPlatformInvoice
+      operationId: PlatformGetInvoice
       parameters:
       - description: Invoice ID
         in: path

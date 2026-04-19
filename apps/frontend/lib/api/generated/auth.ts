@@ -1966,7 +1966,7 @@ code: string;
 state: string;
 };
 
-export type CompaniesMeCompleteOnboarding200 = {[key: string]: boolean};
+export type CompleteCompanyOnboarding200 = {[key: string]: boolean};
 
 export type ListCompanyUsersParams = {
 /**
@@ -3907,41 +3907,41 @@ export const usePatchCompaniesMe = <TError = string,
  * Marks onboarding as complete for the user's company
  * @summary Complete Onboarding
  */
-export type companiesMeCompleteOnboardingResponse200 = {
-  data: CompaniesMeCompleteOnboarding200
+export type completeCompanyOnboardingResponse200 = {
+  data: CompleteCompanyOnboarding200
   status: 200
 }
 
-export type companiesMeCompleteOnboardingResponse401 = {
+export type completeCompanyOnboardingResponse401 = {
   data: string
   status: 401
 }
 
-export type companiesMeCompleteOnboardingResponse403 = {
+export type completeCompanyOnboardingResponse403 = {
   data: string
   status: 403
 }
 
-export type companiesMeCompleteOnboardingResponse404 = {
+export type completeCompanyOnboardingResponse404 = {
   data: string
   status: 404
 }
 
-export type companiesMeCompleteOnboardingResponse500 = {
+export type completeCompanyOnboardingResponse500 = {
   data: string
   status: 500
 }
 
-export type companiesMeCompleteOnboardingResponseSuccess = (companiesMeCompleteOnboardingResponse200) & {
+export type completeCompanyOnboardingResponseSuccess = (completeCompanyOnboardingResponse200) & {
   headers: Headers;
 };
-export type companiesMeCompleteOnboardingResponseError = (companiesMeCompleteOnboardingResponse401 | companiesMeCompleteOnboardingResponse403 | companiesMeCompleteOnboardingResponse404 | companiesMeCompleteOnboardingResponse500) & {
+export type completeCompanyOnboardingResponseError = (completeCompanyOnboardingResponse401 | completeCompanyOnboardingResponse403 | completeCompanyOnboardingResponse404 | completeCompanyOnboardingResponse500) & {
   headers: Headers;
 };
 
-export type companiesMeCompleteOnboardingResponse = (companiesMeCompleteOnboardingResponseSuccess | companiesMeCompleteOnboardingResponseError)
+export type completeCompanyOnboardingResponse = (completeCompanyOnboardingResponseSuccess | completeCompanyOnboardingResponseError)
 
-export const getCompaniesMeCompleteOnboardingUrl = () => {
+export const getCompleteCompanyOnboardingUrl = () => {
 
 
 
@@ -3949,9 +3949,9 @@ export const getCompaniesMeCompleteOnboardingUrl = () => {
   return `/companies/me/complete-onboarding`
 }
 
-export const companiesMeCompleteOnboarding = async ( options?: RequestInit): Promise<companiesMeCompleteOnboardingResponse> => {
+export const completeCompanyOnboarding = async ( options?: RequestInit): Promise<completeCompanyOnboardingResponse> => {
 
-  return orvalMutator<companiesMeCompleteOnboardingResponse>(getCompaniesMeCompleteOnboardingUrl(),
+  return orvalMutator<completeCompanyOnboardingResponse>(getCompleteCompanyOnboardingUrl(),
   {
     ...options,
     method: 'POST'
@@ -3963,11 +3963,11 @@ export const companiesMeCompleteOnboarding = async ( options?: RequestInit): Pro
 
 
 
-export const getCompaniesMeCompleteOnboardingMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof companiesMeCompleteOnboarding>>, TError,void, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof companiesMeCompleteOnboarding>>, TError,void, TContext> => {
+export const getCompleteCompanyOnboardingMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeCompanyOnboarding>>, TError,void, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof completeCompanyOnboarding>>, TError,void, TContext> => {
 
-const mutationKey = ['companiesMeCompleteOnboarding'];
+const mutationKey = ['completeCompanyOnboarding'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -3977,10 +3977,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof companiesMeCompleteOnboarding>>, void> = () => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof completeCompanyOnboarding>>, void> = () => {
 
 
-          return  companiesMeCompleteOnboarding(requestOptions)
+          return  completeCompanyOnboarding(requestOptions)
         }
 
 
@@ -3990,22 +3990,22 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type CompaniesMeCompleteOnboardingMutationResult = NonNullable<Awaited<ReturnType<typeof companiesMeCompleteOnboarding>>>
+    export type CompleteCompanyOnboardingMutationResult = NonNullable<Awaited<ReturnType<typeof completeCompanyOnboarding>>>
 
-    export type CompaniesMeCompleteOnboardingMutationError = string
+    export type CompleteCompanyOnboardingMutationError = string
 
     /**
  * @summary Complete Onboarding
  */
-export const useCompaniesMeCompleteOnboarding = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof companiesMeCompleteOnboarding>>, TError,void, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const useCompleteCompanyOnboarding = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeCompanyOnboarding>>, TError,void, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof companiesMeCompleteOnboarding>>,
+        Awaited<ReturnType<typeof completeCompanyOnboarding>>,
         TError,
         void,
         TContext
       > => {
-      return useMutation(getCompaniesMeCompleteOnboardingMutationOptions(options), queryClient);
+      return useMutation(getCompleteCompanyOnboardingMutationOptions(options), queryClient);
     }
 
 /**

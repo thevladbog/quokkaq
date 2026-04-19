@@ -57,7 +57,11 @@ func NewMailService() MailService {
 		d.TLSConfig.InsecureSkipVerify = true
 	}
 
-	logger.Printf("SMTP Configured: Host=%s, Port=%d, User=%s, SSL=%v", host, port, user, d.SSL)
+	userLog := "(empty)"
+	if u := strings.TrimSpace(user); u != "" {
+		userLog = recipientLogRef(u)
+	}
+	logger.Printf("SMTP Configured: Host=%s, Port=%d, UserRef=%s, SSL=%v", host, port, userLog, d.SSL)
 
 	return &mailService{dialer: d, from: from}
 }
@@ -89,7 +93,7 @@ func (s *mailService) SendMail(to string, subject string, html string) error {
 	m.SetBody("text/html", html)
 
 	if err := s.dialer.DialAndSend(m); err != nil {
-		logger.Printf("Error sending email to %s: %v\n", to, err)
+		logger.Error("failed to send email", "to_ref", recipientLogRef(to), "err", err)
 		return err
 	}
 

@@ -244,22 +244,23 @@ export function getOrCreateRequestId(
 }
 
 /** Adds X-Request-Id, W3C traceparent/tracestate to RequestInit; caller headers win. */
-export function fetchInitWithRequestId(init: RequestInit): RequestInit {
-  const requestId = getOrCreateRequestId(init.headers);
+export function fetchInitWithRequestId(init?: RequestInit): RequestInit {
+  const safe = init ?? {};
+  const requestId = getOrCreateRequestId(safe.headers);
   const extra: Record<string, string> = {
     'X-Request-Id': requestId
   };
   if (shouldAttachManualTraceContext()) {
-    const traceParent = getOrCreateTraceParent(init.headers);
-    const traceState = getTraceStateFromCallerHeaders(init.headers);
+    const traceParent = getOrCreateTraceParent(safe.headers);
+    const traceState = getTraceStateFromCallerHeaders(safe.headers);
     extra.traceparent = traceParent;
     if (traceState !== undefined && traceState !== '') {
       extra.tracestate = traceState;
     }
   }
   return {
-    ...init,
-    headers: mergeRequestInitHeaders(init.headers, extra)
+    ...safe,
+    headers: mergeRequestInitHeaders(safe.headers, extra)
   };
 }
 

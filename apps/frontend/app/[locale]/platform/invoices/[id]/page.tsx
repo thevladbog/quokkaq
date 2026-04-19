@@ -15,10 +15,10 @@ import {
 import { Spinner } from '@/components/ui/spinner';
 import {
   getGetCompanyQueryKey,
-  getPlatformGetPlatformInvoiceQueryKey,
+  getPlatformGetInvoiceQueryKey,
   getListInvoicesQueryKey,
   getCompany,
-  platformGetPlatformInvoice,
+  platformGetInvoice,
   patchInvoice
 } from '@/lib/api/generated/platform';
 import {
@@ -78,7 +78,7 @@ function PlatformInvoiceReadOnly({
         })
       );
       void qc.invalidateQueries({
-        queryKey: getPlatformGetPlatformInvoiceQueryKey(inv.id)
+        queryKey: getPlatformGetInvoiceQueryKey(inv.id)
       });
       void qc.invalidateQueries({
         queryKey: getListInvoicesQueryKey()
@@ -269,8 +269,8 @@ export default function PlatformInvoiceDetailPage() {
     isLoading,
     isError
   } = useQuery({
-    queryKey: getPlatformGetPlatformInvoiceQueryKey(id),
-    queryFn: async () => (await platformGetPlatformInvoice(id)).data as Invoice,
+    queryKey: getPlatformGetInvoiceQueryKey(id),
+    queryFn: async () => (await platformGetInvoice(id)).data as Invoice,
     enabled: !!id
   });
 

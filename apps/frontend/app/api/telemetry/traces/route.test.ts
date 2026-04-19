@@ -8,6 +8,11 @@ describe('POST /api/telemetry/traces', () => {
 
   beforeEach(() => {
     vi.unstubAllEnvs();
+    process.env.OTEL_BROWSER_INGEST_SECRET = 'test-secret';
+    process.env.OTEL_BROWSER_INGEST_TRUST_FORWARDED_HEADERS = 'true';
+    process.env.OTEL_BROWSER_INGEST_RATE_WINDOW_MS = '60000';
+    process.env.OTEL_BROWSER_INGEST_RATE_LIMIT_IP = '100000';
+    process.env.OTEL_BROWSER_INGEST_RATE_LIMIT_KEY = '100000';
     vi.stubGlobal('fetch', fetchMock);
     fetchMock.mockReset();
   });
@@ -27,6 +32,7 @@ describe('POST /api/telemetry/traces', () => {
       body: body ?? null,
       headers: {
         'x-forwarded-for': forwardedFor,
+        'x-otel-ingest-key': 'test-secret',
         'content-type': opts?.contentType ?? 'application/json'
       }
     });

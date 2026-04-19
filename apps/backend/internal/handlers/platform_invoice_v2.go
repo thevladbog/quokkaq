@@ -281,7 +281,7 @@ func (h *PlatformHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 			http.Error(w, "Company not found", http.StatusNotFound)
 			return
 		}
-		logger.PrintfCtx(r.Context(), "CreateInvoice Find company: %v", err)
+		logger.ErrorfCtx(r.Context(), "CreateInvoice Find company: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -316,14 +316,14 @@ func (h *PlatformHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 	if err := database.DB.Transaction(func(tx *gorm.DB) error {
 		return h.invoiceRepo.CreateWithLinesInTx(tx, &inv, lines)
 	}); err != nil {
-		logger.PrintfCtx(r.Context(), "CreateInvoice tx: %v", err)
+		logger.ErrorfCtx(r.Context(), "CreateInvoice tx: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 	logger.PrintfCtx(r.Context(), "platform_admin invoice draft user=%s invoice=%s company=%s", userID, inv.ID, body.CompanyID)
 	out, err := h.invoiceRepo.FindByIDWithLines(inv.ID)
 	if err != nil {
-		logger.PrintfCtx(r.Context(), "CreateInvoice FindByIDWithLines: %v", err)
+		logger.ErrorfCtx(r.Context(), "CreateInvoice FindByIDWithLines: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -367,7 +367,7 @@ func (h *PlatformHandler) PatchInvoiceDraft(w http.ResponseWriter, r *http.Reque
 			http.Error(w, "Not found", http.StatusNotFound)
 			return
 		}
-		logger.PrintfCtx(r.Context(), "PatchInvoiceDraft: %v", err)
+		logger.ErrorfCtx(r.Context(), "PatchInvoiceDraft: %v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -468,7 +468,7 @@ func (h *PlatformHandler) IssueInvoice(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		logger.PrintfCtx(r.Context(), "IssueInvoice tx: %v", err)
+		logger.ErrorfCtx(r.Context(), "IssueInvoice tx: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -481,7 +481,7 @@ func (h *PlatformHandler) IssueInvoice(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetPlatformInvoice godoc
-// @ID           PlatformGetPlatformInvoice
+// @ID           PlatformGetInvoice
 // @Summary      Get invoice by ID (platform)
 // @Description  Returns the invoice with lines and related preloads.
 // @Tags         platform
@@ -502,7 +502,7 @@ func (h *PlatformHandler) GetPlatformInvoice(w http.ResponseWriter, r *http.Requ
 			http.Error(w, "Not found", http.StatusNotFound)
 			return
 		}
-		logger.PrintfCtx(r.Context(), "GetPlatformInvoice: %v", err)
+		logger.ErrorfCtx(r.Context(), "GetPlatformInvoice: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}

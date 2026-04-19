@@ -1,5 +1,5 @@
 /**
- * Ensures github.com/air-verse/air is installed into apps/backend/tmp, then runs it.
+ * Ensures github.com/air-verse/air is installed into apps/backend/bin, then runs it.
  * Used by Nx `backend:serve` so dev reload works on Windows without bash/Git Bash.
  */
 const { existsSync, mkdirSync } = require('fs');
@@ -7,14 +7,14 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 
 const root = path.resolve(__dirname, '..');
-const tmpDir = path.join(root, 'tmp');
+const binDir = path.join(root, 'bin');
 const isWin = process.platform === 'win32';
-const airBin = path.join(tmpDir, isWin ? 'air.exe' : 'air');
+const airBin = path.join(binDir, isWin ? 'air.exe' : 'air');
 
-mkdirSync(tmpDir, { recursive: true });
+mkdirSync(binDir, { recursive: true });
 
 if (!existsSync(airBin)) {
-  const env = { ...process.env, GOBIN: tmpDir };
+  const env = { ...process.env, GOBIN: binDir };
   const install = spawnSync('go', ['install', 'github.com/air-verse/air@v1.65.1'], {
     cwd: root,
     env,
@@ -37,5 +37,9 @@ const run = spawnSync(airBin, [], {
 if (run.error) {
   console.error(run.error);
   process.exit(1);
+}
+if (run.signal) {
+  process.kill(process.pid, run.signal);
+  return;
 }
 process.exit(run.status ?? 0);

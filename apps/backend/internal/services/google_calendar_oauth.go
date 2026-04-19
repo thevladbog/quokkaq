@@ -113,18 +113,18 @@ func revokeGoogleRefreshToken(ctx context.Context, refreshToken string) {
 	form.Set("token", rt)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://oauth2.googleapis.com/revoke", strings.NewReader(form.Encode()))
 	if err != nil {
-		logger.PrintfCtx(ctx, "google calendar oauth: revoke build request: %v", err)
+		logger.ErrorfCtx(ctx, "google calendar oauth: revoke build request: %v", err)
 		return
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	resp, err := googleOAuthHTTPClient.Do(req)
 	if err != nil {
-		logger.PrintfCtx(ctx, "google calendar oauth: revoke request failed: %v", err)
+		logger.ErrorfCtx(ctx, "google calendar oauth: revoke request failed: %v", err)
 		return
 	}
 	defer func() { _, _ = io.Copy(io.Discard, resp.Body); _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		logger.PrintfCtx(ctx, "google calendar oauth: revoke non-2xx: %s", resp.Status)
+		logger.ErrorfCtx(ctx, "google calendar oauth: revoke non-2xx: %s", resp.Status)
 	}
 }
 
@@ -217,7 +217,7 @@ func (s *CalendarIntegrationService) StartGoogleCalendarOAuth(ctx context.Contex
 		ReturnPath:   retPath,
 	}
 	if err := redisstore.SetJSON(ctx, redisstore.KeyGoogleCalendarOAuthState(state), payload, 15*time.Minute); err != nil {
-		logger.PrintfCtx(ctx, "google calendar oauth: oauth state save failed companyId=%s unitId=%s err=%v", companyID, unitID, err)
+		logger.ErrorfCtx(ctx, "google calendar oauth: oauth state save failed companyId=%s unitId=%s err=%v", companyID, unitID, err)
 		return "", fmt.Errorf("%w: %v", ErrGoogleCalendarOAuthSessionSaveFailed, err)
 	}
 	opts := []oauth2.AuthCodeOption{
@@ -281,7 +281,7 @@ func (s *CalendarIntegrationService) CompleteGoogleCalendarOAuth(ctx context.Con
 	}
 	if err := redisstore.SetJSON(ctx, redisstore.KeyGoogleCalendarPickSession(pickToken), pick, 15*time.Minute); err != nil {
 		rtLen := len(strings.TrimSpace(tok.RefreshToken))
-		logger.PrintfCtx(ctx, "google calendar oauth: CRITICAL pick session save failed companyId=%s unitId=%s pickTokenLen=%d refreshTokenLen=%d err=%v",
+		logger.ErrorfCtx(ctx, "google calendar oauth: CRITICAL pick session save failed companyId=%s unitId=%s pickTokenLen=%d refreshTokenLen=%d err=%v",
 			pick.CompanyID, pick.UnitID, len(pickToken), rtLen, err)
 		revokeGoogleRefreshToken(ctx, tok.RefreshToken)
 		return "", failureReturnPath, fmt.Errorf("%w: %v", ErrGoogleCalendarOAuthSessionSaveFailed, err)

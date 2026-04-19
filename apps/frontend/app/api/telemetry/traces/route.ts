@@ -48,7 +48,12 @@ function checkRateLimit(
   return true;
 }
 
+/** Only use spoofable forwarded headers when explicitly enabled (trusted reverse proxy). */
 function clientIp(req: NextRequest): string {
+  const trust = process.env.OTEL_BROWSER_INGEST_TRUST_FORWARDED_HEADERS;
+  if (trust !== 'true' && trust !== '1') {
+    return 'unknown';
+  }
   const xf = req.headers.get('x-forwarded-for');
   if (xf) {
     const first = xf.split(',')[0]?.trim();
@@ -178,7 +183,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   } catch (e) {
     console.error('[telemetry/traces] upstream fetch failed', upstream, e);
     return NextResponse.json(
-      { error: 'Upstream OTLP unreachable', detail: String(e) },
+      { error: 'Upstream OTLP unreachable; see server logs' },
       { status: 502 }
     );
   } finally {

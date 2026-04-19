@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"quokkaq-go-backend/internal/config"
+	"quokkaq-go-backend/internal/logger"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/pkg/database"
 	"time"
@@ -23,13 +24,14 @@ const (
 func main() {
 	fmt.Println("Starting database seeding...")
 	config.Load()
+	logger.Init()
 	if err := database.Connect(); err != nil {
-		fmt.Printf("database connect: %v\n", err)
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 
 	if err := runSeed(); err != nil {
-		fmt.Printf("Seeding failed: %v\n", err)
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 

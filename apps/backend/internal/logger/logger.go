@@ -26,24 +26,16 @@ func Init() {
 			format = "text"
 		}
 	}
-
-	var h slog.Handler
-	opts := &slog.HandlerOptions{Level: level}
-
-	switch format {
-	case "json":
-		h = slog.NewJSONHandler(os.Stdout, opts)
-	default:
-		h = tint.NewHandler(os.Stdout, &tint.Options{Level: level})
-	}
-
-	h = &reqIDHandler{inner: h}
-	slog.SetDefault(slog.New(h))
+	slog.SetDefault(slog.New(buildHandler(os.Stdout, format, level)))
 }
 
 // InitWriter is like Init but writes to w (e.g. tests).
 func InitWriter(w io.Writer, format string, level slog.Level) {
 	format = strings.ToLower(strings.TrimSpace(format))
+	slog.SetDefault(slog.New(buildHandler(w, format, level)))
+}
+
+func buildHandler(w io.Writer, format string, level slog.Level) slog.Handler {
 	opts := &slog.HandlerOptions{Level: level}
 	var h slog.Handler
 	switch format {
@@ -52,8 +44,7 @@ func InitWriter(w io.Writer, format string, level slog.Level) {
 	default:
 		h = tint.NewHandler(w, &tint.Options{Level: level})
 	}
-	h = &reqIDHandler{inner: h}
-	slog.SetDefault(slog.New(h))
+	return &reqIDHandler{inner: h}
 }
 
 func parseLevel(s string) slog.Level {
@@ -112,9 +103,9 @@ func Error(msg string, args ...any) {
 	slog.Error(msg, args...)
 }
 
-// Fatal logs at error level (structured key/value args). It does not exit; callers should return the error and let main os.Exit after defers.
-func Fatal(msg string, args ...any) {
-	slog.Error(msg, args...)
+// Errorf logs fmt.Sprintf(format, args...) at error level (no request context).
+func Errorf(format string, args ...any) {
+	slog.Error(fmt.Sprintf(format, args...))
 }
 
 // Debugf logs a line built with fmt.Sprintf at debug level.
@@ -140,9 +131,4 @@ func ErrorfCtx(ctx context.Context, format string, args ...any) {
 // Println logs fmt.Sprint(args...) at info level.
 func Println(args ...any) {
 	slog.Info(fmt.Sprint(args...))
-}
-
-// Fatalf logs fmt.Sprintf(format, args...) at error level. It does not exit; callers should return the error and let main os.Exit after defers.
-func Fatalf(format string, args ...any) {
-	slog.Error(fmt.Sprintf(format, args...))
 }
