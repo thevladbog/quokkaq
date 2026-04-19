@@ -45,13 +45,14 @@ type SupportReportPlaneClient = SupportReportTicketClient
 
 // SupportReportService creates support reports and syncs status from the configured ticket backend.
 type SupportReportService struct {
-	repo           repository.SupportReportRepository
-	shareRepo      repository.SupportReportShareRepository
-	plane          SupportReportTicketClient
-	tracker        SupportReportTicketClient
-	createPlatform string
-	userRepo       repository.UserRepository
-	companyRepo    repository.CompanyRepository
+	repo               repository.SupportReportRepository
+	shareRepo          repository.SupportReportShareRepository
+	plane              SupportReportTicketClient
+	tracker            SupportReportTicketClient
+	deploymentSettings repository.DeploymentSaaSSettingsRepository
+	createPlatform     string
+	userRepo           repository.UserRepository
+	companyRepo        repository.CompanyRepository
 	// cancelComment is SUPPORT_REPORT_CANCEL_COMMENT (trimmed) or the default applicant-facing Russian line.
 	cancelComment string
 }
@@ -64,20 +65,22 @@ type supportReportTrackerAccessPatcher interface {
 // NewSupportReportService constructs SupportReportService.
 // createPlatform is models.TicketBackendPlane, models.TicketBackendYandexTracker, or SupportReportPlatformNone.
 // companyRepo may be nil (Yandex Tracker company field on create will be left empty).
-func NewSupportReportService(repo repository.SupportReportRepository, shareRepo repository.SupportReportShareRepository, plane, tracker SupportReportTicketClient, createPlatform string, userRepo repository.UserRepository, companyRepo repository.CompanyRepository) *SupportReportService {
+// deploymentSettings may be nil (tests); when set, support ticket queue/type can be read from DB with env fallback.
+func NewSupportReportService(repo repository.SupportReportRepository, shareRepo repository.SupportReportShareRepository, plane, tracker SupportReportTicketClient, deploymentSettings repository.DeploymentSaaSSettingsRepository, createPlatform string, userRepo repository.UserRepository, companyRepo repository.CompanyRepository) *SupportReportService {
 	cc := strings.TrimSpace(os.Getenv("SUPPORT_REPORT_CANCEL_COMMENT"))
 	if cc == "" {
 		cc = "Спасибо, что написали нам. Это обращение закрыто в QuokkaQ. Если снова понадобится помощь — обращайтесь, мы на связи."
 	}
 	return &SupportReportService{
-		repo:           repo,
-		shareRepo:      shareRepo,
-		plane:          plane,
-		tracker:        tracker,
-		createPlatform: createPlatform,
-		userRepo:       userRepo,
-		companyRepo:    companyRepo,
-		cancelComment:  cc,
+		repo:               repo,
+		shareRepo:          shareRepo,
+		plane:              plane,
+		tracker:            tracker,
+		deploymentSettings: deploymentSettings,
+		createPlatform:     createPlatform,
+		userRepo:           userRepo,
+		companyRepo:        companyRepo,
+		cancelComment:      cc,
 	}
 }
 
@@ -111,10 +114,33 @@ func (s *SupportReportService) reportMatchesConfiguredPlatform(row *models.Suppo
 	return normalizeTicketBackend(row.TicketBackend) == s.createPlatform
 }
 
+func (s *SupportReportService) yandexTrackerUsableForSupport() bool {
+	if s.tracker == nil {
+		return false
+	}
+	yt, ok := s.tracker.(*YandexTrackerClient)
+	if !ok {
+		return false
+	}
+	if !yt.CredentialsReady() {
+		return false
+	}
+	if s.deploymentSettings != nil {
+		st, err := s.deploymentSettings.Get()
+		if err != nil {
+			return false
+		}
+		if ResolveSupportTrackerQueue(st) != "" {
+			return true
+		}
+	}
+	return yt.Enabled()
+}
+
 func (s *SupportReportService) clientForBackend(backend string) SupportReportTicketClient {
 	switch normalizeTicketBackend(backend) {
 	case models.TicketBackendYandexTracker:
-		if s.tracker != nil && s.tracker.Enabled() {
+		if s.yandexTrackerUsableForSupport() {
 			return s.tracker
 		}
 	case models.TicketBackendPlane:
@@ -133,6 +159,35 @@ func (s *SupportReportService) activeCreateClient() SupportReportTicketClient {
 		return s.clientForBackend(models.TicketBackendPlane)
 	default:
 		return nil
+	}
+}
+
+// trackerPatcherForExistingIssue returns the Yandex Tracker client for PATCH-style calls on existing issues
+// (e.g. apiAccessToTheTicket). It does not use Enabled(), which requires the default env queue; outbound calls
+// may still work when the queue comes from deployment settings and credentials are ready.
+func (s *SupportReportService) trackerPatcherForExistingIssue() supportReportTrackerAccessPatcher {
+	if s.tracker == nil {
+		return nil
+	}
+	patcher, ok := s.tracker.(supportReportTrackerAccessPatcher)
+	if !ok || patcher == nil {
+		return nil
+	}
+	return patcher
+}
+
+// supportReportTicketClientReadyForExistingIssue is true when cli can sync or comment on an existing external ticket.
+// For Yandex Tracker it uses CredentialsReady() instead of Enabled() so operations work when the queue is supplied via DB settings.
+func (s *SupportReportService) supportReportTicketClientReadyForExistingIssue(backend string, cli SupportReportTicketClient) bool {
+	if cli == nil {
+		return false
+	}
+	switch normalizeTicketBackend(backend) {
+	case models.TicketBackendYandexTracker:
+		yt, ok := cli.(*YandexTrackerClient)
+		return ok && yt != nil && yt.CredentialsReady()
+	default:
+		return cli.Enabled()
 	}
 }
 
@@ -202,6 +257,10 @@ func (s *SupportReportService) Create(ctx context.Context, userID string, in Cre
 		var errAccess error
 		extras.ApiAccessToTicket, errAccess = s.supportReportAPIAccessorUserIDsCSVForReport(row)
 		if errAccess != nil {
+			logger.Printf("support report: supportReportAPIAccessorUserIDsCSVForReport failed after DB insert id=%s: %v", row.ID, errAccess)
+			if delErr := s.repo.DeleteByID(row.ID); delErr != nil {
+				logger.Printf("support report: cleanup DeleteByID after accessor CSV failure id=%s: %v", row.ID, delErr)
+			}
 			return nil, errAccess
 		}
 		if u, err := s.userRepo.FindByID(ctx, userID); err == nil && u != nil && u.Email != nil {
@@ -209,7 +268,32 @@ func (s *SupportReportService) Create(ctx context.Context, userID string, in Cre
 		}
 		extras.CompanyTrackerLabel = strings.TrimSpace(s.buildTrackerCompanyLabel(userID))
 	}
-	extID, seq, stateName, err := client.CreateWorkItem(ctx, row.ID, title, descPayload, extras)
+	var extID string
+	var seq *int
+	var stateName string
+	if s.createPlatform == models.TicketBackendYandexTracker {
+		yt, ok := client.(*YandexTrackerClient)
+		if !ok {
+			return nil, fmt.Errorf("support report: internal: expected Yandex Tracker client")
+		}
+		var st *models.DeploymentSaaSSettings
+		if s.deploymentSettings != nil {
+			var getErr error
+			st, getErr = s.deploymentSettings.Get()
+			if getErr != nil {
+				return nil, fmt.Errorf("%w: deployment settings: %v", ErrSupportReportPersistence, getErr)
+			}
+		}
+		queue := ResolveSupportTrackerQueue(st)
+		typeRaw := ""
+		if st != nil {
+			typeRaw = strings.TrimSpace(st.TrackerTypeSupport)
+		}
+		opts := YandexTrackerIssueCreateOpts{QueueKey: queue, TypeRaw: typeRaw}
+		extID, seq, stateName, err = yt.CreateWorkItemWithOpts(ctx, row.ID, title, descPayload, extras, opts)
+	} else {
+		extID, seq, stateName, err = client.CreateWorkItem(ctx, row.ID, title, descPayload, extras)
+	}
 	if err != nil {
 		logger.Printf("support report: CreateWorkItem failed after DB insert id=%s: %v", row.ID, err)
 		if delErr := s.repo.DeleteByID(row.ID); delErr != nil {
@@ -237,11 +321,28 @@ func (s *SupportReportService) Create(ctx context.Context, userID string, in Cre
 }
 
 // supportReportAPIAccessorUserIDsCSV lists QuokkaQ user ids who may read this support report via the API:
-// the author plus every user with tenant role "admin" (same visibility as List with isAdmin / GetByID for non-authors).
+// the author, tenant system_admin users and the company owner in the author's company, and platform_admin users
+// (SaaS operators). Global role "admin" is not included — it is not tenant-scoped.
 func (s *SupportReportService) supportReportAPIAccessorUserIDsCSV(authorUserID string) (string, error) {
-	adminIDs, err := s.userRepo.ListUserIDsByRoleNames([]string{"admin"})
+	authorUserID = strings.TrimSpace(authorUserID)
+	if authorUserID == "" {
+		return "", fmt.Errorf("support report: empty author user id")
+	}
+	companyID, err := s.userRepo.GetCompanyIDByUserID(authorUserID)
 	if err != nil {
-		return "", fmt.Errorf("support report: list admin user ids: %w", err)
+		return "", fmt.Errorf("support report: author company: %w", err)
+	}
+	companyID = strings.TrimSpace(companyID)
+	if companyID == "" {
+		return "", fmt.Errorf("support report: author has no company")
+	}
+	tenantAdmins, err := s.userRepo.ListUserIDsWithTenantSystemAdminInCompany(companyID)
+	if err != nil {
+		return "", fmt.Errorf("support report: list tenant system admins: %w", err)
+	}
+	platformAdmins, err := s.userRepo.ListUserIDsByRoleNames([]string{"platform_admin"})
+	if err != nil {
+		return "", fmt.Errorf("support report: list platform admins: %w", err)
 	}
 	seen := make(map[string]struct{})
 	var out []string
@@ -257,8 +358,19 @@ func (s *SupportReportService) supportReportAPIAccessorUserIDsCSV(authorUserID s
 		out = append(out, id)
 	}
 	add(authorUserID)
-	for _, id := range adminIDs {
+	for _, id := range tenantAdmins {
 		add(id)
+	}
+	for _, id := range platformAdmins {
+		add(id)
+	}
+	if s.companyRepo != nil {
+		comp, err := s.companyRepo.FindByID(companyID)
+		if err == nil && comp != nil {
+			if oid := strings.TrimSpace(comp.OwnerUserID); oid != "" {
+				add(oid)
+			}
+		}
 	}
 	return strings.Join(out, ","), nil
 }
@@ -312,11 +424,8 @@ func (s *SupportReportService) syncYandexAPIAccessToTicket(ctx context.Context, 
 	if ext == "" {
 		return nil
 	}
-	if s.tracker == nil || !s.tracker.Enabled() {
-		return nil
-	}
-	patcher, ok := s.tracker.(supportReportTrackerAccessPatcher)
-	if !ok || patcher == nil {
+	patcher := s.trackerPatcherForExistingIssue()
+	if patcher == nil {
 		return nil
 	}
 	csv, err := s.supportReportAPIAccessorUserIDsCSVForReport(row)
@@ -348,13 +457,7 @@ func (s *SupportReportService) requireYandexComments(row *models.SupportReport) 
 }
 
 func (s *SupportReportService) canManageSupportReportShares(viewerID string, row *models.SupportReport) (bool, error) {
-	if row == nil {
-		return false, nil
-	}
-	if row.CreatedByUserID == viewerID {
-		return true, nil
-	}
-	return s.userRepo.IsAdmin(viewerID)
+	return s.supportReportManagerAccess(viewerID, row)
 }
 
 // SupportReportShareListItem is one persisted share row for API responses.
@@ -586,7 +689,43 @@ func (s *SupportReportService) buildTrackerCompanyLabel(userID string) string {
 	return short
 }
 
-// canViewSupportReport is true for author, tenant admin, or users granted a share.
+// supportReportManagerAccess is true for the author, platform_admin, or tenant-wide managers for the author's company
+// (system_admin tenant role or company owner).
+func (s *SupportReportService) supportReportManagerAccess(viewerID string, row *models.SupportReport) (bool, error) {
+	if row == nil {
+		return false, nil
+	}
+	if row.CreatedByUserID == viewerID {
+		return true, nil
+	}
+	pf, err := s.userRepo.IsPlatformAdmin(viewerID)
+	if err != nil {
+		return false, err
+	}
+	if pf {
+		return true, nil
+	}
+	authorCompany, err := s.userRepo.GetCompanyIDByUserID(row.CreatedByUserID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
+		return false, err
+	}
+	if strings.TrimSpace(authorCompany) == "" {
+		return false, nil
+	}
+	ok, err := s.userRepo.HasTenantSystemAdminRoleInCompany(viewerID, authorCompany)
+	if err != nil {
+		return false, err
+	}
+	if ok {
+		return true, nil
+	}
+	return s.userRepo.IsCompanyOwner(viewerID, authorCompany)
+}
+
+// canViewSupportReport is true for author, tenant-wide managers, or users granted a share.
 func (s *SupportReportService) canViewSupportReport(viewerID string, row *models.SupportReport) (bool, error) {
 	if row == nil {
 		return false, nil
@@ -594,11 +733,11 @@ func (s *SupportReportService) canViewSupportReport(viewerID string, row *models
 	if row.CreatedByUserID == viewerID {
 		return true, nil
 	}
-	isAdmin, err := s.userRepo.IsAdmin(viewerID)
+	okMgr, err := s.supportReportManagerAccess(viewerID, row)
 	if err != nil {
 		return false, err
 	}
-	if isAdmin {
+	if okMgr {
 		return true, nil
 	}
 	if s.shareRepo == nil {
@@ -629,13 +768,25 @@ func (s *SupportReportService) resolveUnitIDForCreate(userID string, unitID *str
 	return &u, nil
 }
 
-// List returns reports visible to the user (all if admin).
+// List returns reports visible to the user: own reports and shares; all reports in a company when the user is
+// owner or system_admin there; all reports in the deployment only for platform_admin.
 func (s *SupportReportService) List(ctx context.Context, userID string) ([]models.SupportReport, error) {
-	isAdmin, err := s.userRepo.IsAdmin(userID)
+	pf, err := s.userRepo.IsPlatformAdmin(userID)
 	if err != nil {
 		return nil, err
 	}
-	rows, err := s.repo.ListForUser(userID, isAdmin)
+	var tenantCompanies []string
+	if !pf {
+		tenantCompanies, err = s.userRepo.ListCompanyIDsForSupportReportTenantWideAccess(userID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	scope := repository.SupportReportListScope{
+		PlatformWide:     pf,
+		TenantCompanyIDs: tenantCompanies,
+	}
+	rows, err := s.repo.ListForUser(userID, scope)
 	if err != nil {
 		return nil, err
 	}
@@ -648,7 +799,7 @@ func (s *SupportReportService) List(ctx context.Context, userID string) ([]model
 	var candidates []cand
 	for i := range rows {
 		cli := s.clientForBackend(rows[i].TicketBackend)
-		if cli == nil || !cli.Enabled() {
+		if !s.supportReportTicketClientReadyForExistingIssue(rows[i].TicketBackend, cli) {
 			continue
 		}
 		if rows[i].PlaneWorkItemID == "" {
@@ -676,7 +827,7 @@ func (s *SupportReportService) List(ctx context.Context, userID string) ([]model
 		g.Go(func() error {
 			i := c.idx
 			cli := s.clientForBackend(rows[i].TicketBackend)
-			if cli == nil || !cli.Enabled() {
+			if !s.supportReportTicketClientReadyForExistingIssue(rows[i].TicketBackend, cli) {
 				return nil
 			}
 			callCtx, cancel := context.WithTimeout(syncCtx, ticketGetWorkItemTimeout)
@@ -718,7 +869,7 @@ func (s *SupportReportService) GetByID(ctx context.Context, userID, reportID str
 		return nil, gorm.ErrRecordNotFound
 	}
 	cli := s.clientForBackend(row.TicketBackend)
-	if cli != nil && cli.Enabled() && row.PlaneWorkItemID != "" {
+	if s.supportReportTicketClientReadyForExistingIssue(row.TicketBackend, cli) && row.PlaneWorkItemID != "" {
 		syncCtx, cancel := context.WithTimeout(ctx, ticketGetWorkItemTimeout)
 		seq, st, err := cli.GetWorkItem(syncCtx, row.PlaneWorkItemID)
 		cancel()
@@ -750,11 +901,11 @@ func (s *SupportReportService) MarkIrrelevant(ctx context.Context, userID, repor
 	if err != nil {
 		return nil, err
 	}
-	isAdmin, err := s.userRepo.IsAdmin(userID)
+	ok, err := s.supportReportManagerAccess(userID, row)
 	if err != nil {
 		return nil, err
 	}
-	if row.CreatedByUserID != userID && !isAdmin {
+	if !ok {
 		return nil, ErrSupportReportForbidden
 	}
 	if !s.reportMatchesConfiguredPlatform(row) {
@@ -765,7 +916,7 @@ func (s *SupportReportService) MarkIrrelevant(ctx context.Context, userID, repor
 	}
 	comment := s.cancelComment
 	cli := s.clientForBackend(row.TicketBackend)
-	if cli != nil && cli.Enabled() && strings.TrimSpace(row.PlaneWorkItemID) != "" {
+	if s.supportReportTicketClientReadyForExistingIssue(row.TicketBackend, cli) && strings.TrimSpace(row.PlaneWorkItemID) != "" {
 		if err := cli.AddComment(ctx, strings.TrimSpace(row.PlaneWorkItemID), comment); err != nil {
 			if errors.Is(err, ErrPlaneCommentsUnsupported) {
 				logger.Printf("support report: MarkIrrelevant skipping external cancel comment (backend does not support posting this comment) reportID=%s workItemID=%s", reportID, strings.TrimSpace(row.PlaneWorkItemID))

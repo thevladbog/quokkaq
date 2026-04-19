@@ -387,12 +387,12 @@ The command creates the `platform_admin` role in the database if it is missing, 
 
 ### Local dev: tenant `admin` without `platform_admin`
 
-If you log in as the usual organization **admin** (not `platform_admin`), the UI and API still allow `/platform` **only in non-production** when:
+If you log in as the usual organization **admin** (not `platform_admin`), the UI and API allow `/platform` **only when you opt in explicitly** (never by default):
 
-- **Backend:** Tenant `admin` can call `/platform/*` when `APP_ENV` is **not** `production` and either `PLATFORM_ALLOW_TENANT_ADMIN=true` is set, or `PLATFORM_ALLOW_TENANT_ADMIN` is **unset** and `APP_ENV` is empty, `development`, `dev`, or `local` (typical `go run` without a restrictive `.env`). **`docker-compose.yml` under `apps/backend` defaults `PLATFORM_ALLOW_TENANT_ADMIN` to `false`** (fail closed); set `PLATFORM_ALLOW_TENANT_ADMIN=true` in your environment or compose `.env` when you intentionally want tenant admins on `/platform` in that stack (still never for production). Set `PLATFORM_ALLOW_TENANT_ADMIN=false` explicitly to turn off the unset/dev fallback when running the binary directly. Staging with e.g. `APP_ENV=staging` does **not** get tenant-admin platform access unless you set `PLATFORM_ALLOW_TENANT_ADMIN=true` or assign `platform_admin`.
-- **Frontend:** `next dev` treats tenant admins as allowed on `/platform`. For `next start` or preview builds, set `NEXT_PUBLIC_PLATFORM_ALLOW_TENANT_ADMIN=true` in the frontend env.
+- **Backend:** Tenant `admin` can call `/platform/*` only when `APP_ENV` is **not** `production` **and** `PLATFORM_ALLOW_TENANT_ADMIN` is **`true`**, **`1`**, or **`yes`**. Unset or `false`/`0`/`no` means only **`platform_admin`** may use `/platform` APIs. **`docker-compose.yml` under `apps/backend` defaults `PLATFORM_ALLOW_TENANT_ADMIN` to `false`**; set `PLATFORM_ALLOW_TENANT_ADMIN=true` in your environment or compose `.env` when you intentionally want tenant admins on `/platform` in that stack (still never for production).
+- **Frontend:** Set `NEXT_PUBLIC_PLATFORM_ALLOW_TENANT_ADMIN=true` or `1` in the frontend env so tenant `admin` sees the operator UI and routes; without it, only `platform_admin` does.
 
-In **production** (`APP_ENV=production`), only users with **`platform_admin`** can use `/platform`; set `PLATFORM_ALLOW_TENANT_ADMIN=false` if you ever run a non-production build with a loose `APP_ENV`.
+In **production** (`APP_ENV=production`), only users with **`platform_admin`** can use `/platform`.
 
 ### API
 

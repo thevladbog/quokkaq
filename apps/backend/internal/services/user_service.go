@@ -24,6 +24,8 @@ var (
 type UserService interface {
 	CreateUser(user *models.User) error
 	GetAllUsers(search string) ([]models.User, error)
+	// ListUsersForCompany lists users visible in one tenant (see repository.ListUsersForCompany).
+	ListUsersForCompany(companyID string, search string, includeGlobalRoleUsers bool) ([]models.User, error)
 	GetUserByID(id string) (*models.User, error)
 	UpdateUser(id string, input *models.UpdateUserInput) error
 	DeleteUser(id string) error
@@ -71,6 +73,10 @@ func (s *userService) CreateUser(user *models.User) error {
 
 func (s *userService) GetAllUsers(search string) ([]models.User, error) {
 	return s.repo.FindAll(search)
+}
+
+func (s *userService) ListUsersForCompany(companyID string, search string, includeGlobalRoleUsers bool) ([]models.User, error) {
+	return s.repo.ListUsersForCompany(companyID, search, includeGlobalRoleUsers)
 }
 
 func (s *userService) GetUserByID(id string) (*models.User, error) {

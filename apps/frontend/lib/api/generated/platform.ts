@@ -392,8 +392,8 @@ export interface HandlersTenantRoleUnitJSON {
 
 export interface HandlersCreateTenantRoleJSON {
   description?: string;
-  name?: string;
-  slug?: string;
+  name: string;
+  slug: string;
   units?: HandlersTenantRoleUnitJSON[];
 }
 
@@ -426,6 +426,11 @@ export interface HandlersCreateTicketRequestKiosk {
 }
 
 export type HandlersCreateTicketRequest = HandlersCreateTicketRequestAnonymous | HandlersCreateTicketRequestStaff | HandlersCreateTicketRequestKiosk;
+
+export interface HandlersCustomTermsLeadRequestBody {
+  /** @minLength 1 */
+  comment: string;
+}
 
 export interface HandlersDaDataFindPartyByInnRequest {
   inn: string;
@@ -639,6 +644,11 @@ export interface HandlersPickRequest {
   counterId?: string;
 }
 
+export interface HandlersPlanChangeRequestBody {
+  /** @minLength 1 */
+  requestedPlanCode: string;
+}
+
 export interface HandlersPlatformCreateSubscriptionBody {
   companyId: string;
   currentPeriodEnd?: string;
@@ -675,6 +685,15 @@ export interface HandlersPlatformCreateSubscriptionPlanBody {
   price?: number;
 }
 
+export interface HandlersPlatformIntegrationsResponse {
+  leadsTrackerQueue: string;
+  supportTrackerQueue: string;
+  trackerTypeError: string;
+  trackerTypeRegistration: string;
+  trackerTypeRequest: string;
+  trackerTypeSupport: string;
+}
+
 export type HandlersPlatformUpdateSubscriptionPlanBodyFeatures = {[key: string]: boolean};
 
 export type HandlersPlatformUpdateSubscriptionPlanBodyLimits = {[key: string]: number};
@@ -697,6 +716,17 @@ export interface HandlersPlatformUpdateSubscriptionPlanBody {
   name?: string;
   nameEn?: string;
   price?: number;
+}
+
+export interface HandlersPublicLeadRequestBody {
+  company?: string;
+  email: string;
+  locale?: string;
+  message?: string;
+  name: string;
+  planCode?: string;
+  referrer?: string;
+  source?: string;
 }
 
 export interface HandlersRefreshResponse {
@@ -1385,6 +1415,7 @@ export type ModelsInvitationTargetRoles = { [key: string]: unknown };
 export type ModelsInvitationTargetUnits = { [key: string]: unknown };
 
 export interface ModelsInvitation {
+  companyId?: string;
   createdAt?: string;
   email?: string;
   expiresAt?: string;
@@ -1399,6 +1430,7 @@ export interface ModelsInvitation {
 }
 
 export interface ModelsMessageTemplate {
+  companyId?: string;
   content?: string;
   createdAt?: string;
   id?: string;
@@ -1703,6 +1735,15 @@ export interface ServicesCreateCalendarIntegrationRequest {
   timezone?: string;
   unitId: string;
   username: string;
+}
+
+export interface ServicesDeploymentSaaSSettingsPatch {
+  leadsTrackerQueue?: string;
+  supportTrackerQueue?: string;
+  trackerTypeError?: string;
+  trackerTypeRegistration?: string;
+  trackerTypeRequest?: string;
+  trackerTypeSupport?: string;
 }
 
 export interface ServicesEmployeeRadarResponse {
@@ -3078,6 +3119,242 @@ export function useGetFeatures<TData = Awaited<ReturnType<typeof getFeatures>>, 
 
 
 
+
+/**
+ * SaaS operator: Yandex Tracker queue and issue type mappings for leads flows.
+ * @summary Get deployment integration settings
+ */
+export type getPlatformIntegrationsResponse200 = {
+  data: HandlersPlatformIntegrationsResponse
+  status: 200
+}
+
+export type getPlatformIntegrationsResponse401 = {
+  data: string
+  status: 401
+}
+
+export type getPlatformIntegrationsResponse403 = {
+  data: string
+  status: 403
+}
+
+export type getPlatformIntegrationsResponse500 = {
+  data: string
+  status: 500
+}
+
+export type getPlatformIntegrationsResponseSuccess = (getPlatformIntegrationsResponse200) & {
+  headers: Headers;
+};
+export type getPlatformIntegrationsResponseError = (getPlatformIntegrationsResponse401 | getPlatformIntegrationsResponse403 | getPlatformIntegrationsResponse500) & {
+  headers: Headers;
+};
+
+export type getPlatformIntegrationsResponse = (getPlatformIntegrationsResponseSuccess | getPlatformIntegrationsResponseError)
+
+export const getGetPlatformIntegrationsUrl = () => {
+
+
+
+
+  return `/platform/integrations`
+}
+
+export const getPlatformIntegrations = async ( options?: RequestInit): Promise<getPlatformIntegrationsResponse> => {
+
+  return orvalMutator<getPlatformIntegrationsResponse>(getGetPlatformIntegrationsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPlatformIntegrationsQueryKey = () => {
+    return [
+    `/platform/integrations`
+    ] as const;
+    }
+
+
+export const getGetPlatformIntegrationsQueryOptions = <TData = Awaited<ReturnType<typeof getPlatformIntegrations>>, TError = string>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformIntegrations>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPlatformIntegrationsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPlatformIntegrations>>> = ({ signal }) => getPlatformIntegrations({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPlatformIntegrations>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetPlatformIntegrationsQueryResult = NonNullable<Awaited<ReturnType<typeof getPlatformIntegrations>>>
+export type GetPlatformIntegrationsQueryError = string
+
+
+export function useGetPlatformIntegrations<TData = Awaited<ReturnType<typeof getPlatformIntegrations>>, TError = string>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformIntegrations>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getPlatformIntegrations>>,
+          TError,
+          Awaited<ReturnType<typeof getPlatformIntegrations>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetPlatformIntegrations<TData = Awaited<ReturnType<typeof getPlatformIntegrations>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformIntegrations>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getPlatformIntegrations>>,
+          TError,
+          Awaited<ReturnType<typeof getPlatformIntegrations>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetPlatformIntegrations<TData = Awaited<ReturnType<typeof getPlatformIntegrations>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformIntegrations>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get deployment integration settings
+ */
+
+export function useGetPlatformIntegrations<TData = Awaited<ReturnType<typeof getPlatformIntegrations>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformIntegrations>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetPlatformIntegrationsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * @summary Update deployment integration settings
+ */
+export type patchPlatformIntegrationsResponse200 = {
+  data: HandlersPlatformIntegrationsResponse
+  status: 200
+}
+
+export type patchPlatformIntegrationsResponse400 = {
+  data: string
+  status: 400
+}
+
+export type patchPlatformIntegrationsResponse401 = {
+  data: string
+  status: 401
+}
+
+export type patchPlatformIntegrationsResponse403 = {
+  data: string
+  status: 403
+}
+
+export type patchPlatformIntegrationsResponse500 = {
+  data: string
+  status: 500
+}
+
+export type patchPlatformIntegrationsResponseSuccess = (patchPlatformIntegrationsResponse200) & {
+  headers: Headers;
+};
+export type patchPlatformIntegrationsResponseError = (patchPlatformIntegrationsResponse400 | patchPlatformIntegrationsResponse401 | patchPlatformIntegrationsResponse403 | patchPlatformIntegrationsResponse500) & {
+  headers: Headers;
+};
+
+export type patchPlatformIntegrationsResponse = (patchPlatformIntegrationsResponseSuccess | patchPlatformIntegrationsResponseError)
+
+export const getPatchPlatformIntegrationsUrl = () => {
+
+
+
+
+  return `/platform/integrations`
+}
+
+export const patchPlatformIntegrations = async (servicesDeploymentSaaSSettingsPatch: ServicesDeploymentSaaSSettingsPatch, options?: RequestInit): Promise<patchPlatformIntegrationsResponse> => {
+
+  return orvalMutator<patchPlatformIntegrationsResponse>(getPatchPlatformIntegrationsUrl(),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      servicesDeploymentSaaSSettingsPatch,)
+  }
+);}
+
+
+
+
+export const getPatchPlatformIntegrationsMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchPlatformIntegrations>>, TError,{data: ServicesDeploymentSaaSSettingsPatch}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof patchPlatformIntegrations>>, TError,{data: ServicesDeploymentSaaSSettingsPatch}, TContext> => {
+
+const mutationKey = ['patchPlatformIntegrations'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchPlatformIntegrations>>, {data: ServicesDeploymentSaaSSettingsPatch}> = (props) => {
+          const {data} = props ?? {};
+
+          return  patchPlatformIntegrations(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PatchPlatformIntegrationsMutationResult = NonNullable<Awaited<ReturnType<typeof patchPlatformIntegrations>>>
+    export type PatchPlatformIntegrationsMutationBody = ServicesDeploymentSaaSSettingsPatch
+    export type PatchPlatformIntegrationsMutationError = string
+
+    /**
+ * @summary Update deployment integration settings
+ */
+export const usePatchPlatformIntegrations = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchPlatformIntegrations>>, TError,{data: ServicesDeploymentSaaSSettingsPatch}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof patchPlatformIntegrations>>,
+        TError,
+        {data: ServicesDeploymentSaaSSettingsPatch},
+        TContext
+      > => {
+      return useMutation(getPatchPlatformIntegrationsMutationOptions(options), queryClient);
+    }
 
 /**
  * @summary List invoices (platform)

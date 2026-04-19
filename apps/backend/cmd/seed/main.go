@@ -343,6 +343,7 @@ func run() error {
 
 	// Create message template
 	template := models.MessageTemplate{
+		CompanyID: company.ID,
 		Name:      "Welcome",
 		Subject:   "Welcome to QuokkaQ",
 		Content:   "Hello {{name}}, welcome to our queue management system!",

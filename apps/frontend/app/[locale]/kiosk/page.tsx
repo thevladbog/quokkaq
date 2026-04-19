@@ -143,10 +143,12 @@ export default function KioskPage() {
           <div className='flex min-h-0 flex-1 items-center justify-center overflow-hidden'>
             <div className='max-w-md px-4 text-center'>
               <h2 className='mb-2 text-xl font-bold'>
-                {t('noUnitsAvailable', { defaultValue: 'No Units Available' })}
+                {t('unit_selection_empty.title', {
+                  defaultValue: 'No units available'
+                })}
               </h2>
               <p className='text-kiosk-ink-muted'>
-                {t('noUnitsMessage', {
+                {t('unit_selection_empty.body', {
                   defaultValue: 'There are no units available at this location.'
                 })}
               </p>

@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Check, Sparkles } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
+import { cn } from '@/lib/utils';
 
 export const PLAN_CODES = {
   STARTER: 'starter',
@@ -32,13 +33,16 @@ interface PlanSelectorProps {
   currentPlanId?: string;
   onSelect: (plan: SubscriptionPlan) => void;
   isLoading?: boolean;
+  /** When set, non-current plan buttons use this label instead of checkout/select/contact copy. */
+  primaryCtaLabel?: string;
 }
 
 export function PlanSelector({
   plans,
   currentPlanId,
   onSelect,
-  isLoading
+  isLoading,
+  primaryCtaLabel
 }: PlanSelectorProps) {
   const locale = useLocale();
   const intlLocale = useMemo(() => intlLocaleFromAppLocale(locale), [locale]);
@@ -96,11 +100,17 @@ export function PlanSelector({
         .map((plan) => (
           <Card
             key={plan.id}
-            className={`relative ${isPromotedPlan(plan) ? 'border-2 border-blue-500 shadow-xl' : ''} ${isCurrentPlan(plan.id) ? 'bg-blue-50' : ''}`}
+            className={cn(
+              'relative flex h-full flex-col',
+              isPromotedPlan(plan) &&
+                'border-primary dark:border-primary border-2 shadow-xl',
+              isCurrentPlan(plan.id) &&
+                'ring-primary/35 dark:ring-primary/50 ring-2'
+            )}
           >
             {isPromotedPlan(plan) && (
               <div className='absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 transform'>
-                <Badge className='bg-blue-500'>
+                <Badge>
                   <Sparkles className='mr-1 h-3 w-3' />
                   {t('popularBadge')}
                 </Badge>
@@ -108,13 +118,18 @@ export function PlanSelector({
             )}
 
             {isCurrentPlan(plan.id) && (
-              <div className='absolute top-4 right-4'>
-                <Badge variant='outline'>{t('currentPlan')}</Badge>
+              <div className='absolute top-4 right-4 z-10'>
+                <Badge
+                  variant='outline'
+                  className='border-primary/40 bg-background/95 text-foreground dark:bg-background/90 shadow-sm backdrop-blur-sm'
+                >
+                  {t('currentPlan')}
+                </Badge>
               </div>
             )}
 
-            <CardHeader className='pb-4'>
-              <CardTitle className='text-2xl'>
+            <CardHeader className='shrink-0 pb-4'>
+              <CardTitle className='text-foreground text-2xl'>
                 {(() => {
                   const name = subscriptionPlanDisplayName(plan, locale);
                   const split =
@@ -129,7 +144,7 @@ export function PlanSelector({
               <div className='mt-4'>
                 {plan.price > 0 ? (
                   <div className='flex flex-nowrap items-baseline gap-x-2 whitespace-nowrap'>
-                    <span className='text-4xl font-bold tabular-nums'>
+                    <span className='text-foreground text-4xl font-bold tabular-nums'>
                       {locale.startsWith('en') &&
                       plan.code !== PLAN_CODES.ENTERPRISE
                         ? formatPriceMinorUnitsAmountOnly(
@@ -143,27 +158,34 @@ export function PlanSelector({
                             intlLocale
                           )}
                     </span>
-                    <span className='shrink-0 text-gray-500'>
+                    <span className='text-muted-foreground shrink-0'>
                       {plan.interval === 'month'
                         ? tBilling('perMonth')
                         : tBilling('perYear')}
                     </span>
                   </div>
                 ) : (
-                  <div className='text-2xl font-bold'>{t('customPricing')}</div>
+                  <div className='text-foreground text-2xl font-bold'>
+                    {t('customPricing')}
+                  </div>
                 )}
               </div>
             </CardHeader>
 
-            <CardContent className='space-y-4'>
+            <CardContent className='flex flex-1 flex-col space-y-4'>
               <div className='space-y-2'>
-                <p className='text-sm font-semibold text-gray-700'>
+                <p className='text-foreground text-sm font-semibold'>
                   {t('limitsTitle')}
                 </p>
                 <ul className='space-y-1'>
                   {getLimitsText(plan).map((limit) => (
-                    <li key={limit.key} className='text-sm text-gray-600'>
-                      <span className='font-medium'>{limit.value}</span>{' '}
+                    <li
+                      key={limit.key}
+                      className='text-muted-foreground text-sm'
+                    >
+                      <span className='text-foreground font-medium'>
+                        {limit.value}
+                      </span>{' '}
                       {limit.label}
                     </li>
                   ))}
@@ -171,7 +193,7 @@ export function PlanSelector({
               </div>
 
               <div className='space-y-2'>
-                <p className='text-sm font-semibold text-gray-700'>
+                <p className='text-foreground text-sm font-semibold'>
                   {t('featuresTitle')}
                 </p>
                 <ul className='space-y-2'>
@@ -186,12 +208,14 @@ export function PlanSelector({
                             key={feature.key}
                             className='flex items-start gap-2 text-sm'
                           >
-                            <Check className='mt-0.5 h-4 w-4 flex-shrink-0 text-green-500' />
-                            <span>{feature.text}</span>
+                            <Check className='text-primary mt-0.5 h-4 w-4 flex-shrink-0' />
+                            <span className='text-foreground'>
+                              {feature.text}
+                            </span>
                           </li>
                         ))}
                         {rest > 0 ? (
-                          <li className='pl-6 text-sm text-gray-500'>
+                          <li className='text-muted-foreground pl-6 text-sm'>
                             {t('moreFeatures', { count: rest })}
                           </li>
                         ) : null}
@@ -202,7 +226,7 @@ export function PlanSelector({
               </div>
             </CardContent>
 
-            <CardFooter>
+            <CardFooter className='mt-auto border-t pt-6'>
               {!isCurrentPlan(plan.id) ? (
                 <Button
                   type='button'
@@ -211,11 +235,12 @@ export function PlanSelector({
                   className='w-full'
                   variant={isPromotedPlan(plan) ? 'default' : 'outline'}
                 >
-                  {plan.price > 0
-                    ? plan.allowInstantPurchase === false
-                      ? t('requestPlanAccess')
-                      : t('selectPlan')
-                    : t('contactUs')}
+                  {primaryCtaLabel ??
+                    (plan.price > 0
+                      ? plan.allowInstantPurchase === false
+                        ? t('requestPlanAccess')
+                        : t('selectPlan')
+                      : t('contactUs'))}
                 </Button>
               ) : (
                 <Button

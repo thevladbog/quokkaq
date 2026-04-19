@@ -21,10 +21,11 @@ type AuthHandler struct {
 	userService services.UserService
 	userRepo    repository.UserRepository
 	tenantRBAC  repository.TenantRBACRepository
+	leadIssues  *services.LeadIssueService
 }
 
-func NewAuthHandler(service services.AuthService, userService services.UserService, userRepo repository.UserRepository, tenantRBAC repository.TenantRBACRepository) *AuthHandler {
-	return &AuthHandler{service: service, userService: userService, userRepo: userRepo, tenantRBAC: tenantRBAC}
+func NewAuthHandler(service services.AuthService, userService services.UserService, userRepo repository.UserRepository, tenantRBAC repository.TenantRBACRepository, leadIssues *services.LeadIssueService) *AuthHandler {
+	return &AuthHandler{service: service, userService: userService, userRepo: userRepo, tenantRBAC: tenantRBAC, leadIssues: leadIssues}
 }
 
 // PatchMeRequest is the body for PATCH /auth/me (self-service profile photo only).
@@ -485,6 +486,9 @@ func (h *AuthHandler) Signup(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		logger.ErrorfCtx(r.Context(), "Signup: %v", err)
+		if h.leadIssues != nil {
+			h.leadIssues.NotifySignupFailure(r.Context(), req.CompanyName, req.Email, req.PlanCode, err.Error())
+		}
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}

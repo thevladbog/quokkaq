@@ -15,6 +15,8 @@ type UnitRepository interface {
 	CreateTx(tx *gorm.DB, unit *models.Unit) error
 	Create(unit *models.Unit) error
 	FindAll() ([]models.Unit, error)
+	// FindAllByCompanyID returns units for one tenant (company).
+	FindAllByCompanyID(companyID string) ([]models.Unit, error)
 	FindByID(id string) (*models.Unit, error)
 	// FindByIDLight loads only the unit row (no relations). Use for updates/auth checks; use FindByID for API responses that need nested data.
 	FindByIDLight(id string) (*models.Unit, error)
@@ -30,6 +32,8 @@ type UnitRepository interface {
 	DeleteMaterial(id string) error
 	Count() (int64, error)
 	CreateCompany(company *models.Company) error
+	// FindFirstByCompanyID returns the oldest unit for a company (same ordering as FindFirstByCompanyIDTx).
+	FindFirstByCompanyID(companyID string) (*models.Unit, error)
 	// FindFirstByCompanyIDTx returns the oldest unit for a company (used for SSO JIT provisioning).
 	FindFirstByCompanyIDTx(tx *gorm.DB, companyID string) (*models.Unit, error)
 }
@@ -57,6 +61,12 @@ func (r *unitRepository) Create(unit *models.Unit) error {
 func (r *unitRepository) FindAll() ([]models.Unit, error) {
 	var units []models.Unit
 	err := r.db.Find(&units).Error
+	return units, err
+}
+
+func (r *unitRepository) FindAllByCompanyID(companyID string) ([]models.Unit, error) {
+	var units []models.Unit
+	err := r.db.Where("company_id = ?", companyID).Find(&units).Error
 	return units, err
 }
 
@@ -154,6 +164,15 @@ func (r *unitRepository) Count() (int64, error) {
 
 func (r *unitRepository) CreateCompany(company *models.Company) error {
 	return r.db.Create(company).Error
+}
+
+func (r *unitRepository) FindFirstByCompanyID(companyID string) (*models.Unit, error) {
+	var unit models.Unit
+	err := r.db.Where("company_id = ?", companyID).Order("created_at ASC").First(&unit).Error
+	if err != nil {
+		return nil, err
+	}
+	return &unit, nil
 }
 
 func (r *unitRepository) FindFirstByCompanyIDTx(tx *gorm.DB, companyID string) (*models.Unit, error) {

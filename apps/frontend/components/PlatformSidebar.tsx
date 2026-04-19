@@ -18,7 +18,8 @@ import {
   FileText,
   Home,
   Layers,
-  Package
+  Package,
+  Plug
 } from 'lucide-react';
 import Image from 'next/image';
 import { Link, usePathname } from '@/src/i18n/navigation';
@@ -72,6 +73,12 @@ export default function PlatformSidebar() {
       label: t('invoices', { defaultValue: 'Invoices' }),
       icon: FileText,
       match: (p: string) => p.includes('/platform/invoices')
+    },
+    {
+      href: '/platform/integrations',
+      label: t('integrations', { defaultValue: 'Integrations' }),
+      icon: Plug,
+      match: (p: string) => p.includes('/platform/integrations')
     }
   ];
 

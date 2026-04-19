@@ -419,8 +419,8 @@ export interface HandlersTenantRoleUnitJSON {
 
 export interface HandlersCreateTenantRoleJSON {
   description?: string;
-  name?: string;
-  slug?: string;
+  name: string;
+  slug: string;
   units?: HandlersTenantRoleUnitJSON[];
 }
 
@@ -453,6 +453,11 @@ export interface HandlersCreateTicketRequestKiosk {
 }
 
 export type HandlersCreateTicketRequest = HandlersCreateTicketRequestAnonymous | HandlersCreateTicketRequestStaff | HandlersCreateTicketRequestKiosk;
+
+export interface HandlersCustomTermsLeadRequestBody {
+  /** @minLength 1 */
+  comment: string;
+}
 
 export interface HandlersDaDataFindPartyByInnRequest {
   inn: string;
@@ -666,6 +671,11 @@ export interface HandlersPickRequest {
   counterId?: string;
 }
 
+export interface HandlersPlanChangeRequestBody {
+  /** @minLength 1 */
+  requestedPlanCode: string;
+}
+
 export interface HandlersPlatformCreateSubscriptionBody {
   companyId: string;
   currentPeriodEnd?: string;
@@ -702,6 +712,15 @@ export interface HandlersPlatformCreateSubscriptionPlanBody {
   price?: number;
 }
 
+export interface HandlersPlatformIntegrationsResponse {
+  leadsTrackerQueue: string;
+  supportTrackerQueue: string;
+  trackerTypeError: string;
+  trackerTypeRegistration: string;
+  trackerTypeRequest: string;
+  trackerTypeSupport: string;
+}
+
 export type HandlersPlatformUpdateSubscriptionPlanBodyFeatures = {[key: string]: boolean};
 
 export type HandlersPlatformUpdateSubscriptionPlanBodyLimits = {[key: string]: number};
@@ -724,6 +743,17 @@ export interface HandlersPlatformUpdateSubscriptionPlanBody {
   name?: string;
   nameEn?: string;
   price?: number;
+}
+
+export interface HandlersPublicLeadRequestBody {
+  company?: string;
+  email: string;
+  locale?: string;
+  message?: string;
+  name: string;
+  planCode?: string;
+  referrer?: string;
+  source?: string;
 }
 
 export interface HandlersRefreshResponse {
@@ -1412,6 +1442,7 @@ export type ModelsInvitationTargetRoles = { [key: string]: unknown };
 export type ModelsInvitationTargetUnits = { [key: string]: unknown };
 
 export interface ModelsInvitation {
+  companyId?: string;
   createdAt?: string;
   email?: string;
   expiresAt?: string;
@@ -1426,6 +1457,7 @@ export interface ModelsInvitation {
 }
 
 export interface ModelsMessageTemplate {
+  companyId?: string;
   content?: string;
   createdAt?: string;
   id?: string;
@@ -1732,6 +1764,15 @@ export interface ServicesCreateCalendarIntegrationRequest {
   username: string;
 }
 
+export interface ServicesDeploymentSaaSSettingsPatch {
+  leadsTrackerQueue?: string;
+  supportTrackerQueue?: string;
+  trackerTypeError?: string;
+  trackerTypeRegistration?: string;
+  trackerTypeRequest?: string;
+  trackerTypeSupport?: string;
+}
+
 export interface ServicesEmployeeRadarResponse {
   computedAt?: string;
   rating?: number;
@@ -2032,12 +2073,27 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
 /**
- * Retrieves a list of all units
- * @summary Get all units
+ * Returns units for the resolved company (JWT + X-Company-Id when applicable). Never returns units from other tenants.
+ * @summary List units for the current tenant
  */
 export type getUnitsResponse200 = {
   data: ModelsUnit[]
   status: 200
+}
+
+export type getUnitsResponse400 = {
+  data: string
+  status: 400
+}
+
+export type getUnitsResponse401 = {
+  data: string
+  status: 401
+}
+
+export type getUnitsResponse403 = {
+  data: string
+  status: 403
 }
 
 export type getUnitsResponse500 = {
@@ -2048,7 +2104,7 @@ export type getUnitsResponse500 = {
 export type getUnitsResponseSuccess = (getUnitsResponse200) & {
   headers: Headers;
 };
-export type getUnitsResponseError = (getUnitsResponse500) & {
+export type getUnitsResponseError = (getUnitsResponse400 | getUnitsResponse401 | getUnitsResponse403 | getUnitsResponse500) & {
   headers: Headers;
 };
 
@@ -2131,7 +2187,7 @@ export function useGetUnits<TData = Awaited<ReturnType<typeof getUnits>>, TError
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Get all units
+ * @summary List units for the current tenant
  */
 
 export function useGetUnits<TData = Awaited<ReturnType<typeof getUnits>>, TError = string>(

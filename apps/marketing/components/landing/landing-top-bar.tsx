@@ -33,7 +33,7 @@ export function LandingTopBar({ locale, copy, appBaseUrl }: Props) {
   }, []);
 
   const trialHref = appBaseUrl
-    ? `${appBaseUrl}/${locale}/signup`
+    ? `${String(appBaseUrl).replace(/\/$/, '')}/${locale}/signup`
     : `/${locale}/docs`;
 
   const headerSurface = scrolled

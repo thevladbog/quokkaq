@@ -35,15 +35,17 @@ type UnitMaterial struct {
 
 type Invitation struct {
 	ID        string    `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
+	CompanyID string    `gorm:"not null;uniqueIndex:idx_invitations_company_user" json:"companyId"`
 	Token     string    `gorm:"unique;not null" json:"token"`
 	Status    string    `gorm:"default:'active'" json:"status"`
 	ExpiresAt time.Time `gorm:"not null" json:"expiresAt"`
-	UserID    *string   `gorm:"unique" json:"userId,omitempty"`
+	UserID    *string   `gorm:"uniqueIndex:idx_invitations_company_user" json:"userId,omitempty"`
 	Email     string    `gorm:"not null" json:"email"`
 	CreatedAt time.Time `gorm:"default:now()" json:"createdAt"`
 	UpdatedAt time.Time `gorm:"autoUpdateTime" json:"updatedAt"`
 
-	User *User `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-"`
+	Company Company `gorm:"foreignKey:CompanyID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-" swaggerignore:"true"`
+	User    *User   `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-"`
 
 	// Stored permissions to be assigned upon acceptance (JSONB; OpenAPI as generic object)
 	TargetUnits json.RawMessage `gorm:"type:jsonb" json:"targetUnits" swaggertype:"object"`
@@ -52,10 +54,13 @@ type Invitation struct {
 
 type MessageTemplate struct {
 	ID        string    `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
+	CompanyID string    `gorm:"not null;index" json:"companyId"`
 	Name      string    `gorm:"not null" json:"name"`
 	Subject   string    `gorm:"not null" json:"subject"`
 	Content   string    `gorm:"not null" json:"content"`
 	IsDefault bool      `gorm:"default:false" json:"isDefault"`
 	CreatedAt time.Time `gorm:"default:now()" json:"createdAt"`
 	UpdatedAt time.Time `gorm:"autoUpdateTime" json:"updatedAt"`
+
+	Company Company `gorm:"foreignKey:CompanyID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-" swaggerignore:"true"`
 }

@@ -7,21 +7,23 @@ import (
 	"fmt"
 	"os"
 	"quokkaq-go-backend/internal/models"
+	"quokkaq-go-backend/internal/rbac"
 	"quokkaq-go-backend/internal/repository"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
 type InvitationService interface {
-	CreateInvitation(email string, targetUnits []byte, targetRoles []byte, templateID string) (*models.Invitation, error)
-	GetAllInvitations() ([]models.Invitation, error)
+	CreateInvitation(companyID, email string, targetUnits []byte, targetRoles []byte, templateID string) (*models.Invitation, error)
+	GetAllInvitations(companyID string) ([]models.Invitation, error)
 	GetInvitationByID(id string) (*models.Invitation, error)
 	AcceptInvitation(token string, userID string) error
-	ResendInvitation(id string) error
-	DeleteInvitation(id string) error
+	ResendInvitation(id, companyID string) error
+	DeleteInvitation(id, companyID string) error
 	GetInvitationByToken(token string) (*models.Invitation, error)
 	RegisterUser(token, name, password string) (*models.User, error)
 }
@@ -30,37 +32,89 @@ type invitationService struct {
 	repo            repository.InvitationRepository
 	mailService     MailService
 	userRepo        repository.UserRepository
+	unitRepo        repository.UnitRepository
 	templateService TemplateService
 }
 
-func NewInvitationService(repo repository.InvitationRepository, mailService MailService, userRepo repository.UserRepository, templateService TemplateService) InvitationService {
+func NewInvitationService(
+	repo repository.InvitationRepository,
+	mailService MailService,
+	userRepo repository.UserRepository,
+	unitRepo repository.UnitRepository,
+	templateService TemplateService,
+) InvitationService {
 	return &invitationService{
 		repo:            repo,
 		mailService:     mailService,
 		userRepo:        userRepo,
+		unitRepo:        unitRepo,
 		templateService: templateService,
 	}
 }
 
-func (s *invitationService) CreateInvitation(email string, targetUnits []byte, targetRoles []byte, templateID string) (*models.Invitation, error) {
-	// Check if user already exists
+func validateInvitationTargetUnits(unitRepo repository.UnitRepository, companyID string, raw json.RawMessage) error {
+	if len(raw) == 0 {
+		return nil
+	}
+	var targetUnits []struct {
+		UnitID      string   `json:"unitId"`
+		Permissions []string `json:"permissions"`
+	}
+	if err := json.Unmarshal(raw, &targetUnits); err != nil {
+		return fmt.Errorf("invalid targetUnits: %w", err)
+	}
+	for _, u := range targetUnits {
+		uid := strings.TrimSpace(u.UnitID)
+		if uid == "" {
+			return fmt.Errorf("invalid target unit: empty unitId")
+		}
+		un, err := unitRepo.FindByIDLight(uid)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return fmt.Errorf("unit not found: %s", uid)
+			}
+			return err
+		}
+		if un.CompanyID != companyID {
+			return fmt.Errorf("unit %s does not belong to this organization", uid)
+		}
+	}
+	return nil
+}
+
+func (s *invitationService) CreateInvitation(companyID, email string, targetUnits []byte, targetRoles []byte, templateID string) (*models.Invitation, error) {
+	if companyID == "" {
+		return nil, errors.New("companyId is required")
+	}
+	email = strings.TrimSpace(email)
+	if email == "" {
+		return nil, errors.New("email is required")
+	}
+
 	_, err := s.userRepo.FindByEmail(context.Background(), email)
 	if err == nil {
 		return nil, errors.New("user with this email already exists")
 	}
 
-	// Check if active invitation exists
-	existingInv, err := s.repo.FindByEmail(email)
-	if err == nil && existingInv.Status == "active" && existingInv.ExpiresAt.After(time.Now()) {
+	_, err = s.repo.FindActiveByCompanyAndEmail(companyID, email)
+	if err == nil {
 		return nil, errors.New("active invitation already exists for this email")
+	}
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
+	if err := validateInvitationTargetUnits(s.unitRepo, companyID, targetUnits); err != nil {
+		return nil, err
 	}
 
 	token := uuid.New().String()
 	invitation := &models.Invitation{
+		CompanyID:   companyID,
 		Email:       email,
 		Token:       token,
 		Status:      "active",
-		ExpiresAt:   time.Now().Add(24 * time.Hour), // 24 hours expiration
+		ExpiresAt:   time.Now().Add(24 * time.Hour),
 		TargetUnits: targetUnits,
 		TargetRoles: targetRoles,
 	}
@@ -69,7 +123,6 @@ func (s *invitationService) CreateInvitation(email string, targetUnits []byte, t
 		return nil, err
 	}
 
-	// Send email
 	baseURL := os.Getenv("APP_BASE_URL")
 	if baseURL == "" {
 		baseURL = "http://localhost:3000"
@@ -79,16 +132,15 @@ func (s *invitationService) CreateInvitation(email string, targetUnits []byte, t
 	var subject, emailBody string
 
 	if templateID != "" {
-		template, err := s.templateService.GetTemplateByID(templateID)
+		template, err := s.templateService.GetTemplateByID(templateID, companyID)
 		if err != nil {
-			// If template ID is provided but not found, we should probably return an error
-			// to let the user know something went wrong.
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, fmt.Errorf("template not found: %w", err)
+			}
 			return nil, fmt.Errorf("template not found: %w", err)
 		}
 		subject = template.Subject
-		// Simple replacement for now. In a real app, use a template engine.
 		emailBody = template.Content
-		// Replace placeholders
 		emailBody = strings.ReplaceAll(emailBody, "{{link}}", inviteLink)
 		emailBody = strings.ReplaceAll(emailBody, "{{email}}", email)
 	} else {
@@ -96,14 +148,16 @@ func (s *invitationService) CreateInvitation(email string, targetUnits []byte, t
 		emailBody = fmt.Sprintf("You have been invited to join QuokkaQ. Click here to register: <a href=\"%s\">%s</a>", inviteLink, inviteLink)
 	}
 
-	// We ignore email error for now to not block the flow, or we could log it
 	_ = s.mailService.SendMail(email, subject, emailBody)
 
 	return invitation, nil
 }
 
-func (s *invitationService) GetAllInvitations() ([]models.Invitation, error) {
-	return s.repo.FindAll()
+func (s *invitationService) GetAllInvitations(companyID string) ([]models.Invitation, error) {
+	if companyID == "" {
+		return nil, errors.New("companyId is required")
+	}
+	return s.repo.FindAllByCompany(companyID)
 }
 
 func (s *invitationService) GetInvitationByID(id string) (*models.Invitation, error) {
@@ -122,7 +176,7 @@ func (s *invitationService) AcceptInvitation(token string, userID string) error 
 
 	if invitation.ExpiresAt.Before(time.Now()) {
 		invitation.Status = "inactive"
-		_ = s.repo.Update(invitation) // Best effort update, error not critical
+		_ = s.repo.Update(invitation)
 		return errors.New("invitation expired")
 	}
 
@@ -131,12 +185,18 @@ func (s *invitationService) AcceptInvitation(token string, userID string) error 
 	return s.repo.Update(invitation)
 }
 
-func (s *invitationService) DeleteInvitation(id string) error {
-	return s.repo.Delete(id)
+func (s *invitationService) DeleteInvitation(id, companyID string) error {
+	if companyID == "" {
+		return errors.New("companyId is required")
+	}
+	return s.repo.Delete(id, companyID)
 }
 
-func (s *invitationService) ResendInvitation(id string) error {
-	invitation, err := s.repo.FindByID(id)
+func (s *invitationService) ResendInvitation(id, companyID string) error {
+	if companyID == "" {
+		return errors.New("companyId is required")
+	}
+	invitation, err := s.repo.FindByIDAndCompany(id, companyID)
 	if err != nil {
 		return err
 	}
@@ -149,7 +209,6 @@ func (s *invitationService) ResendInvitation(id string) error {
 		return errors.New("invitation expired")
 	}
 
-	// Send email
 	baseURL := os.Getenv("APP_BASE_URL")
 	if baseURL == "" {
 		baseURL = "http://localhost:3000"
@@ -157,7 +216,6 @@ func (s *invitationService) ResendInvitation(id string) error {
 	inviteLink := fmt.Sprintf("%s/register/%s", baseURL, invitation.Token)
 	emailBody := fmt.Sprintf("You have been invited to join QuokkaQ. Click here to register: <a href=\"%s\">%s</a>", inviteLink, inviteLink)
 
-	// We ignore email error for now to not block the flow, or we could log it
 	_ = s.mailService.SendMail(invitation.Email, "Invitation to QuokkaQ", emailBody)
 
 	return nil
@@ -194,7 +252,10 @@ func (s *invitationService) RegisterUser(token, name, password string) (*models.
 		return nil, errors.New("invitation expired")
 	}
 
-	// Hash password
+	if strings.TrimSpace(invitation.CompanyID) == "" {
+		return nil, errors.New("invalid invitation")
+	}
+
 	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
@@ -214,20 +275,25 @@ func (s *invitationService) RegisterUser(token, name, password string) (*models.
 		return nil, err
 	}
 
-	// Assign Units
 	if len(invitation.TargetUnits) > 0 {
+		if err := validateInvitationTargetUnits(s.unitRepo, invitation.CompanyID, invitation.TargetUnits); err != nil {
+			return nil, err
+		}
 		var targetUnits []struct {
 			UnitID      string   `json:"unitId"`
 			Permissions []string `json:"permissions"`
 		}
-		if err := json.Unmarshal(invitation.TargetUnits, &targetUnits); err == nil {
-			for _, unit := range targetUnits {
-				_ = s.userRepo.AssignUnit(user.ID, unit.UnitID, unit.Permissions)
+		if err := json.Unmarshal(invitation.TargetUnits, &targetUnits); err != nil {
+			return nil, fmt.Errorf("invalid targetUnits: %w", err)
+		}
+		for _, unit := range targetUnits {
+			uid := strings.TrimSpace(unit.UnitID)
+			if err := s.userRepo.AssignUnit(user.ID, uid, unit.Permissions); err != nil {
+				return nil, fmt.Errorf("assign unit: %w", err)
 			}
 		}
 	}
 
-	// Assign Roles
 	if len(invitation.TargetRoles) > 0 {
 		var targetRoles []string
 		if err := json.Unmarshal(invitation.TargetRoles, &targetRoles); err == nil {
@@ -240,7 +306,23 @@ func (s *invitationService) RegisterUser(token, name, password string) (*models.
 		}
 	}
 
-	// Mark invitation accepted
+	// Global roles (AssignRole) do not grant tenant-scoped company access; ensure at least one unit
+	// in this company so the user is not orphaned (e.g. empty targetUnits/targetRoles).
+	hasCompany, err := s.userRepo.HasCompanyAccess(user.ID, invitation.CompanyID)
+	if err != nil {
+		return nil, err
+	}
+	if !hasCompany {
+		rootUnit, err := s.unitRepo.FindFirstByCompanyID(invitation.CompanyID)
+		if err != nil {
+			return nil, fmt.Errorf("assign tenant membership: %w", err)
+		}
+		defaultPerms := rbac.LegacyRolePermissions("staff")
+		if err := s.userRepo.AssignUnit(user.ID, rootUnit.ID, defaultPerms); err != nil {
+			return nil, fmt.Errorf("assign tenant membership: %w", err)
+		}
+	}
+
 	invitation.Status = "accepted"
 	userID := user.ID
 	invitation.UserID = &userID

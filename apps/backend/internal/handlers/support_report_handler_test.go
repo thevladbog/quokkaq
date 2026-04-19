@@ -36,7 +36,7 @@ func (s stubSupportReportRepo) FindByID(string) (*models.SupportReport, error) {
 	return s.findRes, s.findErr
 }
 
-func (s stubSupportReportRepo) ListForUser(string, bool) ([]models.SupportReport, error) {
+func (s stubSupportReportRepo) ListForUser(string, repository.SupportReportListScope) ([]models.SupportReport, error) {
 	if s.listErr != nil {
 		return nil, s.listErr
 	}
@@ -57,8 +57,30 @@ func (stubSupportUserRepo) FindByID(_ context.Context, id string) (*models.User,
 	return &models.User{ID: id, Name: "Report Author"}, nil
 }
 
+func (stubSupportUserRepo) GetCompanyIDByUserID(string) (string, error) {
+	return "company-test", nil
+}
+
+func (stubSupportUserRepo) IsCompanyOwner(string, string) (bool, error) {
+	return false, nil
+}
+
 func (stubSupportUserRepo) IsAdmin(string) (bool, error) {
 	return false, nil
+}
+
+func (stubSupportUserRepo) IsPlatformAdmin(string) (bool, error) { return false, nil }
+
+func (stubSupportUserRepo) ListCompanyIDsForSupportReportTenantWideAccess(string) ([]string, error) {
+	return nil, nil
+}
+
+func (stubSupportUserRepo) HasTenantSystemAdminRoleInCompany(string, string) (bool, error) {
+	return false, nil
+}
+
+func (stubSupportUserRepo) ListUserIDsWithTenantSystemAdminInCompany(string) ([]string, error) {
+	return nil, nil
 }
 
 func (stubSupportUserRepo) HasSupportReportAccess(string) (bool, error) {
@@ -70,18 +92,18 @@ func (stubSupportUserRepo) ListUserIDsByRoleNames([]string) ([]string, error) {
 }
 
 func newTestSupportReportHandler(repo repository.SupportReportRepository) *SupportReportHandler {
-	svc := services.NewSupportReportService(repo, nil, nil, nil, services.SupportReportPlatformNone, stubSupportUserRepo{}, nil)
+	svc := services.NewSupportReportService(repo, nil, nil, nil, nil, services.SupportReportPlatformNone, stubSupportUserRepo{}, nil)
 	return NewSupportReportHandler(svc)
 }
 
 func newTestSupportReportHandlerWithPlane(repo repository.SupportReportRepository, plane services.SupportReportTicketClient) *SupportReportHandler {
-	svc := services.NewSupportReportService(repo, nil, plane, nil, models.TicketBackendPlane, stubSupportUserRepo{}, nil)
+	svc := services.NewSupportReportService(repo, nil, plane, nil, nil, models.TicketBackendPlane, stubSupportUserRepo{}, nil)
 	return NewSupportReportHandler(svc)
 }
 
 type stubSupportUserRepoAdmin struct{ stubSupportUserRepo }
 
-func (stubSupportUserRepoAdmin) IsAdmin(string) (bool, error) {
+func (stubSupportUserRepoAdmin) IsPlatformAdmin(string) (bool, error) {
 	return true, nil
 }
 
@@ -113,13 +135,18 @@ func (m *memSupportReportRepo) FindByID(id string) (*models.SupportReport, error
 	return &cp, nil
 }
 
-func (m *memSupportReportRepo) ListForUser(userID string, all bool) ([]models.SupportReport, error) {
+func (m *memSupportReportRepo) ListForUser(userID string, scope repository.SupportReportListScope) ([]models.SupportReport, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	var out []models.SupportReport
 	for _, row := range m.m {
-		if all || row.CreatedByUserID == userID {
-			cp := *row
+		cp := *row
+		if scope.PlatformWide || row.CreatedByUserID == userID {
+			out = append(out, cp)
+			continue
+		}
+		if len(scope.TenantCompanyIDs) > 0 {
+			// Mem store has no company on rows; include all rows when tenant-wide scope is active (tenant admin list).
 			out = append(out, cp)
 		}
 	}
@@ -476,7 +503,7 @@ func TestSupportReportHandler_MarkIrrelevant_Author_OK(t *testing.T) {
 		CreatedAt:       now,
 		UpdatedAt:       now,
 	})
-	svc := services.NewSupportReportService(mem, nil, stub, nil, models.TicketBackendPlane, stubSupportUserRepo{}, nil)
+	svc := services.NewSupportReportService(mem, nil, stub, nil, nil, models.TicketBackendPlane, stubSupportUserRepo{}, nil)
 	h := NewSupportReportHandler(svc)
 	r := chi.NewRouter()
 	r.Post("/support/reports/{id}/mark-irrelevant", h.MarkIrrelevant)
@@ -516,7 +543,7 @@ func TestSupportReportHandler_MarkIrrelevant_Idempotent(t *testing.T) {
 		CreatedAt:                now,
 		UpdatedAt:                now,
 	})
-	svc := services.NewSupportReportService(mem, nil, stub, nil, models.TicketBackendPlane, stubSupportUserRepo{}, nil)
+	svc := services.NewSupportReportService(mem, nil, stub, nil, nil, models.TicketBackendPlane, stubSupportUserRepo{}, nil)
 	h := NewSupportReportHandler(svc)
 	r := chi.NewRouter()
 	r.Post("/support/reports/{id}/mark-irrelevant", h.MarkIrrelevant)
@@ -546,7 +573,7 @@ func TestSupportReportHandler_MarkIrrelevant_Forbidden(t *testing.T) {
 		CreatedAt:       now,
 		UpdatedAt:       now,
 	})
-	svc := services.NewSupportReportService(mem, nil, stub, nil, models.TicketBackendPlane, stubSupportUserRepo{}, nil)
+	svc := services.NewSupportReportService(mem, nil, stub, nil, nil, models.TicketBackendPlane, stubSupportUserRepo{}, nil)
 	h := NewSupportReportHandler(svc)
 	r := chi.NewRouter()
 	r.Post("/support/reports/{id}/mark-irrelevant", h.MarkIrrelevant)
@@ -573,7 +600,7 @@ func TestSupportReportHandler_MarkIrrelevant_Admin_OK(t *testing.T) {
 		CreatedAt:       now,
 		UpdatedAt:       now,
 	})
-	svc := services.NewSupportReportService(mem, nil, stub, nil, models.TicketBackendPlane, stubSupportUserRepoAdmin{}, nil)
+	svc := services.NewSupportReportService(mem, nil, stub, nil, nil, models.TicketBackendPlane, stubSupportUserRepoAdmin{}, nil)
 	h := NewSupportReportHandler(svc)
 	r := chi.NewRouter()
 	r.Post("/support/reports/{id}/mark-irrelevant", h.MarkIrrelevant)

@@ -39,7 +39,7 @@ var (
 
 type DesktopTerminalService interface {
 	Create(name *string, unitID, defaultLocale string, kioskFullscreen bool, contextUnitID, counterID *string, kind string) (*models.DesktopTerminal, string, error)
-	List() ([]models.DesktopTerminal, error)
+	ListForCompany(companyID string) ([]models.DesktopTerminal, error)
 	GetByID(id string) (*models.DesktopTerminal, error)
 	Update(id string, name *string, unitID, defaultLocale string, kioskFullscreen bool, contextUnitID, counterID *string, kind *string) error
 	Revoke(id string) error
@@ -242,8 +242,11 @@ func (s *desktopTerminalService) Create(name *string, unitID, defaultLocale stri
 	return row, plain, nil
 }
 
-func (s *desktopTerminalService) List() ([]models.DesktopTerminal, error) {
-	return s.repo.FindAll()
+func (s *desktopTerminalService) ListForCompany(companyID string) ([]models.DesktopTerminal, error) {
+	if companyID == "" {
+		return nil, errors.New("companyId is required")
+	}
+	return s.repo.FindAllByCompanyID(companyID)
 }
 
 func (s *desktopTerminalService) GetByID(id string) (*models.DesktopTerminal, error) {

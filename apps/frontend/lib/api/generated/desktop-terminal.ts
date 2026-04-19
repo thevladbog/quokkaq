@@ -392,8 +392,8 @@ export interface HandlersTenantRoleUnitJSON {
 
 export interface HandlersCreateTenantRoleJSON {
   description?: string;
-  name?: string;
-  slug?: string;
+  name: string;
+  slug: string;
   units?: HandlersTenantRoleUnitJSON[];
 }
 
@@ -426,6 +426,11 @@ export interface HandlersCreateTicketRequestKiosk {
 }
 
 export type HandlersCreateTicketRequest = HandlersCreateTicketRequestAnonymous | HandlersCreateTicketRequestStaff | HandlersCreateTicketRequestKiosk;
+
+export interface HandlersCustomTermsLeadRequestBody {
+  /** @minLength 1 */
+  comment: string;
+}
 
 export interface HandlersDaDataFindPartyByInnRequest {
   inn: string;
@@ -639,6 +644,11 @@ export interface HandlersPickRequest {
   counterId?: string;
 }
 
+export interface HandlersPlanChangeRequestBody {
+  /** @minLength 1 */
+  requestedPlanCode: string;
+}
+
 export interface HandlersPlatformCreateSubscriptionBody {
   companyId: string;
   currentPeriodEnd?: string;
@@ -675,6 +685,15 @@ export interface HandlersPlatformCreateSubscriptionPlanBody {
   price?: number;
 }
 
+export interface HandlersPlatformIntegrationsResponse {
+  leadsTrackerQueue: string;
+  supportTrackerQueue: string;
+  trackerTypeError: string;
+  trackerTypeRegistration: string;
+  trackerTypeRequest: string;
+  trackerTypeSupport: string;
+}
+
 export type HandlersPlatformUpdateSubscriptionPlanBodyFeatures = {[key: string]: boolean};
 
 export type HandlersPlatformUpdateSubscriptionPlanBodyLimits = {[key: string]: number};
@@ -697,6 +716,17 @@ export interface HandlersPlatformUpdateSubscriptionPlanBody {
   name?: string;
   nameEn?: string;
   price?: number;
+}
+
+export interface HandlersPublicLeadRequestBody {
+  company?: string;
+  email: string;
+  locale?: string;
+  message?: string;
+  name: string;
+  planCode?: string;
+  referrer?: string;
+  source?: string;
 }
 
 export interface HandlersRefreshResponse {
@@ -1385,6 +1415,7 @@ export type ModelsInvitationTargetRoles = { [key: string]: unknown };
 export type ModelsInvitationTargetUnits = { [key: string]: unknown };
 
 export interface ModelsInvitation {
+  companyId?: string;
   createdAt?: string;
   email?: string;
   expiresAt?: string;
@@ -1399,6 +1430,7 @@ export interface ModelsInvitation {
 }
 
 export interface ModelsMessageTemplate {
+  companyId?: string;
   content?: string;
   createdAt?: string;
   id?: string;
@@ -1703,6 +1735,15 @@ export interface ServicesCreateCalendarIntegrationRequest {
   timezone?: string;
   unitId: string;
   username: string;
+}
+
+export interface ServicesDeploymentSaaSSettingsPatch {
+  leadsTrackerQueue?: string;
+  supportTrackerQueue?: string;
+  trackerTypeError?: string;
+  trackerTypeRegistration?: string;
+  trackerTypeRequest?: string;
+  trackerTypeSupport?: string;
 }
 
 export interface ServicesEmployeeRadarResponse {
@@ -2110,6 +2151,21 @@ export type listDesktopTerminalsResponse200 = {
   status: 200
 }
 
+export type listDesktopTerminalsResponse400 = {
+  data: string
+  status: 400
+}
+
+export type listDesktopTerminalsResponse401 = {
+  data: string
+  status: 401
+}
+
+export type listDesktopTerminalsResponse403 = {
+  data: string
+  status: 403
+}
+
 export type listDesktopTerminalsResponse500 = {
   data: string
   status: 500
@@ -2118,7 +2174,7 @@ export type listDesktopTerminalsResponse500 = {
 export type listDesktopTerminalsResponseSuccess = (listDesktopTerminalsResponse200) & {
   headers: Headers;
 };
-export type listDesktopTerminalsResponseError = (listDesktopTerminalsResponse500) & {
+export type listDesktopTerminalsResponseError = (listDesktopTerminalsResponse400 | listDesktopTerminalsResponse401 | listDesktopTerminalsResponse403 | listDesktopTerminalsResponse500) & {
   headers: Headers;
 };
 
@@ -2246,6 +2302,11 @@ export type createDesktopTerminalResponse403 = {
   status: 403
 }
 
+export type createDesktopTerminalResponse404 = {
+  data: string
+  status: 404
+}
+
 export type createDesktopTerminalResponse500 = {
   data: string
   status: 500
@@ -2254,7 +2315,7 @@ export type createDesktopTerminalResponse500 = {
 export type createDesktopTerminalResponseSuccess = (createDesktopTerminalResponse201) & {
   headers: Headers;
 };
-export type createDesktopTerminalResponseError = (createDesktopTerminalResponse400 | createDesktopTerminalResponse401 | createDesktopTerminalResponse403 | createDesktopTerminalResponse500) & {
+export type createDesktopTerminalResponseError = (createDesktopTerminalResponse400 | createDesktopTerminalResponse401 | createDesktopTerminalResponse403 | createDesktopTerminalResponse404 | createDesktopTerminalResponse500) & {
   headers: Headers;
 };
 
@@ -2337,6 +2398,11 @@ export type getDesktopTerminalByIDResponse200 = {
   status: 200
 }
 
+export type getDesktopTerminalByIDResponse400 = {
+  data: string
+  status: 400
+}
+
 export type getDesktopTerminalByIDResponse401 = {
   data: string
   status: 401
@@ -2360,7 +2426,7 @@ export type getDesktopTerminalByIDResponse500 = {
 export type getDesktopTerminalByIDResponseSuccess = (getDesktopTerminalByIDResponse200) & {
   headers: Headers;
 };
-export type getDesktopTerminalByIDResponseError = (getDesktopTerminalByIDResponse401 | getDesktopTerminalByIDResponse403 | getDesktopTerminalByIDResponse404 | getDesktopTerminalByIDResponse500) & {
+export type getDesktopTerminalByIDResponseError = (getDesktopTerminalByIDResponse400 | getDesktopTerminalByIDResponse401 | getDesktopTerminalByIDResponse403 | getDesktopTerminalByIDResponse404 | getDesktopTerminalByIDResponse500) & {
   headers: Headers;
 };
 
@@ -2585,6 +2651,11 @@ export type revokeDesktopTerminalResponse204 = {
   status: 204
 }
 
+export type revokeDesktopTerminalResponse400 = {
+  data: string
+  status: 400
+}
+
 export type revokeDesktopTerminalResponse401 = {
   data: string
   status: 401
@@ -2608,7 +2679,7 @@ export type revokeDesktopTerminalResponse500 = {
 export type revokeDesktopTerminalResponseSuccess = (revokeDesktopTerminalResponse204) & {
   headers: Headers;
 };
-export type revokeDesktopTerminalResponseError = (revokeDesktopTerminalResponse401 | revokeDesktopTerminalResponse403 | revokeDesktopTerminalResponse404 | revokeDesktopTerminalResponse500) & {
+export type revokeDesktopTerminalResponseError = (revokeDesktopTerminalResponse400 | revokeDesktopTerminalResponse401 | revokeDesktopTerminalResponse403 | revokeDesktopTerminalResponse404 | revokeDesktopTerminalResponse500) & {
   headers: Headers;
 };
 

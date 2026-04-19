@@ -92,6 +92,7 @@ func (PanicUserRepo) GetCompanyIDByUserID(string) (string, error)               
 func (PanicUserRepo) ResolveCompanyIDForRequest(string, string) (string, error) {
 	panic("unexpected")
 }
+func (PanicUserRepo) IsUserMemberOfCompanyTenant(string, string) (bool, error) { panic("unexpected") }
 func (PanicUserRepo) ListAccessibleCompanies(string, string) ([]repository.AccessibleCompanySummary, error) {
 	panic("unexpected")
 }
@@ -115,6 +116,15 @@ func (PanicUserRepo) RecomputeUserIsActive(context.Context, string) error     { 
 func (PanicUserRepo) Transaction(context.Context, func(*gorm.DB) error) error { panic("unexpected") }
 func (PanicUserRepo) RecomputeUserIsActiveTx(*gorm.DB, string) error          { panic("unexpected") }
 func (PanicUserRepo) UpdateFields(context.Context, string, map[string]interface{}) error {
+	panic("unexpected")
+}
+func (PanicUserRepo) HasTenantSystemAdminRoleInCompany(string, string) (bool, error) {
+	panic("unexpected")
+}
+func (PanicUserRepo) ListCompanyIDsForSupportReportTenantWideAccess(string) ([]string, error) {
+	panic("unexpected")
+}
+func (PanicUserRepo) ListUserIDsWithTenantSystemAdminInCompany(string) ([]string, error) {
 	panic("unexpected")
 }
 

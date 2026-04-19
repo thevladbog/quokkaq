@@ -4,7 +4,6 @@ import './globals.css';
 import TanStackQueryProvider from '../components/TanStackQueryProvider';
 import { OtelBrowserInit } from '../components/OtelBrowserInit';
 import { Toaster } from '../components/ui/sonner';
-import { AuthProvider } from '../contexts/AuthContext';
 import { ThemeProvider } from 'next-themes';
 
 const geistSans = Geist({
@@ -45,7 +44,7 @@ export default function RootLayout({
           <OtelBrowserInit />
           <TanStackQueryProvider>
             <Toaster />
-            <AuthProvider>{children}</AuthProvider>
+            {children}
           </TanStackQueryProvider>
         </ThemeProvider>
       </body>

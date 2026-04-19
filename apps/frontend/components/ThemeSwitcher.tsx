@@ -25,7 +25,7 @@ export default function ThemeSwitcher() {
 
   return (
     <Select value={current} onValueChange={setTheme}>
-      <SelectTrigger size='sm' className='w-[140px]'>
+      <SelectTrigger size='sm' className='w-full max-w-full min-w-[13rem]'>
         <SelectValue>
           <span className='flex items-center gap-2'>
             <Icon className='h-4 w-4 shrink-0' />

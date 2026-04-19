@@ -113,6 +113,20 @@ export type HomeMessages = {
     requestQuote: string;
     rowLabels: Record<string, string>;
   };
+  /** Public lead / contact form (modal). */
+  leadForm: {
+    title: string;
+    description: string;
+    name: string;
+    email: string;
+    company: string;
+    message: string;
+    submit: string;
+    submitting: string;
+    success: string;
+    error: string;
+    close: string;
+  };
   faq: {
     heading: string;
     items: Array<{ question: string; answer: string }>;
@@ -368,6 +382,20 @@ export const messages: Record<AppLocale, { home: HomeMessages }> = {
           'Custom licensing, SLAs, integrations, and security reviews—we’ll reply with next steps, usually within one business day.',
         requestQuote: 'Get a tailored quote',
         rowLabels: pricingRowLabelsEn
+      },
+      leadForm: {
+        title: 'Contact us',
+        description:
+          'Tell us about your organization and what you need. We will get back to you shortly.',
+        name: 'Name',
+        email: 'Work email',
+        company: 'Company',
+        message: 'How can we help?',
+        submit: 'Send request',
+        submitting: 'Sending…',
+        success: 'Thank you — we received your request.',
+        error: 'Something went wrong. Please try again or email us.',
+        close: 'Close'
       },
       faq: {
         heading: 'Frequently asked questions',
@@ -661,6 +689,21 @@ export const messages: Record<AppLocale, { home: HomeMessages }> = {
           'Лицензия, SLA, интеграции и требования ИБ — подготовим предложение и вернёмся с шагами, чаще всего в течение одного рабочего дня.',
         requestQuote: 'Получить предложение',
         rowLabels: pricingRowLabelsRu
+      },
+      leadForm: {
+        title: 'Связаться с нами',
+        description:
+          'Расскажите об организации и задаче — мы свяжемся с вами в ближайшее время.',
+        name: 'Имя',
+        email: 'Рабочий email',
+        company: 'Компания',
+        message: 'Чем можем помочь?',
+        submit: 'Отправить запрос',
+        submitting: 'Отправка…',
+        success: 'Спасибо — мы получили ваш запрос.',
+        error:
+          'Не удалось отправить. Попробуйте ещё раз или напишите нам на почту.',
+        close: 'Закрыть'
       },
       faq: {
         heading: 'Часто задаваемые вопросы',

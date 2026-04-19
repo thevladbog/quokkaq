@@ -3,15 +3,28 @@ import Link from 'next/link';
 
 import type { AppLocale, HomeMessages } from '@/src/messages';
 
+import { LeadRequestCta } from '@/components/landing/lead-request-cta';
 import { FriendlySmileIcon } from './friendly-smile-icon';
 import { LandingTicketsAnimation } from './landing-tickets-animation';
+
+const heroPrimaryClass =
+  'focus-ring inline-flex min-h-12 items-center justify-center rounded-xl bg-[color:var(--color-primary)] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-[color:var(--color-primary)]/25 transition hover:bg-[color:var(--color-primary-hover)] hover:shadow-xl hover:shadow-[color:var(--color-primary)]/30';
+
+const heroSecondaryClass =
+  'focus-ring inline-flex min-h-12 items-center justify-center rounded-xl border-2 border-[color:var(--color-border)] bg-white/50 px-6 py-3 text-sm font-semibold text-[color:var(--color-text)] backdrop-blur-sm transition hover:border-[color:var(--color-primary)] hover:bg-white hover:text-[color:var(--color-primary)]';
 
 type Props = {
   locale: AppLocale;
   copy: HomeMessages;
+  appBaseUrl: string | null;
 };
 
-export function LandingHero({ locale, copy }: Props) {
+export function LandingHero({ locale, copy, appBaseUrl }: Props) {
+  const normalized = appBaseUrl?.trim();
+  const normalizedAppBase = normalized ? normalized.replace(/\/$/, '') : null;
+  const signupHref = normalizedAppBase
+    ? `${normalizedAppBase}/${locale}/signup`
+    : null;
   return (
     <section className='relative z-10 mx-auto grid max-w-7xl grid-cols-1 content-center gap-8 px-4 py-8 sm:gap-10 sm:px-6 sm:py-10 lg:min-h-[calc(100dvh-5.25rem)] lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] lg:items-center lg:gap-12 lg:px-8 lg:py-6'>
       <LandingTicketsAnimation locale={locale} />
@@ -60,19 +73,39 @@ export function LandingHero({ locale, copy }: Props) {
             {copy.description}
           </p>
           <div className='flex flex-wrap items-center gap-3'>
-            <Link
-              href={`/${locale}/docs`}
-              prefetch={false}
-              className='focus-ring inline-flex min-h-12 items-center justify-center rounded-xl bg-[color:var(--color-primary)] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-[color:var(--color-primary)]/25 transition hover:bg-[color:var(--color-primary-hover)] hover:shadow-xl hover:shadow-[color:var(--color-primary)]/30'
-            >
-              {copy.docsCta}
-            </Link>
-            <a
-              href='#book-demo'
-              className='focus-ring inline-flex min-h-12 items-center justify-center rounded-xl border-2 border-[color:var(--color-border)] bg-white/50 px-6 py-3 text-sm font-semibold text-[color:var(--color-text)] backdrop-blur-sm transition hover:border-[color:var(--color-primary)] hover:bg-white hover:text-[color:var(--color-primary)]'
-            >
-              {copy.secondaryCta}
-            </a>
+            {signupHref ? (
+              <a
+                href={signupHref}
+                target='_blank'
+                rel='noopener noreferrer'
+                className={heroPrimaryClass}
+              >
+                {copy.docsCta}
+              </a>
+            ) : (
+              <Link
+                href={`/${locale}#book-demo`}
+                prefetch={false}
+                className={heroPrimaryClass}
+              >
+                {copy.docsCta}
+              </Link>
+            )}
+            {normalizedAppBase ? (
+              <LeadRequestCta
+                locale={locale}
+                source='hero_demo'
+                lead={copy.leadForm}
+                appBaseUrl={normalizedAppBase}
+                className={heroSecondaryClass}
+              >
+                {copy.secondaryCta}
+              </LeadRequestCta>
+            ) : (
+              <a href='#book-demo' className={heroSecondaryClass}>
+                {copy.secondaryCta}
+              </a>
+            )}
           </div>
         </div>
       </div>

@@ -392,8 +392,8 @@ export interface HandlersTenantRoleUnitJSON {
 
 export interface HandlersCreateTenantRoleJSON {
   description?: string;
-  name?: string;
-  slug?: string;
+  name: string;
+  slug: string;
   units?: HandlersTenantRoleUnitJSON[];
 }
 
@@ -426,6 +426,11 @@ export interface HandlersCreateTicketRequestKiosk {
 }
 
 export type HandlersCreateTicketRequest = HandlersCreateTicketRequestAnonymous | HandlersCreateTicketRequestStaff | HandlersCreateTicketRequestKiosk;
+
+export interface HandlersCustomTermsLeadRequestBody {
+  /** @minLength 1 */
+  comment: string;
+}
 
 export interface HandlersDaDataFindPartyByInnRequest {
   inn: string;
@@ -639,6 +644,11 @@ export interface HandlersPickRequest {
   counterId?: string;
 }
 
+export interface HandlersPlanChangeRequestBody {
+  /** @minLength 1 */
+  requestedPlanCode: string;
+}
+
 export interface HandlersPlatformCreateSubscriptionBody {
   companyId: string;
   currentPeriodEnd?: string;
@@ -675,6 +685,15 @@ export interface HandlersPlatformCreateSubscriptionPlanBody {
   price?: number;
 }
 
+export interface HandlersPlatformIntegrationsResponse {
+  leadsTrackerQueue: string;
+  supportTrackerQueue: string;
+  trackerTypeError: string;
+  trackerTypeRegistration: string;
+  trackerTypeRequest: string;
+  trackerTypeSupport: string;
+}
+
 export type HandlersPlatformUpdateSubscriptionPlanBodyFeatures = {[key: string]: boolean};
 
 export type HandlersPlatformUpdateSubscriptionPlanBodyLimits = {[key: string]: number};
@@ -697,6 +716,17 @@ export interface HandlersPlatformUpdateSubscriptionPlanBody {
   name?: string;
   nameEn?: string;
   price?: number;
+}
+
+export interface HandlersPublicLeadRequestBody {
+  company?: string;
+  email: string;
+  locale?: string;
+  message?: string;
+  name: string;
+  planCode?: string;
+  referrer?: string;
+  source?: string;
 }
 
 export interface HandlersRefreshResponse {
@@ -1385,6 +1415,7 @@ export type ModelsInvitationTargetRoles = { [key: string]: unknown };
 export type ModelsInvitationTargetUnits = { [key: string]: unknown };
 
 export interface ModelsInvitation {
+  companyId?: string;
   createdAt?: string;
   email?: string;
   expiresAt?: string;
@@ -1399,6 +1430,7 @@ export interface ModelsInvitation {
 }
 
 export interface ModelsMessageTemplate {
+  companyId?: string;
   content?: string;
   createdAt?: string;
   id?: string;
@@ -1703,6 +1735,15 @@ export interface ServicesCreateCalendarIntegrationRequest {
   timezone?: string;
   unitId: string;
   username: string;
+}
+
+export interface ServicesDeploymentSaaSSettingsPatch {
+  leadsTrackerQueue?: string;
+  supportTrackerQueue?: string;
+  trackerTypeError?: string;
+  trackerTypeRegistration?: string;
+  trackerTypeRequest?: string;
+  trackerTypeSupport?: string;
 }
 
 export interface ServicesEmployeeRadarResponse {
@@ -5421,7 +5462,7 @@ export const usePatchTenantRole = <TError = string,
     }
 
 /**
- * Users are included if they have a unit in the company, a user_tenant_roles row, or are the company owner. Global admin/platform_admin users are listed only when the caller is a global admin or platform admin. Includes tenantRoles (id, name, slug) per user.
+ * Users are included if they have a unit in the company, a user_tenant_roles row, or are the company owner. Global admin/platform_admin users without tenant membership in this company are not listed. Includes tenantRoles (id, name, slug) per user.
  * @summary List users in the current company with tenant roles
  */
 export type listCompanyUsersResponse200 = {

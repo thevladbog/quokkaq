@@ -129,6 +129,7 @@ func run() error {
 			&models.StatisticsDailyBucket{},
 			&models.StatisticsSurveyDaily{},
 			&models.SupportReport{},
+			&models.DeploymentSaaSSettings{},
 		)
 		if err != nil {
 			logger.Error("failed to run migrations", "err", err)
@@ -176,7 +177,11 @@ func run() error {
 	userService := services.NewUserService(userRepo)
 	mailService := services.NewMailService()
 	tenantRBACRepo := repository.NewTenantRBACRepository()
-	authService, err := services.NewAuthService(userRepo, companyRepo, mailService, subscriptionRepo, tenantRBACRepo)
+	deploymentSaaSSettingsRepo := repository.NewDeploymentSaaSSettingsRepository()
+	deploymentSaaSSettingsService := services.NewDeploymentSaaSSettingsService(deploymentSaaSSettingsRepo)
+	trackerClient := services.NewYandexTrackerClientFromEnv()
+	leadIssueService := services.NewLeadIssueService(deploymentSaaSSettingsRepo, trackerClient)
+	authService, err := services.NewAuthService(userRepo, companyRepo, mailService, subscriptionRepo, tenantRBACRepo, leadIssueService)
 	if err != nil {
 		logger.Error("auth service", "err", err)
 		return fmt.Errorf("auth service: %w", err)
@@ -228,7 +233,7 @@ func run() error {
 	}()
 	shiftService := services.NewShiftService(ticketRepo, counterRepo, serviceRepo, auditLogRepo, operatorIntervalRepo, hub, userRepo)
 	templateService := services.NewTemplateService(templateRepo)
-	invitationService := services.NewInvitationService(invitationRepo, mailService, userRepo, templateService)
+	invitationService := services.NewInvitationService(invitationRepo, mailService, userRepo, unitRepo, templateService)
 	slotService := services.NewSlotService(slotRepo, preRegRepo)
 	preRegService := services.NewPreRegistrationService(preRegRepo, slotRepo, ticketRepo, serviceRepo, calendarIntegrationService)
 	desktopTerminalService := services.NewDesktopTerminalService(desktopTerminalRepo, unitRepo, counterRepo)
@@ -236,28 +241,30 @@ func run() error {
 	surveyService := services.NewSurveyService(surveyRepo, unitRepo, userRepo, ticketRepo, desktopTerminalRepo, counterRepo, storageService)
 	quotaService := services.NewQuotaService()
 
-	userHandler := handlers.NewUserHandler(userService)
-	authHandler := handlers.NewAuthHandler(authService, userService, userRepo, tenantRBACRepo)
+	userHandler := handlers.NewUserHandler(userService, userRepo, unitRepo)
+	authHandler := handlers.NewAuthHandler(authService, userService, userRepo, tenantRBACRepo, leadIssueService)
+	integrationsHandler := handlers.NewIntegrationsHandler(deploymentSaaSSettingsService)
+	leadHandler := handlers.NewLeadHandler(leadIssueService)
 	ssoHandler := handlers.NewSSOHandler(ssoService)
 	companySSOHTTP := handlers.NewCompanySSOHTTP(ssoService, userRepo, companyRepo)
 	tenantRBACHTTP := handlers.NewTenantRBACHTTP(tenantRBACRepo, userRepo, ssoService)
-	unitHandler := handlers.NewUnitHandler(unitService, storageService, operationalService)
+	unitHandler := handlers.NewUnitHandler(unitService, storageService, operationalService, userRepo)
 	ticketHandler := handlers.NewTicketHandler(ticketService, operationalService)
 	serviceHandler := handlers.NewServiceHandler(serviceService, userRepo)
-	counterHandler := handlers.NewCounterHandler(counterService, counterRepo, operationalService)
+	counterHandler := handlers.NewCounterHandler(counterService, counterRepo, operationalService, userRepo, unitRepo)
 	bookingHandler := handlers.NewBookingHandler(bookingService, userRepo)
 	shiftHandler := handlers.NewShiftHandler(shiftService, operationalService)
 	statisticsHandler := handlers.NewStatisticsHandler(statsService, userRepo, unitRepo)
 	operationsHandler := handlers.NewOperationsHandler(operationalService, userRepo, auditLogRepo)
-	templateHandler := handlers.NewTemplateHandler(templateService)
-	invitationHandler := handlers.NewInvitationHandler(invitationService)
+	templateHandler := handlers.NewTemplateHandler(templateService, userRepo)
+	invitationHandler := handlers.NewInvitationHandler(invitationService, userRepo)
 	slotHandler := handlers.NewSlotHandler(slotService, calendarIntegrationService)
 	preRegHandler := handlers.NewPreRegistrationHandler(preRegService, ticketService)
 	calendarIntegrationHandler := handlers.NewCalendarIntegrationHandler(calendarIntegrationService, userRepo)
 	unitClientHandler := handlers.NewUnitClientHandler(unitClientService, ticketService)
 	visitorTagHandler := handlers.NewVisitorTagHandler(visitorTagDefService)
 	uploadHandler := handlers.NewUploadHandler(storageService)
-	desktopTerminalHandler := handlers.NewDesktopTerminalHandler(desktopTerminalService)
+	desktopTerminalHandler := handlers.NewDesktopTerminalHandler(desktopTerminalService, userRepo, unitRepo)
 	surveyHandler := handlers.NewSurveyHandler(surveyService, storageService)
 	guestSurveyHandler := handlers.NewGuestSurveyHandler(surveyService)
 	counterBoardHandler := handlers.NewCounterBoardHandler(surveyService)
@@ -266,9 +273,8 @@ func run() error {
 	supportReportRepo := repository.NewSupportReportRepository()
 	supportReportShareRepo := repository.NewSupportReportShareRepository()
 	planeClient := services.NewPlaneClientFromEnv()
-	trackerClient := services.NewYandexTrackerClientFromEnv()
 	supportReportCreatePlatform := services.ParseSupportReportCreatePlatform()
-	supportReportService := services.NewSupportReportService(supportReportRepo, supportReportShareRepo, planeClient, trackerClient, supportReportCreatePlatform, userRepo, companyRepo)
+	supportReportService := services.NewSupportReportService(supportReportRepo, supportReportShareRepo, planeClient, trackerClient, deploymentSaaSSettingsRepo, supportReportCreatePlatform, userRepo, companyRepo)
 	supportReportHandler := handlers.NewSupportReportHandler(supportReportService)
 
 	var paymentProvider services.PaymentProvider
@@ -283,7 +289,8 @@ func run() error {
 			paymentProvider = services.NewStripeProvider(stripeKey, strings.TrimSpace(os.Getenv("STRIPE_WEBHOOK_SECRET")))
 		}
 	}
-	subscriptionHandler := handlers.NewSubscriptionHandler(subscriptionRepo, userRepo, paymentProvider)
+	subscriptionSvc := services.NewSubscriptionService(subscriptionRepo, userRepo, companyRepo, leadIssueService)
+	subscriptionHandler := handlers.NewSubscriptionHandler(subscriptionRepo, userRepo, companyRepo, paymentProvider, subscriptionSvc)
 	yShop := strings.TrimSpace(os.Getenv("YOOKASSA_SHOP_ID"))
 	ySecret := strings.TrimSpace(os.Getenv("YOOKASSA_SECRET_KEY"))
 	yWebhook := strings.TrimSpace(os.Getenv("YOOKASSA_WEBHOOK_SECRET"))
@@ -333,6 +340,8 @@ func run() error {
 		allowedOrigins = []string{
 			"http://localhost:3000",
 			"http://127.0.0.1:3000",
+			"http://localhost:3010",
+			"http://127.0.0.1:3010",
 			"http://localhost:3001",
 			"http://127.0.0.1:3001",
 			"https://quokkaq.v-b.tech",
@@ -364,6 +373,7 @@ func run() error {
 	r.Route("/public", func(r chi.Router) {
 		r.Use(authmiddleware.SSOPublicRateLimit)
 		r.Get("/tenants/{slug}", ssoHandler.PublicTenant)
+		r.Post("/leads/request", leadHandler.PostPublicLeadRequest)
 	})
 
 	r.Get("/ws", func(w http.ResponseWriter, r *http.Request) {
@@ -449,8 +459,11 @@ func run() error {
 	})
 
 	r.Route("/units", func(r chi.Router) {
-		r.Get("/", unitHandler.GetAllUnits)
-		r.Get("/{id}", unitHandler.GetUnitByID)
+		r.Group(func(r chi.Router) {
+			r.Use(authmiddleware.JWTAuth)
+			r.Get("/", unitHandler.GetAllUnits)
+			r.Get("/{id}", unitHandler.GetUnitByID)
+		})
 		r.Post("/{unitId}/tickets", ticketHandler.CreateTicket)
 		r.Get("/{unitId}/tickets", ticketHandler.GetTicketsByUnit)
 		r.Get("/{unitId}/services", serviceHandler.GetServicesByUnit)
@@ -582,7 +595,10 @@ func run() error {
 	})
 
 	r.Route("/counters", func(r chi.Router) {
-		r.Get("/{id}", counterHandler.GetCounterByID)
+		r.Group(func(r chi.Router) {
+			r.Use(authmiddleware.JWTAuth)
+			r.Get("/{id}", counterHandler.GetCounterByID)
+		})
 		r.Group(func(r chi.Router) {
 			r.Use(authmiddleware.JWTAuth)
 			r.Use(authmiddleware.RequireCounterUnit(userRepo, counterRepo))
@@ -717,8 +733,11 @@ func run() error {
 	r.Route("/subscriptions", func(r chi.Router) {
 		r.Group(func(r chi.Router) {
 			r.Use(authmiddleware.JWTAuth)
+			r.Get("/me/plans", subscriptionHandler.GetMySubscriptionPlans)
 			r.Get("/me", subscriptionHandler.GetMySubscription)
 			r.Post("/checkout", subscriptionHandler.CreateCheckout)
+			r.Post("/plan-change-request", subscriptionHandler.PostPlanChangeRequest)
+			r.Post("/custom-terms-lead-request", subscriptionHandler.PostCustomTermsLeadRequest)
 			r.Post("/{id}/cancel", subscriptionHandler.CancelSubscription)
 		})
 		r.Get("/plans", subscriptionHandler.GetPlans)
@@ -738,6 +757,8 @@ func run() error {
 		r.Use(authmiddleware.JWTAuth)
 		r.Use(authmiddleware.RequirePlatformAdmin(userRepo))
 		r.Get("/features", platformHandler.GetFeatures)
+		r.Get("/integrations", integrationsHandler.GetPlatformIntegrations)
+		r.Patch("/integrations", integrationsHandler.PatchPlatformIntegrations)
 		r.Get("/saas-operator-company", platformHandler.GetSaaSOperatorCompany)
 		r.Get("/companies", platformHandler.ListCompanies)
 		r.Get("/companies/{id}", platformHandler.GetCompany)

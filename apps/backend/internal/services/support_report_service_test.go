@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"quokkaq-go-backend/internal/models"
+	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/testsupport"
 
 	"gorm.io/gorm"
@@ -21,7 +22,7 @@ func (testSupportReportRepoList) FindByID(string) (*models.SupportReport, error)
 	return nil, gorm.ErrRecordNotFound
 }
 
-func (r testSupportReportRepoList) ListForUser(string, bool) ([]models.SupportReport, error) {
+func (r testSupportReportRepoList) ListForUser(string, repository.SupportReportListScope) ([]models.SupportReport, error) {
 	return r.list, nil
 }
 
@@ -42,7 +43,7 @@ func (r testSupportReportRepoFind) FindByID(id string) (*models.SupportReport, e
 	return nil, gorm.ErrRecordNotFound
 }
 
-func (testSupportReportRepoFind) ListForUser(string, bool) ([]models.SupportReport, error) {
+func (testSupportReportRepoFind) ListForUser(string, repository.SupportReportListScope) ([]models.SupportReport, error) {
 	return nil, errors.New("unexpected")
 }
 
@@ -52,14 +53,18 @@ func (testSupportReportRepoFind) DeleteByID(string) error { return nil }
 
 type listUserStub struct{ testsupport.PanicUserRepo }
 
-func (listUserStub) IsAdmin(string) (bool, error) { return true, nil }
+func (listUserStub) IsPlatformAdmin(string) (bool, error) { return false, nil }
+
+func (listUserStub) ListCompanyIDsForSupportReportTenantWideAccess(string) ([]string, error) {
+	return nil, nil
+}
 
 func TestSupportReportService_List_FiltersByConfiguredPlatform(t *testing.T) {
 	repo := testSupportReportRepoList{list: []models.SupportReport{
 		{ID: "1", CreatedByUserID: "u", TicketBackend: models.TicketBackendPlane, Title: "plane"},
 		{ID: "2", CreatedByUserID: "u", TicketBackend: models.TicketBackendYandexTracker, Title: "yt"},
 	}}
-	svc := NewSupportReportService(repo, nil, nil, nil, models.TicketBackendYandexTracker, listUserStub{}, nil)
+	svc := NewSupportReportService(repo, nil, nil, nil, nil, models.TicketBackendYandexTracker, listUserStub{}, nil)
 	out, err := svc.List(context.Background(), "u")
 	if err != nil {
 		t.Fatal(err)
@@ -74,7 +79,7 @@ func TestSupportReportService_GetByID_WrongPlatform_NotFound(t *testing.T) {
 		ID: "x", CreatedByUserID: "u", TicketBackend: models.TicketBackendPlane, Title: "p",
 	}
 	repo := testSupportReportRepoFind{row: row}
-	svc := NewSupportReportService(repo, nil, nil, nil, models.TicketBackendYandexTracker, listUserStub{}, nil)
+	svc := NewSupportReportService(repo, nil, nil, nil, nil, models.TicketBackendYandexTracker, listUserStub{}, nil)
 	_, err := svc.GetByID(context.Background(), "u", "x")
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		t.Fatalf("want ErrRecordNotFound, got %v", err)

@@ -81,14 +81,6 @@ func (h *TenantRBACHTTP) resolveCompany(w http.ResponseWriter, r *http.Request) 
 	return cid, true
 }
 
-func (h *TenantRBACHTTP) viewerIsGlobalAdminOrPlatformAdmin(userID string) (bool, error) {
-	ok, err := h.userRepo.IsAdmin(userID)
-	if err != nil || ok {
-		return ok, err
-	}
-	return h.userRepo.IsPlatformAdmin(userID)
-}
-
 // ListGroupMappings godoc
 // @ID           ListGroupMappings
 // @Summary      List IdP group to role mappings
@@ -275,8 +267,8 @@ type TenantRoleUnitJSON struct {
 
 // CreateTenantRoleJSON is the body for POST/PATCH tenant role.
 type CreateTenantRoleJSON struct {
-	Name        string               `json:"name"`
-	Slug        string               `json:"slug"`
+	Name        string               `json:"name" binding:"required"`
+	Slug        string               `json:"slug" binding:"required"`
 	Description string               `json:"description"`
 	Units       []TenantRoleUnitJSON `json:"units"`
 }
@@ -706,7 +698,7 @@ type PatchUserTenantRolesResponse struct {
 // ListCompanyUsers godoc
 // @ID           ListCompanyUsers
 // @Summary      List users in the current company with tenant roles
-// @Description  Users are included if they have a unit in the company, a user_tenant_roles row, or are the company owner. Global admin/platform_admin users are listed only when the caller is a global admin or platform admin. Includes tenantRoles (id, name, slug) per user.
+// @Description  Users are included if they have a unit in the company, a user_tenant_roles row, or are the company owner. Global admin/platform_admin users without tenant membership in this company are not listed. Includes tenantRoles (id, name, slug) per user.
 // @Tags         companies
 // @Produce      json
 // @Param        X-Company-Id header string false "Tenant company UUID when the user belongs to multiple organizations"
@@ -738,14 +730,10 @@ func (h *TenantRBACHTTP) ListCompanyUsers(w http.ResponseWriter, r *http.Request
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-	includeGlobalRoleUsers, err := h.viewerIsGlobalAdminOrPlatformAdmin(userID)
-	if err != nil {
-		logger.ErrorfCtx(r.Context(), "ListCompanyUsers viewerIsGlobalAdminOrPlatformAdmin(%q): %v", userID, err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
 	search := strings.TrimSpace(r.URL.Query().Get("search"))
-	users, err := h.userRepo.ListUsersForCompany(cid, search, includeGlobalRoleUsers)
+	// Never include global admin/platform_admin via the extra UNION branch: those users
+	// often lack tenant membership, which breaks GET/PATCH /users/{id} in company context.
+	users, err := h.userRepo.ListUsersForCompany(cid, search, false)
 	if err != nil {
 		logger.ErrorfCtx(r.Context(), "ListUsersForCompany: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)

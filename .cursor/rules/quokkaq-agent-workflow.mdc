@@ -8,7 +8,7 @@ alwaysApply: true
 ## Before finishing a task that changes code
 
 1. **Run linters** and fix all reported issues. Do not leave the workspace in a failing lint state.
-2. **Restart local dev stands yourself** after changes that affect runtime (backend and/or frontend): stop whatever is listening on `localhost:3000` and `localhost:3001`, then start `pnpm nx run backend:serve` and `pnpm nx run frontend:dev` again in the background from the repo root. Do this **without asking** the user to restart—treat it as part of handing off the task. **Skip entirely** if the user has explicitly asked not to touch running processes in this session (do not send signals to those PIDs). **Backend:** `pnpm nx run backend:serve` runs **Air** ([`apps/backend/.air.toml`](../../apps/backend/.air.toml)); after edits to `.go` files you do **not** need a manual API restart unless the user is not using Air or you changed `.env`, migrations, `go.mod`, or other inputs that do not trigger an Air rebuild—then restart the API yourself.
+2. **Restart local dev servers yourself** after changes that affect runtime (backend and/or frontend): only stop processes that are **clearly this repo’s dev servers**—match command lines or script signatures (e.g. `pnpm nx run backend:serve`, `pnpm nx run frontend:dev`, the `go run ./cmd/api` path launched via [`apps/backend/scripts/run-backend-dev.js`](../../apps/backend/scripts/run-backend-dev.js), or listeners on `localhost:3000` / `localhost:3001` whose `ps` args show this workspace and those patterns). Use **SIGTERM** first; before **SIGKILL**, re-resolve the listening PID and confirm it still matches a dev-server signature (do not signal unrelated local Go apps or other services). Then start `pnpm nx run backend:serve` and `pnpm nx run frontend:dev` in the background from the repo root. Do this **without asking** the user to restart—treat it as part of handing off the task. **Opt-out — do not touch running processes:** if the user says they do not want processes touched (e.g. “do not touch running processes”), **skip shutdown and restarts entirely** for that session—do not send signals to those PIDs. **Backend:** `pnpm nx run backend:serve` runs `go run ./cmd/api` via `run-backend-dev.js` (no hot reload). **After edits to `.go` files, restart the API yourself** so the new code runs; also restart when you changed `.env`, migrations, `go.mod`, or anything the running binary does not pick up live.
 
 ## Lint & format commands (repository root: `pnpm nx …`)
 
@@ -31,32 +31,40 @@ alwaysApply: true
 
 ## Restart API + Next.js (default local ports)
 
-After frontend changes, or backend changes that **Air does not reload** (`.env`, migrations, dependency updates, or when the API process is not Air), **run the restart yourself**—even if you are unsure whether the user still has dev servers open. For ordinary `.go` edits with `pnpm nx run backend:serve` (Air), a manual backend restart is usually unnecessary.
+After frontend changes, or **any backend code / config change** that requires a new process (`.go`, `.env`, migrations, `go.mod`, etc.), **run the restart yourself**—even if you are unsure whether the user still has dev servers open.
 
-Prefer a **scoped, graceful** shutdown (not an immediate `kill -9` on every listener):
+Prefer a **scoped, graceful** shutdown limited to **this monorepo’s dev servers** (not every listener on those ports):
 
 1. For each port **3000** and **3001**, resolve the listening PID (`lsof -tiTCP:$PORT -sTCP:LISTEN`).
-2. **Verify** the process looks like this repo’s dev servers (command line mentions e.g. `next dev`, `nx run frontend:dev`, `go run`, `cmd/api`, `air-verse/air`, or the workspace path). If it does not match, **do not kill it**—leave that port alone.
-3. Send **SIGTERM** to the matched PID, wait up to a few seconds, and re-check the port. If it is still listening and the process still matches, escalate to **SIGKILL** only then.
+2. **Verify** the process command line matches a known signature: `pnpm nx run backend:serve`, `pnpm nx run frontend:dev`, `next dev` under this repo, `go run` with `./cmd/api`, [`run-backend-dev.js`](../../apps/backend/scripts/run-backend-dev.js), and/or the workspace path (`quokkaq`, `apps/backend`, `apps/frontend`). If it does not match, **do not signal it**—leave that port alone (avoid unrelated local Go binaries or other services).
+3. Send **SIGTERM** to the matched PID. After a short wait, if the port is still listening, **re-resolve the PID and re-check `ps` args** so the PID still belongs to the same matched dev-server command before escalating; only then use **SIGKILL** on that verified PID.
 
 Then start again in the background from repo root: `pnpm nx run backend:serve`, then `pnpm nx run frontend:dev` (short delay between starts is fine).
 
-Example helper (adjust patterns if your `ps` output differs):
+Example helper (adjust path fragments in `matches_dev_server` if your checkout directory name differs; tune patterns if your `ps` output differs):
 
 ```bash
+matches_dev_server() {
+  args="$1"
+  case "$args" in
+    *nx*run*backend:serve*|*nx*run*frontend:dev*|*next*dev*|*go*run*./cmd/api*|*go*run*cmd/api*|*run-backend-dev.js*|*quokkaq*|*apps/backend*|*apps/frontend*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 graceful_port() {
   port="$1"
   pid="$(lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null | head -1)"
   [ -z "$pid" ] && return 0
   args="$(ps -p "$pid" -o args= 2>/dev/null || true)"
-  case "$args" in
-    *next*dev*|*nx*run*frontend:dev*|*go*run*|*cmd/api*|*air-verse*air*)
-      ;;
-    *)
-      echo "Port $port: skip PID $pid (not recognized as repo dev server)"
-      return 0
-      ;;
-  esac
+  if ! matches_dev_server "$args"; then
+    echo "Port $port: skip PID $pid (not this repo's dev server)"
+    return 0
+  fi
   kill -TERM "$pid" 2>/dev/null || true
   i=0
   while [ "$i" -lt 20 ]; do
@@ -64,7 +72,14 @@ graceful_port() {
     lsof -tiTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1 || return 0
     i=$((i + 1))
   done
-  lsof -tiTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1 && kill -KILL "$pid" 2>/dev/null || true
+  newpid="$(lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null | head -1)"
+  [ -z "$newpid" ] && return 0
+  newargs="$(ps -p "$newpid" -o args= 2>/dev/null || true)"
+  if [ "$newpid" = "$pid" ] && matches_dev_server "$newargs"; then
+    kill -KILL "$newpid" 2>/dev/null || true
+  else
+    echo "Port $port: skip SIGKILL (PID changed or no longer matches dev server)"
+  fi
 }
 graceful_port 3000
 graceful_port 3001
@@ -75,6 +90,6 @@ sleep 1
 
 - **Backend DB migrations** (`apps/backend/pkg/database/postgres.go`): never rewrite already-committed migration steps; add a **new** `RunMigration("v…", …)` version instead (see [`apps/backend/AGENTS.md`](../../apps/backend/AGENTS.md)).
 - Run commands yourself; do not only suggest that the user run lint or restart servers.
-- **Dev stands:** proactively restart the frontend and the backend when needed (see Air note above); do not end the turn with “please restart” unless the user opted out of restarts.
+- **Dev stands:** proactively restart the frontend and the backend when needed (restart backend after `.go` or env/migration changes); do not end the turn with “please restart” unless the user opted out of restarts.
 - Prefer `nx run-many -t lint --all` before handing off a multi-area change.
 - If you only touched one app, you may scope lint to that project to save time, but run the full matrix before merge-ready work.

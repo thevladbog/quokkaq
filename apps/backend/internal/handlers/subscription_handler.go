@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -15,6 +16,7 @@ import (
 	"quokkaq-go-backend/pkg/database"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/go-chi/chi/v5"
 	"gorm.io/gorm"
@@ -23,14 +25,24 @@ import (
 type SubscriptionHandler struct {
 	subscriptionRepo repository.SubscriptionRepository
 	userRepo         repository.UserRepository
+	companyRepo      repository.CompanyRepository
 	paymentProvider  services.PaymentProvider
+	subscriptionSvc  *services.SubscriptionService
 }
 
-func NewSubscriptionHandler(subscriptionRepo repository.SubscriptionRepository, userRepo repository.UserRepository, paymentProvider services.PaymentProvider) *SubscriptionHandler {
+func NewSubscriptionHandler(
+	subscriptionRepo repository.SubscriptionRepository,
+	userRepo repository.UserRepository,
+	companyRepo repository.CompanyRepository,
+	paymentProvider services.PaymentProvider,
+	subscriptionSvc *services.SubscriptionService,
+) *SubscriptionHandler {
 	return &SubscriptionHandler{
 		subscriptionRepo: subscriptionRepo,
 		userRepo:         userRepo,
+		companyRepo:      companyRepo,
 		paymentProvider:  paymentProvider,
+		subscriptionSvc:  subscriptionSvc,
 	}
 }
 
@@ -164,6 +176,76 @@ func (h *SubscriptionHandler) GetMySubscription(w http.ResponseWriter, r *http.R
 
 	w.Header().Set("Content-Type", "application/json")
 	RespondJSON(w, subscription)
+}
+
+// GetMySubscriptionPlans godoc
+// @Summary      Subscription plans for tenant catalog
+// @Description  Active public plans plus this company's current and pending plans even when those plans are not public (assigned by platform).
+// @Tags         subscriptions
+// @Produce      json
+// @ID           getMySubscriptionPlans
+// @Security     BearerAuth
+// @Param        X-Company-Id header string false "Tenant company UUID when the user belongs to multiple organizations"
+// @Success      200  {array}   models.SubscriptionPlan
+// @Failure      401  {string}  string "Unauthorized"
+// @Failure      403  {string}  string "Forbidden"
+// @Failure      500  {string}  string "Internal Server Error"
+// @Router       /subscriptions/me/plans [get]
+func (h *SubscriptionHandler) GetMySubscriptionPlans(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	companyID, err := h.userRepo.ResolveCompanyIDForRequest(userID, r.Header.Get("X-Company-Id"))
+	if err != nil {
+		if errors.Is(err, repository.ErrCompanyAccessDenied) {
+			http.Error(w, "Forbidden: no access to selected organization", http.StatusForbidden)
+			return
+		}
+		if repository.IsNotFound(err) {
+			http.Error(w, "User has no associated company", http.StatusNotFound)
+			return
+		}
+		logger.PrintfCtx(r.Context(), "GetMySubscriptionPlans ResolveCompanyIDForRequest: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	subscription, err := h.subscriptionRepo.FindByCompanyID(companyID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			plans, err := h.subscriptionRepo.GetActivePlans()
+			if err != nil {
+				logger.PrintfCtx(r.Context(), "GetMySubscriptionPlans GetActivePlans (no sub): %v", err)
+				http.Error(w, "Failed to fetch subscription plans", http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			RespondJSON(w, plans)
+			return
+		}
+		logger.PrintfCtx(r.Context(), "GetMySubscriptionPlans FindByCompanyID: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	var extraIDs []string
+	if strings.TrimSpace(subscription.PlanID) != "" {
+		extraIDs = append(extraIDs, subscription.PlanID)
+	}
+	if subscription.PendingPlanID != nil && strings.TrimSpace(*subscription.PendingPlanID) != "" {
+		extraIDs = append(extraIDs, strings.TrimSpace(*subscription.PendingPlanID))
+	}
+
+	plans, err := h.subscriptionRepo.GetActivePlansForTenant(extraIDs)
+	if err != nil {
+		logger.PrintfCtx(r.Context(), "GetMySubscriptionPlans GetActivePlansForTenant: %v", err)
+		http.Error(w, "Failed to fetch subscription plans", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	RespondJSON(w, plans)
 }
 
 // GetPlans godoc
@@ -390,4 +472,142 @@ func (h *SubscriptionHandler) CancelSubscription(w http.ResponseWriter, r *http.
 
 	w.Header().Set("Content-Type", "application/json")
 	RespondJSON(w, subscription)
+}
+
+// maxPlanChangeRequestBodyBytes caps JSON for POST /subscriptions/plan-change-request.
+const maxPlanChangeRequestBodyBytes = 4096
+
+// PlanChangeRequestBody is JSON for POST /subscriptions/plan-change-request.
+type PlanChangeRequestBody struct {
+	RequestedPlanCode string `json:"requestedPlanCode" binding:"required" minLength:"1"`
+}
+
+// PostPlanChangeRequest creates a Yandex Tracker issue for a requested subscription plan change (same queue as marketing leads).
+// @ID           postSubscriptionPlanChangeRequest
+// @Summary      Request subscription plan change (Tracker ticket)
+// @Description  Authenticated company owner or billing admin; creates a Tracker work item. Plan switch is applied after manual processing.
+// @Tags         subscriptions
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        X-Company-Id header string false "Tenant company UUID when the user belongs to multiple organizations"
+// @Param        body  body      PlanChangeRequestBody  true  "Requested plan code"
+// @Success      201   {object}  map[string]string  "Created"
+// @Failure      400   {string}  string  "Bad request"
+// @Failure      401   {string}  string  "Unauthorized"
+// @Failure      403   {string}  string  "Forbidden"
+// @Failure      404   {string}  string  "No subscription or company"
+// @Failure      503   {string}  string  "Tracker not configured"
+// @Failure      502   {string}  string  "Tracker error"
+// @Router       /subscriptions/plan-change-request [post]
+func (h *SubscriptionHandler) PostPlanChangeRequest(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	limited := http.MaxBytesReader(w, r.Body, maxPlanChangeRequestBodyBytes)
+	body, err := io.ReadAll(limited)
+	if err != nil {
+		http.Error(w, "Request entity too large", http.StatusRequestEntityTooLarge)
+		return
+	}
+	var req PlanChangeRequestBody
+	if err := json.Unmarshal(body, &req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+	requested := strings.TrimSpace(req.RequestedPlanCode)
+	if requested == "" {
+		http.Error(w, "requestedPlanCode is required", http.StatusBadRequest)
+		return
+	}
+	err = h.subscriptionSvc.SubmitPlanChangeRequest(r.Context(), userID, r.Header.Get("X-Company-Id"), requested)
+	if err != nil {
+		var reqErr *services.SubscriptionRequestError
+		if errors.As(err, &reqErr) {
+			if reqErr.LogErr != nil {
+				logger.PrintfCtx(r.Context(), "PostPlanChangeRequest: %v", reqErr.LogErr)
+			}
+			http.Error(w, reqErr.Message, reqErr.Status)
+			return
+		}
+		logger.PrintfCtx(r.Context(), "PostPlanChangeRequest: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "created"})
+}
+
+const maxCustomTermsLeadRequestBodyBytes = 1 << 16 // 64 KiB
+const maxCustomTermsCommentRunes = 8000
+
+// CustomTermsLeadRequestBody is JSON for POST /subscriptions/custom-terms-lead-request.
+type CustomTermsLeadRequestBody struct {
+	Comment string `json:"comment" binding:"required" minLength:"1"`
+}
+
+// PostCustomTermsLeadRequest creates a [REQ] Yandex Tracker issue (individual pricing / custom terms).
+// @ID           postSubscriptionCustomTermsLeadRequest
+// @Summary      Request individual pricing (marketing-style REQ ticket)
+// @Description  Authenticated company owner or billing admin; comment required. User and company are taken from the session.
+// @Tags         subscriptions
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        X-Company-Id header string false "Tenant company UUID when the user belongs to multiple organizations"
+// @Param        body  body      CustomTermsLeadRequestBody  true  "Comment for sales"
+// @Success      201   {object}  map[string]string  "Created"
+// @Failure      400   {string}  string  "Bad request"
+// @Failure      401   {string}  string  "Unauthorized"
+// @Failure      403   {string}  string  "Forbidden"
+// @Failure      404   {string}  string  "No company"
+// @Failure      503   {string}  string  "Tracker not configured"
+// @Failure      502   {string}  string  "Tracker error"
+// @Router       /subscriptions/custom-terms-lead-request [post]
+func (h *SubscriptionHandler) PostCustomTermsLeadRequest(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	limited := http.MaxBytesReader(w, r.Body, maxCustomTermsLeadRequestBodyBytes)
+	body, err := io.ReadAll(limited)
+	if err != nil {
+		http.Error(w, "Request entity too large", http.StatusRequestEntityTooLarge)
+		return
+	}
+	var req CustomTermsLeadRequestBody
+	if err := json.Unmarshal(body, &req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+	comment := strings.TrimSpace(req.Comment)
+	if comment == "" {
+		http.Error(w, "comment is required", http.StatusBadRequest)
+		return
+	}
+	if utf8.RuneCountInString(comment) > maxCustomTermsCommentRunes {
+		http.Error(w, "comment is too long", http.StatusBadRequest)
+		return
+	}
+	err = h.subscriptionSvc.SubmitCustomTermsRequest(r.Context(), userID, r.Header.Get("X-Company-Id"), comment)
+	if err != nil {
+		var reqErr *services.SubscriptionRequestError
+		if errors.As(err, &reqErr) {
+			if reqErr.LogErr != nil {
+				logger.PrintfCtx(r.Context(), "PostCustomTermsLeadRequest: %v", reqErr.LogErr)
+			}
+			http.Error(w, reqErr.Message, reqErr.Status)
+			return
+		}
+		logger.PrintfCtx(r.Context(), "PostCustomTermsLeadRequest: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "created"})
 }

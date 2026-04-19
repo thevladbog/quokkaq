@@ -121,7 +121,7 @@ export function OrganizationUsageContent() {
               </div>
 
               <Button
-                onClick={() => router.push('/settings/organization/billing')}
+                onClick={() => router.push('/settings/pricing')}
                 className='w-full'
               >
                 {t('viewPlans')}

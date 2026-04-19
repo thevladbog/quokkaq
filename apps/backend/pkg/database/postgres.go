@@ -78,6 +78,203 @@ func requirePostgresAtLeastVersionNum(db *gorm.DB, minNum int, what string) erro
 	return nil
 }
 
+// backfillInvitationsTemplatesCompanyID resolves nullable company_id using tenant-scoped data:
+// invitations from target_units → units.company_id, then user_id → user_units → units;
+// message_templates from an optional owner column (user_id / creator_id) → user_units → units when present.
+// The "oldest company" fallback runs only when exactly one company exists. With multiple companies,
+// unresolved rows abort the migration so operators can fix data instead of mis-attributing tenants.
+func backfillInvitationsTemplatesCompanyID(db *gorm.DB) error {
+	var companyCount int64
+	if err := db.Raw(`SELECT COUNT(*) FROM companies`).Scan(&companyCount).Error; err != nil {
+		return fmt.Errorf("count companies: %w", err)
+	}
+
+	var ambTU int64
+	qAmbTU := `
+SELECT COUNT(*) FROM (
+	SELECT i.id
+	FROM invitations i
+	CROSS JOIN LATERAL jsonb_array_elements(
+		CASE WHEN jsonb_typeof(COALESCE(i.target_units::jsonb, '[]'::jsonb)) = 'array'
+			THEN COALESCE(i.target_units::jsonb, '[]'::jsonb)
+			ELSE '[]'::jsonb
+		END
+	) AS elem
+	INNER JOIN units u ON u.id = (elem->>'unitId')
+	WHERE i.company_id IS NULL
+	GROUP BY i.id
+	HAVING COUNT(DISTINCT u.company_id) > 1
+) sub`
+	if err := db.Raw(qAmbTU).Scan(&ambTU).Error; err != nil {
+		return fmt.Errorf("check invitations ambiguous target_units: %w", err)
+	}
+	if ambTU > 0 {
+		return fmt.Errorf("migration: %d invitation(s) have target_units referencing units in multiple companies; fix rows before continuing", ambTU)
+	}
+
+	var ambUser int64
+	qAmbUser := `
+SELECT COUNT(*) FROM (
+	SELECT i.id
+	FROM invitations i
+	INNER JOIN user_units uu ON uu.user_id = i.user_id
+	INNER JOIN units u ON u.id = uu.unit_id
+	WHERE i.company_id IS NULL AND i.user_id IS NOT NULL
+	GROUP BY i.id
+	HAVING COUNT(DISTINCT u.company_id) > 1
+) sub`
+	if err := db.Raw(qAmbUser).Scan(&ambUser).Error; err != nil {
+		return fmt.Errorf("check invitations ambiguous user_id: %w", err)
+	}
+	if ambUser > 0 {
+		return fmt.Errorf("migration: %d invitation(s) have user_id spanning multiple companies via user_units; fix rows before continuing", ambUser)
+	}
+
+	var tplOwnerCol string
+	if err := db.Raw(`
+SELECT c.column_name FROM information_schema.columns c
+WHERE c.table_schema = current_schema()
+  AND c.table_name = 'message_templates'
+  AND c.column_name IN ('user_id', 'creator_id')
+ORDER BY CASE c.column_name WHEN 'user_id' THEN 1 ELSE 2 END
+LIMIT 1`).Scan(&tplOwnerCol).Error; err != nil {
+		return fmt.Errorf("resolve message_templates owner column: %w", err)
+	}
+	if tplOwnerCol != "" {
+		var ambTpl int64
+		qAmbTpl := fmt.Sprintf(`
+SELECT COUNT(*) FROM (
+	SELECT t.id
+	FROM message_templates t
+	INNER JOIN user_units uu ON uu.user_id = t.%s
+	INNER JOIN units u ON u.id = uu.unit_id
+	WHERE t.company_id IS NULL
+	GROUP BY t.id
+	HAVING COUNT(DISTINCT u.company_id) > 1
+) sub`, tplOwnerCol)
+		if err := db.Raw(qAmbTpl).Scan(&ambTpl).Error; err != nil {
+			return fmt.Errorf("check message_templates ambiguous owner company: %w", err)
+		}
+		if ambTpl > 0 {
+			return fmt.Errorf("migration: %d message_template(s) have %s spanning multiple companies via user_units; fix rows before continuing", ambTpl, tplOwnerCol)
+		}
+	}
+
+	qInvTU := `
+WITH inv_src AS (
+	SELECT i.id AS invitation_id,
+	       MIN(u.company_id) AS cid
+	FROM invitations i
+	CROSS JOIN LATERAL jsonb_array_elements(
+		CASE WHEN jsonb_typeof(COALESCE(i.target_units::jsonb, '[]'::jsonb)) = 'array'
+			THEN COALESCE(i.target_units::jsonb, '[]'::jsonb)
+			ELSE '[]'::jsonb
+		END
+	) AS elem
+	INNER JOIN units u ON u.id = (elem->>'unitId')
+	WHERE i.company_id IS NULL
+	GROUP BY i.id
+	HAVING COUNT(DISTINCT u.company_id) = 1
+)
+UPDATE invitations i
+SET company_id = inv_src.cid
+FROM inv_src
+WHERE i.id = inv_src.invitation_id`
+	res := db.Exec(qInvTU)
+	if res.Error != nil {
+		return fmt.Errorf("backfill invitations from target_units: %w", res.Error)
+	}
+	slog.Info("migration backfill: invitations company_id from target_units→units", "rows", res.RowsAffected)
+
+	qInvUU := `
+WITH inv_src AS (
+	SELECT i.id AS invitation_id,
+	       MIN(u.company_id) AS cid
+	FROM invitations i
+	INNER JOIN user_units uu ON uu.user_id = i.user_id
+	INNER JOIN units u ON u.id = uu.unit_id
+	WHERE i.company_id IS NULL AND i.user_id IS NOT NULL
+	GROUP BY i.id
+	HAVING COUNT(DISTINCT u.company_id) = 1
+)
+UPDATE invitations i
+SET company_id = inv_src.cid
+FROM inv_src
+WHERE i.id = inv_src.invitation_id`
+	res = db.Exec(qInvUU)
+	if res.Error != nil {
+		return fmt.Errorf("backfill invitations from user_id→user_units→units: %w", res.Error)
+	}
+	slog.Info("migration backfill: invitations company_id from user_id→user_units→units", "rows", res.RowsAffected)
+
+	if tplOwnerCol != "" {
+		qTpl := fmt.Sprintf(`
+WITH tpl_src AS (
+	SELECT t.id AS template_id,
+	       MIN(u.company_id) AS cid
+	FROM message_templates t
+	INNER JOIN user_units uu ON uu.user_id = t.%s
+	INNER JOIN units u ON u.id = uu.unit_id
+	WHERE t.company_id IS NULL
+	GROUP BY t.id
+	HAVING COUNT(DISTINCT u.company_id) = 1
+)
+UPDATE message_templates t
+SET company_id = tpl_src.cid
+FROM tpl_src
+WHERE t.id = tpl_src.template_id`, tplOwnerCol)
+		res = db.Exec(qTpl)
+		if res.Error != nil {
+			return fmt.Errorf("backfill message_templates from %s→user_units→units: %w", tplOwnerCol, res.Error)
+		}
+		slog.Info("migration backfill: message_templates company_id from owner column", "column", tplOwnerCol, "rows", res.RowsAffected)
+	} else {
+		slog.Info("migration backfill: message_templates skipped (no user_id/creator_id column)")
+	}
+
+	var invNulls, tplNulls int64
+	if err := db.Raw(`SELECT COUNT(*) FROM invitations WHERE company_id IS NULL`).Scan(&invNulls).Error; err != nil {
+		return fmt.Errorf("count invitations with null company_id: %w", err)
+	}
+	if err := db.Raw(`SELECT COUNT(*) FROM message_templates WHERE company_id IS NULL`).Scan(&tplNulls).Error; err != nil {
+		return fmt.Errorf("count message_templates with null company_id: %w", err)
+	}
+	slog.Info("migration backfill: null company_id counts after targeted updates", "invitations", invNulls, "message_templates", tplNulls, "companies", companyCount)
+
+	if companyCount > 1 && (invNulls > 0 || tplNulls > 0) {
+		slog.Warn("migration backfill: aborting — unresolved company_id with multiple tenants", "invitations_null", invNulls, "message_templates_null", tplNulls, "companies", companyCount)
+		return fmt.Errorf("migration: cannot resolve company_id for %d invitation(s) and %d message_template(s) with %d companies present; assign tenant scope manually or reduce to a single company", invNulls, tplNulls, companyCount)
+	}
+
+	if companyCount == 1 && (invNulls > 0 || tplNulls > 0) {
+		res = db.Exec(`
+			UPDATE invitations i
+			SET company_id = c.id
+			FROM (SELECT id FROM companies ORDER BY created_at ASC NULLS LAST LIMIT 1) AS c
+			WHERE i.company_id IS NULL
+		`)
+		if res.Error != nil {
+			return fmt.Errorf("fallback invitations to sole company: %w", res.Error)
+		}
+		slog.Info("migration backfill: invitations fallback to sole company", "rows", res.RowsAffected)
+
+		res = db.Exec(`
+			UPDATE message_templates t
+			SET company_id = c.id
+			FROM (SELECT id FROM companies ORDER BY created_at ASC NULLS LAST LIMIT 1) AS c
+			WHERE t.company_id IS NULL
+		`)
+		if res.Error != nil {
+			return fmt.Errorf("fallback message_templates to sole company: %w", res.Error)
+		}
+		slog.Info("migration backfill: message_templates fallback to sole company", "rows", res.RowsAffected)
+	} else if companyCount == 0 && (invNulls > 0 || tplNulls > 0) {
+		slog.Info("migration backfill: null company_id rows remain with zero companies (will be deleted next)", "invitations", invNulls, "message_templates", tplNulls)
+	}
+
+	return nil
+}
+
 // Ping checks connectivity to PostgreSQL using the GORM pool (*sql.DB).
 func Ping(ctx context.Context) error {
 	if DB == nil {
@@ -1536,6 +1733,269 @@ func RunVersionedMigrations(models ...interface{}) error {
 	})
 	if err != nil {
 		return fmt.Errorf("failed to run v1.3.8_desktop_terminal_kind_counter_normalize migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.3.9_deployment_saas_settings", func(db *gorm.DB) error {
+		if err := db.AutoMigrate(&dbmodels.DeploymentSaaSSettings{}); err != nil {
+			return err
+		}
+		return db.Exec(`
+			INSERT INTO deployment_saas_settings (id) VALUES ('default')
+			ON CONFLICT (id) DO NOTHING
+		`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.3.9_deployment_saas_settings migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.3.10_deployment_saas_support_tracker", func(db *gorm.DB) error {
+		return db.AutoMigrate(&dbmodels.DeploymentSaaSSettings{})
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.3.10_deployment_saas_support_tracker migration: %w", err)
+	}
+
+	// Tenant-scoped invitations and email templates (company_id + FK). Backfill uses target_units→units and user→user_units→units; single-company fallback only when one tenant exists.
+	// company_id must be TEXT to match companies.id (GORM string PK) and other tenant FK columns — not UUID.
+	err = manager.RunMigration("v1.3.11_invitations_templates_company_id", func(db *gorm.DB) error {
+		if err := db.Exec(`
+DO $$
+BEGIN
+	IF NOT EXISTS (
+		SELECT 1 FROM information_schema.columns
+		WHERE table_schema = current_schema() AND table_name = 'invitations' AND column_name = 'company_id'
+	) THEN
+		ALTER TABLE invitations ADD COLUMN company_id TEXT;
+	ELSIF EXISTS (
+		SELECT 1 FROM information_schema.columns
+		WHERE table_schema = current_schema() AND table_name = 'invitations' AND column_name = 'company_id'
+		  AND udt_name = 'uuid'
+	) THEN
+		ALTER TABLE invitations ALTER COLUMN company_id TYPE TEXT USING company_id::text;
+	END IF;
+END $$;
+`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+DO $$
+BEGIN
+	IF NOT EXISTS (
+		SELECT 1 FROM information_schema.columns
+		WHERE table_schema = current_schema() AND table_name = 'message_templates' AND column_name = 'company_id'
+	) THEN
+		ALTER TABLE message_templates ADD COLUMN company_id TEXT;
+	ELSIF EXISTS (
+		SELECT 1 FROM information_schema.columns
+		WHERE table_schema = current_schema() AND table_name = 'message_templates' AND column_name = 'company_id'
+		  AND udt_name = 'uuid'
+	) THEN
+		ALTER TABLE message_templates ALTER COLUMN company_id TYPE TEXT USING company_id::text;
+	END IF;
+END $$;
+`).Error; err != nil {
+			return err
+		}
+		if err := backfillInvitationsTemplatesCompanyID(db); err != nil {
+			return err
+		}
+		// Rows we could not attach to any company: remove (orphan data).
+		if err := db.Exec(`DELETE FROM invitations WHERE company_id IS NULL`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`DELETE FROM message_templates WHERE company_id IS NULL`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			ALTER TABLE invitations ALTER COLUMN company_id SET NOT NULL
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			ALTER TABLE message_templates ALTER COLUMN company_id SET NOT NULL
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			DO $$
+			BEGIN
+				IF NOT EXISTS (
+					SELECT 1 FROM pg_constraint WHERE conname = 'fk_invitations_company'
+				) THEN
+					ALTER TABLE invitations
+					ADD CONSTRAINT fk_invitations_company
+					FOREIGN KEY (company_id) REFERENCES companies(id) ON UPDATE CASCADE ON DELETE CASCADE;
+				END IF;
+				IF NOT EXISTS (
+					SELECT 1 FROM pg_constraint WHERE conname = 'fk_message_templates_company'
+				) THEN
+					ALTER TABLE message_templates
+					ADD CONSTRAINT fk_message_templates_company
+					FOREIGN KEY (company_id) REFERENCES companies(id) ON UPDATE CASCADE ON DELETE CASCADE;
+				END IF;
+			END $$
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_invitations_company_email ON invitations (company_id, email)`).Error; err != nil {
+			return err
+		}
+		return db.AutoMigrate(&dbmodels.Invitation{}, &dbmodels.MessageTemplate{})
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.3.11_invitations_templates_company_id migration: %w", err)
+	}
+
+	// Repair path: v1.3.11 is skipped once marked applied, so fixes shipped after first apply must live here.
+	// Converts mistaken UUID company_id to TEXT (matches companies.id), idempotent on healthy DBs.
+	err = manager.RunMigration("v1.3.12_invitations_templates_company_id_text_repair", func(db *gorm.DB) error {
+		if err := db.Exec(`
+DO $$
+BEGIN
+	IF EXISTS (
+		SELECT 1 FROM information_schema.columns
+		WHERE table_schema = current_schema() AND table_name = 'invitations' AND column_name = 'company_id'
+		  AND udt_name = 'uuid'
+	) THEN
+		ALTER TABLE invitations ALTER COLUMN company_id TYPE TEXT USING company_id::text;
+	END IF;
+END $$;
+`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+DO $$
+BEGIN
+	IF EXISTS (
+		SELECT 1 FROM information_schema.columns
+		WHERE table_schema = current_schema() AND table_name = 'message_templates' AND column_name = 'company_id'
+		  AND udt_name = 'uuid'
+	) THEN
+		ALTER TABLE message_templates ALTER COLUMN company_id TYPE TEXT USING company_id::text;
+	END IF;
+END $$;
+`).Error; err != nil {
+			return err
+		}
+		if err := backfillInvitationsTemplatesCompanyID(db); err != nil {
+			return err
+		}
+		if err := db.Exec(`DELETE FROM invitations WHERE company_id IS NULL`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`DELETE FROM message_templates WHERE company_id IS NULL`).Error; err != nil {
+			return err
+		}
+		// NOT NULL only when column exists and still allows nulls (skip error if already NOT NULL).
+		if err := db.Exec(`
+DO $$
+BEGIN
+	IF EXISTS (
+		SELECT 1 FROM information_schema.columns
+		WHERE table_schema = current_schema() AND table_name = 'invitations' AND column_name = 'company_id'
+		  AND is_nullable = 'YES'
+	) THEN
+		ALTER TABLE invitations ALTER COLUMN company_id SET NOT NULL;
+	END IF;
+	IF EXISTS (
+		SELECT 1 FROM information_schema.columns
+		WHERE table_schema = current_schema() AND table_name = 'message_templates' AND column_name = 'company_id'
+		  AND is_nullable = 'YES'
+	) THEN
+		ALTER TABLE message_templates ALTER COLUMN company_id SET NOT NULL;
+	END IF;
+END $$;
+`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			DO $$
+			BEGIN
+				IF NOT EXISTS (
+					SELECT 1 FROM pg_constraint WHERE conname = 'fk_invitations_company'
+				) THEN
+					ALTER TABLE invitations
+					ADD CONSTRAINT fk_invitations_company
+					FOREIGN KEY (company_id) REFERENCES companies(id) ON UPDATE CASCADE ON DELETE CASCADE;
+				END IF;
+				IF NOT EXISTS (
+					SELECT 1 FROM pg_constraint WHERE conname = 'fk_message_templates_company'
+				) THEN
+					ALTER TABLE message_templates
+					ADD CONSTRAINT fk_message_templates_company
+					FOREIGN KEY (company_id) REFERENCES companies(id) ON UPDATE CASCADE ON DELETE CASCADE;
+				END IF;
+			END $$
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_invitations_company_email ON invitations (company_id, email)`).Error; err != nil {
+			return err
+		}
+		return db.AutoMigrate(&dbmodels.Invitation{}, &dbmodels.MessageTemplate{})
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.3.12_invitations_templates_company_id_text_repair migration: %w", err)
+	}
+
+	// At most one default template per company (DB-enforced; prevents concurrent double-default races).
+	err = manager.RunMigration("v1.3.13_message_templates_one_default_per_company", func(db *gorm.DB) error {
+		if err := db.Exec(`
+WITH ranked AS (
+	SELECT id,
+	       ROW_NUMBER() OVER (
+	         PARTITION BY company_id
+	         ORDER BY created_at ASC NULLS LAST, id ASC
+	       ) AS rn
+	FROM message_templates
+	WHERE is_default IS TRUE
+)
+UPDATE message_templates t
+SET is_default = FALSE
+FROM ranked r
+WHERE t.id = r.id AND r.rn > 1
+`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+CREATE UNIQUE INDEX IF NOT EXISTS uq_message_templates_company_default
+ON message_templates (company_id)
+WHERE is_default IS TRUE
+`).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.3.13_message_templates_one_default_per_company migration: %w", err)
+	}
+
+	// Tenant-scoped uniqueness for accepted invitations: (company_id, user_id) instead of globally unique user_id.
+	err = manager.RunMigration("v1.3.14_invitations_company_user_unique", func(db *gorm.DB) error {
+		// Drop legacy single-column unique on user_id (GORM/postgres default names).
+		if err := db.Exec(`
+ALTER TABLE invitations DROP CONSTRAINT IF EXISTS uni_invitations_user_id
+`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+ALTER TABLE invitations DROP CONSTRAINT IF EXISTS invitations_user_id_key
+`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`DROP INDEX IF EXISTS uni_invitations_user_id`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+CREATE UNIQUE INDEX IF NOT EXISTS idx_invitations_company_user
+ON invitations (company_id, user_id)
+`).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.3.14_invitations_company_user_unique migration: %w", err)
 	}
 
 	fmt.Println("✅ All migrations completed successfully")

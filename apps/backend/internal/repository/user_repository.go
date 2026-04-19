@@ -24,7 +24,7 @@ type UserRepository interface {
 	CreateTx(tx *gorm.DB, user *models.User) error
 	FindAll(search string) ([]models.User, error)
 	// ListUsersForCompany returns users visible for the tenant: unit members, tenant-role assignments,
-	// the company owner, and optionally users with global admin/platform_admin (only when includeGlobalRoleUsers is true — for tenant viewers omit this so global staff are not listed in every org). Optional name/email search.
+	// the company owner, and optionally users with global admin/platform_admin (only when includeGlobalRoleUsers is true; GET /companies/me/users always passes false). Optional name/email search.
 	ListUsersForCompany(companyID string, search string, includeGlobalRoleUsers bool) ([]models.User, error)
 	FindByID(ctx context.Context, id string) (*models.User, error)
 	FindByIDTx(tx *gorm.DB, id string) (*models.User, error)
@@ -63,6 +63,8 @@ type UserRepository interface {
 	GetCompanyIDByUserID(userID string) (companyID string, err error)
 	// ResolveCompanyIDForRequest uses X-Company-Id when present and allowed; otherwise GetCompanyIDByUserID.
 	ResolveCompanyIDForRequest(userID string, headerCompanyID string) (companyID string, err error)
+	// IsUserMemberOfCompanyTenant is true when the user belongs to the tenant via units, tenant roles, or company ownership (not global admin alone).
+	IsUserMemberOfCompanyTenant(userID, companyID string) (bool, error)
 	// ListAccessibleCompanies returns tenants the user may access (units + ownership), optional search q.
 	ListAccessibleCompanies(userID string, q string) ([]AccessibleCompanySummary, error)
 	// GetFirstUserUnit returns the first user_units row joined to units for the user (same shape as legacy usage handler query).
@@ -84,6 +86,14 @@ type UserRepository interface {
 	Transaction(ctx context.Context, fn func(tx *gorm.DB) error) error
 	// RecomputeUserIsActiveTx sets users.is_active using effective-access checks on tx (same rules as RecomputeUserIsActive).
 	RecomputeUserIsActiveTx(tx *gorm.DB, userID string) error
+
+	// HasTenantSystemAdminRoleInCompany is true when the user has the reserved system_admin tenant role for the company.
+	HasTenantSystemAdminRoleInCompany(userID, companyID string) (bool, error)
+	// ListCompanyIDsForSupportReportTenantWideAccess returns company ids where the user may act as tenant-wide support
+	// (company owner or system_admin tenant role). Used to scope /support/reports lists to the tenant.
+	ListCompanyIDsForSupportReportTenantWideAccess(userID string) ([]string, error)
+	// ListUserIDsWithTenantSystemAdminInCompany returns user ids with the system_admin tenant role in the company.
+	ListUserIDsWithTenantSystemAdminInCompany(companyID string) ([]string, error)
 }
 
 type userRepository struct {
@@ -113,6 +123,39 @@ func (r *userRepository) FindAll(search string) ([]models.User, error) {
 
 	err := query.Find(&users).Error
 	return users, err
+}
+
+func (r *userRepository) IsUserMemberOfCompanyTenant(userID, companyID string) (bool, error) {
+	userID = strings.TrimSpace(userID)
+	companyID = strings.TrimSpace(companyID)
+	if userID == "" || companyID == "" {
+		return false, nil
+	}
+	var ok bool
+	err := r.db.Raw(`
+SELECT (
+  EXISTS (
+    SELECT 1 FROM user_units uu
+    INNER JOIN units un ON un.id = uu.unit_id AND un.company_id = ?
+    WHERE uu.user_id = ?
+  )
+  OR EXISTS (
+    SELECT 1 FROM user_tenant_roles utr
+    WHERE utr.company_id = ? AND utr.user_id = ?
+  )
+  OR EXISTS (
+    SELECT 1 FROM companies c
+    WHERE c.id = ? AND c.owner_user_id = ?
+  )
+)`,
+		companyID, userID,
+		companyID, userID,
+		companyID, userID,
+	).Scan(&ok).Error
+	if err != nil {
+		return false, err
+	}
+	return ok, nil
 }
 
 func (r *userRepository) ListUsersForCompany(companyID string, search string, includeGlobalRoleUsers bool) ([]models.User, error) {
@@ -710,6 +753,78 @@ func (r *userRepository) RecomputeUserIsActiveTx(tx *gorm.DB, userID string) err
 		return err
 	}
 	return tx.Model(&models.User{}).Where("id = ?", userID).Update("is_active", ok).Error
+}
+
+func (r *userRepository) HasTenantSystemAdminRoleInCompany(userID, companyID string) (bool, error) {
+	userID = strings.TrimSpace(userID)
+	companyID = strings.TrimSpace(companyID)
+	if userID == "" || companyID == "" {
+		return false, nil
+	}
+	var n int64
+	err := r.db.Model(&models.UserTenantRole{}).
+		Joins("INNER JOIN tenant_roles tr ON tr.id = user_tenant_roles.tenant_role_id AND tr.company_id = user_tenant_roles.company_id").
+		Where("user_tenant_roles.user_id = ? AND user_tenant_roles.company_id = ? AND tr.slug = ?", userID, companyID, rbac.TenantRoleSlugSystemAdmin).
+		Count(&n).Error
+	return n > 0, err
+}
+
+func (r *userRepository) ListCompanyIDsForSupportReportTenantWideAccess(userID string) ([]string, error) {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return nil, nil
+	}
+	var ownerIDs []string
+	if err := r.db.Model(&models.Company{}).Where("owner_user_id = ?", userID).Pluck("id", &ownerIDs).Error; err != nil {
+		return nil, err
+	}
+	var sysAdmin []string
+	if err := r.db.Raw(`
+SELECT DISTINCT utr.company_id FROM user_tenant_roles utr
+INNER JOIN tenant_roles tr ON tr.id = utr.tenant_role_id AND tr.company_id = utr.company_id
+WHERE utr.user_id = ? AND tr.slug = ?
+`, userID, rbac.TenantRoleSlugSystemAdmin).Scan(&sysAdmin).Error; err != nil {
+		return nil, err
+	}
+	seen := make(map[string]struct{}, len(ownerIDs)+len(sysAdmin))
+	out := make([]string, 0, len(ownerIDs)+len(sysAdmin))
+	for _, id := range ownerIDs {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+	for _, id := range sysAdmin {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+	return out, nil
+}
+
+func (r *userRepository) ListUserIDsWithTenantSystemAdminInCompany(companyID string) ([]string, error) {
+	companyID = strings.TrimSpace(companyID)
+	if companyID == "" {
+		return nil, nil
+	}
+	var ids []string
+	err := r.db.Raw(`
+SELECT utr.user_id FROM user_tenant_roles utr
+INNER JOIN tenant_roles tr ON tr.id = utr.tenant_role_id AND tr.company_id = utr.company_id
+WHERE utr.company_id = ? AND tr.slug = ?
+`, companyID, rbac.TenantRoleSlugSystemAdmin).Scan(&ids).Error
+	return ids, err
 }
 
 func (r *userRepository) Transaction(ctx context.Context, fn func(tx *gorm.DB) error) error {

@@ -392,8 +392,8 @@ export interface HandlersTenantRoleUnitJSON {
 
 export interface HandlersCreateTenantRoleJSON {
   description?: string;
-  name?: string;
-  slug?: string;
+  name: string;
+  slug: string;
   units?: HandlersTenantRoleUnitJSON[];
 }
 
@@ -426,6 +426,11 @@ export interface HandlersCreateTicketRequestKiosk {
 }
 
 export type HandlersCreateTicketRequest = HandlersCreateTicketRequestAnonymous | HandlersCreateTicketRequestStaff | HandlersCreateTicketRequestKiosk;
+
+export interface HandlersCustomTermsLeadRequestBody {
+  /** @minLength 1 */
+  comment: string;
+}
 
 export interface HandlersDaDataFindPartyByInnRequest {
   inn: string;
@@ -639,6 +644,11 @@ export interface HandlersPickRequest {
   counterId?: string;
 }
 
+export interface HandlersPlanChangeRequestBody {
+  /** @minLength 1 */
+  requestedPlanCode: string;
+}
+
 export interface HandlersPlatformCreateSubscriptionBody {
   companyId: string;
   currentPeriodEnd?: string;
@@ -675,6 +685,15 @@ export interface HandlersPlatformCreateSubscriptionPlanBody {
   price?: number;
 }
 
+export interface HandlersPlatformIntegrationsResponse {
+  leadsTrackerQueue: string;
+  supportTrackerQueue: string;
+  trackerTypeError: string;
+  trackerTypeRegistration: string;
+  trackerTypeRequest: string;
+  trackerTypeSupport: string;
+}
+
 export type HandlersPlatformUpdateSubscriptionPlanBodyFeatures = {[key: string]: boolean};
 
 export type HandlersPlatformUpdateSubscriptionPlanBodyLimits = {[key: string]: number};
@@ -697,6 +716,17 @@ export interface HandlersPlatformUpdateSubscriptionPlanBody {
   name?: string;
   nameEn?: string;
   price?: number;
+}
+
+export interface HandlersPublicLeadRequestBody {
+  company?: string;
+  email: string;
+  locale?: string;
+  message?: string;
+  name: string;
+  planCode?: string;
+  referrer?: string;
+  source?: string;
 }
 
 export interface HandlersRefreshResponse {
@@ -1385,6 +1415,7 @@ export type ModelsInvitationTargetRoles = { [key: string]: unknown };
 export type ModelsInvitationTargetUnits = { [key: string]: unknown };
 
 export interface ModelsInvitation {
+  companyId?: string;
   createdAt?: string;
   email?: string;
   expiresAt?: string;
@@ -1399,6 +1430,7 @@ export interface ModelsInvitation {
 }
 
 export interface ModelsMessageTemplate {
+  companyId?: string;
   content?: string;
   createdAt?: string;
   id?: string;
@@ -1705,6 +1737,15 @@ export interface ServicesCreateCalendarIntegrationRequest {
   username: string;
 }
 
+export interface ServicesDeploymentSaaSSettingsPatch {
+  leadsTrackerQueue?: string;
+  supportTrackerQueue?: string;
+  trackerTypeError?: string;
+  trackerTypeRegistration?: string;
+  trackerTypeRequest?: string;
+  trackerTypeSupport?: string;
+}
+
 export interface ServicesEmployeeRadarResponse {
   computedAt?: string;
   rating?: number;
@@ -1997,6 +2038,10 @@ export interface HandlersLoginLinkResponse {
 }
 
 export type PostInvoicesIdYookassaPaymentLink200 = {[key: string]: string};
+
+export type PostSubscriptionCustomTermsLeadRequest201 = {[key: string]: string};
+
+export type PostSubscriptionPlanChangeRequest201 = {[key: string]: string};
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
@@ -2818,6 +2863,122 @@ export const useCreateCheckout = <TError = string,
     }
 
 /**
+ * Authenticated company owner or billing admin; comment required. User and company are taken from the session.
+ * @summary Request individual pricing (marketing-style REQ ticket)
+ */
+export type postSubscriptionCustomTermsLeadRequestResponse201 = {
+  data: PostSubscriptionCustomTermsLeadRequest201
+  status: 201
+}
+
+export type postSubscriptionCustomTermsLeadRequestResponse400 = {
+  data: string
+  status: 400
+}
+
+export type postSubscriptionCustomTermsLeadRequestResponse401 = {
+  data: string
+  status: 401
+}
+
+export type postSubscriptionCustomTermsLeadRequestResponse403 = {
+  data: string
+  status: 403
+}
+
+export type postSubscriptionCustomTermsLeadRequestResponse404 = {
+  data: string
+  status: 404
+}
+
+export type postSubscriptionCustomTermsLeadRequestResponse502 = {
+  data: string
+  status: 502
+}
+
+export type postSubscriptionCustomTermsLeadRequestResponse503 = {
+  data: string
+  status: 503
+}
+
+export type postSubscriptionCustomTermsLeadRequestResponseSuccess = (postSubscriptionCustomTermsLeadRequestResponse201) & {
+  headers: Headers;
+};
+export type postSubscriptionCustomTermsLeadRequestResponseError = (postSubscriptionCustomTermsLeadRequestResponse400 | postSubscriptionCustomTermsLeadRequestResponse401 | postSubscriptionCustomTermsLeadRequestResponse403 | postSubscriptionCustomTermsLeadRequestResponse404 | postSubscriptionCustomTermsLeadRequestResponse502 | postSubscriptionCustomTermsLeadRequestResponse503) & {
+  headers: Headers;
+};
+
+export type postSubscriptionCustomTermsLeadRequestResponse = (postSubscriptionCustomTermsLeadRequestResponseSuccess | postSubscriptionCustomTermsLeadRequestResponseError)
+
+export const getPostSubscriptionCustomTermsLeadRequestUrl = () => {
+
+
+
+
+  return `/subscriptions/custom-terms-lead-request`
+}
+
+export const postSubscriptionCustomTermsLeadRequest = async (handlersCustomTermsLeadRequestBody: HandlersCustomTermsLeadRequestBody, options?: RequestInit): Promise<postSubscriptionCustomTermsLeadRequestResponse> => {
+
+  return orvalMutator<postSubscriptionCustomTermsLeadRequestResponse>(getPostSubscriptionCustomTermsLeadRequestUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersCustomTermsLeadRequestBody,)
+  }
+);}
+
+
+
+
+export const getPostSubscriptionCustomTermsLeadRequestMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postSubscriptionCustomTermsLeadRequest>>, TError,{data: HandlersCustomTermsLeadRequestBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof postSubscriptionCustomTermsLeadRequest>>, TError,{data: HandlersCustomTermsLeadRequestBody}, TContext> => {
+
+const mutationKey = ['postSubscriptionCustomTermsLeadRequest'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postSubscriptionCustomTermsLeadRequest>>, {data: HandlersCustomTermsLeadRequestBody}> = (props) => {
+          const {data} = props ?? {};
+
+          return  postSubscriptionCustomTermsLeadRequest(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostSubscriptionCustomTermsLeadRequestMutationResult = NonNullable<Awaited<ReturnType<typeof postSubscriptionCustomTermsLeadRequest>>>
+    export type PostSubscriptionCustomTermsLeadRequestMutationBody = HandlersCustomTermsLeadRequestBody
+    export type PostSubscriptionCustomTermsLeadRequestMutationError = string
+
+    /**
+ * @summary Request individual pricing (marketing-style REQ ticket)
+ */
+export const usePostSubscriptionCustomTermsLeadRequest = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postSubscriptionCustomTermsLeadRequest>>, TError,{data: HandlersCustomTermsLeadRequestBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postSubscriptionCustomTermsLeadRequest>>,
+        TError,
+        {data: HandlersCustomTermsLeadRequestBody},
+        TContext
+      > => {
+      return useMutation(getPostSubscriptionCustomTermsLeadRequestMutationOptions(options), queryClient);
+    }
+
+/**
  * Returns subscription for the authenticated user's company
  * @summary Get Current User's Subscription
  */
@@ -2952,6 +3113,253 @@ export function useGetMySubscription<TData = Awaited<ReturnType<typeof getMySubs
 
 
 
+
+/**
+ * Active public plans plus this company's current and pending plans even when those plans are not public (assigned by platform).
+ * @summary Subscription plans for tenant catalog
+ */
+export type getMySubscriptionPlansResponse200 = {
+  data: ModelsSubscriptionPlan[]
+  status: 200
+}
+
+export type getMySubscriptionPlansResponse401 = {
+  data: string
+  status: 401
+}
+
+export type getMySubscriptionPlansResponse403 = {
+  data: string
+  status: 403
+}
+
+export type getMySubscriptionPlansResponse500 = {
+  data: string
+  status: 500
+}
+
+export type getMySubscriptionPlansResponseSuccess = (getMySubscriptionPlansResponse200) & {
+  headers: Headers;
+};
+export type getMySubscriptionPlansResponseError = (getMySubscriptionPlansResponse401 | getMySubscriptionPlansResponse403 | getMySubscriptionPlansResponse500) & {
+  headers: Headers;
+};
+
+export type getMySubscriptionPlansResponse = (getMySubscriptionPlansResponseSuccess | getMySubscriptionPlansResponseError)
+
+export const getGetMySubscriptionPlansUrl = () => {
+
+
+
+
+  return `/subscriptions/me/plans`
+}
+
+export const getMySubscriptionPlans = async ( options?: RequestInit): Promise<getMySubscriptionPlansResponse> => {
+
+  return orvalMutator<getMySubscriptionPlansResponse>(getGetMySubscriptionPlansUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMySubscriptionPlansQueryKey = () => {
+    return [
+    `/subscriptions/me/plans`
+    ] as const;
+    }
+
+
+export const getGetMySubscriptionPlansQueryOptions = <TData = Awaited<ReturnType<typeof getMySubscriptionPlans>>, TError = string>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMySubscriptionPlans>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMySubscriptionPlansQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMySubscriptionPlans>>> = ({ signal }) => getMySubscriptionPlans({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMySubscriptionPlans>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetMySubscriptionPlansQueryResult = NonNullable<Awaited<ReturnType<typeof getMySubscriptionPlans>>>
+export type GetMySubscriptionPlansQueryError = string
+
+
+export function useGetMySubscriptionPlans<TData = Awaited<ReturnType<typeof getMySubscriptionPlans>>, TError = string>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMySubscriptionPlans>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getMySubscriptionPlans>>,
+          TError,
+          Awaited<ReturnType<typeof getMySubscriptionPlans>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetMySubscriptionPlans<TData = Awaited<ReturnType<typeof getMySubscriptionPlans>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMySubscriptionPlans>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getMySubscriptionPlans>>,
+          TError,
+          Awaited<ReturnType<typeof getMySubscriptionPlans>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetMySubscriptionPlans<TData = Awaited<ReturnType<typeof getMySubscriptionPlans>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMySubscriptionPlans>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Subscription plans for tenant catalog
+ */
+
+export function useGetMySubscriptionPlans<TData = Awaited<ReturnType<typeof getMySubscriptionPlans>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMySubscriptionPlans>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetMySubscriptionPlansQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * Authenticated company owner or billing admin; creates a Tracker work item. Plan switch is applied after manual processing.
+ * @summary Request subscription plan change (Tracker ticket)
+ */
+export type postSubscriptionPlanChangeRequestResponse201 = {
+  data: PostSubscriptionPlanChangeRequest201
+  status: 201
+}
+
+export type postSubscriptionPlanChangeRequestResponse400 = {
+  data: string
+  status: 400
+}
+
+export type postSubscriptionPlanChangeRequestResponse401 = {
+  data: string
+  status: 401
+}
+
+export type postSubscriptionPlanChangeRequestResponse403 = {
+  data: string
+  status: 403
+}
+
+export type postSubscriptionPlanChangeRequestResponse404 = {
+  data: string
+  status: 404
+}
+
+export type postSubscriptionPlanChangeRequestResponse502 = {
+  data: string
+  status: 502
+}
+
+export type postSubscriptionPlanChangeRequestResponse503 = {
+  data: string
+  status: 503
+}
+
+export type postSubscriptionPlanChangeRequestResponseSuccess = (postSubscriptionPlanChangeRequestResponse201) & {
+  headers: Headers;
+};
+export type postSubscriptionPlanChangeRequestResponseError = (postSubscriptionPlanChangeRequestResponse400 | postSubscriptionPlanChangeRequestResponse401 | postSubscriptionPlanChangeRequestResponse403 | postSubscriptionPlanChangeRequestResponse404 | postSubscriptionPlanChangeRequestResponse502 | postSubscriptionPlanChangeRequestResponse503) & {
+  headers: Headers;
+};
+
+export type postSubscriptionPlanChangeRequestResponse = (postSubscriptionPlanChangeRequestResponseSuccess | postSubscriptionPlanChangeRequestResponseError)
+
+export const getPostSubscriptionPlanChangeRequestUrl = () => {
+
+
+
+
+  return `/subscriptions/plan-change-request`
+}
+
+export const postSubscriptionPlanChangeRequest = async (handlersPlanChangeRequestBody: HandlersPlanChangeRequestBody, options?: RequestInit): Promise<postSubscriptionPlanChangeRequestResponse> => {
+
+  return orvalMutator<postSubscriptionPlanChangeRequestResponse>(getPostSubscriptionPlanChangeRequestUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersPlanChangeRequestBody,)
+  }
+);}
+
+
+
+
+export const getPostSubscriptionPlanChangeRequestMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postSubscriptionPlanChangeRequest>>, TError,{data: HandlersPlanChangeRequestBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof postSubscriptionPlanChangeRequest>>, TError,{data: HandlersPlanChangeRequestBody}, TContext> => {
+
+const mutationKey = ['postSubscriptionPlanChangeRequest'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postSubscriptionPlanChangeRequest>>, {data: HandlersPlanChangeRequestBody}> = (props) => {
+          const {data} = props ?? {};
+
+          return  postSubscriptionPlanChangeRequest(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostSubscriptionPlanChangeRequestMutationResult = NonNullable<Awaited<ReturnType<typeof postSubscriptionPlanChangeRequest>>>
+    export type PostSubscriptionPlanChangeRequestMutationBody = HandlersPlanChangeRequestBody
+    export type PostSubscriptionPlanChangeRequestMutationError = string
+
+    /**
+ * @summary Request subscription plan change (Tracker ticket)
+ */
+export const usePostSubscriptionPlanChangeRequest = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postSubscriptionPlanChangeRequest>>, TError,{data: HandlersPlanChangeRequestBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postSubscriptionPlanChangeRequest>>,
+        TError,
+        {data: HandlersPlanChangeRequestBody},
+        TContext
+      > => {
+      return useMutation(getPostSubscriptionPlanChangeRequestMutationOptions(options), queryClient);
+    }
 
 /**
  * Returns all active subscription plans

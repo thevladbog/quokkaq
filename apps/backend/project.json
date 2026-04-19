@@ -16,7 +16,7 @@
     "serve": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "node scripts/ensure-air-run.js",
+        "command": "node scripts/run-backend-dev.js",
         "cwd": "apps/backend",
         "usePty": false
       }

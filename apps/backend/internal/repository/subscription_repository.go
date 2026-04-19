@@ -1,6 +1,9 @@
 package repository
 
 import (
+	"sort"
+	"strings"
+
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/pkg/database"
 )
@@ -13,6 +16,8 @@ type SubscriptionRepository interface {
 	Delete(id string) error
 	ListAllPaginated(limit, offset int) ([]models.Subscription, int64, error)
 	GetActivePlans() ([]models.SubscriptionPlan, error)
+	// GetActivePlansForTenant returns active public catalog plans plus any extra active plans by ID (e.g. tenant's non-public current plan).
+	GetActivePlansForTenant(extraPlanIDs []string) ([]models.SubscriptionPlan, error)
 	ListAllPlans() ([]models.SubscriptionPlan, error)
 	FindPlanByID(id string) (*models.SubscriptionPlan, error)
 	FindPlanByCode(code string) (*models.SubscriptionPlan, error)
@@ -63,6 +68,44 @@ func (r *subscriptionRepository) GetActivePlans() ([]models.SubscriptionPlan, er
 		Order("name ASC").
 		Find(&plans).Error
 	return plans, err
+}
+
+func (r *subscriptionRepository) GetActivePlansForTenant(extraPlanIDs []string) ([]models.SubscriptionPlan, error) {
+	public, err := r.GetActivePlans()
+	if err != nil {
+		return nil, err
+	}
+	seen := make(map[string]struct{}, len(public)+len(extraPlanIDs))
+	for _, p := range public {
+		seen[p.ID] = struct{}{}
+	}
+	var missing []string
+	for _, raw := range extraPlanIDs {
+		id := strings.TrimSpace(raw)
+		if id == "" {
+			continue
+		}
+		if _, ok := seen[id]; !ok {
+			missing = append(missing, id)
+			seen[id] = struct{}{}
+		}
+	}
+	if len(missing) == 0 {
+		return public, nil
+	}
+	var extras []models.SubscriptionPlan
+	err = database.DB.Where("is_active = ? AND id IN ?", true, missing).Find(&extras).Error
+	if err != nil {
+		return nil, err
+	}
+	out := append(append([]models.SubscriptionPlan{}, public...), extras...)
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].DisplayOrder != out[j].DisplayOrder {
+			return out[i].DisplayOrder < out[j].DisplayOrder
+		}
+		return out[i].Name < out[j].Name
+	})
+	return out, nil
 }
 
 func (r *subscriptionRepository) FindPlanByCode(code string) (*models.SubscriptionPlan, error) {

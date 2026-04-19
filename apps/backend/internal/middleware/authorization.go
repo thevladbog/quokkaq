@@ -129,28 +129,20 @@ func RequireAdminOrTenantPermission(userRepo repository.UserRepository, tr repos
 	}
 }
 
-// platformAllowTenantAdmin is true when tenant "admin" may call /platform APIs (never when APP_ENV=production).
-//   - PLATFORM_ALLOW_TENANT_ADMIN=true|1|yes: allow (non-production only).
-//   - PLATFORM_ALLOW_TENANT_ADMIN=false|0|no: never allow.
-//   - unset: allow only for typical local dev (APP_ENV empty, development, dev, local) so `go run` without .env works.
-//     Staging should set APP_ENV=staging and either assign platform_admin or set PLATFORM_ALLOW_TENANT_ADMIN=true.
+// platformAllowTenantAdmin is true when tenant "admin" may call /platform APIs.
+// Never when APP_ENV=production. Otherwise requires explicit PLATFORM_ALLOW_TENANT_ADMIN=true|1|yes.
+// Unset or false|0|no: only users with platform_admin may use /platform APIs.
 func platformAllowTenantAdmin() bool {
 	app := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV")))
 	if app == "production" {
 		return false
 	}
 	v := strings.ToLower(strings.TrimSpace(os.Getenv("PLATFORM_ALLOW_TENANT_ADMIN")))
-	if v == "false" || v == "0" || v == "no" {
-		return false
-	}
-	if v == "true" || v == "1" || v == "yes" {
-		return true
-	}
-	return app == "" || app == "development" || app == "dev" || app == "local"
+	return v == "true" || v == "1" || v == "yes"
 }
 
 // RequirePlatformAdmin allows users with the "platform_admin" role (SaaS operator).
-// When PLATFORM_ALLOW_TENANT_ADMIN is enabled and APP_ENV is not production, tenant "admin" is also allowed (local dev).
+// When PLATFORM_ALLOW_TENANT_ADMIN is explicitly enabled and APP_ENV is not production, tenant "admin" is also allowed.
 func RequirePlatformAdmin(userRepo repository.UserRepository) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

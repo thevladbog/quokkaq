@@ -220,25 +220,25 @@ go build -o quokkaq-backend cmd/api/main.go
 ./quokkaq-backend
 ```
 
-### Using Air (hot reload)
+### Monorepo dev (`nx run backend:serve`)
 
-The default dev command from the monorepo root uses Air with the committed [`.air.toml`](./.air.toml):
+The default command from the repo root runs `go run ./cmd/api` via [`scripts/run-backend-dev.js`](./scripts/run-backend-dev.js): it can free `PORT` from a previous API process and maps **Ctrl+C** to exit code **0** so Nx does not mark the task as failed after a clean shutdown (plain `go run` often returns **1** on interrupt).
 
 ```bash
 pnpm nx run backend:serve
 ```
 
-Nx `serve` uses `go install` into `tmp/air` and `exec` (not `go run`) so **Ctrl+C** returns Air’s real exit code. `go run` would always report exit code **1** on interrupt, which makes Nx show “failed tasks” even after a clean shutdown.
-
 From `apps/backend` without Nx:
 
 ```bash
-mkdir -p tmp && GOBIN="$PWD/tmp" go install github.com/air-verse/air@v1.65.1 && exec ./tmp/air
+node scripts/run-backend-dev.js
+# or
+go run ./cmd/api
 ```
 
-Optional: install the `air` binary globally (`go install github.com/air-verse/air@v1.65.1`) and run `air` in `apps/backend`.
+After changing `.go` files, restart the process manually (there is no hot reload).
 
-If Air prints **`Process Exit with Code: 1`** right after `Server starting on port …`, the API process called `log.Fatalf` — most often **`ListenAndServe: listen tcp …: bind: address already in use`**: another process (or a slow-shutting-down instance) still holds `PORT` (default **3001**). Stop the duplicate (`lsof -iTCP:3001 -sTCP:LISTEN` / Activity Monitor) or rely on the longer `kill_delay` in `.air.toml` during hot reload.
+If the API exits right after **`Server starting on port …`**, check the lines above in the log — often **`ListenAndServe: listen tcp …: bind: address already in use`**: `PORT` (default **3001**) is still held by another process. Stop it (`lsof -iTCP:3001 -sTCP:LISTEN` / Activity Monitor) or set a different `PORT`.
 
 ---
 
