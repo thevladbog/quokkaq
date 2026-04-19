@@ -31,6 +31,8 @@ type createDesktopTerminalRequest struct {
 	// ContextUnitID: subdivision or service_zone selected in the pairing wizard (required with counterId).
 	ContextUnitID *string `json:"contextUnitId"`
 	CounterID     *string `json:"counterId"`
+	// Kind: kiosk | counter_guest_survey | counter_board (required semantics: counter_* need counterId).
+	Kind string `json:"kind"`
 }
 
 type updateDesktopTerminalRequest struct {
@@ -40,6 +42,7 @@ type updateDesktopTerminalRequest struct {
 	KioskFullscreen bool    `json:"kioskFullscreen"`
 	ContextUnitID   *string `json:"contextUnitId"`
 	CounterID       *string `json:"counterId"`
+	Kind            *string `json:"kind,omitempty"`
 }
 
 type createDesktopTerminalResponse struct {
@@ -52,6 +55,7 @@ type desktopTerminalJSON struct {
 	UnitID          string  `json:"unitId"`
 	CounterID       *string `json:"counterId,omitempty"`
 	CounterName     string  `json:"counterName,omitempty"`
+	Kind            string  `json:"kind"`
 	Name            *string `json:"name,omitempty"`
 	DefaultLocale   string  `json:"defaultLocale"`
 	KioskFullscreen bool    `json:"kioskFullscreen"`
@@ -66,6 +70,7 @@ func mapTerminalToJSON(t *models.DesktopTerminal) desktopTerminalJSON {
 	out := desktopTerminalJSON{
 		ID:              t.ID,
 		UnitID:          t.UnitID,
+		Kind:            models.EffectiveTerminalKind(t),
 		Name:            t.Name,
 		DefaultLocale:   t.DefaultLocale,
 		KioskFullscreen: t.KioskFullscreen,
@@ -103,7 +108,7 @@ func (h *DesktopTerminalHandler) Create(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	row, code, err := h.service.Create(req.Name, req.UnitID, req.DefaultLocale, req.KioskFullscreen, req.ContextUnitID, req.CounterID)
+	row, code, err := h.service.Create(req.Name, req.UnitID, req.DefaultLocale, req.KioskFullscreen, req.ContextUnitID, req.CounterID, req.Kind)
 	if err != nil {
 		if errors.Is(err, services.ErrInvalidLocale) ||
 			errors.Is(err, services.ErrTerminalCounterContext) ||
@@ -113,6 +118,10 @@ func (h *DesktopTerminalHandler) Create(w http.ResponseWriter, r *http.Request) 
 		}
 		if errors.Is(err, services.ErrSurveyFeatureLocked) {
 			http.Error(w, "Counter guest survey is not enabled for your subscription", http.StatusForbidden)
+			return
+		}
+		if errors.Is(err, services.ErrCounterBoardFeatureLocked) {
+			http.Error(w, "Counter board is not enabled for your subscription", http.StatusForbidden)
 			return
 		}
 		if errors.Is(err, services.ErrUnitNotFound) ||
@@ -175,7 +184,7 @@ func (h *DesktopTerminalHandler) Update(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	err := h.service.Update(id, req.Name, req.UnitID, req.DefaultLocale, req.KioskFullscreen, req.ContextUnitID, req.CounterID)
+	err := h.service.Update(id, req.Name, req.UnitID, req.DefaultLocale, req.KioskFullscreen, req.ContextUnitID, req.CounterID, req.Kind)
 	if errors.Is(err, services.ErrInvalidLocale) ||
 		errors.Is(err, services.ErrTerminalCounterContext) ||
 		errors.Is(err, services.ErrTerminalCounterMismatch) {
@@ -184,6 +193,10 @@ func (h *DesktopTerminalHandler) Update(w http.ResponseWriter, r *http.Request) 
 	}
 	if errors.Is(err, services.ErrSurveyFeatureLocked) {
 		http.Error(w, "Counter guest survey is not enabled for your subscription", http.StatusForbidden)
+		return
+	}
+	if errors.Is(err, services.ErrCounterBoardFeatureLocked) {
+		http.Error(w, "Counter board is not enabled for your subscription", http.StatusForbidden)
 		return
 	}
 	if err != nil && (errors.Is(err, services.ErrUnitNotFound) ||
@@ -219,6 +232,7 @@ type terminalBootstrapResponse struct {
 	Token           string  `json:"token"`
 	UnitID          string  `json:"unitId"`
 	CounterID       *string `json:"counterId,omitempty"`
+	TerminalKind    string  `json:"terminalKind"`
 	DefaultLocale   string  `json:"defaultLocale"`
 	AppBaseURL      string  `json:"appBaseUrl"`
 	KioskFullscreen bool    `json:"kioskFullscreen"`
@@ -235,7 +249,7 @@ func (h *DesktopTerminalHandler) Bootstrap(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	token, unitID, loc, appBase, kioskFs, counterID, err := h.service.Bootstrap(req.Code)
+	token, unitID, loc, appBase, kioskFs, counterID, terminalKind, err := h.service.Bootstrap(req.Code)
 	if err != nil {
 		if errors.Is(err, services.ErrInvalidTerminalCode) {
 			http.Error(w, "Invalid or revoked terminal code", http.StatusUnauthorized)
@@ -250,6 +264,7 @@ func (h *DesktopTerminalHandler) Bootstrap(w http.ResponseWriter, r *http.Reques
 		Token:           token,
 		UnitID:          unitID,
 		CounterID:       counterID,
+		TerminalKind:    terminalKind,
 		DefaultLocale:   loc,
 		AppBaseURL:      appBase,
 		KioskFullscreen: kioskFs,

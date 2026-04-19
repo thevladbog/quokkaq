@@ -1595,6 +1595,23 @@ export interface ServicesCompanySSOPatch {
   ssoProtocol?: ServicesCompanySSOPatchSsoProtocol;
 }
 
+export type ServicesCounterBoardSessionUnitConfig = { [key: string]: unknown };
+
+export interface ServicesGuestSurveySessionTicket {
+  id?: string;
+  queueNumber?: string;
+  status?: string;
+}
+
+export interface ServicesCounterBoardSession {
+  activeTicket?: ServicesGuestSurveySessionTicket;
+  counterId?: string;
+  counterName?: string;
+  counterStaffed?: boolean;
+  onBreak?: boolean;
+  unitConfig?: ServicesCounterBoardSessionUnitConfig;
+}
+
 export interface ServicesCreateCalendarIntegrationRequest {
   adminNotifyEmails?: string;
   appPassword: string;
@@ -1623,12 +1640,6 @@ export interface ServicesEmployeeRadarResponse {
 export type ServicesGuestSurveySessionIdleScreen = { [key: string]: unknown };
 
 export type ServicesGuestSurveySessionUnitConfig = { [key: string]: unknown };
-
-export interface ServicesGuestSurveySessionTicket {
-  id?: string;
-  queueNumber?: string;
-  status?: string;
-}
 
 export type ServicesGuestSurveySessionSurveyCompletionMessage = { [key: string]: unknown };
 

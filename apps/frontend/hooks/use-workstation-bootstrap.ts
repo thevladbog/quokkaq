@@ -35,6 +35,77 @@ async function fetchUnitOrNull(id: string): Promise<Unit | null> {
   }
 }
 
+/**
+ * Counters attach to subdivision (workplace) rows, not to service_zone rows.
+ * Walk the org tree with `getChildUnits`:
+ * - **service_zone**: recurse into children (counters are never on the zone row).
+ * - **subdivision**: if it has children, recurse first (counters are often on leaf subdivisions
+ *   under nested zones); then include this unit too (parent may host counters directly).
+ */
+async function expandSeedUnitsForCounters(
+  seedUnitIds: string[]
+): Promise<string[]> {
+  const result: string[] = [];
+  const visited = new Set<string>();
+
+  async function expandOne(id: string, depth: number): Promise<void> {
+    const trimmed = id?.trim();
+    if (!trimmed || visited.has(trimmed)) return;
+    if (depth > MAX_ANCESTOR_DEPTH) {
+      // Do not drop deep leaves: still query counters on this unit id.
+      result.push(trimmed);
+      return;
+    }
+    visited.add(trimmed);
+
+    const u = await fetchUnitOrNull(trimmed);
+    if (!u) {
+      result.push(trimmed);
+      return;
+    }
+
+    let children: Unit[] = [];
+    try {
+      children = await unitsApi.getChildUnits(trimmed);
+    } catch {
+      result.push(trimmed);
+      return;
+    }
+
+    const kind = u.kind ?? 'subdivision';
+
+    if (kind === 'service_zone') {
+      if (children.length === 0) {
+        result.push(trimmed);
+        return;
+      }
+      for (const c of children) {
+        await expandOne(c.id, depth + 1);
+      }
+      return;
+    }
+
+    // subdivision (default): descend so we pick up workplaces under nested service zones / branches.
+    if (children.length === 0) {
+      result.push(trimmed);
+      return;
+    }
+    for (const c of children) {
+      await expandOne(c.id, depth + 1);
+    }
+    result.push(trimmed);
+  }
+
+  const uniq = [
+    ...new Set(seedUnitIds.map((id) => id?.trim()).filter(Boolean))
+  ];
+  for (const id of uniq) {
+    await expandOne(id, 0);
+  }
+  // Always include seed ids so we still query counters if expansion missed a branch.
+  return [...new Set([...uniq, ...result])];
+}
+
 async function loadUnitsWithAncestors(
   seedIds: string[]
 ): Promise<Map<string, Unit>> {
@@ -132,13 +203,27 @@ async function fetchWorkstationBootstrap(
   seedUnitIds: string[],
   unknownZoneLabel: string
 ): Promise<WorkstationBootstrapResult> {
-  const unitsById = await loadUnitsWithAncestors(seedUnitIds);
+  const expandedUnitIds = await expandSeedUnitsForCounters(seedUnitIds);
 
-  const counterLists = await Promise.all(
-    seedUnitIds.map((unitId) => countersApi.getByUnitId(unitId))
+  const unitsById = await loadUnitsWithAncestors(expandedUnitIds);
+
+  const settled = await Promise.allSettled(
+    expandedUnitIds.map((unitId) => countersApi.getByUnitId(unitId))
   );
+  const flat: Counter[] = [];
+  for (let i = 0; i < settled.length; i++) {
+    const r = settled[i];
+    if (r.status === 'fulfilled') {
+      flat.push(...r.value);
+    } else {
+      logger.warn(
+        'Failed to load counters for unit',
+        expandedUnitIds[i],
+        r.reason
+      );
+    }
+  }
 
-  const flat = counterLists.flat();
   const mine = flat.find((c) => c.assignedTo === userId);
   if (mine) {
     return {
@@ -148,15 +233,18 @@ async function fetchWorkstationBootstrap(
     };
   }
 
+  const counterUnitIds = flat.map((c) => c.unitId).filter(Boolean);
   const zoneRefIds = flat
     .map((c) => c.serviceZoneId?.trim())
     .filter((id): id is string => Boolean(id));
-  await enrichMapWithUnitIds(unitsById, zoneRefIds);
+  await enrichMapWithUnitIds(unitsById, [...counterUnitIds, ...zoneRefIds]);
 
   const built: WorkstationRow[] = [];
   for (const counter of flat) {
     const workplaceUnit = unitsById.get(counter.unitId);
-    if (!workplaceUnit) continue;
+    if (!workplaceUnit) {
+      continue;
+    }
     const { zoneFilterKey, zoneLabel } = resolveWorkstationZone(
       counter,
       workplaceUnit,

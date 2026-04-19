@@ -10,6 +10,19 @@ import (
 // PlanFeatureCounterGuestSurvey is the subscription plan.features key for guest survey at counters.
 const PlanFeatureCounterGuestSurvey = "counter_guest_survey"
 
+// PlanFeatureCounterBoard is the subscription plan.features key for above-counter ticket board terminals.
+const PlanFeatureCounterBoard = "counter_board"
+
+// CompanyHasCounterBoardFeature is true when the plan enables counter_board, or when it has websocket_updates
+// (older plans omitted counter_board in JSON; must match CounterBoardSession / ensureCounterBoardFeatureForUnit).
+func CompanyHasCounterBoardFeature(companyID string) (bool, error) {
+	ok, err := CompanyHasPlanFeature(companyID, PlanFeatureCounterBoard)
+	if err != nil || ok {
+		return ok, err
+	}
+	return CompanyHasPlanFeature(companyID, "websocket_updates")
+}
+
 // CompanyHasPlanFeature returns whether the company's subscription plan enables the feature (boolean JSON).
 func CompanyHasPlanFeature(companyID, featureKey string) (bool, error) {
 	var c models.Company

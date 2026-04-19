@@ -103,6 +103,17 @@ func RebuildUserUnitsFromTenantRoles(tx *gorm.DB, userID, companyID string) erro
 	for i := range utr {
 		roleIDs = append(roleIDs, utr[i].TenantRoleID)
 	}
+	var tenantRoles []models.TenantRole
+	if err := tx.Where("id IN ? AND company_id = ?", roleIDs, companyID).Find(&tenantRoles).Error; err != nil {
+		return err
+	}
+	hasSystemAdmin := false
+	for i := range tenantRoles {
+		if tenantRoles[i].Slug == rbac.TenantRoleSlugSystemAdmin {
+			hasSystemAdmin = true
+			break
+		}
+	}
 	var trus []models.TenantRoleUnit
 	if err := tx.Where("tenant_role_id IN ?", roleIDs).Find(&trus).Error; err != nil {
 		return err
@@ -119,6 +130,20 @@ func RebuildUserUnitsFromTenantRoles(tx *gorm.DB, userID, companyID string) erro
 			if p != "" {
 				m[p] = struct{}{}
 			}
+		}
+	}
+	// Reserved system administrator: grant full permission catalog on every unit in the company,
+	// independent of tenant_role_units gaps (new units, legacy data).
+	if hasSystemAdmin {
+		for _, uid := range unitIDs {
+			m := make(map[string]struct{})
+			for _, p := range rbac.All() {
+				p = strings.TrimSpace(p)
+				if p != "" {
+					m[p] = struct{}{}
+				}
+			}
+			permByUnit[uid] = m
 		}
 	}
 	if err := tx.Where("user_id = ? AND unit_id IN ?", userID, unitIDs).Delete(&models.UserUnit{}).Error; err != nil {

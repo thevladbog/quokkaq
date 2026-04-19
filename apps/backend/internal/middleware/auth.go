@@ -11,6 +11,23 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// jwtStringClaim returns a non-empty string claim, normalized to lowercase for UUID comparisons.
+func jwtStringClaim(claims jwt.MapClaims, key string) (string, bool) {
+	raw, ok := claims[key]
+	if !ok || raw == nil {
+		return "", false
+	}
+	s, ok := raw.(string)
+	if !ok {
+		return "", false
+	}
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return "", false
+	}
+	return strings.ToLower(s), true
+}
+
 type contextKey string
 
 const UserIDKey contextKey = "userID"
@@ -27,19 +44,22 @@ const TerminalCounterIDKey contextKey = "terminalCounterID"
 // JWTAuth is a middleware that validates JWT tokens and extracts user ID
 func JWTAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tokenString := authcookie.AccessTokenFromRequest(r)
+		// Prefer Authorization: Bearer when present so explicit credentials win over HttpOnly cookies.
+		// Otherwise a browser with both a staff session (quokkaq_access) and a terminal Bearer token
+		// would use the user JWT and terminal routes return 403 Forbidden.
+		tokenString := ""
+		if authHeader := strings.TrimSpace(r.Header.Get("Authorization")); authHeader != "" {
+			const pfx = "Bearer "
+			if len(authHeader) > len(pfx) && strings.EqualFold(authHeader[:len(pfx)], pfx) {
+				tokenString = strings.TrimSpace(authHeader[len(pfx):])
+			}
+		}
 		if tokenString == "" {
-			authHeader := r.Header.Get("Authorization")
-			if authHeader == "" {
-				http.Error(w, "Authentication required", http.StatusUnauthorized)
-				return
-			}
-			parts := strings.Split(authHeader, " ")
-			if len(parts) != 2 || parts[0] != "Bearer" {
-				http.Error(w, "Invalid authorization header format", http.StatusUnauthorized)
-				return
-			}
-			tokenString = parts[1]
+			tokenString = authcookie.AccessTokenFromRequest(r)
+		}
+		if tokenString == "" {
+			http.Error(w, "Authentication required", http.StatusUnauthorized)
+			return
 		}
 		secret := os.Getenv("JWT_SECRET")
 		if secret == "" {
@@ -77,16 +97,19 @@ func JWTAuth(next http.Handler) http.Handler {
 			http.Error(w, "Invalid user ID in token", http.StatusUnauthorized)
 			return
 		}
+		userID = strings.TrimSpace(userID)
 
 		ctx := r.Context()
 		tokenType := "user"
 		if typ, ok := claims["typ"].(string); ok && typ == "terminal" {
 			tokenType = "terminal"
-			if uid, ok := claims["unit_id"].(string); ok && strings.TrimSpace(uid) != "" {
-				ctx = context.WithValue(ctx, TerminalUnitIDKey, strings.TrimSpace(uid))
+			// Canonical form for UUID PK lookups (JWT / URL casing may differ).
+			userID = strings.ToLower(userID)
+			if uid, ok := jwtStringClaim(claims, "unit_id"); ok {
+				ctx = context.WithValue(ctx, TerminalUnitIDKey, uid)
 			}
-			if cid, ok := claims["counter_id"].(string); ok && strings.TrimSpace(cid) != "" {
-				ctx = context.WithValue(ctx, TerminalCounterIDKey, strings.TrimSpace(cid))
+			if cid, ok := jwtStringClaim(claims, "counter_id"); ok {
+				ctx = context.WithValue(ctx, TerminalCounterIDKey, cid)
 			}
 		}
 		ctx = context.WithValue(ctx, TokenTypeKey, tokenType)

@@ -171,6 +171,29 @@
   --color-kiosk-border: oklch(0.9 0.012 75);
 }
 
+/* Kiosk: fluid typography on service tiles (@container/kiosk-tile on the card) */
+@layer components {
+  .kiosk-service-tile-title {
+    line-height: 1.18;
+    font-size: clamp(1.125rem, calc(4.2cqw + 1.15vmin), 2.5rem);
+  }
+
+  .kiosk-service-tile-desc {
+    line-height: 1.35;
+    font-size: clamp(0.8125rem, calc(2.45cqw + 0.65vmin), 1.125rem);
+  }
+
+  .kiosk-welcome-title {
+    line-height: 1.1;
+    font-size: clamp(1.5rem, min(5.5vmin, 3.8vw), 2.85rem);
+  }
+
+  .kiosk-welcome-subtitle {
+    line-height: 1.35;
+    font-size: clamp(1rem, min(2.75vmin, 2.4vw), 1.35rem);
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -285,6 +308,316 @@
   .screen-called-row-shine-underlay::before {
     animation: none;
   }
+}
+
+/* Counter board /workplace-display: smooth panel morph (called ↔ in_service) */
+.workplace-display-ticket-panel {
+  transition:
+    background 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    border-radius 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    padding 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Counter board /workplace-display: «called» = green card (main stays neutral) */
+.workplace-display-called-card {
+  --workplace-called-ink: oklch(0.98 0.01 145);
+  --workplace-called-ink-muted: oklch(0.9 0.04 145);
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  overflow: hidden;
+  width: 100%;
+  max-width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: clamp(1rem, 3.5cqmin, 2.25rem);
+  padding: clamp(0.75rem, 4cqmin, 2.5rem);
+  background: linear-gradient(
+    155deg,
+    oklch(0.44 0.17 148) 0%,
+    oklch(0.38 0.16 152) 100%
+  );
+  /* Soft green glow — no black */
+  box-shadow:
+    0 0.5em 1.8em color-mix(in oklch, oklch(0.35 0.12 148) 32%, transparent),
+    inset 0 1px 0 color-mix(in oklch, white 18%, transparent);
+  animation: workplace-display-called-card-pulse 2s ease-in-out infinite;
+}
+
+/* Glass-like moving highlight (above bg, below ticket text) */
+.workplace-display-called-card::after {
+  content: '';
+  position: absolute;
+  top: -55%;
+  bottom: -55%;
+  left: -20%;
+  z-index: 1;
+  width: 48%;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    color-mix(in oklch, white 0%, transparent) 36%,
+    color-mix(in oklch, white 52%, transparent) 50%,
+    color-mix(in oklch, white 0%, transparent) 64%,
+    transparent 100%
+  );
+  opacity: 0.42;
+  transform: translateX(-160%) skewX(-16deg);
+  animation: workplace-display-called-glass-sweep 5.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.workplace-display-called-card > * {
+  position: relative;
+  z-index: 2;
+}
+
+.dark .workplace-display-called-card {
+  --workplace-called-ink: oklch(0.97 0.02 145);
+  --workplace-called-ink-muted: oklch(0.88 0.06 145);
+  background: linear-gradient(
+    155deg,
+    oklch(0.5 0.15 148) 0%,
+    oklch(0.42 0.14 152) 100%
+  );
+  box-shadow:
+    0 0.45em 1.5em color-mix(in oklch, oklch(0.2 0.08 148) 45%, transparent),
+    inset 0 1px 0 color-mix(in oklch, white 12%, transparent);
+}
+
+.dark .workplace-display-called-card::after {
+  opacity: 0.28;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    color-mix(in oklch, oklch(0.92 0.04 150) 0%, transparent) 38%,
+    color-mix(in oklch, oklch(0.96 0.03 150) 48%, transparent) 50%,
+    color-mix(in oklch, oklch(0.92 0.04 150) 0%, transparent) 62%,
+    transparent 100%
+  );
+}
+
+@keyframes workplace-display-called-glass-sweep {
+  0% {
+    transform: translateX(-165%) skewX(-16deg);
+  }
+  100% {
+    transform: translateX(290%) skewX(-16deg);
+  }
+}
+
+@keyframes workplace-display-called-card-pulse {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.06);
+  }
+}
+
+@keyframes workplace-display-called-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.88;
+  }
+  50% {
+    transform: scale(1.09);
+    opacity: 1;
+  }
+}
+
+.workplace-display-called-number {
+  color: var(--workplace-called-ink);
+  animation: workplace-display-called-breathe 1.85s ease-in-out infinite;
+}
+
+@keyframes workplace-display-called-status-emphasis {
+  0%,
+  100% {
+    opacity: 0.88;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.workplace-display-called-status {
+  color: var(--workplace-called-ink-muted) !important;
+  animation: workplace-display-called-status-emphasis 1.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workplace-display-called-card {
+    animation: none;
+  }
+
+  .workplace-display-called-card::after {
+    animation: none;
+  }
+
+  .workplace-display-called-number,
+  .workplace-display-called-status {
+    animation: none !important;
+  }
+
+  .workplace-display-break-card::after {
+    animation: none;
+  }
+}
+
+/* Counter board: break — pale yellow, glass sweep (same motion as «called» card) */
+.workplace-display-break-card {
+  --workplace-break-ink: oklch(0.38 0.04 75);
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  overflow: hidden;
+  width: 100%;
+  max-width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: clamp(1rem, 3.5cqmin, 2.25rem);
+  padding: clamp(1rem, 5cqmin, 3rem);
+  background: linear-gradient(
+    148deg,
+    oklch(0.98 0.025 102) 0%,
+    oklch(0.95 0.04 98) 45%,
+    oklch(0.93 0.05 95) 100%
+  );
+  box-shadow:
+    0 0.35em 1.2em color-mix(in oklch, oklch(0.75 0.06 95) 22%, transparent),
+    inset 0 1px 0 color-mix(in oklch, white 55%, transparent);
+}
+
+.workplace-display-break-card::after {
+  content: '';
+  position: absolute;
+  top: -55%;
+  bottom: -55%;
+  left: -20%;
+  z-index: 1;
+  width: 48%;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    color-mix(in oklch, white 0%, transparent) 36%,
+    color-mix(in oklch, white 45%, transparent) 50%,
+    color-mix(in oklch, white 0%, transparent) 64%,
+    transparent 100%
+  );
+  opacity: 0.32;
+  transform: translateX(-160%) skewX(-16deg);
+  animation: workplace-display-called-glass-sweep 5.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.workplace-display-break-card > * {
+  position: relative;
+  z-index: 2;
+}
+
+.workplace-display-break-text {
+  margin: 0;
+  max-width: 100%;
+  text-align: center;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  color: var(--workplace-break-ink);
+  font-size: clamp(2.5rem, min(22cqmin, 14vmin), 6.5rem);
+}
+
+.dark .workplace-display-break-card {
+  --workplace-break-ink: oklch(0.92 0.03 95);
+  background: linear-gradient(
+    148deg,
+    oklch(0.46 0.05 95) 0%,
+    oklch(0.4 0.06 90) 100%
+  );
+  box-shadow:
+    0 0.35em 1.2em color-mix(in oklch, oklch(0.2 0.04 90) 40%, transparent),
+    inset 0 1px 0 color-mix(in oklch, white 8%, transparent);
+}
+
+.dark .workplace-display-break-card::after {
+  opacity: 0.22;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    color-mix(in oklch, oklch(0.95 0.02 95) 0%, transparent) 38%,
+    color-mix(in oklch, white 35%, transparent) 50%,
+    color-mix(in oklch, oklch(0.95 0.02 95) 0%, transparent) 62%,
+    transparent 100%
+  );
+}
+
+/* Counter board: no operator — diagonal gray zebra across ticket area */
+.workplace-display-unstaffed-card {
+  --workplace-unstaffed-ink: oklch(0.32 0.02 264);
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  overflow: hidden;
+  width: 100%;
+  max-width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: clamp(1rem, 3.5cqmin, 2.25rem);
+  padding: clamp(1rem, 5cqmin, 3rem);
+  border: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
+  background-color: oklch(0.965 0.004 264);
+  background-image: repeating-linear-gradient(
+    -42deg,
+    oklch(0.965 0.004 264) 0px,
+    oklch(0.965 0.004 264) 18px,
+    oklch(0.88 0.006 264) 18px,
+    oklch(0.88 0.006 264) 36px
+  );
+  box-shadow: inset 0 1px 0 color-mix(in oklch, white 65%, transparent);
+}
+
+.workplace-display-unstaffed-text {
+  margin: 0;
+  max-width: 100%;
+  text-align: center;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  color: var(--workplace-unstaffed-ink);
+  font-size: clamp(2.5rem, min(22cqmin, 14vmin), 6.5rem);
+  text-shadow:
+    0 0 0.08em color-mix(in oklch, white 88%, transparent),
+    0 0.02em 0.12em color-mix(in oklch, white 35%, transparent);
+}
+
+.dark .workplace-display-unstaffed-card {
+  --workplace-unstaffed-ink: oklch(0.91 0.015 264);
+  background-color: oklch(0.3 0.012 264);
+  background-image: repeating-linear-gradient(
+    -42deg,
+    oklch(0.33 0.014 264) 0px,
+    oklch(0.33 0.014 264) 18px,
+    oklch(0.26 0.016 264) 18px,
+    oklch(0.26 0.016 264) 36px
+  );
+  border-color: color-mix(in oklch, white 14%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in oklch, white 8%, transparent);
+}
+
+.dark .workplace-display-unstaffed-text {
+  text-shadow: 0 0.06em 0.2em color-mix(in oklch, black 40%, transparent);
 }
 
 /* MDXEditor: image/link dialogs portal into this node on document.body (see @mdxeditor/editor).

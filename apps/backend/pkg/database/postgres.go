@@ -1456,6 +1456,70 @@ func RunVersionedMigrations(models ...interface{}) error {
 		return fmt.Errorf("failed to run v1.3.2_company_sso_group_mappings_xor_timestamps migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.3.3_desktop_terminal_kind", func(db *gorm.DB) error {
+		if err := db.Exec(`
+			ALTER TABLE desktop_terminals
+			ADD COLUMN IF NOT EXISTS kind VARCHAR(32) NOT NULL DEFAULT 'kiosk';
+		`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+			UPDATE desktop_terminals
+			SET kind = 'counter_guest_survey'
+			WHERE counter_id IS NOT NULL AND length(trim(counter_id)) > 0;
+		`).Error; err != nil {
+			return err
+		}
+		return db.AutoMigrate(&dbmodels.DesktopTerminal{})
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.3.3_desktop_terminal_kind migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.3.4_subscription_features_counter_board", func(db *gorm.DB) error {
+		// Enable counter board (above-counter ticket display) on all standard plans; guest survey stays gated separately.
+		return db.Exec(`
+			UPDATE subscription_plans
+			SET features = COALESCE(features::jsonb, '{}'::jsonb) || '{"counter_board": true}'::jsonb
+			WHERE code IN ('starter', 'professional', 'enterprise', 'grandfathered');
+		`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.3.4_subscription_features_counter_board migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.3.5_desktop_terminal_kind_kiosk_counter_repair", func(db *gorm.DB) error {
+		// Safety backfill: rows must not stay kind=kiosk when bound to a counter (do not edit v1.3.3 — add new migrations only).
+		return db.Exec(`
+			UPDATE desktop_terminals
+			SET kind = 'counter_guest_survey'
+			WHERE counter_id IS NOT NULL
+			  AND length(trim(counter_id)) > 0
+			  AND kind = 'kiosk';
+		`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.3.5_desktop_terminal_kind_kiosk_counter_repair migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.3.6_subscription_features_counter_board_all_plans", func(db *gorm.DB) error {
+		// v1.3.4 only updated a fixed set of plan codes; merge counter_board for every plan row (idempotent).
+		return db.Exec(`
+			UPDATE subscription_plans
+			SET features = COALESCE(features::jsonb, '{}'::jsonb) || '{"counter_board": true}'::jsonb
+		`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.3.6_subscription_features_counter_board_all_plans migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.3.7_system_admin_user_units_all_units", func(tx *gorm.DB) error {
+		return tenantroleseed.BackfillSystemAdminUserUnits(tx)
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.3.7_system_admin_user_units_all_units migration: %w", err)
+	}
+
 	fmt.Println("✅ All migrations completed successfully")
 	return nil
 }

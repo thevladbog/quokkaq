@@ -11,6 +11,9 @@ import {
 } from 'react';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useActiveCompany } from '@/contexts/ActiveCompanyContext';
+import { useTenantSystemAdminCompanyUnitSnapshot } from '@/hooks/use-tenant-system-admin-company-units';
+import { isTenantSystemAdminSlug } from '@/lib/tenant-roles';
+import { isUnitSelectableInSidebar } from '@/lib/unit-sidebar';
 
 const STORAGE_PREFIX = 'quokkaq.activeUnit.';
 
@@ -29,20 +32,49 @@ export function ActiveUnitProvider({ children }: { children: ReactNode }) {
   const { activeCompanyId } = useActiveCompany();
   const [preference, setPreference] = useState<string | null>(null);
 
-  const assignableUnitIds = useMemo(() => {
+  const assignableUnitIdsFromProfile = useMemo(() => {
     const units = user?.units;
     if (!units?.length) return [];
     const cid = activeCompanyId?.trim();
-    const ids = !cid
-      ? units.map((u: { unitId: string }) => u.unitId)
-      : units
-          .filter(
-            (u: { unitId: string; companyId?: string }) => u.companyId === cid
-          )
-          .map((u: { unitId: string }) => u.unitId);
+    const filtered = !cid
+      ? units
+      : units.filter((u: { companyId?: string }) => u.companyId === cid);
+    const ids = filtered
+      .filter((u: { unit?: { kind?: string } | null }) =>
+        isUnitSelectableInSidebar(u.unit?.kind)
+      )
+      .map((u: { unitId: string }) => u.unitId);
     // user.units can list the same unit more than once (e.g. multiple roles); keys must be unique.
     return [...new Set(ids)];
   }, [user?.units, activeCompanyId]);
+
+  const sidebarNeedsTenantAdminSnapshot =
+    (user?.tenantRoles?.some((r) => isTenantSystemAdminSlug(r.slug)) ??
+      false) &&
+    !!activeCompanyId?.trim() &&
+    assignableUnitIdsFromProfile.length === 0;
+
+  const { data: tenantAdminSnapshot } = useTenantSystemAdminCompanyUnitSnapshot(
+    activeCompanyId,
+    sidebarNeedsTenantAdminSnapshot
+  );
+
+  const assignableUnitIds = useMemo(() => {
+    if (assignableUnitIdsFromProfile.length > 0) {
+      return assignableUnitIdsFromProfile;
+    }
+    if (
+      sidebarNeedsTenantAdminSnapshot &&
+      tenantAdminSnapshot?.allIds?.length
+    ) {
+      return tenantAdminSnapshot.allIds;
+    }
+    return [];
+  }, [
+    assignableUnitIdsFromProfile,
+    sidebarNeedsTenantAdminSnapshot,
+    tenantAdminSnapshot?.allIds
+  ]);
 
   const userId = user?.id;
 

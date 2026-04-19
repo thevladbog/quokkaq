@@ -347,6 +347,13 @@ function CounterDisplayPageInner() {
           toast.error(t('wrong_terminal_type'));
           return;
         }
+        const kind =
+          res.terminalKind ??
+          (res.counterId ? 'counter_guest_survey' : 'kiosk');
+        if (kind !== 'counter_guest_survey') {
+          toast.error(t('wrong_terminal_type'));
+          return;
+        }
         localStorage.setItem(COUNTER_DISPLAY_TOKEN_KEY, res.token);
         localStorage.setItem(COUNTER_DISPLAY_UNIT_KEY, res.unitId);
         setToken(res.token);

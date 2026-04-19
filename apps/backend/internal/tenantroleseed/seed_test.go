@@ -264,6 +264,74 @@ func TestRebuildUserUnitsFromTenantRoles_rebuildsFromTRU(t *testing.T) {
 	}
 }
 
+func TestRebuildUserUnitsFromTenantRoles_systemAdminAssignsAllUnits(t *testing.T) {
+	t.Parallel()
+	db := openSeedTestDB(t)
+	const (
+		cid       = "co-sysadm"
+		u1        = "unit-s1"
+		u2        = "unit-s2"
+		uid       = "user-sysadm"
+		sysRoleID = "role-system-admin"
+	)
+	if err := db.Select("ID", "Name", "Slug").Create(&models.Company{ID: cid, Name: "C", Slug: "c"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{u1, u2} {
+		if err := db.Select("ID", "CompanyID", "Code", "Kind", "Name", "Timezone").Create(&models.Unit{
+			ID: id, CompanyID: cid, Code: id, Kind: models.UnitKindSubdivision, Name: id, Timezone: "UTC",
+		}).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := db.Select("ID", "Name").Create(&models.User{ID: uid, Name: "U"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Select("ID", "CompanyID", "Name", "Slug").Create(&models.TenantRole{
+		ID: sysRoleID, CompanyID: cid, Name: "Sys", Slug: rbac.TenantRoleSlugSystemAdmin,
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	// Only one TRU — without system_admin logic, user would get a single user_unit.
+	if err := db.Select("ID", "TenantRoleID", "UnitID", "Permissions").Create(&models.TenantRoleUnit{
+		ID:           "tru-1",
+		TenantRoleID: sysRoleID,
+		UnitID:       u1,
+		Permissions:  models.StringArray{"access.operator"},
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Select("ID", "UserID", "CompanyID", "TenantRoleID").Create(&models.UserTenantRole{
+		ID: "utr-1", UserID: uid, CompanyID: cid, TenantRoleID: sysRoleID,
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		return RebuildUserUnitsFromTenantRoles(tx, uid, cid)
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	var uus []models.UserUnit
+	if err := db.Where("user_id = ?", uid).Order("unit_id").Find(&uus).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(uus) != 2 {
+		t.Fatalf("user_units count %d want 2", len(uus))
+	}
+	wantPerms := rbac.All()
+	for _, uu := range uus {
+		got := []string(uu.Permissions)
+		slices.Sort(got)
+		cp := append([]string(nil), wantPerms...)
+		slices.Sort(cp)
+		if !slices.Equal(got, cp) {
+			t.Fatalf("unit %s permissions mismatch (len got %d want %d)", uu.UnitID, len(got), len(cp))
+		}
+	}
+}
+
 func TestRebuildUserUnitsFromTenantRoles_noRolesClearsUnits(t *testing.T) {
 	t.Parallel()
 	db := openSeedTestDB(t)

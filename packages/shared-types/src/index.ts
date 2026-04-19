@@ -596,26 +596,38 @@ export const BookingModelSchema = z.object({
   createdAt: z.string().nullable().optional()
 });
 
-export const CounterModelSchema = z.object({
-  id: z.string(),
-  unitId: z.string(),
-  serviceZoneId: z.string().nullable().optional(),
-  name: z.string(),
-  assignedTo: z.string().nullable().optional(),
-  onBreak: z.boolean().optional(),
-  breakStartedAt: z.string().nullable().optional(),
-  assignedUser: z
-    .object({
-      name: z.string()
-    })
-    .optional()
-});
+export const CounterModelSchema = z
+  .object({
+    id: z.string(),
+    unitId: z.string(),
+    serviceZoneId: z.string().nullable().optional(),
+    name: z.string(),
+    assignedTo: z.string().nullable().optional(),
+    onBreak: z.boolean().optional(),
+    breakStartedAt: z.string().nullable().optional(),
+    /** Hydrated operator; backend may send only `id` when name is omitted. */
+    assignedUser: z
+      .object({
+        name: z.string().optional()
+      })
+      .passthrough()
+      .optional()
+      .nullable()
+  })
+  .passthrough();
+
+export const DesktopTerminalKindSchema = z.enum([
+  'kiosk',
+  'counter_guest_survey',
+  'counter_board'
+]);
 
 export const DesktopTerminalSchema = z.object({
   id: z.string(),
   unitId: z.string(),
   counterId: z.string().nullable().optional(),
   counterName: z.string().optional(),
+  kind: DesktopTerminalKindSchema.optional().default('kiosk'),
   name: z.string().nullable().optional(),
   defaultLocale: z.string(),
   kioskFullscreen: z.boolean().optional().default(false),

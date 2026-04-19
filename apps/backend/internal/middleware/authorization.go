@@ -463,21 +463,50 @@ func RequireGuestSurveyCompletionImageRead(userRepo repository.UserRepository, u
 	}
 }
 
-// RequireTerminalGuestSurvey allows only a terminal JWT bound to a counter, with unit_id matching the URL unit.
-// Use after JWTAuth on /units/{unitId}/guest-survey/* routes.
-func RequireTerminalGuestSurvey(urlUnitIDParam string) func(http.Handler) http.Handler {
+// RequireTerminalUnitMatch allows only a desktop terminal JWT whose unit_id claim matches the URL unit param.
+// Does not require counter_id in the token (binding is validated in the service from DB). Use for routes that
+// scope by unit only, e.g. GET /units/{unitId}/counter-board/session.
+func RequireTerminalUnitMatch(urlUnitIDParam string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if typ, _ := r.Context().Value(TokenTypeKey).(string); typ != "terminal" {
 				http.Error(w, "Forbidden", http.StatusForbidden)
 				return
 			}
-			want := chi.URLParam(r, urlUnitIDParam)
-			if strings.TrimSpace(want) == "" {
+			want := strings.ToLower(strings.TrimSpace(chi.URLParam(r, urlUnitIDParam)))
+			if want == "" {
 				http.Error(w, "Unit ID required", http.StatusBadRequest)
 				return
 			}
 			got, ok := r.Context().Value(TerminalUnitIDKey).(string)
+			got = strings.ToLower(strings.TrimSpace(got))
+			if !ok || got != want {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// RequireTerminalWithCounter allows only a desktop terminal JWT (typ=terminal) that is bound to a counter:
+// unit_id and counter_id claims must be present, and unit_id must match the URL unit param.
+// It does not inspect terminal kind — handlers enforce guest-survey vs counter-board rules.
+// Use after JWTAuth on /units/{unitId}/guest-survey/*.
+func RequireTerminalWithCounter(urlUnitIDParam string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if typ, _ := r.Context().Value(TokenTypeKey).(string); typ != "terminal" {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+			want := strings.ToLower(strings.TrimSpace(chi.URLParam(r, urlUnitIDParam)))
+			if want == "" {
+				http.Error(w, "Unit ID required", http.StatusBadRequest)
+				return
+			}
+			got, ok := r.Context().Value(TerminalUnitIDKey).(string)
+			got = strings.ToLower(strings.TrimSpace(got))
 			if !ok || got != want {
 				http.Error(w, "Forbidden", http.StatusForbidden)
 				return

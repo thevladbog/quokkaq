@@ -32,6 +32,10 @@ import {
   useWorkstationBootstrap,
   type WorkstationRow
 } from '@/hooks/use-workstation-bootstrap';
+import { useTenantSystemAdminCompanyUnitSnapshot } from '@/hooks/use-tenant-system-admin-company-units';
+import { useActiveCompany } from '@/contexts/ActiveCompanyContext';
+import { isTenantSystemAdminSlug } from '@/lib/tenant-roles';
+import { isUnitSelectableInSidebar } from '@/lib/unit-sidebar';
 
 export type { WorkstationRow };
 
@@ -41,6 +45,7 @@ type Props = {
 
 export default function StaffWorkstationDirectory({ restrictUnitId }: Props) {
   const { user, isLoading: authLoading } = useAuthContext();
+  const { activeCompanyId } = useActiveCompany();
   const router = useRouter();
   const t = useTranslations('staff.directory');
   const tStaff = useTranslations('staff');
@@ -52,13 +57,36 @@ export default function StaffWorkstationDirectory({ restrictUnitId }: Props) {
   >('all');
   const [search, setSearch] = useState('');
 
+  const staffNeedsTenantAdminSnapshot =
+    (user?.tenantRoles?.some((r) => isTenantSystemAdminSlug(r.slug)) ??
+      false) &&
+    !!activeCompanyId?.trim() &&
+    !user?.units?.length;
+
+  const { data: tenantAdminSnapshot, isPending: tenantAdminSnapshotLoading } =
+    useTenantSystemAdminCompanyUnitSnapshot(
+      activeCompanyId,
+      staffNeedsTenantAdminSnapshot
+    );
+
   const seedUnitIds = useMemo(() => {
-    if (!user?.units?.length) return [];
-    const ids = user.units.map((u: { unitId: string }) => u.unitId);
-    if (restrictUnitId && ids.includes(restrictUnitId)) return [restrictUnitId];
+    const fromProfile = user?.units?.length
+      ? [
+          ...new Set(
+            user.units
+              .filter((u: { unit?: { kind?: string } | null }) =>
+                isUnitSelectableInSidebar(u.unit?.kind)
+              )
+              .map((u: { unitId: string }) => u.unitId)
+          )
+        ]
+      : (tenantAdminSnapshot?.rootIds ?? []);
+    if (restrictUnitId && fromProfile.includes(restrictUnitId)) {
+      return [restrictUnitId];
+    }
     if (restrictUnitId) return [];
-    return ids;
-  }, [user, restrictUnitId]);
+    return fromProfile;
+  }, [user, restrictUnitId, tenantAdminSnapshot?.rootIds]);
 
   const { rows, isLoading: bootstrapLoading } = useWorkstationBootstrap({
     authLoading,
@@ -140,7 +168,11 @@ export default function StaffWorkstationDirectory({ restrictUnitId }: Props) {
     }
   });
 
-  if (authLoading || bootstrapLoading) {
+  // Disabled useQuery stays isPending in v5; only block when we actually need the snapshot.
+  const tenantSnapshotBlocking =
+    staffNeedsTenantAdminSnapshot && tenantAdminSnapshotLoading;
+
+  if (authLoading || bootstrapLoading || tenantSnapshotBlocking) {
     return (
       <div className='flex min-h-[40vh] items-center justify-center'>
         <Loader2 className='text-primary h-10 w-10 animate-spin' />

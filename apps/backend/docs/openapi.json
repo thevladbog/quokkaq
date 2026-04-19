@@ -3592,6 +3592,29 @@
                 },
                 "type": "object"
             },
+            "services.CounterBoardSession": {
+                "properties": {
+                    "activeTicket": {
+                        "$ref": "#/components/schemas/services.GuestSurveySessionTicket"
+                    },
+                    "counterId": {
+                        "type": "string"
+                    },
+                    "counterName": {
+                        "type": "string"
+                    },
+                    "counterStaffed": {
+                        "type": "boolean"
+                    },
+                    "onBreak": {
+                        "type": "boolean"
+                    },
+                    "unitConfig": {
+                        "type": "object"
+                    }
+                },
+                "type": "object"
+            },
             "services.CreateCalendarIntegrationRequest": {
                 "properties": {
                     "adminNotifyEmails": {
@@ -15408,6 +15431,84 @@
                 "summary": "List past visits for a client",
                 "tags": [
                     "clients"
+                ]
+            }
+        },
+        "/units/{unitId}/counter-board/session": {
+            "get": {
+                "description": "Above-counter ticket display only. Does not load guest survey definitions and does not require the counter guest survey subscription feature.",
+                "operationId": "counterBoardSession",
+                "parameters": [
+                    {
+                        "description": "Subdivision unit id (queue scope)",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/services.CounterBoardSession"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Counter board session (terminal)",
+                "tags": [
+                    "guest-survey"
                 ]
             }
         },
