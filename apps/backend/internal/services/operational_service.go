@@ -3,7 +3,7 @@ package services
 import (
 	"errors"
 	"fmt"
-	"log"
+	"quokkaq-go-backend/internal/logger"
 	"strings"
 	"sync"
 	"time"
@@ -158,7 +158,7 @@ func (s *OperationalService) WakeStatisticsIfQuiet(unitID string) {
 		st.Phase = "idle"
 	}
 	if err := s.opRepo.Upsert(st); err != nil {
-		log.Printf("WakeStatisticsIfQuiet Upsert(subdivisionID=%q unitID=%q): %v", subID, unitID, err)
+		logger.Printf("WakeStatisticsIfQuiet Upsert(subdivisionID=%q unitID=%q): %v", subID, unitID, err)
 	}
 }
 
@@ -201,7 +201,7 @@ func (s *OperationalService) AbortEODFreeze(subdivisionID string) {
 func (s *OperationalService) CompleteEODPipeline(subdivisionID string) {
 	subID, resErr := s.ResolveSubdivisionForOperationalState(subdivisionID)
 	if resErr != nil {
-		log.Printf("eod pipeline: resolve subdivision %s: %v", subdivisionID, resErr)
+		logger.Printf("eod pipeline: resolve subdivision %s: %v", subdivisionID, resErr)
 		return
 	}
 	claimMu := s.eodClaimMutex(subID)
@@ -209,7 +209,7 @@ func (s *OperationalService) CompleteEODPipeline(subdivisionID string) {
 	st, err := s.getOperationalStateForRead(subID)
 	if err != nil {
 		claimMu.Unlock()
-		log.Printf("eod pipeline: get state %s: %v", subID, err)
+		logger.Printf("eod pipeline: get state %s: %v", subID, err)
 		s.AbortEODFreeze(subID)
 		return
 	}
@@ -224,7 +224,7 @@ func (s *OperationalService) CompleteEODPipeline(subdivisionID string) {
 	st.LastEODAt = &now
 	if err := s.opRepo.Upsert(st); err != nil {
 		claimMu.Unlock()
-		log.Printf("eod pipeline: begin reconcile %s: %v", subdivisionID, err)
+		logger.Printf("eod pipeline: begin reconcile %s: %v", subdivisionID, err)
 		s.AbortEODFreeze(subID)
 		return
 	}
@@ -234,7 +234,7 @@ func (s *OperationalService) CompleteEODPipeline(subdivisionID string) {
 		var rollupErr error
 		u, err := s.unitRepo.FindByIDLight(subID)
 		if err != nil {
-			log.Printf("eod pipeline: unit %s: %v", subID, err)
+			logger.Printf("eod pipeline: unit %s: %v", subID, err)
 			s.AbortEODFreeze(subID)
 			return
 		}
@@ -258,12 +258,12 @@ func (s *OperationalService) CompleteEODPipeline(subdivisionID string) {
 		}
 		st2, rerr := s.getOperationalStateForRead(subID)
 		if rerr != nil {
-			log.Printf("eod pipeline: finalize read state %s: %v", subID, rerr)
+			logger.Printf("eod pipeline: finalize read state %s: %v", subID, rerr)
 			s.AbortEODFreeze(subID)
 			return
 		}
 		if st2 == nil {
-			log.Printf("eod pipeline: finalize missing state row %s", subID)
+			logger.Printf("eod pipeline: finalize missing state row %s", subID)
 			s.AbortEODFreeze(subID)
 			return
 		}
@@ -292,7 +292,7 @@ func (s *OperationalService) CompleteEODPipeline(subdivisionID string) {
 			}
 		}
 		if upErr != nil {
-			log.Printf("eod pipeline: finalize Upsert failed unit=%s rollupErr=%v upsertErr=%v (after retries)", subID, rollupErr, upErr)
+			logger.Printf("eod pipeline: finalize Upsert failed unit=%s rollupErr=%v upsertErr=%v (after retries)", subID, rollupErr, upErr)
 			// Compensating path: clear latch flags (already intended after rollup), then retry persisting.
 			st2.ReconcileInProgress = false
 			st2.KioskFrozen = false
@@ -307,7 +307,7 @@ func (s *OperationalService) CompleteEODPipeline(subdivisionID string) {
 				}
 			}
 			if upErr != nil {
-				log.Printf("eod pipeline: compensating Upsert failed unit=%s rollupErr=%v upsertErr=%v; forcing AbortEODFreeze", subID, rollupErr, upErr)
+				logger.Printf("eod pipeline: compensating Upsert failed unit=%s rollupErr=%v upsertErr=%v; forcing AbortEODFreeze", subID, rollupErr, upErr)
 				s.AbortEODFreeze(subID)
 			}
 		}

@@ -2,9 +2,9 @@ package middleware
 
 import (
 	"errors"
-	"log"
 	"net/http"
 	"os"
+	"quokkaq-go-backend/internal/logger"
 	"quokkaq-go-backend/internal/repository"
 	"strings"
 
@@ -20,7 +20,7 @@ func RespondRepoFindError(w http.ResponseWriter, err error, op string) bool {
 		http.Error(w, "Not found", http.StatusNotFound)
 		return true
 	}
-	log.Printf("%s: %v", op, err)
+	logger.Printf("%s: %v", op, err)
 	http.Error(w, "Internal server error", http.StatusInternalServerError)
 	return true
 }
@@ -40,7 +40,7 @@ func RequireSupportReportAccess(userRepo repository.UserRepository) func(http.Ha
 			}
 			allowed, err := userRepo.HasSupportReportAccess(userID)
 			if err != nil {
-				log.Printf("RequireSupportReportAccess: userID=%s: %v", userID, err)
+				logger.PrintfCtx(r.Context(), "RequireSupportReportAccess: userID=%s: %v", userID, err)
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}

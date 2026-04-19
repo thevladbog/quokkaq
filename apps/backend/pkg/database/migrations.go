@@ -2,7 +2,7 @@ package database
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"gorm.io/gorm"
@@ -69,11 +69,11 @@ func (m *MigrationManager) RunMigration(version string, migrationFunc func(*gorm
 			return fmt.Errorf("failed to check migration status: %w", err)
 		}
 		if count > 0 {
-			log.Printf("⏭️ Migration %s already applied, skipping", version)
+			slog.Info(fmt.Sprintf("⏭️ Migration %s already applied, skipping", version))
 			return nil
 		}
 
-		log.Printf("🔄 Applying migration %s...", version)
+		slog.Info(fmt.Sprintf("🔄 Applying migration %s...", version))
 		if err := migrationFunc(tx); err != nil {
 			return fmt.Errorf("failed to apply migration %s: %w", version, err)
 		}
@@ -86,7 +86,7 @@ func (m *MigrationManager) RunMigration(version string, migrationFunc func(*gorm
 			return fmt.Errorf("failed to mark migration %s as applied: %w", version, err)
 		}
 
-		log.Printf("✅ Migration %s applied successfully", version)
+		slog.Info(fmt.Sprintf("✅ Migration %s applied successfully", version))
 		return nil
 	})
 }

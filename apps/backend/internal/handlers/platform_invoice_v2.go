@@ -3,9 +3,9 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"log"
 	"math"
 	"net/http"
+	"quokkaq-go-backend/internal/logger"
 	"strings"
 	"time"
 
@@ -280,7 +280,7 @@ func (h *PlatformHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 			http.Error(w, "Company not found", http.StatusNotFound)
 			return
 		}
-		log.Printf("CreateInvoice Find company: %v", err)
+		logger.PrintfCtx(r.Context(), "CreateInvoice Find company: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -315,14 +315,14 @@ func (h *PlatformHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 	if err := database.DB.Transaction(func(tx *gorm.DB) error {
 		return h.invoiceRepo.CreateWithLinesInTx(tx, &inv, lines)
 	}); err != nil {
-		log.Printf("CreateInvoice tx: %v", err)
+		logger.PrintfCtx(r.Context(), "CreateInvoice tx: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-	log.Printf("platform_admin invoice draft user=%s invoice=%s company=%s", userID, inv.ID, body.CompanyID)
+	logger.PrintfCtx(r.Context(), "platform_admin invoice draft user=%s invoice=%s company=%s", userID, inv.ID, body.CompanyID)
 	out, err := h.invoiceRepo.FindByIDWithLines(inv.ID)
 	if err != nil {
-		log.Printf("CreateInvoice FindByIDWithLines: %v", err)
+		logger.PrintfCtx(r.Context(), "CreateInvoice FindByIDWithLines: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -365,7 +365,7 @@ func (h *PlatformHandler) PatchInvoiceDraft(w http.ResponseWriter, r *http.Reque
 			http.Error(w, "Not found", http.StatusNotFound)
 			return
 		}
-		log.Printf("PatchInvoiceDraft: %v", err)
+		logger.PrintfCtx(r.Context(), "PatchInvoiceDraft: %v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -465,7 +465,7 @@ func (h *PlatformHandler) IssueInvoice(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		log.Printf("IssueInvoice tx: %v", err)
+		logger.PrintfCtx(r.Context(), "IssueInvoice tx: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -498,7 +498,7 @@ func (h *PlatformHandler) GetPlatformInvoice(w http.ResponseWriter, r *http.Requ
 			http.Error(w, "Not found", http.StatusNotFound)
 			return
 		}
-		log.Printf("GetPlatformInvoice: %v", err)
+		logger.PrintfCtx(r.Context(), "GetPlatformInvoice: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}

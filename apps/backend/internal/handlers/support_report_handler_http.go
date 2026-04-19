@@ -1,7 +1,8 @@
 package handlers
 
 import (
-	"log"
+	"fmt"
+	"log/slog"
 	"net/http"
 
 	"quokkaq-go-backend/internal/services"
@@ -10,7 +11,7 @@ import (
 // writeSupportReportUpstreamHTTPError logs err, maps upstream HTTP 503 to 503, and other
 // TicketIntegrationHTTPStatus errors to 502 with clientMsg502.
 func writeSupportReportUpstreamHTTPError(w http.ResponseWriter, err error, logMsg string, clientMsg502 string) {
-	log.Printf(logMsg, err)
+	slog.Error(fmt.Sprintf(logMsg, err))
 	if st, ok := services.TicketIntegrationHTTPStatus(err); ok && st == http.StatusServiceUnavailable {
 		http.Error(w, "External ticketing service is temporarily unavailable", http.StatusServiceUnavailable)
 		return

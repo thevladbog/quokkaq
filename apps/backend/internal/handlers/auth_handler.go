@@ -3,9 +3,9 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
 	"net/url"
+	"quokkaq-go-backend/internal/logger"
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/pkg/authcookie"
@@ -270,7 +270,7 @@ func (h *AuthHandler) PatchMe(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		log.Printf("PatchMe: UpdateUser error: %v", err)
+		logger.PrintfCtx(r.Context(), "PatchMe: UpdateUser error: %v", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -278,11 +278,11 @@ func (h *AuthHandler) PatchMe(w http.ResponseWriter, r *http.Request) {
 	user, err := h.service.GetMe(userID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			log.Printf("PatchMe: GetMe after update: user not found: %v", err)
+			logger.PrintfCtx(r.Context(), "PatchMe: GetMe after update: user not found: %v", err)
 			http.Error(w, "User not found", http.StatusNotFound)
 			return
 		}
-		log.Printf("PatchMe: GetMe after update error: %v", err)
+		logger.PrintfCtx(r.Context(), "PatchMe: GetMe after update error: %v", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -348,7 +348,7 @@ func (h *AuthHandler) ListAccessibleCompanies(w http.ResponseWriter, r *http.Req
 	q := r.URL.Query().Get("q")
 	rows, err := h.userRepo.ListAccessibleCompanies(userID, q)
 	if err != nil {
-		log.Printf("ListAccessibleCompanies: %v", err)
+		logger.PrintfCtx(r.Context(), "ListAccessibleCompanies: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -484,7 +484,7 @@ func (h *AuthHandler) Signup(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusServiceUnavailable)
 			return
 		}
-		log.Printf("Signup: %v", err)
+		logger.PrintfCtx(r.Context(), "Signup: %v", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}

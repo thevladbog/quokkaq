@@ -3,8 +3,9 @@ package database
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
+	applogger "quokkaq-go-backend/internal/logger"
 	dbmodels "quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/pkg/tenantslug"
 	"quokkaq-go-backend/internal/tenantroleseed"
@@ -13,7 +14,7 @@ import (
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
+	gormlogger "gorm.io/gorm/logger"
 )
 
 var DB *gorm.DB
@@ -42,19 +43,19 @@ func Connect() {
 	}
 
 	if dsn == "" {
-		log.Fatal("❌ DATABASE_URL or DB_* environment variables are not set")
+		applogger.Fatal("DATABASE_URL or DB_* environment variables are not set")
 	}
 
 	var err error
 	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
-		Logger:                                   logger.Default.LogMode(logger.Silent), // Suppress migration logs
-		DisableForeignKeyConstraintWhenMigrating: true,                                  // Disable FK constraints during migration
+		Logger:                                   gormlogger.Default.LogMode(gormlogger.Silent), // Suppress migration logs
+		DisableForeignKeyConstraintWhenMigrating: true,                                          // Disable FK constraints during migration
 	})
 	if err != nil {
-		log.Fatal("❌ Failed to connect to database:", err)
+		applogger.Fatal("failed to connect to database", "err", err)
 	}
 
-	fmt.Println("✅ Database connected successfully")
+	slog.Info("database connected")
 }
 
 // requirePostgresAtLeastVersionNum fails if server_version_num < minNum (e.g. 160000 = PostgreSQL 16.0).
@@ -91,9 +92,9 @@ func Ping(ctx context.Context) error {
 func AutoMigrate(models ...interface{}) {
 	err := DB.AutoMigrate(models...)
 	if err != nil {
-		log.Fatal("❌ Failed to migrate database:", err)
+		applogger.Fatal("failed to migrate database", "err", err)
 	}
-	fmt.Println("✅ Database migration completed")
+	slog.Info("database migration completed")
 }
 
 // RunVersionedMigrations initializes migration tracking and runs all migrations

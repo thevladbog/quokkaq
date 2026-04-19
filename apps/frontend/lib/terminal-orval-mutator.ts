@@ -1,5 +1,8 @@
 import { throwApiHttpErrorFromBody } from './api-errors';
-import { API_BASE_URL } from './authenticated-api-fetch';
+import {
+  API_BASE_URL,
+  fetchInitWithRequestId
+} from './authenticated-api-fetch';
 
 /**
  * Orval mutator for counter-display terminal JWT (no staff refresh).
@@ -9,7 +12,10 @@ export async function terminalOrvalMutator<T>(
   url: string,
   init: RequestInit = {}
 ): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${url}`, init);
+  const response = await fetch(
+    `${API_BASE_URL}${url}`,
+    fetchInitWithRequestId(init)
+  );
 
   if (response.status === 204 || response.status === 205) {
     return {

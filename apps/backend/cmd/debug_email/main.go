@@ -3,9 +3,9 @@ package main
 import (
 	"crypto/tls"
 	"fmt"
-	"log"
 	"net/smtp"
 	"os"
+	"quokkaq-go-backend/internal/logger"
 
 	"github.com/joho/godotenv"
 )
@@ -15,9 +15,10 @@ func main() {
 	if err := godotenv.Load(); err != nil {
 		// If failed, try loading from two levels up (if running from cmd/debug_email)
 		if err := godotenv.Load("../../.env"); err != nil {
-			log.Println("Warning: .env file not found or could not be loaded.")
+			fmt.Fprintln(os.Stderr, "Warning: .env file not found or could not be loaded.")
 		}
 	}
+	logger.Init()
 
 	host := os.Getenv("SMTP_HOST")
 	port := os.Getenv("SMTP_PORT")
@@ -68,7 +69,7 @@ func main() {
 		c, err := smtp.Dial(addr)
 		if err != nil {
 			fmt.Printf("   ❌ Connection to %s failed: %v\n", addr, err)
-			log.Fatal("All connection attempts failed.")
+			logger.Fatal("all connection attempts failed")
 		}
 		fmt.Println("   ✅ Connected to server!")
 

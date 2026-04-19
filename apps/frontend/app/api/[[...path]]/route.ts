@@ -31,7 +31,10 @@ async function proxy(req: NextRequest, ctx: RouteCtx): Promise<Response> {
     'content-type',
     'accept-language',
     'accept',
-    'x-company-id'
+    'x-company-id',
+    'x-request-id',
+    'traceparent',
+    'tracestate'
   ]) {
     const v = req.headers.get(name);
     if (v) headers.set(name, v);

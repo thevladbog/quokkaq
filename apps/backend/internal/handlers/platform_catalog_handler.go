@@ -3,8 +3,8 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
+	"quokkaq-go-backend/internal/logger"
 	"strings"
 
 	"quokkaq-go-backend/internal/middleware"
@@ -31,7 +31,7 @@ func (h *PlatformHandler) ListCatalogItems(w http.ResponseWriter, r *http.Reques
 	limit, offset := platformParseCatalogLimitOffset(r)
 	items, total, err := h.catalogRepo.ListAll(limit, offset)
 	if err != nil {
-		log.Printf("ListCatalogItems: %v", err)
+		logger.PrintfCtx(r.Context(), "ListCatalogItems: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -78,7 +78,7 @@ func (h *PlatformHandler) GetCatalogItem(w http.ResponseWriter, r *http.Request)
 			http.Error(w, "Not found", http.StatusNotFound)
 			return
 		}
-		log.Printf("GetCatalogItem: %v", err)
+		logger.PrintfCtx(r.Context(), "GetCatalogItem: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -149,7 +149,7 @@ func (h *PlatformHandler) CreateCatalogItem(w http.ResponseWriter, r *http.Reque
 				http.Error(w, "Unknown subscriptionPlanId", http.StatusBadRequest)
 				return
 			}
-			log.Printf("CreateCatalogItem FindPlanByID: %v", err)
+			logger.PrintfCtx(r.Context(), "CreateCatalogItem FindPlanByID: %v", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -168,13 +168,13 @@ func (h *PlatformHandler) CreateCatalogItem(w http.ResponseWriter, r *http.Reque
 		IsActive:           active,
 	}
 	if err := h.catalogRepo.Create(item); err != nil {
-		log.Printf("CreateCatalogItem: %v", err)
+		logger.PrintfCtx(r.Context(), "CreateCatalogItem: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 	out, err := h.catalogRepo.FindByID(item.ID)
 	if err != nil {
-		log.Printf("CreateCatalogItem FindByID after create: %v", err)
+		logger.PrintfCtx(r.Context(), "CreateCatalogItem FindByID after create: %v", err)
 		RespondJSONWithStatus(w, http.StatusCreated, item)
 		return
 	}
@@ -209,7 +209,7 @@ func (h *PlatformHandler) PatchCatalogItem(w http.ResponseWriter, r *http.Reques
 			http.Error(w, "Not found", http.StatusNotFound)
 			return
 		}
-		log.Printf("PatchCatalogItem FindByID: %v", err)
+		logger.PrintfCtx(r.Context(), "PatchCatalogItem FindByID: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -252,7 +252,7 @@ func (h *PlatformHandler) PatchCatalogItem(w http.ResponseWriter, r *http.Reques
 					http.Error(w, "Unknown subscriptionPlanId", http.StatusBadRequest)
 					return
 				}
-				log.Printf("PatchCatalogItem FindPlanByID: %v", err)
+				logger.PrintfCtx(r.Context(), "PatchCatalogItem FindPlanByID: %v", err)
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
@@ -263,13 +263,13 @@ func (h *PlatformHandler) PatchCatalogItem(w http.ResponseWriter, r *http.Reques
 		item.IsActive = *body.IsActive
 	}
 	if err := h.catalogRepo.Update(item); err != nil {
-		log.Printf("PatchCatalogItem: %v", err)
+		logger.PrintfCtx(r.Context(), "PatchCatalogItem: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 	out, err := h.catalogRepo.FindByID(id)
 	if err != nil {
-		log.Printf("PatchCatalogItem FindByID after update: %v", err)
+		logger.PrintfCtx(r.Context(), "PatchCatalogItem FindByID after update: %v", err)
 		RespondJSON(w, item)
 		return
 	}
@@ -300,12 +300,12 @@ func (h *PlatformHandler) DeleteCatalogItem(w http.ResponseWriter, r *http.Reque
 			http.Error(w, "Not found", http.StatusNotFound)
 			return
 		}
-		log.Printf("DeleteCatalogItem FindByID: %v", err)
+		logger.PrintfCtx(r.Context(), "DeleteCatalogItem FindByID: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 	if err := h.catalogRepo.Delete(id); err != nil {
-		log.Printf("DeleteCatalogItem: %v", err)
+		logger.PrintfCtx(r.Context(), "DeleteCatalogItem: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}

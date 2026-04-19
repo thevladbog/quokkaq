@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"log"
 	"net/http"
+	"quokkaq-go-backend/internal/logger"
 	"strings"
 
 	"quokkaq-go-backend/internal/localeutil"
@@ -118,7 +118,7 @@ func (h *TicketHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 		go func() {
 			defer func() {
 				if rec := recover(); rec != nil {
-					log.Printf("CreateTicket WakeStatisticsIfQuiet panic (unitID=%q): %v", uid, rec)
+					logger.PrintfCtx(r.Context(), "CreateTicket WakeStatisticsIfQuiet panic (unitID=%q): %v", uid, rec)
 				}
 			}()
 			op.WakeStatisticsIfQuiet(uid)

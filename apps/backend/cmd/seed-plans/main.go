@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"quokkaq-go-backend/internal/config"
+	"quokkaq-go-backend/internal/logger"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/pkg/database"
 	"quokkaq-go-backend/pkg/plans"
@@ -41,6 +41,7 @@ func planSeedAllowInstantPurchase(code string) bool {
 
 func main() {
 	config.Load()
+	logger.Init()
 	database.Connect()
 
 	fmt.Println("Seeding subscription plans...")
@@ -50,13 +51,13 @@ func main() {
 	for _, planDef := range plans.Plans {
 		limitsJSON, err := planDef.LimitsJSON()
 		if err != nil {
-			log.Printf("Failed to marshal limits for plan %s: %v", planDef.Code, err)
+			logger.Printf("Failed to marshal limits for plan %s: %v", planDef.Code, err)
 			continue
 		}
 
 		featuresJSON, err := planDef.FeaturesJSON()
 		if err != nil {
-			log.Printf("Failed to marshal features for plan %s: %v", planDef.Code, err)
+			logger.Printf("Failed to marshal features for plan %s: %v", planDef.Code, err)
 			continue
 		}
 
@@ -80,14 +81,14 @@ func main() {
 				AllowInstantPurchase: planSeedAllowInstantPurchase(planDef.Code),
 			}
 			if err := db.Create(plan).Error; err != nil {
-				log.Printf("Failed to create plan %s: %v", planDef.Code, err)
+				logger.Printf("Failed to create plan %s: %v", planDef.Code, err)
 				continue
 			}
 			fmt.Printf("✓ Created plan: %s (%s)\n", planDef.Name, planDef.Code)
 			continue
 		}
 		if err != nil {
-			log.Printf("Failed to look up plan %s: %v", planDef.Code, err)
+			logger.Printf("Failed to look up plan %s: %v", planDef.Code, err)
 			continue
 		}
 
@@ -108,7 +109,7 @@ func main() {
 			existing.LimitsNegotiable = json.RawMessage("{}")
 		}
 		if err := db.Save(&existing).Error; err != nil {
-			log.Printf("Failed to update plan %s: %v", planDef.Code, err)
+			logger.Printf("Failed to update plan %s: %v", planDef.Code, err)
 			continue
 		}
 		fmt.Printf("✓ Updated plan: %s (%s)\n", planDef.Name, planDef.Code)

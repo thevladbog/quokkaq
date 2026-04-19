@@ -341,13 +341,23 @@ export default function LoginPage() {
                   </Alert>
                 ) : null}
                 {subStep === 'email' ? (
-                  <div className='space-y-4'>
+                  <form
+                    className='space-y-4'
+                    method='post'
+                    action='#'
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      void continueFromEmail();
+                    }}
+                  >
                     <div className='grid gap-2'>
                       <Label htmlFor='email'>{t('workEmail')}</Label>
                       <Input
                         id='email'
+                        name='username'
                         type='email'
-                        autoComplete='email'
+                        inputMode='email'
+                        autoComplete='username'
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         required
@@ -355,9 +365,8 @@ export default function LoginPage() {
                       />
                     </div>
                     <Button
-                      type='button'
+                      type='submit'
                       className='w-full'
-                      onClick={() => void continueFromEmail()}
                       disabled={hintLoading}
                     >
                       {hintLoading ? (
@@ -366,7 +375,7 @@ export default function LoginPage() {
                         t('continue')
                       )}
                     </Button>
-                  </div>
+                  </form>
                 ) : (
                   <form onSubmit={handleSubmit} className='space-y-4'>
                     {tenantBanner ? (
@@ -425,8 +434,10 @@ export default function LoginPage() {
                       <Label htmlFor='login-email'>{t('email')}</Label>
                       <Input
                         id='login-email'
+                        name='username'
                         type='email'
-                        autoComplete='email'
+                        inputMode='email'
+                        autoComplete='username'
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         required
@@ -438,6 +449,7 @@ export default function LoginPage() {
                       <Label htmlFor='password'>{t('password')}</Label>
                       <Input
                         id='password'
+                        name='password'
                         type='password'
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}

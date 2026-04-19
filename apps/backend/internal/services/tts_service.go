@@ -3,7 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
-	"log"
+	"quokkaq-go-backend/internal/logger"
 	"time"
 )
 
@@ -20,7 +20,7 @@ func NewTtsService(storage StorageService) TtsService {
 }
 
 func (s *ttsService) GenerateAndUpload(ctx context.Context, text string, ticketID string) (string, error) {
-	log.Printf("Generating TTS for text: %s", text)
+	logger.Printf("Generating TTS for text: %s", text)
 
 	// Simulate TTS generation delay (respect cancellation / deadlines)
 	select {
@@ -41,6 +41,6 @@ func (s *ttsService) GenerateAndUpload(ctx context.Context, text string, ticketI
 		return "", err
 	}
 
-	log.Printf("TTS generated and uploaded to: %s", url)
+	logger.Printf("TTS generated and uploaded to: %s", url)
 	return url, nil
 }

@@ -3,19 +3,21 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"quokkaq-go-backend/internal/config"
 	"quokkaq-go-backend/internal/handlers"
 	"quokkaq-go-backend/internal/jobs"
+	"quokkaq-go-backend/internal/logger"
 	authmiddleware "quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/rbac"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
 	"quokkaq-go-backend/internal/services/billing"
+	"quokkaq-go-backend/internal/telemetry"
 	"quokkaq-go-backend/internal/ws"
 	"quokkaq-go-backend/pkg/database"
 	"runtime"
@@ -28,6 +30,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 // @title           QuokkaQ Go Backend API
@@ -50,6 +53,7 @@ import (
 // @name Authorization
 func main() {
 	config.Load()
+	logger.Init()
 	database.Connect()
 
 	runAutoMigrate := true
@@ -117,7 +121,7 @@ func main() {
 			&models.SupportReport{},
 		)
 		if err != nil {
-			log.Fatalf("❌ Failed to run migrations: %v", err)
+			logger.Fatal("failed to run migrations", "err", err)
 		}
 	}
 
@@ -127,7 +131,7 @@ func main() {
 	jobClient := jobs.NewJobClient()
 	defer func() {
 		if err := jobClient.Close(); err != nil {
-			fmt.Printf("Error closing job client: %v\n", err)
+			slog.Error("error closing job client", "err", err)
 		}
 	}()
 
@@ -161,7 +165,7 @@ func main() {
 	tenantRBACRepo := repository.NewTenantRBACRepository()
 	authService, err := services.NewAuthService(userRepo, companyRepo, mailService, subscriptionRepo, tenantRBACRepo)
 	if err != nil {
-		log.Fatalf("auth service: %v", err)
+		logger.Fatal("auth service", "err", err)
 	}
 	ssoRepo := repository.NewSSORepository()
 	ssoService := services.NewSSOService(companyRepo, userRepo, ssoRepo, unitRepo, tenantRBACRepo, authService)
@@ -196,13 +200,13 @@ func main() {
 			case <-ticker.C:
 				rows, err := calendarIntegrationRepo.ListEnabled()
 				if err != nil {
-					log.Printf("calendar ListEnabled: %v", err)
+					slog.Error("calendar ListEnabled", "err", err)
 					continue
 				}
 				for i := range rows {
 					iid := rows[i].ID
 					if err := calendarIntegrationService.SyncIntegration(context.Background(), iid); err != nil {
-						log.Printf("calendar SyncIntegration %s: %v", iid, err)
+						slog.Error("calendar SyncIntegration", "integration_id", iid, "err", err)
 					}
 				}
 			}
@@ -280,7 +284,7 @@ func main() {
 	if yookassaInvoiceReady {
 		yooInvoice = billing.NewYooKassaInvoiceClient(yShop, ySecret, yWebhook)
 	} else if yShop != "" || ySecret != "" || yWebhook != "" || yReturn != "" {
-		log.Printf("YooKassa invoice integration disabled: incomplete env (need non-empty YOOKASSA_SHOP_ID, YOOKASSA_SECRET_KEY, and YOOKASSA_PAYMENT_RETURN_URL or PUBLIC_APP_URL (unless APP_ENV is local dev for localhost fallback only); optional YOOKASSA_WEBHOOK_SECRET falls back to shop secret)")
+		slog.Warn("YooKassa invoice integration disabled: incomplete env (need non-empty YOOKASSA_SHOP_ID, YOOKASSA_SECRET_KEY, and YOOKASSA_PAYMENT_RETURN_URL or PUBLIC_APP_URL (unless APP_ENV is local dev for localhost fallback only); optional YOOKASSA_WEBHOOK_SECRET falls back to shop secret)")
 	}
 
 	invoiceHandler := handlers.NewInvoiceHandler(
@@ -296,6 +300,15 @@ func main() {
 	dadataHandler := handlers.NewDaDataHandler()
 
 	r := chi.NewRouter()
+	r.Use(middleware.RequestID)
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if id := middleware.GetReqID(r.Context()); id != "" {
+				w.Header().Set(middleware.RequestIDHeader, id)
+			}
+			next.ServeHTTP(w, r)
+		})
+	})
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(authmiddleware.LocaleMiddleware)
@@ -314,8 +327,8 @@ func main() {
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   allowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
-		AllowedHeaders:   []string{"Accept", "Accept-Language", "Authorization", "Content-Type", "X-CSRF-Token", "X-Company-Id"},
-		ExposedHeaders:   []string{"Link"},
+		AllowedHeaders:   []string{"Accept", "Accept-Language", "Authorization", "Content-Type", "X-CSRF-Token", "X-Company-Id", "X-Request-Id", "traceparent", "tracestate"},
+		ExposedHeaders:   []string{"Link", "X-Request-Id", "traceparent", "tracestate"},
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
@@ -327,7 +340,7 @@ func main() {
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		if _, err := w.Write([]byte("Hello from QuokkaQ Go Backend!")); err != nil {
-			fmt.Printf("Error writing response: %v\n", err)
+			slog.ErrorContext(r.Context(), "error writing response", "err", err)
 		}
 	})
 
@@ -363,7 +376,7 @@ func main() {
 		}
 
 		if _, err := fmt.Fprintln(w, htmlContent); err != nil {
-			fmt.Printf("Error writing API reference: %v\n", err)
+			slog.ErrorContext(r.Context(), "error writing API reference", "err", err)
 		}
 	})
 
@@ -748,15 +761,29 @@ func main() {
 		})
 	})
 
+	shutdownOtel, err := telemetry.Setup(context.Background())
+	if err != nil {
+		logger.Fatal("telemetry setup", "err", err)
+	}
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := shutdownOtel(ctx); err != nil {
+			slog.Error("telemetry shutdown", "err", err)
+		}
+	}()
+
+	otelHandler := otelhttp.NewHandler(r, "quokkaq-api")
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "3001"
 	}
 
-	fmt.Printf("Server starting on port %s\n", port)
+	slog.Info("server starting", "port", port)
 	srv := &http.Server{
 		Addr:              ":" + port,
-		Handler:           r,
+		Handler:           otelHandler,
 		ReadHeaderTimeout: 15 * time.Second,
 		ReadTimeout:       60 * time.Second,
 		WriteTimeout:      60 * time.Second,
@@ -777,14 +804,17 @@ func main() {
 	select {
 	case err := <-errCh:
 		if err != nil && err != http.ErrServerClosed {
-			log.Fatalf("ListenAndServe: %v", err)
+			shCtx, shCancel := context.WithTimeout(context.Background(), 10*time.Second)
+			_ = shutdownOtel(shCtx)
+			shCancel()
+			logger.Fatal("ListenAndServe", "err", err)
 		}
 	case <-quit:
 		refreshCancel()
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		if err := srv.Shutdown(ctx); err != nil {
-			log.Printf("Server shutdown: %v", err)
+			slog.Error("server shutdown", "err", err)
 		}
 	}
 }

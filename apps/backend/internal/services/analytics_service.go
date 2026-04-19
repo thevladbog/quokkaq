@@ -3,7 +3,7 @@ package services
 import (
 	"errors"
 	"fmt"
-	"log"
+	"quokkaq-go-backend/internal/logger"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/pkg/database"
 	"time"
@@ -37,7 +37,7 @@ func (s *analyticsService) TrackEvent(companyID, event string, properties map[st
 	// 1. Send to external analytics platform (Mixpanel, Amplitude, etc.)
 	// 2. Store in a separate analytics table
 	// 3. Trigger webhooks
-	
+
 	// For now, we'll just log usage for quota tracking
 	return nil
 }
@@ -96,7 +96,7 @@ func SyncCurrentUsageToRecords(companyID string) error {
 	for _, metric := range metrics {
 		current, err := quotaService.GetCurrentUsage(companyID, metric)
 		if err != nil {
-			log.Printf("SyncCurrentUsageToRecords company=%s metric=%s: %v", companyID, metric, err)
+			logger.Printf("SyncCurrentUsageToRecords company=%s metric=%s: %v", companyID, metric, err)
 			syncErrs = append(syncErrs, fmt.Errorf("metric %q: %w", metric, err))
 			continue
 		}

@@ -5,8 +5,8 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"log"
 	"math/big"
+	"quokkaq-go-backend/internal/logger"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
 	"sort"
@@ -169,7 +169,7 @@ func (s *PreRegistrationService) Update(ctx context.Context, previous *models.Pr
 				if previous.ExternalEventHref != nil {
 					href = *previous.ExternalEventHref
 				}
-				log.Printf("pre-registration cancel: database update failed after CalDAV ReleaseFreeSlot (reconcile DB vs calendar): preRegID=%s unitID=%s externalEventHref=%s err=%v",
+				logger.Printf("pre-registration cancel: database update failed after CalDAV ReleaseFreeSlot (reconcile DB vs calendar): preRegID=%s unitID=%s externalEventHref=%s err=%v",
 					previous.ID, previous.UnitID, href, err)
 				return fmt.Errorf("%w: %w", ErrPreRegistrationCancelPersistAfterCalendarRelease, err)
 			}
@@ -226,13 +226,13 @@ func (s *PreRegistrationService) Update(ctx context.Context, previous *models.Pr
 
 			integOld, err := s.calendar.ResolveIntegrationForRelease(previous)
 			if err != nil {
-				log.Printf("pre-registration reschedule: resolve old integration for release: %v", err)
+				logger.Printf("pre-registration reschedule: resolve old integration for release: %v", err)
 				return nil
 			}
 			if integOld != nil && integOld.Enabled {
 				oldSvc, err := s.serviceRepo.FindByID(previous.ServiceID)
 				if err != nil {
-					log.Printf("pre-registration reschedule: load old service for calendar release: %v", err)
+					logger.Printf("pre-registration reschedule: load old service for calendar release: %v", err)
 					return nil
 				}
 				oldEtag := ""
@@ -240,7 +240,7 @@ func (s *PreRegistrationService) Update(ctx context.Context, previous *models.Pr
 					oldEtag = *previous.ExternalEventETag
 				}
 				if err := s.calendar.ReleaseFreeSlot(ctx, integOld, oldSvc, *previous.ExternalEventHref, oldEtag); err != nil {
-					log.Printf("pre-registration reschedule: release old calendar slot failed (retry/async cleanup recommended): href=%s err=%v", *previous.ExternalEventHref, err)
+					logger.Printf("pre-registration reschedule: release old calendar slot failed (retry/async cleanup recommended): href=%s err=%v", *previous.ExternalEventHref, err)
 				}
 			}
 			return nil
@@ -254,13 +254,13 @@ func (s *PreRegistrationService) Update(ctx context.Context, previous *models.Pr
 		}
 		integOld, err := s.calendar.ResolveIntegrationForRelease(previous)
 		if err != nil {
-			log.Printf("pre-registration reschedule (no new href): resolve old integration: %v", err)
+			logger.Printf("pre-registration reschedule (no new href): resolve old integration: %v", err)
 			return nil
 		}
 		if integOld != nil && integOld.Enabled {
 			oldSvc, err := s.serviceRepo.FindByID(previous.ServiceID)
 			if err != nil {
-				log.Printf("pre-registration reschedule (no new href): load old service: %v", err)
+				logger.Printf("pre-registration reschedule (no new href): load old service: %v", err)
 				return nil
 			}
 			oldEtag := ""
@@ -268,7 +268,7 @@ func (s *PreRegistrationService) Update(ctx context.Context, previous *models.Pr
 				oldEtag = *previous.ExternalEventETag
 			}
 			if err := s.calendar.ReleaseFreeSlot(ctx, integOld, oldSvc, *previous.ExternalEventHref, oldEtag); err != nil {
-				log.Printf("pre-registration reschedule (no new href): release old calendar slot failed (retry/async cleanup recommended): href=%s err=%v", *previous.ExternalEventHref, err)
+				logger.Printf("pre-registration reschedule (no new href): release old calendar slot failed (retry/async cleanup recommended): href=%s err=%v", *previous.ExternalEventHref, err)
 			}
 		}
 		return nil

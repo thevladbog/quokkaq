@@ -1,7 +1,7 @@
 package config
 
 import (
-	"log"
+	"fmt"
 	"os"
 
 	"github.com/joho/godotenv"
@@ -13,12 +13,12 @@ import (
 func Load() {
 	if _, err := os.Stat("../../.env"); err == nil {
 		if err := godotenv.Load("../../.env"); err != nil {
-			log.Printf("config: error loading ../../.env: %v", err)
+			fmt.Fprintf(os.Stderr, "config: error loading ../../.env: %v\n", err)
 		}
 	}
 	if _, err := os.Stat(".env"); err == nil {
 		if err := godotenv.Overload(".env"); err != nil {
-			log.Printf("config: error loading .env: %v", err)
+			fmt.Fprintf(os.Stderr, "config: error loading .env: %v\n", err)
 		}
 	}
 }

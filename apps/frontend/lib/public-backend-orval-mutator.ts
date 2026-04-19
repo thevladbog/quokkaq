@@ -2,6 +2,8 @@
  * Orval mutator for server-side calls to the real backend (no Next `/api` proxy, no cookies).
  * Matches the shape returned by {@link orvalMutator}: `{ data, status, headers }`.
  */
+import { fetchInitWithRequestId } from './authenticated-api-fetch';
+
 const DEFAULT_TIMEOUT_MS = 10_000;
 
 function mergeTimeoutSignal(
@@ -64,10 +66,10 @@ export async function publicBackendOrvalMutator<T>(
   );
 
   try {
+    const mergedInit = fetchInitWithRequestId({ ...init, signal });
     const response = await fetch(`${base}${url}`, {
       ...(cacheable ? { next: { revalidate: 300 } } : {}),
-      ...init,
-      signal
+      ...mergedInit
     });
 
     if (response.status === 204 || response.status === 205) {

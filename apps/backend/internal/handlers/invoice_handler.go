@@ -2,9 +2,9 @@ package handlers
 
 import (
 	"errors"
-	"log"
 	"net/http"
 	"net/url"
+	"quokkaq-go-backend/internal/logger"
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
@@ -84,14 +84,14 @@ func (h *InvoiceHandler) GetMyInvoices(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "User has no associated company", http.StatusNotFound)
 			return
 		}
-		log.Printf("GetMyInvoices userRepo.ResolveCompanyIDForRequest: %v", err)
+		logger.PrintfCtx(r.Context(), "GetMyInvoices userRepo.ResolveCompanyIDForRequest: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	invoices, err := h.invoiceRepo.FindByCompanyIDNonDraft(companyID)
 	if err != nil {
-		log.Printf("GetMyInvoices invoiceRepo.FindByCompanyID: %v", err)
+		logger.PrintfCtx(r.Context(), "GetMyInvoices invoiceRepo.FindByCompanyID: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -126,7 +126,7 @@ func (h *InvoiceHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request)
 
 	platformAdmin, err := h.userRepo.IsPlatformAdmin(userID)
 	if err != nil {
-		log.Printf("DownloadInvoice IsPlatformAdmin: %v", err)
+		logger.PrintfCtx(r.Context(), "DownloadInvoice IsPlatformAdmin: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -137,7 +137,7 @@ func (h *InvoiceHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request)
 			http.Error(w, "Invoice not found", http.StatusNotFound)
 			return
 		}
-		log.Printf("DownloadInvoice invoiceRepo.FindByIDWithLines(%s): %v", invoiceID, err)
+		logger.PrintfCtx(r.Context(), "DownloadInvoice invoiceRepo.FindByIDWithLines(%s): %v", invoiceID, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -155,7 +155,7 @@ func (h *InvoiceHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request)
 	if invoice.CompanyID != nil && *invoice.CompanyID != "" {
 		hasAccess, err = h.userRepo.HasCompanyAccess(userID, *invoice.CompanyID)
 		if err != nil {
-			log.Printf("DownloadInvoice userRepo.HasCompanyAccess: %v", err)
+			logger.PrintfCtx(r.Context(), "DownloadInvoice userRepo.HasCompanyAccess: %v", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -174,7 +174,7 @@ func (h *InvoiceHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request)
 
 	vendor, err := h.companyRepo.FindSaaSOperatorCompany()
 	if err != nil {
-		log.Printf("DownloadInvoice FindSaaSOperatorCompany: %v", err)
+		logger.PrintfCtx(r.Context(), "DownloadInvoice FindSaaSOperatorCompany: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -189,14 +189,14 @@ func (h *InvoiceHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if err != nil {
-		log.Printf("DownloadInvoice BuildInvoicePDF: %v", err)
+		logger.PrintfCtx(r.Context(), "DownloadInvoice BuildInvoicePDF: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	suffix, err := services.InvoicePDFDownloadSuffix()
 	if err != nil {
-		log.Printf("DownloadInvoice InvoicePDFDownloadSuffix: %v", err)
+		logger.PrintfCtx(r.Context(), "DownloadInvoice InvoicePDFDownloadSuffix: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -207,6 +207,6 @@ func (h *InvoiceHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request)
 	w.Header().Set("Content-Type", "application/pdf")
 	w.WriteHeader(http.StatusOK)
 	if _, err := w.Write(pdfBytes); err != nil {
-		log.Printf("DownloadInvoice write body: %v", err)
+		logger.PrintfCtx(r.Context(), "DownloadInvoice write body: %v", err)
 	}
 }

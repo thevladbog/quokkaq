@@ -3,8 +3,8 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
+	"quokkaq-go-backend/internal/logger"
 	"strings"
 	"time"
 
@@ -121,14 +121,14 @@ func (h *DesktopTerminalHandler) Create(w http.ResponseWriter, r *http.Request) 
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		log.Printf("desktop terminal create: %v", err)
+		logger.PrintfCtx(r.Context(), "desktop terminal create: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	full := row
 	if enriched, err := h.service.GetByID(row.ID); err != nil {
-		log.Printf("desktop terminal get after create: %v", err)
+		logger.PrintfCtx(r.Context(), "desktop terminal get after create: %v", err)
 	} else {
 		full = enriched
 	}
@@ -143,7 +143,7 @@ func (h *DesktopTerminalHandler) Create(w http.ResponseWriter, r *http.Request) 
 func (h *DesktopTerminalHandler) List(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.service.List()
 	if err != nil {
-		log.Printf("desktop terminal list: %v", err)
+		logger.PrintfCtx(r.Context(), "desktop terminal list: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -196,7 +196,7 @@ func (h *DesktopTerminalHandler) Update(w http.ResponseWriter, r *http.Request) 
 		if middleware.RespondRepoFindError(w, err, "UpdateDesktopTerminal") {
 			return
 		}
-		log.Printf("desktop terminal update: %v", err)
+		logger.PrintfCtx(r.Context(), "desktop terminal update: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -241,7 +241,7 @@ func (h *DesktopTerminalHandler) Bootstrap(w http.ResponseWriter, r *http.Reques
 			http.Error(w, "Invalid or revoked terminal code", http.StatusUnauthorized)
 			return
 		}
-		log.Printf("desktop terminal bootstrap: %v", err)
+		logger.PrintfCtx(r.Context(), "desktop terminal bootstrap: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}

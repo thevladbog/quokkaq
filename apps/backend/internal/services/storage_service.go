@@ -5,9 +5,9 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
+	"quokkaq-go-backend/internal/logger"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -44,7 +44,7 @@ func NewStorageService() StorageService {
 		config.WithRegion(region),
 	)
 	if err != nil {
-		log.Printf("unable to load SDK config, %v", err)
+		logger.Printf("unable to load SDK config, %v", err)
 		return &storageService{}
 	}
 
@@ -58,7 +58,7 @@ func NewStorageService() StorageService {
 			config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKey, secretKey, "")),
 		)
 		if err != nil {
-			log.Printf("unable to load SDK config with custom endpoint, %v", err)
+			logger.Printf("unable to load SDK config with custom endpoint, %v", err)
 			return &storageService{}
 		}
 	}
@@ -106,7 +106,7 @@ func (s *storageService) UploadFile(ctx context.Context, fileBytes []byte, fileN
 	})
 
 	if err != nil {
-		log.Printf("Failed to upload file to S3: %v", err)
+		logger.Printf("Failed to upload file to S3: %v", err)
 		return "", "", err
 	}
 
@@ -153,7 +153,7 @@ func (s *storageService) UploadTenantAsset(ctx context.Context, tenantID, catego
 		ContentType: aws.String(contentType),
 	})
 	if err != nil {
-		log.Printf("Failed to upload tenant asset to S3: %v", err)
+		logger.Printf("Failed to upload tenant asset to S3: %v", err)
 		return "", err
 	}
 	return key, nil
@@ -208,7 +208,7 @@ func (s *storageService) DeleteFile(ctx context.Context, key string) error {
 	})
 
 	if err != nil {
-		log.Printf("Failed to delete file from S3: %v", err)
+		logger.Printf("Failed to delete file from S3: %v", err)
 		return err
 	}
 

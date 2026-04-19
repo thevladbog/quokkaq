@@ -11,8 +11,8 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"log"
 	"os"
+	"quokkaq-go-backend/internal/logger"
 
 	"quokkaq-go-backend/internal/config"
 	"quokkaq-go-backend/internal/models"
@@ -30,6 +30,7 @@ func main() {
 	}
 
 	config.Load()
+	logger.Init()
 	database.Connect()
 
 	var role models.Role
@@ -37,27 +38,27 @@ func main() {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			role = models.Role{Name: "platform_admin"}
 			if err := database.DB.Create(&role).Error; err != nil {
-				log.Fatalf("create platform_admin role: %v", err)
+				logger.Fatalf("create platform_admin role: %v", err)
 			}
 			fmt.Println("Created role platform_admin")
 		} else {
-			log.Fatalf("lookup platform_admin role: %v", err)
+			logger.Fatalf("lookup platform_admin role: %v", err)
 		}
 	}
 
 	var user models.User
 	if err := database.DB.Where("email = ?", *email).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			log.Fatalf("no user with email %q", *email)
+			logger.Fatalf("no user with email %q", *email)
 		}
-		log.Fatalf("lookup user: %v", err)
+		logger.Fatalf("lookup user: %v", err)
 	}
 
 	var existing int64
 	if err := database.DB.Model(&models.UserRole{}).
 		Where("user_id = ? AND role_id = ?", user.ID, role.ID).
 		Count(&existing).Error; err != nil {
-		log.Fatalf("check user_roles: %v", err)
+		logger.Fatalf("check user_roles: %v", err)
 	}
 	if existing > 0 {
 		fmt.Printf("User %s already has platform_admin\n", *email)
@@ -65,7 +66,7 @@ func main() {
 	}
 
 	if err := database.DB.Create(&models.UserRole{UserID: user.ID, RoleID: role.ID}).Error; err != nil {
-		log.Fatalf("assign role: %v", err)
+		logger.Fatalf("assign role: %v", err)
 	}
 	fmt.Printf("Assigned platform_admin to %s (%s)\n", *email, user.ID)
 }

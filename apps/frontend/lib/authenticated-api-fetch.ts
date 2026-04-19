@@ -7,6 +7,7 @@
  * succeeded (see {@link tryRefreshSessionOnce}).
  */
 import { logger } from './logger';
+import { isOtelBrowserRumEnabled } from './otel-env';
 
 export const API_BASE_URL = '/api';
 
@@ -100,6 +101,147 @@ function mergeRequestInitHeaders(
     Object.assign(fromCaller, callerHeaders as Record<string, string>);
   }
   return { ...authHeaders, ...fromCaller };
+}
+
+function getRequestIdFromCallerHeaders(
+  callerHeaders: HeadersInit | undefined
+): string | undefined {
+  if (callerHeaders == null) {
+    return undefined;
+  }
+  if (callerHeaders instanceof Headers) {
+    return (
+      callerHeaders.get('X-Request-Id') ??
+      callerHeaders.get('x-request-id') ??
+      undefined
+    );
+  }
+  if (Array.isArray(callerHeaders)) {
+    for (const pair of callerHeaders) {
+      if (pair.length >= 2 && pair[0].toLowerCase() === 'x-request-id') {
+        return String(pair[1]);
+      }
+    }
+    return undefined;
+  }
+  for (const k of Object.keys(callerHeaders as Record<string, string>)) {
+    if (k.toLowerCase() === 'x-request-id') {
+      return String((callerHeaders as Record<string, string>)[k]);
+    }
+  }
+  return undefined;
+}
+
+function newRequestId(): string {
+  const c = globalThis.crypto;
+  if (c && typeof c.randomUUID === 'function') {
+    return c.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+}
+
+function randomHex(byteLength: number): string {
+  const bytes = new Uint8Array(byteLength);
+  const cr = globalThis.crypto;
+  if (cr && typeof cr.getRandomValues === 'function') {
+    cr.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < byteLength; i++) {
+      bytes[i] = Math.floor(Math.random() * 256);
+    }
+  }
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** W3C Trace Context traceparent (version 00, sampled). */
+function newTraceParentValue(): string {
+  const traceId = randomHex(16);
+  const spanId = randomHex(8);
+  return `00-${traceId}-${spanId}-01`;
+}
+
+function getTraceParentFromCallerHeaders(
+  callerHeaders: HeadersInit | undefined
+): string | undefined {
+  return getHeaderValueInsensitive(callerHeaders, 'traceparent');
+}
+
+function getTraceStateFromCallerHeaders(
+  callerHeaders: HeadersInit | undefined
+): string | undefined {
+  return getHeaderValueInsensitive(callerHeaders, 'tracestate');
+}
+
+function getHeaderValueInsensitive(
+  callerHeaders: HeadersInit | undefined,
+  nameLower: string
+): string | undefined {
+  if (callerHeaders == null) {
+    return undefined;
+  }
+  if (callerHeaders instanceof Headers) {
+    return callerHeaders.get(nameLower) ?? undefined;
+  }
+  if (Array.isArray(callerHeaders)) {
+    for (const pair of callerHeaders) {
+      if (
+        pair.length >= 2 &&
+        pair[0].toLowerCase() === nameLower.toLowerCase()
+      ) {
+        return String(pair[1]);
+      }
+    }
+    return undefined;
+  }
+  for (const k of Object.keys(callerHeaders as Record<string, string>)) {
+    if (k.toLowerCase() === nameLower.toLowerCase()) {
+      return String((callerHeaders as Record<string, string>)[k]);
+    }
+  }
+  return undefined;
+}
+
+function getOrCreateTraceParent(
+  callerHeaders: HeadersInit | undefined
+): string {
+  return (
+    getTraceParentFromCallerHeaders(callerHeaders) ?? newTraceParentValue()
+  );
+}
+
+/** When OTel fetch instrumentation is on, it injects W3C headers; avoid duplicates. SSR keeps manual trace. */
+function shouldAttachManualTraceContext(): boolean {
+  if (typeof window === 'undefined') {
+    return true;
+  }
+  return !isOtelBrowserRumEnabled();
+}
+
+/** Reuses caller-provided X-Request-Id or generates one (for backend log correlation). */
+export function getOrCreateRequestId(
+  callerHeaders: HeadersInit | undefined
+): string {
+  return getRequestIdFromCallerHeaders(callerHeaders) ?? newRequestId();
+}
+
+/** Adds X-Request-Id, W3C traceparent/tracestate to RequestInit; caller headers win. */
+export function fetchInitWithRequestId(init: RequestInit): RequestInit {
+  const requestId = getOrCreateRequestId(init.headers);
+  const extra: Record<string, string> = {
+    'X-Request-Id': requestId
+  };
+  if (shouldAttachManualTraceContext()) {
+    const traceParent = getOrCreateTraceParent(init.headers);
+    const traceState = getTraceStateFromCallerHeaders(init.headers);
+    extra.traceparent = traceParent;
+    if (traceState !== undefined && traceState !== '') {
+      extra.tracestate = traceState;
+    }
+  }
+  return {
+    ...init,
+    headers: mergeRequestInitHeaders(init.headers, extra)
+  };
 }
 
 function headersInitWithoutAuthorization(
@@ -284,13 +426,26 @@ export async function authenticatedApiFetch(
   const url = `${API_BASE_URL}${endpoint}`;
   const { headers: callerHeaders, body, ...restOptions } = options;
 
+  const requestId = getOrCreateRequestId(callerHeaders);
+  const traceParent = getOrCreateTraceParent(callerHeaders);
+  const traceState = getTraceStateFromCallerHeaders(callerHeaders);
+
   const shouldSetContentType =
     !hasContentTypeHeader(callerHeaders) && !isMultipartBody(body);
 
   const authHeaders: Record<string, string> = {
     ...(shouldSetContentType && { 'Content-Type': 'application/json' }),
     ...(currentLocale && { 'Accept-Language': currentLocale }),
-    ...activeCompanyIdHeader()
+    ...activeCompanyIdHeader(),
+    'X-Request-Id': requestId,
+    ...(shouldAttachManualTraceContext()
+      ? {
+          traceparent: traceParent,
+          ...(traceState !== undefined && traceState !== ''
+            ? { tracestate: traceState }
+            : {})
+        }
+      : {})
   };
 
   const config: RequestInit = {
@@ -327,7 +482,16 @@ export async function authenticatedApiFetch(
                 Authorization: `Bearer ${newLegacy}`
               }),
             ...(currentLocale && { 'Accept-Language': currentLocale }),
-            ...activeCompanyIdHeader()
+            ...activeCompanyIdHeader(),
+            'X-Request-Id': requestId,
+            ...(shouldAttachManualTraceContext()
+              ? {
+                  traceparent: traceParent,
+                  ...(traceState !== undefined && traceState !== ''
+                    ? { tracestate: traceState }
+                    : {})
+                }
+              : {})
           };
 
           const retryConfig: RequestInit = {

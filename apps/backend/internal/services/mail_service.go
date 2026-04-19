@@ -2,8 +2,8 @@ package services
 
 import (
 	"crypto/tls"
-	"log"
 	"os"
+	"quokkaq-go-backend/internal/logger"
 	"strconv"
 
 	"gopkg.in/gomail.v2"
@@ -27,7 +27,7 @@ func NewMailService() MailService {
 	secureStr := os.Getenv("SMTP_SECURE")
 
 	if host == "" {
-		log.Println("SMTP_HOST not configured. MailService will log emails instead of sending.")
+		logger.Println("SMTP_HOST not configured. MailService will log emails instead of sending.")
 		return &mailService{dialer: nil, from: from}
 	}
 
@@ -54,14 +54,14 @@ func NewMailService() MailService {
 		d.TLSConfig.InsecureSkipVerify = true
 	}
 
-	log.Printf("SMTP Configured: Host=%s, Port=%d, User=%s, SSL=%v", host, port, user, d.SSL)
+	logger.Printf("SMTP Configured: Host=%s, Port=%d, User=%s, SSL=%v", host, port, user, d.SSL)
 
 	return &mailService{dialer: d, from: from}
 }
 
 func (s *mailService) SendMail(to string, subject string, html string) error {
 	if s.dialer == nil {
-		log.Printf("Mock Send Mail -> To: %s, Subject: %s, Body: %s\n", to, subject, html)
+		logger.Printf("Mock Send Mail -> To: %s, Subject: %s, Body: %s\n", to, subject, html)
 		return nil
 	}
 
@@ -76,10 +76,10 @@ func (s *mailService) SendMail(to string, subject string, html string) error {
 	m.SetBody("text/html", html)
 
 	if err := s.dialer.DialAndSend(m); err != nil {
-		log.Printf("Error sending email to %s: %v\n", to, err)
+		logger.Printf("Error sending email to %s: %v\n", to, err)
 		return err
 	}
 
-	log.Printf("Email sent to %s\n", to)
+	logger.Printf("Email sent to %s\n", to)
 	return nil
 }

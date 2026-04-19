@@ -3,8 +3,8 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
+	"quokkaq-go-backend/internal/logger"
 
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/repository"
@@ -35,7 +35,7 @@ func (h *CalendarIntegrationHandler) resolveCompanyID(w http.ResponseWriter, r *
 			http.Error(w, "Forbidden: no access to selected organization", http.StatusForbidden)
 			return "", false
 		}
-		log.Printf("calendar integration company: %v", err)
+		logger.PrintfCtx(r.Context(), "calendar integration company: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return "", false
 	}
@@ -53,7 +53,7 @@ const (
 )
 
 func logCalendarIntegration(op string, err error) {
-	log.Printf("calendar integration handler %s: %v", op, err)
+	logger.Printf("calendar integration handler %s: %v", op, err)
 }
 
 func writeJSONDecodeError(w http.ResponseWriter, op string, err error) {

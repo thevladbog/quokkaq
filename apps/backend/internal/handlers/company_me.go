@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"log"
 	"net/http"
 	"os"
+	"quokkaq-go-backend/internal/logger"
 	"strings"
 
 	"quokkaq-go-backend/internal/middleware"
@@ -88,7 +88,7 @@ func (h *CompanyHandler) GetMyCompany(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "User has no associated company", http.StatusNotFound)
 			return
 		}
-		log.Printf("GetMyCompany ResolveCompanyIDForRequest: %v", err)
+		logger.PrintfCtx(r.Context(), "GetMyCompany ResolveCompanyIDForRequest: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -99,7 +99,7 @@ func (h *CompanyHandler) GetMyCompany(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Company not found", http.StatusNotFound)
 			return
 		}
-		log.Printf("GetMyCompany FindByID: %v", err)
+		logger.PrintfCtx(r.Context(), "GetMyCompany FindByID: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -149,7 +149,7 @@ func (h *CompanyHandler) PatchMyCompany(w http.ResponseWriter, r *http.Request) 
 			http.Error(w, "User has no associated company", http.StatusNotFound)
 			return
 		}
-		log.Printf("PatchMyCompany ResolveCompanyIDForRequest: %v", err)
+		logger.PrintfCtx(r.Context(), "PatchMyCompany ResolveCompanyIDForRequest: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -160,7 +160,7 @@ func (h *CompanyHandler) PatchMyCompany(w http.ResponseWriter, r *http.Request) 
 			http.Error(w, "Company not found", http.StatusNotFound)
 			return
 		}
-		log.Printf("PatchMyCompany FindByID: %v", err)
+		logger.PrintfCtx(r.Context(), "PatchMyCompany FindByID: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -173,7 +173,7 @@ func (h *CompanyHandler) PatchMyCompany(w http.ResponseWriter, r *http.Request) 
 
 	isGlobalAdmin, err := h.userRepo.IsAdmin(userID)
 	if err != nil {
-		log.Printf("PatchMyCompany IsAdmin: %v", err)
+		logger.PrintfCtx(r.Context(), "PatchMyCompany IsAdmin: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -222,7 +222,7 @@ func (h *CompanyHandler) PatchMyCompany(w http.ResponseWriter, r *http.Request) 
 	if body.SsoAccessSource != nil {
 		ok, err := h.canChangeSsoAccessSource(userID, companyID)
 		if err != nil {
-			log.Printf("PatchMyCompany canChangeSsoAccessSource: %v", err)
+			logger.PrintfCtx(r.Context(), "PatchMyCompany canChangeSsoAccessSource: %v", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -294,14 +294,14 @@ func (h *CompanyHandler) PatchMyCompany(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if err := h.companyRepo.Update(company); err != nil {
-		log.Printf("PatchMyCompany Update: %v", err)
+		logger.PrintfCtx(r.Context(), "PatchMyCompany Update: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	updated, err := h.companyRepo.FindByID(company.ID)
 	if err != nil {
-		log.Printf("PatchMyCompany FindByID after update: %v", err)
+		logger.PrintfCtx(r.Context(), "PatchMyCompany FindByID after update: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}

@@ -5,17 +5,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"os"
+	"quokkaq-go-backend/internal/logger"
 	"sort"
 	"strings"
 	"sync/atomic"
 	"time"
 
-	"github.com/google/uuid"
-	"golang.org/x/sync/errgroup"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
+
+	"github.com/google/uuid"
+	"golang.org/x/sync/errgroup"
 
 	"gorm.io/gorm"
 )
@@ -210,9 +211,9 @@ func (s *SupportReportService) Create(ctx context.Context, userID string, in Cre
 	}
 	extID, seq, stateName, err := client.CreateWorkItem(ctx, row.ID, title, descPayload, extras)
 	if err != nil {
-		log.Printf("support report: CreateWorkItem failed after DB insert id=%s: %v", row.ID, err)
+		logger.Printf("support report: CreateWorkItem failed after DB insert id=%s: %v", row.ID, err)
 		if delErr := s.repo.DeleteByID(row.ID); delErr != nil {
-			log.Printf("support report: cleanup DeleteByID after ticket failure id=%s: %v", row.ID, delErr)
+			logger.Printf("support report: cleanup DeleteByID after ticket failure id=%s: %v", row.ID, delErr)
 		}
 		return nil, err
 	}
@@ -224,11 +225,11 @@ func (s *SupportReportService) Create(ctx context.Context, userID string, in Cre
 
 	if err := s.repo.Update(row); err != nil {
 		n := supportReportOrphanCreated.Add(1)
-		log.Printf("metric support_report_orphan_created=%d: DB update after external ticket success failed id=%s externalId=%s: %v", n, row.ID, extID, err)
+		logger.Printf("metric support_report_orphan_created=%d: DB update after external ticket success failed id=%s externalId=%s: %v", n, row.ID, extID, err)
 		if delErr := s.repo.DeleteByID(row.ID); delErr != nil {
-			log.Printf("support report: orphan cleanup DeleteByID id=%s: %v", row.ID, delErr)
+			logger.Printf("support report: orphan cleanup DeleteByID id=%s: %v", row.ID, delErr)
 		} else {
-			log.Printf("support report: orphan cleanup removed local row id=%s; external ticket %s was left in the external system (no delete policy)", row.ID, extID)
+			logger.Printf("support report: orphan cleanup removed local row id=%s; external ticket %s was left in the external system (no delete policy)", row.ID, extID)
 		}
 		return nil, fmt.Errorf("%w: %v", ErrSupportReportPersistence, err)
 	}
@@ -501,7 +502,7 @@ func (s *SupportReportService) AddSupportReportShare(ctx context.Context, viewer
 	}
 	if err := s.syncYandexAPIAccessToTicket(ctx, row); err != nil {
 		if rbErr := s.shareRepo.DeleteByReportAndUser(reportID, targetUserID); rbErr != nil {
-			log.Printf("ERROR support report: rollback share after Tracker sync failed reportID=%s targetUserID=%s rollbackErr=%v syncErr=%v", reportID, targetUserID, rbErr, err)
+			logger.Printf("ERROR support report: rollback share after Tracker sync failed reportID=%s targetUserID=%s rollbackErr=%v syncErr=%v", reportID, targetUserID, rbErr, err)
 		}
 		return nil, err
 	}
@@ -552,7 +553,7 @@ func (s *SupportReportService) RemoveSupportReportShare(ctx context.Context, vie
 	}
 	if err := s.syncYandexAPIAccessToTicket(ctx, row); err != nil {
 		if rbErr := s.shareRepo.Create(&backup); rbErr != nil {
-			log.Printf("ERROR support report: rollback share delete after Tracker sync failed reportID=%s sharedWithUserID=%s rollbackErr=%v syncErr=%v", reportID, sharedWithUserID, rbErr, err)
+			logger.Printf("ERROR support report: rollback share delete after Tracker sync failed reportID=%s sharedWithUserID=%s rollbackErr=%v syncErr=%v", reportID, sharedWithUserID, rbErr, err)
 		}
 		return nil, err
 	}
@@ -682,7 +683,7 @@ func (s *SupportReportService) List(ctx context.Context, userID string) ([]model
 			seq, st, err := cli.GetWorkItem(callCtx, rows[i].PlaneWorkItemID)
 			cancel()
 			if err != nil {
-				log.Printf("support report: List sync GetWorkItem id=%s externalId=%s: %v", rows[i].ID, rows[i].PlaneWorkItemID, err)
+				logger.Printf("support report: List sync GetWorkItem id=%s externalId=%s: %v", rows[i].ID, rows[i].PlaneWorkItemID, err)
 				return nil
 			}
 			if seq != nil {
@@ -691,7 +692,7 @@ func (s *SupportReportService) List(ctx context.Context, userID string) ([]model
 			rows[i].PlaneStatus = st
 			rows[i].LastSyncedAt = &now
 			if err := s.repo.Update(&rows[i]); err != nil {
-				log.Printf("support report: List sync: update id=%s: %v", rows[i].ID, err)
+				logger.Printf("support report: List sync: update id=%s: %v", rows[i].ID, err)
 			}
 			return nil
 		})
@@ -722,7 +723,7 @@ func (s *SupportReportService) GetByID(ctx context.Context, userID, reportID str
 		seq, st, err := cli.GetWorkItem(syncCtx, row.PlaneWorkItemID)
 		cancel()
 		if err != nil {
-			log.Printf("support report: GetByID sync GetWorkItem id=%s externalId=%s: %v", row.ID, row.PlaneWorkItemID, err)
+			logger.Printf("support report: GetByID sync GetWorkItem id=%s externalId=%s: %v", row.ID, row.PlaneWorkItemID, err)
 		} else {
 			if seq != nil {
 				row.PlaneSequenceID = seq
@@ -731,7 +732,7 @@ func (s *SupportReportService) GetByID(ctx context.Context, userID, reportID str
 			now := time.Now().UTC()
 			row.LastSyncedAt = &now
 			if err := s.repo.Update(row); err != nil {
-				log.Printf("support report: GetByID sync: update id=%s: %v", row.ID, err)
+				logger.Printf("support report: GetByID sync: update id=%s: %v", row.ID, err)
 			}
 		}
 	}
@@ -767,7 +768,7 @@ func (s *SupportReportService) MarkIrrelevant(ctx context.Context, userID, repor
 	if cli != nil && cli.Enabled() && strings.TrimSpace(row.PlaneWorkItemID) != "" {
 		if err := cli.AddComment(ctx, strings.TrimSpace(row.PlaneWorkItemID), comment); err != nil {
 			if errors.Is(err, ErrPlaneCommentsUnsupported) {
-				log.Printf("support report: MarkIrrelevant skipping external cancel comment (backend does not support posting this comment) reportID=%s workItemID=%s", reportID, strings.TrimSpace(row.PlaneWorkItemID))
+				logger.Printf("support report: MarkIrrelevant skipping external cancel comment (backend does not support posting this comment) reportID=%s workItemID=%s", reportID, strings.TrimSpace(row.PlaneWorkItemID))
 			} else {
 				return nil, err
 			}

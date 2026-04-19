@@ -3,8 +3,8 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
+	"quokkaq-go-backend/internal/logger"
 	"strings"
 	"time"
 
@@ -257,7 +257,7 @@ func (h *CompanySSOHTTP) GetCompanySSO(w http.ResponseWriter, r *http.Request) {
 	}
 	out, err := h.sso.GetCompanySSO(c.ID)
 	if err != nil {
-		log.Printf("GetCompanySSO: %v", err)
+		logger.PrintfCtx(r.Context(), "GetCompanySSO: %v", err)
 		http.Error(w, "Internal error", http.StatusInternalServerError)
 		return
 	}
@@ -286,7 +286,7 @@ func (h *CompanySSOHTTP) PatchCompanySSO(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if err := h.sso.PatchCompanySSO(c, body); err != nil {
-		log.Printf("PatchCompanySSO: %v", err)
+		logger.PrintfCtx(r.Context(), "PatchCompanySSO: %v", err)
 		http.Error(w, "Unable to update SSO settings", http.StatusBadRequest)
 		return
 	}

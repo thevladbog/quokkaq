@@ -1,12 +1,13 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
+	"quokkaq-go-backend/internal/logger"
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
@@ -72,10 +73,10 @@ func checkoutBaseURLValidForPaymentProvider() (base string, ok bool) {
 }
 
 // requireBillingAdmin allows platform admins or the company owner to perform billing mutations.
-func (h *SubscriptionHandler) requireBillingAdmin(w http.ResponseWriter, userID, companyID string) bool {
+func (h *SubscriptionHandler) requireBillingAdmin(w http.ResponseWriter, ctx context.Context, userID, companyID string) bool {
 	isAdmin, err := h.userRepo.IsAdmin(userID)
 	if err != nil {
-		log.Printf("subscription billing auth IsAdmin: %v", err)
+		logger.PrintfCtx(ctx, "subscription billing auth IsAdmin: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return false
 	}
@@ -84,7 +85,7 @@ func (h *SubscriptionHandler) requireBillingAdmin(w http.ResponseWriter, userID,
 	}
 	isOwner, err := h.userRepo.IsCompanyOwner(userID, companyID)
 	if err != nil {
-		log.Printf("subscription billing auth IsCompanyOwner: %v", err)
+		logger.PrintfCtx(ctx, "subscription billing auth IsCompanyOwner: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return false
 	}
@@ -126,7 +127,7 @@ func (h *SubscriptionHandler) GetMySubscription(w http.ResponseWriter, r *http.R
 			http.Error(w, "User has no associated company", http.StatusNotFound)
 			return
 		}
-		log.Printf("GetMySubscription userRepo.ResolveCompanyIDForRequest(%q): %v", userID, err)
+		logger.PrintfCtx(r.Context(), "GetMySubscription userRepo.ResolveCompanyIDForRequest(%q): %v", userID, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -137,14 +138,14 @@ func (h *SubscriptionHandler) GetMySubscription(w http.ResponseWriter, r *http.R
 			http.Error(w, "No subscription found", http.StatusNotFound)
 			return
 		}
-		log.Printf("GetMySubscription subscriptionRepo.FindByCompanyID(%q): %v", companyID, err)
+		logger.PrintfCtx(r.Context(), "GetMySubscription subscriptionRepo.FindByCompanyID(%q): %v", companyID, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	promoted, err := subscriptions.ApplyPendingPlanIfDue(database.DB, subscription, time.Now().UTC())
 	if err != nil {
-		log.Printf("GetMySubscription ApplyPendingPlanIfDue: %v", err)
+		logger.PrintfCtx(r.Context(), "GetMySubscription ApplyPendingPlanIfDue: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -155,7 +156,7 @@ func (h *SubscriptionHandler) GetMySubscription(w http.ResponseWriter, r *http.R
 				http.Error(w, "No subscription found", http.StatusNotFound)
 				return
 			}
-			log.Printf("GetMySubscription subscriptionRepo.FindByCompanyID reload: %v", err)
+			logger.PrintfCtx(r.Context(), "GetMySubscription subscriptionRepo.FindByCompanyID reload: %v", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -177,7 +178,7 @@ func (h *SubscriptionHandler) GetMySubscription(w http.ResponseWriter, r *http.R
 func (h *SubscriptionHandler) GetPlans(w http.ResponseWriter, r *http.Request) {
 	plans, err := h.subscriptionRepo.GetActivePlans()
 	if err != nil {
-		log.Printf("GetPlans subscriptionRepo.GetActivePlans: %v", err)
+		logger.PrintfCtx(r.Context(), "GetPlans subscriptionRepo.GetActivePlans: %v", err)
 		http.Error(w, "Failed to fetch subscription plans", http.StatusInternalServerError)
 		return
 	}
@@ -245,11 +246,11 @@ func (h *SubscriptionHandler) CreateCheckout(w http.ResponseWriter, r *http.Requ
 			http.Error(w, "User has no associated company", http.StatusNotFound)
 			return
 		}
-		log.Printf("CreateCheckout userRepo.ResolveCompanyIDForRequest(%q): %v", userID, err)
+		logger.PrintfCtx(r.Context(), "CreateCheckout userRepo.ResolveCompanyIDForRequest(%q): %v", userID, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-	if !h.requireBillingAdmin(w, userID, companyID) {
+	if !h.requireBillingAdmin(w, r.Context(), userID, companyID) {
 		return
 	}
 
@@ -259,7 +260,7 @@ func (h *SubscriptionHandler) CreateCheckout(w http.ResponseWriter, r *http.Requ
 			http.Error(w, "Unknown plan code", http.StatusBadRequest)
 			return
 		}
-		log.Printf("CreateCheckout subscriptionRepo.FindPlanByCode(%q): %v", planCode, err)
+		logger.PrintfCtx(r.Context(), "CreateCheckout subscriptionRepo.FindPlanByCode(%q): %v", planCode, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -282,7 +283,7 @@ func (h *SubscriptionHandler) CreateCheckout(w http.ResponseWriter, r *http.Requ
 			http.Error(w, "No subscription found", http.StatusNotFound)
 			return
 		}
-		log.Printf("CreateCheckout subscriptionRepo.FindByCompanyID(%q): %v", companyID, err)
+		logger.PrintfCtx(r.Context(), "CreateCheckout subscriptionRepo.FindByCompanyID(%q): %v", companyID, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -349,19 +350,19 @@ func (h *SubscriptionHandler) CancelSubscription(w http.ResponseWriter, r *http.
 			http.Error(w, "Subscription not found", http.StatusNotFound)
 			return
 		}
-		log.Printf("CancelSubscription subscriptionRepo.FindByID(%q): %v", subscriptionID, err)
+		logger.PrintfCtx(r.Context(), "CancelSubscription subscriptionRepo.FindByID(%q): %v", subscriptionID, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	if !h.requireBillingAdmin(w, userID, subscription.CompanyID) {
+	if !h.requireBillingAdmin(w, r.Context(), userID, subscription.CompanyID) {
 		return
 	}
 
 	stripeLinked := subscription.StripeSubscriptionID != nil && strings.TrimSpace(*subscription.StripeSubscriptionID) != ""
 	if h.paymentProvider != nil && stripeLinked {
 		if err := h.paymentProvider.CancelSubscription(r.Context(), subscriptionID); err != nil {
-			log.Printf("CancelSubscription (payment provider): %v", err)
+			logger.PrintfCtx(r.Context(), "CancelSubscription (payment provider): %v", err)
 			http.Error(w, "Failed to cancel subscription with payment provider", http.StatusBadGateway)
 			return
 		}
@@ -371,7 +372,7 @@ func (h *SubscriptionHandler) CancelSubscription(w http.ResponseWriter, r *http.
 				http.Error(w, "Subscription not found", http.StatusNotFound)
 				return
 			}
-			log.Printf("CancelSubscription subscriptionRepo.FindByID(%q) after provider cancel: %v", subscriptionID, err)
+			logger.PrintfCtx(r.Context(), "CancelSubscription subscriptionRepo.FindByID(%q) after provider cancel: %v", subscriptionID, err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -382,7 +383,7 @@ func (h *SubscriptionHandler) CancelSubscription(w http.ResponseWriter, r *http.
 
 	subscription.CancelAtPeriodEnd = true
 	if err := h.subscriptionRepo.Update(subscription); err != nil {
-		log.Printf("CancelSubscription subscriptionRepo.Update(%q): %v", subscription.ID, err)
+		logger.PrintfCtx(r.Context(), "CancelSubscription subscriptionRepo.Update(%q): %v", subscription.ID, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}

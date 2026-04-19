@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"log"
 	"net/http"
+	"quokkaq-go-backend/internal/logger"
 	"strings"
 
 	"quokkaq-go-backend/internal/middleware"
@@ -116,7 +116,7 @@ func (h *SupportReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if errors.Is(err, services.ErrSupportReportPersistence) {
-			log.Printf("support report Create: %v", err)
+			logger.PrintfCtx(r.Context(), "support report Create: %v", err)
 			http.Error(w, "Failed to save support report", http.StatusInternalServerError)
 			return
 		}
@@ -243,7 +243,7 @@ func (h *SupportReportHandler) MarkIrrelevant(w http.ResponseWriter, r *http.Req
 			return
 		}
 		if errors.Is(err, services.ErrSupportReportPersistence) {
-			log.Printf("support report MarkIrrelevant: %v", err)
+			logger.PrintfCtx(r.Context(), "support report MarkIrrelevant: %v", err)
 			http.Error(w, "Failed to save support report", http.StatusInternalServerError)
 			return
 		}
@@ -429,7 +429,7 @@ func (h *SupportReportHandler) AddShare(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 		if errors.Is(err, services.ErrSupportReportPersistence) {
-			log.Printf("support report AddShare: %v", err)
+			logger.PrintfCtx(r.Context(), "support report AddShare: %v", err)
 			http.Error(w, "Failed to save share", http.StatusInternalServerError)
 			return
 		}
@@ -496,7 +496,7 @@ func (h *SupportReportHandler) RemoveShare(w http.ResponseWriter, r *http.Reques
 			return
 		}
 		if errors.Is(err, services.ErrSupportReportPersistence) {
-			log.Printf("support report RemoveShare: %v", err)
+			logger.PrintfCtx(r.Context(), "support report RemoveShare: %v", err)
 			http.Error(w, "Failed to update share", http.StatusInternalServerError)
 			return
 		}

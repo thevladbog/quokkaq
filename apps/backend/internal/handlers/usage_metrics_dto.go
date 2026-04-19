@@ -8,7 +8,7 @@ import (
 
 // UsageMetricsResponse is the public API shape for usage metrics (decoupled from services package for OpenAPI).
 type UsageMetricsResponse struct {
-	CurrentPeriod PeriodResponse                      `json:"currentPeriod"`
+	CurrentPeriod PeriodResponse                     `json:"currentPeriod"`
 	Metrics       map[string]UsageMetricInfoResponse `json:"metrics"`
 }
 
