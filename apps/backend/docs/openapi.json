@@ -77,6 +77,38 @@
                 },
                 "type": "object"
             },
+            "handlers.CompanyUserListItem": {
+                "properties": {
+                    "createdAt": {
+                        "type": "string"
+                    },
+                    "email": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "isActive": {
+                        "type": "boolean"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "photoUrl": {
+                        "type": "string"
+                    },
+                    "tenantRoles": {
+                        "items": {
+                            "$ref": "#/components/schemas/handlers.TenantRoleBriefResponse"
+                        },
+                        "type": "array"
+                    },
+                    "type": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "handlers.CounterCallNextRequest": {
                 "properties": {
                     "serviceId": {
@@ -123,6 +155,26 @@
                     },
                     "templateId": {
                         "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "handlers.CreateTenantRoleJSON": {
+                "properties": {
+                    "description": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "slug": {
+                        "type": "string"
+                    },
+                    "units": {
+                        "items": {
+                            "$ref": "#/components/schemas/handlers.TenantRoleUnitJSON"
+                        },
+                        "type": "array"
                     }
                 },
                 "type": "object"
@@ -423,13 +475,29 @@
                 ],
                 "type": "object"
             },
+            "handlers.PatchExternalIdentityJSON": {
+                "properties": {
+                    "externalObjectId": {
+                        "type": "string"
+                    },
+                    "issuer": {
+                        "type": "string"
+                    },
+                    "subject": {
+                        "type": "string"
+                    }
+                },
+                "type": "object",
+                "minProperties": 1
+            },
             "handlers.PatchMeRequest": {
                 "properties": {
                     "photoUrl": {
                         "type": "string"
                     }
                 },
-                "type": "object"
+                "type": "object",
+                "minProperties": 1
             },
             "handlers.PatchPlatformCompanyBody": {
                 "properties": {
@@ -580,6 +648,53 @@
                 "type": "object",
                 "required": [
                     "config"
+                ]
+            },
+            "handlers.PatchUserSSOFlagsJSON": {
+                "properties": {
+                    "exemptFromSsoSync": {
+                        "description": "ExemptFromSSOSync when true, SSO directory reconcile does not change this user's global roles, unit assignments, or tenant role mappings (IdP group sync).",
+                        "type": "boolean"
+                    },
+                    "ssoProfileSyncOptOut": {
+                        "description": "SSOProfileSyncOptOut when true, skip name/email updates from IdP on SSO login.",
+                        "type": "boolean"
+                    }
+                },
+                "type": "object",
+                "minProperties": 1
+            },
+            "handlers.PatchUserTenantRolesJSON": {
+                "properties": {
+                    "confirmRemoveAllTenantRoles": {
+                        "description": "ConfirmRemoveAllTenantRoles must be true when tenantRoleIds is empty after trimming, so ReplaceUserTenantRoles does not\nclear user_tenant_roles and trigger RebuildUserUnitsFromTenantRoles mass-removal of user_units by mistake.",
+                        "type": "boolean"
+                    },
+                    "tenantRoleIds": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    }
+                },
+                "type": "object",
+                "minProperties": 1,
+                "required": [
+                    "tenantRoleIds"
+                ]
+            },
+            "handlers.PatchUserTenantRolesResponse": {
+                "properties": {
+                    "tenantRoles": {
+                        "items": {
+                            "$ref": "#/components/schemas/handlers.TenantRoleBriefResponse"
+                        },
+                        "type": "array"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "tenantRoles"
                 ]
             },
             "handlers.PeriodResponse": {
@@ -856,6 +971,34 @@
                 ],
                 "type": "object"
             },
+            "handlers.TenantRoleBriefResponse": {
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "slug": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "handlers.TenantRoleUnitJSON": {
+                "properties": {
+                    "permissions": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "unitId": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "handlers.TransferRequest": {
                 "properties": {
                     "operatorComment": {
@@ -949,6 +1092,55 @@
                     "url"
                 ]
             },
+            "handlers.UpsertGroupMappingJSON": {
+                "oneOf": [
+                    {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                            "idpGroupId",
+                            "tenantRoleId"
+                        ],
+                        "properties": {
+                            "idpGroupId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "description": "IdP group identifier (e.g. Azure AD group object id)."
+                            },
+                            "tenantRoleId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "description": "Tenant role UUID in this company. Mutually exclusive with legacyRoleName."
+                            }
+                        }
+                    },
+                    {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                            "idpGroupId",
+                            "legacyRoleName"
+                        ],
+                        "properties": {
+                            "idpGroupId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "description": "IdP group identifier (e.g. Azure AD group object id)."
+                            },
+                            "legacyRoleName": {
+                                "type": "string",
+                                "description": "Legacy global role name applied by SSO group sync. Mutually exclusive with tenantRoleId.",
+                                "enum": [
+                                    "staff",
+                                    "supervisor",
+                                    "operator"
+                                ]
+                            }
+                        }
+                    }
+                ],
+                "description": "Map an IdP group to exactly one target: a tenant role id, or a legacy global role name. Send idpGroupId plus either tenantRoleId or legacyRoleName (not both)."
+            },
             "handlers.UsageMetricInfoResponse": {
                 "properties": {
                     "current": {
@@ -1003,6 +1195,12 @@
                     "roles": {
                         "items": {
                             "$ref": "#/components/schemas/handlers.RoleDTO"
+                        },
+                        "type": "array"
+                    },
+                    "tenantRoles": {
+                        "items": {
+                            "$ref": "#/components/schemas/handlers.TenantRoleBriefResponse"
                         },
                         "type": "array"
                     },
@@ -1621,6 +1819,14 @@
                         "description": "public tenant slug for login URLs",
                         "type": "string"
                     },
+                    "ssoAccessSource": {
+                        "description": "SsoAccessSource: \"manual\" (default) or \"sso_groups\" — IdP groups are source of truth for access when set.",
+                        "enum": [
+                            "manual",
+                            "sso_groups"
+                        ],
+                        "type": "string"
+                    },
                     "ssoJitProvisioning": {
                         "description": "SsoJitProvisioning: allow creating a user on first successful SSO when policy permits.",
                         "type": "boolean"
@@ -1683,6 +1889,41 @@
                         "type": "array"
                     },
                     "slug": {
+                        "type": "string"
+                    },
+                    "ssoAccessSource": {
+                        "description": "SsoAccessSource sets SSO access provisioning (`manual` | `sso_groups`). Changing this field via PatchMyCompany requires logical scope `company.settings.ssoAccessSource` (any of `global.role.admin`, `global.role.platform_admin`, `company.tenant_role.system_admin`; not `unit.tenant.admin` alone).",
+                        "enum": [
+                            "manual",
+                            "sso_groups"
+                        ],
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "models.CompanySSOGroupMapping": {
+                "properties": {
+                    "companyId": {
+                        "type": "string"
+                    },
+                    "createdAt": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "idpGroupId": {
+                        "type": "string"
+                    },
+                    "legacyRoleName": {
+                        "description": "legacy global role: staff | supervisor | operator (not admin)",
+                        "type": "string"
+                    },
+                    "tenantRoleId": {
+                        "type": "string"
+                    },
+                    "updatedAt": {
                         "type": "string"
                     }
                 },
@@ -2655,6 +2896,61 @@
                 },
                 "type": "object"
             },
+            "models.TenantRole": {
+                "properties": {
+                    "companyId": {
+                        "type": "string"
+                    },
+                    "createdAt": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "slug": {
+                        "type": "string"
+                    },
+                    "units": {
+                        "items": {
+                            "$ref": "#/components/schemas/models.TenantRoleUnit"
+                        },
+                        "type": "array"
+                    },
+                    "updatedAt": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "models.TenantRoleUnit": {
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "permissions": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "tenantRoleId": {
+                        "type": "string"
+                    },
+                    "unit": {
+                        "$ref": "#/components/schemas/models.Unit"
+                    },
+                    "unitId": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "models.Ticket": {
                 "properties": {
                     "booking": {
@@ -3018,6 +3314,10 @@
                     "email": {
                         "type": "string"
                     },
+                    "exemptFromSsoSync": {
+                        "description": "ExemptFromSSOSync when true, SSO directory reconcile does not change this user's global roles, unit assignments, or tenant role mappings (IdP group sync).",
+                        "type": "boolean"
+                    },
                     "id": {
                         "type": "string"
                     },
@@ -3040,6 +3340,10 @@
                         },
                         "type": "array"
                     },
+                    "ssoProfileSyncOptOut": {
+                        "description": "SSOProfileSyncOptOut: when true, skip name/email updates from IdP on SSO login.",
+                        "type": "boolean"
+                    },
                     "type": {
                         "type": "string"
                     },
@@ -3048,6 +3352,33 @@
                             "$ref": "#/components/schemas/models.UserUnit"
                         },
                         "type": "array"
+                    }
+                },
+                "type": "object"
+            },
+            "models.UserExternalIdentity": {
+                "properties": {
+                    "companyId": {
+                        "type": "string"
+                    },
+                    "createdAt": {
+                        "type": "string"
+                    },
+                    "externalObjectId": {
+                        "description": "ExternalObjectID is an optional stable directory id (e.g. Entra oid) for matching across subject changes.",
+                        "type": "string"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "issuer": {
+                        "type": "string"
+                    },
+                    "subject": {
+                        "type": "string"
+                    },
+                    "userId": {
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -4362,6 +4693,7 @@
         "/auth/me": {
             "get": {
                 "description": "Returns the currently authenticated user's information",
+                "operationId": "authGetMe",
                 "responses": {
                     "200": {
                         "content": {
@@ -5645,7 +5977,7 @@
                 ]
             },
             "patch": {
-                "description": "Partial update: JSON body matches models.CompanyPatch at the root (not wrapped in a \"company\" property). Only send fields to change. Cannot combine clearBillingAddress with billingAddress (same for counterparty).",
+                "description": "Partial update: JSON body matches models.CompanyPatch at the root (not wrapped in a \"company\" property). Only send fields to change. Cannot combine clearBillingAddress with billingAddress (same for counterparty). If the body includes `ssoAccessSource`, the caller must satisfy logical scope `company.settings.ssoAccessSource`, which the server grants when the principal matches any of: `global.role.admin`, `global.role.platform_admin`, or `company.tenant_role.system_admin`. Unit-scoped permission `tenant.admin` alone (scope `unit.tenant.admin`) is not sufficient. Other fields still require global `admin` unless the body only contains `ssoAccessSource` and the caller is authorized as above. See the PatchMyCompany operation `x-logical-scopes` extension in OpenAPI for the documented scope labels (runtime auth remains Bearer JWT only).",
                 "parameters": [
                     {
                         "description": "Tenant company UUID when the user belongs to multiple organizations",
@@ -5738,7 +6070,17 @@
                 "summary": "Update current user's company (tenant admin)",
                 "tags": [
                     "companies"
-                ]
+                ],
+                "x-logical-scopes": {
+                    "description": "Logical scopes for company-wide tenant settings (documentation only). Clients send `Authorization: Bearer` JWT; the server enforces these rules in code. For `models.CompanyPatch.ssoAccessSource`, the caller must match scope `company.settings.ssoAccessSource`, satisfied when the principal matches any of `global.role.admin`, `global.role.platform_admin`, or `company.tenant_role.system_admin`. Scope `unit.tenant.admin` (unit-only `tenant.admin` permission) is not sufficient alone.",
+                    "scopes": {
+                        "company.settings.ssoAccessSource": "Change company SSO access provisioning (`manual` vs `sso_groups`). Equivalent to any of global.role.admin, global.role.platform_admin, company.tenant_role.system_admin (not unit.tenant.admin alone).",
+                        "global.role.admin": "Global administrator (role name `admin`).",
+                        "global.role.platform_admin": "Platform administrator (role `platform_admin`).",
+                        "company.tenant_role.system_admin": "Company tenant role slug `system_admin`.",
+                        "unit.tenant.admin": "Unit-scoped `tenant.admin` permission — NOT sufficient for ssoAccessSource alone."
+                    }
+                }
             }
         },
         "/companies/me/calendar-integrations": {
@@ -6568,6 +6910,86 @@
                 ]
             }
         },
+        "/companies/me/rbac/permissions": {
+            "get": {
+                "description": "Returns the canonical permission strings shared by all tenants; used when defining tenant roles.",
+                "operationId": "GetPermissionCatalog",
+                "parameters": [
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "type": "string"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "No company found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List global permission keys (tenant RBAC catalog)",
+                "tags": [
+                    "companies"
+                ]
+            }
+        },
         "/companies/me/slug": {
             "patch": {
                 "operationId": "companiesMeSlugPatch",
@@ -6656,6 +7078,1129 @@
                     }
                 ],
                 "summary": "Update SSO settings (OIDC or SAML)",
+                "tags": [
+                    "companies"
+                ]
+            }
+        },
+        "/companies/me/sso/group-mappings": {
+            "get": {
+                "description": "Returns SSO group id mappings to tenant roles or legacy global role names for the current company.",
+                "operationId": "ListGroupMappings",
+                "parameters": [
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/models.CompanySSOGroupMapping"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "No company found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List IdP group to role mappings",
+                "tags": [
+                    "companies"
+                ]
+            },
+            "post": {
+                "description": "Maps an IdP group id (e.g. Azure object id) to exactly one of: a tenant role id or legacy global role name staff | supervisor | operator. Not both; global admin is not assignable via group mapping.",
+                "operationId": "UpsertGroupMapping",
+                "parameters": [
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.UpsertGroupMappingJSON"
+                            }
+                        }
+                    },
+                    "description": "Mapping payload",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/models.CompanySSOGroupMapping"
+                                }
+                            }
+                        },
+                        "description": "Updated existing mapping"
+                    },
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/models.CompanySSOGroupMapping"
+                                }
+                            }
+                        },
+                        "description": "Created new mapping"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "No company found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Create or update IdP group mapping",
+                "tags": [
+                    "companies"
+                ]
+            }
+        },
+        "/companies/me/sso/group-mappings/{mappingId}": {
+            "delete": {
+                "operationId": "DeleteGroupMapping",
+                "parameters": [
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Mapping row id",
+                        "in": "path",
+                        "name": "mappingId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "No company found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Delete IdP group mapping",
+                "tags": [
+                    "companies"
+                ]
+            }
+        },
+        "/companies/me/tenant-roles": {
+            "get": {
+                "operationId": "ListTenantRoles",
+                "parameters": [
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/models.TenantRole"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "No company found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List tenant-defined roles",
+                "tags": [
+                    "companies"
+                ]
+            },
+            "post": {
+                "operationId": "CreateTenantRole",
+                "parameters": [
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.CreateTenantRoleJSON"
+                            }
+                        }
+                    },
+                    "description": "Role definition",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/models.TenantRole"
+                                }
+                            }
+                        },
+                        "description": "Created"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "No company found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Create tenant role",
+                "tags": [
+                    "companies"
+                ]
+            }
+        },
+        "/companies/me/tenant-roles/{roleId}": {
+            "delete": {
+                "description": "Deletes a tenant-defined role. The reserved system role (`system_admin`) cannot be deleted.",
+                "operationId": "DeleteTenantRole",
+                "parameters": [
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Tenant role id",
+                        "in": "path",
+                        "name": "roleId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "No company found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Delete tenant role",
+                "tags": [
+                    "companies"
+                ]
+            },
+            "patch": {
+                "operationId": "PatchTenantRole",
+                "parameters": [
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Tenant role id",
+                        "in": "path",
+                        "name": "roleId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.CreateTenantRoleJSON"
+                            }
+                        }
+                    },
+                    "description": "Role definition",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/models.TenantRole"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Update tenant role",
+                "tags": [
+                    "companies"
+                ]
+            }
+        },
+        "/companies/me/users": {
+            "get": {
+                "description": "Users are included if they have a unit in the company, a user_tenant_roles row, or are the company owner. Global admin/platform_admin users are listed only when the caller is a global admin or platform admin. Includes tenantRoles (id, name, slug) per user.",
+                "operationId": "ListCompanyUsers",
+                "parameters": [
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Filter by name or email (ILIKE)",
+                        "in": "query",
+                        "name": "search",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/handlers.CompanyUserListItem"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "No company found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List users in the current company with tenant roles",
+                "tags": [
+                    "companies"
+                ]
+            }
+        },
+        "/companies/me/users/{userId}/external-identity": {
+            "get": {
+                "description": "Returns the linked OIDC issuer, subject, and optional directory object id for SSO (tenant admin).",
+                "operationId": "GetExternalIdentity",
+                "parameters": [
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Target user id",
+                        "in": "path",
+                        "name": "userId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/models.UserExternalIdentity"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "204": {
+                        "description": "No linked external identity"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get user external SSO identity",
+                "tags": [
+                    "companies"
+                ]
+            },
+            "patch": {
+                "description": "Admin repair for issuer/subject/oid when IdP metadata or user domain changes.",
+                "operationId": "PatchExternalIdentity",
+                "parameters": [
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Target user id",
+                        "in": "path",
+                        "name": "userId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.PatchExternalIdentityJSON"
+                            }
+                        }
+                    },
+                    "description": "Identity fields",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/models.UserExternalIdentity"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "external identity not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Patch user external SSO identity",
+                "tags": [
+                    "companies"
+                ]
+            }
+        },
+        "/companies/me/users/{userId}/sso-directory": {
+            "patch": {
+                "description": "Sets exemptFromSsoSync (skip IdP directory reconcile for global roles, units, and tenant role mappings) and/or ssoProfileSyncOptOut (skip name/email sync from IdP).",
+                "operationId": "PatchUserSSOFlags",
+                "parameters": [
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Target user id",
+                        "in": "path",
+                        "name": "userId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.PatchUserSSOFlagsJSON"
+                            }
+                        }
+                    },
+                    "description": "Flags",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/models.User"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Patch user SSO directory flags",
+                "tags": [
+                    "companies"
+                ]
+            }
+        },
+        "/companies/me/users/{userId}/tenant-roles": {
+            "patch": {
+                "description": "Sets the user’s tenant-defined roles for the company; replaces existing rows (ReplaceUserTenantRoles then SyncUserUnitsFromTenantRoles, which uses RebuildUserUnitsFromTenantRoles). An empty tenantRoleIds list removes all tenant roles and unit access for this company only when confirmRemoveAllTenantRoles is true; if tenantRoleIds is empty and confirmRemoveAllTenantRoles is not true, the request is rejected (400). The reserved system role (slug `system_admin`) is mutually exclusive with other tenant roles. Adding or removing that role requires the caller to be a global admin/platform admin or a tenant system administrator in this company.",
+                "operationId": "PatchUserTenantRoles",
+                "parameters": [
+                    {
+                        "description": "Tenant company UUID when the user belongs to multiple organizations",
+                        "in": "header",
+                        "name": "X-Company-Id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Target user id",
+                        "in": "path",
+                        "name": "userId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.PatchUserTenantRolesJSON"
+                            }
+                        }
+                    },
+                    "description": "Tenant role ids",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.PatchUserTenantRolesResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "No company found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Replace tenant role assignments for a user",
                 "tags": [
                     "companies"
                 ]

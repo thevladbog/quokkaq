@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"time"
@@ -120,7 +121,7 @@ func (s *counterService) GetCountersByUnit(unitID string) ([]models.Counter, err
 
 	for i := range counters {
 		if counters[i].AssignedTo != nil {
-			user, err := s.userRepo.FindByID(*counters[i].AssignedTo)
+			user, err := s.userRepo.FindByID(context.Background(), *counters[i].AssignedTo)
 			if err == nil {
 				counters[i].AssignedUser = user
 			} else {
@@ -143,7 +144,7 @@ func (s *counterService) GetCounterByID(id string) (*models.Counter, error) {
 	}
 
 	if counter.AssignedTo != nil {
-		user, err := s.userRepo.FindByID(*counter.AssignedTo)
+		user, err := s.userRepo.FindByID(context.Background(), *counter.AssignedTo)
 		if err == nil {
 			counter.AssignedUser = user
 		}
@@ -219,7 +220,7 @@ func (s *counterService) Occupy(counterID, userID string) (*models.Counter, erro
 		return nil, err
 	}
 
-	user, err := s.userRepo.FindByID(userID)
+	user, err := s.userRepo.FindByID(context.Background(), userID)
 	if err == nil {
 		counter.AssignedUser = user
 	}
@@ -358,7 +359,7 @@ func (s *counterService) StartBreak(counterID, userID string) (*models.Counter, 
 	if err != nil {
 		return nil, err
 	}
-	user, err := s.userRepo.FindByID(userID)
+	user, err := s.userRepo.FindByID(context.Background(), userID)
 	if err == nil {
 		counter.AssignedUser = user
 	}
@@ -397,7 +398,7 @@ func (s *counterService) EndBreak(counterID, userID string) (*models.Counter, er
 	if err != nil {
 		return nil, err
 	}
-	user, err := s.userRepo.FindByID(userID)
+	user, err := s.userRepo.FindByID(context.Background(), userID)
 	if err == nil {
 		counter.AssignedUser = user
 	}
@@ -484,7 +485,7 @@ func (s *counterService) CallNext(counterID string, serviceIDs []string, actorUs
 		return nil, err
 	}
 	if updatedCounter.AssignedTo != nil {
-		user, uerr := s.userRepo.FindByID(*updatedCounter.AssignedTo)
+		user, uerr := s.userRepo.FindByID(context.Background(), *updatedCounter.AssignedTo)
 		if uerr == nil {
 			updatedCounter.AssignedUser = user
 		}

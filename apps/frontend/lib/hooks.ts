@@ -28,6 +28,7 @@ import {
 } from '../lib/api';
 import { fetchCurrentUser, loginWithPassword } from '../lib/auth-orval';
 import { authPatchMe } from '@/lib/api/generated/auth';
+import { useAuthContext } from '@/contexts/AuthContext';
 import { invalidateTicketListQueries } from '../lib/ticket-query-invalidation';
 
 // User-related hooks
@@ -56,6 +57,35 @@ export const useCreateUser = () => {
     }) => usersApi.create(userData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
+    }
+  });
+};
+
+export const usePatchUserTenantRoles = () => {
+  const queryClient = useQueryClient();
+  const { user: sessionUser } = useAuthContext();
+  return useMutation({
+    mutationFn: ({
+      userId,
+      tenantRoleIds
+    }: {
+      userId: string;
+      tenantRoleIds: string[];
+    }) => usersApi.patchTenantRoles(userId, tenantRoleIds),
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ['users'] });
+      const uid = variables.userId?.trim();
+      if (uid) {
+        void queryClient.invalidateQueries({ queryKey: ['users', uid] });
+        void queryClient.invalidateQueries({
+          queryKey: ['users', uid, 'units']
+        });
+      }
+      if (uid && sessionUser?.id === uid) {
+        void queryClient.invalidateQueries({
+          predicate: (q: Query) => q.queryKey[0] === 'me'
+        });
+      }
     }
   });
 };

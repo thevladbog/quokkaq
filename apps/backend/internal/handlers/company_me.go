@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
@@ -14,6 +15,13 @@ import (
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
 )
+
+// companyPatchSsoAccessSourceOnly is the only JSON shape non-global-admin callers may send to PATCH /companies/me.
+// Extra keys are rejected (json.Decoder DisallowUnknownFields). When models.CompanyPatch gains fields, non-admins
+// still cannot set them without adding them here explicitly.
+type companyPatchSsoAccessSourceOnly struct {
+	SsoAccessSource *string `json:"ssoAccessSource,omitempty"`
+}
 
 // companyMeResponse is returned by GET /companies/me.
 type companyMeResponse struct {
@@ -35,6 +43,20 @@ func dadataConfigured() bool {
 
 func dadataCleanerConfigured() bool {
 	return strings.TrimSpace(os.Getenv("DADATA_CLEANER_API_KEY")) != ""
+}
+
+// canChangeSsoAccessSource is true if the caller may change models.CompanyPatch.ssoAccessSource on PatchMyCompany:
+// global admin (`admin`), platform admin (`platform_admin`), or company-scoped tenant role `system_admin` (not unit-scoped tenant.admin).
+func (h *CompanyHandler) canChangeSsoAccessSource(actorID, companyID string) (bool, error) {
+	ok, err := h.userRepo.IsPlatformAdmin(actorID)
+	if err != nil || ok {
+		return ok, err
+	}
+	ok, err = h.userRepo.IsAdmin(actorID)
+	if err != nil || ok {
+		return ok, err
+	}
+	return h.tenantRBAC.UserHasTenantSystemAdminRole(actorID, companyID)
 }
 
 // GetMyCompany godoc
@@ -96,7 +118,7 @@ func (h *CompanyHandler) GetMyCompany(w http.ResponseWriter, r *http.Request) {
 
 // PatchMyCompany godoc
 // @Summary      Update current user's company (tenant admin)
-// @Description  Partial update: JSON body matches models.CompanyPatch at the root (not wrapped in a "company" property). Only send fields to change. Cannot combine clearBillingAddress with billingAddress (same for counterparty).
+// @Description  Partial update: JSON body matches models.CompanyPatch at the root (not wrapped in a "company" property). Only send fields to change. Cannot combine clearBillingAddress with billingAddress (same for counterparty). If the body includes `ssoAccessSource`, the caller must satisfy logical scope `company.settings.ssoAccessSource`, which the server grants when the principal matches any of: `global.role.admin`, `global.role.platform_admin`, or `company.tenant_role.system_admin`. Unit-scoped permission `tenant.admin` alone (scope `unit.tenant.admin`) is not sufficient. Other fields still require global `admin` unless the body only contains `ssoAccessSource` and the caller is authorized as above. See the PatchMyCompany operation `x-logical-scopes` extension in OpenAPI for the documented scope labels (runtime auth remains Bearer JWT only).
 // @Tags         companies
 // @Accept       json
 // @Produce      json
@@ -143,21 +165,71 @@ func (h *CompanyHandler) PatchMyCompany(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	dec := json.NewDecoder(r.Body)
-	dec.DisallowUnknownFields()
-	var body models.CompanyPatch
-	if err := dec.Decode(&body); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-	var tail any
-	if err := dec.Decode(&tail); err != io.EOF {
-		if err == nil {
-			http.Error(w, "request body must contain a single JSON object", http.StatusBadRequest)
+
+	isGlobalAdmin, err := h.userRepo.IsAdmin(userID)
+	if err != nil {
+		log.Printf("PatchMyCompany IsAdmin: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	var body models.CompanyPatch
+	if isGlobalAdmin {
+		dec := json.NewDecoder(bytes.NewReader(bodyBytes))
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(&body); err != nil {
+			http.Error(w, "Invalid JSON", http.StatusBadRequest)
 			return
 		}
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
-		return
+		var tail any
+		if err := dec.Decode(&tail); err != io.EOF {
+			if err == nil {
+				http.Error(w, "request body must contain a single JSON object", http.StatusBadRequest)
+				return
+			}
+			http.Error(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
+	} else {
+		dec := json.NewDecoder(bytes.NewReader(bodyBytes))
+		dec.DisallowUnknownFields()
+		var narrow companyPatchSsoAccessSourceOnly
+		if err := dec.Decode(&narrow); err != nil {
+			http.Error(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
+		var tail any
+		if err := dec.Decode(&tail); err != io.EOF {
+			if err == nil {
+				http.Error(w, "request body must contain a single JSON object", http.StatusBadRequest)
+				return
+			}
+			http.Error(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
+		if narrow.SsoAccessSource == nil {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+		body = models.CompanyPatch{SsoAccessSource: narrow.SsoAccessSource}
+	}
+
+	if body.SsoAccessSource != nil {
+		ok, err := h.canChangeSsoAccessSource(userID, companyID)
+		if err != nil {
+			log.Printf("PatchMyCompany canChangeSsoAccessSource: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		if !ok {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
 	}
 
 	if body.ClearBillingAddress != nil && *body.ClearBillingAddress && body.BillingAddress != nil {
@@ -211,6 +283,14 @@ func (h *CompanyHandler) PatchMyCompany(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 		company.PaymentAccounts = out
+	}
+	if body.SsoAccessSource != nil {
+		v := strings.ToLower(strings.TrimSpace(*body.SsoAccessSource))
+		if v != models.SsoAccessSourceManual && v != models.SsoAccessSourceSSOGroups {
+			http.Error(w, "invalid ssoAccessSource", http.StatusBadRequest)
+			return
+		}
+		company.SsoAccessSource = v
 	}
 
 	if err := h.companyRepo.Update(company); err != nil {

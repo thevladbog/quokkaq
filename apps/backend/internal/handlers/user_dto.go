@@ -1,20 +1,30 @@
 package handlers
 
 import (
+	"time"
+
 	"quokkaq-go-backend/internal/models"
 )
 
+// TenantRoleBriefResponse is a tenant-defined role (id, name, slug) for the active company on /auth/me.
+type TenantRoleBriefResponse struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+}
+
 // UserResponse is the DTO for user API responses
 type UserResponse struct {
-	ID          string              `json:"id"`
-	Name        string              `json:"name"`
-	Email       *string             `json:"email,omitempty"`
-	Type        string              `json:"type,omitempty"`
-	CreatedAt   string              `json:"createdAt,omitempty"`
-	PhotoURL    *string             `json:"photoUrl,omitempty"`
-	Roles       []RoleDTO           `json:"roles,omitempty"`
-	Units       []UserUnitDTO       `json:"units,omitempty"`
-	Permissions map[string][]string `json:"permissions,omitempty"`
+	ID          string                    `json:"id"`
+	Name        string                    `json:"name"`
+	Email       *string                   `json:"email,omitempty"`
+	Type        string                    `json:"type,omitempty"`
+	CreatedAt   string                    `json:"createdAt,omitempty"`
+	PhotoURL    *string                   `json:"photoUrl,omitempty"`
+	Roles       []RoleDTO                 `json:"roles,omitempty"`
+	Units       []UserUnitDTO             `json:"units,omitempty"`
+	Permissions map[string][]string       `json:"permissions,omitempty"`
+	TenantRoles []TenantRoleBriefResponse `json:"tenantRoles,omitempty"`
 }
 
 type RoleDTO struct {
@@ -93,4 +103,32 @@ func MapUserToResponse(user *models.User) *UserResponse {
 	}
 
 	return response
+}
+
+// CompanyUserListItem is the response row for GET /companies/me/users (listing only; no internal SSO fields).
+type CompanyUserListItem struct {
+	ID          string                    `json:"id"`
+	Name        string                    `json:"name"`
+	Email       *string                   `json:"email,omitempty"`
+	Type        string                    `json:"type,omitempty"`
+	PhotoURL    *string                   `json:"photoUrl,omitempty"`
+	IsActive    bool                      `json:"isActive"`
+	CreatedAt   string                    `json:"createdAt,omitempty"`
+	TenantRoles []TenantRoleBriefResponse `json:"tenantRoles,omitempty"`
+}
+
+func userToCompanyUserListItem(u models.User, tenantRoles []TenantRoleBriefResponse) CompanyUserListItem {
+	item := CompanyUserListItem{
+		ID:          u.ID,
+		Name:        u.Name,
+		Email:       u.Email,
+		Type:        u.Type,
+		PhotoURL:    u.PhotoURL,
+		IsActive:    u.IsActive,
+		TenantRoles: tenantRoles,
+	}
+	if !u.CreatedAt.IsZero() {
+		item.CreatedAt = u.CreatedAt.UTC().Format(time.RFC3339)
+	}
+	return item
 }

@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -43,7 +44,7 @@ func NewInvitationService(repo repository.InvitationRepository, mailService Mail
 
 func (s *invitationService) CreateInvitation(email string, targetUnits []byte, targetRoles []byte, templateID string) (*models.Invitation, error) {
 	// Check if user already exists
-	_, err := s.userRepo.FindByEmail(email)
+	_, err := s.userRepo.FindByEmail(context.Background(), email)
 	if err == nil {
 		return nil, errors.New("user with this email already exists")
 	}

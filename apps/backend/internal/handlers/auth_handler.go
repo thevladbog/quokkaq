@@ -20,10 +20,11 @@ type AuthHandler struct {
 	service     services.AuthService
 	userService services.UserService
 	userRepo    repository.UserRepository
+	tenantRBAC  repository.TenantRBACRepository
 }
 
-func NewAuthHandler(service services.AuthService, userService services.UserService, userRepo repository.UserRepository) *AuthHandler {
-	return &AuthHandler{service: service, userService: userService, userRepo: userRepo}
+func NewAuthHandler(service services.AuthService, userService services.UserService, userRepo repository.UserRepository, tenantRBAC repository.TenantRBACRepository) *AuthHandler {
+	return &AuthHandler{service: service, userService: userService, userRepo: userRepo, tenantRBAC: tenantRBAC}
 }
 
 // PatchMeRequest is the body for PATCH /auth/me (self-service profile photo only).
@@ -188,6 +189,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetMe godoc
+// @ID           authGetMe
 // @Summary      Get current user
 // @Description  Returns the currently authenticated user's information
 // @Tags         auth
@@ -212,6 +214,7 @@ func (h *AuthHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 
 	// Map to DTO for proper frontend format
 	response := MapUserToResponse(user)
+	h.attachTenantRolesToResponse(r, userID, response)
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 	}
@@ -285,8 +288,28 @@ func (h *AuthHandler) PatchMe(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	response := MapUserToResponse(user)
+	h.attachTenantRolesToResponse(r, userID, response)
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
+}
+
+func (h *AuthHandler) attachTenantRolesToResponse(r *http.Request, userID string, response *UserResponse) {
+	if h.tenantRBAC == nil {
+		return
+	}
+	cid, err := h.userRepo.ResolveCompanyIDForRequest(userID, r.Header.Get("X-Company-Id"))
+	if err != nil {
+		return
+	}
+	trByUser, err := h.tenantRBAC.MapTenantRolesByUserForCompany(cid, []string{userID})
+	if err != nil {
+		return
+	}
+	for _, tr := range trByUser[userID] {
+		response.TenantRoles = append(response.TenantRoles, TenantRoleBriefResponse{
+			ID: tr.ID, Name: tr.Name, Slug: tr.Slug,
+		})
 	}
 }
 
@@ -455,6 +478,10 @@ func (h *AuthHandler) Signup(w http.ResponseWriter, r *http.Request) {
 		}
 		if errors.Is(err, services.ErrCompanySlugTaken) {
 			http.Error(w, "Company slug is already taken", http.StatusConflict)
+			return
+		}
+		if errors.Is(err, services.ErrTenantRBACNotConfigured) {
+			http.Error(w, err.Error(), http.StatusServiceUnavailable)
 			return
 		}
 		log.Printf("Signup: %v", err)

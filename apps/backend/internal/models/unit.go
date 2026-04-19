@@ -38,9 +38,11 @@ type Company struct {
 	// OpaqueLoginLinksOnly: deep links should use TenantLoginLink tokens instead of slug-based branding.
 	OpaqueLoginLinksOnly bool `gorm:"column:opaque_login_links_only;not null;default:false" json:"opaqueLoginLinksOnly"`
 	// SsoJitProvisioning: allow creating a user on first successful SSO when policy permits.
-	SsoJitProvisioning bool      `gorm:"column:sso_jit_provisioning;not null;default:false" json:"ssoJitProvisioning"`
-	CreatedAt          time.Time `gorm:"autoCreateTime" json:"createdAt"`
-	UpdatedAt          time.Time `gorm:"autoUpdateTime" json:"updatedAt"`
+	SsoJitProvisioning bool `gorm:"column:sso_jit_provisioning;not null;default:false" json:"ssoJitProvisioning"`
+	// SsoAccessSource: "manual" (default) or "sso_groups" — IdP groups are source of truth for access when set.
+	SsoAccessSource string    `gorm:"column:sso_access_source;size:32;not null;default:manual" json:"ssoAccessSource" enums:"manual,sso_groups"`
+	CreatedAt       time.Time `gorm:"autoCreateTime" json:"createdAt"`
+	UpdatedAt       time.Time `gorm:"autoUpdateTime" json:"updatedAt"`
 
 	// Relations
 	Units        []Unit        `gorm:"foreignKey:CompanyID" json:"units,omitempty"`
@@ -68,6 +70,8 @@ type CompanyPatch struct {
 	ClearBillingAddress *bool            `json:"clearBillingAddress,omitempty"`
 	PaymentAccounts     *json.RawMessage `json:"paymentAccounts,omitempty" swaggertype:"array,object"` // items: @quokkaq/shared-types PaymentAccountSchema
 	Slug                *string          `json:"slug,omitempty"`
+	// SsoAccessSource sets SSO access provisioning (`manual` | `sso_groups`). Changing this field via PatchMyCompany requires logical scope `company.settings.ssoAccessSource` (any of `global.role.admin`, `global.role.platform_admin`, `company.tenant_role.system_admin`; not `unit.tenant.admin` alone).
+	SsoAccessSource *string `json:"ssoAccessSource,omitempty" enums:"manual,sso_groups"`
 }
 
 type Unit struct {

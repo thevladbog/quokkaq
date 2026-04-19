@@ -577,6 +577,12 @@ def apply_openapi_tweaks(doc: dict[str, Any]) -> None:
     patch_visitor = _schema(comp, "handlers.PatchTicketVisitorRequest")
     patch_visitor["minProperties"] = 1
 
+    # PATCH bodies where the server rejects an empty object `{}` (at least one field required).
+    _schema(comp, "handlers.PatchExternalIdentityJSON")["minProperties"] = 1
+    _schema(comp, "handlers.PatchUserSSOFlagsJSON")["minProperties"] = 1
+    _schema(comp, "handlers.PatchUserTenantRolesJSON")["minProperties"] = 1
+    _schema(comp, "handlers.PatchMeRequest")["minProperties"] = 1
+
     create_tag = _schema(comp, "handlers.createVisitorTagDefinitionRequest")
     _patch_color_pattern(create_tag, "createVisitorTagDefinitionRequest")
 
@@ -585,6 +591,7 @@ def apply_openapi_tweaks(doc: dict[str, Any]) -> None:
     _patch_color_pattern(patch_tag, "patchVisitorTagDefinitionRequest")
 
     _patch_create_ticket_request(comp)
+    _patch_upsert_group_mapping_json(comp)
 
     upload_logo = _schema(comp, "handlers.UploadLogoResponse")
     upload_logo["required"] = ["url"]
@@ -604,6 +611,12 @@ def apply_openapi_tweaks(doc: dict[str, Any]) -> None:
     _merge_schema_required_if_prop_present(comp, "handlers.tenantHintRequest", "email")
     _merge_schema_required_if_prop_present(comp, "handlers.ssoExchangeRequest", "code")
     _merge_schema_required_if_prop_present(comp, "handlers.patchCompanySlugRequest", "slug")
+    _merge_schema_required_if_prop_present(
+        comp, "handlers.PatchUserTenantRolesResponse", "tenantRoles"
+    )
+    _merge_schema_required_if_prop_present(
+        comp, "handlers.PatchUserTenantRolesJSON", "tenantRoleIds"
+    )
 
     patch_survey = _schema(comp, "handlers.patchSurveyRequest")
     patch_survey["minProperties"] = 1
@@ -627,6 +640,132 @@ def apply_openapi_tweaks(doc: dict[str, Any]) -> None:
     )
 
     _patch_models_update_user_input(comp)
+
+    _patch_company_me_patch_sso_access_security(doc)
+    _patch_get_external_identity_204_no_body(doc)
+
+
+def _patch_get_external_identity_204_no_body(doc: dict[str, Any]) -> None:
+    """GET /companies/me/users/{userId}/external-identity: 204 must not declare a response body."""
+    paths = doc.get("paths")
+    if not isinstance(paths, dict):
+        return
+    ext = paths.get("/companies/me/users/{userId}/external-identity")
+    if not isinstance(ext, dict):
+        return
+    get = ext.get("get")
+    if not isinstance(get, dict):
+        return
+    responses = get.get("responses")
+    if not isinstance(responses, dict):
+        return
+    r204 = responses.get("204")
+    if isinstance(r204, dict):
+        r204.pop("content", None)
+
+
+def _patch_company_me_patch_sso_access_security(doc: dict[str, Any]) -> None:
+    """Bearer-only security on PATCH /companies/me; logical SSO scope rules live in x-logical-scopes (doc-only)."""
+    comp = _components(doc)
+    schemes = comp.get("securitySchemes")
+    if not isinstance(schemes, dict):
+        sys.exit("post_swagger_openapi_tweaks: components.securitySchemes not an object")
+    schemes.pop("QuokkaQLogicalScopes", None)
+    if "BearerAuth" not in schemes:
+        sys.exit(
+            "post_swagger_openapi_tweaks: BearerAuth missing (cannot patch PATCH /companies/me security)"
+        )
+    paths = doc.get("paths")
+    if not isinstance(paths, dict):
+        sys.exit("post_swagger_openapi_tweaks: paths missing")
+    me = paths.get("/companies/me")
+    if not isinstance(me, dict):
+        sys.exit("post_swagger_openapi_tweaks: paths /companies/me missing")
+    patch = me.get("patch")
+    if not isinstance(patch, dict):
+        sys.exit("post_swagger_openapi_tweaks: PATCH /companies/me missing (swag/kin drift)")
+    patch["security"] = [{"BearerAuth": []}]
+    patch["x-logical-scopes"] = {
+        "description": (
+            "Logical scopes for company-wide tenant settings (documentation only). "
+            "Clients send `Authorization: Bearer` JWT; the server enforces these rules in code. "
+            "For `models.CompanyPatch.ssoAccessSource`, the caller must match scope "
+            "`company.settings.ssoAccessSource`, satisfied when the principal matches any of "
+            "`global.role.admin`, `global.role.platform_admin`, or `company.tenant_role.system_admin`. "
+            "Scope `unit.tenant.admin` (unit-only `tenant.admin` permission) is not sufficient alone."
+        ),
+        "scopes": {
+            "company.settings.ssoAccessSource": (
+                "Change company SSO access provisioning (`manual` vs `sso_groups`). "
+                "Equivalent to any of global.role.admin, global.role.platform_admin, "
+                "company.tenant_role.system_admin (not unit.tenant.admin alone)."
+            ),
+            "global.role.admin": "Global administrator (role name `admin`).",
+            "global.role.platform_admin": "Platform administrator (role `platform_admin`).",
+            "company.tenant_role.system_admin": "Company tenant role slug `system_admin`.",
+            "unit.tenant.admin": (
+                "Unit-scoped `tenant.admin` permission — NOT sufficient for ssoAccessSource alone."
+            ),
+        },
+    }
+
+
+def _patch_upsert_group_mapping_json(components: dict[str, Any]) -> None:
+    """POST /companies/me/sso/group-mappings: require idpGroupId and exactly one of tenantRoleId | legacyRoleName.
+
+    Legacy global roles managed by SSO group reconciliation are staff, supervisor, operator
+    (see internal/services/sso_reconcile.go). Admin is excluded from IdP-driven legacy grants.
+    """
+    schemas = components.get("schemas")
+    if not isinstance(schemas, dict):
+        sys.exit(
+            "post_swagger_openapi_tweaks: components.schemas missing "
+            "(required for UpsertGroupMappingJSON patch)"
+        )
+    id_prop: dict[str, Any] = {
+        "type": "string",
+        "minLength": 1,
+        "description": "IdP group identifier (e.g. Azure AD group object id).",
+    }
+    schemas["handlers.UpsertGroupMappingJSON"] = {
+        "oneOf": [
+            {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["idpGroupId", "tenantRoleId"],
+                "properties": {
+                    "idpGroupId": dict(id_prop),
+                    "tenantRoleId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": (
+                            "Tenant role UUID in this company. Mutually exclusive with legacyRoleName."
+                        ),
+                    },
+                },
+            },
+            {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["idpGroupId", "legacyRoleName"],
+                "properties": {
+                    "idpGroupId": dict(id_prop),
+                    "legacyRoleName": {
+                        "type": "string",
+                        "description": (
+                            "Legacy global role name applied by SSO group sync. "
+                            "Mutually exclusive with tenantRoleId."
+                        ),
+                        "enum": ["staff", "supervisor", "operator"],
+                    },
+                },
+            },
+        ],
+        "description": (
+            "Map an IdP group to exactly one target: a tenant role id, or a legacy global role name. "
+            "Send idpGroupId plus either tenantRoleId or legacyRoleName (not both)."
+        ),
+    }
 
 
 def _patch_create_ticket_request(components: dict[str, Any]) -> None:

@@ -34,6 +34,8 @@ import { resolveUnitFilterFromQuery } from '@/lib/integrations-unit-filter';
 import { OrganizationTenantSlugCard } from '@/components/organization/organization-tenant-slug-card';
 import { getUnitDisplayName } from '@/lib/unit-display';
 import { OrganizationSsoSettingsCard } from '@/components/organization/organization-sso-settings-card';
+import { OrganizationSsoAccessSourceCard } from '@/components/organization/organization-sso-access-source-card';
+import { OrganizationTenantRbacSettings } from '@/components/organization/organization-tenant-rbac-settings';
 
 export function IntegrationsSettingsContent() {
   const t = useTranslations('admin.integrations');
@@ -85,6 +87,16 @@ export function IntegrationsSettingsContent() {
       )
     );
   }, [unitsQuery.data, locale]);
+
+  const unitOptionsForProps = useMemo(
+    () =>
+      unitOptions.map((u) => ({
+        id: u.id,
+        name: u.name,
+        nameEn: u.nameEn
+      })),
+    [unitOptions]
+  );
 
   /** Optional filter: `?unit=` from URL (e.g. deep link from a unit page). */
   const filterUnitId = useMemo(() => {
@@ -252,11 +264,7 @@ export function IntegrationsSettingsContent() {
                   </div>
                   <CalendarIntegrationsPanel
                     filterUnitId={filterUnitId}
-                    unitOptions={unitOptions.map((u) => ({
-                      id: u.id,
-                      name: u.name,
-                      nameEn: u.nameEn
-                    }))}
+                    unitOptions={unitOptionsForProps}
                   />
                 </>
               )}
@@ -277,6 +285,7 @@ export function IntegrationsSettingsContent() {
             </Alert>
           )}
           <OrganizationTenantSlugCard company={company} />
+          <OrganizationSsoAccessSourceCard company={company} />
           {!ssoLoadFailed &&
             ssoQ.data?.status === 200 &&
             ssoQ.data.data != null && (
@@ -286,6 +295,7 @@ export function IntegrationsSettingsContent() {
                 publicApiUrl={companyMe.data?.publicApiUrl}
               />
             )}
+          <OrganizationTenantRbacSettings units={unitOptionsForProps} />
         </TabsContent>
       </Tabs>
     </>

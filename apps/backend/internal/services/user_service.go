@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"slices"
 	"strings"
@@ -45,7 +46,7 @@ func NewUserService(repo repository.UserRepository) UserService {
 func (s *userService) CreateUser(user *models.User) error {
 	// Check if email exists
 	if user.Email != nil {
-		existing, _ := s.repo.FindByEmail(*user.Email)
+		existing, _ := s.repo.FindByEmail(context.Background(), *user.Email)
 		if existing != nil {
 			return errors.New("email already in use")
 		}
@@ -73,7 +74,7 @@ func (s *userService) GetAllUsers(search string) ([]models.User, error) {
 }
 
 func (s *userService) GetUserByID(id string) (*models.User, error) {
-	return s.repo.FindByID(id)
+	return s.repo.FindByID(context.Background(), id)
 }
 
 func userHasAdminRole(u *models.User) bool {
@@ -89,7 +90,7 @@ func (s *userService) UpdateUser(id string, input *models.UpdateUserInput) error
 	if input == nil {
 		return ErrUpdateUserEmptyInput
 	}
-	existing, err := s.repo.FindByID(id)
+	existing, err := s.repo.FindByID(context.Background(), id)
 	if err != nil {
 		return err
 	}
@@ -125,7 +126,7 @@ func (s *userService) UpdateUser(id string, input *models.UpdateUserInput) error
 
 	wantsAdmin := slices.Contains(input.Roles, "admin")
 
-	return database.DB.Transaction(func(tx *gorm.DB) error {
+	err = database.DB.Transaction(func(tx *gorm.DB) error {
 		if err := s.repo.UpdateTx(tx, existing); err != nil {
 			return err
 		}
@@ -147,6 +148,10 @@ func (s *userService) UpdateUser(id string, input *models.UpdateUserInput) error
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	return s.repo.RecomputeUserIsActive(context.Background(), id)
 }
 
 func (s *userService) DeleteUser(id string) error {
@@ -154,7 +159,10 @@ func (s *userService) DeleteUser(id string) error {
 }
 
 func (s *userService) AssignUnit(userID, unitID string, permissions []string) error {
-	return s.repo.AssignUnit(userID, unitID, permissions)
+	if err := s.repo.AssignUnit(userID, unitID, permissions); err != nil {
+		return err
+	}
+	return s.repo.RecomputeUserIsActive(context.Background(), userID)
 }
 
 func (s *userService) AssignRole(userID, roleID string) error {
@@ -162,7 +170,10 @@ func (s *userService) AssignRole(userID, roleID string) error {
 }
 
 func (s *userService) RemoveUnit(userID, unitID string) error {
-	return s.repo.RemoveUnit(userID, unitID)
+	if err := s.repo.RemoveUnit(userID, unitID); err != nil {
+		return err
+	}
+	return s.repo.RecomputeUserIsActive(context.Background(), userID)
 }
 
 func (s *userService) IsSystemInitialized() (bool, error) {

@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { UserSettingsSheet } from '@/components/settings/users/user-settings-sheet';
 import { UsersTable } from '@/components/settings/users/users-table';
+import { TenantRolesManager } from '@/components/settings/tenant-roles-manager';
 import { useUnits, useUsers } from '@/lib/hooks';
 import { useTranslations } from 'next-intl';
 import type { Unit, User } from '@quokkaq/shared-types';
@@ -35,6 +37,16 @@ export default function UsersPage() {
     [units]
   );
 
+  const unitPick = useMemo(
+    () =>
+      (units as Unit[]).map((u) => ({
+        id: u.id,
+        name: u.name,
+        nameEn: u.nameEn
+      })),
+    [units]
+  );
+
   const selectedUser = useMemo(
     () => (users as User[]).find((u) => u.id === selectedUserId) ?? null,
     [users, selectedUserId]
@@ -56,24 +68,39 @@ export default function UsersPage() {
   return (
     <div className='container mx-auto max-w-6xl p-4'>
       <h1 className='mb-2 text-3xl font-bold'>{t('users.title')}</h1>
-      <p className='text-muted-foreground mb-6'>{t('users.description')}</p>
 
-      <div className='mb-4'>
-        <Input
-          placeholder={t('users.search_placeholder')}
-          value={userSearchTerm}
-          onChange={(e) => setUserSearchTerm(e.target.value)}
-          className='max-w-md'
-        />
-      </div>
+      <Tabs defaultValue='users' className='w-full'>
+        <TabsList className='mb-4'>
+          <TabsTrigger value='users'>{t('users.tab_users')}</TabsTrigger>
+          <TabsTrigger value='roles'>{t('users.tab_roles')}</TabsTrigger>
+        </TabsList>
 
-      <UsersTable
-        users={users as User[]}
-        unitsById={unitsById}
-        loading={usersLoading || unitsLoading}
-        selectedUserId={selectedUserId}
-        onRowClick={openSheet}
-      />
+        <TabsContent value='users' className='mt-0'>
+          <p className='text-muted-foreground mb-6'>{t('users.description')}</p>
+          <div className='mb-4'>
+            <Input
+              placeholder={t('users.search_placeholder')}
+              value={userSearchTerm}
+              onChange={(e) => setUserSearchTerm(e.target.value)}
+              className='max-w-md'
+            />
+          </div>
+          <UsersTable
+            users={users as User[]}
+            unitsById={unitsById}
+            loading={usersLoading || unitsLoading}
+            selectedUserId={selectedUserId}
+            onRowClick={openSheet}
+          />
+        </TabsContent>
+
+        <TabsContent value='roles' className='mt-0'>
+          <p className='text-muted-foreground mb-6'>
+            {t('users.roles_tab_description')}
+          </p>
+          <TenantRolesManager units={unitPick} variant='plain' />
+        </TabsContent>
+      </Tabs>
 
       <UserSettingsSheet
         open={sheetOpen}

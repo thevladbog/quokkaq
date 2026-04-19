@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -30,6 +31,9 @@ var ErrCompanySlugTaken = errors.New("company slug already taken")
 
 // ErrUserInactive is returned when issuing tokens for a disabled user account.
 var ErrUserInactive = errors.New("user account is inactive")
+
+// ErrTenantRBACNotConfigured is returned when TenantRBACRepository was not wired (signup requires it).
+var ErrTenantRBACNotConfigured = errors.New("tenant rbac not configured")
 
 // IsUniqueConstraintViolation reports Postgres unique violations (23505) and similar driver errors.
 func IsUniqueConstraintViolation(err error) bool {
@@ -68,6 +72,7 @@ type authService struct {
 	companyRepo      repository.CompanyRepository
 	mailService      MailService
 	subscriptionRepo repository.SubscriptionRepository
+	tenantRBAC       repository.TenantRBACRepository
 }
 
 func NewAuthService(
@@ -75,13 +80,18 @@ func NewAuthService(
 	companyRepo repository.CompanyRepository,
 	mailService MailService,
 	subscriptionRepo repository.SubscriptionRepository,
-) AuthService {
+	tenantRBAC repository.TenantRBACRepository,
+) (AuthService, error) {
+	if tenantRBAC == nil {
+		return nil, ErrTenantRBACNotConfigured
+	}
 	return &authService{
 		userRepo:         userRepo,
 		companyRepo:      companyRepo,
 		mailService:      mailService,
 		subscriptionRepo: subscriptionRepo,
-	}
+		tenantRBAC:       tenantRBAC,
+	}, nil
 }
 
 func jwtSecretBytes() []byte {
@@ -93,7 +103,7 @@ func jwtSecretBytes() []byte {
 }
 
 func (s *authService) Login(email, password, tenantSlug string) (*TokenPair, error) {
-	user, err := s.userRepo.FindByEmail(email)
+	user, err := s.userRepo.FindByEmail(context.Background(), email)
 	if err != nil {
 		return nil, errors.New("invalid credentials")
 	}
@@ -165,7 +175,7 @@ func (s *authService) generateTokenPair(user *models.User) (*TokenPair, error) {
 }
 
 func (s *authService) IssueTokenPairForUserID(userID string) (*TokenPair, error) {
-	user, err := s.userRepo.FindByID(userID)
+	user, err := s.userRepo.FindByID(context.Background(), userID)
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +203,7 @@ func (s *authService) Refresh(refreshToken string) (*TokenPair, error) {
 	if !ok || strings.TrimSpace(userID) == "" {
 		return nil, errors.New("invalid refresh token")
 	}
-	user, err := s.userRepo.FindByID(userID)
+	user, err := s.userRepo.FindByID(context.Background(), userID)
 	if err != nil {
 		return nil, errors.New("invalid refresh token")
 	}
@@ -201,11 +211,11 @@ func (s *authService) Refresh(refreshToken string) (*TokenPair, error) {
 }
 
 func (s *authService) GetMe(userID string) (*models.User, error) {
-	return s.userRepo.FindByID(userID)
+	return s.userRepo.FindByID(context.Background(), userID)
 }
 
 func (s *authService) RequestPasswordReset(email string) error {
-	user, err := s.userRepo.FindByEmail(email)
+	user, err := s.userRepo.FindByEmail(context.Background(), email)
 	if err != nil {
 		// Don't reveal if user exists
 		return nil
@@ -268,7 +278,7 @@ func (s *authService) ResetPassword(token, newPassword string) error {
 
 func (s *authService) Signup(name, email, password, companyName, planCode string, preferredSlug *string) (*TokenPair, error) {
 	// Check if user already exists
-	existingUser, _ := s.userRepo.FindByEmail(email)
+	existingUser, _ := s.userRepo.FindByEmail(context.Background(), email)
 	if existingUser != nil {
 		return nil, ErrEmailAlreadyExists
 	}
@@ -305,6 +315,10 @@ func (s *authService) Signup(name, email, password, companyName, planCode string
 		Email:    &email,
 		Password: &hashedPasswordStr,
 		Type:     "staff",
+	}
+
+	if s.tenantRBAC == nil {
+		return nil, ErrTenantRBACNotConfigured
 	}
 
 	var pair *TokenPair
@@ -367,6 +381,17 @@ func (s *authService) Signup(name, email, password, companyName, planCode string
 
 		if err := s.userRepo.AssignRoleTx(tx, user.ID, adminRole.ID); err != nil {
 			return fmt.Errorf("failed to assign admin role: %w", err)
+		}
+
+		sysRoleID, err := s.tenantRBAC.EnsureSystemTenantRoleTx(tx, company.ID)
+		if err != nil {
+			return fmt.Errorf("ensure system tenant role: %w", err)
+		}
+		if err := s.tenantRBAC.ReplaceUserTenantRolesTx(tx, user.ID, company.ID, []string{sysRoleID}, false); err != nil {
+			return fmt.Errorf("assign system tenant role: %w", err)
+		}
+		if err := s.tenantRBAC.SyncUserUnitsFromTenantRolesTx(tx, user.ID, company.ID); err != nil {
+			return fmt.Errorf("sync user units from tenant roles: %w", err)
 		}
 
 		var genErr error

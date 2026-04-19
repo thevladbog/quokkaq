@@ -243,6 +243,8 @@ export interface ModelsUserUnit {
 export interface ModelsUser {
   createdAt?: string;
   email?: string;
+  /** ExemptFromSSOSync when true, SSO directory reconcile does not change this user's global roles, unit assignments, or tenant role mappings (IdP group sync). */
+  exemptFromSsoSync?: boolean;
   id?: string;
   isActive?: boolean;
   name?: string;
@@ -250,6 +252,8 @@ export interface ModelsUser {
   photoUrl?: string;
   /** Relations */
   roles?: ModelsUserRole[];
+  /** SSOProfileSyncOptOut: when true, skip name/email updates from IdP on SSO login. */
+  ssoProfileSyncOptOut?: boolean;
   type?: string;
   units?: ModelsUserUnit[];
 }
@@ -321,6 +325,23 @@ export interface HandlersClientVisitsResponse {
   nextCursor?: string;
 }
 
+export interface HandlersTenantRoleBriefResponse {
+  id?: string;
+  name?: string;
+  slug?: string;
+}
+
+export interface HandlersCompanyUserListItem {
+  createdAt?: string;
+  email?: string;
+  id?: string;
+  isActive?: boolean;
+  name?: string;
+  photoUrl?: string;
+  tenantRoles?: HandlersTenantRoleBriefResponse[];
+  type?: string;
+}
+
 export interface HandlersCounterCallNextRequest {
   serviceId?: string;
   serviceIds?: string[];
@@ -344,6 +365,18 @@ export interface HandlersCreateInvitationRequest {
   targetRoles?: HandlersCreateInvitationRequestTargetRoles;
   targetUnits?: HandlersCreateInvitationRequestTargetUnits;
   templateId?: string;
+}
+
+export interface HandlersTenantRoleUnitJSON {
+  permissions?: string[];
+  unitId?: string;
+}
+
+export interface HandlersCreateTenantRoleJSON {
+  description?: string;
+  name?: string;
+  slug?: string;
+  units?: HandlersTenantRoleUnitJSON[];
 }
 
 export interface HandlersCreateTicketRequestAnonymous {
@@ -487,6 +520,12 @@ export interface HandlersOperatorCommentPatchDTO {
   operatorComment: string | null;
 }
 
+export interface HandlersPatchExternalIdentityJSON {
+  externalObjectId?: string;
+  issuer?: string;
+  subject?: string;
+}
+
 export interface HandlersPatchMeRequest {
   photoUrl?: string;
 }
@@ -553,6 +592,24 @@ export type HandlersPatchUnitKioskConfigRequestConfig = {
 
 export interface HandlersPatchUnitKioskConfigRequest {
   config: HandlersPatchUnitKioskConfigRequestConfig;
+}
+
+export interface HandlersPatchUserSSOFlagsJSON {
+  /** ExemptFromSSOSync when true, SSO directory reconcile does not change this user's global roles, unit assignments, or tenant role mappings (IdP group sync). */
+  exemptFromSsoSync?: boolean;
+  /** SSOProfileSyncOptOut when true, skip name/email updates from IdP on SSO login. */
+  ssoProfileSyncOptOut?: boolean;
+}
+
+export interface HandlersPatchUserTenantRolesJSON {
+  /** ConfirmRemoveAllTenantRoles must be true when tenantRoleIds is empty after trimming, so ReplaceUserTenantRoles does not
+  clear user_tenant_roles and trigger RebuildUserUnitsFromTenantRoles mass-removal of user_units by mistake. */
+  confirmRemoveAllTenantRoles?: boolean;
+  tenantRoleIds: string[];
+}
+
+export interface HandlersPatchUserTenantRolesResponse {
+  tenantRoles: HandlersTenantRoleBriefResponse[];
 }
 
 export interface HandlersPeriodResponse {
@@ -714,6 +771,30 @@ export interface HandlersUploadSurveyIdleMediaResponse {
   url: string;
 }
 
+/**
+ * Map an IdP group to exactly one target: a tenant role id, or a legacy global role name. Send idpGroupId plus either tenantRoleId or legacyRoleName (not both).
+ */
+export type HandlersUpsertGroupMappingJSON = {
+  /**
+     * IdP group identifier (e.g. Azure AD group object id).
+     * @minLength 1
+     */
+  idpGroupId: string;
+  /**
+     * Tenant role UUID in this company. Mutually exclusive with legacyRoleName.
+     * @minLength 1
+     */
+  tenantRoleId: string;
+} | {
+  /**
+     * IdP group identifier (e.g. Azure AD group object id).
+     * @minLength 1
+     */
+  idpGroupId: string;
+  /** Legacy global role name applied by SSO group sync. Mutually exclusive with tenantRoleId. */
+  legacyRoleName: 'staff' | 'supervisor' | 'operator';
+};
+
 export interface HandlersUsageMetricInfoResponse {
   current?: number;
   limit?: number;
@@ -743,6 +824,7 @@ export interface HandlersUserResponse {
   permissions?: HandlersUserResponsePermissions;
   photoUrl?: string;
   roles?: HandlersRoleDTO[];
+  tenantRoles?: HandlersTenantRoleBriefResponse[];
   type?: string;
   units?: HandlersUserUnitDTO[];
 }
@@ -899,6 +981,17 @@ export interface ModelsInvoice {
   yookassaPaymentId?: string;
 }
 
+/**
+ * SsoAccessSource: "manual" (default) or "sso_groups" — IdP groups are source of truth for access when set.
+ */
+export type ModelsCompanySsoAccessSource = typeof ModelsCompanySsoAccessSource[keyof typeof ModelsCompanySsoAccessSource];
+
+
+export const ModelsCompanySsoAccessSource = {
+  manual: 'manual',
+  sso_groups: 'sso_groups',
+} as const;
+
 export interface ModelsUsageRecord {
   /** month for aggregation (first day of month) */
   billingMonth?: string;
@@ -960,6 +1053,8 @@ export interface ModelsCompany {
   settings?: ModelsCompanySettings;
   /** public tenant slug for login URLs */
   slug?: string;
+  /** SsoAccessSource: "manual" (default) or "sso_groups" — IdP groups are source of truth for access when set. */
+  ssoAccessSource?: ModelsCompanySsoAccessSource;
   /** SsoJitProvisioning: allow creating a user on first successful SSO when policy permits. */
   ssoJitProvisioning?: boolean;
   /** StrictPublicTenantResolve: SaaS-enabled — GET /public/tenants/{slug} does not expose org metadata for slug guessing. */
@@ -1161,6 +1256,17 @@ export type ModelsCompanyPatchCounterparty = { [key: string]: unknown };
 
 export type ModelsCompanyPatchPaymentAccountsItem = { [key: string]: unknown };
 
+/**
+ * SsoAccessSource sets SSO access provisioning (`manual` | `sso_groups`). Changing this field via PatchMyCompany requires logical scope `company.settings.ssoAccessSource` (any of `global.role.admin`, `global.role.platform_admin`, `company.tenant_role.system_admin`; not `unit.tenant.admin` alone).
+ */
+export type ModelsCompanyPatchSsoAccessSource = typeof ModelsCompanyPatchSsoAccessSource[keyof typeof ModelsCompanyPatchSsoAccessSource];
+
+
+export const ModelsCompanyPatchSsoAccessSource = {
+  manual: 'manual',
+  sso_groups: 'sso_groups',
+} as const;
+
 export interface ModelsCompanyPatch {
   billingAddress?: ModelsCompanyPatchBillingAddress;
   billingEmail?: string;
@@ -1171,6 +1277,19 @@ export interface ModelsCompanyPatch {
   /** items: @quokkaq/shared-types PaymentAccountSchema */
   paymentAccounts?: ModelsCompanyPatchPaymentAccountsItem[];
   slug?: string;
+  /** SsoAccessSource sets SSO access provisioning (`manual` | `sso_groups`). Changing this field via PatchMyCompany requires logical scope `company.settings.ssoAccessSource` (any of `global.role.admin`, `global.role.platform_admin`, `company.tenant_role.system_admin`; not `unit.tenant.admin` alone). */
+  ssoAccessSource?: ModelsCompanyPatchSsoAccessSource;
+}
+
+export interface ModelsCompanySSOGroupMapping {
+  companyId?: string;
+  createdAt?: string;
+  id?: string;
+  idpGroupId?: string;
+  /** legacy global role: staff | supervisor | operator (not admin) */
+  legacyRoleName?: string;
+  tenantRoleId?: string;
+  updatedAt?: string;
 }
 
 export interface ModelsServiceSlot {
@@ -1379,6 +1498,25 @@ export interface ModelsSurveyResponse {
   unitId?: string;
 }
 
+export interface ModelsTenantRoleUnit {
+  id?: string;
+  permissions?: string[];
+  tenantRoleId?: string;
+  unit?: ModelsUnit;
+  unitId?: string;
+}
+
+export interface ModelsTenantRole {
+  companyId?: string;
+  createdAt?: string;
+  description?: string;
+  id?: string;
+  name?: string;
+  slug?: string;
+  units?: ModelsTenantRoleUnit[];
+  updatedAt?: string;
+}
+
 export interface ModelsUnitMaterial {
   createdAt?: string;
   filename?: string;
@@ -1400,6 +1538,17 @@ export interface ModelsUpdateUserInput {
   /** URL of the user's profile photo. Send an empty string to clear the photo; omit the field to leave the current value unchanged. */
   photoUrl?: string;
   roles?: string[];
+}
+
+export interface ModelsUserExternalIdentity {
+  companyId?: string;
+  createdAt?: string;
+  /** ExternalObjectID is an optional stable directory id (e.g. Entra oid) for matching across subject changes. */
+  externalObjectId?: string;
+  id?: string;
+  issuer?: string;
+  subject?: string;
+  userId?: string;
 }
 
 export interface ModelsWeeklySlotCapacity {

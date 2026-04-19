@@ -53,11 +53,12 @@ type PublicTenantResponse struct {
 
 // SSOService OIDC + tenant resolution.
 type SSOService struct {
-	companyRepo repository.CompanyRepository
-	userRepo    repository.UserRepository
-	ssoRepo     repository.SSORepository
-	unitRepo    repository.UnitRepository
-	authSvc     AuthService
+	companyRepo    repository.CompanyRepository
+	userRepo       repository.UserRepository
+	ssoRepo        repository.SSORepository
+	unitRepo       repository.UnitRepository
+	tenantRBACRepo repository.TenantRBACRepository
+	authSvc        AuthService
 }
 
 func NewSSOService(
@@ -65,14 +66,16 @@ func NewSSOService(
 	userRepo repository.UserRepository,
 	ssoRepo repository.SSORepository,
 	unitRepo repository.UnitRepository,
+	tenantRBACRepo repository.TenantRBACRepository,
 	authSvc AuthService,
 ) *SSOService {
 	return &SSOService{
-		companyRepo: companyRepo,
-		userRepo:    userRepo,
-		ssoRepo:     ssoRepo,
-		unitRepo:    unitRepo,
-		authSvc:     authSvc,
+		companyRepo:    companyRepo,
+		userRepo:       userRepo,
+		ssoRepo:        ssoRepo,
+		unitRepo:       unitRepo,
+		tenantRBACRepo: tenantRBACRepo,
+		authSvc:        authSvc,
 	}
 }
 
@@ -431,28 +434,24 @@ func (s *SSOService) HandleCallback(ctx context.Context, w http.ResponseWriter, 
 		http.Error(w, "invalid id_token", http.StatusBadRequest)
 		return
 	}
-	var claims struct {
-		Email         string `json:"email"`
-		EmailVerified *bool  `json:"email_verified"`
-		Name          string `json:"name"`
-		Nonce         string `json:"nonce"`
-	}
-	if err := idToken.Claims(&claims); err != nil {
+	extClaims, err := ParseOIDCClaimsFromIDToken(idToken)
+	if err != nil && !errors.Is(err, ErrOIDCGroupsClaimOverage) {
 		http.Error(w, "invalid claims", http.StatusBadRequest)
 		return
 	}
+	deferGroupReconcile := errors.Is(err, ErrOIDCGroupsClaimOverage)
 	if strings.TrimSpace(payload.Nonce) != "" {
-		if strings.TrimSpace(claims.Nonce) == "" {
+		if strings.TrimSpace(extClaims.Nonce) == "" {
 			http.Error(w, "missing nonce in id_token", http.StatusBadRequest)
 			return
 		}
-		if claims.Nonce != payload.Nonce {
+		if extClaims.Nonce != payload.Nonce {
 			http.Error(w, "nonce mismatch", http.StatusBadRequest)
 			return
 		}
 	}
-	emailVerified := claims.EmailVerified != nil && *claims.EmailVerified
-	if !emailVerified && claims.Email != "" {
+	emailVerified := extClaims.EmailVerified
+	if !emailVerified && extClaims.Email != "" {
 		// Some IdPs omit email_verified; treat as unverified.
 		cid := payload.CompanyID
 		s.redirectLoginSSOError(ctx, w, r, &cid, "email_unverified", "oidc_email_unverified", payload.UILocale)
@@ -465,12 +464,19 @@ func (s *SSOService) HandleCallback(ctx context.Context, w http.ResponseWriter, 
 		return
 	}
 
-	user, err := s.resolveSSOUser(ctx, company, conn, idToken.Issuer, idToken.Subject, claims.Email, claims.Name, emailVerified)
+	user, err := s.resolveSSOUser(ctx, company, conn, idToken.Issuer, idToken.Subject, extClaims.Email, extClaims.Name, emailVerified, extClaims.ObjectID)
 	if err != nil {
 		log.Printf("sso resolve user: %v", err)
 		code := ssoErrorQueryCode(err)
 		cid := payload.CompanyID
 		s.redirectLoginSSOError(ctx, w, r, &cid, code, "oidc_callback_denied:"+code, payload.UILocale)
+		return
+	}
+
+	if err := s.ApplyPostSSOLogin(ctx, company, user, extClaims.Name, extClaims.Email, emailVerified, extClaims.Groups, extClaims.ObjectID, idToken.Issuer, idToken.Subject, deferGroupReconcile); err != nil {
+		log.Printf("oidc ApplyPostSSOLogin: %v", err)
+		cid := payload.CompanyID
+		s.redirectLoginSSOError(ctx, w, r, &cid, "access_sync_failed", "oidc_callback_denied:access_sync_failed", payload.UILocale)
 		return
 	}
 
@@ -497,9 +503,33 @@ func firstAllowedFrontendLocale() string {
 	return "en"
 }
 
-func (s *SSOService) resolveSSOUser(ctx context.Context, company *models.Company, conn *models.CompanySSOConnection, iss, sub, email, name string, emailVerified bool) (*models.User, error) {
-	if ext, err := s.ssoRepo.FindExternalIdentity(iss, sub); err == nil && ext.CompanyID == company.ID {
-		u, err := s.userRepo.FindByID(ext.UserID)
+func (s *SSOService) resolveSSOUser(ctx context.Context, company *models.Company, conn *models.CompanySSOConnection, iss, sub, email, name string, emailVerified bool, externalObjectID string) (*models.User, error) {
+	externalObjectID = strings.TrimSpace(externalObjectID)
+	if externalObjectID != "" {
+		if ext, err := s.ssoRepo.FindExternalIdentityByCompanyAndObjectID(company.ID, externalObjectID); err == nil && ext.CompanyID == company.ID {
+			u, err := s.userRepo.FindByID(ctx, ext.UserID)
+			if err != nil {
+				return nil, err
+			}
+			ok, err := s.userRepo.HasCompanyAccess(u.ID, company.ID)
+			if err != nil {
+				return nil, err
+			}
+			if ok {
+				// Refresh issuer/subject if IdP rotated subject but oid stable.
+				if ext.Issuer != iss || ext.Subject != sub {
+					ext.Issuer = iss
+					ext.Subject = sub
+					if err := s.ssoRepo.UpdateExternalIdentity(ctx, ext); err != nil {
+						log.Printf("sso update external identity iss/sub: %v", err)
+					}
+				}
+				return u, nil
+			}
+		}
+	}
+	if ext, err := s.ssoRepo.FindExternalIdentity(ctx, iss, sub); err == nil && ext.CompanyID == company.ID {
+		u, err := s.userRepo.FindByID(ctx, ext.UserID)
 		if err != nil {
 			return nil, err
 		}
@@ -508,6 +538,21 @@ func (s *SSOService) resolveSSOUser(ctx context.Context, company *models.Company
 			return nil, err
 		}
 		if ok {
+			// Row was matched by issuer/subject only; persist stable directory id when the token includes it so
+			// FindExternalIdentityByCompanyAndObjectID works on later logins.
+			if externalObjectID != "" {
+				prev := ""
+				if ext.ExternalObjectID != nil {
+					prev = strings.TrimSpace(*ext.ExternalObjectID)
+				}
+				if prev != externalObjectID {
+					oid := externalObjectID
+					ext.ExternalObjectID = &oid
+					if err := s.ssoRepo.UpdateExternalIdentity(ctx, ext); err != nil {
+						log.Printf("sso update external identity external_object_id: %v", err)
+					}
+				}
+			}
 			return u, nil
 		}
 		// Identity row exists but user lost access, or stale link — fall through.
@@ -515,7 +560,7 @@ func (s *SSOService) resolveSSOUser(ctx context.Context, company *models.Company
 	if email == "" || !emailVerified {
 		return nil, ErrSSOEmailRequired
 	}
-	user, err := s.userRepo.FindByEmail(strings.TrimSpace(email))
+	user, err := s.userRepo.FindByEmail(ctx, strings.TrimSpace(email))
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
@@ -527,12 +572,17 @@ func (s *SSOService) resolveSSOUser(ctx context.Context, company *models.Company
 		if !ok {
 			return nil, ErrSSONoCompanyAccess
 		}
-		if err := s.ssoRepo.CreateExternalIdentity(&models.UserExternalIdentity{
+		eid := &models.UserExternalIdentity{
 			UserID:    user.ID,
 			CompanyID: company.ID,
 			Issuer:    iss,
 			Subject:   sub,
-		}); err != nil {
+		}
+		if externalObjectID != "" {
+			oid := externalObjectID
+			eid.ExternalObjectID = &oid
+		}
+		if err := s.ssoRepo.CreateExternalIdentity(eid); err != nil {
 			log.Printf(
 				"sso create external identity: user=%s company=%s iss=%s sub=%s: %v",
 				user.ID, company.ID, iss, sub, err,
@@ -585,12 +635,16 @@ func (s *SSOService) resolveSSOUser(ctx context.Context, company *models.Company
 			Issuer:    iss,
 			Subject:   sub,
 		}
+		if externalObjectID != "" {
+			oid := externalObjectID
+			ext.ExternalObjectID = &oid
+		}
 		return s.ssoRepo.CreateExternalIdentityTx(tx, ext)
 	})
 	if err != nil {
 		return nil, err
 	}
-	return s.userRepo.FindByID(newUser.ID)
+	return s.userRepo.FindByID(ctx, newUser.ID)
 }
 
 // ExchangeFinishCode returns JWT pair for a one-time code from the OIDC callback redirect.
@@ -795,6 +849,34 @@ func (s *SSOService) ValidateAndSetSlug(company *models.Company, slug string) er
 	}
 	company.Slug = n
 	return nil
+}
+
+// AdminPatchExternalIdentity updates issuer/subject/oid for a user's SSO link (tenant admin).
+func (s *SSOService) AdminPatchExternalIdentity(companyID, targetUserID string, issuer, subject, oid *string) error {
+	ext, err := s.ssoRepo.FindExternalIdentityByUserAndCompany(targetUserID, companyID)
+	if err != nil {
+		return err
+	}
+	if issuer != nil {
+		ext.Issuer = strings.TrimSpace(*issuer)
+	}
+	if subject != nil {
+		ext.Subject = strings.TrimSpace(*subject)
+	}
+	if oid != nil {
+		t := strings.TrimSpace(*oid)
+		if t == "" {
+			ext.ExternalObjectID = nil
+		} else {
+			ext.ExternalObjectID = &t
+		}
+	}
+	return s.ssoRepo.UpdateExternalIdentity(context.Background(), ext)
+}
+
+// GetExternalIdentityForUser returns the SSO external identity row for a user in a company.
+func (s *SSOService) GetExternalIdentityForUser(companyID, targetUserID string) (*models.UserExternalIdentity, error) {
+	return s.ssoRepo.FindExternalIdentityByUserAndCompany(targetUserID, companyID)
 }
 
 // BackfillSlugIfEmpty generates slug from company name (used after signup).

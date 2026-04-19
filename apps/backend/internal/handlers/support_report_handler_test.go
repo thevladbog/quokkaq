@@ -52,7 +52,7 @@ func (stubSupportReportRepo) DeleteByID(string) error {
 
 type stubSupportUserRepo struct{ testsupport.PanicUserRepo }
 
-func (stubSupportUserRepo) FindByID(id string) (*models.User, error) {
+func (stubSupportUserRepo) FindByID(_ context.Context, id string) (*models.User, error) {
 	return &models.User{ID: id, Name: "Report Author"}, nil
 }
 

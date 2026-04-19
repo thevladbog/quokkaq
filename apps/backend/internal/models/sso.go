@@ -36,12 +36,14 @@ func (c *CompanySSOConnection) BeforeCreate(tx *gorm.DB) error {
 
 // UserExternalIdentity links a QuokkaQ user to an OIDC subject for a given issuer.
 type UserExternalIdentity struct {
-	ID        string    `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
-	UserID    string    `gorm:"not null;index" json:"userId"`
-	CompanyID string    `gorm:"not null;index" json:"companyId"`
-	Issuer    string    `gorm:"not null;uniqueIndex:ux_user_ext_issuer_sub,priority:1" json:"issuer"`
-	Subject   string    `gorm:"not null;uniqueIndex:ux_user_ext_issuer_sub,priority:2" json:"subject"`
-	CreatedAt time.Time `gorm:"autoCreateTime" json:"createdAt"`
+	ID        string `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
+	UserID    string `gorm:"not null;index" json:"userId"`
+	CompanyID string `gorm:"not null;index" json:"companyId"`
+	Issuer    string `gorm:"not null;uniqueIndex:ux_user_ext_issuer_sub,priority:1" json:"issuer"`
+	Subject   string `gorm:"not null;uniqueIndex:ux_user_ext_issuer_sub,priority:2" json:"subject"`
+	// ExternalObjectID is an optional stable directory id (e.g. Entra oid) for matching across subject changes.
+	ExternalObjectID *string   `gorm:"column:external_object_id;size:512;index" json:"externalObjectId,omitempty"`
+	CreatedAt        time.Time `gorm:"autoCreateTime" json:"createdAt"`
 
 	User    User    `gorm:"foreignKey:UserID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-" swaggerignore:"true"`
 	Company Company `gorm:"foreignKey:CompanyID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-" swaggerignore:"true"`
