@@ -173,6 +173,8 @@ type TicketRepository interface {
 	UpdateStatusByUnit(unitID string, oldStatuses []string, newStatus string) (int64, error)
 	GetActiveTicketByCounter(counterID string) (*models.Ticket, error)
 	GetActiveTicketByCounterTx(tx *gorm.DB, counterID string) (*models.Ticket, error)
+	// GetActiveTicketByCounterLight loads only id, queue_number, status (no preloads) for polling paths.
+	GetActiveTicketByCounterLight(counterID string) (*models.Ticket, error)
 	// FindInServiceTicketByCounter returns the ticket at the counter with status in_service, if any.
 	FindInServiceTicketByCounter(counterID string) (*models.Ticket, error)
 	MarkAsEODTicketIDsTx(tx *gorm.DB, ticketIDs []string) (int64, error)
@@ -416,6 +418,21 @@ func (r *ticketRepository) UpdateStatusByUnit(unitID string, oldStatuses []strin
 
 func (r *ticketRepository) GetActiveTicketByCounter(counterID string) (*models.Ticket, error) {
 	return r.GetActiveTicketByCounterTx(r.db, counterID)
+}
+
+func (r *ticketRepository) GetActiveTicketByCounterLight(counterID string) (*models.Ticket, error) {
+	var tickets []models.Ticket
+	err := r.db.Select("id", "queue_number", "status").
+		Where("counter_id = ? AND status IN ? AND is_eod = ?", counterID, []string{"called", "in_service"}, false).
+		Limit(1).
+		Find(&tickets).Error
+	if err != nil {
+		return nil, err
+	}
+	if len(tickets) == 0 {
+		return nil, nil
+	}
+	return &tickets[0], nil
 }
 
 func (r *ticketRepository) GetActiveTicketByCounterTx(tx *gorm.DB, counterID string) (*models.Ticket, error) {

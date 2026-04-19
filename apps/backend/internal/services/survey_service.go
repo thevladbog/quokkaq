@@ -42,6 +42,13 @@ type GuestSurveySessionTicket struct {
 	Status      string `json:"status"`
 }
 
+// CounterBoardSessionTicket is the active ticket for counter-board displays (minimal fields; no survey payload).
+type CounterBoardSessionTicket struct {
+	ID          string `json:"id"`
+	QueueNumber string `json:"queueNumber"`
+	Status      string `json:"status"`
+}
+
 type GuestSurveySessionSurvey struct {
 	ID                string          `json:"id"`
 	Title             string          `json:"title"`
@@ -56,10 +63,10 @@ type CounterBoardSession struct {
 	CounterID   string `json:"counterId"`
 	CounterName string `json:"counterName"`
 	// false when no operator has taken the counter
-	CounterStaffed bool                      `json:"counterStaffed"`
-	OnBreak        bool                      `json:"onBreak"`
-	UnitConfig     json.RawMessage           `json:"unitConfig,omitempty" swaggertype:"object"`
-	ActiveTicket   *GuestSurveySessionTicket `json:"activeTicket,omitempty"`
+	CounterStaffed bool                       `json:"counterStaffed"`
+	OnBreak        bool                       `json:"onBreak"`
+	UnitConfig     json.RawMessage            `json:"unitConfig,omitempty" swaggertype:"object"`
+	ActiveTicket   *CounterBoardSessionTicket `json:"activeTicket,omitempty"`
 }
 
 const maxCompletionMessagePerLocaleBytes = 64 * 1024
@@ -857,7 +864,7 @@ func buildCounterBoardSessionPayload(counter *models.Counter, u *models.Unit, ti
 		out.UnitConfig = u.Config
 	}
 	if ticket != nil {
-		out.ActiveTicket = &GuestSurveySessionTicket{
+		out.ActiveTicket = &CounterBoardSessionTicket{
 			ID:          ticket.ID,
 			QueueNumber: ticket.QueueNumber,
 			Status:      ticket.Status,
@@ -908,7 +915,7 @@ func (s *surveyService) CounterBoardSession(ctx context.Context, unitID, termina
 		return nil, err
 	}
 
-	ticket, err := s.ticketRepo.GetActiveTicketByCounter(counter.ID)
+	ticket, err := s.ticketRepo.GetActiveTicketByCounterLight(counter.ID)
 	if err != nil {
 		return nil, err
 	}

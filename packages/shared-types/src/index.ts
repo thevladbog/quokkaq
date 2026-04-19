@@ -624,7 +624,18 @@ export const DesktopTerminalKindSchema = z.enum([
 
 export type DesktopTerminalKind = z.infer<typeof DesktopTerminalKindSchema>;
 
-/** Mirrors backend models.EffectiveTerminalKind for API payloads. */
+/**
+ * Mirrors backend `models.EffectiveTerminalKind` for API payloads parsed with {@link DesktopTerminalSchema}.
+ *
+ * **Important:** If `counterId` is non-empty, the result is always `counter_guest_survey` or `counter_board`
+ * — never `kiosk`. That includes when the wire payload has `kind: 'kiosk'` together with a counter binding:
+ * `effectiveDesktopTerminalKind` coerces that combination to `counter_guest_survey` (invalid kiosk+counter
+ * pairs are normalized like the server). The returned `kind` may therefore **not round-trip** as the same
+ * string that was sent.
+ *
+ * For stricter validation (reject `kiosk` + `counterId` instead of coercing), enforce rules at your
+ * request/schema boundary before calling this helper.
+ */
 export function effectiveDesktopTerminalKind(input: {
   kind?: DesktopTerminalKind | undefined;
   counterId?: string | null | undefined;

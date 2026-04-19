@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   BookingModelSchema,
+  DesktopTerminalKindSchema,
   DesktopTerminalSchema,
+  effectiveDesktopTerminalKind,
   UnitKindSchema,
   UserModelSchema
 } from './index';
@@ -48,6 +50,59 @@ describe('DesktopTerminalSchema', () => {
     });
     expect(r.success).toBe(true);
     if (r.success) expect(r.data.kind).toBe('counter_board');
+  });
+
+  it('preserves counter_guest_survey when counterId is omitted', () => {
+    const r = DesktopTerminalSchema.safeParse({
+      ...desktopTerminalMinimal,
+      kind: 'counter_guest_survey'
+    });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.kind).toBe('counter_guest_survey');
+  });
+
+  it('preserves counter_board without counterId', () => {
+    const r = DesktopTerminalSchema.safeParse({
+      ...desktopTerminalMinimal,
+      kind: 'counter_board'
+    });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.kind).toBe('counter_board');
+  });
+
+  it('rejects unknown kind (enum) before transform', () => {
+    const r = DesktopTerminalSchema.safeParse({
+      ...desktopTerminalMinimal,
+      // @ts-expect-error exercise invalid wire value
+      kind: 'some_unknown_string'
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it('aligns transform output with effectiveDesktopTerminalKind', () => {
+    const input = {
+      ...desktopTerminalMinimal,
+      kind: 'kiosk' as const,
+      counterId: 'c1'
+    };
+    const parsed = DesktopTerminalSchema.safeParse(input);
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.kind).toBe(
+        effectiveDesktopTerminalKind({
+          kind: 'kiosk',
+          counterId: 'c1'
+        })
+      );
+    }
+  });
+});
+
+describe('DesktopTerminalKindSchema', () => {
+  it('rejects values outside the terminal kind union', () => {
+    expect(DesktopTerminalKindSchema.safeParse('not_a_kind').success).toBe(
+      false
+    );
   });
 });
 

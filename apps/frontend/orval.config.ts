@@ -158,6 +158,20 @@ export default defineConfig({
       }
     }
   },
+  /** Admin terminal CRUD + public bootstrap (same mutator as main app API). */
+  quokkaqDesktopTerminal: {
+    input: {
+      target: '../backend/docs/swagger.json',
+      filters: {
+        mode: 'include',
+        tags: ['DesktopTerminal']
+      }
+    },
+    output: {
+      ...reactQueryOutput,
+      target: './lib/api/generated/desktop-terminal.ts'
+    }
+  },
   quokkaqServices: {
     input: {
       target: '../backend/docs/swagger.json',

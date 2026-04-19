@@ -33,7 +33,7 @@ type CreateDesktopTerminalRequest struct {
 	ContextUnitID *string `json:"contextUnitId"`
 	CounterID     *string `json:"counterId"`
 	// Kind: kiosk | counter_guest_survey | counter_board (required semantics: counter_* need counterId).
-	Kind string `json:"kind"`
+	Kind string `json:"kind" enums:"kiosk,counter_guest_survey,counter_board"`
 }
 
 // UpdateDesktopTerminalRequest is the body for PATCH /desktop-terminals/{id}.
@@ -110,6 +110,7 @@ func mapTerminalToJSON(t *models.DesktopTerminal) DesktopTerminalJSON {
 // @Param        body  body      CreateDesktopTerminalRequest  true  "Create payload"
 // @Success      201   {object}  CreateDesktopTerminalResponse
 // @Failure      400   {string}  string  "Bad request"
+// @Failure      401   {string}  string  "Unauthorized"
 // @Failure      403   {string}  string  "Forbidden"
 // @Failure      500   {string}  string  "Internal Server Error"
 // @Router       /desktop-terminals [post]
@@ -201,6 +202,8 @@ func (h *DesktopTerminalHandler) List(w http.ResponseWriter, r *http.Request) {
 // @Produce      json
 // @Param        id   path      string  true  "Terminal ID"
 // @Success      200  {object}  DesktopTerminalJSON
+// @Failure      401  {string}  string  "Unauthorized"
+// @Failure      403  {string}  string  "Forbidden"
 // @Failure      404  {string}  string  "Not found"
 // @Failure      500  {string}  string  "Internal Server Error"
 // @Router       /desktop-terminals/{id} [get]
@@ -225,6 +228,7 @@ func (h *DesktopTerminalHandler) GetByID(w http.ResponseWriter, r *http.Request)
 // @Param        body  body      UpdateDesktopTerminalRequest  true  "Update payload"
 // @Success      204   "No Content"
 // @Failure      400   {string}  string  "Bad request"
+// @Failure      401   {string}  string  "Unauthorized"
 // @Failure      403   {string}  string  "Forbidden"
 // @Failure      404   {string}  string  "Not found"
 // @Failure      500   {string}  string  "Internal Server Error"
@@ -285,6 +289,8 @@ func (h *DesktopTerminalHandler) Update(w http.ResponseWriter, r *http.Request) 
 // @Tags         DesktopTerminal
 // @Param        id   path      string  true  "Terminal ID"
 // @Success      204  "No Content"
+// @Failure      401  {string}  string  "Unauthorized"
+// @Failure      403  {string}  string  "Forbidden"
 // @Failure      404  {string}  string  "Not found"
 // @Failure      500  {string}  string  "Internal Server Error"
 // @Router       /desktop-terminals/{id}/revoke [post]
@@ -300,7 +306,7 @@ func (h *DesktopTerminalHandler) Revoke(w http.ResponseWriter, r *http.Request) 
 
 // TerminalBootstrapRequest is the body for POST /auth/terminal/bootstrap.
 type TerminalBootstrapRequest struct {
-	Code string `json:"code"`
+	Code string `json:"code" binding:"required" example:"PAIR12345"`
 }
 
 // TerminalBootstrapResponse is returned from POST /auth/terminal/bootstrap.

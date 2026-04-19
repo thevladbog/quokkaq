@@ -329,13 +329,25 @@ export interface HandlersCreateCheckoutResponse {
   sessionId?: string;
 }
 
+/**
+ * Kind: kiosk | counter_guest_survey | counter_board (required semantics: counter_* need counterId).
+ */
+export type HandlersCreateDesktopTerminalRequestKind = typeof HandlersCreateDesktopTerminalRequestKind[keyof typeof HandlersCreateDesktopTerminalRequestKind];
+
+
+export const HandlersCreateDesktopTerminalRequestKind = {
+  kiosk: 'kiosk',
+  counter_guest_survey: 'counter_guest_survey',
+  counter_board: 'counter_board',
+} as const;
+
 export interface HandlersCreateDesktopTerminalRequest {
   /** ContextUnitID: subdivision or service_zone selected in the pairing wizard (required with counterId). */
   contextUnitId?: string;
   counterId?: string;
   defaultLocale?: string;
   /** Kind: kiosk | counter_guest_survey | counter_board (required semantics: counter_* need counterId). */
-  kind?: string;
+  kind?: HandlersCreateDesktopTerminalRequestKind;
   kioskFullscreen?: boolean;
   name?: string;
   unitId?: string;
@@ -740,7 +752,8 @@ export interface HandlersSignupRequest {
 }
 
 export interface HandlersTerminalBootstrapRequest {
-  code?: string;
+  /** @minLength 1 */
+  code: string;
 }
 
 export interface HandlersTerminalBootstrapResponse {
@@ -1663,14 +1676,14 @@ export interface ServicesCompanySSOPatch {
 
 export type ServicesCounterBoardSessionUnitConfig = { [key: string]: unknown };
 
-export interface ServicesGuestSurveySessionTicket {
+export interface ServicesCounterBoardSessionTicket {
   id?: string;
   queueNumber?: string;
   status?: string;
 }
 
 export interface ServicesCounterBoardSession {
-  activeTicket?: ServicesGuestSurveySessionTicket;
+  activeTicket?: ServicesCounterBoardSessionTicket;
   counterId?: string;
   counterName?: string;
   /** false when no operator has taken the counter */
@@ -1707,6 +1720,12 @@ export interface ServicesEmployeeRadarResponse {
 export type ServicesGuestSurveySessionIdleScreen = { [key: string]: unknown };
 
 export type ServicesGuestSurveySessionUnitConfig = { [key: string]: unknown };
+
+export interface ServicesGuestSurveySessionTicket {
+  id?: string;
+  queueNumber?: string;
+  status?: string;
+}
 
 export type ServicesGuestSurveySessionSurveyCompletionMessage = { [key: string]: unknown };
 

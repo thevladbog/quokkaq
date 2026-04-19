@@ -23,6 +23,7 @@ import {
   terminalAuthBootstrap,
   terminalBootstrapDisplayLocale
 } from '@/lib/api';
+import { isApiHttpError } from '@/lib/api-errors';
 import {
   counterBoardSession,
   type ServicesCounterBoardSession
@@ -105,8 +106,30 @@ function WorkplaceDisplayPageInner() {
       return res.data as ServicesCounterBoardSession;
     },
     enabled: Boolean(hydrated && token && unitId),
-    refetchInterval: 5000,
-    retry: 1
+    retry: (failureCount, err) => {
+      if (
+        isApiHttpError(err) &&
+        (err.status === 401 ||
+          err.status === 403 ||
+          err.code === 'FEATURE_LOCKED')
+      ) {
+        return false;
+      }
+      return failureCount < 1;
+    },
+    refetchInterval: (query) => {
+      const err = query.state.error;
+      if (
+        err &&
+        isApiHttpError(err) &&
+        (err.status === 401 ||
+          err.status === 403 ||
+          err.code === 'FEATURE_LOCKED')
+      ) {
+        return false;
+      }
+      return 5000;
+    }
   });
 
   const session = sessionQuery.data;
@@ -201,6 +224,16 @@ function WorkplaceDisplayPageInner() {
     window.dispatchEvent(new Event(COUNTER_BOARD_STORAGE_CHANGED_EVENT));
     qc.removeQueries({ queryKey: ['counter-board-session'] });
   }, [qc, resetSessionLocale]);
+
+  useEffect(() => {
+    if (!sessionQuery.isError) return;
+    const err = sessionQuery.error;
+    if (isApiHttpError(err) && err.status === 401) {
+      /* Pairing token rejected by API — mirror manual unpair (clears storage + session). */
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional recovery from auth failure
+      handleReset();
+    }
+  }, [sessionQuery.isError, sessionQuery.error, handleReset]);
 
   /** Hidden unpair: 5 quick taps on the top band (counter name area). */
   const handleTopBandResetTap = useCallback(() => {
@@ -325,7 +358,6 @@ function WorkplaceDisplayPageInner() {
         )}
         style={topBandStyle}
         onClick={handleTopBandResetTap}
-        aria-label={t('reset_icon_aria')}
       >
         <p
           className='text-foreground text-center font-semibold tracking-tight'

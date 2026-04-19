@@ -156,6 +156,11 @@
                     },
                     "kind": {
                         "description": "Kind: kiosk | counter_guest_survey | counter_board (required semantics: counter_* need counterId).",
+                        "enum": [
+                            "kiosk",
+                            "counter_guest_survey",
+                            "counter_board"
+                        ],
                         "type": "string"
                     },
                     "kioskFullscreen": {
@@ -1085,9 +1090,14 @@
             "handlers.TerminalBootstrapRequest": {
                 "properties": {
                     "code": {
-                        "type": "string"
+                        "example": "PAIR12345",
+                        "type": "string",
+                        "minLength": 1
                     }
                 },
+                "required": [
+                    "code"
+                ],
                 "type": "object"
             },
             "handlers.TerminalBootstrapResponse": {
@@ -3738,7 +3748,7 @@
             "services.CounterBoardSession": {
                 "properties": {
                     "activeTicket": {
-                        "$ref": "#/components/schemas/services.GuestSurveySessionTicket"
+                        "$ref": "#/components/schemas/services.CounterBoardSessionTicket"
                     },
                     "counterId": {
                         "type": "string"
@@ -3755,6 +3765,20 @@
                     },
                     "unitConfig": {
                         "type": "object"
+                    }
+                },
+                "type": "object"
+            },
+            "services.CounterBoardSessionTicket": {
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "queueNumber": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -8896,6 +8920,16 @@
                         },
                         "description": "Bad Request"
                     },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
                     "404": {
                         "content": {
                             "application/json": {
@@ -8927,6 +8961,11 @@
                         "description": "Internal Server Error"
                     }
                 },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "summary": "Call next ticket",
                 "tags": [
                     "counters"
@@ -8959,6 +8998,16 @@
                         },
                         "description": "OK"
                     },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
                     "404": {
                         "content": {
                             "application/json": {
@@ -8970,6 +9019,11 @@
                         "description": "Counter not found"
                     }
                 },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "summary": "Force release counter",
                 "tags": [
                     "counters"
@@ -9002,6 +9056,16 @@
                         },
                         "description": "OK"
                     },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
                     "404": {
                         "content": {
                             "application/json": {
@@ -9013,6 +9077,11 @@
                         "description": "Counter not found"
                     }
                 },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "summary": "Occupy counter",
                 "tags": [
                     "counters"
@@ -9044,6 +9113,16 @@
                         },
                         "description": "OK"
                     },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
                     "404": {
                         "content": {
                             "application/json": {
@@ -9055,6 +9134,11 @@
                         "description": "Counter not found"
                     }
                 },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "summary": "Release counter",
                 "tags": [
                     "counters"
@@ -9136,6 +9220,16 @@
                         },
                         "description": "Bad request"
                     },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
                     "403": {
                         "content": {
                             "application/json": {
@@ -9193,6 +9287,26 @@
                             }
                         },
                         "description": "OK"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
                     },
                     "404": {
                         "content": {
@@ -9265,6 +9379,16 @@
                         },
                         "description": "Bad request"
                     },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
                     "403": {
                         "content": {
                             "application/json": {
@@ -9325,6 +9449,26 @@
                 "responses": {
                     "204": {
                         "description": "No Content"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
                     },
                     "404": {
                         "content": {

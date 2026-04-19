@@ -584,6 +584,13 @@ def apply_openapi_tweaks(doc: dict[str, Any]) -> None:
     _patch_root_tag_counter_board(doc)
     comp = _components(doc)
 
+    tb_req = _schema(comp, "handlers.TerminalBootstrapRequest")
+    tb_props = tb_req.get("properties")
+    if isinstance(tb_props, dict):
+        code = tb_props.get("code")
+        if isinstance(code, dict):
+            code["minLength"] = 1
+
     _patch_plan_json_object_maps(comp)
     _patch_security_schemes_session_cookie(doc)
     _patch_saml_acs_request_body_required(doc)

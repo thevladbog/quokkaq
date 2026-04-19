@@ -102,6 +102,10 @@ components:
           type: string
         kind:
           description: 'Kind: kiosk | counter_guest_survey | counter_board (required semantics: counter_* need counterId).'
+          enum:
+          - kiosk
+          - counter_guest_survey
+          - counter_board
           type: string
         kioskFullscreen:
           type: boolean
@@ -719,7 +723,11 @@ components:
     handlers.TerminalBootstrapRequest:
       properties:
         code:
+          example: PAIR12345
           type: string
+          minLength: 1
+      required:
+      - code
       type: object
     handlers.TerminalBootstrapResponse:
       properties:
@@ -2501,7 +2509,7 @@ components:
     services.CounterBoardSession:
       properties:
         activeTicket:
-          $ref: '#/components/schemas/services.GuestSurveySessionTicket'
+          $ref: '#/components/schemas/services.CounterBoardSessionTicket'
         counterId:
           type: string
         counterName:
@@ -2513,6 +2521,15 @@ components:
           type: boolean
         unitConfig:
           type: object
+      type: object
+    services.CounterBoardSessionTicket:
+      properties:
+        id:
+          type: string
+        queueNumber:
+          type: string
+        status:
+          type: string
       type: object
     services.CreateCalendarIntegrationRequest:
       properties:
@@ -5698,6 +5715,12 @@ paths:
               schema:
                 type: string
           description: Bad Request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
         '404':
           content:
             application/json:
@@ -5716,6 +5739,8 @@ paths:
               schema:
                 type: string
           description: Internal Server Error
+      security:
+      - BearerAuth: []
       summary: Call next ticket
       tags:
       - counters
@@ -5737,12 +5762,20 @@ paths:
                 additionalProperties: true
                 type: object
           description: OK
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
         '404':
           content:
             application/json:
               schema:
                 type: string
           description: Counter not found
+      security:
+      - BearerAuth: []
       summary: Force release counter
       tags:
       - counters
@@ -5764,12 +5797,20 @@ paths:
               schema:
                 $ref: '#/components/schemas/models.Counter'
           description: OK
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
         '404':
           content:
             application/json:
               schema:
                 type: string
           description: Counter not found
+      security:
+      - BearerAuth: []
       summary: Occupy counter
       tags:
       - counters
@@ -5790,12 +5831,20 @@ paths:
               schema:
                 $ref: '#/components/schemas/models.Counter'
           description: OK
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
         '404':
           content:
             application/json:
               schema:
                 type: string
           description: Counter not found
+      security:
+      - BearerAuth: []
       summary: Release counter
       tags:
       - counters
@@ -5847,6 +5896,12 @@ paths:
               schema:
                 type: string
           description: Bad request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
         '403':
           content:
             application/json:
@@ -5882,6 +5937,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/handlers.DesktopTerminalJSON'
           description: OK
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
         '404':
           content:
             application/json:
@@ -5926,6 +5993,12 @@ paths:
               schema:
                 type: string
           description: Bad request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
         '403':
           content:
             application/json:
@@ -5963,6 +6036,18 @@ paths:
       responses:
         '204':
           description: No Content
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
         '404':
           content:
             application/json:

@@ -220,8 +220,10 @@ func (h *CounterHandler) DeleteCounter(w http.ResponseWriter, r *http.Request) {
 // @Tags         counters
 // @Accept       json
 // @Produce      json
+// @Security     BearerAuth
 // @Param        id   path      string  true  "Counter ID"
 // @Success      200  {object}  models.Counter
+// @Failure      401  {string}  string "Unauthorized"
 // @Failure      404  {string}  string "Counter not found"
 // @Router       /counters/{id}/occupy [post]
 func (h *CounterHandler) Occupy(w http.ResponseWriter, r *http.Request) {
@@ -344,8 +346,10 @@ func (h *CounterHandler) EndBreak(w http.ResponseWriter, r *http.Request) {
 // @Tags         counters
 // @Accept       json
 // @Produce      json
+// @Security     BearerAuth
 // @Param        id   path      string  true  "Counter ID"
 // @Success      200  {object}  models.Counter
+// @Failure      401  {string}  string "Unauthorized"
 // @Failure      404  {string}  string "Counter not found"
 // @Router       /counters/{id}/release [post]
 func (h *CounterHandler) Release(w http.ResponseWriter, r *http.Request) {
@@ -364,8 +368,10 @@ func (h *CounterHandler) Release(w http.ResponseWriter, r *http.Request) {
 // @Tags         counters
 // @Accept       json
 // @Produce      json
+// @Security     BearerAuth
 // @Param        id   path      string  true  "Counter ID"
 // @Success      200  {object}  map[string]interface{}
+// @Failure      401  {string}  string "Unauthorized"
 // @Failure      404  {string}  string "Counter not found"
 // @Router       /counters/{id}/force-release [post]
 func (h *CounterHandler) ForceRelease(w http.ResponseWriter, r *http.Request) {
@@ -396,10 +402,12 @@ type CounterCallNextRequest struct {
 // @Tags         counters
 // @Accept       json
 // @Produce      json
+// @Security     BearerAuth
 // @Param        id       path      string                   true  "Counter ID"
 // @Param        request  body      CounterCallNextRequest   false "Optional service filter (serviceIds / serviceId); omit for all services"
 // @Success      200      {object}  map[string]interface{}
 // @Failure      400      {string}  string "Bad Request"
+// @Failure      401      {string}  string "Unauthorized"
 // @Failure      404      {string}  string "Counter not found or no tickets"
 // @Failure      409      {string}  string "Counter on break"
 // @Failure      500      {string}  string "Internal Server Error"

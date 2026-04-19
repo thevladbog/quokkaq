@@ -326,7 +326,6 @@
 
   position: relative;
   isolation: isolate;
-
   display: flex;
   overflow: hidden;
   width: 100%;
@@ -336,7 +335,6 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-
   border-radius: clamp(1rem, 3.5cqmin, 2.25rem);
   padding: clamp(0.75rem, 4cqmin, 2.5rem);
 
@@ -357,14 +355,12 @@
 /* Glass-like moving highlight (above bg, below ticket text) */
 .workplace-display-called-card::after {
   content: '';
-
   position: absolute;
   top: -55%;
   bottom: -55%;
   left: -20%;
   z-index: 1;
   width: 48%;
-
   background: linear-gradient(
     100deg,
     transparent 0%,
@@ -403,7 +399,6 @@
 
 .dark .workplace-display-called-card::after {
   opacity: 0.28;
-
   background: linear-gradient(
     100deg,
     transparent 0%,
@@ -487,6 +482,7 @@
 /* Counter board: break — pale yellow, glass sweep (same motion as «called» card) */
 .workplace-display-break-card {
   --workplace-break-ink: oklch(0.38 0.04 75);
+
   position: relative;
   isolation: isolate;
   display: flex;
@@ -551,6 +547,7 @@
 
 .dark .workplace-display-break-card {
   --workplace-break-ink: oklch(0.92 0.03 95);
+
   background: linear-gradient(
     148deg,
     oklch(0.46 0.05 95) 0%,
@@ -576,6 +573,7 @@
 /* Counter board: no operator — diagonal gray zebra across ticket area */
 .workplace-display-unstaffed-card {
   --workplace-unstaffed-ink: oklch(0.32 0.02 264);
+
   position: relative;
   isolation: isolate;
   display: flex;
@@ -617,6 +615,7 @@
 
 .dark .workplace-display-unstaffed-card {
   --workplace-unstaffed-ink: oklch(0.91 0.015 264);
+
   background-color: oklch(0.3 0.012 264);
   background-image: repeating-linear-gradient(
     -42deg,

@@ -68,6 +68,20 @@ import { getUnitDisplayName } from '@/lib/unit-display';
 /** Radix Select requires `value` to match a `SelectItem`; empty string is not a valid item value here. */
 const SELECT_UNSET = '__unset__';
 
+function isCounterTerminalKind(
+  kind: 'kiosk' | 'counter_display' | 'counter_board'
+): boolean {
+  return kind === 'counter_display' || kind === 'counter_board';
+}
+
+function featureLockedToastKey(
+  kind: 'kiosk' | 'counter_display' | 'counter_board'
+): 'feature_locked_create_board' | 'feature_locked_create' {
+  return kind === 'counter_board'
+    ? 'feature_locked_create_board'
+    : 'feature_locked_create';
+}
+
 export default function DesktopTerminalsPage() {
   const t = useTranslations('admin.desktop_terminals');
   const locale = useLocale();
@@ -144,10 +158,7 @@ export default function DesktopTerminalsPage() {
 
   useEffect(() => {
     if (!(createOpen || editOpen)) return;
-    if (
-      formDeviceKind !== 'counter_display' &&
-      formDeviceKind !== 'counter_board'
-    ) {
+    if (!isCounterTerminalKind(formDeviceKind)) {
       setAvailableCounters([]);
       setCountersLoading(false);
       return;
@@ -267,10 +278,7 @@ export default function DesktopTerminalsPage() {
       ? formContextUnitId
       : '';
     try {
-      if (
-        formDeviceKind === 'counter_display' ||
-        formDeviceKind === 'counter_board'
-      ) {
+      if (isCounterTerminalKind(formDeviceKind)) {
         if (!safeContextUnitId || !formCounterId) {
           toast.error(t('select_counter_error'));
           return;
@@ -320,11 +328,7 @@ export default function DesktopTerminalsPage() {
       load();
     } catch (e) {
       if (e instanceof ApiHttpError && e.status === 403) {
-        toast.error(
-          formDeviceKind === 'counter_board'
-            ? t('feature_locked_create_board')
-            : t('feature_locked_create')
-        );
+        toast.error(t(featureLockedToastKey(formDeviceKind)));
         return;
       }
       toast.error(t('error_save'));
@@ -341,10 +345,7 @@ export default function DesktopTerminalsPage() {
       ? formContextUnitId
       : '';
     try {
-      if (
-        formDeviceKind === 'counter_display' ||
-        formDeviceKind === 'counter_board'
-      ) {
+      if (isCounterTerminalKind(formDeviceKind)) {
         if (!safeContextUnitId || !formCounterId) {
           toast.error(t('select_counter_error'));
           return;
@@ -386,11 +387,7 @@ export default function DesktopTerminalsPage() {
       load();
     } catch (e) {
       if (e instanceof ApiHttpError && e.status === 403) {
-        toast.error(
-          formDeviceKind === 'counter_board'
-            ? t('feature_locked_create_board')
-            : t('feature_locked_create')
-        );
+        toast.error(t(featureLockedToastKey(formDeviceKind)));
         return;
       }
       toast.error(t('error_save'));

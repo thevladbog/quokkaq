@@ -95,9 +95,7 @@ async function expandSeedUnitsForCounters(
   const uniq = [
     ...new Set(seedUnitIds.map((id) => id?.trim()).filter(Boolean))
   ];
-  for (const id of uniq) {
-    await expandOne(id, 0);
-  }
+  await Promise.all(uniq.map((id) => expandOne(id, 0)));
   // Always include seed ids so we still query counters if expansion missed a branch.
   return [...new Set([...uniq, ...result])];
 }
