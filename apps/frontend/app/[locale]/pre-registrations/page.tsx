@@ -15,7 +15,7 @@ import { useRouter } from '@/src/i18n/navigation';
 import { Loader2 } from 'lucide-react';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useActiveUnit } from '@/contexts/ActiveUnitContext';
-import { getGetUnitsIdQueryKey } from '@/lib/api/generated/units';
+import { getGetUnitByIDQueryKey } from '@/lib/api/generated/units';
 import { unitsApi, type Unit } from '@/lib/api';
 import { getUnitDisplayName } from '@/lib/unit-display';
 
@@ -29,7 +29,7 @@ export default function PreRegistrationsIndexPage() {
 
   const queries = useQueries({
     queries: assignableUnitIds.map((id) => ({
-      queryKey: getGetUnitsIdQueryKey(id),
+      queryKey: getGetUnitByIDQueryKey(id),
       queryFn: () => unitsApi.getById(id),
       enabled: assignableUnitIds.length > 0 && !authLoading
     }))

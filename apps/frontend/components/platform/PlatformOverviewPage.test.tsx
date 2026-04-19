@@ -6,10 +6,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import PlatformOverviewPage from '@/app/[locale]/platform/page';
 
 const platformApi = vi.hoisted(() => ({
-  platformListCompanies: vi.fn(),
-  platformListSubscriptions: vi.fn(),
-  getPlatformSubscriptionPlans: vi.fn(),
-  getPlatformInvoices: vi.fn()
+  listCompanies: vi.fn(),
+  listSubscriptions: vi.fn(),
+  listSubscriptionPlans: vi.fn(),
+  listInvoices: vi.fn()
 }));
 
 vi.mock('@/lib/api/generated/platform', async (importOriginal) => {
@@ -17,10 +17,10 @@ vi.mock('@/lib/api/generated/platform', async (importOriginal) => {
     await importOriginal<typeof import('@/lib/api/generated/platform')>();
   return {
     ...actual,
-    platformListCompanies: platformApi.platformListCompanies,
-    platformListSubscriptions: platformApi.platformListSubscriptions,
-    getPlatformSubscriptionPlans: platformApi.getPlatformSubscriptionPlans,
-    getPlatformInvoices: platformApi.getPlatformInvoices
+    listCompanies: platformApi.listCompanies,
+    listSubscriptions: platformApi.listSubscriptions,
+    listSubscriptionPlans: platformApi.listSubscriptionPlans,
+    listInvoices: platformApi.listInvoices
   };
 });
 
@@ -64,16 +64,16 @@ function renderWithQuery(ui: ReactNode) {
 describe('PlatformOverviewPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    platformApi.platformListCompanies.mockResolvedValue({
+    platformApi.listCompanies.mockResolvedValue({
       data: { total: 2, items: [] }
     });
-    platformApi.platformListSubscriptions.mockResolvedValue({
+    platformApi.listSubscriptions.mockResolvedValue({
       data: { total: 3, items: [] }
     });
-    platformApi.getPlatformSubscriptionPlans.mockResolvedValue({
+    platformApi.listSubscriptionPlans.mockResolvedValue({
       data: [{ id: 'p1' }]
     });
-    platformApi.getPlatformInvoices.mockResolvedValue({
+    platformApi.listInvoices.mockResolvedValue({
       data: { total: 5, items: [] }
     });
   });
@@ -95,16 +95,14 @@ describe('PlatformOverviewPage', () => {
   });
 
   it('shows load error and refetches when Retry is clicked', async () => {
-    platformApi.platformListCompanies.mockRejectedValueOnce(
-      new Error('network')
-    );
+    platformApi.listCompanies.mockRejectedValueOnce(new Error('network'));
     renderWithQuery(<PlatformOverviewPage />);
     const user = userEvent.setup();
 
     expect(await screen.findByText('Failed to load')).toBeInTheDocument();
     expect(screen.getByText('Could not load overview')).toBeInTheDocument();
 
-    platformApi.platformListCompanies.mockResolvedValue({
+    platformApi.listCompanies.mockResolvedValue({
       data: { total: 9, items: [] }
     });
     await user.click(screen.getByRole('button', { name: 'Retry' }));

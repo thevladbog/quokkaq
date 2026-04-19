@@ -3,8 +3,8 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
+	"quokkaq-go-backend/internal/logger"
 
 	authmiddleware "quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/services"
@@ -54,7 +54,7 @@ func (h *GuestSurveyHandler) Session(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Feature not enabled", http.StatusForbidden)
 			return
 		}
-		log.Printf("guest survey session: %v", err)
+		logger.PrintfCtx(r.Context(), "guest survey session: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -122,7 +122,7 @@ func (h *GuestSurveyHandler) SubmitResponse(w http.ResponseWriter, r *http.Reque
 			http.Error(w, "Feature not enabled", http.StatusForbidden)
 			return
 		}
-		log.Printf("guest survey submit: %v", err)
+		logger.PrintfCtx(r.Context(), "guest survey submit: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}

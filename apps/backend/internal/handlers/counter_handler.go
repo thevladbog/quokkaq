@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"log"
 	"net/http"
+	"quokkaq-go-backend/internal/logger"
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
@@ -214,6 +214,7 @@ func (h *CounterHandler) DeleteCounter(w http.ResponseWriter, r *http.Request) {
 }
 
 // Occupy godoc
+// @ID           OccupyCounter
 // @Summary      Occupy counter
 // @Description  Sets a counter as occupied by the current user
 // @Tags         counters
@@ -235,7 +236,7 @@ func (h *CounterHandler) Occupy(w http.ResponseWriter, r *http.Request) {
 		c, err := h.counterRepo.FindByID(id)
 		if err != nil {
 			if !errors.Is(err, gorm.ErrRecordNotFound) {
-				log.Printf("counter Occupy: operational pre-check FindByID(counterId=%q) err=%v", id, err)
+				logger.PrintfCtx(r.Context(), "counter Occupy: operational pre-check FindByID(counterId=%q) err=%v", id, err)
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}

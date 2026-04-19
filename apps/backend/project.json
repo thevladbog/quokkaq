@@ -16,7 +16,7 @@
     "serve": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "go build -o bin/server ./cmd/api && ./bin/server",
+        "command": "node scripts/ensure-air-run.js",
         "cwd": "apps/backend",
         "usePty": false
       }

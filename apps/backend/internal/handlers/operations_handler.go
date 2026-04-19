@@ -3,8 +3,8 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
+	"quokkaq-go-backend/internal/logger"
 	"strings"
 
 	"quokkaq-go-backend/internal/middleware"
@@ -122,7 +122,7 @@ func (h *OperationsHandler) PostEmergencyUnlock(w http.ResponseWriter, r *http.R
 		Action:  "operations.emergency_unlock",
 		Payload: payload,
 	}); err != nil {
-		log.Printf("operations emergency_unlock audit log unitId=%q: %v", unitID, err)
+		logger.ErrorfCtx(r.Context(), "operations emergency_unlock audit log unitId=%q: %v", unitID, err)
 		http.Error(w, "unlock applied but audit log failed", http.StatusInternalServerError)
 		return
 	}
@@ -159,7 +159,7 @@ func (h *OperationsHandler) PostClearStatisticsQuiet(w http.ResponseWriter, r *h
 		Action:  "operations.clear_statistics_quiet",
 		Payload: payload,
 	}); err != nil {
-		log.Printf("operations clear_statistics_quiet audit log unitId=%q: %v", unitID, err)
+		logger.ErrorfCtx(r.Context(), "operations clear_statistics_quiet audit log unitId=%q: %v", unitID, err)
 		http.Error(w, "quiet flag cleared but audit log failed", http.StatusInternalServerError)
 		return
 	}

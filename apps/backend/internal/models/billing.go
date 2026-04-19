@@ -13,7 +13,7 @@ type Invoice struct {
 	SubscriptionID           *string    `gorm:"index" json:"subscriptionId"`
 	Amount                   int64      `gorm:"not null" json:"amount"`                  // total in minor units (gross); equals sum of line gross when lines exist
 	Currency                 string     `gorm:"not null;default:'RUB'" json:"currency"`  // "RUB", "USD"
-	Status                   string     `gorm:"not null;default:'draft'" json:"status"` // "draft", "open", "paid", "void", "uncollectible"
+	Status                   string     `gorm:"not null;default:'draft'" json:"status"`  // "draft", "open", "paid", "void", "uncollectible"
 	PaymentProvider          string     `gorm:"default:'manual'" json:"paymentProvider"` // "stripe", "yookassa", "manual"
 	PaymentProviderInvoiceID string     `json:"paymentProviderInvoiceId,omitempty"`      // external invoice ID
 	PaidAt                   *time.Time `json:"paidAt,omitempty"`                        // when payment was received
@@ -21,24 +21,24 @@ type Invoice struct {
 	CreatedAt                time.Time  `gorm:"default:now()" json:"createdAt"`
 	UpdatedAt                time.Time  `gorm:"autoUpdateTime" json:"updatedAt"`
 
-	DocumentNumber                  *string          `gorm:"column:document_number" json:"documentNumber,omitempty"` // QQ-YYYY-NNNNN when issued
-	SubtotalExclVatMinor            int64            `gorm:"column:subtotal_excl_vat_minor;not null;default:0" json:"subtotalExclVatMinor"`
-	VatTotalMinor                   int64            `gorm:"column:vat_total_minor;not null;default:0" json:"vatTotalMinor"`
-	AllowYookassaPaymentLink        bool             `gorm:"not null;default:false" json:"allowYookassaPaymentLink"`
-	AllowStripePaymentLink          bool             `gorm:"not null;default:false" json:"allowStripePaymentLink"`
-	ProvisionSubscriptionsOnPayment bool             `gorm:"not null;default:false" json:"provisionSubscriptionsOnPayment"`
-	YookassaPaymentID               string           `json:"yookassaPaymentId,omitempty"`
-	YookassaConfirmationURL         string           `json:"yookassaConfirmationUrl,omitempty"`
-	StripeCheckoutURL               string           `json:"stripeCheckoutUrl,omitempty"`
-	StripeSessionID                 string           `json:"stripeSessionId,omitempty"`
-	ProvisioningDoneAt              *time.Time       `json:"provisioningDoneAt,omitempty"`
-	IssuedAt                        *time.Time       `json:"issuedAt,omitempty"`
-	BuyerSnapshot                   json.RawMessage  `gorm:"type:jsonb" json:"buyerSnapshot,omitempty" swaggertype:"object"`
-	Lines                           []InvoiceLine    `gorm:"foreignKey:InvoiceID" json:"lines,omitempty"`
+	DocumentNumber                  *string         `gorm:"column:document_number" json:"documentNumber,omitempty"` // QQ-YYYY-NNNNN when issued
+	SubtotalExclVatMinor            int64           `gorm:"column:subtotal_excl_vat_minor;not null;default:0" json:"subtotalExclVatMinor"`
+	VatTotalMinor                   int64           `gorm:"column:vat_total_minor;not null;default:0" json:"vatTotalMinor"`
+	AllowYookassaPaymentLink        bool            `gorm:"not null;default:false" json:"allowYookassaPaymentLink"`
+	AllowStripePaymentLink          bool            `gorm:"not null;default:false" json:"allowStripePaymentLink"`
+	ProvisionSubscriptionsOnPayment bool            `gorm:"not null;default:false" json:"provisionSubscriptionsOnPayment"`
+	YookassaPaymentID               string          `json:"yookassaPaymentId,omitempty"`
+	YookassaConfirmationURL         string          `json:"yookassaConfirmationUrl,omitempty"`
+	StripeCheckoutURL               string          `json:"stripeCheckoutUrl,omitempty"`
+	StripeSessionID                 string          `json:"stripeSessionId,omitempty"`
+	ProvisioningDoneAt              *time.Time      `json:"provisioningDoneAt,omitempty"`
+	IssuedAt                        *time.Time      `json:"issuedAt,omitempty"`
+	BuyerSnapshot                   json.RawMessage `gorm:"type:jsonb" json:"buyerSnapshot,omitempty" swaggertype:"object"`
+	Lines                           []InvoiceLine   `gorm:"foreignKey:InvoiceID" json:"lines,omitempty"`
 
 	// Relations — OnDelete:SET NULL on subscription keeps paid/open manual history if subscription row is removed.
-	Company      Company        `gorm:"foreignKey:CompanyID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;" json:"-" swaggerignore:"true"`
-	Subscription *Subscription  `gorm:"foreignKey:SubscriptionID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;" json:"subscription,omitempty"`
+	Company      Company       `gorm:"foreignKey:CompanyID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;" json:"-" swaggerignore:"true"`
+	Subscription *Subscription `gorm:"foreignKey:SubscriptionID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;" json:"subscription,omitempty"`
 }
 
 // UsageRecord tracks resource usage for quota management and billing.

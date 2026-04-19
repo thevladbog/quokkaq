@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/card';
 import { Combobox } from '@/components/ui/combobox';
 import { buildIanaTimezoneComboboxOptions } from '@/lib/iana-timezone-combobox-options';
-import { getGetUnitsIdQueryKey } from '@/lib/api/generated/units';
+import { getGetUnitByIDQueryKey } from '@/lib/api/generated/units';
 import { unitsApi } from '@/lib/api';
 import { useUpdateUnit } from '@/lib/hooks';
 import { CountersList } from '@/components/admin/units/counters-list';
@@ -55,7 +55,7 @@ export default function UnitPage({ params }: UnitPageProps) {
   const [activeTab, setActiveTab] = useState('general');
 
   const { data: unit } = useQuery({
-    queryKey: getGetUnitsIdQueryKey(unitId),
+    queryKey: getGetUnitByIDQueryKey(unitId),
     queryFn: () => unitsApi.getById(unitId)
   });
 

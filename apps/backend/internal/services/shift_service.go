@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"math"
+	"quokkaq-go-backend/internal/logger"
 	"strings"
 	"time"
 
@@ -151,7 +151,7 @@ func (s *shiftService) enrichShiftActivityZoneTransferServiceLabels(items []Shif
 	}
 	svcMap, err := s.serviceRepo.FindMapByIDs(ids)
 	if err != nil {
-		log.Printf("GetShiftActivity: FindMapByIDs for journal service labels: %v", err)
+		logger.Printf("GetShiftActivity: FindMapByIDs for journal service labels: %v", err)
 		return
 	}
 	for _, r := range refs {
@@ -355,7 +355,7 @@ func (s *shiftService) GetShiftActivity(unitID, viewerUserID string, limit int, 
 	if len(needActorName) > 0 {
 		m, err := s.userRepo.ResolveJournalActorDisplayNames(needActorName)
 		if err != nil {
-			log.Printf("GetShiftActivity: ResolveJournalActorDisplayNames: %v", err)
+			logger.Printf("GetShiftActivity: ResolveJournalActorDisplayNames: %v", err)
 			nameByID = nil
 		} else {
 			nameByID = m
@@ -512,7 +512,7 @@ func (s *shiftService) ExecuteEndOfDay(ctx context.Context, unitID string, userI
 		return nil
 	})
 	if err != nil {
-		log.Printf("shift eod transaction failed unitId=%s err=%v", unitID, err)
+		logger.PrintfCtx(ctx, "shift eod transaction failed unitId=%s err=%v", unitID, err)
 		return nil, err
 	}
 

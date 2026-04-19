@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 
+	applogger "quokkaq-go-backend/internal/logger"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
 
@@ -14,7 +14,7 @@ import (
 )
 
 type JobWorker interface {
-	Start()
+	Start() error
 	Stop()
 }
 
@@ -68,11 +68,13 @@ func NewJobWorker(ttsService services.TtsService, ticketRepo repository.TicketRe
 	return w
 }
 
-func (w *jobWorker) Start() {
+func (w *jobWorker) Start() error {
 	// Run() also registers SIGINT/SIGTERM and races with main's signal.Notify; Start() + Shutdown() from main avoids that.
 	if err := w.server.Start(w.mux); err != nil {
-		log.Fatalf("could not start asynq worker: %v", err)
+		applogger.Error("could not start asynq worker", "err", err)
+		return fmt.Errorf("asynq worker: %w", err)
 	}
+	return nil
 }
 
 func (w *jobWorker) Stop() {
@@ -85,7 +87,8 @@ func (w *jobWorker) handleTtsGenerate(ctx context.Context, t *asynq.Task) error 
 		return fmt.Errorf("json.Unmarshal failed: %v: %w", err, asynq.SkipRetry)
 	}
 
-	log.Printf("Processing TTS generation for ticket %s (Queue: %s, Counter: %s)", p.TicketID, p.QueueNumber, p.CounterName)
+	applogger.InfoContext(ctx, "processing TTS generation",
+		"ticket_id", p.TicketID, "queue", p.QueueNumber, "counter", p.CounterName)
 
 	text := fmt.Sprintf("Ticket number %s, please go to counter %s", p.QueueNumber, p.CounterName)
 	url, err := w.ttsService.GenerateAndUpload(ctx, text, p.TicketID)
@@ -93,19 +96,19 @@ func (w *jobWorker) handleTtsGenerate(ctx context.Context, t *asynq.Task) error 
 		return fmt.Errorf("failed to generate/upload TTS: %v", err)
 	}
 
-	log.Printf("TTS generated successfully: %s", url)
+	applogger.InfoContext(ctx, "TTS generated successfully", "url", url)
 
 	// Update ticket with TTS URL
 	ticket, err := w.ticketRepo.FindByID(p.TicketID)
 	if err != nil {
-		log.Printf("Warning: Failed to find ticket %s to update TTS URL: %v", p.TicketID, err)
+		applogger.WarnContext(ctx, "failed to find ticket to update TTS URL", "ticket_id", p.TicketID, "err", err)
 		// Not returning error as TTS was generated successfully
 		return nil
 	}
 
 	ticket.TTSUrl = &url
 	if err := w.ticketRepo.Update(ticket); err != nil {
-		log.Printf("Warning: Failed to update ticket %s with TTS URL: %v", p.TicketID, err)
+		applogger.WarnContext(ctx, "failed to update ticket with TTS URL", "ticket_id", p.TicketID, "err", err)
 		// Not returning error as TTS was generated successfully
 	}
 

@@ -1,10 +1,13 @@
 package services
 
 import (
+	"crypto/sha256"
 	"crypto/tls"
-	"log"
+	"encoding/hex"
 	"os"
+	"quokkaq-go-backend/internal/logger"
 	"strconv"
+	"strings"
 
 	"gopkg.in/gomail.v2"
 )
@@ -27,7 +30,7 @@ func NewMailService() MailService {
 	secureStr := os.Getenv("SMTP_SECURE")
 
 	if host == "" {
-		log.Println("SMTP_HOST not configured. MailService will log emails instead of sending.")
+		logger.Println("SMTP_HOST not configured. MailService will log emails instead of sending.")
 		return &mailService{dialer: nil, from: from}
 	}
 
@@ -54,14 +57,28 @@ func NewMailService() MailService {
 		d.TLSConfig.InsecureSkipVerify = true
 	}
 
-	log.Printf("SMTP Configured: Host=%s, Port=%d, User=%s, SSL=%v", host, port, user, d.SSL)
+	userLog := "(empty)"
+	if u := strings.TrimSpace(user); u != "" {
+		userLog = recipientLogRef(u)
+	}
+	logger.Printf("SMTP Configured: Host=%s, Port=%d, UserRef=%s, SSL=%v", host, port, userLog, d.SSL)
 
 	return &mailService{dialer: d, from: from}
 }
 
+// recipientLogRef is a stable short hex digest for correlating logs without logging the raw address.
+func recipientLogRef(email string) string {
+	s := strings.TrimSpace(strings.ToLower(email))
+	if s == "" {
+		return "(empty)"
+	}
+	sum := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(sum[:8])
+}
+
 func (s *mailService) SendMail(to string, subject string, html string) error {
 	if s.dialer == nil {
-		log.Printf("Mock Send Mail -> To: %s, Subject: %s, Body: %s\n", to, subject, html)
+		logger.Printf("Mock Send Mail -> to_ref=%s, Subject: %s, Body: %s\n", recipientLogRef(to), subject, html)
 		return nil
 	}
 
@@ -76,10 +93,10 @@ func (s *mailService) SendMail(to string, subject string, html string) error {
 	m.SetBody("text/html", html)
 
 	if err := s.dialer.DialAndSend(m); err != nil {
-		log.Printf("Error sending email to %s: %v\n", to, err)
+		logger.Error("failed to send email", "to_ref", recipientLogRef(to), "err", err)
 		return err
 	}
 
-	log.Printf("Email sent to %s\n", to)
+	logger.Debugf("Email sent to_ref=%s\n", recipientLogRef(to))
 	return nil
 }

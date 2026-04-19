@@ -3,9 +3,9 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"log"
 	"math"
 	"net/http"
+	"quokkaq-go-backend/internal/logger"
 	"strings"
 	"time"
 
@@ -245,6 +245,7 @@ func (h *PlatformHandler) upsertDraftInvoiceInTx(tx *gorm.DB, invoiceID string, 
 }
 
 // CreateInvoice godoc
+// @ID           PlatformCreateInvoice
 // @Summary      Create draft invoice (platform)
 // @Description  Creates a multi-line draft invoice for a company. companyId and dueDate (RFC3339) are required; at least one line.
 // @Tags         platform
@@ -280,7 +281,7 @@ func (h *PlatformHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 			http.Error(w, "Company not found", http.StatusNotFound)
 			return
 		}
-		log.Printf("CreateInvoice Find company: %v", err)
+		logger.ErrorfCtx(r.Context(), "CreateInvoice Find company: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -315,14 +316,14 @@ func (h *PlatformHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 	if err := database.DB.Transaction(func(tx *gorm.DB) error {
 		return h.invoiceRepo.CreateWithLinesInTx(tx, &inv, lines)
 	}); err != nil {
-		log.Printf("CreateInvoice tx: %v", err)
+		logger.ErrorfCtx(r.Context(), "CreateInvoice tx: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-	log.Printf("platform_admin invoice draft user=%s invoice=%s company=%s", userID, inv.ID, body.CompanyID)
+	logger.PrintfCtx(r.Context(), "platform_admin invoice draft user=%s invoice=%s company=%s", userID, inv.ID, body.CompanyID)
 	out, err := h.invoiceRepo.FindByIDWithLines(inv.ID)
 	if err != nil {
-		log.Printf("CreateInvoice FindByIDWithLines: %v", err)
+		logger.ErrorfCtx(r.Context(), "CreateInvoice FindByIDWithLines: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -330,6 +331,7 @@ func (h *PlatformHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 }
 
 // PatchInvoiceDraft godoc
+// @ID           PlatformPatchInvoiceDraft
 // @Summary      Update draft invoice (platform)
 // @Description  Replaces header and lines for a draft invoice. companyId in body is ignored; taken from the existing invoice.
 // @Tags         platform
@@ -365,7 +367,7 @@ func (h *PlatformHandler) PatchInvoiceDraft(w http.ResponseWriter, r *http.Reque
 			http.Error(w, "Not found", http.StatusNotFound)
 			return
 		}
-		log.Printf("PatchInvoiceDraft: %v", err)
+		logger.ErrorfCtx(r.Context(), "PatchInvoiceDraft: %v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -378,6 +380,7 @@ func (h *PlatformHandler) PatchInvoiceDraft(w http.ResponseWriter, r *http.Reque
 }
 
 // IssueInvoice godoc
+// @ID           PlatformIssueInvoice
 // @Summary      Issue invoice (platform)
 // @Description  Assigns document number, sets status to open, and stores buyer snapshot from the company.
 // @Tags         platform
@@ -465,7 +468,7 @@ func (h *PlatformHandler) IssueInvoice(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		log.Printf("IssueInvoice tx: %v", err)
+		logger.ErrorfCtx(r.Context(), "IssueInvoice tx: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -478,6 +481,7 @@ func (h *PlatformHandler) IssueInvoice(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetPlatformInvoice godoc
+// @ID           PlatformGetInvoice
 // @Summary      Get invoice by ID (platform)
 // @Description  Returns the invoice with lines and related preloads.
 // @Tags         platform
@@ -498,7 +502,7 @@ func (h *PlatformHandler) GetPlatformInvoice(w http.ResponseWriter, r *http.Requ
 			http.Error(w, "Not found", http.StatusNotFound)
 			return
 		}
-		log.Printf("GetPlatformInvoice: %v", err)
+		logger.ErrorfCtx(r.Context(), "GetPlatformInvoice: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}

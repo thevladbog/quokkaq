@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"os"
+	"quokkaq-go-backend/internal/logger"
 	"strings"
 	"time"
 
@@ -687,7 +687,7 @@ func (s *CalendarIntegrationService) SyncIntegration(ctx context.Context, integr
 			ServiceID:     svcPtr,
 		}
 		if err := s.repo.UpsertExternalSlot(&row); err != nil {
-			log.Printf("calendar sync: upsert slot: %v", err)
+			logger.ErrorfCtx(ctx, "calendar sync: upsert slot: %v", err)
 			continue
 		}
 		seen[co.Path] = struct{}{}
@@ -718,11 +718,11 @@ func (s *CalendarIntegrationService) SyncIntegration(ctx context.Context, integr
 			continue
 		}
 		if errors.Is(gerr, caldavclient.ErrNotFound) {
-			_ = s.raiseOrphanIncident(unitID, integ, pr, href)
+			_ = s.raiseOrphanIncident(ctx, unitID, integ, pr, href)
 			continue
 		}
 		if gerr != nil {
-			log.Printf("calendar sync orphan check: get %s: %v", href, gerr)
+			logger.ErrorfCtx(ctx, "calendar sync orphan check: get %s: %v", href, gerr)
 		}
 	}
 
@@ -734,7 +734,7 @@ func (s *CalendarIntegrationService) markSyncError(id, msg string) error {
 	return s.repo.UpdateSyncMeta(id, time.Now().UTC(), msg)
 }
 
-func (s *CalendarIntegrationService) raiseOrphanIncident(unitID string, integ *models.UnitCalendarIntegration, pr *models.PreRegistration, href string) error {
+func (s *CalendarIntegrationService) raiseOrphanIncident(ctx context.Context, unitID string, integ *models.UnitCalendarIntegration, pr *models.PreRegistration, href string) error {
 	const typ = "orphan_booking_missing_event"
 	recent, _ := s.repo.HasRecentIncident(unitID, typ, href, time.Now().Add(-24*time.Hour))
 	if recent {
@@ -750,11 +750,11 @@ func (s *CalendarIntegrationService) raiseOrphanIncident(unitID string, integ *m
 	if err := s.repo.CreateIncident(&inc); err != nil {
 		return err
 	}
-	s.notifyAdminsOrphan(integ, pr, href, inc.ID)
+	s.notifyAdminsOrphan(ctx, integ, pr, href, inc.ID)
 	return nil
 }
 
-func (s *CalendarIntegrationService) notifyAdminsOrphan(integ *models.UnitCalendarIntegration, pr *models.PreRegistration, href, incidentID string) {
+func (s *CalendarIntegrationService) notifyAdminsOrphan(ctx context.Context, integ *models.UnitCalendarIntegration, pr *models.PreRegistration, href, incidentID string) {
 	if strings.TrimSpace(integ.AdminNotifyEmails) == "" {
 		return
 	}
@@ -769,7 +769,7 @@ func (s *CalendarIntegrationService) notifyAdminsOrphan(integ *models.UnitCalend
 <p><a href="%s">Open app</a></p>`,
 			pr.ID, pr.ServiceID, pr.Date, pr.Time, href, link)
 		if err := s.mail.SendMail(to, "QuokkaQ: calendar slot removed with active booking", body); err != nil {
-			log.Printf("calendar orphan email: %v", err)
+			logger.ErrorfCtx(ctx, "calendar orphan email: %v", err)
 			continue
 		}
 		_ = s.repo.MarkIncidentEmailSent(incidentID)
@@ -930,7 +930,7 @@ func (s *CalendarIntegrationService) ReleaseFreeSlot(ctx context.Context, integ 
 		if errors.Is(err, caldavclient.ErrNotFound) {
 			return nil
 		}
-		log.Printf("calendar ReleaseFreeSlot: get %s: %v (treating as done)", href, err)
+		logger.PrintfCtx(ctx, "calendar ReleaseFreeSlot: get %s: %v (treating as done)", href, err)
 		return nil
 	}
 	lbl := summary.ServiceLabelForService(svc.Name, svc.CalendarSlotKey)

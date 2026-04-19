@@ -15,11 +15,11 @@ const (
 )
 
 var (
-	inn10        = regexp.MustCompile(`^\d{10}$`)
-	inn12        = regexp.MustCompile(`^\d{12}$`)
-	kpp9         = regexp.MustCompile(`^\d{9}$`)
-	ogrn13       = regexp.MustCompile(`^\d{13}$`)
-	ogrnip15     = regexp.MustCompile(`^\d{15}$`)
+	inn10    = regexp.MustCompile(`^\d{10}$`)
+	inn12    = regexp.MustCompile(`^\d{12}$`)
+	kpp9     = regexp.MustCompile(`^\d{9}$`)
+	ogrn13   = regexp.MustCompile(`^\d{13}$`)
+	ogrnip15 = regexp.MustCompile(`^\d{15}$`)
 )
 
 type counterpartyPayload struct {

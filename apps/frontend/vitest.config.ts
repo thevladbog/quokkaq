@@ -32,7 +32,7 @@ export default defineConfig({
         test: {
           name: 'unit-node',
           environment: 'node',
-          include: ['lib/**/*.test.ts']
+          include: ['lib/**/*.test.ts', 'app/api/**/*.test.ts']
         }
       },
       {
@@ -40,7 +40,8 @@ export default defineConfig({
         test: {
           name: 'component-jsdom',
           environment: 'jsdom',
-          include: ['**/*.test.tsx']
+          include: ['**/*.test.tsx'],
+          exclude: ['**/node_modules/**', '**/.next/**', '**/dist/**']
         }
       }
     ]

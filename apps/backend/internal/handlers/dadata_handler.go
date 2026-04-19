@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"log"
 	"net/http"
+	"quokkaq-go-backend/internal/logger"
 	"strings"
 
 	"quokkaq-go-backend/internal/integrations/dadata"
@@ -102,7 +102,7 @@ func (h *DaDataHandler) FindPartyByInn(w http.ResponseWriter, r *http.Request) {
 	}
 	raw, status, err := dc.FindPartyByID(out)
 	if err != nil {
-		log.Printf("DaData FindPartyByID: %v", err)
+		logger.PrintfCtx(r.Context(), "DaData FindPartyByID: %v", err)
 		http.Error(w, "Upstream error", http.StatusBadGateway)
 		return
 	}
@@ -144,7 +144,7 @@ func (h *DaDataHandler) SuggestParty(w http.ResponseWriter, r *http.Request) {
 	}
 	raw, status, err := dc.SuggestParty(b)
 	if err != nil {
-		log.Printf("DaData SuggestParty: %v", err)
+		logger.PrintfCtx(r.Context(), "DaData SuggestParty: %v", err)
 		http.Error(w, "Upstream error", http.StatusBadGateway)
 		return
 	}
@@ -186,7 +186,7 @@ func (h *DaDataHandler) SuggestAddress(w http.ResponseWriter, r *http.Request) {
 	}
 	raw, status, err := dc.SuggestAddress(b)
 	if err != nil {
-		log.Printf("DaData SuggestAddress: %v", err)
+		logger.PrintfCtx(r.Context(), "DaData SuggestAddress: %v", err)
 		http.Error(w, "Upstream error", http.StatusBadGateway)
 		return
 	}
@@ -228,7 +228,7 @@ func (h *DaDataHandler) SuggestBank(w http.ResponseWriter, r *http.Request) {
 	}
 	raw, status, err := dc.SuggestBank(b)
 	if err != nil {
-		log.Printf("DaData SuggestBank: %v", err)
+		logger.PrintfCtx(r.Context(), "DaData SuggestBank: %v", err)
 		http.Error(w, "Upstream error", http.StatusBadGateway)
 		return
 	}
@@ -269,7 +269,7 @@ func (h *DaDataHandler) CleanAddress(w http.ResponseWriter, r *http.Request) {
 	}
 	raw, status, err := dadata.CleanAddress(b)
 	if err != nil {
-		log.Printf("DaData CleanAddress: %v", err)
+		logger.PrintfCtx(r.Context(), "DaData CleanAddress: %v", err)
 		http.Error(w, "Upstream error", http.StatusBadGateway)
 		return
 	}

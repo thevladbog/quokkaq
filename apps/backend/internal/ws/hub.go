@@ -2,7 +2,7 @@ package ws
 
 import (
 	"encoding/json"
-	"log"
+	"quokkaq-go-backend/internal/logger"
 )
 
 type Hub struct {
@@ -102,7 +102,7 @@ func (h *Hub) BroadcastEvent(event string, data interface{}, roomID string) {
 	}
 	bytes, err := json.Marshal(msg)
 	if err != nil {
-		log.Println("Error marshaling broadcast message:", err)
+		logger.Println("Error marshaling broadcast message:", err)
 		return
 	}
 	h.broadcast <- BroadcastMessage{

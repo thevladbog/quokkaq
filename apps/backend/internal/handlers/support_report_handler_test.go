@@ -12,12 +12,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-chi/chi/v5"
-	"gorm.io/gorm"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
 	"quokkaq-go-backend/internal/testsupport"
+
+	"github.com/go-chi/chi/v5"
+	"gorm.io/gorm"
 )
 
 type stubSupportReportRepo struct {

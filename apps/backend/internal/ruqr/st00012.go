@@ -10,20 +10,20 @@ import (
 
 // Input mirrors apps/frontend/lib/ru-bank-qr-st00012.ts RuBankQrSt00012Input.
 type Input struct {
-	Name                   string
-	PersonalAcc            string
-	BankName               string
-	BIC                    string
-	CorrespondentAccount   string
-	SumKopecks             int64
-	Purpose                string
-	PayeeINN               string
-	KPP                    string
+	Name                 string
+	PersonalAcc          string
+	BankName             string
+	BIC                  string
+	CorrespondentAccount string
+	SumKopecks           int64
+	Purpose              string
+	PayeeINN             string
+	KPP                  string
 }
 
 var (
-	re20   = regexp.MustCompile(`^\d{20}$`)
-	re9    = regexp.MustCompile(`^\d{9}$`)
+	re20    = regexp.MustCompile(`^\d{20}$`)
+	re9     = regexp.MustCompile(`^\d{9}$`)
 	reInn10 = regexp.MustCompile(`^\d{10}$`)
 	reInn12 = regexp.MustCompile(`^\d{12}$`)
 	reKpp   = regexp.MustCompile(`^\d{9}$`)

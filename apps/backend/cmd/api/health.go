@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"quokkaq-go-backend/pkg/database"
 	"time"
@@ -45,7 +45,7 @@ func healthReady(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := database.Ping(ctx); err != nil {
-		log.Printf("/health/ready: database ping failed: %v (%s %s)", err, r.Method, r.RemoteAddr)
+		slog.ErrorContext(ctx, "/health/ready: database ping failed", "err", err, "method", r.Method, "remote_addr", r.RemoteAddr)
 		w.WriteHeader(http.StatusServiceUnavailable)
 		_, _ = w.Write([]byte(`{"status":"not ready"}`))
 		return
@@ -66,7 +66,7 @@ func healthReadyHead(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	if err := database.Ping(ctx); err != nil {
-		log.Printf("/health/ready: database ping failed: %v (%s %s)", err, r.Method, r.RemoteAddr)
+		slog.ErrorContext(ctx, "/health/ready: database ping failed", "err", err, "method", r.Method, "remote_addr", r.RemoteAddr)
 		w.WriteHeader(http.StatusServiceUnavailable)
 		return
 	}

@@ -2,8 +2,8 @@ package handlers
 
 import (
 	"errors"
-	"log"
 	"net/http"
+	"quokkaq-go-backend/internal/logger"
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
@@ -49,7 +49,7 @@ func (h *UsageHandler) GetUsageMetrics(w http.ResponseWriter, r *http.Request) {
 	// Verify user has access to this company by checking their units
 	hasAccess, err := h.userRepo.HasCompanyAccess(userID, companyID)
 	if err != nil {
-		log.Printf("GetUsageMetrics userRepo.HasCompanyAccess: %v", err)
+		logger.PrintfCtx(r.Context(), "GetUsageMetrics userRepo.HasCompanyAccess: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -60,7 +60,7 @@ func (h *UsageHandler) GetUsageMetrics(w http.ResponseWriter, r *http.Request) {
 
 	metrics, err := h.quotaService.GetUsageMetrics(companyID)
 	if err != nil {
-		log.Printf("GetUsageMetrics quotaService.GetUsageMetrics(%q): %v", companyID, err)
+		logger.PrintfCtx(r.Context(), "GetUsageMetrics quotaService.GetUsageMetrics(%q): %v", companyID, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -100,14 +100,14 @@ func (h *UsageHandler) GetMyUsageMetrics(w http.ResponseWriter, r *http.Request)
 			http.Error(w, "User has no associated company", http.StatusNotFound)
 			return
 		}
-		log.Printf("GetMyUsageMetrics userRepo.ResolveCompanyIDForRequest: %v", err)
+		logger.PrintfCtx(r.Context(), "GetMyUsageMetrics userRepo.ResolveCompanyIDForRequest: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	metrics, err := h.quotaService.GetUsageMetrics(companyID)
 	if err != nil {
-		log.Printf("GetMyUsageMetrics quotaService.GetUsageMetrics(%q): %v", companyID, err)
+		logger.PrintfCtx(r.Context(), "GetMyUsageMetrics quotaService.GetUsageMetrics(%q): %v", companyID, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}

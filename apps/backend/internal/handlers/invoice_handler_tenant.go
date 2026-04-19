@@ -3,9 +3,9 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
 	"os"
+	"quokkaq-go-backend/internal/logger"
 	"strings"
 
 	"quokkaq-go-backend/internal/config"
@@ -75,7 +75,7 @@ func (h *InvoiceHandler) GetMyInvoiceByID(w http.ResponseWriter, r *http.Request
 			http.Error(w, "User has no associated company", http.StatusNotFound)
 			return
 		}
-		log.Printf("GetMyInvoiceByID ResolveCompanyIDForRequest: %v", err)
+		logger.PrintfCtx(r.Context(), "GetMyInvoiceByID ResolveCompanyIDForRequest: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -86,7 +86,7 @@ func (h *InvoiceHandler) GetMyInvoiceByID(w http.ResponseWriter, r *http.Request
 			http.Error(w, "Not found", http.StatusNotFound)
 			return
 		}
-		log.Printf("GetMyInvoiceByID: %v", err)
+		logger.PrintfCtx(r.Context(), "GetMyInvoiceByID: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -117,7 +117,7 @@ func (h *InvoiceHandler) GetSaaSVendor(w http.ResponseWriter, r *http.Request) {
 	}
 	c, err := h.companyRepo.FindSaaSOperatorCompany()
 	if err != nil {
-		log.Printf("GetSaaSVendor: %v", err)
+		logger.PrintfCtx(r.Context(), "GetSaaSVendor: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -162,7 +162,7 @@ func (h *InvoiceHandler) RequestYooKassaPaymentLink(w http.ResponseWriter, r *ht
 			http.Error(w, "User has no associated company", http.StatusNotFound)
 			return
 		}
-		log.Printf(
+		logger.PrintfCtx(r.Context(),
 			"RequestYooKassaPaymentLink ResolveCompanyIDForRequest: userID=%q X-Company-Id=%q err=%v",
 			userID,
 			r.Header.Get("X-Company-Id"),
@@ -207,16 +207,16 @@ func (h *InvoiceHandler) RequestYooKassaPaymentLink(w http.ResponseWriter, r *ht
 	if ret == "" {
 		if config.AppEnvAllowsYooKassaDevReturnURLFallback() {
 			ret = yooKassaDevPaymentReturnURL
-			log.Printf("RequestYooKassaPaymentLink: using development-only default return URL %q (set YOOKASSA_PAYMENT_RETURN_URL or PUBLIC_APP_URL)", ret)
+			logger.PrintfCtx(r.Context(), "RequestYooKassaPaymentLink: using development-only default return URL %q (set YOOKASSA_PAYMENT_RETURN_URL or PUBLIC_APP_URL)", ret)
 		} else {
-			log.Printf("RequestYooKassaPaymentLink: payment return URL missing (APP_ENV=%q); set YOOKASSA_PAYMENT_RETURN_URL or PUBLIC_APP_URL", strings.TrimSpace(os.Getenv("APP_ENV")))
+			logger.PrintfCtx(r.Context(), "RequestYooKassaPaymentLink: payment return URL missing (APP_ENV=%q); set YOOKASSA_PAYMENT_RETURN_URL or PUBLIC_APP_URL", strings.TrimSpace(os.Getenv("APP_ENV")))
 			http.Error(w, "Payment return URL is not configured", http.StatusServiceUnavailable)
 			return
 		}
 	}
 	payID, url, err := h.yooKassa.CreatePayment(r.Context(), inv, ret)
 	if err != nil {
-		log.Printf("RequestYooKassaPaymentLink CreatePayment: %v", err)
+		logger.PrintfCtx(r.Context(), "RequestYooKassaPaymentLink CreatePayment: %v", err)
 		if errors.Is(err, billing.ErrYooKassaReturnURLRequired) {
 			http.Error(w, "Payment return URL is not configured", http.StatusServiceUnavailable)
 			return
@@ -225,7 +225,7 @@ func (h *InvoiceHandler) RequestYooKassaPaymentLink(w http.ResponseWriter, r *ht
 		return
 	}
 	if err := h.invoiceRepo.UpdateYookassaPayment(inv.ID, payID, url); err != nil {
-		log.Printf("RequestYooKassaPaymentLink Updates: %v", err)
+		logger.PrintfCtx(r.Context(), "RequestYooKassaPaymentLink Updates: %v", err)
 		if errors.Is(err, repository.ErrInvoiceYooKassaPaymentAlreadyLinked) {
 			http.Error(w, "Invoice is already linked to a different payment", http.StatusConflict)
 			return

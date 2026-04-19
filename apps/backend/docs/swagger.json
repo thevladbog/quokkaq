@@ -6818,6 +6818,7 @@
         "/companies/me/complete-onboarding": {
             "post": {
                 "description": "Marks onboarding as complete for the user's company",
+                "operationId": "CompleteCompanyOnboarding",
                 "responses": {
                     "200": {
                         "content": {
@@ -8747,6 +8748,7 @@
         "/counters/{id}/occupy": {
             "post": {
                 "description": "Sets a counter as occupied by the current user",
+                "operationId": "OccupyCounter",
                 "parameters": [
                     {
                         "description": "Counter ID",
@@ -9189,6 +9191,7 @@
         "/invoices/me": {
             "get": {
                 "description": "Returns invoices for the authenticated user's company",
+                "operationId": "GetMyInvoices",
                 "parameters": [
                     {
                         "description": "Tenant company UUID when the user belongs to multiple organizations",
@@ -9409,6 +9412,7 @@
         "/invoices/{id}/download": {
             "get": {
                 "description": "Returns application/pdf (A4 счёт на оплату with ST00012 QR). 422 if SaaS operator bank details cannot form a valid QR.",
+                "operationId": "DownloadInvoice",
                 "parameters": [
                     {
                         "description": "Invoice ID",
@@ -10039,7 +10043,7 @@
         },
         "/platform/companies": {
             "get": {
-                "operationId": "platformListCompanies",
+                "operationId": "ListCompanies",
                 "parameters": [
                     {
                         "description": "Filter by name",
@@ -10091,6 +10095,7 @@
         },
         "/platform/companies/{id}": {
             "get": {
+                "operationId": "GetCompany",
                 "parameters": [
                     {
                         "description": "Company ID",
@@ -10125,6 +10130,7 @@
                 ]
             },
             "patch": {
+                "operationId": "PatchCompany",
                 "parameters": [
                     {
                         "description": "Company ID",
@@ -10624,6 +10630,7 @@
         },
         "/platform/features": {
             "get": {
+                "operationId": "GetFeatures",
                 "responses": {
                     "200": {
                         "content": {
@@ -10649,6 +10656,7 @@
         },
         "/platform/invoices": {
             "get": {
+                "operationId": "ListInvoices",
                 "parameters": [
                     {
                         "description": "Filter by company",
@@ -10699,6 +10707,7 @@
             },
             "post": {
                 "description": "Creates a multi-line draft invoice for a company. companyId and dueDate (RFC3339) are required; at least one line.",
+                "operationId": "PlatformCreateInvoice",
                 "requestBody": {
                     "content": {
                         "application/json": {
@@ -10787,6 +10796,7 @@
         "/platform/invoices/{id}": {
             "get": {
                 "description": "Returns the invoice with lines and related preloads.",
+                "operationId": "PlatformGetInvoice",
                 "parameters": [
                     {
                         "description": "Invoice ID",
@@ -10861,6 +10871,7 @@
                 ]
             },
             "patch": {
+                "operationId": "PatchInvoice",
                 "parameters": [
                     {
                         "description": "Invoice ID",
@@ -10910,6 +10921,7 @@
         "/platform/invoices/{id}/draft": {
             "patch": {
                 "description": "Replaces header and lines for a draft invoice. companyId in body is ignored; taken from the existing invoice.",
+                "operationId": "PlatformPatchInvoiceDraft",
                 "parameters": [
                     {
                         "description": "Invoice ID",
@@ -11019,6 +11031,7 @@
         "/platform/invoices/{id}/issue": {
             "post": {
                 "description": "Assigns document number, sets status to open, and stores buyer snapshot from the company.",
+                "operationId": "PlatformIssueInvoice",
                 "parameters": [
                     {
                         "description": "Invoice ID",
@@ -11115,6 +11128,7 @@
         },
         "/platform/saas-operator-company": {
             "get": {
+                "operationId": "GetSaaSOperatorCompany",
                 "responses": {
                     "200": {
                         "content": {
@@ -11150,6 +11164,7 @@
         },
         "/platform/subscription-plans": {
             "get": {
+                "operationId": "ListSubscriptionPlans",
                 "responses": {
                     "200": {
                         "content": {
@@ -11176,6 +11191,7 @@
                 ]
             },
             "post": {
+                "operationId": "CreateSubscriptionPlan",
                 "requestBody": {
                     "content": {
                         "application/json": {
@@ -11213,6 +11229,7 @@
         },
         "/platform/subscription-plans/{id}": {
             "put": {
+                "operationId": "UpdateSubscriptionPlan",
                 "parameters": [
                     {
                         "description": "Plan ID",
@@ -11261,7 +11278,7 @@
         },
         "/platform/subscriptions": {
             "get": {
-                "operationId": "platformListSubscriptions",
+                "operationId": "ListSubscriptions",
                 "parameters": [
                     {
                         "description": "Page size (max 100)",
@@ -11303,7 +11320,7 @@
                 ]
             },
             "post": {
-                "operationId": "platformCreateSubscription",
+                "operationId": "CreateSubscription",
                 "requestBody": {
                     "content": {
                         "application/json": {
@@ -11371,7 +11388,7 @@
         },
         "/platform/subscriptions/{id}": {
             "patch": {
-                "operationId": "platformPatchSubscription",
+                "operationId": "PatchSubscription",
                 "parameters": [
                     {
                         "description": "Subscription ID",
@@ -14062,6 +14079,7 @@
             },
             "get": {
                 "description": "Retrieves a specific unit by its ID",
+                "operationId": "GetUnitByID",
                 "parameters": [
                     {
                         "description": "Unit ID",

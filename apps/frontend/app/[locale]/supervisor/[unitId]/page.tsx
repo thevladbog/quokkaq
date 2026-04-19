@@ -11,7 +11,7 @@ import {
   DialogTitle
 } from '@/components/ui/dialog';
 import {
-  getGetUnitsIdQueryKey,
+  getGetUnitByIDQueryKey,
   getGetUnitsUnitIdChildWorkplacesQueryKey
 } from '@/lib/api/generated/units';
 import { shiftApi, unitsApi, Ticket } from '@/lib/api';
@@ -50,7 +50,7 @@ export default function ShiftDashboardPage({
   };
 
   const { data: unit } = useQuery({
-    queryKey: getGetUnitsIdQueryKey(unitId),
+    queryKey: getGetUnitByIDQueryKey(unitId),
     queryFn: () => unitsApi.getById(unitId)
   });
 

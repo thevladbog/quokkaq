@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"path/filepath"
+	"quokkaq-go-backend/internal/logger"
 	"strings"
 
 	"quokkaq-go-backend/internal/models"
@@ -86,6 +86,7 @@ func (h *UnitHandler) GetAllUnits(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetUnitByID godoc
+// @ID           GetUnitByID
 // @Summary      Get a unit by ID
 // @Description  Retrieves a specific unit by its ID
 // @Tags         units
@@ -104,7 +105,7 @@ func (h *UnitHandler) GetUnitByID(w http.ResponseWriter, r *http.Request) {
 	if h.operational != nil {
 		snap, snapErr := h.operational.GetPublicSnapshot(unit.ID)
 		if snapErr != nil {
-			log.Printf("GetUnitByID: GetPublicSnapshot unitID=%q err=%v", unit.ID, snapErr)
+			logger.PrintfCtx(r.Context(), "GetUnitByID: GetPublicSnapshot unitID=%q err=%v", unit.ID, snapErr)
 		} else if snap != nil {
 			unit.Operations = snap
 		}

@@ -9,11 +9,11 @@ import (
 	"fmt"
 	"html"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
+	"quokkaq-go-backend/internal/logger"
 	"strconv"
 	"strings"
 	"sync"
@@ -39,7 +39,7 @@ func newPlaneHTTPError(status int, body []byte) *PlaneHTTPError {
 	const storeMax = 8192
 	b := strings.TrimSpace(string(body))
 	if len(b) > storeMax {
-		log.Printf("plane api: HTTP %d response body (first %d of %d bytes)", status, storeMax, len(b))
+		logger.Printf("plane api: HTTP %d response body (first %d of %d bytes)", status, storeMax, len(b))
 		b = b[:storeMax]
 	}
 	return &PlaneHTTPError{
@@ -279,7 +279,7 @@ func (c *PlaneClient) fetchProjectUUIDByRef(ctx context.Context, ref string) (st
 			break
 		}
 		if page >= planeProjectListMaxPages-1 {
-			log.Printf("plane: project list pagination cap reached while resolving ref=%q (%d pages)", ref, planeProjectListMaxPages)
+			logger.Printf("plane: project list pagination cap reached while resolving ref=%q (%d pages)", ref, planeProjectListMaxPages)
 			return "", fmt.Errorf("%w for ref %q (%d pages); set PLANE_PROJECT_ID to the project UUID", ErrPlaneProjectListPaginationLimit, ref, planeProjectListMaxPages)
 		}
 		cursor = strings.TrimSpace(*env.NextCursor)

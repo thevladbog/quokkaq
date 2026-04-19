@@ -3,8 +3,8 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
+	"quokkaq-go-backend/internal/logger"
 	"strings"
 	"time"
 
@@ -121,14 +121,14 @@ func (h *DesktopTerminalHandler) Create(w http.ResponseWriter, r *http.Request) 
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		log.Printf("desktop terminal create: %v", err)
+		logger.PrintfCtx(r.Context(), "desktop terminal create: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	full := row
 	if enriched, err := h.service.GetByID(row.ID); err != nil {
-		log.Printf("desktop terminal get after create: %v", err)
+		logger.PrintfCtx(r.Context(), "desktop terminal get after create: %v", err)
 	} else {
 		full = enriched
 	}
@@ -143,7 +143,7 @@ func (h *DesktopTerminalHandler) Create(w http.ResponseWriter, r *http.Request) 
 func (h *DesktopTerminalHandler) List(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.service.List()
 	if err != nil {
-		log.Printf("desktop terminal list: %v", err)
+		logger.PrintfCtx(r.Context(), "desktop terminal list: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -157,7 +157,7 @@ func (h *DesktopTerminalHandler) List(w http.ResponseWriter, r *http.Request) {
 func (h *DesktopTerminalHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	row, err := h.service.GetByID(id)
-	if middleware.RespondRepoFindError(w, err, "GetDesktopTerminal") {
+	if middleware.RespondRepoFindError(r.Context(), w, err, "GetDesktopTerminal") {
 		return
 	}
 	_ = json.NewEncoder(w).Encode(mapTerminalToJSON(row))
@@ -193,10 +193,10 @@ func (h *DesktopTerminalHandler) Update(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if err != nil {
-		if middleware.RespondRepoFindError(w, err, "UpdateDesktopTerminal") {
+		if middleware.RespondRepoFindError(r.Context(), w, err, "UpdateDesktopTerminal") {
 			return
 		}
-		log.Printf("desktop terminal update: %v", err)
+		logger.PrintfCtx(r.Context(), "desktop terminal update: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -205,7 +205,7 @@ func (h *DesktopTerminalHandler) Update(w http.ResponseWriter, r *http.Request) 
 
 func (h *DesktopTerminalHandler) Revoke(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	if err := h.service.Revoke(id); middleware.RespondRepoFindError(w, err, "RevokeDesktopTerminal") {
+	if err := h.service.Revoke(id); middleware.RespondRepoFindError(r.Context(), w, err, "RevokeDesktopTerminal") {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -241,7 +241,7 @@ func (h *DesktopTerminalHandler) Bootstrap(w http.ResponseWriter, r *http.Reques
 			http.Error(w, "Invalid or revoked terminal code", http.StatusUnauthorized)
 			return
 		}
-		log.Printf("desktop terminal bootstrap: %v", err)
+		logger.PrintfCtx(r.Context(), "desktop terminal bootstrap: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}

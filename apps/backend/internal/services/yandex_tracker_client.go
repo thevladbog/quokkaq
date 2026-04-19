@@ -6,10 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
+	"quokkaq-go-backend/internal/logger"
 	"strconv"
 	"strings"
 	"time"
@@ -34,7 +34,7 @@ func newYandexTrackerHTTPError(status int, body []byte) *YandexTrackerHTTPError 
 	const storeMax = 8192
 	b := strings.TrimSpace(string(body))
 	if len(b) > storeMax {
-		log.Printf("yandex tracker api: HTTP %d response body (first %d of %d bytes)", status, storeMax, len(b))
+		logger.Printf("yandex tracker api: HTTP %d response body (first %d of %d bytes)", status, storeMax, len(b))
 		b = b[:storeMax]
 	}
 	return &YandexTrackerHTTPError{
@@ -78,7 +78,7 @@ func NewYandexTrackerClientFromEnv() *YandexTrackerClient {
 		if b, err := strconv.ParseBool(v); err == nil {
 			useCloud = b
 		} else {
-			log.Printf("Yandex Tracker: invalid bool for YANDEX_TRACKER_USE_CLOUD_ORG_ID=%q: %v (defaulting useCloud=false)", v, err)
+			logger.Printf("Yandex Tracker: invalid bool for YANDEX_TRACKER_USE_CLOUD_ORG_ID=%q: %v (defaulting useCloud=false)", v, err)
 		}
 	}
 	var iam *yandexTrackerIAM

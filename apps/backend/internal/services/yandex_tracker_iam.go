@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yandex-cloud/go-sdk/v2"
+	ycsdk "github.com/yandex-cloud/go-sdk/v2"
 	"github.com/yandex-cloud/go-sdk/v2/credentials"
 	"github.com/yandex-cloud/go-sdk/v2/pkg/options"
 )

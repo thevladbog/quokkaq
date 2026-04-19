@@ -2254,26 +2254,26 @@ export const useDeleteUnitsId = <TError = string,
  * Retrieves a specific unit by its ID
  * @summary Get a unit by ID
  */
-export type getUnitsIdResponse200 = {
+export type getUnitByIDResponse200 = {
   data: ModelsUnit
   status: 200
 }
 
-export type getUnitsIdResponse404 = {
+export type getUnitByIDResponse404 = {
   data: string
   status: 404
 }
 
-export type getUnitsIdResponseSuccess = (getUnitsIdResponse200) & {
+export type getUnitByIDResponseSuccess = (getUnitByIDResponse200) & {
   headers: Headers;
 };
-export type getUnitsIdResponseError = (getUnitsIdResponse404) & {
+export type getUnitByIDResponseError = (getUnitByIDResponse404) & {
   headers: Headers;
 };
 
-export type getUnitsIdResponse = (getUnitsIdResponseSuccess | getUnitsIdResponseError)
+export type getUnitByIDResponse = (getUnitByIDResponseSuccess | getUnitByIDResponseError)
 
-export const getGetUnitsIdUrl = (id: string,) => {
+export const getGetUnitByIDUrl = (id: string,) => {
 
 
 
@@ -2281,9 +2281,9 @@ export const getGetUnitsIdUrl = (id: string,) => {
   return `/units/${id}`
 }
 
-export const getUnitsId = async (id: string, options?: RequestInit): Promise<getUnitsIdResponse> => {
+export const getUnitByID = async (id: string, options?: RequestInit): Promise<getUnitByIDResponse> => {
 
-  return orvalMutator<getUnitsIdResponse>(getGetUnitsIdUrl(id),
+  return orvalMutator<getUnitByIDResponse>(getGetUnitByIDUrl(id),
   {
     ...options,
     method: 'GET'
@@ -2296,69 +2296,69 @@ export const getUnitsId = async (id: string, options?: RequestInit): Promise<get
 
 
 
-export const getGetUnitsIdQueryKey = (id: string,) => {
+export const getGetUnitByIDQueryKey = (id: string,) => {
     return [
     `/units/${id}`
     ] as const;
     }
 
 
-export const getGetUnitsIdQueryOptions = <TData = Awaited<ReturnType<typeof getUnitsId>>, TError = string>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsId>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export const getGetUnitByIDQueryOptions = <TData = Awaited<ReturnType<typeof getUnitByID>>, TError = string>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitByID>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetUnitsIdQueryKey(id);
+  const queryKey =  queryOptions?.queryKey ?? getGetUnitByIDQueryKey(id);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUnitsId>>> = ({ signal }) => getUnitsId(id, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUnitByID>>> = ({ signal }) => getUnitByID(id, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUnitsId>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUnitByID>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type GetUnitsIdQueryResult = NonNullable<Awaited<ReturnType<typeof getUnitsId>>>
-export type GetUnitsIdQueryError = string
+export type GetUnitByIDQueryResult = NonNullable<Awaited<ReturnType<typeof getUnitByID>>>
+export type GetUnitByIDQueryError = string
 
 
-export function useGetUnitsId<TData = Awaited<ReturnType<typeof getUnitsId>>, TError = string>(
- id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsId>>, TError, TData>> & Pick<
+export function useGetUnitByID<TData = Awaited<ReturnType<typeof getUnitByID>>, TError = string>(
+ id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitByID>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getUnitsId>>,
+          Awaited<ReturnType<typeof getUnitByID>>,
           TError,
-          Awaited<ReturnType<typeof getUnitsId>>
+          Awaited<ReturnType<typeof getUnitByID>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitsId<TData = Awaited<ReturnType<typeof getUnitsId>>, TError = string>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsId>>, TError, TData>> & Pick<
+export function useGetUnitByID<TData = Awaited<ReturnType<typeof getUnitByID>>, TError = string>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitByID>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getUnitsId>>,
+          Awaited<ReturnType<typeof getUnitByID>>,
           TError,
-          Awaited<ReturnType<typeof getUnitsId>>
+          Awaited<ReturnType<typeof getUnitByID>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitsId<TData = Awaited<ReturnType<typeof getUnitsId>>, TError = string>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsId>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useGetUnitByID<TData = Awaited<ReturnType<typeof getUnitByID>>, TError = string>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitByID>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get a unit by ID
  */
 
-export function useGetUnitsId<TData = Awaited<ReturnType<typeof getUnitsId>>, TError = string>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsId>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useGetUnitByID<TData = Awaited<ReturnType<typeof getUnitByID>>, TError = string>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitByID>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetUnitsIdQueryOptions(id,options)
+  const queryOptions = getGetUnitByIDQueryOptions(id,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

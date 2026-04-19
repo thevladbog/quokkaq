@@ -35,7 +35,7 @@ func EnsureTenantAccess(userRepo repository.UserRepository) func(http.Handler) h
 
 			// Try to get company ID from URL parameter
 			companyID := chi.URLParam(r, "companyId")
-			
+
 			// If not in URL, try to get from query parameter
 			if companyID == "" {
 				companyID = r.URL.Query().Get("companyId")

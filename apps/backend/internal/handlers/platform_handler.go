@@ -3,8 +3,8 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
+	"quokkaq-go-backend/internal/logger"
 	"strconv"
 	"strings"
 	"time"
@@ -202,7 +202,7 @@ type platformListResponse[T any] struct {
 }
 
 // ListCompanies godoc
-// @ID           platformListCompanies
+// @ID           ListCompanies
 // @Summary      List companies (platform)
 // @Tags         platform
 // @Produce      json
@@ -217,7 +217,7 @@ func (h *PlatformHandler) ListCompanies(w http.ResponseWriter, r *http.Request) 
 	limit, offset := platformParseLimitOffset(r)
 	companies, total, err := h.companyRepo.ListPaginated(search, limit, offset)
 	if err != nil {
-		log.Printf("Platform ListCompanies: %v", err)
+		logger.ErrorfCtx(r.Context(), "Platform ListCompanies: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -240,6 +240,7 @@ func toCompanyPtrSlice(in []models.Company) []*models.Company {
 }
 
 // GetFeatures godoc
+// @ID           GetFeatures
 // @Summary      UI capability flags (DaData, etc.)
 // @Tags         platform
 // @Produce      json
@@ -255,6 +256,7 @@ func (h *PlatformHandler) GetFeatures(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetSaaSOperatorCompany godoc
+// @ID           GetSaaSOperatorCompany
 // @Summary      Get the marked SaaS operator company (legal profile source for the deployment)
 // @Tags         platform
 // @Produce      json
@@ -265,7 +267,7 @@ func (h *PlatformHandler) GetFeatures(w http.ResponseWriter, r *http.Request) {
 func (h *PlatformHandler) GetSaaSOperatorCompany(w http.ResponseWriter, r *http.Request) {
 	c, err := h.companyRepo.FindSaaSOperatorCompany()
 	if err != nil {
-		log.Printf("Platform GetSaaSOperatorCompany: %v", err)
+		logger.ErrorfCtx(r.Context(), "Platform GetSaaSOperatorCompany: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -278,6 +280,7 @@ func (h *PlatformHandler) GetSaaSOperatorCompany(w http.ResponseWriter, r *http.
 }
 
 // GetCompany godoc
+// @ID           GetCompany
 // @Summary      Get company with billing (platform)
 // @Tags         platform
 // @Produce      json
@@ -293,7 +296,7 @@ func (h *PlatformHandler) GetCompany(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Not found", http.StatusNotFound)
 			return
 		}
-		log.Printf("Platform GetCompany: %v", err)
+		logger.ErrorfCtx(r.Context(), "Platform GetCompany: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -318,6 +321,7 @@ type PatchPlatformCompanyBody struct {
 }
 
 // PatchCompany godoc
+// @ID           PatchCompany
 // @Summary      Update company (platform)
 // @Tags         platform
 // @Accept       json
@@ -345,7 +349,7 @@ func (h *PlatformHandler) PatchCompany(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Not found", http.StatusNotFound)
 			return
 		}
-		log.Printf("Platform PatchCompany FindByID: %v", err)
+		logger.ErrorfCtx(r.Context(), "Platform PatchCompany FindByID: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -436,30 +440,30 @@ func (h *PlatformHandler) PatchCompany(w http.ResponseWriter, r *http.Request) {
 				company.IsSaaSOperator = true
 				return tx.Save(company).Error
 			}); err != nil {
-				log.Printf("Platform PatchCompany operator tx: %v", err)
+				logger.ErrorfCtx(r.Context(), "Platform PatchCompany operator tx: %v", err)
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
 		} else {
 			company.IsSaaSOperator = false
 			if err := h.companyRepo.Update(company); err != nil {
-				log.Printf("Platform PatchCompany Update: %v", err)
+				logger.ErrorfCtx(r.Context(), "Platform PatchCompany Update: %v", err)
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
 		}
 	} else {
 		if err := h.companyRepo.Update(company); err != nil {
-			log.Printf("Platform PatchCompany Update: %v", err)
+			logger.ErrorfCtx(r.Context(), "Platform PatchCompany Update: %v", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 	}
 
-	log.Printf("platform_admin company patch user=%s company=%s", userID, id)
+	logger.PrintfCtx(r.Context(), "platform_admin company patch user=%s company=%s", userID, id)
 	updated, err := h.companyRepo.FindByIDWithBilling(id)
 	if err != nil {
-		log.Printf("Platform PatchCompany FindByIDWithBilling: %v", err)
+		logger.ErrorfCtx(r.Context(), "Platform PatchCompany FindByIDWithBilling: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -468,7 +472,7 @@ func (h *PlatformHandler) PatchCompany(w http.ResponseWriter, r *http.Request) {
 }
 
 // ListSubscriptions godoc
-// @ID           platformListSubscriptions
+// @ID           ListSubscriptions
 // @Summary      List all subscriptions (platform)
 // @Tags         platform
 // @Produce      json
@@ -481,7 +485,7 @@ func (h *PlatformHandler) ListSubscriptions(w http.ResponseWriter, r *http.Reque
 	limit, offset := platformParseLimitOffset(r)
 	subs, total, err := h.subscriptionRepo.ListAllPaginated(limit, offset)
 	if err != nil {
-		log.Printf("Platform ListSubscriptions: %v", err)
+		logger.ErrorfCtx(r.Context(), "Platform ListSubscriptions: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -514,7 +518,7 @@ type PlatformCreateSubscriptionBody struct {
 }
 
 // CreateSubscription godoc
-// @ID           platformCreateSubscription
+// @ID           CreateSubscription
 // @Summary      Create subscription for a company without one (platform)
 // @Tags         platform
 // @Accept       json
@@ -551,7 +555,7 @@ func (h *PlatformHandler) CreateSubscription(w http.ResponseWriter, r *http.Requ
 			http.Error(w, "Company not found", http.StatusNotFound)
 			return
 		}
-		log.Printf("Platform CreateSubscription FindByID company: %v", err)
+		logger.ErrorfCtx(r.Context(), "Platform CreateSubscription FindByID company: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -561,7 +565,7 @@ func (h *PlatformHandler) CreateSubscription(w http.ResponseWriter, r *http.Requ
 			http.Error(w, "Unknown planId", http.StatusBadRequest)
 			return
 		}
-		log.Printf("Platform CreateSubscription FindPlanByID: %v", err)
+		logger.ErrorfCtx(r.Context(), "Platform CreateSubscription FindPlanByID: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -641,16 +645,16 @@ func (h *PlatformHandler) CreateSubscription(w http.ResponseWriter, r *http.Requ
 			http.Error(w, "Company already has a subscription", http.StatusConflict)
 			return
 		}
-		log.Printf("Platform CreateSubscription transaction: %v", err)
+		logger.ErrorfCtx(r.Context(), "Platform CreateSubscription transaction: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	log.Printf("platform_admin subscription create user=%s company=%s subscription=%s plan=%s", userID, companyID, sub.ID, planID)
+	logger.PrintfCtx(r.Context(), "platform_admin subscription create user=%s company=%s subscription=%s plan=%s", userID, companyID, sub.ID, planID)
 
 	created, err := h.subscriptionRepo.FindByID(sub.ID)
 	if err != nil {
-		log.Printf("Platform CreateSubscription FindByID: %v", err)
+		logger.ErrorfCtx(r.Context(), "Platform CreateSubscription FindByID: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -687,7 +691,7 @@ func patchSubscriptionRequestsTierChange(body PatchPlatformSubscriptionBody) boo
 }
 
 // PatchSubscription godoc
-// @ID           platformPatchSubscription
+// @ID           PatchSubscription
 // @Summary      Update subscription fields (platform; may diverge from Stripe)
 // @Tags         platform
 // @Accept       json
@@ -710,7 +714,7 @@ func (h *PlatformHandler) PatchSubscription(w http.ResponseWriter, r *http.Reque
 			http.Error(w, "Not found", http.StatusNotFound)
 			return
 		}
-		log.Printf("Platform PatchSubscription FindByID: %v", err)
+		logger.ErrorfCtx(r.Context(), "Platform PatchSubscription FindByID: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -743,7 +747,7 @@ func (h *PlatformHandler) PatchSubscription(w http.ResponseWriter, r *http.Reque
 				http.Error(w, "Unknown planId", http.StatusBadRequest)
 				return
 			}
-			log.Printf("Platform PatchSubscription FindPlanByID(planId): %v", err)
+			logger.ErrorfCtx(r.Context(), "Platform PatchSubscription FindPlanByID(planId): %v", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -771,7 +775,7 @@ func (h *PlatformHandler) PatchSubscription(w http.ResponseWriter, r *http.Reque
 				http.Error(w, "Unknown pendingPlanId", http.StatusBadRequest)
 				return
 			}
-			log.Printf("Platform PatchSubscription FindPlanByID(pendingPlanId): %v", err)
+			logger.ErrorfCtx(r.Context(), "Platform PatchSubscription FindPlanByID(pendingPlanId): %v", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -790,18 +794,18 @@ func (h *PlatformHandler) PatchSubscription(w http.ResponseWriter, r *http.Reque
 	}
 
 	if err := h.subscriptionRepo.Update(sub); err != nil {
-		log.Printf("Platform PatchSubscription Update: %v", err)
+		logger.ErrorfCtx(r.Context(), "Platform PatchSubscription Update: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-	log.Printf("platform_admin subscription patch user=%s subscription=%s", userID, id)
+	logger.PrintfCtx(r.Context(), "platform_admin subscription patch user=%s subscription=%s", userID, id)
 	updated, err := h.subscriptionRepo.FindByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			http.Error(w, "subscription not found", http.StatusNotFound)
 			return
 		}
-		log.Printf("Platform PatchSubscription FindByID: %v", err)
+		logger.ErrorfCtx(r.Context(), "Platform PatchSubscription FindByID: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -810,6 +814,7 @@ func (h *PlatformHandler) PatchSubscription(w http.ResponseWriter, r *http.Reque
 }
 
 // ListSubscriptionPlans godoc
+// @ID           ListSubscriptionPlans
 // @Summary      List all subscription plans including inactive (platform)
 // @Tags         platform
 // @Produce      json
@@ -819,7 +824,7 @@ func (h *PlatformHandler) PatchSubscription(w http.ResponseWriter, r *http.Reque
 func (h *PlatformHandler) ListSubscriptionPlans(w http.ResponseWriter, r *http.Request) {
 	plans, err := h.subscriptionRepo.ListAllPlans()
 	if err != nil {
-		log.Printf("Platform ListSubscriptionPlans: %v", err)
+		logger.ErrorfCtx(r.Context(), "Platform ListSubscriptionPlans: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -850,6 +855,7 @@ type PlatformCreateSubscriptionPlanBody struct {
 }
 
 // CreateSubscriptionPlan godoc
+// @ID           CreateSubscriptionPlan
 // @Summary      Create subscription plan (platform)
 // @Tags         platform
 // @Accept       json
@@ -932,7 +938,7 @@ func (h *PlatformHandler) CreateSubscriptionPlan(w http.ResponseWriter, r *http.
 		}
 		return tx.Create(&plan).Error
 	}); err != nil {
-		log.Printf("Platform CreateSubscriptionPlan: %v", err)
+		logger.ErrorfCtx(r.Context(), "Platform CreateSubscriptionPlan: %v", err)
 		if isSubscriptionPlanSinglePromotedUniqueViolation(err) {
 			http.Error(w, "only one plan may be promoted at a time; try again", http.StatusConflict)
 			return
@@ -967,6 +973,7 @@ type PlatformUpdateSubscriptionPlanBody struct {
 }
 
 // UpdateSubscriptionPlan godoc
+// @ID           UpdateSubscriptionPlan
 // @Summary      Replace subscription plan (platform)
 // @Tags         platform
 // @Accept       json
@@ -984,7 +991,7 @@ func (h *PlatformHandler) UpdateSubscriptionPlan(w http.ResponseWriter, r *http.
 			http.Error(w, "Not found", http.StatusNotFound)
 			return
 		}
-		log.Printf("Platform UpdateSubscriptionPlan FindPlanByID: %v", err)
+		logger.ErrorfCtx(r.Context(), "Platform UpdateSubscriptionPlan FindPlanByID: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -1051,7 +1058,7 @@ func (h *PlatformHandler) UpdateSubscriptionPlan(w http.ResponseWriter, r *http.
 		}
 		return tx.Save(plan).Error
 	}); err != nil {
-		log.Printf("Platform UpdateSubscriptionPlan: %v", err)
+		logger.ErrorfCtx(r.Context(), "Platform UpdateSubscriptionPlan: %v", err)
 		if isSubscriptionPlanSinglePromotedUniqueViolation(err) {
 			http.Error(w, "only one plan may be promoted at a time; try again", http.StatusConflict)
 			return
@@ -1068,6 +1075,7 @@ func (h *PlatformHandler) UpdateSubscriptionPlan(w http.ResponseWriter, r *http.
 }
 
 // ListInvoices godoc
+// @ID           ListInvoices
 // @Summary      List invoices (platform)
 // @Tags         platform
 // @Produce      json
@@ -1085,7 +1093,7 @@ func (h *PlatformHandler) ListInvoices(w http.ResponseWriter, r *http.Request) {
 	}
 	invoices, total, err := h.invoiceRepo.ListPaginated(companyID, limit, offset)
 	if err != nil {
-		log.Printf("Platform ListInvoices: %v", err)
+		logger.ErrorfCtx(r.Context(), "Platform ListInvoices: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -1116,6 +1124,7 @@ type PatchPlatformInvoiceBody struct {
 }
 
 // PatchInvoice godoc
+// @ID           PatchInvoice
 // @Summary      Update invoice status (platform)
 // @Tags         platform
 // @Accept       json
@@ -1138,7 +1147,7 @@ func (h *PlatformHandler) PatchInvoice(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Not found", http.StatusNotFound)
 			return
 		}
-		log.Printf("Platform PatchInvoice FindByID: %v", err)
+		logger.ErrorfCtx(r.Context(), "Platform PatchInvoice FindByID: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -1200,7 +1209,7 @@ func (h *PlatformHandler) PatchInvoice(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "subscription not found", http.StatusBadRequest)
 				return
 			}
-			log.Printf("Platform PatchInvoice FindSubscription: %v", err)
+			logger.ErrorfCtx(r.Context(), "Platform PatchInvoice FindSubscription: %v", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -1233,18 +1242,18 @@ func (h *PlatformHandler) PatchInvoice(w http.ResponseWriter, r *http.Request) {
 		}
 		return nil
 	}); err != nil {
-		log.Printf("Platform PatchInvoice transaction: %v", err)
+		logger.ErrorfCtx(r.Context(), "Platform PatchInvoice transaction: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-	log.Printf("platform_admin invoice patch user=%s invoice=%s", userID, id)
+	logger.PrintfCtx(r.Context(), "platform_admin invoice patch user=%s invoice=%s", userID, id)
 	updated, err := h.invoiceRepo.FindByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			http.Error(w, "invoice not found", http.StatusNotFound)
 			return
 		}
-		log.Printf("Platform PatchInvoice FindByID: %v", err)
+		logger.ErrorfCtx(r.Context(), "Platform PatchInvoice FindByID: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}

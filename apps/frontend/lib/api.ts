@@ -451,7 +451,7 @@ export const unitsApi = {
   },
 
   getById: async (id: string) => {
-    const res = await orvalUnits.getUnitsId(id, { cache: 'no-store' });
+    const res = await orvalUnits.getUnitByID(id, { cache: 'no-store' });
     return UnitModelSchema.parse(res.data);
   },
 
@@ -972,7 +972,7 @@ export const countersApi = {
   },
 
   occupy: async (id: string) => {
-    const res = await orvalTc.postCountersIdOccupy(id);
+    const res = await orvalTc.occupyCounter(id);
     return CounterModelSchema.parse(res.data);
   },
 
@@ -1338,7 +1338,7 @@ export const subscriptionsApi = {
 // Invoice API functions
 export const invoicesApi = {
   getMyInvoices: async () => {
-    const res = await orvalTenantBilling.getInvoicesMe();
+    const res = await orvalTenantBilling.getMyInvoices();
     return z.array(InvoiceSchema).parse(res.data ?? []);
   },
 

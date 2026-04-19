@@ -199,6 +199,11 @@ AWS_ENDPOINT=http://localhost:9000
 SMTP_HOST=smtp.example.com
 SMTP_PORT=587
 SMTP_USER=your-email@example.com
+SMTP_PASS=your-app-password
+SMTP_FROM=noreply@example.com
+SMTP_SECURE=false
+
+```
 
 ### Development Mode
 
@@ -215,19 +220,25 @@ go build -o quokkaq-backend cmd/api/main.go
 ./quokkaq-backend
 ```
 
-### Using Air (Hot Reload)
+### Using Air (hot reload)
 
-Install Air:
-
-```bash
-go install github.com/air-verse/air@latest
-```
-
-Run with hot reload:
+The default dev command from the monorepo root uses Air with the committed [`.air.toml`](./.air.toml):
 
 ```bash
-air
+pnpm nx run backend:serve
 ```
+
+Nx `serve` uses `go install` into `tmp/air` and `exec` (not `go run`) so **Ctrl+C** returns Air’s real exit code. `go run` would always report exit code **1** on interrupt, which makes Nx show “failed tasks” even after a clean shutdown.
+
+From `apps/backend` without Nx:
+
+```bash
+mkdir -p tmp && GOBIN="$PWD/tmp" go install github.com/air-verse/air@v1.65.1 && exec ./tmp/air
+```
+
+Optional: install the `air` binary globally (`go install github.com/air-verse/air@v1.65.1`) and run `air` in `apps/backend`.
+
+If Air prints **`Process Exit with Code: 1`** right after `Server starting on port …`, the API process called `log.Fatalf` — most often **`ListenAndServe: listen tcp …: bind: address already in use`**: another process (or a slow-shutting-down instance) still holds `PORT` (default **3001**). Stop the duplicate (`lsof -iTCP:3001 -sTCP:LISTEN` / Activity Monitor) or rely on the longer `kill_delay` in `.air.toml` during hot reload.
 
 ---
 

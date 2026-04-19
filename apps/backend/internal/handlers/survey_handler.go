@@ -1,14 +1,15 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"mime"
 	"net/http"
 	"path/filepath"
+	"quokkaq-go-backend/internal/logger"
 	"regexp"
 	"strconv"
 	"strings"
@@ -66,7 +67,7 @@ func (h *SurveyHandler) ListDefinitions(w http.ResponseWriter, r *http.Request) 
 	}
 	rows, err := h.survey.ListDefinitions(r.Context(), userID, unitID)
 	if err != nil {
-		h.writeSurveyErr(w, err)
+		h.writeSurveyErr(w, r.Context(), err)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -126,7 +127,7 @@ func (h *SurveyHandler) CreateDefinition(w http.ResponseWriter, r *http.Request)
 	}
 	d, err := h.survey.CreateDefinition(r.Context(), userID, unitID, req.Title, req.Questions, cm, dt, is)
 	if err != nil {
-		h.writeSurveyErr(w, err)
+		h.writeSurveyErr(w, r.Context(), err)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -172,7 +173,7 @@ func (h *SurveyHandler) PatchDefinition(w http.ResponseWriter, r *http.Request) 
 	}
 	err := h.survey.UpdateDefinition(r.Context(), userID, unitID, surveyID, req.Title, req.Questions, req.CompletionMessage, req.DisplayTheme, req.IdleScreen)
 	if err != nil {
-		h.writeSurveyErr(w, err)
+		h.writeSurveyErr(w, r.Context(), err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -197,7 +198,7 @@ func (h *SurveyHandler) ActivateDefinition(w http.ResponseWriter, r *http.Reques
 	}
 	err := h.survey.SetActiveDefinition(r.Context(), userID, unitID, surveyID)
 	if err != nil {
-		h.writeSurveyErr(w, err)
+		h.writeSurveyErr(w, r.Context(), err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -228,7 +229,7 @@ func (h *SurveyHandler) ListResponses(w http.ResponseWriter, r *http.Request) {
 	}
 	rows, err := h.survey.ListResponses(r.Context(), userID, unitID, limit, offset)
 	if err != nil {
-		h.writeSurveyErr(w, err)
+		h.writeSurveyErr(w, r.Context(), err)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -255,7 +256,7 @@ func (h *SurveyHandler) ListResponsesForClient(w http.ResponseWriter, r *http.Re
 	}
 	rows, err := h.survey.ListResponsesForClient(r.Context(), userID, unitID, clientID)
 	if err != nil {
-		h.writeSurveyErr(w, err)
+		h.writeSurveyErr(w, r.Context(), err)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -292,7 +293,7 @@ func (h *SurveyHandler) UploadCompletionImage(w http.ResponseWriter, r *http.Req
 		return
 	}
 	if err := h.survey.EnsureGuestSurveyUploadAccess(userID, unitID); err != nil {
-		h.writeSurveyErr(w, err)
+		h.writeSurveyErr(w, r.Context(), err)
 		return
 	}
 
@@ -359,7 +360,7 @@ func (h *SurveyHandler) UploadCompletionImage(w http.ResponseWriter, r *http.Req
 
 	companyID, err := h.survey.CompanyIDForUnit(unitID)
 	if err != nil {
-		h.writeSurveyErr(w, err)
+		h.writeSurveyErr(w, r.Context(), err)
 		return
 	}
 
@@ -413,13 +414,13 @@ func (h *SurveyHandler) GetSurveyCompletionImage(w http.ResponseWriter, r *http.
 	termCtr, _ := r.Context().Value(authmiddleware.TerminalCounterIDKey).(string)
 
 	if err := h.survey.EnsureCompletionImageRead(unitID, tokenType, userID, termUnit, termCtr); err != nil {
-		h.writeSurveyErr(w, err)
+		h.writeSurveyErr(w, r.Context(), err)
 		return
 	}
 
 	companyID, err := h.survey.CompanyIDForUnit(unitID)
 	if err != nil {
-		h.writeSurveyErr(w, err)
+		h.writeSurveyErr(w, r.Context(), err)
 		return
 	}
 
@@ -466,7 +467,7 @@ func (h *SurveyHandler) UploadIdleMedia(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if err := h.survey.EnsureGuestSurveyUploadAccess(userID, unitID); err != nil {
-		h.writeSurveyErr(w, err)
+		h.writeSurveyErr(w, r.Context(), err)
 		return
 	}
 
@@ -542,7 +543,7 @@ func (h *SurveyHandler) UploadIdleMedia(w http.ResponseWriter, r *http.Request) 
 
 	companyID, err := h.survey.CompanyIDForUnit(unitID)
 	if err != nil {
-		h.writeSurveyErr(w, err)
+		h.writeSurveyErr(w, r.Context(), err)
 		return
 	}
 
@@ -596,13 +597,13 @@ func (h *SurveyHandler) GetSurveyIdleMedia(w http.ResponseWriter, r *http.Reques
 	termCtr, _ := r.Context().Value(authmiddleware.TerminalCounterIDKey).(string)
 
 	if err := h.survey.EnsureCompletionImageRead(unitID, tokenType, userID, termUnit, termCtr); err != nil {
-		h.writeSurveyErr(w, err)
+		h.writeSurveyErr(w, r.Context(), err)
 		return
 	}
 
 	companyID, err := h.survey.CompanyIDForUnit(unitID)
 	if err != nil {
-		h.writeSurveyErr(w, err)
+		h.writeSurveyErr(w, r.Context(), err)
 		return
 	}
 
@@ -641,7 +642,7 @@ func (h *SurveyHandler) DeleteSurveyIdleMedia(w http.ResponseWriter, r *http.Req
 		return
 	}
 	if err := h.survey.EnsureGuestSurveyUploadAccess(userID, unitID); err != nil {
-		h.writeSurveyErr(w, err)
+		h.writeSurveyErr(w, r.Context(), err)
 		return
 	}
 
@@ -657,25 +658,25 @@ func (h *SurveyHandler) DeleteSurveyIdleMedia(w http.ResponseWriter, r *http.Req
 
 	companyID, err := h.survey.CompanyIDForUnit(unitID)
 	if err != nil {
-		h.writeSurveyErr(w, err)
+		h.writeSurveyErr(w, r.Context(), err)
 		return
 	}
 
 	if err := h.survey.EnsureIdleMediaFileDeletable(companyID, fileName); err != nil {
-		h.writeSurveyErr(w, err)
+		h.writeSurveyErr(w, r.Context(), err)
 		return
 	}
 
 	key := fmt.Sprintf("tenants/%s/%s/%s", companyID, services.GuestSurveyIdleMediaCategory, fileName)
 	if err := h.storage.DeleteFile(r.Context(), key); err != nil {
-		log.Printf("delete idle media %s: %v", key, err)
+		logger.PrintfCtx(r.Context(), "delete idle media %s: %v", key, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *SurveyHandler) writeSurveyErr(w http.ResponseWriter, err error) {
+func (h *SurveyHandler) writeSurveyErr(w http.ResponseWriter, ctx context.Context, err error) {
 	switch {
 	case errors.Is(err, services.ErrSurveyForbidden):
 		http.Error(w, "Forbidden", http.StatusForbidden)
@@ -688,7 +689,7 @@ func (h *SurveyHandler) writeSurveyErr(w http.ResponseWriter, err error) {
 	case errors.Is(err, services.ErrSurveyIdleMediaInUse):
 		http.Error(w, "Idle media is still referenced by a survey definition", http.StatusConflict)
 	default:
-		log.Printf("survey handler: %v", err)
+		logger.PrintfCtx(ctx, "survey handler: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
 }

@@ -3,8 +3,8 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
+	"quokkaq-go-backend/internal/logger"
 	"strings"
 
 	"quokkaq-go-backend/internal/models"
@@ -227,7 +227,7 @@ func (h *PreRegistrationHandler) GetCalendarSlots(w http.ResponseWriter, r *http
 	}
 	items, err := h.service.ListCalendarSlotItems(unitID, serviceID, date)
 	if err != nil {
-		log.Printf("pre-registration calendar-slots: ListCalendarSlotItems unitID=%s serviceID=%s date=%s err=%v", unitID, serviceID, date, err)
+		logger.PrintfCtx(r.Context(), "pre-registration calendar-slots: ListCalendarSlotItems unitID=%s serviceID=%s date=%s err=%v", unitID, serviceID, date, err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -296,7 +296,7 @@ func (h *PreRegistrationHandler) Validate(w http.ResponseWriter, r *http.Request
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
-		log.Printf("ValidateForKiosk: %v", err)
+		logger.PrintfCtx(r.Context(), "ValidateForKiosk: %v", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -335,7 +335,7 @@ func (h *PreRegistrationHandler) Redeem(w http.ResponseWriter, r *http.Request) 
 			})
 			return
 		}
-		log.Printf("Redeem ValidateForKiosk: %v", err)
+		logger.PrintfCtx(r.Context(), "Redeem ValidateForKiosk: %v", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -353,14 +353,14 @@ func (h *PreRegistrationHandler) Redeem(w http.ResponseWriter, r *http.Request) 
 			})
 			return
 		}
-		log.Printf("Redeem CreateTicketWithPreRegistration: %v", err)
+		logger.PrintfCtx(r.Context(), "Redeem CreateTicketWithPreRegistration: %v", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
 	// 3. Mark as Redeemed
 	if err := h.service.MarkAsRedeemed(preReg.ID, ticket.ID); err != nil {
-		log.Printf("Redeem MarkAsRedeemed: %v", err)
+		logger.PrintfCtx(r.Context(), "Redeem MarkAsRedeemed: %v", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}

@@ -11,7 +11,7 @@ import {
   getGetUnitsUnitIdTicketsQueryKey
 } from '../lib/api/generated/tickets-counters';
 import {
-  getGetUnitsIdQueryKey,
+  getGetUnitByIDQueryKey,
   getGetUnitsQueryKey,
   getGetUnitsUnitIdVisitorTagDefinitionsQueryKey
 } from '../lib/api/generated/units';
@@ -113,7 +113,7 @@ export const useUnit = (
   const enabled =
     options.enabled !== undefined ? options.enabled && !!id : !!id;
   return useQuery({
-    queryKey: getGetUnitsIdQueryKey(id),
+    queryKey: getGetUnitByIDQueryKey(id),
     queryFn: () => unitsApi.getById(id),
     enabled,
     refetchInterval: options.refetchInterval,
@@ -149,7 +149,7 @@ export const useUpdateUnit = () => {
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: getGetUnitsQueryKey() });
       queryClient.invalidateQueries({
-        queryKey: getGetUnitsIdQueryKey(variables.id)
+        queryKey: getGetUnitByIDQueryKey(variables.id)
       });
     }
   });
@@ -169,7 +169,7 @@ export const usePatchKioskConfig = () => {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: getGetUnitsQueryKey() });
       queryClient.invalidateQueries({
-        queryKey: getGetUnitsIdQueryKey(variables.id)
+        queryKey: getGetUnitByIDQueryKey(variables.id)
       });
     }
   });

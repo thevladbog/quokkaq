@@ -1,10 +1,11 @@
 package middleware
 
 import (
+	"context"
 	"errors"
-	"log"
 	"net/http"
 	"os"
+	"quokkaq-go-backend/internal/logger"
 	"quokkaq-go-backend/internal/repository"
 	"strings"
 
@@ -12,7 +13,7 @@ import (
 )
 
 // RespondRepoFindError writes 404 for missing rows (GORM not found) or 500 + log for other failures. Returns true if the handler should stop.
-func RespondRepoFindError(w http.ResponseWriter, err error, op string) bool {
+func RespondRepoFindError(ctx context.Context, w http.ResponseWriter, err error, op string) bool {
 	if err == nil {
 		return false
 	}
@@ -20,7 +21,7 @@ func RespondRepoFindError(w http.ResponseWriter, err error, op string) bool {
 		http.Error(w, "Not found", http.StatusNotFound)
 		return true
 	}
-	log.Printf("%s: %v", op, err)
+	logger.ErrorfCtx(ctx, "%s: %v", op, err)
 	http.Error(w, "Internal server error", http.StatusInternalServerError)
 	return true
 }
@@ -40,7 +41,7 @@ func RequireSupportReportAccess(userRepo repository.UserRepository) func(http.Ha
 			}
 			allowed, err := userRepo.HasSupportReportAccess(userID)
 			if err != nil {
-				log.Printf("RequireSupportReportAccess: userID=%s: %v", userID, err)
+				logger.ErrorfCtx(r.Context(), "RequireSupportReportAccess: userID=%s: %v", userID, err)
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
@@ -293,7 +294,7 @@ func RequireServiceUnit(userRepo repository.UserRepository, serviceRepo reposito
 				return
 			}
 			svc, err := serviceRepo.FindByID(serviceID)
-			if RespondRepoFindError(w, err, "RequireServiceUnit serviceRepo.FindByID") {
+			if RespondRepoFindError(r.Context(), w, err, "RequireServiceUnit serviceRepo.FindByID") {
 				return
 			}
 			allowed, err := userRepo.IsAdminOrHasUnitAccess(userID, svc.UnitID)
@@ -325,7 +326,7 @@ func RequireTicketUnit(userRepo repository.UserRepository, ticketRepo repository
 				return
 			}
 			ticket, err := ticketRepo.FindByID(ticketID)
-			if RespondRepoFindError(w, err, "RequireTicketUnit ticketRepo.FindByID") {
+			if RespondRepoFindError(r.Context(), w, err, "RequireTicketUnit ticketRepo.FindByID") {
 				return
 			}
 			allowed, err := userRepo.IsAdminOrHasUnitAccess(userID, ticket.UnitID)
@@ -357,7 +358,7 @@ func RequireBookingUnit(userRepo repository.UserRepository, bookingRepo reposito
 				return
 			}
 			b, err := bookingRepo.FindByID(bookingID)
-			if RespondRepoFindError(w, err, "RequireBookingUnit bookingRepo.FindByID") {
+			if RespondRepoFindError(r.Context(), w, err, "RequireBookingUnit bookingRepo.FindByID") {
 				return
 			}
 			allowed, err := userRepo.IsAdminOrHasUnitAccess(userID, b.UnitID)
@@ -389,7 +390,7 @@ func RequireCounterUnit(userRepo repository.UserRepository, counterRepo reposito
 				return
 			}
 			c, err := counterRepo.FindByID(counterID)
-			if RespondRepoFindError(w, err, "RequireCounterUnit counterRepo.FindByID") {
+			if RespondRepoFindError(r.Context(), w, err, "RequireCounterUnit counterRepo.FindByID") {
 				return
 			}
 			allowed, err := userRepo.IsAdminOrHasUnitAccess(userID, c.UnitID)

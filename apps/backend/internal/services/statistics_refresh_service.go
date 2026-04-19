@@ -3,8 +3,8 @@ package services
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
+	"quokkaq-go-backend/internal/logger"
 	"strconv"
 	"strings"
 	"time"
@@ -339,7 +339,7 @@ WHERE t.unit_id = ? AND h.user_id = ?
 func (s *StatisticsRefreshService) RefreshRecentDays() {
 	var units []models.Unit
 	if err := s.db.Where("kind = ?", models.UnitKindSubdivision).Find(&units).Error; err != nil {
-		log.Printf("statistics refresh: list units: %v", err)
+		logger.Printf("statistics refresh: list units: %v", err)
 		return
 	}
 	for i := range units {
@@ -352,7 +352,7 @@ func (s *StatisticsRefreshService) RefreshRecentDays() {
 		for d := 0; d >= -1; d-- {
 			day := now.AddDate(0, 0, d).Format("2006-01-02")
 			if err := s.RollupUnitDay(u.ID, day); err != nil {
-				log.Printf("statistics refresh unit=%s day=%s: %v", u.ID, day, err)
+				logger.Printf("statistics refresh unit=%s day=%s: %v", u.ID, day, err)
 			}
 		}
 	}

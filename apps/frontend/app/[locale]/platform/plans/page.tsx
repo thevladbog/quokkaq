@@ -7,10 +7,10 @@ import type {
   ModelsSubscriptionPlan
 } from '@/lib/api/generated/platform';
 import {
-  getGetPlatformSubscriptionPlansQueryKey,
-  getPlatformSubscriptionPlans,
-  postPlatformSubscriptionPlans,
-  putPlatformSubscriptionPlansId
+  getListSubscriptionPlansQueryKey,
+  listSubscriptionPlans,
+  createSubscriptionPlan,
+  updateSubscriptionPlan
 } from '@/lib/api/generated/platform';
 import {
   PLAN_FEATURE_KEYS,
@@ -233,8 +233,8 @@ export default function PlatformPlansPage() {
   const intlLocale = useMemo(() => intlLocaleFromAppLocale(locale), [locale]);
   const qc = useQueryClient();
   const { data: plans, isLoading } = useQuery({
-    queryKey: getGetPlatformSubscriptionPlansQueryKey(),
-    queryFn: async () => (await getPlatformSubscriptionPlans()).data
+    queryKey: getListSubscriptionPlansQueryKey(),
+    queryFn: async () => (await listSubscriptionPlans()).data
   });
 
   const sortedPlans = useMemo(() => {
@@ -303,7 +303,7 @@ export default function PlatformPlansPage() {
       if (parsedLimits === null || !validateLimits(parsedLimits)) {
         throw new Error(INVALID_PLAN_LIMITS);
       }
-      return postPlatformSubscriptionPlans({
+      return createSubscriptionPlan({
         name: form.name.trim(),
         nameEn: form.nameEn.trim(),
         code: form.code.trim().toLowerCase(),
@@ -322,7 +322,7 @@ export default function PlatformPlansPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({
-        queryKey: getGetPlatformSubscriptionPlansQueryKey()
+        queryKey: getListSubscriptionPlansQueryKey()
       });
       setOpenCreate(false);
       setForm(emptyForm());
@@ -360,7 +360,7 @@ export default function PlatformPlansPage() {
       if (parsedLimits === null || !validateLimits(parsedLimits)) {
         throw new Error(INVALID_PLAN_LIMITS);
       }
-      return putPlatformSubscriptionPlansId(editPlan.id, {
+      return updateSubscriptionPlan(editPlan.id, {
         name: form.name.trim(),
         nameEn: form.nameEn.trim(),
         code: form.code.trim().toLowerCase(),
@@ -379,7 +379,7 @@ export default function PlatformPlansPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({
-        queryKey: getGetPlatformSubscriptionPlansQueryKey()
+        queryKey: getListSubscriptionPlansQueryKey()
       });
       setEditPlan(null);
       setForm(emptyForm());

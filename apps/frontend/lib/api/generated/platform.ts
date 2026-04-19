@@ -1919,7 +1919,7 @@ limit?: number;
 offset?: number;
 };
 
-export type PlatformListCompaniesParams = {
+export type ListCompaniesParams = {
 /**
  * Filter by name
  */
@@ -1934,7 +1934,7 @@ limit?: number;
 offset?: number;
 };
 
-export type GetPlatformInvoicesParams = {
+export type ListInvoicesParams = {
 /**
  * Filter by company
  */
@@ -1949,7 +1949,7 @@ limit?: number;
 offset?: number;
 };
 
-export type PlatformListSubscriptionsParams = {
+export type ListSubscriptionsParams = {
 /**
  * Page size (max 100)
  */
@@ -2564,19 +2564,19 @@ export const usePatchPlatformCatalogItemsId = <TError = string,
 /**
  * @summary List companies (platform)
  */
-export type platformListCompaniesResponse200 = {
+export type listCompaniesResponse200 = {
   data: HandlersPlatformListResponseModelsCompany
   status: 200
 }
 
-export type platformListCompaniesResponseSuccess = (platformListCompaniesResponse200) & {
+export type listCompaniesResponseSuccess = (listCompaniesResponse200) & {
   headers: Headers;
 };
 ;
 
-export type platformListCompaniesResponse = (platformListCompaniesResponseSuccess)
+export type listCompaniesResponse = (listCompaniesResponseSuccess)
 
-export const getPlatformListCompaniesUrl = (params?: PlatformListCompaniesParams,) => {
+export const getListCompaniesUrl = (params?: ListCompaniesParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -2591,9 +2591,9 @@ export const getPlatformListCompaniesUrl = (params?: PlatformListCompaniesParams
   return stringifiedParams.length > 0 ? `/platform/companies?${stringifiedParams}` : `/platform/companies`
 }
 
-export const platformListCompanies = async (params?: PlatformListCompaniesParams, options?: RequestInit): Promise<platformListCompaniesResponse> => {
+export const listCompanies = async (params?: ListCompaniesParams, options?: RequestInit): Promise<listCompaniesResponse> => {
 
-  return orvalMutator<platformListCompaniesResponse>(getPlatformListCompaniesUrl(params),
+  return orvalMutator<listCompaniesResponse>(getListCompaniesUrl(params),
   {
     ...options,
     method: 'GET'
@@ -2606,69 +2606,69 @@ export const platformListCompanies = async (params?: PlatformListCompaniesParams
 
 
 
-export const getPlatformListCompaniesQueryKey = (params?: PlatformListCompaniesParams,) => {
+export const getListCompaniesQueryKey = (params?: ListCompaniesParams,) => {
     return [
     `/platform/companies`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getPlatformListCompaniesQueryOptions = <TData = Awaited<ReturnType<typeof platformListCompanies>>, TError = unknown>(params?: PlatformListCompaniesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof platformListCompanies>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export const getListCompaniesQueryOptions = <TData = Awaited<ReturnType<typeof listCompanies>>, TError = unknown>(params?: ListCompaniesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCompanies>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getPlatformListCompaniesQueryKey(params);
+  const queryKey =  queryOptions?.queryKey ?? getListCompaniesQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof platformListCompanies>>> = ({ signal }) => platformListCompanies(params, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCompanies>>> = ({ signal }) => listCompanies(params, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof platformListCompanies>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCompanies>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type PlatformListCompaniesQueryResult = NonNullable<Awaited<ReturnType<typeof platformListCompanies>>>
-export type PlatformListCompaniesQueryError = unknown
+export type ListCompaniesQueryResult = NonNullable<Awaited<ReturnType<typeof listCompanies>>>
+export type ListCompaniesQueryError = unknown
 
 
-export function usePlatformListCompanies<TData = Awaited<ReturnType<typeof platformListCompanies>>, TError = unknown>(
- params: undefined |  PlatformListCompaniesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof platformListCompanies>>, TError, TData>> & Pick<
+export function useListCompanies<TData = Awaited<ReturnType<typeof listCompanies>>, TError = unknown>(
+ params: undefined |  ListCompaniesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCompanies>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof platformListCompanies>>,
+          Awaited<ReturnType<typeof listCompanies>>,
           TError,
-          Awaited<ReturnType<typeof platformListCompanies>>
+          Awaited<ReturnType<typeof listCompanies>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function usePlatformListCompanies<TData = Awaited<ReturnType<typeof platformListCompanies>>, TError = unknown>(
- params?: PlatformListCompaniesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof platformListCompanies>>, TError, TData>> & Pick<
+export function useListCompanies<TData = Awaited<ReturnType<typeof listCompanies>>, TError = unknown>(
+ params?: ListCompaniesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCompanies>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof platformListCompanies>>,
+          Awaited<ReturnType<typeof listCompanies>>,
           TError,
-          Awaited<ReturnType<typeof platformListCompanies>>
+          Awaited<ReturnType<typeof listCompanies>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function usePlatformListCompanies<TData = Awaited<ReturnType<typeof platformListCompanies>>, TError = unknown>(
- params?: PlatformListCompaniesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof platformListCompanies>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useListCompanies<TData = Awaited<ReturnType<typeof listCompanies>>, TError = unknown>(
+ params?: ListCompaniesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCompanies>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List companies (platform)
  */
 
-export function usePlatformListCompanies<TData = Awaited<ReturnType<typeof platformListCompanies>>, TError = unknown>(
- params?: PlatformListCompaniesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof platformListCompanies>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useListCompanies<TData = Awaited<ReturnType<typeof listCompanies>>, TError = unknown>(
+ params?: ListCompaniesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCompanies>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getPlatformListCompaniesQueryOptions(params,options)
+  const queryOptions = getListCompaniesQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -2684,19 +2684,19 @@ export function usePlatformListCompanies<TData = Awaited<ReturnType<typeof platf
 /**
  * @summary Get company with billing (platform)
  */
-export type getPlatformCompaniesIdResponse200 = {
+export type getCompanyResponse200 = {
   data: ModelsCompany
   status: 200
 }
 
-export type getPlatformCompaniesIdResponseSuccess = (getPlatformCompaniesIdResponse200) & {
+export type getCompanyResponseSuccess = (getCompanyResponse200) & {
   headers: Headers;
 };
 ;
 
-export type getPlatformCompaniesIdResponse = (getPlatformCompaniesIdResponseSuccess)
+export type getCompanyResponse = (getCompanyResponseSuccess)
 
-export const getGetPlatformCompaniesIdUrl = (id: string,) => {
+export const getGetCompanyUrl = (id: string,) => {
 
 
 
@@ -2704,9 +2704,9 @@ export const getGetPlatformCompaniesIdUrl = (id: string,) => {
   return `/platform/companies/${id}`
 }
 
-export const getPlatformCompaniesId = async (id: string, options?: RequestInit): Promise<getPlatformCompaniesIdResponse> => {
+export const getCompany = async (id: string, options?: RequestInit): Promise<getCompanyResponse> => {
 
-  return orvalMutator<getPlatformCompaniesIdResponse>(getGetPlatformCompaniesIdUrl(id),
+  return orvalMutator<getCompanyResponse>(getGetCompanyUrl(id),
   {
     ...options,
     method: 'GET'
@@ -2719,69 +2719,69 @@ export const getPlatformCompaniesId = async (id: string, options?: RequestInit):
 
 
 
-export const getGetPlatformCompaniesIdQueryKey = (id: string,) => {
+export const getGetCompanyQueryKey = (id: string,) => {
     return [
     `/platform/companies/${id}`
     ] as const;
     }
 
 
-export const getGetPlatformCompaniesIdQueryOptions = <TData = Awaited<ReturnType<typeof getPlatformCompaniesId>>, TError = unknown>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformCompaniesId>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export const getGetCompanyQueryOptions = <TData = Awaited<ReturnType<typeof getCompany>>, TError = unknown>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompany>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetPlatformCompaniesIdQueryKey(id);
+  const queryKey =  queryOptions?.queryKey ?? getGetCompanyQueryKey(id);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPlatformCompaniesId>>> = ({ signal }) => getPlatformCompaniesId(id, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCompany>>> = ({ signal }) => getCompany(id, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPlatformCompaniesId>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCompany>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type GetPlatformCompaniesIdQueryResult = NonNullable<Awaited<ReturnType<typeof getPlatformCompaniesId>>>
-export type GetPlatformCompaniesIdQueryError = unknown
+export type GetCompanyQueryResult = NonNullable<Awaited<ReturnType<typeof getCompany>>>
+export type GetCompanyQueryError = unknown
 
 
-export function useGetPlatformCompaniesId<TData = Awaited<ReturnType<typeof getPlatformCompaniesId>>, TError = unknown>(
- id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformCompaniesId>>, TError, TData>> & Pick<
+export function useGetCompany<TData = Awaited<ReturnType<typeof getCompany>>, TError = unknown>(
+ id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompany>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getPlatformCompaniesId>>,
+          Awaited<ReturnType<typeof getCompany>>,
           TError,
-          Awaited<ReturnType<typeof getPlatformCompaniesId>>
+          Awaited<ReturnType<typeof getCompany>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetPlatformCompaniesId<TData = Awaited<ReturnType<typeof getPlatformCompaniesId>>, TError = unknown>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformCompaniesId>>, TError, TData>> & Pick<
+export function useGetCompany<TData = Awaited<ReturnType<typeof getCompany>>, TError = unknown>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompany>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getPlatformCompaniesId>>,
+          Awaited<ReturnType<typeof getCompany>>,
           TError,
-          Awaited<ReturnType<typeof getPlatformCompaniesId>>
+          Awaited<ReturnType<typeof getCompany>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetPlatformCompaniesId<TData = Awaited<ReturnType<typeof getPlatformCompaniesId>>, TError = unknown>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformCompaniesId>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useGetCompany<TData = Awaited<ReturnType<typeof getCompany>>, TError = unknown>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompany>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get company with billing (platform)
  */
 
-export function useGetPlatformCompaniesId<TData = Awaited<ReturnType<typeof getPlatformCompaniesId>>, TError = unknown>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformCompaniesId>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useGetCompany<TData = Awaited<ReturnType<typeof getCompany>>, TError = unknown>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCompany>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetPlatformCompaniesIdQueryOptions(id,options)
+  const queryOptions = getGetCompanyQueryOptions(id,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -2797,19 +2797,19 @@ export function useGetPlatformCompaniesId<TData = Awaited<ReturnType<typeof getP
 /**
  * @summary Update company (platform)
  */
-export type patchPlatformCompaniesIdResponse200 = {
+export type patchCompanyResponse200 = {
   data: ModelsCompany
   status: 200
 }
 
-export type patchPlatformCompaniesIdResponseSuccess = (patchPlatformCompaniesIdResponse200) & {
+export type patchCompanyResponseSuccess = (patchCompanyResponse200) & {
   headers: Headers;
 };
 ;
 
-export type patchPlatformCompaniesIdResponse = (patchPlatformCompaniesIdResponseSuccess)
+export type patchCompanyResponse = (patchCompanyResponseSuccess)
 
-export const getPatchPlatformCompaniesIdUrl = (id: string,) => {
+export const getPatchCompanyUrl = (id: string,) => {
 
 
 
@@ -2817,10 +2817,10 @@ export const getPatchPlatformCompaniesIdUrl = (id: string,) => {
   return `/platform/companies/${id}`
 }
 
-export const patchPlatformCompaniesId = async (id: string,
-    handlersPatchPlatformCompanyBody: HandlersPatchPlatformCompanyBody, options?: RequestInit): Promise<patchPlatformCompaniesIdResponse> => {
+export const patchCompany = async (id: string,
+    handlersPatchPlatformCompanyBody: HandlersPatchPlatformCompanyBody, options?: RequestInit): Promise<patchCompanyResponse> => {
 
-  return orvalMutator<patchPlatformCompaniesIdResponse>(getPatchPlatformCompaniesIdUrl(id),
+  return orvalMutator<patchCompanyResponse>(getPatchCompanyUrl(id),
   {
     ...options,
     method: 'PATCH',
@@ -2833,11 +2833,11 @@ export const patchPlatformCompaniesId = async (id: string,
 
 
 
-export const getPatchPlatformCompaniesIdMutationOptions = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchPlatformCompaniesId>>, TError,{id: string;data: HandlersPatchPlatformCompanyBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof patchPlatformCompaniesId>>, TError,{id: string;data: HandlersPatchPlatformCompanyBody}, TContext> => {
+export const getPatchCompanyMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchCompany>>, TError,{id: string;data: HandlersPatchPlatformCompanyBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof patchCompany>>, TError,{id: string;data: HandlersPatchPlatformCompanyBody}, TContext> => {
 
-const mutationKey = ['patchPlatformCompaniesId'];
+const mutationKey = ['patchCompany'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -2847,10 +2847,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchPlatformCompaniesId>>, {id: string;data: HandlersPatchPlatformCompanyBody}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchCompany>>, {id: string;data: HandlersPatchPlatformCompanyBody}> = (props) => {
           const {id,data} = props ?? {};
 
-          return  patchPlatformCompaniesId(id,data,requestOptions)
+          return  patchCompany(id,data,requestOptions)
         }
 
 
@@ -2860,40 +2860,40 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PatchPlatformCompaniesIdMutationResult = NonNullable<Awaited<ReturnType<typeof patchPlatformCompaniesId>>>
-    export type PatchPlatformCompaniesIdMutationBody = HandlersPatchPlatformCompanyBody
-    export type PatchPlatformCompaniesIdMutationError = unknown
+    export type PatchCompanyMutationResult = NonNullable<Awaited<ReturnType<typeof patchCompany>>>
+    export type PatchCompanyMutationBody = HandlersPatchPlatformCompanyBody
+    export type PatchCompanyMutationError = unknown
 
     /**
  * @summary Update company (platform)
  */
-export const usePatchPlatformCompaniesId = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchPlatformCompaniesId>>, TError,{id: string;data: HandlersPatchPlatformCompanyBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const usePatchCompany = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchCompany>>, TError,{id: string;data: HandlersPatchPlatformCompanyBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof patchPlatformCompaniesId>>,
+        Awaited<ReturnType<typeof patchCompany>>,
         TError,
         {id: string;data: HandlersPatchPlatformCompanyBody},
         TContext
       > => {
-      return useMutation(getPatchPlatformCompaniesIdMutationOptions(options), queryClient);
+      return useMutation(getPatchCompanyMutationOptions(options), queryClient);
     }
 
 /**
  * @summary UI capability flags (DaData, etc.)
  */
-export type getPlatformFeaturesResponse200 = {
+export type getFeaturesResponse200 = {
   data: HandlersFeaturesFlags
   status: 200
 }
 
-export type getPlatformFeaturesResponseSuccess = (getPlatformFeaturesResponse200) & {
+export type getFeaturesResponseSuccess = (getFeaturesResponse200) & {
   headers: Headers;
 };
 ;
 
-export type getPlatformFeaturesResponse = (getPlatformFeaturesResponseSuccess)
+export type getFeaturesResponse = (getFeaturesResponseSuccess)
 
-export const getGetPlatformFeaturesUrl = () => {
+export const getGetFeaturesUrl = () => {
 
 
 
@@ -2901,9 +2901,9 @@ export const getGetPlatformFeaturesUrl = () => {
   return `/platform/features`
 }
 
-export const getPlatformFeatures = async ( options?: RequestInit): Promise<getPlatformFeaturesResponse> => {
+export const getFeatures = async ( options?: RequestInit): Promise<getFeaturesResponse> => {
 
-  return orvalMutator<getPlatformFeaturesResponse>(getGetPlatformFeaturesUrl(),
+  return orvalMutator<getFeaturesResponse>(getGetFeaturesUrl(),
   {
     ...options,
     method: 'GET'
@@ -2916,69 +2916,69 @@ export const getPlatformFeatures = async ( options?: RequestInit): Promise<getPl
 
 
 
-export const getGetPlatformFeaturesQueryKey = () => {
+export const getGetFeaturesQueryKey = () => {
     return [
     `/platform/features`
     ] as const;
     }
 
 
-export const getGetPlatformFeaturesQueryOptions = <TData = Awaited<ReturnType<typeof getPlatformFeatures>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformFeatures>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export const getGetFeaturesQueryOptions = <TData = Awaited<ReturnType<typeof getFeatures>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFeatures>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetPlatformFeaturesQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetFeaturesQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPlatformFeatures>>> = ({ signal }) => getPlatformFeatures({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFeatures>>> = ({ signal }) => getFeatures({ signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPlatformFeatures>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFeatures>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type GetPlatformFeaturesQueryResult = NonNullable<Awaited<ReturnType<typeof getPlatformFeatures>>>
-export type GetPlatformFeaturesQueryError = unknown
+export type GetFeaturesQueryResult = NonNullable<Awaited<ReturnType<typeof getFeatures>>>
+export type GetFeaturesQueryError = unknown
 
 
-export function useGetPlatformFeatures<TData = Awaited<ReturnType<typeof getPlatformFeatures>>, TError = unknown>(
-  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformFeatures>>, TError, TData>> & Pick<
+export function useGetFeatures<TData = Awaited<ReturnType<typeof getFeatures>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFeatures>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getPlatformFeatures>>,
+          Awaited<ReturnType<typeof getFeatures>>,
           TError,
-          Awaited<ReturnType<typeof getPlatformFeatures>>
+          Awaited<ReturnType<typeof getFeatures>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetPlatformFeatures<TData = Awaited<ReturnType<typeof getPlatformFeatures>>, TError = unknown>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformFeatures>>, TError, TData>> & Pick<
+export function useGetFeatures<TData = Awaited<ReturnType<typeof getFeatures>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFeatures>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getPlatformFeatures>>,
+          Awaited<ReturnType<typeof getFeatures>>,
           TError,
-          Awaited<ReturnType<typeof getPlatformFeatures>>
+          Awaited<ReturnType<typeof getFeatures>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetPlatformFeatures<TData = Awaited<ReturnType<typeof getPlatformFeatures>>, TError = unknown>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformFeatures>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useGetFeatures<TData = Awaited<ReturnType<typeof getFeatures>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFeatures>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary UI capability flags (DaData, etc.)
  */
 
-export function useGetPlatformFeatures<TData = Awaited<ReturnType<typeof getPlatformFeatures>>, TError = unknown>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformFeatures>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useGetFeatures<TData = Awaited<ReturnType<typeof getFeatures>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFeatures>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetPlatformFeaturesQueryOptions(options)
+  const queryOptions = getGetFeaturesQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -2994,19 +2994,19 @@ export function useGetPlatformFeatures<TData = Awaited<ReturnType<typeof getPlat
 /**
  * @summary List invoices (platform)
  */
-export type getPlatformInvoicesResponse200 = {
+export type listInvoicesResponse200 = {
   data: HandlersPlatformListResponseModelsInvoice
   status: 200
 }
 
-export type getPlatformInvoicesResponseSuccess = (getPlatformInvoicesResponse200) & {
+export type listInvoicesResponseSuccess = (listInvoicesResponse200) & {
   headers: Headers;
 };
 ;
 
-export type getPlatformInvoicesResponse = (getPlatformInvoicesResponseSuccess)
+export type listInvoicesResponse = (listInvoicesResponseSuccess)
 
-export const getGetPlatformInvoicesUrl = (params?: GetPlatformInvoicesParams,) => {
+export const getListInvoicesUrl = (params?: ListInvoicesParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -3021,9 +3021,9 @@ export const getGetPlatformInvoicesUrl = (params?: GetPlatformInvoicesParams,) =
   return stringifiedParams.length > 0 ? `/platform/invoices?${stringifiedParams}` : `/platform/invoices`
 }
 
-export const getPlatformInvoices = async (params?: GetPlatformInvoicesParams, options?: RequestInit): Promise<getPlatformInvoicesResponse> => {
+export const listInvoices = async (params?: ListInvoicesParams, options?: RequestInit): Promise<listInvoicesResponse> => {
 
-  return orvalMutator<getPlatformInvoicesResponse>(getGetPlatformInvoicesUrl(params),
+  return orvalMutator<listInvoicesResponse>(getListInvoicesUrl(params),
   {
     ...options,
     method: 'GET'
@@ -3036,69 +3036,69 @@ export const getPlatformInvoices = async (params?: GetPlatformInvoicesParams, op
 
 
 
-export const getGetPlatformInvoicesQueryKey = (params?: GetPlatformInvoicesParams,) => {
+export const getListInvoicesQueryKey = (params?: ListInvoicesParams,) => {
     return [
     `/platform/invoices`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetPlatformInvoicesQueryOptions = <TData = Awaited<ReturnType<typeof getPlatformInvoices>>, TError = unknown>(params?: GetPlatformInvoicesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformInvoices>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export const getListInvoicesQueryOptions = <TData = Awaited<ReturnType<typeof listInvoices>>, TError = unknown>(params?: ListInvoicesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listInvoices>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetPlatformInvoicesQueryKey(params);
+  const queryKey =  queryOptions?.queryKey ?? getListInvoicesQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPlatformInvoices>>> = ({ signal }) => getPlatformInvoices(params, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listInvoices>>> = ({ signal }) => listInvoices(params, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPlatformInvoices>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listInvoices>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type GetPlatformInvoicesQueryResult = NonNullable<Awaited<ReturnType<typeof getPlatformInvoices>>>
-export type GetPlatformInvoicesQueryError = unknown
+export type ListInvoicesQueryResult = NonNullable<Awaited<ReturnType<typeof listInvoices>>>
+export type ListInvoicesQueryError = unknown
 
 
-export function useGetPlatformInvoices<TData = Awaited<ReturnType<typeof getPlatformInvoices>>, TError = unknown>(
- params: undefined |  GetPlatformInvoicesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformInvoices>>, TError, TData>> & Pick<
+export function useListInvoices<TData = Awaited<ReturnType<typeof listInvoices>>, TError = unknown>(
+ params: undefined |  ListInvoicesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listInvoices>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getPlatformInvoices>>,
+          Awaited<ReturnType<typeof listInvoices>>,
           TError,
-          Awaited<ReturnType<typeof getPlatformInvoices>>
+          Awaited<ReturnType<typeof listInvoices>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetPlatformInvoices<TData = Awaited<ReturnType<typeof getPlatformInvoices>>, TError = unknown>(
- params?: GetPlatformInvoicesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformInvoices>>, TError, TData>> & Pick<
+export function useListInvoices<TData = Awaited<ReturnType<typeof listInvoices>>, TError = unknown>(
+ params?: ListInvoicesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listInvoices>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getPlatformInvoices>>,
+          Awaited<ReturnType<typeof listInvoices>>,
           TError,
-          Awaited<ReturnType<typeof getPlatformInvoices>>
+          Awaited<ReturnType<typeof listInvoices>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetPlatformInvoices<TData = Awaited<ReturnType<typeof getPlatformInvoices>>, TError = unknown>(
- params?: GetPlatformInvoicesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformInvoices>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useListInvoices<TData = Awaited<ReturnType<typeof listInvoices>>, TError = unknown>(
+ params?: ListInvoicesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listInvoices>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List invoices (platform)
  */
 
-export function useGetPlatformInvoices<TData = Awaited<ReturnType<typeof getPlatformInvoices>>, TError = unknown>(
- params?: GetPlatformInvoicesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformInvoices>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useListInvoices<TData = Awaited<ReturnType<typeof listInvoices>>, TError = unknown>(
+ params?: ListInvoicesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listInvoices>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetPlatformInvoicesQueryOptions(params,options)
+  const queryOptions = getListInvoicesQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -3115,46 +3115,46 @@ export function useGetPlatformInvoices<TData = Awaited<ReturnType<typeof getPlat
  * Creates a multi-line draft invoice for a company. companyId and dueDate (RFC3339) are required; at least one line.
  * @summary Create draft invoice (platform)
  */
-export type postPlatformInvoicesResponse201 = {
+export type platformCreateInvoiceResponse201 = {
   data: ModelsInvoice
   status: 201
 }
 
-export type postPlatformInvoicesResponse400 = {
+export type platformCreateInvoiceResponse400 = {
   data: string
   status: 400
 }
 
-export type postPlatformInvoicesResponse401 = {
+export type platformCreateInvoiceResponse401 = {
   data: string
   status: 401
 }
 
-export type postPlatformInvoicesResponse403 = {
+export type platformCreateInvoiceResponse403 = {
   data: string
   status: 403
 }
 
-export type postPlatformInvoicesResponse404 = {
+export type platformCreateInvoiceResponse404 = {
   data: string
   status: 404
 }
 
-export type postPlatformInvoicesResponse500 = {
+export type platformCreateInvoiceResponse500 = {
   data: string
   status: 500
 }
 
-export type postPlatformInvoicesResponseSuccess = (postPlatformInvoicesResponse201) & {
+export type platformCreateInvoiceResponseSuccess = (platformCreateInvoiceResponse201) & {
   headers: Headers;
 };
-export type postPlatformInvoicesResponseError = (postPlatformInvoicesResponse400 | postPlatformInvoicesResponse401 | postPlatformInvoicesResponse403 | postPlatformInvoicesResponse404 | postPlatformInvoicesResponse500) & {
+export type platformCreateInvoiceResponseError = (platformCreateInvoiceResponse400 | platformCreateInvoiceResponse401 | platformCreateInvoiceResponse403 | platformCreateInvoiceResponse404 | platformCreateInvoiceResponse500) & {
   headers: Headers;
 };
 
-export type postPlatformInvoicesResponse = (postPlatformInvoicesResponseSuccess | postPlatformInvoicesResponseError)
+export type platformCreateInvoiceResponse = (platformCreateInvoiceResponseSuccess | platformCreateInvoiceResponseError)
 
-export const getPostPlatformInvoicesUrl = () => {
+export const getPlatformCreateInvoiceUrl = () => {
 
 
 
@@ -3162,9 +3162,9 @@ export const getPostPlatformInvoicesUrl = () => {
   return `/platform/invoices`
 }
 
-export const postPlatformInvoices = async (handlersInvoiceDraftCreateBody: HandlersInvoiceDraftCreateBody, options?: RequestInit): Promise<postPlatformInvoicesResponse> => {
+export const platformCreateInvoice = async (handlersInvoiceDraftCreateBody: HandlersInvoiceDraftCreateBody, options?: RequestInit): Promise<platformCreateInvoiceResponse> => {
 
-  return orvalMutator<postPlatformInvoicesResponse>(getPostPlatformInvoicesUrl(),
+  return orvalMutator<platformCreateInvoiceResponse>(getPlatformCreateInvoiceUrl(),
   {
     ...options,
     method: 'POST',
@@ -3177,11 +3177,11 @@ export const postPlatformInvoices = async (handlersInvoiceDraftCreateBody: Handl
 
 
 
-export const getPostPlatformInvoicesMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlatformInvoices>>, TError,{data: HandlersInvoiceDraftCreateBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof postPlatformInvoices>>, TError,{data: HandlersInvoiceDraftCreateBody}, TContext> => {
+export const getPlatformCreateInvoiceMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof platformCreateInvoice>>, TError,{data: HandlersInvoiceDraftCreateBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof platformCreateInvoice>>, TError,{data: HandlersInvoiceDraftCreateBody}, TContext> => {
 
-const mutationKey = ['postPlatformInvoices'];
+const mutationKey = ['platformCreateInvoice'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -3191,10 +3191,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postPlatformInvoices>>, {data: HandlersInvoiceDraftCreateBody}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof platformCreateInvoice>>, {data: HandlersInvoiceDraftCreateBody}> = (props) => {
           const {data} = props ?? {};
 
-          return  postPlatformInvoices(data,requestOptions)
+          return  platformCreateInvoice(data,requestOptions)
         }
 
 
@@ -3204,63 +3204,63 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PostPlatformInvoicesMutationResult = NonNullable<Awaited<ReturnType<typeof postPlatformInvoices>>>
-    export type PostPlatformInvoicesMutationBody = HandlersInvoiceDraftCreateBody
-    export type PostPlatformInvoicesMutationError = string
+    export type PlatformCreateInvoiceMutationResult = NonNullable<Awaited<ReturnType<typeof platformCreateInvoice>>>
+    export type PlatformCreateInvoiceMutationBody = HandlersInvoiceDraftCreateBody
+    export type PlatformCreateInvoiceMutationError = string
 
     /**
  * @summary Create draft invoice (platform)
  */
-export const usePostPlatformInvoices = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlatformInvoices>>, TError,{data: HandlersInvoiceDraftCreateBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const usePlatformCreateInvoice = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof platformCreateInvoice>>, TError,{data: HandlersInvoiceDraftCreateBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof postPlatformInvoices>>,
+        Awaited<ReturnType<typeof platformCreateInvoice>>,
         TError,
         {data: HandlersInvoiceDraftCreateBody},
         TContext
       > => {
-      return useMutation(getPostPlatformInvoicesMutationOptions(options), queryClient);
+      return useMutation(getPlatformCreateInvoiceMutationOptions(options), queryClient);
     }
 
 /**
  * Returns the invoice with lines and related preloads.
  * @summary Get invoice by ID (platform)
  */
-export type getPlatformInvoicesIdResponse200 = {
+export type platformGetInvoiceResponse200 = {
   data: ModelsInvoice
   status: 200
 }
 
-export type getPlatformInvoicesIdResponse401 = {
+export type platformGetInvoiceResponse401 = {
   data: string
   status: 401
 }
 
-export type getPlatformInvoicesIdResponse403 = {
+export type platformGetInvoiceResponse403 = {
   data: string
   status: 403
 }
 
-export type getPlatformInvoicesIdResponse404 = {
+export type platformGetInvoiceResponse404 = {
   data: string
   status: 404
 }
 
-export type getPlatformInvoicesIdResponse500 = {
+export type platformGetInvoiceResponse500 = {
   data: string
   status: 500
 }
 
-export type getPlatformInvoicesIdResponseSuccess = (getPlatformInvoicesIdResponse200) & {
+export type platformGetInvoiceResponseSuccess = (platformGetInvoiceResponse200) & {
   headers: Headers;
 };
-export type getPlatformInvoicesIdResponseError = (getPlatformInvoicesIdResponse401 | getPlatformInvoicesIdResponse403 | getPlatformInvoicesIdResponse404 | getPlatformInvoicesIdResponse500) & {
+export type platformGetInvoiceResponseError = (platformGetInvoiceResponse401 | platformGetInvoiceResponse403 | platformGetInvoiceResponse404 | platformGetInvoiceResponse500) & {
   headers: Headers;
 };
 
-export type getPlatformInvoicesIdResponse = (getPlatformInvoicesIdResponseSuccess | getPlatformInvoicesIdResponseError)
+export type platformGetInvoiceResponse = (platformGetInvoiceResponseSuccess | platformGetInvoiceResponseError)
 
-export const getGetPlatformInvoicesIdUrl = (id: string,) => {
+export const getPlatformGetInvoiceUrl = (id: string,) => {
 
 
 
@@ -3268,9 +3268,9 @@ export const getGetPlatformInvoicesIdUrl = (id: string,) => {
   return `/platform/invoices/${id}`
 }
 
-export const getPlatformInvoicesId = async (id: string, options?: RequestInit): Promise<getPlatformInvoicesIdResponse> => {
+export const platformGetInvoice = async (id: string, options?: RequestInit): Promise<platformGetInvoiceResponse> => {
 
-  return orvalMutator<getPlatformInvoicesIdResponse>(getGetPlatformInvoicesIdUrl(id),
+  return orvalMutator<platformGetInvoiceResponse>(getPlatformGetInvoiceUrl(id),
   {
     ...options,
     method: 'GET'
@@ -3283,69 +3283,69 @@ export const getPlatformInvoicesId = async (id: string, options?: RequestInit): 
 
 
 
-export const getGetPlatformInvoicesIdQueryKey = (id: string,) => {
+export const getPlatformGetInvoiceQueryKey = (id: string,) => {
     return [
     `/platform/invoices/${id}`
     ] as const;
     }
 
 
-export const getGetPlatformInvoicesIdQueryOptions = <TData = Awaited<ReturnType<typeof getPlatformInvoicesId>>, TError = string>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformInvoicesId>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export const getPlatformGetInvoiceQueryOptions = <TData = Awaited<ReturnType<typeof platformGetInvoice>>, TError = string>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof platformGetInvoice>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetPlatformInvoicesIdQueryKey(id);
+  const queryKey =  queryOptions?.queryKey ?? getPlatformGetInvoiceQueryKey(id);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPlatformInvoicesId>>> = ({ signal }) => getPlatformInvoicesId(id, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof platformGetInvoice>>> = ({ signal }) => platformGetInvoice(id, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPlatformInvoicesId>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof platformGetInvoice>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type GetPlatformInvoicesIdQueryResult = NonNullable<Awaited<ReturnType<typeof getPlatformInvoicesId>>>
-export type GetPlatformInvoicesIdQueryError = string
+export type PlatformGetInvoiceQueryResult = NonNullable<Awaited<ReturnType<typeof platformGetInvoice>>>
+export type PlatformGetInvoiceQueryError = string
 
 
-export function useGetPlatformInvoicesId<TData = Awaited<ReturnType<typeof getPlatformInvoicesId>>, TError = string>(
- id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformInvoicesId>>, TError, TData>> & Pick<
+export function usePlatformGetInvoice<TData = Awaited<ReturnType<typeof platformGetInvoice>>, TError = string>(
+ id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof platformGetInvoice>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getPlatformInvoicesId>>,
+          Awaited<ReturnType<typeof platformGetInvoice>>,
           TError,
-          Awaited<ReturnType<typeof getPlatformInvoicesId>>
+          Awaited<ReturnType<typeof platformGetInvoice>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetPlatformInvoicesId<TData = Awaited<ReturnType<typeof getPlatformInvoicesId>>, TError = string>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformInvoicesId>>, TError, TData>> & Pick<
+export function usePlatformGetInvoice<TData = Awaited<ReturnType<typeof platformGetInvoice>>, TError = string>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof platformGetInvoice>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getPlatformInvoicesId>>,
+          Awaited<ReturnType<typeof platformGetInvoice>>,
           TError,
-          Awaited<ReturnType<typeof getPlatformInvoicesId>>
+          Awaited<ReturnType<typeof platformGetInvoice>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetPlatformInvoicesId<TData = Awaited<ReturnType<typeof getPlatformInvoicesId>>, TError = string>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformInvoicesId>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function usePlatformGetInvoice<TData = Awaited<ReturnType<typeof platformGetInvoice>>, TError = string>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof platformGetInvoice>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get invoice by ID (platform)
  */
 
-export function useGetPlatformInvoicesId<TData = Awaited<ReturnType<typeof getPlatformInvoicesId>>, TError = string>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformInvoicesId>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function usePlatformGetInvoice<TData = Awaited<ReturnType<typeof platformGetInvoice>>, TError = string>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof platformGetInvoice>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetPlatformInvoicesIdQueryOptions(id,options)
+  const queryOptions = getPlatformGetInvoiceQueryOptions(id,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -3361,19 +3361,19 @@ export function useGetPlatformInvoicesId<TData = Awaited<ReturnType<typeof getPl
 /**
  * @summary Update invoice status (platform)
  */
-export type patchPlatformInvoicesIdResponse200 = {
+export type patchInvoiceResponse200 = {
   data: ModelsInvoice
   status: 200
 }
 
-export type patchPlatformInvoicesIdResponseSuccess = (patchPlatformInvoicesIdResponse200) & {
+export type patchInvoiceResponseSuccess = (patchInvoiceResponse200) & {
   headers: Headers;
 };
 ;
 
-export type patchPlatformInvoicesIdResponse = (patchPlatformInvoicesIdResponseSuccess)
+export type patchInvoiceResponse = (patchInvoiceResponseSuccess)
 
-export const getPatchPlatformInvoicesIdUrl = (id: string,) => {
+export const getPatchInvoiceUrl = (id: string,) => {
 
 
 
@@ -3381,10 +3381,10 @@ export const getPatchPlatformInvoicesIdUrl = (id: string,) => {
   return `/platform/invoices/${id}`
 }
 
-export const patchPlatformInvoicesId = async (id: string,
-    handlersPatchPlatformInvoiceBody: HandlersPatchPlatformInvoiceBody, options?: RequestInit): Promise<patchPlatformInvoicesIdResponse> => {
+export const patchInvoice = async (id: string,
+    handlersPatchPlatformInvoiceBody: HandlersPatchPlatformInvoiceBody, options?: RequestInit): Promise<patchInvoiceResponse> => {
 
-  return orvalMutator<patchPlatformInvoicesIdResponse>(getPatchPlatformInvoicesIdUrl(id),
+  return orvalMutator<patchInvoiceResponse>(getPatchInvoiceUrl(id),
   {
     ...options,
     method: 'PATCH',
@@ -3397,11 +3397,11 @@ export const patchPlatformInvoicesId = async (id: string,
 
 
 
-export const getPatchPlatformInvoicesIdMutationOptions = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchPlatformInvoicesId>>, TError,{id: string;data: HandlersPatchPlatformInvoiceBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof patchPlatformInvoicesId>>, TError,{id: string;data: HandlersPatchPlatformInvoiceBody}, TContext> => {
+export const getPatchInvoiceMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchInvoice>>, TError,{id: string;data: HandlersPatchPlatformInvoiceBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof patchInvoice>>, TError,{id: string;data: HandlersPatchPlatformInvoiceBody}, TContext> => {
 
-const mutationKey = ['patchPlatformInvoicesId'];
+const mutationKey = ['patchInvoice'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -3411,10 +3411,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchPlatformInvoicesId>>, {id: string;data: HandlersPatchPlatformInvoiceBody}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchInvoice>>, {id: string;data: HandlersPatchPlatformInvoiceBody}> = (props) => {
           const {id,data} = props ?? {};
 
-          return  patchPlatformInvoicesId(id,data,requestOptions)
+          return  patchInvoice(id,data,requestOptions)
         }
 
 
@@ -3424,73 +3424,73 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PatchPlatformInvoicesIdMutationResult = NonNullable<Awaited<ReturnType<typeof patchPlatformInvoicesId>>>
-    export type PatchPlatformInvoicesIdMutationBody = HandlersPatchPlatformInvoiceBody
-    export type PatchPlatformInvoicesIdMutationError = unknown
+    export type PatchInvoiceMutationResult = NonNullable<Awaited<ReturnType<typeof patchInvoice>>>
+    export type PatchInvoiceMutationBody = HandlersPatchPlatformInvoiceBody
+    export type PatchInvoiceMutationError = unknown
 
     /**
  * @summary Update invoice status (platform)
  */
-export const usePatchPlatformInvoicesId = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchPlatformInvoicesId>>, TError,{id: string;data: HandlersPatchPlatformInvoiceBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const usePatchInvoice = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchInvoice>>, TError,{id: string;data: HandlersPatchPlatformInvoiceBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof patchPlatformInvoicesId>>,
+        Awaited<ReturnType<typeof patchInvoice>>,
         TError,
         {id: string;data: HandlersPatchPlatformInvoiceBody},
         TContext
       > => {
-      return useMutation(getPatchPlatformInvoicesIdMutationOptions(options), queryClient);
+      return useMutation(getPatchInvoiceMutationOptions(options), queryClient);
     }
 
 /**
  * Replaces header and lines for a draft invoice. companyId in body is ignored; taken from the existing invoice.
  * @summary Update draft invoice (platform)
  */
-export type patchPlatformInvoicesIdDraftResponse200 = {
+export type platformPatchInvoiceDraftResponse200 = {
   data: ModelsInvoice
   status: 200
 }
 
-export type patchPlatformInvoicesIdDraftResponse400 = {
+export type platformPatchInvoiceDraftResponse400 = {
   data: string
   status: 400
 }
 
-export type patchPlatformInvoicesIdDraftResponse401 = {
+export type platformPatchInvoiceDraftResponse401 = {
   data: string
   status: 401
 }
 
-export type patchPlatformInvoicesIdDraftResponse403 = {
+export type platformPatchInvoiceDraftResponse403 = {
   data: string
   status: 403
 }
 
-export type patchPlatformInvoicesIdDraftResponse404 = {
+export type platformPatchInvoiceDraftResponse404 = {
   data: string
   status: 404
 }
 
-export type patchPlatformInvoicesIdDraftResponse409 = {
+export type platformPatchInvoiceDraftResponse409 = {
   data: string
   status: 409
 }
 
-export type patchPlatformInvoicesIdDraftResponse500 = {
+export type platformPatchInvoiceDraftResponse500 = {
   data: string
   status: 500
 }
 
-export type patchPlatformInvoicesIdDraftResponseSuccess = (patchPlatformInvoicesIdDraftResponse200) & {
+export type platformPatchInvoiceDraftResponseSuccess = (platformPatchInvoiceDraftResponse200) & {
   headers: Headers;
 };
-export type patchPlatformInvoicesIdDraftResponseError = (patchPlatformInvoicesIdDraftResponse400 | patchPlatformInvoicesIdDraftResponse401 | patchPlatformInvoicesIdDraftResponse403 | patchPlatformInvoicesIdDraftResponse404 | patchPlatformInvoicesIdDraftResponse409 | patchPlatformInvoicesIdDraftResponse500) & {
+export type platformPatchInvoiceDraftResponseError = (platformPatchInvoiceDraftResponse400 | platformPatchInvoiceDraftResponse401 | platformPatchInvoiceDraftResponse403 | platformPatchInvoiceDraftResponse404 | platformPatchInvoiceDraftResponse409 | platformPatchInvoiceDraftResponse500) & {
   headers: Headers;
 };
 
-export type patchPlatformInvoicesIdDraftResponse = (patchPlatformInvoicesIdDraftResponseSuccess | patchPlatformInvoicesIdDraftResponseError)
+export type platformPatchInvoiceDraftResponse = (platformPatchInvoiceDraftResponseSuccess | platformPatchInvoiceDraftResponseError)
 
-export const getPatchPlatformInvoicesIdDraftUrl = (id: string,) => {
+export const getPlatformPatchInvoiceDraftUrl = (id: string,) => {
 
 
 
@@ -3498,10 +3498,10 @@ export const getPatchPlatformInvoicesIdDraftUrl = (id: string,) => {
   return `/platform/invoices/${id}/draft`
 }
 
-export const patchPlatformInvoicesIdDraft = async (id: string,
-    handlersInvoiceDraftUpsertBody: HandlersInvoiceDraftUpsertBody, options?: RequestInit): Promise<patchPlatformInvoicesIdDraftResponse> => {
+export const platformPatchInvoiceDraft = async (id: string,
+    handlersInvoiceDraftUpsertBody: HandlersInvoiceDraftUpsertBody, options?: RequestInit): Promise<platformPatchInvoiceDraftResponse> => {
 
-  return orvalMutator<patchPlatformInvoicesIdDraftResponse>(getPatchPlatformInvoicesIdDraftUrl(id),
+  return orvalMutator<platformPatchInvoiceDraftResponse>(getPlatformPatchInvoiceDraftUrl(id),
   {
     ...options,
     method: 'PATCH',
@@ -3514,11 +3514,11 @@ export const patchPlatformInvoicesIdDraft = async (id: string,
 
 
 
-export const getPatchPlatformInvoicesIdDraftMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchPlatformInvoicesIdDraft>>, TError,{id: string;data: HandlersInvoiceDraftUpsertBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof patchPlatformInvoicesIdDraft>>, TError,{id: string;data: HandlersInvoiceDraftUpsertBody}, TContext> => {
+export const getPlatformPatchInvoiceDraftMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof platformPatchInvoiceDraft>>, TError,{id: string;data: HandlersInvoiceDraftUpsertBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof platformPatchInvoiceDraft>>, TError,{id: string;data: HandlersInvoiceDraftUpsertBody}, TContext> => {
 
-const mutationKey = ['patchPlatformInvoicesIdDraft'];
+const mutationKey = ['platformPatchInvoiceDraft'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -3528,10 +3528,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchPlatformInvoicesIdDraft>>, {id: string;data: HandlersInvoiceDraftUpsertBody}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof platformPatchInvoiceDraft>>, {id: string;data: HandlersInvoiceDraftUpsertBody}> = (props) => {
           const {id,data} = props ?? {};
 
-          return  patchPlatformInvoicesIdDraft(id,data,requestOptions)
+          return  platformPatchInvoiceDraft(id,data,requestOptions)
         }
 
 
@@ -3541,73 +3541,73 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PatchPlatformInvoicesIdDraftMutationResult = NonNullable<Awaited<ReturnType<typeof patchPlatformInvoicesIdDraft>>>
-    export type PatchPlatformInvoicesIdDraftMutationBody = HandlersInvoiceDraftUpsertBody
-    export type PatchPlatformInvoicesIdDraftMutationError = string
+    export type PlatformPatchInvoiceDraftMutationResult = NonNullable<Awaited<ReturnType<typeof platformPatchInvoiceDraft>>>
+    export type PlatformPatchInvoiceDraftMutationBody = HandlersInvoiceDraftUpsertBody
+    export type PlatformPatchInvoiceDraftMutationError = string
 
     /**
  * @summary Update draft invoice (platform)
  */
-export const usePatchPlatformInvoicesIdDraft = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchPlatformInvoicesIdDraft>>, TError,{id: string;data: HandlersInvoiceDraftUpsertBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const usePlatformPatchInvoiceDraft = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof platformPatchInvoiceDraft>>, TError,{id: string;data: HandlersInvoiceDraftUpsertBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof patchPlatformInvoicesIdDraft>>,
+        Awaited<ReturnType<typeof platformPatchInvoiceDraft>>,
         TError,
         {id: string;data: HandlersInvoiceDraftUpsertBody},
         TContext
       > => {
-      return useMutation(getPatchPlatformInvoicesIdDraftMutationOptions(options), queryClient);
+      return useMutation(getPlatformPatchInvoiceDraftMutationOptions(options), queryClient);
     }
 
 /**
  * Assigns document number, sets status to open, and stores buyer snapshot from the company.
  * @summary Issue invoice (platform)
  */
-export type postPlatformInvoicesIdIssueResponse200 = {
+export type platformIssueInvoiceResponse200 = {
   data: ModelsInvoice
   status: 200
 }
 
-export type postPlatformInvoicesIdIssueResponse400 = {
+export type platformIssueInvoiceResponse400 = {
   data: string
   status: 400
 }
 
-export type postPlatformInvoicesIdIssueResponse401 = {
+export type platformIssueInvoiceResponse401 = {
   data: string
   status: 401
 }
 
-export type postPlatformInvoicesIdIssueResponse403 = {
+export type platformIssueInvoiceResponse403 = {
   data: string
   status: 403
 }
 
-export type postPlatformInvoicesIdIssueResponse404 = {
+export type platformIssueInvoiceResponse404 = {
   data: string
   status: 404
 }
 
-export type postPlatformInvoicesIdIssueResponse409 = {
+export type platformIssueInvoiceResponse409 = {
   data: string
   status: 409
 }
 
-export type postPlatformInvoicesIdIssueResponse500 = {
+export type platformIssueInvoiceResponse500 = {
   data: string
   status: 500
 }
 
-export type postPlatformInvoicesIdIssueResponseSuccess = (postPlatformInvoicesIdIssueResponse200) & {
+export type platformIssueInvoiceResponseSuccess = (platformIssueInvoiceResponse200) & {
   headers: Headers;
 };
-export type postPlatformInvoicesIdIssueResponseError = (postPlatformInvoicesIdIssueResponse400 | postPlatformInvoicesIdIssueResponse401 | postPlatformInvoicesIdIssueResponse403 | postPlatformInvoicesIdIssueResponse404 | postPlatformInvoicesIdIssueResponse409 | postPlatformInvoicesIdIssueResponse500) & {
+export type platformIssueInvoiceResponseError = (platformIssueInvoiceResponse400 | platformIssueInvoiceResponse401 | platformIssueInvoiceResponse403 | platformIssueInvoiceResponse404 | platformIssueInvoiceResponse409 | platformIssueInvoiceResponse500) & {
   headers: Headers;
 };
 
-export type postPlatformInvoicesIdIssueResponse = (postPlatformInvoicesIdIssueResponseSuccess | postPlatformInvoicesIdIssueResponseError)
+export type platformIssueInvoiceResponse = (platformIssueInvoiceResponseSuccess | platformIssueInvoiceResponseError)
 
-export const getPostPlatformInvoicesIdIssueUrl = (id: string,) => {
+export const getPlatformIssueInvoiceUrl = (id: string,) => {
 
 
 
@@ -3615,9 +3615,9 @@ export const getPostPlatformInvoicesIdIssueUrl = (id: string,) => {
   return `/platform/invoices/${id}/issue`
 }
 
-export const postPlatformInvoicesIdIssue = async (id: string, options?: RequestInit): Promise<postPlatformInvoicesIdIssueResponse> => {
+export const platformIssueInvoice = async (id: string, options?: RequestInit): Promise<platformIssueInvoiceResponse> => {
 
-  return orvalMutator<postPlatformInvoicesIdIssueResponse>(getPostPlatformInvoicesIdIssueUrl(id),
+  return orvalMutator<platformIssueInvoiceResponse>(getPlatformIssueInvoiceUrl(id),
   {
     ...options,
     method: 'POST'
@@ -3629,11 +3629,11 @@ export const postPlatformInvoicesIdIssue = async (id: string, options?: RequestI
 
 
 
-export const getPostPlatformInvoicesIdIssueMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlatformInvoicesIdIssue>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof postPlatformInvoicesIdIssue>>, TError,{id: string}, TContext> => {
+export const getPlatformIssueInvoiceMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof platformIssueInvoice>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof platformIssueInvoice>>, TError,{id: string}, TContext> => {
 
-const mutationKey = ['postPlatformInvoicesIdIssue'];
+const mutationKey = ['platformIssueInvoice'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -3643,10 +3643,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postPlatformInvoicesIdIssue>>, {id: string}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof platformIssueInvoice>>, {id: string}> = (props) => {
           const {id} = props ?? {};
 
-          return  postPlatformInvoicesIdIssue(id,requestOptions)
+          return  platformIssueInvoice(id,requestOptions)
         }
 
 
@@ -3656,47 +3656,47 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PostPlatformInvoicesIdIssueMutationResult = NonNullable<Awaited<ReturnType<typeof postPlatformInvoicesIdIssue>>>
+    export type PlatformIssueInvoiceMutationResult = NonNullable<Awaited<ReturnType<typeof platformIssueInvoice>>>
 
-    export type PostPlatformInvoicesIdIssueMutationError = string
+    export type PlatformIssueInvoiceMutationError = string
 
     /**
  * @summary Issue invoice (platform)
  */
-export const usePostPlatformInvoicesIdIssue = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlatformInvoicesIdIssue>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const usePlatformIssueInvoice = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof platformIssueInvoice>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof postPlatformInvoicesIdIssue>>,
+        Awaited<ReturnType<typeof platformIssueInvoice>>,
         TError,
         {id: string},
         TContext
       > => {
-      return useMutation(getPostPlatformInvoicesIdIssueMutationOptions(options), queryClient);
+      return useMutation(getPlatformIssueInvoiceMutationOptions(options), queryClient);
     }
 
 /**
  * @summary Get the marked SaaS operator company (legal profile source for the deployment)
  */
-export type getPlatformSaasOperatorCompanyResponse200 = {
+export type getSaaSOperatorCompanyResponse200 = {
   data: ModelsCompany
   status: 200
 }
 
-export type getPlatformSaasOperatorCompanyResponse404 = {
+export type getSaaSOperatorCompanyResponse404 = {
   data: string
   status: 404
 }
 
-export type getPlatformSaasOperatorCompanyResponseSuccess = (getPlatformSaasOperatorCompanyResponse200) & {
+export type getSaaSOperatorCompanyResponseSuccess = (getSaaSOperatorCompanyResponse200) & {
   headers: Headers;
 };
-export type getPlatformSaasOperatorCompanyResponseError = (getPlatformSaasOperatorCompanyResponse404) & {
+export type getSaaSOperatorCompanyResponseError = (getSaaSOperatorCompanyResponse404) & {
   headers: Headers;
 };
 
-export type getPlatformSaasOperatorCompanyResponse = (getPlatformSaasOperatorCompanyResponseSuccess | getPlatformSaasOperatorCompanyResponseError)
+export type getSaaSOperatorCompanyResponse = (getSaaSOperatorCompanyResponseSuccess | getSaaSOperatorCompanyResponseError)
 
-export const getGetPlatformSaasOperatorCompanyUrl = () => {
+export const getGetSaaSOperatorCompanyUrl = () => {
 
 
 
@@ -3704,9 +3704,9 @@ export const getGetPlatformSaasOperatorCompanyUrl = () => {
   return `/platform/saas-operator-company`
 }
 
-export const getPlatformSaasOperatorCompany = async ( options?: RequestInit): Promise<getPlatformSaasOperatorCompanyResponse> => {
+export const getSaaSOperatorCompany = async ( options?: RequestInit): Promise<getSaaSOperatorCompanyResponse> => {
 
-  return orvalMutator<getPlatformSaasOperatorCompanyResponse>(getGetPlatformSaasOperatorCompanyUrl(),
+  return orvalMutator<getSaaSOperatorCompanyResponse>(getGetSaaSOperatorCompanyUrl(),
   {
     ...options,
     method: 'GET'
@@ -3719,69 +3719,69 @@ export const getPlatformSaasOperatorCompany = async ( options?: RequestInit): Pr
 
 
 
-export const getGetPlatformSaasOperatorCompanyQueryKey = () => {
+export const getGetSaaSOperatorCompanyQueryKey = () => {
     return [
     `/platform/saas-operator-company`
     ] as const;
     }
 
 
-export const getGetPlatformSaasOperatorCompanyQueryOptions = <TData = Awaited<ReturnType<typeof getPlatformSaasOperatorCompany>>, TError = string>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformSaasOperatorCompany>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export const getGetSaaSOperatorCompanyQueryOptions = <TData = Awaited<ReturnType<typeof getSaaSOperatorCompany>>, TError = string>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSaaSOperatorCompany>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetPlatformSaasOperatorCompanyQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetSaaSOperatorCompanyQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPlatformSaasOperatorCompany>>> = ({ signal }) => getPlatformSaasOperatorCompany({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSaaSOperatorCompany>>> = ({ signal }) => getSaaSOperatorCompany({ signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPlatformSaasOperatorCompany>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSaaSOperatorCompany>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type GetPlatformSaasOperatorCompanyQueryResult = NonNullable<Awaited<ReturnType<typeof getPlatformSaasOperatorCompany>>>
-export type GetPlatformSaasOperatorCompanyQueryError = string
+export type GetSaaSOperatorCompanyQueryResult = NonNullable<Awaited<ReturnType<typeof getSaaSOperatorCompany>>>
+export type GetSaaSOperatorCompanyQueryError = string
 
 
-export function useGetPlatformSaasOperatorCompany<TData = Awaited<ReturnType<typeof getPlatformSaasOperatorCompany>>, TError = string>(
-  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformSaasOperatorCompany>>, TError, TData>> & Pick<
+export function useGetSaaSOperatorCompany<TData = Awaited<ReturnType<typeof getSaaSOperatorCompany>>, TError = string>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSaaSOperatorCompany>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getPlatformSaasOperatorCompany>>,
+          Awaited<ReturnType<typeof getSaaSOperatorCompany>>,
           TError,
-          Awaited<ReturnType<typeof getPlatformSaasOperatorCompany>>
+          Awaited<ReturnType<typeof getSaaSOperatorCompany>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetPlatformSaasOperatorCompany<TData = Awaited<ReturnType<typeof getPlatformSaasOperatorCompany>>, TError = string>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformSaasOperatorCompany>>, TError, TData>> & Pick<
+export function useGetSaaSOperatorCompany<TData = Awaited<ReturnType<typeof getSaaSOperatorCompany>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSaaSOperatorCompany>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getPlatformSaasOperatorCompany>>,
+          Awaited<ReturnType<typeof getSaaSOperatorCompany>>,
           TError,
-          Awaited<ReturnType<typeof getPlatformSaasOperatorCompany>>
+          Awaited<ReturnType<typeof getSaaSOperatorCompany>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetPlatformSaasOperatorCompany<TData = Awaited<ReturnType<typeof getPlatformSaasOperatorCompany>>, TError = string>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformSaasOperatorCompany>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useGetSaaSOperatorCompany<TData = Awaited<ReturnType<typeof getSaaSOperatorCompany>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSaaSOperatorCompany>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get the marked SaaS operator company (legal profile source for the deployment)
  */
 
-export function useGetPlatformSaasOperatorCompany<TData = Awaited<ReturnType<typeof getPlatformSaasOperatorCompany>>, TError = string>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformSaasOperatorCompany>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useGetSaaSOperatorCompany<TData = Awaited<ReturnType<typeof getSaaSOperatorCompany>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSaaSOperatorCompany>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetPlatformSaasOperatorCompanyQueryOptions(options)
+  const queryOptions = getGetSaaSOperatorCompanyQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -3797,19 +3797,19 @@ export function useGetPlatformSaasOperatorCompany<TData = Awaited<ReturnType<typ
 /**
  * @summary List all subscription plans including inactive (platform)
  */
-export type getPlatformSubscriptionPlansResponse200 = {
+export type listSubscriptionPlansResponse200 = {
   data: ModelsSubscriptionPlan[]
   status: 200
 }
 
-export type getPlatformSubscriptionPlansResponseSuccess = (getPlatformSubscriptionPlansResponse200) & {
+export type listSubscriptionPlansResponseSuccess = (listSubscriptionPlansResponse200) & {
   headers: Headers;
 };
 ;
 
-export type getPlatformSubscriptionPlansResponse = (getPlatformSubscriptionPlansResponseSuccess)
+export type listSubscriptionPlansResponse = (listSubscriptionPlansResponseSuccess)
 
-export const getGetPlatformSubscriptionPlansUrl = () => {
+export const getListSubscriptionPlansUrl = () => {
 
 
 
@@ -3817,9 +3817,9 @@ export const getGetPlatformSubscriptionPlansUrl = () => {
   return `/platform/subscription-plans`
 }
 
-export const getPlatformSubscriptionPlans = async ( options?: RequestInit): Promise<getPlatformSubscriptionPlansResponse> => {
+export const listSubscriptionPlans = async ( options?: RequestInit): Promise<listSubscriptionPlansResponse> => {
 
-  return orvalMutator<getPlatformSubscriptionPlansResponse>(getGetPlatformSubscriptionPlansUrl(),
+  return orvalMutator<listSubscriptionPlansResponse>(getListSubscriptionPlansUrl(),
   {
     ...options,
     method: 'GET'
@@ -3832,69 +3832,69 @@ export const getPlatformSubscriptionPlans = async ( options?: RequestInit): Prom
 
 
 
-export const getGetPlatformSubscriptionPlansQueryKey = () => {
+export const getListSubscriptionPlansQueryKey = () => {
     return [
     `/platform/subscription-plans`
     ] as const;
     }
 
 
-export const getGetPlatformSubscriptionPlansQueryOptions = <TData = Awaited<ReturnType<typeof getPlatformSubscriptionPlans>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformSubscriptionPlans>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export const getListSubscriptionPlansQueryOptions = <TData = Awaited<ReturnType<typeof listSubscriptionPlans>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSubscriptionPlans>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetPlatformSubscriptionPlansQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getListSubscriptionPlansQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPlatformSubscriptionPlans>>> = ({ signal }) => getPlatformSubscriptionPlans({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSubscriptionPlans>>> = ({ signal }) => listSubscriptionPlans({ signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPlatformSubscriptionPlans>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSubscriptionPlans>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type GetPlatformSubscriptionPlansQueryResult = NonNullable<Awaited<ReturnType<typeof getPlatformSubscriptionPlans>>>
-export type GetPlatformSubscriptionPlansQueryError = unknown
+export type ListSubscriptionPlansQueryResult = NonNullable<Awaited<ReturnType<typeof listSubscriptionPlans>>>
+export type ListSubscriptionPlansQueryError = unknown
 
 
-export function useGetPlatformSubscriptionPlans<TData = Awaited<ReturnType<typeof getPlatformSubscriptionPlans>>, TError = unknown>(
-  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformSubscriptionPlans>>, TError, TData>> & Pick<
+export function useListSubscriptionPlans<TData = Awaited<ReturnType<typeof listSubscriptionPlans>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSubscriptionPlans>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getPlatformSubscriptionPlans>>,
+          Awaited<ReturnType<typeof listSubscriptionPlans>>,
           TError,
-          Awaited<ReturnType<typeof getPlatformSubscriptionPlans>>
+          Awaited<ReturnType<typeof listSubscriptionPlans>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetPlatformSubscriptionPlans<TData = Awaited<ReturnType<typeof getPlatformSubscriptionPlans>>, TError = unknown>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformSubscriptionPlans>>, TError, TData>> & Pick<
+export function useListSubscriptionPlans<TData = Awaited<ReturnType<typeof listSubscriptionPlans>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSubscriptionPlans>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getPlatformSubscriptionPlans>>,
+          Awaited<ReturnType<typeof listSubscriptionPlans>>,
           TError,
-          Awaited<ReturnType<typeof getPlatformSubscriptionPlans>>
+          Awaited<ReturnType<typeof listSubscriptionPlans>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetPlatformSubscriptionPlans<TData = Awaited<ReturnType<typeof getPlatformSubscriptionPlans>>, TError = unknown>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformSubscriptionPlans>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useListSubscriptionPlans<TData = Awaited<ReturnType<typeof listSubscriptionPlans>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSubscriptionPlans>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List all subscription plans including inactive (platform)
  */
 
-export function useGetPlatformSubscriptionPlans<TData = Awaited<ReturnType<typeof getPlatformSubscriptionPlans>>, TError = unknown>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformSubscriptionPlans>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useListSubscriptionPlans<TData = Awaited<ReturnType<typeof listSubscriptionPlans>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSubscriptionPlans>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetPlatformSubscriptionPlansQueryOptions(options)
+  const queryOptions = getListSubscriptionPlansQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -3910,19 +3910,19 @@ export function useGetPlatformSubscriptionPlans<TData = Awaited<ReturnType<typeo
 /**
  * @summary Create subscription plan (platform)
  */
-export type postPlatformSubscriptionPlansResponse201 = {
+export type createSubscriptionPlanResponse201 = {
   data: ModelsSubscriptionPlan
   status: 201
 }
 
-export type postPlatformSubscriptionPlansResponseSuccess = (postPlatformSubscriptionPlansResponse201) & {
+export type createSubscriptionPlanResponseSuccess = (createSubscriptionPlanResponse201) & {
   headers: Headers;
 };
 ;
 
-export type postPlatformSubscriptionPlansResponse = (postPlatformSubscriptionPlansResponseSuccess)
+export type createSubscriptionPlanResponse = (createSubscriptionPlanResponseSuccess)
 
-export const getPostPlatformSubscriptionPlansUrl = () => {
+export const getCreateSubscriptionPlanUrl = () => {
 
 
 
@@ -3930,9 +3930,9 @@ export const getPostPlatformSubscriptionPlansUrl = () => {
   return `/platform/subscription-plans`
 }
 
-export const postPlatformSubscriptionPlans = async (handlersPlatformCreateSubscriptionPlanBody: HandlersPlatformCreateSubscriptionPlanBody, options?: RequestInit): Promise<postPlatformSubscriptionPlansResponse> => {
+export const createSubscriptionPlan = async (handlersPlatformCreateSubscriptionPlanBody: HandlersPlatformCreateSubscriptionPlanBody, options?: RequestInit): Promise<createSubscriptionPlanResponse> => {
 
-  return orvalMutator<postPlatformSubscriptionPlansResponse>(getPostPlatformSubscriptionPlansUrl(),
+  return orvalMutator<createSubscriptionPlanResponse>(getCreateSubscriptionPlanUrl(),
   {
     ...options,
     method: 'POST',
@@ -3945,11 +3945,11 @@ export const postPlatformSubscriptionPlans = async (handlersPlatformCreateSubscr
 
 
 
-export const getPostPlatformSubscriptionPlansMutationOptions = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlatformSubscriptionPlans>>, TError,{data: HandlersPlatformCreateSubscriptionPlanBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof postPlatformSubscriptionPlans>>, TError,{data: HandlersPlatformCreateSubscriptionPlanBody}, TContext> => {
+export const getCreateSubscriptionPlanMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSubscriptionPlan>>, TError,{data: HandlersPlatformCreateSubscriptionPlanBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof createSubscriptionPlan>>, TError,{data: HandlersPlatformCreateSubscriptionPlanBody}, TContext> => {
 
-const mutationKey = ['postPlatformSubscriptionPlans'];
+const mutationKey = ['createSubscriptionPlan'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -3959,10 +3959,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postPlatformSubscriptionPlans>>, {data: HandlersPlatformCreateSubscriptionPlanBody}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createSubscriptionPlan>>, {data: HandlersPlatformCreateSubscriptionPlanBody}> = (props) => {
           const {data} = props ?? {};
 
-          return  postPlatformSubscriptionPlans(data,requestOptions)
+          return  createSubscriptionPlan(data,requestOptions)
         }
 
 
@@ -3972,40 +3972,40 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PostPlatformSubscriptionPlansMutationResult = NonNullable<Awaited<ReturnType<typeof postPlatformSubscriptionPlans>>>
-    export type PostPlatformSubscriptionPlansMutationBody = HandlersPlatformCreateSubscriptionPlanBody
-    export type PostPlatformSubscriptionPlansMutationError = unknown
+    export type CreateSubscriptionPlanMutationResult = NonNullable<Awaited<ReturnType<typeof createSubscriptionPlan>>>
+    export type CreateSubscriptionPlanMutationBody = HandlersPlatformCreateSubscriptionPlanBody
+    export type CreateSubscriptionPlanMutationError = unknown
 
     /**
  * @summary Create subscription plan (platform)
  */
-export const usePostPlatformSubscriptionPlans = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlatformSubscriptionPlans>>, TError,{data: HandlersPlatformCreateSubscriptionPlanBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const useCreateSubscriptionPlan = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSubscriptionPlan>>, TError,{data: HandlersPlatformCreateSubscriptionPlanBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof postPlatformSubscriptionPlans>>,
+        Awaited<ReturnType<typeof createSubscriptionPlan>>,
         TError,
         {data: HandlersPlatformCreateSubscriptionPlanBody},
         TContext
       > => {
-      return useMutation(getPostPlatformSubscriptionPlansMutationOptions(options), queryClient);
+      return useMutation(getCreateSubscriptionPlanMutationOptions(options), queryClient);
     }
 
 /**
  * @summary Replace subscription plan (platform)
  */
-export type putPlatformSubscriptionPlansIdResponse200 = {
+export type updateSubscriptionPlanResponse200 = {
   data: ModelsSubscriptionPlan
   status: 200
 }
 
-export type putPlatformSubscriptionPlansIdResponseSuccess = (putPlatformSubscriptionPlansIdResponse200) & {
+export type updateSubscriptionPlanResponseSuccess = (updateSubscriptionPlanResponse200) & {
   headers: Headers;
 };
 ;
 
-export type putPlatformSubscriptionPlansIdResponse = (putPlatformSubscriptionPlansIdResponseSuccess)
+export type updateSubscriptionPlanResponse = (updateSubscriptionPlanResponseSuccess)
 
-export const getPutPlatformSubscriptionPlansIdUrl = (id: string,) => {
+export const getUpdateSubscriptionPlanUrl = (id: string,) => {
 
 
 
@@ -4013,10 +4013,10 @@ export const getPutPlatformSubscriptionPlansIdUrl = (id: string,) => {
   return `/platform/subscription-plans/${id}`
 }
 
-export const putPlatformSubscriptionPlansId = async (id: string,
-    handlersPlatformUpdateSubscriptionPlanBody: HandlersPlatformUpdateSubscriptionPlanBody, options?: RequestInit): Promise<putPlatformSubscriptionPlansIdResponse> => {
+export const updateSubscriptionPlan = async (id: string,
+    handlersPlatformUpdateSubscriptionPlanBody: HandlersPlatformUpdateSubscriptionPlanBody, options?: RequestInit): Promise<updateSubscriptionPlanResponse> => {
 
-  return orvalMutator<putPlatformSubscriptionPlansIdResponse>(getPutPlatformSubscriptionPlansIdUrl(id),
+  return orvalMutator<updateSubscriptionPlanResponse>(getUpdateSubscriptionPlanUrl(id),
   {
     ...options,
     method: 'PUT',
@@ -4029,11 +4029,11 @@ export const putPlatformSubscriptionPlansId = async (id: string,
 
 
 
-export const getPutPlatformSubscriptionPlansIdMutationOptions = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putPlatformSubscriptionPlansId>>, TError,{id: string;data: HandlersPlatformUpdateSubscriptionPlanBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof putPlatformSubscriptionPlansId>>, TError,{id: string;data: HandlersPlatformUpdateSubscriptionPlanBody}, TContext> => {
+export const getUpdateSubscriptionPlanMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSubscriptionPlan>>, TError,{id: string;data: HandlersPlatformUpdateSubscriptionPlanBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateSubscriptionPlan>>, TError,{id: string;data: HandlersPlatformUpdateSubscriptionPlanBody}, TContext> => {
 
-const mutationKey = ['putPlatformSubscriptionPlansId'];
+const mutationKey = ['updateSubscriptionPlan'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -4043,10 +4043,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putPlatformSubscriptionPlansId>>, {id: string;data: HandlersPlatformUpdateSubscriptionPlanBody}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateSubscriptionPlan>>, {id: string;data: HandlersPlatformUpdateSubscriptionPlanBody}> = (props) => {
           const {id,data} = props ?? {};
 
-          return  putPlatformSubscriptionPlansId(id,data,requestOptions)
+          return  updateSubscriptionPlan(id,data,requestOptions)
         }
 
 
@@ -4056,40 +4056,40 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PutPlatformSubscriptionPlansIdMutationResult = NonNullable<Awaited<ReturnType<typeof putPlatformSubscriptionPlansId>>>
-    export type PutPlatformSubscriptionPlansIdMutationBody = HandlersPlatformUpdateSubscriptionPlanBody
-    export type PutPlatformSubscriptionPlansIdMutationError = unknown
+    export type UpdateSubscriptionPlanMutationResult = NonNullable<Awaited<ReturnType<typeof updateSubscriptionPlan>>>
+    export type UpdateSubscriptionPlanMutationBody = HandlersPlatformUpdateSubscriptionPlanBody
+    export type UpdateSubscriptionPlanMutationError = unknown
 
     /**
  * @summary Replace subscription plan (platform)
  */
-export const usePutPlatformSubscriptionPlansId = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putPlatformSubscriptionPlansId>>, TError,{id: string;data: HandlersPlatformUpdateSubscriptionPlanBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const useUpdateSubscriptionPlan = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSubscriptionPlan>>, TError,{id: string;data: HandlersPlatformUpdateSubscriptionPlanBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof putPlatformSubscriptionPlansId>>,
+        Awaited<ReturnType<typeof updateSubscriptionPlan>>,
         TError,
         {id: string;data: HandlersPlatformUpdateSubscriptionPlanBody},
         TContext
       > => {
-      return useMutation(getPutPlatformSubscriptionPlansIdMutationOptions(options), queryClient);
+      return useMutation(getUpdateSubscriptionPlanMutationOptions(options), queryClient);
     }
 
 /**
  * @summary List all subscriptions (platform)
  */
-export type platformListSubscriptionsResponse200 = {
+export type listSubscriptionsResponse200 = {
   data: HandlersPlatformListResponseModelsSubscription
   status: 200
 }
 
-export type platformListSubscriptionsResponseSuccess = (platformListSubscriptionsResponse200) & {
+export type listSubscriptionsResponseSuccess = (listSubscriptionsResponse200) & {
   headers: Headers;
 };
 ;
 
-export type platformListSubscriptionsResponse = (platformListSubscriptionsResponseSuccess)
+export type listSubscriptionsResponse = (listSubscriptionsResponseSuccess)
 
-export const getPlatformListSubscriptionsUrl = (params?: PlatformListSubscriptionsParams,) => {
+export const getListSubscriptionsUrl = (params?: ListSubscriptionsParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -4104,9 +4104,9 @@ export const getPlatformListSubscriptionsUrl = (params?: PlatformListSubscriptio
   return stringifiedParams.length > 0 ? `/platform/subscriptions?${stringifiedParams}` : `/platform/subscriptions`
 }
 
-export const platformListSubscriptions = async (params?: PlatformListSubscriptionsParams, options?: RequestInit): Promise<platformListSubscriptionsResponse> => {
+export const listSubscriptions = async (params?: ListSubscriptionsParams, options?: RequestInit): Promise<listSubscriptionsResponse> => {
 
-  return orvalMutator<platformListSubscriptionsResponse>(getPlatformListSubscriptionsUrl(params),
+  return orvalMutator<listSubscriptionsResponse>(getListSubscriptionsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -4119,69 +4119,69 @@ export const platformListSubscriptions = async (params?: PlatformListSubscriptio
 
 
 
-export const getPlatformListSubscriptionsQueryKey = (params?: PlatformListSubscriptionsParams,) => {
+export const getListSubscriptionsQueryKey = (params?: ListSubscriptionsParams,) => {
     return [
     `/platform/subscriptions`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getPlatformListSubscriptionsQueryOptions = <TData = Awaited<ReturnType<typeof platformListSubscriptions>>, TError = unknown>(params?: PlatformListSubscriptionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof platformListSubscriptions>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export const getListSubscriptionsQueryOptions = <TData = Awaited<ReturnType<typeof listSubscriptions>>, TError = unknown>(params?: ListSubscriptionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSubscriptions>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getPlatformListSubscriptionsQueryKey(params);
+  const queryKey =  queryOptions?.queryKey ?? getListSubscriptionsQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof platformListSubscriptions>>> = ({ signal }) => platformListSubscriptions(params, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSubscriptions>>> = ({ signal }) => listSubscriptions(params, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof platformListSubscriptions>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSubscriptions>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type PlatformListSubscriptionsQueryResult = NonNullable<Awaited<ReturnType<typeof platformListSubscriptions>>>
-export type PlatformListSubscriptionsQueryError = unknown
+export type ListSubscriptionsQueryResult = NonNullable<Awaited<ReturnType<typeof listSubscriptions>>>
+export type ListSubscriptionsQueryError = unknown
 
 
-export function usePlatformListSubscriptions<TData = Awaited<ReturnType<typeof platformListSubscriptions>>, TError = unknown>(
- params: undefined |  PlatformListSubscriptionsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof platformListSubscriptions>>, TError, TData>> & Pick<
+export function useListSubscriptions<TData = Awaited<ReturnType<typeof listSubscriptions>>, TError = unknown>(
+ params: undefined |  ListSubscriptionsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSubscriptions>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof platformListSubscriptions>>,
+          Awaited<ReturnType<typeof listSubscriptions>>,
           TError,
-          Awaited<ReturnType<typeof platformListSubscriptions>>
+          Awaited<ReturnType<typeof listSubscriptions>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function usePlatformListSubscriptions<TData = Awaited<ReturnType<typeof platformListSubscriptions>>, TError = unknown>(
- params?: PlatformListSubscriptionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof platformListSubscriptions>>, TError, TData>> & Pick<
+export function useListSubscriptions<TData = Awaited<ReturnType<typeof listSubscriptions>>, TError = unknown>(
+ params?: ListSubscriptionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSubscriptions>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof platformListSubscriptions>>,
+          Awaited<ReturnType<typeof listSubscriptions>>,
           TError,
-          Awaited<ReturnType<typeof platformListSubscriptions>>
+          Awaited<ReturnType<typeof listSubscriptions>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function usePlatformListSubscriptions<TData = Awaited<ReturnType<typeof platformListSubscriptions>>, TError = unknown>(
- params?: PlatformListSubscriptionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof platformListSubscriptions>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useListSubscriptions<TData = Awaited<ReturnType<typeof listSubscriptions>>, TError = unknown>(
+ params?: ListSubscriptionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSubscriptions>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List all subscriptions (platform)
  */
 
-export function usePlatformListSubscriptions<TData = Awaited<ReturnType<typeof platformListSubscriptions>>, TError = unknown>(
- params?: PlatformListSubscriptionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof platformListSubscriptions>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useListSubscriptions<TData = Awaited<ReturnType<typeof listSubscriptions>>, TError = unknown>(
+ params?: ListSubscriptionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSubscriptions>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getPlatformListSubscriptionsQueryOptions(params,options)
+  const queryOptions = getListSubscriptionsQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -4197,36 +4197,36 @@ export function usePlatformListSubscriptions<TData = Awaited<ReturnType<typeof p
 /**
  * @summary Create subscription for a company without one (platform)
  */
-export type platformCreateSubscriptionResponse201 = {
+export type createSubscriptionResponse201 = {
   data: ModelsSubscription
   status: 201
 }
 
-export type platformCreateSubscriptionResponse400 = {
+export type createSubscriptionResponse400 = {
   data: string
   status: 400
 }
 
-export type platformCreateSubscriptionResponse404 = {
+export type createSubscriptionResponse404 = {
   data: string
   status: 404
 }
 
-export type platformCreateSubscriptionResponse409 = {
+export type createSubscriptionResponse409 = {
   data: string
   status: 409
 }
 
-export type platformCreateSubscriptionResponseSuccess = (platformCreateSubscriptionResponse201) & {
+export type createSubscriptionResponseSuccess = (createSubscriptionResponse201) & {
   headers: Headers;
 };
-export type platformCreateSubscriptionResponseError = (platformCreateSubscriptionResponse400 | platformCreateSubscriptionResponse404 | platformCreateSubscriptionResponse409) & {
+export type createSubscriptionResponseError = (createSubscriptionResponse400 | createSubscriptionResponse404 | createSubscriptionResponse409) & {
   headers: Headers;
 };
 
-export type platformCreateSubscriptionResponse = (platformCreateSubscriptionResponseSuccess | platformCreateSubscriptionResponseError)
+export type createSubscriptionResponse = (createSubscriptionResponseSuccess | createSubscriptionResponseError)
 
-export const getPlatformCreateSubscriptionUrl = () => {
+export const getCreateSubscriptionUrl = () => {
 
 
 
@@ -4234,9 +4234,9 @@ export const getPlatformCreateSubscriptionUrl = () => {
   return `/platform/subscriptions`
 }
 
-export const platformCreateSubscription = async (handlersPlatformCreateSubscriptionBody: HandlersPlatformCreateSubscriptionBody, options?: RequestInit): Promise<platformCreateSubscriptionResponse> => {
+export const createSubscription = async (handlersPlatformCreateSubscriptionBody: HandlersPlatformCreateSubscriptionBody, options?: RequestInit): Promise<createSubscriptionResponse> => {
 
-  return orvalMutator<platformCreateSubscriptionResponse>(getPlatformCreateSubscriptionUrl(),
+  return orvalMutator<createSubscriptionResponse>(getCreateSubscriptionUrl(),
   {
     ...options,
     method: 'POST',
@@ -4249,11 +4249,11 @@ export const platformCreateSubscription = async (handlersPlatformCreateSubscript
 
 
 
-export const getPlatformCreateSubscriptionMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof platformCreateSubscription>>, TError,{data: HandlersPlatformCreateSubscriptionBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof platformCreateSubscription>>, TError,{data: HandlersPlatformCreateSubscriptionBody}, TContext> => {
+export const getCreateSubscriptionMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSubscription>>, TError,{data: HandlersPlatformCreateSubscriptionBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof createSubscription>>, TError,{data: HandlersPlatformCreateSubscriptionBody}, TContext> => {
 
-const mutationKey = ['platformCreateSubscription'];
+const mutationKey = ['createSubscription'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -4263,10 +4263,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof platformCreateSubscription>>, {data: HandlersPlatformCreateSubscriptionBody}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createSubscription>>, {data: HandlersPlatformCreateSubscriptionBody}> = (props) => {
           const {data} = props ?? {};
 
-          return  platformCreateSubscription(data,requestOptions)
+          return  createSubscription(data,requestOptions)
         }
 
 
@@ -4276,40 +4276,40 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PlatformCreateSubscriptionMutationResult = NonNullable<Awaited<ReturnType<typeof platformCreateSubscription>>>
-    export type PlatformCreateSubscriptionMutationBody = HandlersPlatformCreateSubscriptionBody
-    export type PlatformCreateSubscriptionMutationError = string
+    export type CreateSubscriptionMutationResult = NonNullable<Awaited<ReturnType<typeof createSubscription>>>
+    export type CreateSubscriptionMutationBody = HandlersPlatformCreateSubscriptionBody
+    export type CreateSubscriptionMutationError = string
 
     /**
  * @summary Create subscription for a company without one (platform)
  */
-export const usePlatformCreateSubscription = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof platformCreateSubscription>>, TError,{data: HandlersPlatformCreateSubscriptionBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const useCreateSubscription = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSubscription>>, TError,{data: HandlersPlatformCreateSubscriptionBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof platformCreateSubscription>>,
+        Awaited<ReturnType<typeof createSubscription>>,
         TError,
         {data: HandlersPlatformCreateSubscriptionBody},
         TContext
       > => {
-      return useMutation(getPlatformCreateSubscriptionMutationOptions(options), queryClient);
+      return useMutation(getCreateSubscriptionMutationOptions(options), queryClient);
     }
 
 /**
  * @summary Update subscription fields (platform; may diverge from Stripe)
  */
-export type platformPatchSubscriptionResponse200 = {
+export type patchSubscriptionResponse200 = {
   data: ModelsSubscription
   status: 200
 }
 
-export type platformPatchSubscriptionResponseSuccess = (platformPatchSubscriptionResponse200) & {
+export type patchSubscriptionResponseSuccess = (patchSubscriptionResponse200) & {
   headers: Headers;
 };
 ;
 
-export type platformPatchSubscriptionResponse = (platformPatchSubscriptionResponseSuccess)
+export type patchSubscriptionResponse = (patchSubscriptionResponseSuccess)
 
-export const getPlatformPatchSubscriptionUrl = (id: string,) => {
+export const getPatchSubscriptionUrl = (id: string,) => {
 
 
 
@@ -4317,10 +4317,10 @@ export const getPlatformPatchSubscriptionUrl = (id: string,) => {
   return `/platform/subscriptions/${id}`
 }
 
-export const platformPatchSubscription = async (id: string,
-    handlersPatchPlatformSubscriptionBody: HandlersPatchPlatformSubscriptionBody, options?: RequestInit): Promise<platformPatchSubscriptionResponse> => {
+export const patchSubscription = async (id: string,
+    handlersPatchPlatformSubscriptionBody: HandlersPatchPlatformSubscriptionBody, options?: RequestInit): Promise<patchSubscriptionResponse> => {
 
-  return orvalMutator<platformPatchSubscriptionResponse>(getPlatformPatchSubscriptionUrl(id),
+  return orvalMutator<patchSubscriptionResponse>(getPatchSubscriptionUrl(id),
   {
     ...options,
     method: 'PATCH',
@@ -4333,11 +4333,11 @@ export const platformPatchSubscription = async (id: string,
 
 
 
-export const getPlatformPatchSubscriptionMutationOptions = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof platformPatchSubscription>>, TError,{id: string;data: HandlersPatchPlatformSubscriptionBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof platformPatchSubscription>>, TError,{id: string;data: HandlersPatchPlatformSubscriptionBody}, TContext> => {
+export const getPatchSubscriptionMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchSubscription>>, TError,{id: string;data: HandlersPatchPlatformSubscriptionBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof patchSubscription>>, TError,{id: string;data: HandlersPatchPlatformSubscriptionBody}, TContext> => {
 
-const mutationKey = ['platformPatchSubscription'];
+const mutationKey = ['patchSubscription'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -4347,10 +4347,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof platformPatchSubscription>>, {id: string;data: HandlersPatchPlatformSubscriptionBody}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchSubscription>>, {id: string;data: HandlersPatchPlatformSubscriptionBody}> = (props) => {
           const {id,data} = props ?? {};
 
-          return  platformPatchSubscription(id,data,requestOptions)
+          return  patchSubscription(id,data,requestOptions)
         }
 
 
@@ -4360,20 +4360,20 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PlatformPatchSubscriptionMutationResult = NonNullable<Awaited<ReturnType<typeof platformPatchSubscription>>>
-    export type PlatformPatchSubscriptionMutationBody = HandlersPatchPlatformSubscriptionBody
-    export type PlatformPatchSubscriptionMutationError = unknown
+    export type PatchSubscriptionMutationResult = NonNullable<Awaited<ReturnType<typeof patchSubscription>>>
+    export type PatchSubscriptionMutationBody = HandlersPatchPlatformSubscriptionBody
+    export type PatchSubscriptionMutationError = unknown
 
     /**
  * @summary Update subscription fields (platform; may diverge from Stripe)
  */
-export const usePlatformPatchSubscription = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof platformPatchSubscription>>, TError,{id: string;data: HandlersPatchPlatformSubscriptionBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const usePatchSubscription = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchSubscription>>, TError,{id: string;data: HandlersPatchPlatformSubscriptionBody}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof platformPatchSubscription>>,
+        Awaited<ReturnType<typeof patchSubscription>>,
         TError,
         {id: string;data: HandlersPatchPlatformSubscriptionBody},
         TContext
       > => {
-      return useMutation(getPlatformPatchSubscriptionMutationOptions(options), queryClient);
+      return useMutation(getPatchSubscriptionMutationOptions(options), queryClient);
     }

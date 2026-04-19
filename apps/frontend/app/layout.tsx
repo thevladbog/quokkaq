@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import TanStackQueryProvider from '../components/TanStackQueryProvider';
+import { OtelBrowserInit } from '../components/OtelBrowserInit';
 import { Toaster } from '../components/ui/sonner';
 import { AuthProvider } from '../contexts/AuthContext';
 import { ThemeProvider } from 'next-themes';
@@ -41,6 +42,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+          <OtelBrowserInit />
           <TanStackQueryProvider>
             <Toaster />
             <AuthProvider>{children}</AuthProvider>

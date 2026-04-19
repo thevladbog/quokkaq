@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  getGetPlatformInvoicesQueryKey,
-  getPlatformInvoices,
-  patchPlatformInvoicesId
+  getListInvoicesQueryKey,
+  listInvoices,
+  patchInvoice
 } from '@/lib/api/generated/platform';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -64,8 +64,8 @@ export default function PlatformInvoicesPage() {
   };
 
   const { data, isLoading } = useQuery({
-    queryKey: getGetPlatformInvoicesQueryKey(invoiceListParams),
-    queryFn: async () => (await getPlatformInvoices(invoiceListParams)).data
+    queryKey: getListInvoicesQueryKey(invoiceListParams),
+    queryFn: async () => (await listInvoices(invoiceListParams)).data
   });
 
   const patch = useMutation({
@@ -75,13 +75,13 @@ export default function PlatformInvoicesPage() {
     }: {
       id: string;
       status: (typeof INV_STATUSES)[number];
-    }) => patchPlatformInvoicesId(id, { status }),
+    }) => patchInvoice(id, { status }),
     onSuccess: () => {
       toast.success(
         t('toastStatusUpdated', { defaultValue: 'Invoice status updated.' })
       );
       void qc.invalidateQueries({
-        queryKey: getGetPlatformInvoicesQueryKey()
+        queryKey: getListInvoicesQueryKey()
       });
     },
     onError: (err) => {

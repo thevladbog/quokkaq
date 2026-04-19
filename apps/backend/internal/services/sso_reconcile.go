@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"quokkaq-go-backend/internal/logger"
 	"strings"
 
 	"quokkaq-go-backend/internal/models"
@@ -40,14 +40,14 @@ func (s *SSOService) ApplyPostSSOLogin(
 			if errors.Is(extErr, gorm.ErrRecordNotFound) {
 				// No external identity row yet; nothing to backfill.
 			} else {
-				log.Printf("ApplyPostSSOLogin ssoRepo.FindExternalIdentity(issuer=%q, subject=%q): %v", iss, sub, extErr)
+				logger.PrintfCtx(ctx, "ApplyPostSSOLogin ssoRepo.FindExternalIdentity(issuer=%q, subject=%q): %v", iss, sub, extErr)
 				return fmt.Errorf("apply post SSO login: ssoRepo.FindExternalIdentity: %w", extErr)
 			}
 		} else if ext != nil && ext.CompanyID == company.ID {
 			if ext.ExternalObjectID == nil || strings.TrimSpace(*ext.ExternalObjectID) == "" {
 				ext.ExternalObjectID = &extObjectID
 				if err := s.ssoRepo.UpdateExternalIdentity(ctx, ext); err != nil {
-					log.Printf("ApplyPostSSOLogin UpdateExternalIdentity oid: %v", err)
+					logger.PrintfCtx(ctx, "ApplyPostSSOLogin UpdateExternalIdentity oid: %v", err)
 				}
 			}
 		}
@@ -70,15 +70,15 @@ func (s *SSOService) ApplyPostSSOLogin(
 				} else if err == nil && other != nil && other.ID == u.ID {
 					updates["email"] = pe
 				} else if err == nil && other != nil && other.ID != u.ID {
-					log.Printf("ApplyPostSSOLogin: skip email update, already taken")
+					logger.PrintfCtx(ctx, "ApplyPostSSOLogin: skip email update, already taken")
 				} else if err != nil {
-					log.Printf("ApplyPostSSOLogin FindByEmail: %v", err)
+					logger.PrintfCtx(ctx, "ApplyPostSSOLogin FindByEmail: %v", err)
 				}
 			}
 		}
 		if len(updates) > 0 {
 			if err := s.userRepo.UpdateFields(ctx, u.ID, updates); err != nil {
-				log.Printf("ApplyPostSSOLogin UpdateFields: %v", err)
+				logger.PrintfCtx(ctx, "ApplyPostSSOLogin UpdateFields: %v", err)
 			}
 		}
 	}
@@ -89,7 +89,7 @@ func (s *SSOService) ApplyPostSSOLogin(
 		return nil
 	}
 	if deferGroupReconcile {
-		log.Printf("ApplyPostSSOLogin: skipping group reconcile (OIDC groups claim omitted due to token overage; use Graph or a later sync)")
+		logger.PrintfCtx(ctx, "ApplyPostSSOLogin: skipping group reconcile (OIDC groups claim omitted due to token overage; use Graph or a later sync)")
 		return nil
 	}
 	if err := s.reconcileGroupsToAccess(ctx, company, u, groups); err != nil {
@@ -139,7 +139,7 @@ func (s *SSOService) reconcileGroupsToAccess(ctx context.Context, company *model
 	defer func() {
 		if err != nil {
 			if rerr := s.userRepo.RecomputeUserIsActive(ctx, user.ID); rerr != nil {
-				log.Printf("reconcileGroupsToAccess: userRepo.RecomputeUserIsActive(%q) after failed tx: %v", user.ID, rerr)
+				logger.PrintfCtx(ctx, "reconcileGroupsToAccess: userRepo.RecomputeUserIsActive(%q) after failed tx: %v", user.ID, rerr)
 			}
 		}
 	}()

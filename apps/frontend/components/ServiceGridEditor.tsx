@@ -12,7 +12,7 @@ import { useQuery } from '@tanstack/react-query';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import {
-  getGetUnitsIdQueryKey,
+  getGetUnitByIDQueryKey,
   getGetUnitsUnitIdChildUnitsQueryKey
 } from '@/lib/api/generated/units';
 import { normalizeChildUnitsQueryData } from '@/lib/child-units-query';
@@ -1468,8 +1468,8 @@ const ServiceGridEditor: React.FC<ServiceGridEditorProps> = ({
 
   const { data: gridContextUnit } = useQuery({
     queryKey: activeUnitId
-      ? getGetUnitsIdQueryKey(activeUnitId)
-      : (['getUnitsId', 'disabled'] as const),
+      ? getGetUnitByIDQueryKey(activeUnitId)
+      : (['/units/__disabled__'] as const),
     queryFn: () => unitsApi.getById(activeUnitId!),
     enabled: !!activeUnitId
   });
@@ -1498,7 +1498,7 @@ const ServiceGridEditor: React.FC<ServiceGridEditorProps> = ({
   const { data: zoneLabelChildUnitsRaw } = useQuery({
     queryKey: zoneLabelsParentId
       ? getGetUnitsUnitIdChildUnitsQueryKey(zoneLabelsParentId)
-      : (['getUnitsUnitIdChildUnits', 'disabled'] as const),
+      : (['/units/__disabled__/child-units'] as const),
     queryFn: () => unitsApi.getChildUnits(zoneLabelsParentId!),
     enabled: !!zoneLabelsParentId
   });
