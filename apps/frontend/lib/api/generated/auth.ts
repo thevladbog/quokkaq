@@ -5072,6 +5072,7 @@ export const usePostCompaniesMeTenantRoles = <TError = string,
     }
 
 /**
+ * Deletes a tenant-defined role. The reserved system role (`system_admin`) cannot be deleted.
  * @summary Delete tenant role
  */
 export type deleteCompaniesMeTenantRolesRoleIdResponse204 = {
@@ -5654,7 +5655,7 @@ export const usePatchCompaniesMeUsersUserIdSsoDirectory = <TError = string,
     }
 
 /**
- * Sets the user’s tenant-defined roles for the company; replaces existing rows. Rebuilds user_units from role grants.
+ * Sets the user’s tenant-defined roles for the company; replaces existing rows. Rebuilds user_units from role grants. The reserved system role (slug `system_admin`) is mutually exclusive with other tenant roles. Adding or removing that role requires the caller to be a global admin/platform admin or a tenant system administrator in this company.
  * @summary Replace tenant role assignments for a user
  */
 export type patchCompaniesMeUsersUserIdTenantRolesResponse200 = {
