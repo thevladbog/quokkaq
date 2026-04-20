@@ -59,6 +59,25 @@ sudo systemctl enable --now quokkaq-demo-reset.timer
 
 The demo compose sets **`APP_ENV=demo`** on the API so first-run setup token behaviour matches a public demo (see [`internal/config/setup_token.go`](../internal/config/setup_token.go)).
 
+## GitHub Actions: demo images and VM refresh
+
+The workflow [`.github/workflows/deploy-demo.yml`](../../../.github/workflows/deploy-demo.yml) builds and pushes **demo** images to Yandex Container Registry and refreshes the `backend` and `frontend` services on the demo VM.
+
+| Topic | Detail |
+|-------|--------|
+| **When it runs** | `push` to **`release` only**, with a **paths** filter (`deploy/demo`, `apps/backend`, `apps/frontend`, shared packages, workflow). Pushes to **`main` do not** start this workflow. There is **no** `workflow_dispatch`. |
+| **Images** | `quokkaq-backend-demo` (from [`Dockerfile.demo`](../../../deploy/demo/Dockerfile.demo)) and `quokkaq-frontend-demo` (from [`apps/frontend/Dockerfile`](../../frontend/Dockerfile)), tags: commit SHA and `latest`. |
+| **On the VM** | Assumes `~/quokkaq-demo/.env.demo` and runs `docker compose -f ~/quokkaq-demo/docker-compose.demo.yml --env-file ~/quokkaq-demo/.env.demo pull … up -d`. CI exports `DEMO_BACKEND_IMAGE` / `DEMO_FRONTEND_IMAGE` for that run so compose pulls the new tags. |
+| **Data** | **`demo-reset.sh` is not invoked** by the pipeline; deploys upgrade containers only. Nightly or manual reset stays separate (scheduler / systemd / manual). |
+
+### Secrets checklist (repository)
+
+- **Registry:** `YC_SA_JSON_CREDENTIALS`, `YC_REGISTRY_ID` (same pattern as prod).
+- **Demo frontend build:** `DEMO_NEXT_PUBLIC_API_URL`, `DEMO_NEXT_PUBLIC_WS_URL` (browser-facing URLs for the demo hostnames).
+- **Demo VM:** `DEMO_VM_HOST`, `DEMO_VM_USERNAME`, `DEMO_VM_SSH_KEY`.
+
+See also [`deploy/demo/README.md`](../../../deploy/demo/README.md) (CI section).
+
 ## Related
 
 - Product infrastructure overview: [`docs/saas/INFRASTRUCTURE.md`](../../../docs/saas/INFRASTRUCTURE.md)

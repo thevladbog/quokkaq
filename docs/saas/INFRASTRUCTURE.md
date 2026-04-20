@@ -51,6 +51,8 @@
 | **Traefik** | 1 на хост с публичным ingress | 1 на каждый публичный ingress-узел |
 | **Внешние зависимости** | SMTP можно упростить (тестовый ящик / mock); Stripe — тестовые ключи; DNS/TLS по месту | Как prod-подобная схема, тестовые ключи процессора |
 
+Автоматическое обновление образов демо-стека на VM (без сброса БД): GitHub Actions — [`.github/workflows/deploy-demo.yml`](../../.github/workflows/deploy-demo.yml); подробнее — [`deploy/demo/README.md`](../../deploy/demo/README.md) и [`apps/backend/docs/DEMO_DEPLOYMENT.md`](../../apps/backend/docs/DEMO_DEPLOYMENT.md).
+
 ### Контур **stage**
 
 | Критерий | Минимальный | Оптимальный |

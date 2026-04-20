@@ -8,6 +8,47 @@ Single Compose file: Postgres, Redis, MinIO, Traefik, backend (with `seed-plans`
 - DNS `A` records for `DEMO_APP_HOST`, `DEMO_API_HOST`, `DEMO_S3_HOST` pointing to the VM.
 - A pushed **frontend** image tag (`DEMO_FRONTEND_IMAGE`). Backend is built from this repo via [`Dockerfile.demo`](Dockerfile.demo).
 
+## CI/CD (GitHub Actions)
+
+Workflow: [`.github/workflows/deploy-demo.yml`](../../.github/workflows/deploy-demo.yml).
+
+| Item | Behaviour |
+|------|-----------|
+| **Trigger** | `push` to branch **`release` only** (not `main`, not `workflow_dispatch`). |
+| **Paths filter** | Runs only when changes touch `deploy/demo/**`, `apps/backend/**`, `apps/frontend/**`, `packages/shared-types/**`, `packages/kiosk-lib/**`, or the workflow file. |
+| **Images** | Pushes `quokkaq-backend-demo` and `quokkaq-frontend-demo` to Yandex Container Registry (`cr.yandex/<YC_REGISTRY_ID>/…`), tagged with the commit SHA and `:latest`. |
+| **VM** | Copies [`docker-compose.demo.yml`](docker-compose.demo.yml) to `~/quokkaq-demo/`, then SSH: `docker login` → `compose pull backend frontend` → `compose up -d`. **Does not** run [`demo-reset.sh`](demo-reset.sh) (no DB wipe on each deploy). |
+
+### GitHub Secrets / variables
+
+**Registry (same idea as prod):**
+
+| Secret | Purpose |
+|--------|---------|
+| `YC_SA_JSON_CREDENTIALS` | Service account JSON for `docker login` to `cr.yandex` (CI and on the VM). |
+| `YC_REGISTRY_ID` | Registry ID in image URLs. |
+
+**Frontend build (demo-specific; avoid reusing prod `NEXT_PUBLIC_*` secrets):**
+
+| Secret | Purpose |
+|--------|---------|
+| `DEMO_NEXT_PUBLIC_API_URL` | Passed as `NEXT_PUBLIC_API_URL` when building the demo frontend image (must match what browsers use, e.g. `https://<DEMO_API_HOST>`). |
+| `DEMO_NEXT_PUBLIC_WS_URL` | Passed as `NEXT_PUBLIC_WS_URL` for the demo WebSocket endpoint. |
+
+**Demo VM SSH:**
+
+| Secret | Purpose |
+|--------|---------|
+| `DEMO_VM_HOST` | Hostname or IP of the demo VM. |
+| `DEMO_VM_USERNAME` | SSH user. |
+| `DEMO_VM_SSH_KEY` | Private key (PEM) for that user. |
+
+### VM layout before the first CI deploy
+
+1. Create `~/quokkaq-demo/` on the VM.
+2. Place **`.env.demo`** there (not from git): copy from [`.env.demo.example`](.env.demo.example), set passwords, `JWT_SECRET`, hostnames, bucket, etc. Values for public URLs should align with `DEMO_NEXT_PUBLIC_*` in GitHub.
+3. First-time stack: from the repo (or after CI has pushed images), run `docker compose … up -d` and seed as in [First run](#first-run). Later pushes to `release` update only **backend** and **frontend** images via Actions.
+
 ## First run
 
 ```bash
