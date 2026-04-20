@@ -18,6 +18,8 @@ import (
 )
 
 type StorageService interface {
+	// S3Ping verifies the configured bucket exists (HeadBucket).
+	S3Ping(ctx context.Context) error
 	UploadFile(ctx context.Context, fileBytes []byte, fileName string, folder string, contentType string) (string, string, error)
 	// UploadTenantAsset stores a private object at tenants/{tenantID}/{category}/{uuid}{ext}. Returns S3 object key only (no public URL).
 	UploadTenantAsset(ctx context.Context, tenantID, category string, fileBytes []byte, fileName string, contentType string) (key string, err error)
@@ -74,6 +76,17 @@ func NewStorageService() StorageService {
 		client:     client,
 		bucketName: bucketName,
 	}
+}
+
+func (s *storageService) S3Ping(ctx context.Context) error {
+	if s.client == nil {
+		return fmt.Errorf("s3 client not initialized")
+	}
+	if strings.TrimSpace(s.bucketName) == "" {
+		return fmt.Errorf("AWS_S3_BUCKET not set")
+	}
+	_, err := s.client.HeadBucket(ctx, &s3.HeadBucketInput{Bucket: aws.String(s.bucketName)})
+	return err
 }
 
 func (s *storageService) UploadFile(ctx context.Context, fileBytes []byte, fileName string, folder string, contentType string) (string, string, error) {

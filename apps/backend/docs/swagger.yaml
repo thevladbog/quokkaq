@@ -1199,11 +1199,17 @@ components:
       type: object
     handlers.setupFirstAdminRequest:
       properties:
+        companyName:
+          type: string
         email:
           type: string
         name:
           type: string
         password:
+          type: string
+        timezone:
+          type: string
+        unitName:
           type: string
       type: object
     handlers.ssoExchangeRequest:
@@ -2884,6 +2890,22 @@ components:
           items:
             $ref: '#/components/schemas/services.SLADeviationsPoint'
           type: array
+      type: object
+    services.SetupHealthCheck:
+      properties:
+        message:
+          type: string
+        ok:
+          type: boolean
+      type: object
+    services.SetupHealthReport:
+      properties:
+        checks:
+          additionalProperties:
+            $ref: '#/components/schemas/services.SetupHealthCheck'
+          type: object
+        ok:
+          type: boolean
       type: object
     services.ShiftActivityActorOption:
       properties:
@@ -9571,15 +9593,46 @@ paths:
       summary: Revoke a support report share
       tags:
       - support
+  /system/health:
+    get:
+      description: Probes PostgreSQL, Redis, S3, and SMTP. Requires X-Setup-Token when APP_ENV is production or staging and SETUP_TOKEN is set.
+      operationId: getSystemHealth
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/services.SetupHealthReport'
+          description: OK
+        '401':
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  type: string
+                type: object
+          description: Unauthorized
+        '503':
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  type: string
+                type: object
+          description: Service Unavailable
+      summary: Setup wizard health checks
+      tags:
+      - system
   /system/setup:
     post:
-      description: Creates the first administrator if the system is not initialized
+      description: Creates SaaS operator company, root unit, anonymous kiosk client, and first admin with admin + platform_admin roles.
+      operationId: setupFirstAdmin
       requestBody:
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/handlers.setupFirstAdminRequest'
-        description: Admin user
+        description: Bootstrap payload
         required: true
         x-originalParamName: request
       responses:
@@ -9593,26 +9646,32 @@ paths:
           content:
             application/json:
               schema:
-                type: string
+                additionalProperties:
+                  type: string
+                type: object
           description: Bad Request
         '403':
           content:
             application/json:
               schema:
-                type: string
-          description: Forbidden - System already initialized
+                additionalProperties:
+                  type: string
+                type: object
+          description: Forbidden
         '500':
           content:
             application/json:
               schema:
-                type: string
+                additionalProperties:
+                  type: string
+                type: object
           description: Internal Server Error
-      summary: Setup first admin
+      summary: SaaS first deployment bootstrap
       tags:
       - system
   /system/status:
     get:
-      description: Checks if the system is initialized (has users)
+      description: True when SaaS deployment bootstrap is complete (SaaS operator company + at least one platform_admin).
       responses:
         '200':
           content:

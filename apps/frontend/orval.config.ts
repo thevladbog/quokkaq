@@ -249,5 +249,18 @@ export default defineConfig({
       ...reactQueryOutput,
       target: './lib/api/generated/support.ts'
     }
+  },
+  quokkaqSystem: {
+    input: {
+      target: '../backend/docs/swagger.json',
+      filters: {
+        mode: 'include',
+        tags: ['system']
+      }
+    },
+    output: {
+      ...reactQueryOutput,
+      target: './lib/api/generated/system.ts'
+    }
   }
 });

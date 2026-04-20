@@ -1296,9 +1296,12 @@ export interface HandlersPutVisitorTagsRequest {
 }
 
 export interface HandlersSetupFirstAdminRequest {
+  companyName?: string;
   email?: string;
   name?: string;
   password?: string;
+  timezone?: string;
+  unitName?: string;
 }
 
 export interface HandlersSsoExchangeRequest {
@@ -1897,6 +1900,18 @@ export interface ServicesSLADeviationsResponse {
   computedAt?: string;
   granularity?: string;
   points?: ServicesSLADeviationsPoint[];
+}
+
+export interface ServicesSetupHealthCheck {
+  message?: string;
+  ok?: boolean;
+}
+
+export type ServicesSetupHealthReportChecks = {[key: string]: ServicesSetupHealthCheck};
+
+export interface ServicesSetupHealthReport {
+  checks?: ServicesSetupHealthReportChecks;
+  ok?: boolean;
 }
 
 export interface ServicesShiftActivityActorOption {

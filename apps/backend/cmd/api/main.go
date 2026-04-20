@@ -179,7 +179,8 @@ func run() error {
 	}
 	defer jobWorker.Stop()
 
-	userService := services.NewUserService(userRepo)
+	userService := services.NewUserService(userRepo, companyRepo)
+	deploymentSetupService := services.NewDeploymentSetupService(userRepo, companyRepo)
 	mailService := services.NewMailService()
 	tenantRBACRepo := repository.NewTenantRBACRepository()
 	deploymentSaaSSettingsRepo := repository.NewDeploymentSaaSSettingsRepository()
@@ -246,7 +247,7 @@ func run() error {
 	surveyService := services.NewSurveyService(surveyRepo, unitRepo, userRepo, ticketRepo, desktopTerminalRepo, counterRepo, storageService)
 	quotaService := services.NewQuotaService()
 
-	userHandler := handlers.NewUserHandler(userService, userRepo, unitRepo)
+	userHandler := handlers.NewUserHandler(userService, userRepo, unitRepo, deploymentSetupService, storageService)
 	authHandler := handlers.NewAuthHandler(authService, userService, userRepo, tenantRBACRepo, leadIssueService)
 	integrationsHandler := handlers.NewIntegrationsHandler(deploymentSaaSSettingsService)
 	leadHandler := handlers.NewLeadHandler(leadIssueService)
@@ -454,7 +455,8 @@ func run() error {
 
 	r.Route("/system", func(r chi.Router) {
 		r.Get("/status", userHandler.GetSystemStatus)
-		r.Post("/setup", userHandler.SetupFirstAdmin)
+		r.With(authmiddleware.SSOPublicRateLimit, authmiddleware.SetupWizardTokenGate).Get("/health", userHandler.GetSystemHealth)
+		r.With(authmiddleware.SSOPublicRateLimit, authmiddleware.SetupWizardTokenGate).Post("/setup", userHandler.SetupFirstAdmin)
 	})
 
 	r.Route("/users", func(r chi.Router) {

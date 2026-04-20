@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -14,13 +15,27 @@ import (
 )
 
 type UserHandler struct {
-	service  services.UserService
-	userRepo repository.UserRepository
-	unitRepo repository.UnitRepository
+	service         services.UserService
+	userRepo        repository.UserRepository
+	unitRepo        repository.UnitRepository
+	deploymentSetup *services.DeploymentSetupService
+	storage         services.StorageService
 }
 
-func NewUserHandler(service services.UserService, userRepo repository.UserRepository, unitRepo repository.UnitRepository) *UserHandler {
-	return &UserHandler{service: service, userRepo: userRepo, unitRepo: unitRepo}
+func NewUserHandler(
+	service services.UserService,
+	userRepo repository.UserRepository,
+	unitRepo repository.UnitRepository,
+	deploymentSetup *services.DeploymentSetupService,
+	storage services.StorageService,
+) *UserHandler {
+	return &UserHandler{
+		service:         service,
+		userRepo:        userRepo,
+		unitRepo:        unitRepo,
+		deploymentSetup: deploymentSetup,
+		storage:         storage,
+	}
 }
 
 func (h *UserHandler) resolveViewerCompany(w http.ResponseWriter, r *http.Request) (viewerID, companyID string, ok bool) {
@@ -416,7 +431,7 @@ func (h *UserHandler) GetUserUnits(w http.ResponseWriter, r *http.Request) {
 
 // GetSystemStatus godoc
 // @Summary      Get system status
-// @Description  Checks if the system is initialized (has users)
+// @Description  True when SaaS deployment bootstrap is complete (SaaS operator company + at least one platform_admin).
 // @Tags         system
 // @Produce      json
 // @Success      200  {object}  map[string]bool
@@ -428,54 +443,87 @@ func (h *UserHandler) GetSystemStatus(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	RespondJSON(w, map[string]bool{"initialized": initialized})
+	RespondJSON(w, map[string]bool{
+		"initialized":     initialized,
+		"deploymentReady": initialized,
+	})
+}
+
+// GetSystemHealth godoc
+// @ID           getSystemHealth
+// @Summary      Setup wizard health checks
+// @Description  Probes PostgreSQL, Redis, S3, and SMTP. Requires X-Setup-Token when APP_ENV is production or staging and SETUP_TOKEN is set.
+// @Tags         system
+// @Produce      json
+// @Success      200  {object}  services.SetupHealthReport
+// @Failure      401  {object}  map[string]string
+// @Failure      503  {object}  map[string]string
+// @Router       /system/health [get]
+func (h *UserHandler) GetSystemHealth(w http.ResponseWriter, r *http.Request) {
+	report := services.CollectSetupHealth(r.Context(), h.storage)
+	RespondJSON(w, report)
 }
 
 type setupFirstAdminRequest struct {
-	Name     string `json:"name"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	CompanyName string `json:"companyName"`
+	UnitName    string `json:"unitName"`
+	Timezone    string `json:"timezone"`
+	Name        string `json:"name"`
+	Email       string `json:"email"`
+	Password    string `json:"password"`
 }
 
 // SetupFirstAdmin godoc
-// @Summary      Setup first admin
-// @Description  Creates the first administrator if the system is not initialized
+// @ID           setupFirstAdmin
+// @Summary      SaaS first deployment bootstrap
+// @Description  Creates SaaS operator company, root unit, anonymous kiosk client, and first admin with admin + platform_admin roles.
 // @Tags         system
 // @Accept       json
 // @Produce      json
-// @Param        request body setupFirstAdminRequest true "Admin user"
+// @Param        request body setupFirstAdminRequest true "Bootstrap payload"
 // @Success      201  {object}  models.User
-// @Failure      400  {string}  string "Bad Request"
-// @Failure      403  {string}  string "Forbidden - System already initialized"
-// @Failure      500  {string}  string "Internal Server Error"
+// @Failure      400  {object}  map[string]string
+// @Failure      403  {object}  map[string]string
+// @Failure      500  {object}  map[string]string
 // @Router       /system/setup [post]
 func (h *UserHandler) SetupFirstAdmin(w http.ResponseWriter, r *http.Request) {
 	var req setupFirstAdminRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		RespondJSONWithStatus(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
 		return
 	}
-	if req.Name == "" || req.Email == "" || req.Password == "" {
-		http.Error(w, "name, email and password are required", http.StatusBadRequest)
+	if req.Name == "" || req.Email == "" || req.Password == "" || req.CompanyName == "" {
+		RespondJSONWithStatus(w, http.StatusBadRequest, map[string]string{"error": "companyName, name, email and password are required"})
 		return
 	}
 	email := req.Email
-	plainPassword := req.Password
-	user := models.User{
-		Name:     req.Name,
-		Email:    &email,
-		Password: &plainPassword,
+	in := services.BootstrapSaaSInput{
+		CompanyName: req.CompanyName,
+		UnitName:    req.UnitName,
+		Timezone:    req.Timezone,
+		AdminName:   req.Name,
+		AdminEmail:  email,
+		AdminPass:   req.Password,
 	}
 
-	if err := h.service.CreateFirstAdmin(&user); err != nil {
-		if err.Error() == "system is already initialized" {
-			http.Error(w, err.Error(), http.StatusForbidden)
+	if err := h.deploymentSetup.BootstrapSaaS(context.Background(), in); err != nil {
+		if errors.Is(err, services.ErrDeploymentAlreadyReady) {
+			RespondJSONWithStatus(w, http.StatusForbidden, map[string]string{"error": err.Error()})
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		if errors.Is(err, services.ErrBootstrapValidation) {
+			RespondJSONWithStatus(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			return
+		}
+		RespondJSONWithStatus(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	RespondJSON(w, user)
+	user, err := h.userRepo.FindByEmail(r.Context(), email)
+	if err != nil || user == nil {
+		RespondJSONWithStatus(w, http.StatusInternalServerError, map[string]string{"error": "user was created but could not be loaded"})
+		return
+	}
+	user.Password = nil
+	RespondJSONWithStatus(w, http.StatusCreated, user)
 }

@@ -33,16 +33,16 @@ type UserService interface {
 	RemoveUnit(userID, unitID string) error
 	AssignRole(userID, roleID string) error
 	IsSystemInitialized() (bool, error)
-	CreateFirstAdmin(user *models.User) error
 	EnsureRoleExists(name string) (*models.Role, error)
 }
 
 type userService struct {
-	repo repository.UserRepository
+	repo        repository.UserRepository
+	companyRepo repository.CompanyRepository
 }
 
-func NewUserService(repo repository.UserRepository) UserService {
-	return &userService{repo: repo}
+func NewUserService(repo repository.UserRepository, companyRepo repository.CompanyRepository) UserService {
+	return &userService{repo: repo, companyRepo: companyRepo}
 }
 
 func (s *userService) CreateUser(user *models.User) error {
@@ -183,44 +183,18 @@ func (s *userService) RemoveUnit(userID, unitID string) error {
 }
 
 func (s *userService) IsSystemInitialized() (bool, error) {
-	count, err := s.repo.Count()
+	op, err := s.companyRepo.FindSaaSOperatorCompany()
 	if err != nil {
 		return false, err
 	}
-	return count > 0, nil
-}
-
-func (s *userService) CreateFirstAdmin(user *models.User) error {
-	// 1. Check if system is already initialized
-	initialized, err := s.IsSystemInitialized()
+	if op == nil {
+		return false, nil
+	}
+	ids, err := s.repo.ListUserIDsByRoleNames([]string{"platform_admin"})
 	if err != nil {
-		return err
+		return false, err
 	}
-	if initialized {
-		return errors.New("system is already initialized")
-	}
-
-	// 2. Ensure roles exist
-	roles := []string{"admin", "supervisor", "operator"}
-	for _, roleName := range roles {
-		if _, err := s.EnsureRoleExists(roleName); err != nil {
-			return err
-		}
-	}
-
-	// 3. Find Admin Role
-	adminRole, err := s.repo.FindRoleByName("admin")
-	if err != nil {
-		return errors.New("admin role not found")
-	}
-
-	// 4. Create User
-	if err := s.CreateUser(user); err != nil {
-		return err
-	}
-
-	// 5. Assign Admin Role
-	return s.AssignRole(user.ID, adminRole.ID)
+	return len(ids) > 0, nil
 }
 
 func (s *userService) EnsureRoleExists(name string) (*models.Role, error) {

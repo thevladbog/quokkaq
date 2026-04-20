@@ -2111,646 +2111,209 @@ export interface HandlersLoginLinkResponse {
   exampleUrl: string;
 }
 
-export type GetUnitsUnitIdShiftActivityParams = {
-/**
- * Page size (default 20, max 100)
- */
-limit?: number;
-/**
- * Opaque keyset pagination cursor
- */
-cursor?: string;
-/**
- * Filter by ticket.counter_id
- */
-counterId?: string;
-/**
- * Filter by history actor user id
- */
-userId?: string;
-/**
- * Filter by ticket.client_id
- */
-clientId?: string;
-/**
- * Ticket UUID or queue number substring
- */
-ticket?: string;
-/**
- * Search queue number, ticket id, or visitor name
- */
-q?: string;
-/**
- * Comma-separated DOW 0-6 (unit timezone)
- */
-weekdays?: string;
-/**
- * Inclusive start date YYYY-MM-DD (unit timezone)
- */
-dateFrom?: string;
-/**
- * Inclusive end date YYYY-MM-DD (unit timezone)
- */
-dateTo?: string;
-};
+export type GetSystemHealth401 = {[key: string]: string};
 
-export type GetUnitsUnitIdShiftDashboard200 = { [key: string]: unknown };
+export type GetSystemHealth503 = {[key: string]: string};
 
-export type PostUnitsUnitIdShiftEod200 = { [key: string]: unknown };
+export type SetupFirstAdmin400 = {[key: string]: string};
+
+export type SetupFirstAdmin403 = {[key: string]: string};
+
+export type SetupFirstAdmin500 = {[key: string]: string};
+
+export type GetSystemStatus200 = {[key: string]: boolean};
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
 
 /**
- * Paginated ticket history rows for tickets belonging to the unit (supervisor dashboard / journal). Limit is capped at 100. Optional filters: counterId (current ticket counter_id), userId (history actor), clientId, ticket (UUID or queue substring), q (search queue/id/visitor name), weekdays (comma-separated PostgreSQL DOW 0=Sun..6=Sat in unit timezone), dateFrom/dateTo (YYYY-MM-DD inclusive, history timestamp calendar date in unit timezone). counter_id reflects the ticket's current assignment, not necessarily the desk at event time. For users without full journal access (not admin/supervisor/platform_admin and no ACCESS_SUPERVISOR_PANEL on this unit), results are restricted to rows where the authenticated user is the history actor; userId filter is ignored/overridden in that case.
- * @summary Shift ticket activity feed
+ * Probes PostgreSQL, Redis, S3, and SMTP. Requires X-Setup-Token when APP_ENV is production or staging and SETUP_TOKEN is set.
+ * @summary Setup wizard health checks
  */
-export type getUnitsUnitIdShiftActivityResponse200 = {
-  data: ServicesShiftActivityResponse
+export type getSystemHealthResponse200 = {
+  data: ServicesSetupHealthReport
   status: 200
 }
 
-export type getUnitsUnitIdShiftActivityResponse400 = {
-  data: string
+export type getSystemHealthResponse401 = {
+  data: GetSystemHealth401
+  status: 401
+}
+
+export type getSystemHealthResponse503 = {
+  data: GetSystemHealth503
+  status: 503
+}
+
+export type getSystemHealthResponseSuccess = (getSystemHealthResponse200) & {
+  headers: Headers;
+};
+export type getSystemHealthResponseError = (getSystemHealthResponse401 | getSystemHealthResponse503) & {
+  headers: Headers;
+};
+
+export type getSystemHealthResponse = (getSystemHealthResponseSuccess | getSystemHealthResponseError)
+
+export const getGetSystemHealthUrl = () => {
+
+
+
+
+  return `/system/health`
+}
+
+export const getSystemHealth = async ( options?: RequestInit): Promise<getSystemHealthResponse> => {
+
+  return orvalMutator<getSystemHealthResponse>(getGetSystemHealthUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSystemHealthQueryKey = () => {
+    return [
+    `/system/health`
+    ] as const;
+    }
+
+
+export const getGetSystemHealthQueryOptions = <TData = Awaited<ReturnType<typeof getSystemHealth>>, TError = GetSystemHealth401 | GetSystemHealth503>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSystemHealth>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSystemHealthQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSystemHealth>>> = ({ signal }) => getSystemHealth({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSystemHealth>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetSystemHealthQueryResult = NonNullable<Awaited<ReturnType<typeof getSystemHealth>>>
+export type GetSystemHealthQueryError = GetSystemHealth401 | GetSystemHealth503
+
+
+export function useGetSystemHealth<TData = Awaited<ReturnType<typeof getSystemHealth>>, TError = GetSystemHealth401 | GetSystemHealth503>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSystemHealth>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getSystemHealth>>,
+          TError,
+          Awaited<ReturnType<typeof getSystemHealth>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetSystemHealth<TData = Awaited<ReturnType<typeof getSystemHealth>>, TError = GetSystemHealth401 | GetSystemHealth503>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSystemHealth>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getSystemHealth>>,
+          TError,
+          Awaited<ReturnType<typeof getSystemHealth>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetSystemHealth<TData = Awaited<ReturnType<typeof getSystemHealth>>, TError = GetSystemHealth401 | GetSystemHealth503>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSystemHealth>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Setup wizard health checks
+ */
+
+export function useGetSystemHealth<TData = Awaited<ReturnType<typeof getSystemHealth>>, TError = GetSystemHealth401 | GetSystemHealth503>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSystemHealth>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetSystemHealthQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * Creates SaaS operator company, root unit, anonymous kiosk client, and first admin with admin + platform_admin roles.
+ * @summary SaaS first deployment bootstrap
+ */
+export type setupFirstAdminResponse201 = {
+  data: ModelsUser
+  status: 201
+}
+
+export type setupFirstAdminResponse400 = {
+  data: SetupFirstAdmin400
   status: 400
 }
 
-export type getUnitsUnitIdShiftActivityResponse401 = {
-  data: string
-  status: 401
-}
-
-export type getUnitsUnitIdShiftActivityResponse403 = {
-  data: string
+export type setupFirstAdminResponse403 = {
+  data: SetupFirstAdmin403
   status: 403
 }
 
-export type getUnitsUnitIdShiftActivityResponse500 = {
-  data: string
+export type setupFirstAdminResponse500 = {
+  data: SetupFirstAdmin500
   status: 500
 }
 
-export type getUnitsUnitIdShiftActivityResponseSuccess = (getUnitsUnitIdShiftActivityResponse200) & {
+export type setupFirstAdminResponseSuccess = (setupFirstAdminResponse201) & {
   headers: Headers;
 };
-export type getUnitsUnitIdShiftActivityResponseError = (getUnitsUnitIdShiftActivityResponse400 | getUnitsUnitIdShiftActivityResponse401 | getUnitsUnitIdShiftActivityResponse403 | getUnitsUnitIdShiftActivityResponse500) & {
+export type setupFirstAdminResponseError = (setupFirstAdminResponse400 | setupFirstAdminResponse403 | setupFirstAdminResponse500) & {
   headers: Headers;
 };
 
-export type getUnitsUnitIdShiftActivityResponse = (getUnitsUnitIdShiftActivityResponseSuccess | getUnitsUnitIdShiftActivityResponseError)
+export type setupFirstAdminResponse = (setupFirstAdminResponseSuccess | setupFirstAdminResponseError)
 
-export const getGetUnitsUnitIdShiftActivityUrl = (unitId: string,
-    params?: GetUnitsUnitIdShiftActivityParams,) => {
-  const normalizedParams = new URLSearchParams();
+export const getSetupFirstAdminUrl = () => {
 
-  Object.entries(params || {}).forEach(([key, value]) => {
 
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : value.toString())
-    }
-  });
 
-  const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/units/${unitId}/shift/activity?${stringifiedParams}` : `/units/${unitId}/shift/activity`
+  return `/system/setup`
 }
 
-export const getUnitsUnitIdShiftActivity = async (unitId: string,
-    params?: GetUnitsUnitIdShiftActivityParams, options?: RequestInit): Promise<getUnitsUnitIdShiftActivityResponse> => {
+export const setupFirstAdmin = async (handlersSetupFirstAdminRequest: HandlersSetupFirstAdminRequest, options?: RequestInit): Promise<setupFirstAdminResponse> => {
 
-  return orvalMutator<getUnitsUnitIdShiftActivityResponse>(getGetUnitsUnitIdShiftActivityUrl(unitId,params),
+  return orvalMutator<setupFirstAdminResponse>(getSetupFirstAdminUrl(),
   {
     ...options,
-    method: 'GET'
-
-
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersSetupFirstAdminRequest,)
   }
 );}
 
 
 
 
-
-export const getGetUnitsUnitIdShiftActivityQueryKey = (unitId: string,
-    params?: GetUnitsUnitIdShiftActivityParams,) => {
-    return [
-    `/units/${unitId}/shift/activity`, ...(params ? [params] : [])
-    ] as const;
-    }
-
-
-export const getGetUnitsUnitIdShiftActivityQueryOptions = <TData = Awaited<ReturnType<typeof getUnitsUnitIdShiftActivity>>, TError = string>(unitId: string,
-    params?: GetUnitsUnitIdShiftActivityParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdShiftActivity>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetUnitsUnitIdShiftActivityQueryKey(unitId,params);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUnitsUnitIdShiftActivity>>> = ({ signal }) => getUnitsUnitIdShiftActivity(unitId,params, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdShiftActivity>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type GetUnitsUnitIdShiftActivityQueryResult = NonNullable<Awaited<ReturnType<typeof getUnitsUnitIdShiftActivity>>>
-export type GetUnitsUnitIdShiftActivityQueryError = string
-
-
-export function useGetUnitsUnitIdShiftActivity<TData = Awaited<ReturnType<typeof getUnitsUnitIdShiftActivity>>, TError = string>(
- unitId: string,
-    params: undefined |  GetUnitsUnitIdShiftActivityParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdShiftActivity>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getUnitsUnitIdShiftActivity>>,
-          TError,
-          Awaited<ReturnType<typeof getUnitsUnitIdShiftActivity>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitsUnitIdShiftActivity<TData = Awaited<ReturnType<typeof getUnitsUnitIdShiftActivity>>, TError = string>(
- unitId: string,
-    params?: GetUnitsUnitIdShiftActivityParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdShiftActivity>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getUnitsUnitIdShiftActivity>>,
-          TError,
-          Awaited<ReturnType<typeof getUnitsUnitIdShiftActivity>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitsUnitIdShiftActivity<TData = Awaited<ReturnType<typeof getUnitsUnitIdShiftActivity>>, TError = string>(
- unitId: string,
-    params?: GetUnitsUnitIdShiftActivityParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdShiftActivity>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Shift ticket activity feed
- */
-
-export function useGetUnitsUnitIdShiftActivity<TData = Awaited<ReturnType<typeof getUnitsUnitIdShiftActivity>>, TError = string>(
- unitId: string,
-    params?: GetUnitsUnitIdShiftActivityParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdShiftActivity>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getGetUnitsUnitIdShiftActivityQueryOptions(unitId,params,options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-
-
-
-
-
-
-/**
- * User ids and display names for journal filter dropdown (from ticket_histories in this unit). For users without full journal access, only the authenticated user is returned.
- * @summary Distinct operators in unit ticket history
- */
-export type getUnitsUnitIdShiftActivityActorsResponse200 = {
-  data: ServicesShiftActivityActorsResponse
-  status: 200
-}
-
-export type getUnitsUnitIdShiftActivityActorsResponse401 = {
-  data: string
-  status: 401
-}
-
-export type getUnitsUnitIdShiftActivityActorsResponse403 = {
-  data: string
-  status: 403
-}
-
-export type getUnitsUnitIdShiftActivityActorsResponse500 = {
-  data: string
-  status: 500
-}
-
-export type getUnitsUnitIdShiftActivityActorsResponseSuccess = (getUnitsUnitIdShiftActivityActorsResponse200) & {
-  headers: Headers;
-};
-export type getUnitsUnitIdShiftActivityActorsResponseError = (getUnitsUnitIdShiftActivityActorsResponse401 | getUnitsUnitIdShiftActivityActorsResponse403 | getUnitsUnitIdShiftActivityActorsResponse500) & {
-  headers: Headers;
-};
-
-export type getUnitsUnitIdShiftActivityActorsResponse = (getUnitsUnitIdShiftActivityActorsResponseSuccess | getUnitsUnitIdShiftActivityActorsResponseError)
-
-export const getGetUnitsUnitIdShiftActivityActorsUrl = (unitId: string,) => {
-
-
-
-
-  return `/units/${unitId}/shift/activity/actors`
-}
-
-export const getUnitsUnitIdShiftActivityActors = async (unitId: string, options?: RequestInit): Promise<getUnitsUnitIdShiftActivityActorsResponse> => {
-
-  return orvalMutator<getUnitsUnitIdShiftActivityActorsResponse>(getGetUnitsUnitIdShiftActivityActorsUrl(unitId),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getGetUnitsUnitIdShiftActivityActorsQueryKey = (unitId: string,) => {
-    return [
-    `/units/${unitId}/shift/activity/actors`
-    ] as const;
-    }
-
-
-export const getGetUnitsUnitIdShiftActivityActorsQueryOptions = <TData = Awaited<ReturnType<typeof getUnitsUnitIdShiftActivityActors>>, TError = string>(unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdShiftActivityActors>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetUnitsUnitIdShiftActivityActorsQueryKey(unitId);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUnitsUnitIdShiftActivityActors>>> = ({ signal }) => getUnitsUnitIdShiftActivityActors(unitId, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdShiftActivityActors>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type GetUnitsUnitIdShiftActivityActorsQueryResult = NonNullable<Awaited<ReturnType<typeof getUnitsUnitIdShiftActivityActors>>>
-export type GetUnitsUnitIdShiftActivityActorsQueryError = string
-
-
-export function useGetUnitsUnitIdShiftActivityActors<TData = Awaited<ReturnType<typeof getUnitsUnitIdShiftActivityActors>>, TError = string>(
- unitId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdShiftActivityActors>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getUnitsUnitIdShiftActivityActors>>,
-          TError,
-          Awaited<ReturnType<typeof getUnitsUnitIdShiftActivityActors>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitsUnitIdShiftActivityActors<TData = Awaited<ReturnType<typeof getUnitsUnitIdShiftActivityActors>>, TError = string>(
- unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdShiftActivityActors>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getUnitsUnitIdShiftActivityActors>>,
-          TError,
-          Awaited<ReturnType<typeof getUnitsUnitIdShiftActivityActors>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitsUnitIdShiftActivityActors<TData = Awaited<ReturnType<typeof getUnitsUnitIdShiftActivityActors>>, TError = string>(
- unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdShiftActivityActors>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Distinct operators in unit ticket history
- */
-
-export function useGetUnitsUnitIdShiftActivityActors<TData = Awaited<ReturnType<typeof getUnitsUnitIdShiftActivityActors>>, TError = string>(
- unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdShiftActivityActors>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getGetUnitsUnitIdShiftActivityActorsQueryOptions(unitId,options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-
-
-
-
-
-
-/**
- * Returns stations (counters) for the unit with occupancy flag and optional active ticket for the supervisor shift view.
- * @summary List counters for shift dashboard
- */
-export type getUnitsUnitIdShiftCountersResponse200 = {
-  data: ServicesShiftCounterDTO[]
-  status: 200
-}
-
-export type getUnitsUnitIdShiftCountersResponse401 = {
-  data: string
-  status: 401
-}
-
-export type getUnitsUnitIdShiftCountersResponse403 = {
-  data: string
-  status: 403
-}
-
-export type getUnitsUnitIdShiftCountersResponse500 = {
-  data: string
-  status: 500
-}
-
-export type getUnitsUnitIdShiftCountersResponseSuccess = (getUnitsUnitIdShiftCountersResponse200) & {
-  headers: Headers;
-};
-export type getUnitsUnitIdShiftCountersResponseError = (getUnitsUnitIdShiftCountersResponse401 | getUnitsUnitIdShiftCountersResponse403 | getUnitsUnitIdShiftCountersResponse500) & {
-  headers: Headers;
-};
-
-export type getUnitsUnitIdShiftCountersResponse = (getUnitsUnitIdShiftCountersResponseSuccess | getUnitsUnitIdShiftCountersResponseError)
-
-export const getGetUnitsUnitIdShiftCountersUrl = (unitId: string,) => {
-
-
-
-
-  return `/units/${unitId}/shift/counters`
-}
-
-export const getUnitsUnitIdShiftCounters = async (unitId: string, options?: RequestInit): Promise<getUnitsUnitIdShiftCountersResponse> => {
-
-  return orvalMutator<getUnitsUnitIdShiftCountersResponse>(getGetUnitsUnitIdShiftCountersUrl(unitId),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getGetUnitsUnitIdShiftCountersQueryKey = (unitId: string,) => {
-    return [
-    `/units/${unitId}/shift/counters`
-    ] as const;
-    }
-
-
-export const getGetUnitsUnitIdShiftCountersQueryOptions = <TData = Awaited<ReturnType<typeof getUnitsUnitIdShiftCounters>>, TError = string>(unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdShiftCounters>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetUnitsUnitIdShiftCountersQueryKey(unitId);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUnitsUnitIdShiftCounters>>> = ({ signal }) => getUnitsUnitIdShiftCounters(unitId, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdShiftCounters>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type GetUnitsUnitIdShiftCountersQueryResult = NonNullable<Awaited<ReturnType<typeof getUnitsUnitIdShiftCounters>>>
-export type GetUnitsUnitIdShiftCountersQueryError = string
-
-
-export function useGetUnitsUnitIdShiftCounters<TData = Awaited<ReturnType<typeof getUnitsUnitIdShiftCounters>>, TError = string>(
- unitId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdShiftCounters>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getUnitsUnitIdShiftCounters>>,
-          TError,
-          Awaited<ReturnType<typeof getUnitsUnitIdShiftCounters>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitsUnitIdShiftCounters<TData = Awaited<ReturnType<typeof getUnitsUnitIdShiftCounters>>, TError = string>(
- unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdShiftCounters>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getUnitsUnitIdShiftCounters>>,
-          TError,
-          Awaited<ReturnType<typeof getUnitsUnitIdShiftCounters>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitsUnitIdShiftCounters<TData = Awaited<ReturnType<typeof getUnitsUnitIdShiftCounters>>, TError = string>(
- unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdShiftCounters>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List counters for shift dashboard
- */
-
-export function useGetUnitsUnitIdShiftCounters<TData = Awaited<ReturnType<typeof getUnitsUnitIdShiftCounters>>, TError = string>(
- unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdShiftCounters>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getGetUnitsUnitIdShiftCountersQueryOptions(unitId,options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-
-
-
-
-
-
-/**
- * Retrieves dashboard statistics for a unit
- * @summary Get dashboard stats
- */
-export type getUnitsUnitIdShiftDashboardResponse200 = {
-  data: GetUnitsUnitIdShiftDashboard200
-  status: 200
-}
-
-export type getUnitsUnitIdShiftDashboardResponse500 = {
-  data: string
-  status: 500
-}
-
-export type getUnitsUnitIdShiftDashboardResponseSuccess = (getUnitsUnitIdShiftDashboardResponse200) & {
-  headers: Headers;
-};
-export type getUnitsUnitIdShiftDashboardResponseError = (getUnitsUnitIdShiftDashboardResponse500) & {
-  headers: Headers;
-};
-
-export type getUnitsUnitIdShiftDashboardResponse = (getUnitsUnitIdShiftDashboardResponseSuccess | getUnitsUnitIdShiftDashboardResponseError)
-
-export const getGetUnitsUnitIdShiftDashboardUrl = (unitId: string,) => {
-
-
-
-
-  return `/units/${unitId}/shift/dashboard`
-}
-
-export const getUnitsUnitIdShiftDashboard = async (unitId: string, options?: RequestInit): Promise<getUnitsUnitIdShiftDashboardResponse> => {
-
-  return orvalMutator<getUnitsUnitIdShiftDashboardResponse>(getGetUnitsUnitIdShiftDashboardUrl(unitId),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getGetUnitsUnitIdShiftDashboardQueryKey = (unitId: string,) => {
-    return [
-    `/units/${unitId}/shift/dashboard`
-    ] as const;
-    }
-
-
-export const getGetUnitsUnitIdShiftDashboardQueryOptions = <TData = Awaited<ReturnType<typeof getUnitsUnitIdShiftDashboard>>, TError = string>(unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdShiftDashboard>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetUnitsUnitIdShiftDashboardQueryKey(unitId);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUnitsUnitIdShiftDashboard>>> = ({ signal }) => getUnitsUnitIdShiftDashboard(unitId, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdShiftDashboard>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type GetUnitsUnitIdShiftDashboardQueryResult = NonNullable<Awaited<ReturnType<typeof getUnitsUnitIdShiftDashboard>>>
-export type GetUnitsUnitIdShiftDashboardQueryError = string
-
-
-export function useGetUnitsUnitIdShiftDashboard<TData = Awaited<ReturnType<typeof getUnitsUnitIdShiftDashboard>>, TError = string>(
- unitId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdShiftDashboard>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getUnitsUnitIdShiftDashboard>>,
-          TError,
-          Awaited<ReturnType<typeof getUnitsUnitIdShiftDashboard>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitsUnitIdShiftDashboard<TData = Awaited<ReturnType<typeof getUnitsUnitIdShiftDashboard>>, TError = string>(
- unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdShiftDashboard>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getUnitsUnitIdShiftDashboard>>,
-          TError,
-          Awaited<ReturnType<typeof getUnitsUnitIdShiftDashboard>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitsUnitIdShiftDashboard<TData = Awaited<ReturnType<typeof getUnitsUnitIdShiftDashboard>>, TError = string>(
- unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdShiftDashboard>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get dashboard stats
- */
-
-export function useGetUnitsUnitIdShiftDashboard<TData = Awaited<ReturnType<typeof getUnitsUnitIdShiftDashboard>>, TError = string>(
- unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdShiftDashboard>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getGetUnitsUnitIdShiftDashboardQueryOptions(unitId,options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-
-
-
-
-
-
-/**
- * Performs end of day operations for a unit
- * @summary Execute End of Day
- */
-export type postUnitsUnitIdShiftEodResponse200 = {
-  data: PostUnitsUnitIdShiftEod200
-  status: 200
-}
-
-export type postUnitsUnitIdShiftEodResponse401 = {
-  data: string
-  status: 401
-}
-
-export type postUnitsUnitIdShiftEodResponse500 = {
-  data: string
-  status: 500
-}
-
-export type postUnitsUnitIdShiftEodResponseSuccess = (postUnitsUnitIdShiftEodResponse200) & {
-  headers: Headers;
-};
-export type postUnitsUnitIdShiftEodResponseError = (postUnitsUnitIdShiftEodResponse401 | postUnitsUnitIdShiftEodResponse500) & {
-  headers: Headers;
-};
-
-export type postUnitsUnitIdShiftEodResponse = (postUnitsUnitIdShiftEodResponseSuccess | postUnitsUnitIdShiftEodResponseError)
-
-export const getPostUnitsUnitIdShiftEodUrl = (unitId: string,) => {
-
-
-
-
-  return `/units/${unitId}/shift/eod`
-}
-
-export const postUnitsUnitIdShiftEod = async (unitId: string, options?: RequestInit): Promise<postUnitsUnitIdShiftEodResponse> => {
-
-  return orvalMutator<postUnitsUnitIdShiftEodResponse>(getPostUnitsUnitIdShiftEodUrl(unitId),
-  {
-    ...options,
-    method: 'POST'
-
-
-  }
-);}
-
-
-
-
-export const getPostUnitsUnitIdShiftEodMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdShiftEod>>, TError,{unitId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdShiftEod>>, TError,{unitId: string}, TContext> => {
-
-const mutationKey = ['postUnitsUnitIdShiftEod'];
+export const getSetupFirstAdminMutationOptions = <TError = SetupFirstAdmin400 | SetupFirstAdmin403 | SetupFirstAdmin500,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setupFirstAdmin>>, TError,{data: HandlersSetupFirstAdminRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof setupFirstAdmin>>, TError,{data: HandlersSetupFirstAdminRequest}, TContext> => {
+
+const mutationKey = ['setupFirstAdmin'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -2760,10 +2323,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postUnitsUnitIdShiftEod>>, {unitId: string}> = (props) => {
-          const {unitId} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setupFirstAdmin>>, {data: HandlersSetupFirstAdminRequest}> = (props) => {
+          const {data} = props ?? {};
 
-          return  postUnitsUnitIdShiftEod(unitId,requestOptions)
+          return  setupFirstAdmin(data,requestOptions)
         }
 
 
@@ -2773,58 +2336,58 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PostUnitsUnitIdShiftEodMutationResult = NonNullable<Awaited<ReturnType<typeof postUnitsUnitIdShiftEod>>>
-
-    export type PostUnitsUnitIdShiftEodMutationError = string
+    export type SetupFirstAdminMutationResult = NonNullable<Awaited<ReturnType<typeof setupFirstAdmin>>>
+    export type SetupFirstAdminMutationBody = HandlersSetupFirstAdminRequest
+    export type SetupFirstAdminMutationError = SetupFirstAdmin400 | SetupFirstAdmin403 | SetupFirstAdmin500
 
     /**
- * @summary Execute End of Day
+ * @summary SaaS first deployment bootstrap
  */
-export const usePostUnitsUnitIdShiftEod = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdShiftEod>>, TError,{unitId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const useSetupFirstAdmin = <TError = SetupFirstAdmin400 | SetupFirstAdmin403 | SetupFirstAdmin500,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setupFirstAdmin>>, TError,{data: HandlersSetupFirstAdminRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof postUnitsUnitIdShiftEod>>,
+        Awaited<ReturnType<typeof setupFirstAdmin>>,
         TError,
-        {unitId: string},
+        {data: HandlersSetupFirstAdminRequest},
         TContext
       > => {
-      return useMutation(getPostUnitsUnitIdShiftEodMutationOptions(options), queryClient);
+      return useMutation(getSetupFirstAdminMutationOptions(options), queryClient);
     }
 
 /**
- * Retrieves current queue tickets for a unit
- * @summary Get queue tickets
+ * True when SaaS deployment bootstrap is complete (SaaS operator company + at least one platform_admin).
+ * @summary Get system status
  */
-export type getUnitsUnitIdShiftQueueResponse200 = {
-  data: ModelsTicket[]
+export type getSystemStatusResponse200 = {
+  data: GetSystemStatus200
   status: 200
 }
 
-export type getUnitsUnitIdShiftQueueResponse500 = {
+export type getSystemStatusResponse500 = {
   data: string
   status: 500
 }
 
-export type getUnitsUnitIdShiftQueueResponseSuccess = (getUnitsUnitIdShiftQueueResponse200) & {
+export type getSystemStatusResponseSuccess = (getSystemStatusResponse200) & {
   headers: Headers;
 };
-export type getUnitsUnitIdShiftQueueResponseError = (getUnitsUnitIdShiftQueueResponse500) & {
+export type getSystemStatusResponseError = (getSystemStatusResponse500) & {
   headers: Headers;
 };
 
-export type getUnitsUnitIdShiftQueueResponse = (getUnitsUnitIdShiftQueueResponseSuccess | getUnitsUnitIdShiftQueueResponseError)
+export type getSystemStatusResponse = (getSystemStatusResponseSuccess | getSystemStatusResponseError)
 
-export const getGetUnitsUnitIdShiftQueueUrl = (unitId: string,) => {
-
-
+export const getGetSystemStatusUrl = () => {
 
 
-  return `/units/${unitId}/shift/queue`
+
+
+  return `/system/status`
 }
 
-export const getUnitsUnitIdShiftQueue = async (unitId: string, options?: RequestInit): Promise<getUnitsUnitIdShiftQueueResponse> => {
+export const getSystemStatus = async ( options?: RequestInit): Promise<getSystemStatusResponse> => {
 
-  return orvalMutator<getUnitsUnitIdShiftQueueResponse>(getGetUnitsUnitIdShiftQueueUrl(unitId),
+  return orvalMutator<getSystemStatusResponse>(getGetSystemStatusUrl(),
   {
     ...options,
     method: 'GET'
@@ -2837,69 +2400,69 @@ export const getUnitsUnitIdShiftQueue = async (unitId: string, options?: Request
 
 
 
-export const getGetUnitsUnitIdShiftQueueQueryKey = (unitId: string,) => {
+export const getGetSystemStatusQueryKey = () => {
     return [
-    `/units/${unitId}/shift/queue`
+    `/system/status`
     ] as const;
     }
 
 
-export const getGetUnitsUnitIdShiftQueueQueryOptions = <TData = Awaited<ReturnType<typeof getUnitsUnitIdShiftQueue>>, TError = string>(unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdShiftQueue>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export const getGetSystemStatusQueryOptions = <TData = Awaited<ReturnType<typeof getSystemStatus>>, TError = string>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSystemStatus>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetUnitsUnitIdShiftQueueQueryKey(unitId);
+  const queryKey =  queryOptions?.queryKey ?? getGetSystemStatusQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUnitsUnitIdShiftQueue>>> = ({ signal }) => getUnitsUnitIdShiftQueue(unitId, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSystemStatus>>> = ({ signal }) => getSystemStatus({ signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdShiftQueue>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSystemStatus>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type GetUnitsUnitIdShiftQueueQueryResult = NonNullable<Awaited<ReturnType<typeof getUnitsUnitIdShiftQueue>>>
-export type GetUnitsUnitIdShiftQueueQueryError = string
+export type GetSystemStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getSystemStatus>>>
+export type GetSystemStatusQueryError = string
 
 
-export function useGetUnitsUnitIdShiftQueue<TData = Awaited<ReturnType<typeof getUnitsUnitIdShiftQueue>>, TError = string>(
- unitId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdShiftQueue>>, TError, TData>> & Pick<
+export function useGetSystemStatus<TData = Awaited<ReturnType<typeof getSystemStatus>>, TError = string>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSystemStatus>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getUnitsUnitIdShiftQueue>>,
+          Awaited<ReturnType<typeof getSystemStatus>>,
           TError,
-          Awaited<ReturnType<typeof getUnitsUnitIdShiftQueue>>
+          Awaited<ReturnType<typeof getSystemStatus>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitsUnitIdShiftQueue<TData = Awaited<ReturnType<typeof getUnitsUnitIdShiftQueue>>, TError = string>(
- unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdShiftQueue>>, TError, TData>> & Pick<
+export function useGetSystemStatus<TData = Awaited<ReturnType<typeof getSystemStatus>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSystemStatus>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getUnitsUnitIdShiftQueue>>,
+          Awaited<ReturnType<typeof getSystemStatus>>,
           TError,
-          Awaited<ReturnType<typeof getUnitsUnitIdShiftQueue>>
+          Awaited<ReturnType<typeof getSystemStatus>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUnitsUnitIdShiftQueue<TData = Awaited<ReturnType<typeof getUnitsUnitIdShiftQueue>>, TError = string>(
- unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdShiftQueue>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useGetSystemStatus<TData = Awaited<ReturnType<typeof getSystemStatus>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSystemStatus>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Get queue tickets
+ * @summary Get system status
  */
 
-export function useGetUnitsUnitIdShiftQueue<TData = Awaited<ReturnType<typeof getUnitsUnitIdShiftQueue>>, TError = string>(
- unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitsUnitIdShiftQueue>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useGetSystemStatus<TData = Awaited<ReturnType<typeof getSystemStatus>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSystemStatus>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetUnitsUnitIdShiftQueueQueryOptions(unitId,options)
+  const queryOptions = getGetSystemStatusQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
