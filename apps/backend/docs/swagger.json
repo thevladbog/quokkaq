@@ -458,15 +458,15 @@
                     "descriptionPrint": {
                         "type": "string"
                     },
-                    "lineComment": {
-                        "description": "Optional note under the line title in print (stored without outer parentheses).",
-                        "type": "string"
-                    },
                     "discountAmountMinor": {
                         "type": "integer"
                     },
                     "discountPercent": {
                         "type": "number"
+                    },
+                    "lineComment": {
+                        "description": "LineComment is optional text shown under the line title in print (parentheses in UI/PDF).",
+                        "type": "string"
                     },
                     "quantity": {
                         "type": "number"
@@ -2547,10 +2547,6 @@
                     "descriptionPrint": {
                         "type": "string"
                     },
-                    "lineComment": {
-                        "description": "Optional print-only clarification under the line title.",
-                        "type": "string"
-                    },
                     "discountAmountMinor": {
                         "type": "integer"
                     },
@@ -2561,6 +2557,10 @@
                         "type": "string"
                     },
                     "invoiceId": {
+                        "type": "string"
+                    },
+                    "lineComment": {
+                        "description": "LineComment is optional print-only clarification (e.g. period); shown under description in UI/PDF.",
                         "type": "string"
                     },
                     "lineGrossMinor": {
