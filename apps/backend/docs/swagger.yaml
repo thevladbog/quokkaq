@@ -285,7 +285,7 @@ components:
           minItems: 1
           type: array
         paymentTerms:
-          description: PaymentTerms is optional markdown for «Условия оплаты». Omit to leave unset on create; send an empty string to set to an empty value.
+          description: PaymentTerms is optional markdown for «Условия оплаты». Omit on PATCH to leave unchanged; send "" to clear.
           type: string
         provisionSubscriptionsOnPayment:
           type: boolean
@@ -305,7 +305,7 @@ components:
         discountPercent:
           type: number
         lineComment:
-          description: Optional note under the line title in print.
+          description: LineComment is optional text shown under the line title in print (parentheses in UI/PDF).
           type: string
         quantity:
           type: number
@@ -1395,7 +1395,7 @@ components:
         id:
           type: string
         invoiceDefaultPaymentTerms:
-          description: InvoiceDefaultPaymentTerms is markdown used as default «Условия оплаты» on new platform invoices; only the SaaS operator row (isSaasOperator) is intended to hold a template.
+          description: InvoiceDefaultPaymentTerms is markdown used as default «Условия оплаты» on new platform invoices; only the SaaS operator row (IsSaaSOperator) is intended to hold a template.
           type: string
         invoices:
           items:
