@@ -66,9 +66,7 @@ func CollectSetupHealth(ctx context.Context, storage StorageService) SetupHealth
 
 	smtpRes := checkSMTP(ctx)
 	checks["smtp"] = smtpRes
-	if !smtpRes.OK {
-		// SMTP issues are warnings for the wizard; do not fail overall readiness.
-	}
+	// SMTP is informational for the wizard; failures do not set allOK=false above.
 
 	return SetupHealthReport{OK: allOK, Checks: checks}
 }
@@ -117,12 +115,12 @@ func smtpDialAndAuth(host string, port int, user, pass string, ssl bool) error {
 		if err != nil {
 			return err
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 		c, err := smtp.NewClient(conn, host)
 		if err != nil {
 			return err
 		}
-		defer c.Close()
+		defer func() { _ = c.Close() }()
 		if user != "" {
 			auth := smtp.PlainAuth("", user, pass, host)
 			if err := c.Auth(auth); err != nil {
@@ -136,7 +134,7 @@ func smtpDialAndAuth(host string, port int, user, pass string, ssl bool) error {
 	if err != nil {
 		return err
 	}
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 	if err := c.Hello("localhost"); err != nil {
 		return err
 	}
