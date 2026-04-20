@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 
+import { getMetadataBaseUrl } from '@/lib/marketing-site-url';
 import { isAppLocale } from '@/src/messages';
 
 import { fontDisplay, fontSans } from './fonts';
@@ -9,7 +10,10 @@ import { Providers } from './providers';
 
 import './globals.css';
 
+const marketingSite = getMetadataBaseUrl();
+
 export const metadata: Metadata = {
+  metadataBase: marketingSite,
   title: {
     default: 'QuokkaQ',
     template: '%s | QuokkaQ'
@@ -32,6 +36,7 @@ export default async function RootLayout({
   return (
     <html
       lang={lang}
+      data-scroll-behavior="smooth"
       suppressHydrationWarning
       className={`${fontSans.variable} ${fontDisplay.variable}`}
     >

@@ -1,0 +1,80 @@
+import { ImageResponse } from 'next/og';
+import { notFound } from 'next/navigation';
+
+import { isAppLocale, messages } from '@/src/messages';
+
+export const size = { width: 1200, height: 630 };
+
+export const contentType = 'image/png';
+
+export default async function Image({
+  params
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale: raw } = await params;
+  if (!isAppLocale(raw)) {
+    notFound();
+  }
+
+  const t = messages[raw].home;
+  const brand = raw === 'ru' ? 'КвоккаКю' : 'QuokkaQ';
+
+  return new ImageResponse(
+    (
+      <div
+        style={{
+          height: '100%',
+          width: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'flex-start',
+          justifyContent: 'center',
+          background: 'linear-gradient(135deg, #fafafa 0%, #eef2ff 45%, #ffffff 100%)',
+          padding: 64
+        }}
+      >
+        <div
+          style={{
+            fontSize: 52,
+            fontWeight: 800,
+            color: '#171717',
+            lineHeight: 1.12,
+            maxWidth: 920,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6
+          }}
+        >
+          <span>{t.titleBefore}</span>
+          <span style={{ color: '#2563eb' }}>{t.titleAccent}</span>
+        </div>
+        <div
+          style={{
+            marginTop: 28,
+            fontSize: 24,
+            color: '#525252',
+            maxWidth: 900,
+            lineHeight: 1.45
+          }}
+        >
+          {t.description}
+        </div>
+        <div
+          style={{
+            marginTop: 44,
+            fontSize: 22,
+            fontWeight: 700,
+            color: '#0a0a0a',
+            letterSpacing: '-0.02em'
+          }}
+        >
+          {brand}
+        </div>
+      </div>
+    ),
+    {
+      ...size
+    }
+  );
+}

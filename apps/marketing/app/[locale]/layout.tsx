@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { notFound } from 'next/navigation';
 
+import { MarketingJsonLd } from '@/components/seo/marketing-json-ld';
 import { isAppLocale, locales } from '@/src/messages';
 
 export function generateStaticParams() {
@@ -23,8 +24,7 @@ export async function generateMetadata({
     title: {
       default: brand,
       template: `%s | ${brand}`
-    },
-    description: brand
+    }
   };
 }
 
@@ -40,5 +40,10 @@ export default async function LocaleLayout({
     notFound();
   }
 
-  return children;
+  return (
+    <>
+      <MarketingJsonLd locale={raw} />
+      {children}
+    </>
+  );
 }
