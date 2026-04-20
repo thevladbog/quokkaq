@@ -1029,7 +1029,8 @@
                         "type": "string"
                     },
                     "privacyConsentAccepted": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "enum": [true]
                     },
                     "referrer": {
                         "type": "string"
@@ -1061,10 +1062,20 @@
                     "password": {
                         "type": "string"
                     },
+                    "privacyConsentAccepted": {
+                        "type": "boolean",
+                        "enum": [true]
+                    },
                     "token": {
                         "type": "string"
                     }
                 },
+                "required": [
+                    "name",
+                    "password",
+                    "privacyConsentAccepted",
+                    "token"
+                ],
                 "type": "object"
             },
             "handlers.RemoveUnitRequest": {
@@ -1146,13 +1157,18 @@
                     "planCode": {
                         "description": "optional, defaults to starter with trial",
                         "type": "string"
+                    },
+                    "privacyConsentAccepted": {
+                        "type": "boolean",
+                        "enum": [true]
                     }
                 },
                 "required": [
                     "companyName",
                     "email",
                     "name",
-                    "password"
+                    "password",
+                    "privacyConsentAccepted"
                 ],
                 "type": "object"
             },

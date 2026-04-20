@@ -6,7 +6,16 @@ export function getMarketingSiteOrigin(): URL | null {
   const raw = process.env.NEXT_PUBLIC_MARKETING_SITE_URL?.trim();
   if (raw) {
     try {
-      const u = new URL(raw.includes('://') ? raw : `https://${raw}`);
+      const u = new URL(
+        raw.startsWith('//')
+          ? `https:${raw}`
+          : raw.includes('://')
+            ? raw
+            : `https://${raw}`
+      );
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+        return null;
+      }
       u.hash = '';
       u.search = '';
       u.pathname = '';

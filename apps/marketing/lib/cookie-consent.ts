@@ -16,9 +16,13 @@ export function parseConsentCookie(
     return null;
   }
   try {
-    const j = JSON.parse(raw) as StoredConsentV1;
-    if (j.v === 1 && typeof j.analytics === 'boolean') {
-      return j;
+    const j: unknown = JSON.parse(raw);
+    if (typeof j !== 'object' || j === null) {
+      return null;
+    }
+    const rec = j as Record<string, unknown>;
+    if (rec.v === 1 && typeof rec.analytics === 'boolean') {
+      return { v: 1, analytics: rec.analytics };
     }
   } catch {
     /* ignore */

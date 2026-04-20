@@ -1,4 +1,5 @@
 import { marketingAppBaseUrl } from '@/lib/fetch-marketing-subscription-plans';
+import { safeJsonLdStringify } from '@/lib/safe-json-ld';
 import { getMetadataBaseUrl } from '@/lib/marketing-site-url';
 import type { AppLocale } from '@/src/messages';
 import { messages } from '@/src/messages';
@@ -48,7 +49,7 @@ export function HomePageJsonLd({ locale }: Props) {
     <script
       type='application/ld+json'
       dangerouslySetInnerHTML={{
-        __html: JSON.stringify({
+        __html: safeJsonLdStringify({
           '@context': 'https://schema.org',
           '@graph': graph
         })

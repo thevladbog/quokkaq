@@ -1,5 +1,6 @@
 import Link from 'next/link';
 
+import { CookieSettingsButton } from '@/components/consent/cookie-settings-button';
 import { LeadRequestCta } from '@/components/landing/lead-request-cta';
 import { TextLogoImg } from '@/components/landing/text-logo-img';
 import {
@@ -125,6 +126,10 @@ export function LandingFooterCta({ locale, copy, appBaseUrl }: Props) {
             >
               {copy.footer.terms}
             </Link>
+            <CookieSettingsButton
+              label={copy.footer.cookieSettings}
+              className='focus-ring rounded-sm transition hover:text-[color:var(--color-primary)] dark:hover:text-[color:var(--color-primary)]'
+            />
           </nav>
         </div>
       </div>

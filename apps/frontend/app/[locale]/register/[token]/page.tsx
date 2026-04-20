@@ -90,7 +90,8 @@ export default function RegisterPage() {
         body: JSON.stringify({
           token,
           name,
-          password
+          password,
+          privacyConsentAccepted: privacyAccepted
         })
       });
 

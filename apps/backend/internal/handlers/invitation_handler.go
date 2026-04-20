@@ -175,9 +175,10 @@ func (h *InvitationHandler) ResendInvitation(w http.ResponseWriter, r *http.Requ
 }
 
 type RegisterUserRequest struct {
-	Token    string `json:"token"`
-	Name     string `json:"name"`
-	Password string `json:"password"`
+	Token                  string `json:"token"`
+	Name                   string `json:"name"`
+	Password               string `json:"password"`
+	PrivacyConsentAccepted *bool  `json:"privacyConsentAccepted"`
 }
 
 // RegisterUser godoc
@@ -203,8 +204,12 @@ func (h *InvitationHandler) RegisterUser(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "Token, name and password are required", http.StatusBadRequest)
 		return
 	}
+	if req.PrivacyConsentAccepted == nil || !*req.PrivacyConsentAccepted {
+		http.Error(w, "privacy consent is required", http.StatusBadRequest)
+		return
+	}
 
-	user, err := h.service.RegisterUser(req.Token, req.Name, req.Password)
+	user, err := h.service.RegisterUser(req.Token, req.Name, req.Password, true)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

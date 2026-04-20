@@ -148,6 +148,8 @@ export type HomeMessages = {
     ctaSecondary: string;
     privacy: string;
     terms: string;
+    /** Reopens the cookie / analytics consent banner when GTM is configured. */
+    cookieSettings: string;
     /** Company line after © year (e.g. “QuokkaQ Systems”). */
     copyrightBrand: string;
     /** “All rights reserved.” sentence fragment. */
@@ -474,6 +476,7 @@ export const messages: Record<
         ctaSecondary: 'Contact us',
         privacy: 'Privacy Policy',
         terms: 'Terms of Service',
+        cookieSettings: 'Cookie settings',
         copyrightBrand: 'Bogatyrev V.',
         copyrightReserved: 'All rights reserved.'
       }
@@ -796,6 +799,7 @@ export const messages: Record<
         ctaSecondary: 'Связаться с нами',
         privacy: 'Политика конфиденциальности',
         terms: 'Условия использования',
+        cookieSettings: 'Настройки cookie',
         copyrightBrand: 'Богатырев В.С.',
         copyrightReserved: 'Все права защищены.'
       }

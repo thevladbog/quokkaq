@@ -752,7 +752,7 @@ export interface HandlersPublicLeadRequestBody {
   message?: string;
   name: string;
   planCode?: string;
-  privacyConsentAccepted: boolean;
+  privacyConsentAccepted: true;
   referrer?: string;
   source?: string;
 }
@@ -762,9 +762,10 @@ export interface HandlersRefreshResponse {
 }
 
 export interface HandlersRegisterUserRequest {
-  name?: string;
-  password?: string;
-  token?: string;
+  name: string;
+  password: string;
+  privacyConsentAccepted: true;
+  token: string;
 }
 
 export interface HandlersRemoveUnitRequest {
@@ -807,6 +808,7 @@ export interface HandlersSignupRequest {
   password: string;
   /** optional, defaults to starter with trial */
   planCode?: string;
+  privacyConsentAccepted: true;
 }
 
 export interface HandlersTerminalBootstrapRequest {

@@ -9,6 +9,7 @@ import {
   serializeConsent,
   type StoredConsentV1
 } from '@/lib/cookie-consent';
+import { registerCookieConsentOpener } from '@/lib/cookie-consent-open';
 import { localePrivacyPath } from '@/lib/locale-paths';
 import type { AppLocale } from '@/src/messages';
 import { messages } from '@/src/messages';
@@ -33,8 +34,9 @@ function initDataLayerAndDefaultConsent() {
   }
   window.dataLayer = window.dataLayer || [];
   if (!window.gtag) {
-    window.gtag = function gtag(...args: unknown[]) {
-      window.dataLayer.push(args);
+    window.gtag = function gtag() {
+      /* eslint-disable prefer-rest-params -- align with Google's gtag(): dataLayer.push(arguments) */
+      window.dataLayer.push(arguments);
     };
   }
   if (consentDefaultPushed) {
@@ -139,6 +141,16 @@ export function CookieConsentAndGtm({ appLocale }: CookieConsentProps) {
       }
     });
   }, [gtmId, applyGranted]);
+
+  useEffect(() => {
+    if (!gtmId) {
+      return;
+    }
+    registerCookieConsentOpener(() => {
+      startTransition(() => setVisible(true));
+    });
+    return () => registerCookieConsentOpener(null);
+  }, [gtmId]);
 
   const onAccept = () => {
     writeConsentCookie({ v: 1, analytics: true });

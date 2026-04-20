@@ -85,7 +85,8 @@ export default function SignupPage() {
         password,
         companyName: cn,
         planCode,
-        companySlug
+        companySlug,
+        privacyConsentAccepted: privacyAccepted
       });
       if (res.status === 201 && res.data) {
         const token = res.data.accessToken ?? res.data.token;

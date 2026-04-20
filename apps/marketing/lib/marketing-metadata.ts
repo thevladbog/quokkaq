@@ -21,20 +21,13 @@ export function buildLocaleAlternates(
   locale: AppLocale,
   segments: string[]
 ): Metadata['alternates'] {
-  const origin = getMetadataBaseUrl();
-
-  const pathFor = (loc: AppLocale) => {
-    const parts = [loc, ...segments].join('/');
-    return `/${parts}`;
-  };
-
-  const canonical = new URL(pathFor(locale), origin).toString();
+  const canonical = marketingCanonicalUrl(locale, segments);
 
   const languages: Record<string, string> = {};
   for (const loc of locales) {
-    languages[loc] = new URL(pathFor(loc), origin).toString();
+    languages[loc] = marketingCanonicalUrl(loc, segments);
   }
-  languages['x-default'] = new URL(pathFor('en'), origin).toString();
+  languages['x-default'] = marketingCanonicalUrl('en', segments);
 
   return {
     canonical,

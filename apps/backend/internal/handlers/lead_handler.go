@@ -34,7 +34,7 @@ type PublicLeadRequestBody struct {
 	Locale                 string `json:"locale"`
 	Referrer               string `json:"referrer"`
 	PlanCode               string `json:"planCode"`
-	PrivacyConsentAccepted bool   `json:"privacyConsentAccepted" binding:"required"`
+	PrivacyConsentAccepted *bool  `json:"privacyConsentAccepted"`
 }
 
 // PostPublicLeadRequest godoc
@@ -74,7 +74,7 @@ func (h *LeadHandler) PostPublicLeadRequest(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "name and email are required", http.StatusBadRequest)
 		return
 	}
-	if !req.PrivacyConsentAccepted {
+	if req.PrivacyConsentAccepted == nil || !*req.PrivacyConsentAccepted {
 		http.Error(w, "privacy consent is required", http.StatusBadRequest)
 		return
 	}
@@ -89,7 +89,7 @@ func (h *LeadHandler) PostPublicLeadRequest(w http.ResponseWriter, r *http.Reque
 	}
 	err = h.leadIssues.CreateLeadRequest(r.Context(), name, email, strings.TrimSpace(req.Company), strings.TrimSpace(req.Message),
 		strings.TrimSpace(req.Source), strings.TrimSpace(req.Locale), strings.TrimSpace(req.Referrer), strings.TrimSpace(req.PlanCode),
-		req.PrivacyConsentAccepted)
+		true)
 	if err != nil {
 		logger.PrintfCtx(r.Context(), "PostPublicLeadRequest: CreateLeadRequest: %v", err)
 		if strings.Contains(strings.ToLower(err.Error()), "not configured") {

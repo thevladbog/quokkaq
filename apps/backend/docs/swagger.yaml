@@ -686,6 +686,8 @@ components:
         planCode:
           type: string
         privacyConsentAccepted:
+          enum:
+          - true
           type: boolean
         referrer:
           type: string
@@ -707,8 +709,17 @@ components:
           type: string
         password:
           type: string
+        privacyConsentAccepted:
+          enum:
+          - true
+          type: boolean
         token:
           type: string
+      required:
+      - name
+      - password
+      - privacyConsentAccepted
+      - token
       type: object
     handlers.RemoveUnitRequest:
       properties:
@@ -763,11 +774,16 @@ components:
         planCode:
           description: optional, defaults to starter with trial
           type: string
+        privacyConsentAccepted:
+          enum:
+          - true
+          type: boolean
       required:
       - companyName
       - email
       - name
       - password
+      - privacyConsentAccepted
       type: object
     handlers.TenantRoleBriefResponse:
       properties:

@@ -15,10 +15,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       const priority = suffix === '' ? 1 : 0.5;
       entries.push({
         url: `${base}${pathname}`,
-        changeFrequency:
-          suffix === '' || suffix === 'privacy' || suffix === 'terms'
-            ? 'monthly'
-            : 'weekly',
+        changeFrequency: suffix === '' ? 'weekly' : 'monthly',
         priority
       });
     }
