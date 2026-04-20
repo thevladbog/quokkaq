@@ -470,98 +470,160 @@ func BuildInvoicePDF(inv *models.Invoice, vendor *models.Company) ([]byte, error
 	const tableCommentGapAfterDesc = 1.5
 	minTableRowH := 14.0
 
+	type lineTableSeg struct {
+		height    float64
+		text      string
+		isGap     bool
+		isComment bool
+	}
+
+	tableTopReserve := pdfMargin + 8 + invoiceContinuationHeaderInset
+	maxTableSegH := pdfPageH - pdfMargin - footerReserve - tableTopReserve
+
 	setFont(8)
-	for i, line := range inv.Lines {
+	for i, invLine := range inv.Lines {
 		descW := tableWidths[1] - 2
 		setFont(tableDescFontPt)
-		descLines := pdfWordWrapLines(&pdf, strings.TrimSpace(line.DescriptionPrint), descW)
+		descLines := pdfWordWrapLines(&pdf, strings.TrimSpace(invLine.DescriptionPrint), descW)
 		if len(descLines) == 0 {
-			descLines = []string{strings.TrimSpace(line.DescriptionPrint)}
+			descLines = []string{strings.TrimSpace(invLine.DescriptionPrint)}
 		}
-		rowDescH := float64(len(descLines)) * descLineStep
 		var commentLines []string
-		if c := strings.TrimSpace(line.LineComment); c != "" {
+		if c := strings.TrimSpace(invLine.LineComment); c != "" {
 			commentLines = pdfWordWrapLines(&pdf, "("+c+")", descW)
 		}
-		rowCommentH := 0.0
-		if len(commentLines) > 0 {
-			rowCommentH = tableCommentGapAfterDesc + float64(len(commentLines))*commentLineStep
-		}
-		rowH := rowDescH + rowCommentH
-		if rowH < minTableRowH {
-			rowH = minTableRowH
-		}
 
-		if y+rowH+footerReserve > pdfPageH-pdfMargin {
-			if err := addInvoicePage(); err != nil {
-				return nil, err
+		segs := make([]lineTableSeg, 0, len(descLines)+1+len(commentLines))
+		for _, ln := range descLines {
+			segs = append(segs, lineTableSeg{height: descLineStep, text: ln})
+		}
+		if len(commentLines) > 0 {
+			segs = append(segs, lineTableSeg{height: tableCommentGapAfterDesc, isGap: true})
+			for _, cl := range commentLines {
+				segs = append(segs, lineTableSeg{height: commentLineStep, text: cl, isComment: true})
 			}
-			y = pdfMargin + 8 + pdfContinuationBodyTopPad(&pdf)
-			setFont(8)
+		}
+		for _, s := range segs {
+			if s.height > maxTableSegH {
+				return nil, fmt.Errorf("invoice PDF: line item description/comment segment exceeds printable page body")
+			}
 		}
 
 		row := []string{
 			fmt.Sprintf("%d", i+1),
 			"",
-			trimQuantity(line.Quantity),
-			strings.TrimSpace(line.MeasureUnit),
-			formatMinorForPDF(inv.Currency, effectiveUnitPriceInclVatMinor(line)),
-			vatRateLinePDF(line),
-			vatAmountLinePDF(line, inv.Currency),
-			discountLinePDF(line, inv.Currency),
-			formatMinorForPDF(inv.Currency, line.LineGrossMinor),
+			trimQuantity(invLine.Quantity),
+			strings.TrimSpace(invLine.MeasureUnit),
+			formatMinorForPDF(inv.Currency, effectiveUnitPriceInclVatMinor(invLine)),
+			vatRateLinePDF(invLine),
+			vatAmountLinePDF(invLine, inv.Currency),
+			discountLinePDF(invLine, inv.Currency),
+			formatMinorForPDF(inv.Currency, invLine.LineGrossMinor),
 		}
 
-		x = left
-		pdf.SetTextColor(0, 0, 0)
-		setFont(tableDescFontPt)
-		pdf.SetXY(x, y)
-		_ = pdf.Cell(&gopdf.Rect{W: tableWidths[0], H: rowH}, row[0])
-		x += tableWidths[0] + tableColGutter
+		chunkIsFirst := true
+		segIdx := 0
+		for segIdx < len(segs) {
+			if y+minTableRowH+footerReserve > pdfPageH-pdfMargin {
+				if err := addInvoicePage(); err != nil {
+					return nil, err
+				}
+				y = pdfMargin + 8 + pdfContinuationBodyTopPad(&pdf)
+				setFont(8)
+			}
 
-		dy := y
-		for _, ln := range descLines {
+			end := segIdx
+			sumH := 0.0
+			for end < len(segs) {
+				nextH := segs[end].height
+				trySum := sumH + nextH
+				tryDraw := trySum
+				if tryDraw < minTableRowH {
+					tryDraw = minTableRowH
+				}
+				if y+tryDraw+footerReserve > pdfPageH-pdfMargin {
+					break
+				}
+				sumH = trySum
+				end++
+			}
+			if end == segIdx {
+				if err := addInvoicePage(); err != nil {
+					return nil, err
+				}
+				y = pdfMargin + 8 + pdfContinuationBodyTopPad(&pdf)
+				setFont(8)
+				continue
+			}
+
+			chunkH := sumH
+			if chunkH < minTableRowH {
+				chunkH = minTableRowH
+			}
+
+			x = left
 			pdf.SetTextColor(0, 0, 0)
 			setFont(tableDescFontPt)
-			pdf.SetXY(x, dy)
-			_ = pdf.Cell(&gopdf.Rect{W: tableWidths[1], H: descLineStep}, ln)
-			dy += descLineStep
-		}
-		if len(commentLines) > 0 {
-			dy += tableCommentGapAfterDesc
-			for _, cl := range commentLines {
-				setFontItalic(tableCommentFontPt)
-				pdf.SetTextColor(115, 115, 115)
-				pdf.SetXY(x, dy)
-				_ = pdf.Cell(&gopdf.Rect{W: tableWidths[1], H: commentLineStep}, cl)
-				dy += commentLineStep
+			lineNo := ""
+			if chunkIsFirst {
+				lineNo = row[0]
 			}
-		}
-		pdf.SetTextColor(0, 0, 0)
-		setFont(8)
+			pdf.SetXY(x, y)
+			_ = pdf.Cell(&gopdf.Rect{W: tableWidths[0], H: chunkH}, lineNo)
+			x += tableWidths[0] + tableColGutter
 
-		x += tableWidths[1] + tableColGutter
-		for j := 2; j < len(row); j++ {
-			txt := row[j]
-			cellW := tableWidths[j]
-			tw, _ := pdf.MeasureTextWidth(txt)
-			if j >= 2 && j != 3 {
-				xi := x + cellW - tw - 2
-				if xi < x {
-					xi = x
+			dy := y
+			for si := segIdx; si < end; si++ {
+				s := segs[si]
+				if s.isGap {
+					dy += s.height
+					continue
 				}
-				pdf.SetXY(xi, y)
-				_ = pdf.Cell(&gopdf.Rect{W: tw + 2, H: rowH}, txt)
-			} else {
-				pdf.SetXY(x, y)
-				_ = pdf.Cell(&gopdf.Rect{W: cellW, H: rowH}, txt)
+				if s.isComment {
+					setFontItalic(tableCommentFontPt)
+					pdf.SetTextColor(115, 115, 115)
+					pdf.SetXY(x, dy)
+					_ = pdf.Cell(&gopdf.Rect{W: tableWidths[1], H: s.height}, s.text)
+					dy += s.height
+				} else {
+					pdf.SetTextColor(0, 0, 0)
+					setFont(tableDescFontPt)
+					pdf.SetXY(x, dy)
+					_ = pdf.Cell(&gopdf.Rect{W: tableWidths[1], H: s.height}, s.text)
+					dy += s.height
+				}
 			}
-			x += cellW
-			if j < nGaps {
-				x += tableColGutter
+			pdf.SetTextColor(0, 0, 0)
+			setFont(8)
+
+			x += tableWidths[1] + tableColGutter
+			for j := 2; j < len(row); j++ {
+				txt := ""
+				if chunkIsFirst {
+					txt = row[j]
+				}
+				cellW := tableWidths[j]
+				tw, _ := pdf.MeasureTextWidth(txt)
+				if j >= 2 && j != 3 {
+					xi := x + cellW - tw - 2
+					if xi < x {
+						xi = x
+					}
+					pdf.SetXY(xi, y)
+					_ = pdf.Cell(&gopdf.Rect{W: tw + 2, H: chunkH}, txt)
+				} else {
+					pdf.SetXY(x, y)
+					_ = pdf.Cell(&gopdf.Rect{W: cellW, H: chunkH}, txt)
+				}
+				x += cellW
+				if j < nGaps {
+					x += tableColGutter
+				}
 			}
+			y += chunkH + 3
+			chunkIsFirst = false
+			segIdx = end
 		}
-		y += rowH + 3
 	}
 
 	y += 8

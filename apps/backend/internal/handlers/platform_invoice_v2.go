@@ -349,13 +349,11 @@ func (h *PlatformHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 	}
 	if body.PaymentTerms != nil {
 		t := strings.TrimSpace(*body.PaymentTerms)
-		if t != "" {
-			if utf8.RuneCountInString(t) > maxInvoicePaymentTermsRunes {
-				http.Error(w, fmt.Sprintf("paymentTerms exceeds %d characters", maxInvoicePaymentTermsRunes), http.StatusBadRequest)
-				return
-			}
-			inv.PaymentTermsMarkdown = &t
+		if utf8.RuneCountInString(t) > maxInvoicePaymentTermsRunes {
+			http.Error(w, fmt.Sprintf("paymentTerms exceeds %d characters", maxInvoicePaymentTermsRunes), http.StatusBadRequest)
+			return
 		}
+		inv.PaymentTermsMarkdown = &t
 	}
 	if inv.PaymentTermsMarkdown == nil {
 		op, errOp := h.companyRepo.FindSaaSOperatorCompany()

@@ -366,6 +366,11 @@ func (h *PlatformHandler) PatchCompany(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	effectiveIsSaasOperator := company.IsSaaSOperator
+	if body.IsSaasOperator != nil {
+		effectiveIsSaasOperator = *body.IsSaasOperator
+	}
+
 	if body.Name != nil {
 		s := strings.TrimSpace(*body.Name)
 		if s == "" {
@@ -411,7 +416,7 @@ func (h *PlatformHandler) PatchCompany(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if body.InvoiceDefaultPaymentTerms != nil {
-		if !company.IsSaaSOperator {
+		if !effectiveIsSaasOperator {
 			http.Error(w, "invoiceDefaultPaymentTerms can only be set on the SaaS operator company", http.StatusBadRequest)
 			return
 		}
@@ -483,6 +488,7 @@ func (h *PlatformHandler) PatchCompany(w http.ResponseWriter, r *http.Request) {
 			}
 		} else {
 			company.IsSaaSOperator = false
+			company.InvoiceDefaultPaymentTerms = nil
 			if err := h.companyRepo.Update(company); err != nil {
 				logger.ErrorfCtx(r.Context(), "Platform PatchCompany Update: %v", err)
 				http.Error(w, "Internal server error", http.StatusInternalServerError)

@@ -1231,6 +1231,11 @@ export const SaasVendorSchema = z.object({
 
 export type SaasVendor = z.infer<typeof SaasVendorSchema>;
 
+/** Matches backend `maxInvoicePaymentTermsRunes` (UTF-8 runes). */
+export const invoicePaymentTermsMaxCharacters = 32000;
+/** Matches backend line comment limit (UTF-8 runes). */
+export const invoiceLineCommentMaxCharacters = 512;
+
 /** SSO access provisioning mode (matches backend `models.SsoAccessSource` / `SsoAccessSourceManual` | `SsoAccessSourceSSOGroups`). */
 export const SsoAccessSourceSchema = z.enum(['manual', 'sso_groups']);
 export type SsoAccessSource = z.infer<typeof SsoAccessSourceSchema>;
@@ -1246,7 +1251,11 @@ export const CompanySchema = z.object({
   subscriptionId: z.string().nullable().optional(),
   isSaasOperator: z.boolean().optional(),
   /** Default «Условия оплаты» (markdown) for new invoices; SaaS operator company only. */
-  invoiceDefaultPaymentTerms: z.string().nullable().optional(),
+  invoiceDefaultPaymentTerms: z
+    .string()
+    .max(invoicePaymentTermsMaxCharacters)
+    .nullable()
+    .optional(),
   billingEmail: z.union([z.string().email(), z.literal('')]).optional(),
   billingAddress: z.record(z.string(), z.any()).optional(),
   paymentAccounts: PaymentAccountsSchema.optional(),
@@ -1281,7 +1290,11 @@ export const InvoiceLineSchema = z.object({
   position: z.number(),
   catalogItemId: z.string().nullable().optional(),
   descriptionPrint: z.string(),
-  lineComment: z.string().optional().default(''),
+  lineComment: z
+    .string()
+    .max(invoiceLineCommentMaxCharacters)
+    .optional()
+    .default(''),
   quantity: z.number(),
   unit: z
     .union([z.string(), z.null()])
@@ -1350,7 +1363,11 @@ export const InvoiceSchema = z.object({
     .union([z.record(z.string(), z.unknown()), z.null()])
     .optional(),
   /** Markdown in admin; PDF renders plain text. */
-  paymentTerms: z.string().nullable().optional(),
+  paymentTerms: z
+    .string()
+    .max(invoicePaymentTermsMaxCharacters)
+    .nullable()
+    .optional(),
   lines: z.array(InvoiceLineSchema).optional()
 });
 
@@ -1387,7 +1404,11 @@ export type CatalogItem = z.infer<typeof CatalogItemSchema>;
 export const InvoiceDraftLineInputSchema = z.object({
   catalogItemId: z.string().nullable().optional(),
   descriptionPrint: z.string(),
-  lineComment: z.string().optional().default(''),
+  lineComment: z
+    .string()
+    .max(invoiceLineCommentMaxCharacters)
+    .optional()
+    .default(''),
   quantity: z.number(),
   unit: z
     .string()
@@ -1417,7 +1438,7 @@ export const InvoiceDraftUpsertBodySchema = z.object({
   allowStripePaymentLink: z.boolean(),
   provisionSubscriptionsOnPayment: z.boolean(),
   /** Omit on PATCH to keep existing; send empty string to clear. */
-  paymentTerms: z.string().optional(),
+  paymentTerms: z.string().max(invoicePaymentTermsMaxCharacters).optional(),
   lines: z.array(InvoiceDraftLineInputSchema)
 });
 

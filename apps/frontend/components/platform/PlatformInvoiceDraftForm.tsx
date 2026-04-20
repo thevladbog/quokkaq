@@ -64,6 +64,7 @@ import {
 import {
   buildDraftBody,
   invoiceToDraftUpsertBody,
+  maxInvoiceLineCommentRunes,
   newDraftLineRow,
   rowsFromInvoiceLines,
   tryParseDraftRowForTotals,
@@ -807,15 +808,16 @@ export function PlatformInvoiceDraftForm({
                     />
                   </div>
                   <div className='grid min-w-0 gap-2'>
-                    <Label>
+                    <Label htmlFor={`lineComment-${row.key}`}>
                       {t('lineComment', {
                         defaultValue: 'Line comment'
                       })}
                     </Label>
                     <Textarea
+                      id={`lineComment-${row.key}`}
                       className='min-h-[2.75rem] resize-y'
                       rows={2}
-                      maxLength={512}
+                      maxLength={maxInvoiceLineCommentRunes}
                       placeholder={t('lineCommentPlaceholder', {
                         defaultValue:
                           'e.g. March 2026 (printed in italics in parentheses under the title)'

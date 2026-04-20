@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/dialog';
 import { PlatformInvoicePaymentTermsMdx } from '@/components/platform/PlatformInvoicePaymentTermsMdx';
 import { useTranslations } from 'next-intl';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 type Props = {
@@ -33,6 +33,7 @@ export function PlatformInvoiceDefaultPaymentTermsModal({
   const t = useTranslations('platform.invoices');
   const qc = useQueryClient();
   const [markdown, setMarkdown] = useState('');
+  const [isDirty, setIsDirty] = useState(false);
 
   const {
     data: op,
@@ -53,11 +54,21 @@ export function PlatformInvoiceDefaultPaymentTermsModal({
     enabled: open
   });
 
+  const handleOpenChange = useCallback(
+    (next: boolean) => {
+      if (!next) {
+        setIsDirty(false);
+      }
+      onOpenChange(next);
+    },
+    [onOpenChange]
+  );
+
   useEffect(() => {
-    if (!open) return;
+    if (!open || isDirty) return;
     const next = (op?.invoiceDefaultPaymentTerms ?? '').trim();
     queueMicrotask(() => setMarkdown(next));
-  }, [open, op?.invoiceDefaultPaymentTerms]);
+  }, [open, isDirty, op?.invoiceDefaultPaymentTerms]);
 
   const saveMut = useMutation({
     mutationFn: async () => {
@@ -73,7 +84,7 @@ export function PlatformInvoiceDefaultPaymentTermsModal({
       void qc.invalidateQueries({
         queryKey: getGetSaaSOperatorCompanyQueryKey()
       });
-      onOpenChange(false);
+      handleOpenChange(false);
     },
     onError: (err) => {
       const raw = err instanceof Error ? err.message : String(err);
@@ -88,7 +99,7 @@ export function PlatformInvoiceDefaultPaymentTermsModal({
   });
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className='max-h-[90vh] max-w-3xl overflow-y-auto'>
         <DialogHeader>
           <DialogTitle>
@@ -126,7 +137,10 @@ export function PlatformInvoiceDefaultPaymentTermsModal({
         ) : (
           <PlatformInvoicePaymentTermsMdx
             markdown={markdown}
-            onChange={setMarkdown}
+            onChange={(next) => {
+              setIsDirty(true);
+              setMarkdown(next);
+            }}
             placeholder={t('paymentTermsPlaceholder', {
               defaultValue: 'Payment terms (markdown)…'
             })}
@@ -136,7 +150,7 @@ export function PlatformInvoiceDefaultPaymentTermsModal({
           <Button
             type='button'
             variant='secondary'
-            onClick={() => onOpenChange(false)}
+            onClick={() => handleOpenChange(false)}
           >
             {t('paymentTermsCancel', { defaultValue: 'Cancel' })}
           </Button>

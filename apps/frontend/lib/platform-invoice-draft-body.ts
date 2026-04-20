@@ -14,7 +14,7 @@ import {
 import type { InvoiceLineCalcInput } from './invoice-line-totals';
 import { normalizeInvoiceLineCommentForSave } from './invoice-line-comment-display';
 
-const maxInvoiceLineCommentRunes = 512;
+export const maxInvoiceLineCommentRunes = 512;
 
 export type DraftLineRow = {
   key: string;
