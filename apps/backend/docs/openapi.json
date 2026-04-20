@@ -437,6 +437,7 @@
                     },
                     "paymentTerms": {
                         "description": "PaymentTerms is optional markdown for «Условия оплаты». Omit on PATCH to leave unchanged; send \"\" to clear.",
+                        "maxLength": 32000,
                         "type": "string"
                     },
                     "provisionSubscriptionsOnPayment": {
@@ -466,6 +467,7 @@
                     },
                     "lineComment": {
                         "description": "LineComment is optional text shown under the line title in print (parentheses in UI/PDF).",
+                        "maxLength": 512,
                         "type": "string"
                     },
                     "quantity": {
@@ -519,6 +521,7 @@
                     },
                     "paymentTerms": {
                         "description": "PaymentTerms is optional markdown for «Условия оплаты». Omit on PATCH to leave unchanged; send \"\" to clear.",
+                        "maxLength": 32000,
                         "type": "string"
                     },
                     "provisionSubscriptionsOnPayment": {
@@ -2093,6 +2096,7 @@
                     },
                     "invoiceDefaultPaymentTerms": {
                         "description": "InvoiceDefaultPaymentTerms is markdown used as default «Условия оплаты» on new platform invoices; only the SaaS operator row (IsSaaSOperator) is intended to hold a template.",
+                        "maxLength": 32000,
                         "type": "string"
                     },
                     "invoices": {
@@ -2491,6 +2495,7 @@
                     },
                     "paymentTerms": {
                         "description": "PaymentTermsMarkdown is per-invoice «Условия оплаты» (markdown in UI; PDF uses a plain-text rendering).",
+                        "maxLength": 32000,
                         "type": "string"
                     },
                     "provisionSubscriptionsOnPayment": {
@@ -2561,6 +2566,7 @@
                     },
                     "lineComment": {
                         "description": "LineComment is optional print-only clarification (e.g. period); shown under description in UI/PDF.",
+                        "maxLength": 512,
                         "type": "string"
                     },
                     "lineGrossMinor": {

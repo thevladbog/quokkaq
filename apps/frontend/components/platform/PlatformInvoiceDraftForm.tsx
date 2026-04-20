@@ -244,9 +244,9 @@ export function PlatformInvoiceDraftForm({
 
   const { data: saasOperator } = useQuery({
     queryKey: getGetSaaSOperatorCompanyQueryKey(),
-    queryFn: async (): Promise<ModelsCompany | undefined> => {
+    queryFn: async (): Promise<ModelsCompany | null> => {
       const res = await getSaaSOperatorCompany();
-      if (res.status !== 200) return undefined;
+      if (res.status !== 200) return null;
       return res.data;
     },
     enabled: !isEdit

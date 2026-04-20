@@ -7,6 +7,8 @@ import (
 	"math"
 	"sort"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"quokkaq-go-backend/internal/assets"
 	"quokkaq-go-backend/internal/models"
@@ -68,6 +70,32 @@ func parseCounterparty(raw json.RawMessage) counterpartyJSON {
 	return cp
 }
 
+// isPostalIndexPrefixBoundary reports whether u begins with postal as its own component:
+// u equals postal, or the first rune after postal is whitespace or a separator (comma, etc.).
+// ASCII hyphen is not treated as a separator so strings like "123308-й" are not stripped.
+func isPostalIndexPrefixBoundary(u, postal string) bool {
+	if postal == "" || !strings.HasPrefix(u, postal) {
+		return false
+	}
+	rest := u[len(postal):]
+	if rest == "" {
+		return true
+	}
+	r, _ := utf8.DecodeRuneInString(rest)
+	if r == utf8.RuneError {
+		return false
+	}
+	if unicode.IsSpace(r) {
+		return true
+	}
+	switch r {
+	case ',', ';', ':', '.', '—', '–', '·':
+		return true
+	default:
+		return false
+	}
+}
+
 func legalAddressLine(cp counterpartyJSON) string {
 	if cp.Addresses == nil || cp.Addresses.Legal == nil {
 		return ""
@@ -90,7 +118,7 @@ func legalAddressLine(cp counterpartyJSON) string {
 	// Avoid "123308, 123308, …" when unrestricted already starts with the same index.
 	for {
 		u := strings.TrimSpace(unrest)
-		if !strings.HasPrefix(u, postal) {
+		if !isPostalIndexPrefixBoundary(u, postal) {
 			break
 		}
 		u = strings.TrimSpace(u[len(postal):])
@@ -266,9 +294,6 @@ func BuildInvoicePDF(inv *models.Invoice, vendor *models.Company) ([]byte, error
 	if err := pdf.AddTTFFontData("dejavubd", assets.DejaVuSansBoldTTF); err != nil {
 		return nil, err
 	}
-	if err := pdf.AddTTFFontDataWithOption("dejavu", assets.DejaVuSansTTF, gopdf.TtfOption{Style: gopdf.Italic}); err != nil {
-		return nil, err
-	}
 
 	setFont := func(size float64) {
 		_ = pdf.SetFont("dejavu", "", size)
@@ -281,7 +306,8 @@ func BuildInvoicePDF(inv *models.Invoice, vendor *models.Company) ([]byte, error
 	}
 
 	setFontItalic := func(size float64) {
-		_ = pdf.SetFont("dejavu", "I", size)
+		// No embedded oblique/italic TTF; use regular face (comments / muted styling via color).
+		_ = pdf.SetFont("dejavu", "", size)
 		pdf.SetTextColor(55, 55, 55)
 	}
 

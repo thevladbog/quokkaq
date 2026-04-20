@@ -167,11 +167,8 @@ export default function PlatformCatalogItemsPage() {
       if (nomGuid.length > 128) {
         throw new Error(t('validationOnecNomenclatureGuid'));
       }
-      const nomPart = editing
-        ? { onecNomenclatureGuid: nomGuid }
-        : nomGuid
-          ? { onecNomenclatureGuid: nomGuid }
-          : {};
+      const nomPart =
+        editing || nomGuid ? { onecNomenclatureGuid: nomGuid } : {};
       const base = {
         name: form.name.trim(),
         printName: form.printName.trim() || form.name.trim(),
