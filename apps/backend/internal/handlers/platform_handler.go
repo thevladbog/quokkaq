@@ -318,6 +318,8 @@ type PatchPlatformCompanyBody struct {
 	StrictPublicTenantResolve *bool            `json:"strictPublicTenantResolve"`
 	OpaqueLoginLinksOnly      *bool            `json:"opaqueLoginLinksOnly"`
 	SsoJitProvisioning        *bool            `json:"ssoJitProvisioning"`
+	OneCCounterpartyGUID      *string          `json:"onecCounterpartyGuid"`
+	ClearOneCCounterpartyGUID *bool            `json:"clearOnecCounterpartyGuid"`
 }
 
 // PatchCompany godoc
@@ -412,6 +414,20 @@ func (h *PlatformHandler) PatchCompany(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.SsoJitProvisioning != nil {
 		company.SsoJitProvisioning = *body.SsoJitProvisioning
+	}
+	if body.ClearOneCCounterpartyGUID != nil && *body.ClearOneCCounterpartyGUID {
+		company.OneCCounterpartyGUID = nil
+	} else if body.OneCCounterpartyGUID != nil {
+		s := strings.TrimSpace(*body.OneCCounterpartyGUID)
+		if s == "" {
+			company.OneCCounterpartyGUID = nil
+		} else {
+			if len(s) > 128 {
+				http.Error(w, "onecCounterpartyGuid must be at most 128 characters", http.StatusBadRequest)
+				return
+			}
+			company.OneCCounterpartyGUID = &s
+		}
 	}
 	if body.Slug != nil {
 		n := tenantslug.Normalize(*body.Slug)

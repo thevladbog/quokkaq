@@ -40,9 +40,11 @@ type Company struct {
 	// SsoJitProvisioning: allow creating a user on first successful SSO when policy permits.
 	SsoJitProvisioning bool `gorm:"column:sso_jit_provisioning;not null;default:false" json:"ssoJitProvisioning"`
 	// SsoAccessSource: "manual" (default) or "sso_groups" — IdP groups are source of truth for access when set.
-	SsoAccessSource string    `gorm:"column:sso_access_source;size:32;not null;default:manual" json:"ssoAccessSource" enums:"manual,sso_groups"`
-	CreatedAt       time.Time `gorm:"autoCreateTime" json:"createdAt"`
-	UpdatedAt       time.Time `gorm:"autoUpdateTime" json:"updatedAt"`
+	SsoAccessSource string `gorm:"column:sso_access_source;size:32;not null;default:manual" json:"ssoAccessSource" enums:"manual,sso_groups"`
+	// OneCCounterpartyGUID maps this tenant company to Контрагент in 1С (УНФ) for CommerceML orders.
+	OneCCounterpartyGUID *string   `gorm:"column:onec_counterparty_guid" json:"onecCounterpartyGuid,omitempty"`
+	CreatedAt            time.Time `gorm:"autoCreateTime" json:"createdAt"`
+	UpdatedAt            time.Time `gorm:"autoUpdateTime" json:"updatedAt"`
 
 	// Relations
 	Units        []Unit        `gorm:"foreignKey:CompanyID" json:"units,omitempty"`

@@ -167,6 +167,16 @@ func (h *PlatformHandler) CreateCatalogItem(w http.ResponseWriter, r *http.Reque
 		SubscriptionPlanID: body.SubscriptionPlanID,
 		IsActive:           active,
 	}
+	if body.OneCNomenclatureGUID != nil {
+		s := strings.TrimSpace(*body.OneCNomenclatureGUID)
+		if s != "" {
+			if len(s) > 128 {
+				http.Error(w, "onecNomenclatureGuid must be at most 128 characters", http.StatusBadRequest)
+				return
+			}
+			item.OneCNomenclatureGUID = &s
+		}
+	}
 	if err := h.catalogRepo.Create(item); err != nil {
 		logger.PrintfCtx(r.Context(), "CreateCatalogItem: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -261,6 +271,18 @@ func (h *PlatformHandler) PatchCatalogItem(w http.ResponseWriter, r *http.Reques
 	}
 	if body.IsActive != nil {
 		item.IsActive = *body.IsActive
+	}
+	if body.OneCNomenclatureGUID != nil {
+		s := strings.TrimSpace(*body.OneCNomenclatureGUID)
+		if s == "" {
+			item.OneCNomenclatureGUID = nil
+		} else {
+			if len(s) > 128 {
+				http.Error(w, "onecNomenclatureGuid must be at most 128 characters", http.StatusBadRequest)
+				return
+			}
+			item.OneCNomenclatureGUID = &s
+		}
 	}
 	if err := h.catalogRepo.Update(item); err != nil {
 		logger.PrintfCtx(r.Context(), "PatchCatalogItem: %v", err)

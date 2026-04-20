@@ -554,6 +554,38 @@ def _patch_models_update_user_input(components: dict[str, Any]) -> None:
             )
 
 
+def _patch_models_company_onec_settings_put_request_password(components: dict[str, Any]) -> None:
+    """PUT onec-settings body: httpPassword is write-only credentials."""
+    s = _schema(components, "models.CompanyOneCSettingsPutRequest")
+    props = s.get("properties")
+    if not isinstance(props, dict):
+        sys.exit(
+            "post_swagger_openapi_tweaks: models.CompanyOneCSettingsPutRequest.properties missing"
+        )
+    pwd = props.get("httpPassword")
+    if not isinstance(pwd, dict):
+        sys.exit(
+            "post_swagger_openapi_tweaks: models.CompanyOneCSettingsPutRequest.properties.httpPassword missing"
+        )
+    pwd["writeOnly"] = True
+    pwd["format"] = "password"
+
+
+def _patch_onec_status_mapping_invoice_status_enum(components: dict[str, Any]) -> None:
+    """Restrict status mapping rule target statuses to the three supported invoice states."""
+    s = _schema(components, "models.OneCStatusMappingRuleDTO")
+    props = s.get("properties")
+    if not isinstance(props, dict):
+        sys.exit("post_swagger_openapi_tweaks: models.OneCStatusMappingRuleDTO.properties missing")
+    inv = props.get("invoiceStatus")
+    if not isinstance(inv, dict):
+        sys.exit(
+            "post_swagger_openapi_tweaks: models.OneCStatusMappingRuleDTO.properties.invoiceStatus missing"
+        )
+    inv["type"] = "string"
+    inv["enum"] = ["paid", "void", "uncollectible"]
+
+
 def _patch_root_tag_counter_board(doc: dict[str, Any]) -> None:
     """Declare counter-board in root OpenAPI tags so Swagger UI lists a description for the tag."""
     name = "counter-board"
@@ -672,6 +704,8 @@ def apply_openapi_tweaks(doc: dict[str, Any]) -> None:
     _patch_privacy_consent_schemas(comp)
 
     _patch_models_update_user_input(comp)
+    _patch_models_company_onec_settings_put_request_password(comp)
+    _patch_onec_status_mapping_invoice_status_enum(comp)
 
     _patch_company_me_patch_sso_access_security(doc)
     _patch_get_external_identity_204_no_body(doc)

@@ -408,11 +408,15 @@ components:
           type: boolean
         clearCounterparty:
           type: boolean
+        clearOnecCounterpartyGuid:
+          type: boolean
         counterparty:
           type: object
         isSaasOperator:
           type: boolean
         name:
+          type: string
+        onecCounterpartyGuid:
           type: string
         opaqueLoginLinksOnly:
           type: boolean
@@ -1254,6 +1258,8 @@ components:
           type: boolean
         name:
           type: string
+        onecNomenclatureGuid:
+          type: string
         plan:
           $ref: '#/components/schemas/models.SubscriptionPlan'
         printName:
@@ -1283,6 +1289,8 @@ components:
         name:
           example: Подписка Pro
           type: string
+        onecNomenclatureGuid:
+          type: string
         printName:
           type: string
         subscriptionPlanId:
@@ -1307,6 +1315,8 @@ components:
         isActive:
           type: boolean
         name:
+          type: string
+        onecNomenclatureGuid:
           type: string
         printName:
           type: string
@@ -1373,6 +1383,9 @@ components:
         onboardingState:
           description: onboarding progress
           type: object
+        onecCounterpartyGuid:
+          description: OneCCounterpartyGUID maps this tenant company to Контрагент in 1С (УНФ) for CommerceML orders.
+          type: string
         opaqueLoginLinksOnly:
           description: 'OpaqueLoginLinksOnly: deep links should use TenantLoginLink tokens instead of slug-based branding.'
           type: boolean
@@ -1418,6 +1431,46 @@ components:
           items:
             $ref: '#/components/schemas/models.UsageRecord'
           type: array
+      type: object
+    models.CompanyOneCSettingsPublic:
+      properties:
+        commerceMlVersion:
+          type: string
+        companyId:
+          type: string
+        exchangeEnabled:
+          type: boolean
+        exchangeUrlHint:
+          description: filled by handler from PUBLIC_APP_URL
+          type: string
+        httpLogin:
+          type: string
+        passwordSet:
+          type: boolean
+        sitePaymentSystemName:
+          type: string
+        statusMapping:
+          $ref: '#/components/schemas/models.OneCStatusMappingDTO'
+      type: object
+    models.CompanyOneCSettingsPutRequest:
+      properties:
+        commerceMlVersion:
+          type: string
+        exchangeEnabled:
+          type: boolean
+        httpLogin:
+          type: string
+        httpPassword:
+          description: empty string clears password; omit to leave unchanged
+          type: string
+          writeOnly: true
+          format: password
+        sitePaymentSystemName:
+          type: string
+        statusMapping:
+          allOf:
+          - $ref: '#/components/schemas/models.OneCStatusMappingDTO'
+          nullable: true
       type: object
     models.CompanyPatch:
       properties:
@@ -1574,6 +1627,11 @@ components:
           items:
             $ref: '#/components/schemas/models.InvoiceLine'
           type: array
+        onecLastExchangeAt:
+          type: string
+        onecOrderSiteId:
+          description: OneCOrderSiteID is the document Ид in CommerceML (typically equals invoice id) for 1С УНФ order exchange.
+          type: string
         paidAt:
           description: when payment was received
           type: string
@@ -1611,6 +1669,8 @@ components:
       type: object
     models.InvoiceLine:
       properties:
+        catalogItem:
+          $ref: '#/components/schemas/models.CatalogItem'
         catalogItemId:
           type: string
         createdAt:
@@ -1673,6 +1733,27 @@ components:
           type: string
         updatedAt:
           type: string
+      type: object
+    models.OneCStatusMappingDTO:
+      properties:
+        rules:
+          items:
+            $ref: '#/components/schemas/models.OneCStatusMappingRuleDTO'
+          type: array
+      type: object
+    models.OneCStatusMappingRuleDTO:
+      properties:
+        contains:
+          type: string
+        equals:
+          type: string
+        invoiceStatus:
+          description: paid | void | uncollectible
+          type: string
+          enum:
+          - paid
+          - void
+          - uncollectible
       type: object
     models.PreRegCalendarSlotItem:
       properties:
@@ -3868,6 +3949,171 @@ paths:
       summary: Google Calendar OAuth callback (browser redirect)
       tags:
       - calendar-integration
+  /commerceml/exchange:
+    get:
+      description: 'Bitrix-style protocol: type=sale with mode=checkauth|query|import|file; session from checkauth via sessid or session query param. Import body is CommerceML XML (up to 8 MiB).'
+      operationId: CommerceMLExchange
+      parameters:
+      - description: Protocol branch (e.g. sale)
+        in: query
+        name: type
+        schema:
+          type: string
+      - description: checkauth, query, import, file
+        in: query
+        name: mode
+        schema:
+          type: string
+      - description: Session id returned by checkauth
+        in: query
+        name: sessid
+        schema:
+          type: string
+      - description: Alias for sessid
+        in: query
+        name: session
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/xml:
+              schema:
+                type: string
+            text/plain:
+              schema:
+                type: string
+          description: Plain-text success/failure lines or sale/query XML
+        '400':
+          content:
+            application/xml:
+              schema:
+                type: string
+            text/plain:
+              schema:
+                type: string
+          description: Bad request
+        '401':
+          content:
+            application/xml:
+              schema:
+                type: string
+            text/plain:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/xml:
+              schema:
+                type: string
+            text/plain:
+              schema:
+                type: string
+          description: Forbidden
+        '429':
+          content:
+            application/xml:
+              schema:
+                type: string
+            text/plain:
+              schema:
+                type: string
+          description: Too many requests
+        '500':
+          content:
+            application/xml:
+              schema:
+                type: string
+            text/plain:
+              schema:
+                type: string
+          description: Internal error
+      summary: CommerceML HTTP exchange (1С УНФ)
+      tags:
+      - CommerceML
+    post:
+      description: 'Bitrix-style protocol: type=sale with mode=checkauth|query|import|file; session from checkauth via sessid or session query param. Import body is CommerceML XML (up to 8 MiB).'
+      operationId: CommerceMLExchange
+      parameters:
+      - description: Protocol branch (e.g. sale)
+        in: query
+        name: type
+        schema:
+          type: string
+      - description: checkauth, query, import, file
+        in: query
+        name: mode
+        schema:
+          type: string
+      - description: Session id returned by checkauth
+        in: query
+        name: sessid
+        schema:
+          type: string
+      - description: Alias for sessid
+        in: query
+        name: session
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/xml:
+              schema:
+                type: string
+            text/plain:
+              schema:
+                type: string
+          description: Plain-text success/failure lines or sale/query XML
+        '400':
+          content:
+            application/xml:
+              schema:
+                type: string
+            text/plain:
+              schema:
+                type: string
+          description: Bad request
+        '401':
+          content:
+            application/xml:
+              schema:
+                type: string
+            text/plain:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/xml:
+              schema:
+                type: string
+            text/plain:
+              schema:
+                type: string
+          description: Forbidden
+        '429':
+          content:
+            application/xml:
+              schema:
+                type: string
+            text/plain:
+              schema:
+                type: string
+          description: Too many requests
+        '500':
+          content:
+            application/xml:
+              schema:
+                type: string
+            text/plain:
+              schema:
+                type: string
+          description: Internal error
+      summary: CommerceML HTTP exchange (1С УНФ)
+      tags:
+      - CommerceML
   /companies/{companyId}/usage-metrics:
     get:
       description: Returns current resource usage and limits for the company
@@ -7173,6 +7419,125 @@ paths:
       security:
       - BearerAuth: []
       summary: Update company (platform)
+      tags:
+      - platform
+  /platform/companies/{id}/onec-settings:
+    get:
+      description: Path id must be the company marked is_saas_operator. Returns 404 if none is marked; 403 if id is another company.
+      operationId: GetPlatformCompanyOneCSettings
+      parameters:
+      - description: SaaS operator company ID
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.CompanyOneCSettingsPublic'
+          description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden — id is not the SaaS operator company
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Not found
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: Get 1С УНФ CommerceML settings for the SaaS operator company
+      tags:
+      - platform
+    put:
+      description: Path id must be the company marked is_saas_operator. Returns 404 if none is marked; 403 if id is another company.
+      operationId: PutPlatformCompanyOneCSettings
+      parameters:
+      - description: SaaS operator company ID
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/models.CompanyOneCSettingsPutRequest'
+        description: Settings
+        required: true
+        x-originalParamName: body
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.CompanyOneCSettingsPublic'
+          description: OK
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden — id is not the SaaS operator company
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Not found
+        '409':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Conflict
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: Update 1С УНФ CommerceML settings for the SaaS operator company
       tags:
       - platform
   /platform/dadata/address/clean:

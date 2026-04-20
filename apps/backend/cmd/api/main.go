@@ -19,6 +19,7 @@ import (
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
 	"quokkaq-go-backend/internal/services/billing"
+	"quokkaq-go-backend/internal/services/commerceml"
 	"quokkaq-go-backend/internal/telemetry"
 	"quokkaq-go-backend/internal/ws"
 	"quokkaq-go-backend/pkg/database"
@@ -130,6 +131,7 @@ func run() error {
 			&models.StatisticsSurveyDaily{},
 			&models.SupportReport{},
 			&models.DeploymentSaaSSettings{},
+			&models.CompanyOneCSettings{},
 		)
 		if err != nil {
 			logger.Error("failed to run migrations", "err", err)
@@ -166,6 +168,9 @@ func run() error {
 	invoiceRepo := repository.NewInvoiceRepository()
 	catalogRepo := repository.NewCatalogRepository()
 	companyRepo := repository.NewCompanyRepository()
+	onecSettingsRepo := repository.NewOneCSettingsRepository()
+	onecSessionStore := commerceml.NewSessionStore(2 * time.Hour)
+	slog.Info("CommerceML checkauth sessions use in-memory storage; multiple API replicas require sticky routing or a future shared session backend")
 	operatorIntervalRepo := repository.NewOperatorIntervalRepository()
 
 	jobWorker := jobs.NewJobWorker(ttsService, ticketRepo)
@@ -318,6 +323,8 @@ func run() error {
 		pubApp,
 	)
 	companyHandler := handlers.NewCompanyHandler(companyRepo, userRepo, tenantRBACRepo)
+	onecSettingsHandler := handlers.NewOneCSettingsHandler(companyRepo, onecSettingsRepo)
+	commerceMLExchangeHandler := handlers.NewCommerceMLExchangeHandler(companyRepo, invoiceRepo, onecSettingsRepo, onecSessionStore)
 	platformHandler := handlers.NewPlatformHandler(companyRepo, subscriptionRepo, invoiceRepo, catalogRepo)
 	dadataHandler := handlers.NewDaDataHandler()
 
@@ -369,6 +376,11 @@ func run() error {
 	})
 
 	r.Post("/webhooks/yookassa", handlers.ServeYooKassaWebhook)
+
+	// CommerceML exchange: 1C UNF uses GET and POST on the same URL; constrain methods and rate-limit (see SSOPublicRateLimit).
+	mlExchange := http.HandlerFunc(commerceMLExchangeHandler.ServeHTTP)
+	r.With(authmiddleware.SSOPublicRateLimit).Post("/commerceml/exchange", mlExchange)
+	r.With(authmiddleware.SSOPublicRateLimit).Get("/commerceml/exchange", mlExchange)
 
 	r.Route("/public", func(r chi.Router) {
 		r.Use(authmiddleware.SSOPublicRateLimit)
@@ -761,6 +773,8 @@ func run() error {
 		r.Patch("/integrations", integrationsHandler.PatchPlatformIntegrations)
 		r.Get("/saas-operator-company", platformHandler.GetSaaSOperatorCompany)
 		r.Get("/companies", platformHandler.ListCompanies)
+		r.Get("/companies/{id}/onec-settings", onecSettingsHandler.GetPlatformCompanyOneCSettings)
+		r.Put("/companies/{id}/onec-settings", onecSettingsHandler.PutPlatformCompanyOneCSettings)
 		r.Get("/companies/{id}", platformHandler.GetCompany)
 		r.Patch("/companies/{id}", platformHandler.PatchCompany)
 		r.Post("/dadata/party/find-by-inn", dadataHandler.FindPartyByInn)

@@ -564,9 +564,11 @@ export interface HandlersPatchPlatformCompanyBody {
   billingEmail?: string;
   clearBillingAddress?: boolean;
   clearCounterparty?: boolean;
+  clearOnecCounterpartyGuid?: boolean;
   counterparty?: HandlersPatchPlatformCompanyBodyCounterparty;
   isSaasOperator?: boolean;
   name?: string;
+  onecCounterpartyGuid?: string;
   opaqueLoginLinksOnly?: boolean;
   paymentAccounts?: HandlersPatchPlatformCompanyBodyPaymentAccountsItem[];
   slug?: string;
@@ -962,7 +964,28 @@ export interface ModelsSubscriptionPlan {
   updatedAt?: string;
 }
 
+export interface ModelsCatalogItem {
+  article?: string;
+  createdAt?: string;
+  currency?: string;
+  /** gross (incl. VAT) per unit */
+  defaultPriceMinor?: number;
+  id?: string;
+  isActive?: boolean;
+  name?: string;
+  onecNomenclatureGuid?: string;
+  plan?: ModelsSubscriptionPlan;
+  printName?: string;
+  subscriptionPlanId?: string;
+  unit?: string;
+  updatedAt?: string;
+  vatExempt?: boolean;
+  /** used when VatExempt is false */
+  vatRatePercent?: number;
+}
+
 export interface ModelsInvoiceLine {
+  catalogItem?: ModelsCatalogItem;
   catalogItemId?: string;
   createdAt?: string;
   descriptionPrint?: string;
@@ -1036,6 +1059,9 @@ export interface ModelsInvoice {
   id?: string;
   issuedAt?: string;
   lines?: ModelsInvoiceLine[];
+  onecLastExchangeAt?: string;
+  /** OneCOrderSiteID is the document Ид in CommerceML (typically equals invoice id) for 1С УНФ order exchange. */
+  onecOrderSiteId?: string;
   /** when payment was received */
   paidAt?: string;
   /** "stripe", "yookassa", "manual" */
@@ -1119,6 +1145,8 @@ export interface ModelsCompany {
   name?: string;
   /** onboarding progress */
   onboardingState?: ModelsCompanyOnboardingState;
+  /** OneCCounterpartyGUID maps this tenant company to Контрагент in 1С (УНФ) for CommerceML orders. */
+  onecCounterpartyGuid?: string;
   /** OpaqueLoginLinksOnly: deep links should use TenantLoginLink tokens instead of slug-based branding. */
   opaqueLoginLinksOnly?: boolean;
   /** owner of the organization */
@@ -1230,25 +1258,6 @@ export interface HandlersPatchVisitorTagDefinitionRequest {
   sortOrder?: number;
 }
 
-export interface ModelsCatalogItem {
-  article?: string;
-  createdAt?: string;
-  currency?: string;
-  /** gross (incl. VAT) per unit */
-  defaultPriceMinor?: number;
-  id?: string;
-  isActive?: boolean;
-  name?: string;
-  plan?: ModelsSubscriptionPlan;
-  printName?: string;
-  subscriptionPlanId?: string;
-  unit?: string;
-  updatedAt?: string;
-  vatExempt?: boolean;
-  /** used when VatExempt is false */
-  vatRatePercent?: number;
-}
-
 export interface HandlersPlatformListResponseModelsCatalogItem {
   items?: ModelsCatalogItem[];
   limit?: number;
@@ -1306,6 +1315,7 @@ export interface ModelsCatalogItemCreateRequest {
   defaultPriceMinor?: number;
   isActive?: boolean;
   name: string;
+  onecNomenclatureGuid?: string;
   printName?: string;
   subscriptionPlanId?: string;
   unit?: string;
@@ -1319,11 +1329,57 @@ export interface ModelsCatalogItemPatchRequest {
   defaultPriceMinor?: number;
   isActive?: boolean;
   name?: string;
+  onecNomenclatureGuid?: string;
   printName?: string;
   subscriptionPlanId?: string;
   unit?: string;
   vatExempt?: boolean;
   vatRatePercent?: number;
+}
+
+/**
+ * paid | void | uncollectible
+ */
+export type ModelsOneCStatusMappingRuleDTOInvoiceStatus = typeof ModelsOneCStatusMappingRuleDTOInvoiceStatus[keyof typeof ModelsOneCStatusMappingRuleDTOInvoiceStatus];
+
+
+export const ModelsOneCStatusMappingRuleDTOInvoiceStatus = {
+  paid: 'paid',
+  void: 'void',
+  uncollectible: 'uncollectible',
+} as const;
+
+export interface ModelsOneCStatusMappingRuleDTO {
+  contains?: string;
+  equals?: string;
+  /** paid | void | uncollectible */
+  invoiceStatus?: ModelsOneCStatusMappingRuleDTOInvoiceStatus;
+}
+
+export interface ModelsOneCStatusMappingDTO {
+  rules?: ModelsOneCStatusMappingRuleDTO[];
+}
+
+export interface ModelsCompanyOneCSettingsPublic {
+  commerceMlVersion?: string;
+  companyId?: string;
+  exchangeEnabled?: boolean;
+  /** filled by handler from PUBLIC_APP_URL */
+  exchangeUrlHint?: string;
+  httpLogin?: string;
+  passwordSet?: boolean;
+  sitePaymentSystemName?: string;
+  statusMapping?: ModelsOneCStatusMappingDTO;
+}
+
+export interface ModelsCompanyOneCSettingsPutRequest {
+  commerceMlVersion?: string;
+  exchangeEnabled?: boolean;
+  httpLogin?: string;
+  /** empty string clears password; omit to leave unchanged */
+  httpPassword?: string;
+  sitePaymentSystemName?: string;
+  statusMapping?: ModelsOneCStatusMappingDTO | null;
 }
 
 export type ModelsCompanyPatchBillingAddress = { [key: string]: unknown };
@@ -3008,6 +3064,264 @@ export const usePatchCompany = <TError = unknown,
         TContext
       > => {
       return useMutation(getPatchCompanyMutationOptions(options), queryClient);
+    }
+
+/**
+ * Path id must be the company marked is_saas_operator. Returns 404 if none is marked; 403 if id is another company.
+ * @summary Get 1С УНФ CommerceML settings for the SaaS operator company
+ */
+export type getPlatformCompanyOneCSettingsResponse200 = {
+  data: ModelsCompanyOneCSettingsPublic
+  status: 200
+}
+
+export type getPlatformCompanyOneCSettingsResponse400 = {
+  data: string
+  status: 400
+}
+
+export type getPlatformCompanyOneCSettingsResponse401 = {
+  data: string
+  status: 401
+}
+
+export type getPlatformCompanyOneCSettingsResponse403 = {
+  data: string
+  status: 403
+}
+
+export type getPlatformCompanyOneCSettingsResponse404 = {
+  data: string
+  status: 404
+}
+
+export type getPlatformCompanyOneCSettingsResponse500 = {
+  data: string
+  status: 500
+}
+
+export type getPlatformCompanyOneCSettingsResponseSuccess = (getPlatformCompanyOneCSettingsResponse200) & {
+  headers: Headers;
+};
+export type getPlatformCompanyOneCSettingsResponseError = (getPlatformCompanyOneCSettingsResponse400 | getPlatformCompanyOneCSettingsResponse401 | getPlatformCompanyOneCSettingsResponse403 | getPlatformCompanyOneCSettingsResponse404 | getPlatformCompanyOneCSettingsResponse500) & {
+  headers: Headers;
+};
+
+export type getPlatformCompanyOneCSettingsResponse = (getPlatformCompanyOneCSettingsResponseSuccess | getPlatformCompanyOneCSettingsResponseError)
+
+export const getGetPlatformCompanyOneCSettingsUrl = (id: string,) => {
+
+
+
+
+  return `/platform/companies/${id}/onec-settings`
+}
+
+export const getPlatformCompanyOneCSettings = async (id: string, options?: RequestInit): Promise<getPlatformCompanyOneCSettingsResponse> => {
+
+  return orvalMutator<getPlatformCompanyOneCSettingsResponse>(getGetPlatformCompanyOneCSettingsUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPlatformCompanyOneCSettingsQueryKey = (id: string,) => {
+    return [
+    `/platform/companies/${id}/onec-settings`
+    ] as const;
+    }
+
+
+export const getGetPlatformCompanyOneCSettingsQueryOptions = <TData = Awaited<ReturnType<typeof getPlatformCompanyOneCSettings>>, TError = string>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformCompanyOneCSettings>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPlatformCompanyOneCSettingsQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPlatformCompanyOneCSettings>>> = ({ signal }) => getPlatformCompanyOneCSettings(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPlatformCompanyOneCSettings>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetPlatformCompanyOneCSettingsQueryResult = NonNullable<Awaited<ReturnType<typeof getPlatformCompanyOneCSettings>>>
+export type GetPlatformCompanyOneCSettingsQueryError = string
+
+
+export function useGetPlatformCompanyOneCSettings<TData = Awaited<ReturnType<typeof getPlatformCompanyOneCSettings>>, TError = string>(
+ id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformCompanyOneCSettings>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getPlatformCompanyOneCSettings>>,
+          TError,
+          Awaited<ReturnType<typeof getPlatformCompanyOneCSettings>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetPlatformCompanyOneCSettings<TData = Awaited<ReturnType<typeof getPlatformCompanyOneCSettings>>, TError = string>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformCompanyOneCSettings>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getPlatformCompanyOneCSettings>>,
+          TError,
+          Awaited<ReturnType<typeof getPlatformCompanyOneCSettings>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetPlatformCompanyOneCSettings<TData = Awaited<ReturnType<typeof getPlatformCompanyOneCSettings>>, TError = string>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformCompanyOneCSettings>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get 1С УНФ CommerceML settings for the SaaS operator company
+ */
+
+export function useGetPlatformCompanyOneCSettings<TData = Awaited<ReturnType<typeof getPlatformCompanyOneCSettings>>, TError = string>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlatformCompanyOneCSettings>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetPlatformCompanyOneCSettingsQueryOptions(id,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * Path id must be the company marked is_saas_operator. Returns 404 if none is marked; 403 if id is another company.
+ * @summary Update 1С УНФ CommerceML settings for the SaaS operator company
+ */
+export type putPlatformCompanyOneCSettingsResponse200 = {
+  data: ModelsCompanyOneCSettingsPublic
+  status: 200
+}
+
+export type putPlatformCompanyOneCSettingsResponse400 = {
+  data: string
+  status: 400
+}
+
+export type putPlatformCompanyOneCSettingsResponse401 = {
+  data: string
+  status: 401
+}
+
+export type putPlatformCompanyOneCSettingsResponse403 = {
+  data: string
+  status: 403
+}
+
+export type putPlatformCompanyOneCSettingsResponse404 = {
+  data: string
+  status: 404
+}
+
+export type putPlatformCompanyOneCSettingsResponse409 = {
+  data: string
+  status: 409
+}
+
+export type putPlatformCompanyOneCSettingsResponse500 = {
+  data: string
+  status: 500
+}
+
+export type putPlatformCompanyOneCSettingsResponseSuccess = (putPlatformCompanyOneCSettingsResponse200) & {
+  headers: Headers;
+};
+export type putPlatformCompanyOneCSettingsResponseError = (putPlatformCompanyOneCSettingsResponse400 | putPlatformCompanyOneCSettingsResponse401 | putPlatformCompanyOneCSettingsResponse403 | putPlatformCompanyOneCSettingsResponse404 | putPlatformCompanyOneCSettingsResponse409 | putPlatformCompanyOneCSettingsResponse500) & {
+  headers: Headers;
+};
+
+export type putPlatformCompanyOneCSettingsResponse = (putPlatformCompanyOneCSettingsResponseSuccess | putPlatformCompanyOneCSettingsResponseError)
+
+export const getPutPlatformCompanyOneCSettingsUrl = (id: string,) => {
+
+
+
+
+  return `/platform/companies/${id}/onec-settings`
+}
+
+export const putPlatformCompanyOneCSettings = async (id: string,
+    modelsCompanyOneCSettingsPutRequest: ModelsCompanyOneCSettingsPutRequest, options?: RequestInit): Promise<putPlatformCompanyOneCSettingsResponse> => {
+
+  return orvalMutator<putPlatformCompanyOneCSettingsResponse>(getPutPlatformCompanyOneCSettingsUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      modelsCompanyOneCSettingsPutRequest,)
+  }
+);}
+
+
+
+
+export const getPutPlatformCompanyOneCSettingsMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putPlatformCompanyOneCSettings>>, TError,{id: string;data: ModelsCompanyOneCSettingsPutRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof putPlatformCompanyOneCSettings>>, TError,{id: string;data: ModelsCompanyOneCSettingsPutRequest}, TContext> => {
+
+const mutationKey = ['putPlatformCompanyOneCSettings'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putPlatformCompanyOneCSettings>>, {id: string;data: ModelsCompanyOneCSettingsPutRequest}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  putPlatformCompanyOneCSettings(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PutPlatformCompanyOneCSettingsMutationResult = NonNullable<Awaited<ReturnType<typeof putPlatformCompanyOneCSettings>>>
+    export type PutPlatformCompanyOneCSettingsMutationBody = ModelsCompanyOneCSettingsPutRequest
+    export type PutPlatformCompanyOneCSettingsMutationError = string
+
+    /**
+ * @summary Update 1С УНФ CommerceML settings for the SaaS operator company
+ */
+export const usePutPlatformCompanyOneCSettings = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putPlatformCompanyOneCSettings>>, TError,{id: string;data: ModelsCompanyOneCSettingsPutRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof putPlatformCompanyOneCSettings>>,
+        TError,
+        {id: string;data: ModelsCompanyOneCSettingsPutRequest},
+        TContext
+      > => {
+      return useMutation(getPutPlatformCompanyOneCSettingsMutationOptions(options), queryClient);
     }
 
 /**

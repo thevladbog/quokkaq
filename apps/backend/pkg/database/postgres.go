@@ -1998,6 +1998,68 @@ ON invitations (company_id, user_id)
 		return fmt.Errorf("failed to run v1.3.14_invitations_company_user_unique migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.3.15_onec_commerceml_integration", func(db *gorm.DB) error {
+		if err := db.Exec(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS onec_counterparty_guid VARCHAR(128)`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`ALTER TABLE catalog_items ADD COLUMN IF NOT EXISTS onec_nomenclature_guid VARCHAR(128)`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS onec_order_site_id VARCHAR(128)`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS onec_last_exchange_at TIMESTAMPTZ`).Error; err != nil {
+			return err
+		}
+		// company_id must be TEXT to match companies.id (same as other tenant FKs — not UUID).
+		if err := db.Exec(`
+CREATE TABLE IF NOT EXISTS company_onec_settings (
+  company_id TEXT PRIMARY KEY REFERENCES companies(id) ON DELETE CASCADE,
+  exchange_enabled BOOLEAN NOT NULL DEFAULT false,
+  http_login VARCHAR(128) NOT NULL DEFAULT '',
+  http_password_bcrypt TEXT NOT NULL DEFAULT '',
+  commerce_ml_version VARCHAR(16) NOT NULL DEFAULT '2.10',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+)`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+CREATE UNIQUE INDEX IF NOT EXISTS idx_company_onec_settings_http_login
+ON company_onec_settings (http_login)
+WHERE http_login <> ''`).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.3.15_onec_commerceml_integration migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.3.16_onec_status_mapping_json", func(db *gorm.DB) error {
+		if err := db.Exec(`
+ALTER TABLE company_onec_settings
+ADD COLUMN IF NOT EXISTS status_mapping_json JSONB`).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.3.16_onec_status_mapping_json migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.3.17_onec_site_payment_system_name", func(db *gorm.DB) error {
+		if err := db.Exec(`
+ALTER TABLE company_onec_settings
+ADD COLUMN IF NOT EXISTS site_payment_system_name VARCHAR(256) NOT NULL DEFAULT ''`).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.3.17_onec_site_payment_system_name migration: %w", err)
+	}
+
 	fmt.Println("✅ All migrations completed successfully")
 	return nil
 }

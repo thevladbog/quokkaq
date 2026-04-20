@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm, useFormState } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 
+import { OneCIntegrationSettings } from '@/components/settings/onec-integration-settings';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -18,9 +19,12 @@ import {
 } from '@/components/ui/form';
 import { Spinner } from '@/components/ui/spinner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Link } from '@/src/i18n/navigation';
 import {
   getGetPlatformIntegrationsQueryKey,
+  getGetSaaSOperatorCompanyQueryKey,
   getPlatformIntegrations,
+  getSaaSOperatorCompany,
   patchPlatformIntegrations,
   type HandlersPlatformIntegrationsResponse,
   type ServicesDeploymentSaaSSettingsPatch
@@ -54,6 +58,7 @@ function PlatformIntegrationsForm({
   data: HandlersPlatformIntegrationsResponse;
 }) {
   const t = useTranslations('platform.integrations');
+  const [integrationsTab, setIntegrationsTab] = useState('tracker');
   const queryClient = useQueryClient();
 
   const form = useForm<PlatformIntegrationsFormValues>({
@@ -97,12 +102,17 @@ function PlatformIntegrationsForm({
   });
 
   return (
-    <Form {...form}>
-      <Tabs defaultValue='tracker' className='max-w-2xl'>
-        <TabsList className='grid w-full max-w-md grid-cols-2'>
-          <TabsTrigger value='tracker'>{t('tabTracker')}</TabsTrigger>
-          <TabsTrigger value='support'>{t('tabSupport')}</TabsTrigger>
-        </TabsList>
+    <Tabs
+      value={integrationsTab}
+      onValueChange={setIntegrationsTab}
+      className='max-w-2xl'
+    >
+      <TabsList className='grid w-full max-w-2xl grid-cols-3'>
+        <TabsTrigger value='tracker'>{t('tabTracker')}</TabsTrigger>
+        <TabsTrigger value='support'>{t('tabSupport')}</TabsTrigger>
+        <TabsTrigger value='onec'>{t('tabOneC')}</TabsTrigger>
+      </TabsList>
+      <Form {...form}>
         <TabsContent value='tracker' className='mt-6 space-y-6'>
           <p className='text-muted-foreground text-sm'>{t('trackerIntro')}</p>
           <FormField
@@ -193,8 +203,58 @@ function PlatformIntegrationsForm({
             {mutation.isPending ? <Spinner className='size-4' /> : t('save')}
           </Button>
         </TabsContent>
-      </Tabs>
-    </Form>
+      </Form>
+      <PlatformOneCSaaSOperatorTab active={integrationsTab === 'onec'} />
+    </Tabs>
+  );
+}
+
+type SaaSOperatorTabState =
+  | { kind: 'ok'; companyId: string }
+  | { kind: 'none' };
+
+function PlatformOneCSaaSOperatorTab({ active }: { active: boolean }) {
+  const t = useTranslations('platform.integrations');
+  const operatorQ = useQuery({
+    queryKey: getGetSaaSOperatorCompanyQueryKey(),
+    enabled: active,
+    queryFn: async (): Promise<SaaSOperatorTabState> => {
+      const res = await getSaaSOperatorCompany();
+      if (res.status === 200 && res.data?.id) {
+        return { kind: 'ok', companyId: res.data.id };
+      }
+      if (res.status === 404) {
+        return { kind: 'none' };
+      }
+      throw new Error('load');
+    }
+  });
+
+  return (
+    <TabsContent value='onec' className='mt-6 max-w-2xl space-y-6'>
+      <p className='text-muted-foreground text-sm'>{t('onecIntro')}</p>
+      {operatorQ.isLoading ? (
+        <p className='text-muted-foreground text-sm'>
+          {t('onecOperatorLoading')}
+        </p>
+      ) : operatorQ.isError ? (
+        <p className='text-destructive text-sm'>{t('onecOperatorLoadError')}</p>
+      ) : operatorQ.data?.kind === 'none' ? (
+        <div className='space-y-3'>
+          <p className='text-muted-foreground text-sm'>
+            {t('onecOperatorMissing')}
+          </p>
+          <Button variant='outline' size='sm' asChild>
+            <Link href='/platform/companies'>
+              {t('onecOperatorOpenCompanies')}
+            </Link>
+          </Button>
+        </div>
+      ) : operatorQ.data?.kind === 'ok' ? (
+        <OneCIntegrationSettings platformCompanyId={operatorQ.data.companyId} />
+      ) : null}
+      <p className='text-muted-foreground text-xs'>{t('onecDocHint')}</p>
+    </TabsContent>
   );
 }
 
