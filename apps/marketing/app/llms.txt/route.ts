@@ -32,7 +32,12 @@ export function GET() {
   ];
 
   if (product) {
-    lines.push('## Product web application', '', `- Signup / app base URL: ${product}`, '');
+    lines.push(
+      '## Product web application',
+      '',
+      `- Signup / app base URL: ${product}`,
+      ''
+    );
   }
 
   lines.push(

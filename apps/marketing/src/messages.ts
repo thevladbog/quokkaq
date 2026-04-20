@@ -410,7 +410,8 @@ export const messages: Record<
         email: 'Work email',
         company: 'Company',
         message: 'How can we help?',
-        privacyConsentPrefix: 'I agree to the processing of my personal data as described in the ',
+        privacyConsentPrefix:
+          'I agree to the processing of my personal data as described in the ',
         privacyLinkLabel: 'Privacy Policy',
         privacyConsentSuffix: '.',
         privacyConsentRequired:
@@ -730,7 +731,8 @@ export const messages: Record<
         email: 'Рабочий email',
         company: 'Компания',
         message: 'Чем можем помочь?',
-        privacyConsentPrefix: 'Я согласен(а) на обработку персональных данных в соответствии с ',
+        privacyConsentPrefix:
+          'Я согласен(а) на обработку персональных данных в соответствии с ',
         privacyLinkLabel: 'политикой конфиденциальности',
         privacyConsentSuffix: '.',
         privacyConsentRequired:

@@ -48,7 +48,10 @@ export function HomePageJsonLd({ locale }: Props) {
     <script
       type='application/ld+json'
       dangerouslySetInnerHTML={{
-        __html: JSON.stringify({ '@context': 'https://schema.org', '@graph': graph })
+        __html: JSON.stringify({
+          '@context': 'https://schema.org',
+          '@graph': graph
+        })
       }}
     />
   );

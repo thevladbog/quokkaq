@@ -9,7 +9,9 @@ export type StoredConsentV1 = {
   analytics: boolean;
 };
 
-export function parseConsentCookie(raw: string | undefined): StoredConsentV1 | null {
+export function parseConsentCookie(
+  raw: string | undefined
+): StoredConsentV1 | null {
   if (!raw?.trim()) {
     return null;
   }

@@ -27,7 +27,9 @@ type PageProps = {
   params: Promise<{ locale: string }>;
 };
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+export async function generateMetadata({
+  params
+}: PageProps): Promise<Metadata> {
   const { locale: raw } = await params;
   if (!isAppLocale(raw)) {
     return {};

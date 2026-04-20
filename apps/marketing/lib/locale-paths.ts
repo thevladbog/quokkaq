@@ -5,7 +5,9 @@ export function localeHomePath(locale: AppLocale): '/en' | '/ru' {
   return locale === 'ru' ? '/ru' : '/en';
 }
 
-export function localePrivacyPath(locale: AppLocale): '/en/privacy' | '/ru/privacy' {
+export function localePrivacyPath(
+  locale: AppLocale
+): '/en/privacy' | '/ru/privacy' {
   return locale === 'ru' ? '/ru/privacy' : '/en/privacy';
 }
 

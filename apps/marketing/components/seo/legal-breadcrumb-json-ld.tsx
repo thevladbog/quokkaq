@@ -12,7 +12,11 @@ type Props = {
   pathSegment: 'privacy' | 'terms';
 };
 
-export function LegalBreadcrumbJsonLd({ locale, pageTitle, pathSegment }: Props) {
+export function LegalBreadcrumbJsonLd({
+  locale,
+  pageTitle,
+  pathSegment
+}: Props) {
   const origin = getMetadataBaseUrl().origin;
   const pageUrl = `${origin}/${locale}/${pathSegment}`;
 
@@ -39,7 +43,10 @@ export function LegalBreadcrumbJsonLd({ locale, pageTitle, pathSegment }: Props)
     <script
       type='application/ld+json'
       dangerouslySetInnerHTML={{
-        __html: JSON.stringify({ '@context': 'https://schema.org', ...breadcrumb })
+        __html: JSON.stringify({
+          '@context': 'https://schema.org',
+          ...breadcrumb
+        })
       }}
     />
   );
