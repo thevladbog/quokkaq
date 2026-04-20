@@ -287,6 +287,7 @@ components:
         paymentTerms:
           description: PaymentTerms is optional markdown for «Условия оплаты». Omit on PATCH to leave unchanged; send "" to clear.
           type: string
+          maxLength: 32000
         provisionSubscriptionsOnPayment:
           type: boolean
       required:
@@ -307,6 +308,7 @@ components:
         lineComment:
           description: LineComment is optional text shown under the line title in print (parentheses in UI/PDF).
           type: string
+          maxLength: 512
         quantity:
           type: number
         subscriptionPeriodStart:
@@ -344,6 +346,7 @@ components:
         paymentTerms:
           description: PaymentTerms is optional markdown for «Условия оплаты». Omit on PATCH to leave unchanged; send "" to clear.
           type: string
+          maxLength: 32000
         provisionSubscriptionsOnPayment:
           type: boolean
       required:
@@ -1397,6 +1400,7 @@ components:
         invoiceDefaultPaymentTerms:
           description: InvoiceDefaultPaymentTerms is markdown used as default «Условия оплаты» on new platform invoices; only the SaaS operator row (IsSaaSOperator) is intended to hold a template.
           type: string
+          maxLength: 32000
         invoices:
           items:
             $ref: '#/components/schemas/models.Invoice'
@@ -1670,6 +1674,7 @@ components:
         paymentTerms:
           description: PaymentTermsMarkdown is per-invoice «Условия оплаты» (markdown in UI; PDF uses a plain-text rendering).
           type: string
+          maxLength: 32000
         provisionSubscriptionsOnPayment:
           type: boolean
         provisioningDoneAt:
@@ -1717,6 +1722,7 @@ components:
         lineComment:
           description: LineComment is optional print-only clarification (e.g. period); shown under description in UI/PDF.
           type: string
+          maxLength: 512
         lineGrossMinor:
           type: integer
         lineNetMinor:

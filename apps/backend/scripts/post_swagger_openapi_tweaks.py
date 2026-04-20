@@ -79,6 +79,26 @@ def _schema(components: dict[str, Any], name: str) -> dict[str, Any]:
     return s
 
 
+def _set_string_prop_max_length(
+    components: dict[str, Any], schema_name: str, prop: str, max_length: int
+) -> None:
+    """Document server-side UTF-8 rune limits (see platform_invoice_v2.go)."""
+    schema = _schema(components, schema_name)
+    props = schema.get("properties")
+    if not isinstance(props, dict):
+        sys.exit(
+            f"post_swagger_openapi_tweaks: components.schemas[{schema_name!r}].properties "
+            "missing or not an object"
+        )
+    p = props.get(prop)
+    if not isinstance(p, dict):
+        sys.exit(
+            f"post_swagger_openapi_tweaks: components.schemas[{schema_name!r}].properties[{prop!r}] "
+            "missing (schema drift — update swag annotations or this script)."
+        )
+    p["maxLength"] = max_length
+
+
 def _patch_color_pattern(schema_obj: dict[str, Any], schema_label: str) -> None:
     """Set properties.color.pattern on a components.schemas entry; schema_label is used in errors."""
     props = schema_obj.get("properties")
@@ -706,6 +726,14 @@ def apply_openapi_tweaks(doc: dict[str, Any]) -> None:
     _patch_models_update_user_input(comp)
     _patch_models_company_onec_settings_put_request_password(comp)
     _patch_onec_status_mapping_invoice_status_enum(comp)
+
+    # Platform invoice markdown / line comments (utf8.RuneCount limits in platform_invoice_v2.go).
+    _set_string_prop_max_length(comp, "handlers.InvoiceDraftCreateBody", "paymentTerms", 32000)
+    _set_string_prop_max_length(comp, "handlers.InvoiceDraftUpsertBody", "paymentTerms", 32000)
+    _set_string_prop_max_length(comp, "handlers.InvoiceDraftLineInput", "lineComment", 512)
+    _set_string_prop_max_length(comp, "models.Company", "invoiceDefaultPaymentTerms", 32000)
+    _set_string_prop_max_length(comp, "models.Invoice", "paymentTerms", 32000)
+    _set_string_prop_max_length(comp, "models.InvoiceLine", "lineComment", 512)
 
     _patch_company_me_patch_sso_access_security(doc)
     _patch_get_external_identity_204_no_body(doc)
