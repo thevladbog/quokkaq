@@ -2077,6 +2077,20 @@ ADD COLUMN IF NOT EXISTS payment_terms_markdown TEXT`).Error; err != nil {
 		return fmt.Errorf("failed to run v1.3.18_invoice_payment_terms migration: %w", err)
 	}
 
+	// Optional per-line print comment; versioned migrations do not re-run v1.0.7 AutoMigrate.
+	err = manager.RunMigration("v1.3.19_invoice_lines_line_comment", func(db *gorm.DB) error {
+		if err := db.Exec(`
+			ALTER TABLE invoice_lines
+			ADD COLUMN IF NOT EXISTS line_comment TEXT NOT NULL DEFAULT ''
+		`).Error; err != nil {
+			return err
+		}
+		return db.AutoMigrate(&dbmodels.InvoiceLine{})
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.3.19_invoice_lines_line_comment migration: %w", err)
+	}
+
 	fmt.Println("✅ All migrations completed successfully")
 	return nil
 }

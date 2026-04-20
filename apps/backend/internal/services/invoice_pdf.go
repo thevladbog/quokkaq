@@ -461,9 +461,37 @@ func BuildInvoicePDF(inv *models.Invoice, vendor *models.Company) ([]byte, error
 	pdf.Line(left, y-2, contentRight, y-2)
 	y += 4
 
-	rowH := 14.0
+	const tableDescFontPt = 8.0
+	const tableDescLineGap = 1.2
+	descLineStep := tableDescFontPt + tableDescLineGap
+	const tableCommentFontPt = 7.0
+	const tableCommentLineGap = 1.0
+	commentLineStep := tableCommentFontPt + tableCommentLineGap
+	const tableCommentGapAfterDesc = 1.5
+	minTableRowH := 14.0
+
 	setFont(8)
 	for i, line := range inv.Lines {
+		descW := tableWidths[1] - 2
+		setFont(tableDescFontPt)
+		descLines := pdfWordWrapLines(&pdf, strings.TrimSpace(line.DescriptionPrint), descW)
+		if len(descLines) == 0 {
+			descLines = []string{strings.TrimSpace(line.DescriptionPrint)}
+		}
+		rowDescH := float64(len(descLines)) * descLineStep
+		var commentLines []string
+		if c := strings.TrimSpace(line.LineComment); c != "" {
+			commentLines = pdfWordWrapLines(&pdf, "("+c+")", descW)
+		}
+		rowCommentH := 0.0
+		if len(commentLines) > 0 {
+			rowCommentH = tableCommentGapAfterDesc + float64(len(commentLines))*commentLineStep
+		}
+		rowH := rowDescH + rowCommentH
+		if rowH < minTableRowH {
+			rowH = minTableRowH
+		}
+
 		if y+rowH+footerReserve > pdfPageH-pdfMargin {
 			if err := addInvoicePage(); err != nil {
 				return nil, err
@@ -471,10 +499,10 @@ func BuildInvoicePDF(inv *models.Invoice, vendor *models.Company) ([]byte, error
 			y = pdfMargin + 8 + pdfContinuationBodyTopPad(&pdf)
 			setFont(8)
 		}
-		x = left
+
 		row := []string{
 			fmt.Sprintf("%d", i+1),
-			line.DescriptionPrint,
+			"",
 			trimQuantity(line.Quantity),
 			strings.TrimSpace(line.MeasureUnit),
 			formatMinorForPDF(inv.Currency, effectiveUnitPriceInclVatMinor(line)),
@@ -483,24 +511,50 @@ func BuildInvoicePDF(inv *models.Invoice, vendor *models.Company) ([]byte, error
 			discountLinePDF(line, inv.Currency),
 			formatMinorForPDF(inv.Currency, line.LineGrossMinor),
 		}
-		for j, txt := range row {
-			cellW := tableWidths[j]
-			clip := txt
-			if j == 1 && len([]rune(clip)) > 36 {
-				r := []rune(clip)
-				clip = string(r[:34]) + "…"
+
+		x = left
+		pdf.SetTextColor(0, 0, 0)
+		setFont(tableDescFontPt)
+		pdf.SetXY(x, y)
+		_ = pdf.Cell(&gopdf.Rect{W: tableWidths[0], H: rowH}, row[0])
+		x += tableWidths[0] + tableColGutter
+
+		dy := y
+		for _, ln := range descLines {
+			pdf.SetTextColor(0, 0, 0)
+			setFont(tableDescFontPt)
+			pdf.SetXY(x, dy)
+			_ = pdf.Cell(&gopdf.Rect{W: tableWidths[1], H: descLineStep}, ln)
+			dy += descLineStep
+		}
+		if len(commentLines) > 0 {
+			dy += tableCommentGapAfterDesc
+			for _, cl := range commentLines {
+				setFontItalic(tableCommentFontPt)
+				pdf.SetTextColor(115, 115, 115)
+				pdf.SetXY(x, dy)
+				_ = pdf.Cell(&gopdf.Rect{W: tableWidths[1], H: commentLineStep}, cl)
+				dy += commentLineStep
 			}
-			tw, _ := pdf.MeasureTextWidth(clip)
+		}
+		pdf.SetTextColor(0, 0, 0)
+		setFont(8)
+
+		x += tableWidths[1] + tableColGutter
+		for j := 2; j < len(row); j++ {
+			txt := row[j]
+			cellW := tableWidths[j]
+			tw, _ := pdf.MeasureTextWidth(txt)
 			if j >= 2 && j != 3 {
 				xi := x + cellW - tw - 2
 				if xi < x {
 					xi = x
 				}
 				pdf.SetXY(xi, y)
-				_ = pdf.Cell(&gopdf.Rect{W: tw + 2, H: rowH}, clip)
+				_ = pdf.Cell(&gopdf.Rect{W: tw + 2, H: rowH}, txt)
 			} else {
 				pdf.SetXY(x, y)
-				_ = pdf.Cell(&gopdf.Rect{W: cellW, H: rowH}, clip)
+				_ = pdf.Cell(&gopdf.Rect{W: cellW, H: rowH}, txt)
 			}
 			x += cellW
 			if j < nGaps {

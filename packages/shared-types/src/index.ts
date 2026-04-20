@@ -1281,6 +1281,7 @@ export const InvoiceLineSchema = z.object({
   position: z.number(),
   catalogItemId: z.string().nullable().optional(),
   descriptionPrint: z.string(),
+  lineComment: z.string().optional().default(''),
   quantity: z.number(),
   unit: z
     .union([z.string(), z.null()])
@@ -1386,6 +1387,7 @@ export type CatalogItem = z.infer<typeof CatalogItemSchema>;
 export const InvoiceDraftLineInputSchema = z.object({
   catalogItemId: z.string().nullable().optional(),
   descriptionPrint: z.string(),
+  lineComment: z.string().optional().default(''),
   quantity: z.number(),
   unit: z
     .string()

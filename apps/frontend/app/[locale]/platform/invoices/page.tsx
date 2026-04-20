@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { PlatformInvoiceDefaultPaymentTermsModal } from '@/components/platform/PlatformInvoiceDefaultPaymentTermsModal';
+import { InvoiceStatusBadge } from '@/components/billing/invoice-status-badge';
 import { Link } from '@/src/i18n/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useMemo } from 'react';
@@ -212,7 +213,10 @@ export default function PlatformInvoicesPage() {
                     )}
                   </TableCell>
                   <TableCell>
-                    {invoiceStatusLabel(tOrgInv, inv.status ?? 'draft')}
+                    <InvoiceStatusBadge
+                      status={inv.status ?? 'draft'}
+                      label={invoiceStatusLabel(tOrgInv, inv.status ?? 'draft')}
+                    />
                   </TableCell>
                   <TableCell className='text-sm'>
                     {formatAppDateTime(inv.dueDate, intlLocale)}

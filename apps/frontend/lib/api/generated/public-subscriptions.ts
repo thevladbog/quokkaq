@@ -463,6 +463,8 @@ export interface HandlersGoogleCalendarPickListResponse {
 export interface HandlersInvoiceDraftLineInput {
   catalogItemId?: string;
   descriptionPrint?: string;
+  /** Optional note under the line title in print (stored without outer parentheses). */
+  lineComment?: string;
   discountAmountMinor?: number;
   discountPercent?: number;
   quantity?: number;
@@ -976,6 +978,8 @@ export interface ModelsInvoiceLine {
   catalogItemId?: string;
   createdAt?: string;
   descriptionPrint?: string;
+  /** Optional print-only clarification under the line title. */
+  lineComment?: string;
   discountAmountMinor?: number;
   discountPercent?: number;
   id?: string;

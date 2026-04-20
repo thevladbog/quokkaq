@@ -30,6 +30,7 @@ import {
 } from '@/lib/api/generated/platform';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DateTimePicker } from '@/components/ui/datetime-picker';
@@ -794,6 +795,32 @@ export function PlatformInvoiceDraftForm({
                           prev.map((r) =>
                             r.key === row.key
                               ? { ...r, descriptionPrint: e.target.value }
+                              : r
+                          )
+                        )
+                      }
+                    />
+                  </div>
+                  <div className='grid min-w-0 gap-2'>
+                    <Label>
+                      {t('lineComment', {
+                        defaultValue: 'Line comment'
+                      })}
+                    </Label>
+                    <Textarea
+                      className='min-h-[2.75rem] resize-y'
+                      rows={2}
+                      maxLength={512}
+                      placeholder={t('lineCommentPlaceholder', {
+                        defaultValue:
+                          'e.g. March 2026 (printed in italics in parentheses under the title)'
+                      })}
+                      value={row.lineComment}
+                      onChange={(e) =>
+                        setRows((prev) =>
+                          prev.map((r) =>
+                            r.key === row.key
+                              ? { ...r, lineComment: e.target.value }
                               : r
                           )
                         )

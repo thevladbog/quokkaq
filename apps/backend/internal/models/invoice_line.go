@@ -9,7 +9,9 @@ type InvoiceLine struct {
 	Position         int     `gorm:"not null" json:"position"`
 	CatalogItemID    *string `gorm:"index" json:"catalogItemId,omitempty"`
 	DescriptionPrint string  `gorm:"not null" json:"descriptionPrint"`
-	Quantity         float64 `gorm:"not null" json:"quantity"`
+	// LineComment is optional print-only clarification (e.g. period); shown under description in UI/PDF.
+	LineComment string  `gorm:"column:line_comment;type:text;not null;default:''" json:"lineComment,omitempty"`
+	Quantity    float64 `gorm:"not null" json:"quantity"`
 	// Print UOM (DB column unit). Renamed from "Unit" to avoid GORM confusion with models.Unit in this package.
 	MeasureUnit             string     `gorm:"column:unit;not null;default:''" json:"unit"`
 	UnitPriceInclVatMinor   int64      `gorm:"not null" json:"unitPriceInclVatMinor"`

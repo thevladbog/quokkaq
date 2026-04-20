@@ -458,6 +458,10 @@
                     "descriptionPrint": {
                         "type": "string"
                     },
+                    "lineComment": {
+                        "description": "Optional note under the line title in print (stored without outer parentheses).",
+                        "type": "string"
+                    },
                     "discountAmountMinor": {
                         "type": "integer"
                     },
@@ -2541,6 +2545,10 @@
                         "type": "string"
                     },
                     "descriptionPrint": {
+                        "type": "string"
+                    },
+                    "lineComment": {
+                        "description": "Optional print-only clarification under the line title.",
                         "type": "string"
                     },
                     "discountAmountMinor": {

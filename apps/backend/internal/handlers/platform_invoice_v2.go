@@ -30,13 +30,16 @@ var (
 )
 
 const maxInvoicePaymentTermsRunes = 32000
+const maxInvoiceLineCommentRunes = 512
 
 // InvoiceDraftLineInput is one line in a platform invoice draft create/patch request.
 type InvoiceDraftLineInput struct {
 	CatalogItemID    *string `json:"catalogItemId"`
 	DescriptionPrint string  `json:"descriptionPrint"`
-	Quantity         float64 `json:"quantity"`
-	Unit             string  `json:"unit"` // UOM; if empty and catalog linked, defaults from catalog
+	// LineComment is optional text shown under the line title in print (parentheses in UI/PDF).
+	LineComment string  `json:"lineComment"`
+	Quantity    float64 `json:"quantity"`
+	Unit        string  `json:"unit"` // UOM; if empty and catalog linked, defaults from catalog
 	// If nil with a catalog line, defaults to catalog default price; if non-nil (including *0), that value is used as-is.
 	UnitPriceInclVatMinor   *int64     `json:"unitPriceInclVatMinor,omitempty"`
 	DiscountPercent         *float64   `json:"discountPercent"`
@@ -64,6 +67,14 @@ type InvoiceDraftUpsertBody struct {
 type InvoiceDraftCreateBody struct {
 	CompanyID string `json:"companyId" binding:"required"`
 	InvoiceDraftUpsertBody
+}
+
+func normalizeInvoiceLineComment(s string) string {
+	s = strings.TrimSpace(s)
+	if len(s) >= 2 && s[0] == '(' && s[len(s)-1] == ')' {
+		return strings.TrimSpace(s[1 : len(s)-1])
+	}
+	return s
 }
 
 func licensePeriodEnd(start time.Time, qty float64, interval string) time.Time {
@@ -143,6 +154,11 @@ func (h *PlatformHandler) buildDraftLines(inputs []InvoiceDraftLineInput) ([]mod
 			return nil, 0, 0, 0, errors.New("descriptionPrint is required when no catalog item")
 		}
 
+		cmt := normalizeInvoiceLineComment(in.LineComment)
+		if utf8.RuneCountInString(cmt) > maxInvoiceLineCommentRunes {
+			return nil, 0, 0, 0, fmt.Errorf("lineComment exceeds %d characters", maxInvoiceLineCommentRunes)
+		}
+
 		var planID *string
 		if in.SubscriptionPlanID != nil {
 			p := strings.TrimSpace(*in.SubscriptionPlanID)
@@ -188,6 +204,7 @@ func (h *PlatformHandler) buildDraftLines(inputs []InvoiceDraftLineInput) ([]mod
 		line := models.InvoiceLine{
 			CatalogItemID:           catID,
 			DescriptionPrint:        desc,
+			LineComment:             cmt,
 			Quantity:                qty,
 			MeasureUnit:             lineUnit,
 			UnitPriceInclVatMinor:   priceMinor,

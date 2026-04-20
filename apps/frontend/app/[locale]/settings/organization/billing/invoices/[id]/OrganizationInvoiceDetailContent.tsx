@@ -1,8 +1,9 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Invoice, SaasVendor } from '@quokkaq/shared-types';
+import type { SaasVendor } from '@quokkaq/shared-types';
 import { InvoiceDocumentLinesAndTotals } from '@/components/billing/InvoiceDocumentLinesAndTotals';
+import { invoiceStatusBadgeClassName } from '@/components/billing/invoice-status-badge';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
@@ -43,22 +44,6 @@ function legalAddressLine(
     .filter(Boolean)
     .join(', ');
   return line || null;
-}
-
-function invoiceStatusChipClass(status: Invoice['status']): string {
-  switch (status) {
-    case 'paid':
-      return 'border-emerald-500/35 bg-emerald-500/12 text-emerald-900 dark:text-emerald-200';
-    case 'open':
-      return 'border-amber-500/40 bg-amber-500/12 text-amber-950 dark:text-amber-100';
-    case 'void':
-      return 'border-muted-foreground/30 bg-muted text-muted-foreground';
-    case 'uncollectible':
-      return 'border-destructive/40 bg-destructive/10 text-destructive';
-    case 'draft':
-    default:
-      return 'border-transparent bg-secondary text-secondary-foreground';
-  }
 }
 
 async function fetchSaaSVendor(): Promise<SaasVendor | null> {
@@ -247,7 +232,7 @@ export function OrganizationInvoiceDetailContent() {
               variant='outline'
               className={cn(
                 'rounded-md border px-2.5 py-1 font-medium',
-                invoiceStatusChipClass(inv.status)
+                invoiceStatusBadgeClassName(inv.status)
               )}
             >
               {t(`statuses.${inv.status}`, { defaultValue: inv.status })}

@@ -463,6 +463,8 @@ export interface HandlersGoogleCalendarPickListResponse {
 export interface HandlersInvoiceDraftLineInput {
   catalogItemId?: string;
   descriptionPrint?: string;
+  /** Optional note under the line title in print (stored without outer parentheses). */
+  lineComment?: string;
   discountAmountMinor?: number;
   discountPercent?: number;
   quantity?: number;
@@ -486,6 +488,8 @@ export interface HandlersInvoiceDraftCreateBody {
   dueDate: string;
   /** @minItems 1 */
   lines: HandlersInvoiceDraftLineInput[];
+  /** PaymentTerms is optional markdown for «Условия оплаты». Omit on PATCH to leave unchanged; send "" to clear. */
+  paymentTerms?: string;
   provisionSubscriptionsOnPayment?: boolean;
 }
 
@@ -498,6 +502,8 @@ export interface HandlersInvoiceDraftUpsertBody {
   dueDate: string;
   /** @minItems 1 */
   lines: HandlersInvoiceDraftLineInput[];
+  /** PaymentTerms is optional markdown for «Условия оплаты». Omit on PATCH to leave unchanged; send "" to clear. */
+  paymentTerms?: string;
   provisionSubscriptionsOnPayment?: boolean;
 }
 
@@ -547,6 +553,8 @@ export interface HandlersPatchPlatformCompanyBody {
   clearCounterparty?: boolean;
   clearOnecCounterpartyGuid?: boolean;
   counterparty?: HandlersPatchPlatformCompanyBodyCounterparty;
+  /** InvoiceDefaultPaymentTerms is markdown; only allowed when patching the SaaS operator company (isSaasOperator). */
+  invoiceDefaultPaymentTerms?: string;
   isSaasOperator?: boolean;
   name?: string;
   onecCounterpartyGuid?: string;
@@ -970,6 +978,8 @@ export interface ModelsInvoiceLine {
   catalogItemId?: string;
   createdAt?: string;
   descriptionPrint?: string;
+  /** Optional print-only clarification under the line title. */
+  lineComment?: string;
   discountAmountMinor?: number;
   discountPercent?: number;
   id?: string;
@@ -1049,6 +1059,8 @@ export interface ModelsInvoice {
   paymentProvider?: string;
   /** external invoice ID */
   paymentProviderInvoiceId?: string;
+  /** PaymentTermsMarkdown is per-invoice «Условия оплаты» (markdown in UI; PDF uses a plain-text rendering). */
+  paymentTerms?: string;
   provisionSubscriptionsOnPayment?: boolean;
   provisioningDoneAt?: string;
   /** "draft", "open", "paid", "void", "uncollectible" */
@@ -1120,6 +1132,8 @@ export interface ModelsCompany {
   counterparty?: ModelsCompanyCounterparty;
   createdAt?: string;
   id?: string;
+  /** InvoiceDefaultPaymentTerms is markdown used as default «Условия оплаты» on new platform invoices; only the SaaS operator row (IsSaaSOperator) is intended to hold a template. */
+  invoiceDefaultPaymentTerms?: string;
   invoices?: ModelsInvoice[];
   /** single operator tenant per deployment; quotas bypassed */
   isSaasOperator?: boolean;

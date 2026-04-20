@@ -75,7 +75,8 @@ func stripOneEmphasisPass(s string) string {
 	return s
 }
 
-// pdfDrawInvoicePaymentTermsSection draws «Условия оплаты»; may use multiple pages/chunks when text is long.
+// pdfDrawInvoicePaymentTermsSection draws «Условия оплаты» when markdown/plain text is non-empty;
+// otherwise returns y unchanged (no box). May use multiple pages/chunks when text is long.
 func pdfDrawInvoicePaymentTermsSection(
 	pdf *gopdf.GoPdf,
 	left, y, contentW, pad float64,
@@ -83,7 +84,10 @@ func pdfDrawInvoicePaymentTermsSection(
 	setFont, setFontBold func(float64),
 	termsMarkdown string,
 ) (float64, error) {
-	plain := invoiceMarkdownToPlainForPDF(termsMarkdown)
+	plain := strings.TrimSpace(invoiceMarkdownToPlainForPDF(termsMarkdown))
+	if plain == "" {
+		return y, nil
+	}
 	textW := contentW - 2*pad
 	lineH := 10.5
 	lineGap := 1.2
@@ -99,19 +103,7 @@ func pdfDrawInvoicePaymentTermsSection(
 		}
 	}
 	if len(paras) == 0 {
-		condH := minChunkH
-		if y+condH > paymentTermsMaxContentY() {
-			if err := addInvoicePage(); err != nil {
-				return y, err
-			}
-			y = pdfMargin + 8 + pdfContinuationBodyTopPad(pdf)
-		}
-		pdfStrokeRectGray(pdf, left, y, contentW, condH)
-		setFontBold(10)
-		pdf.SetTextColor(0, 0, 0)
-		pdf.SetXY(left+pad, y+pad)
-		_ = pdf.Cell(&gopdf.Rect{W: textW, H: 12}, "Условия оплаты")
-		return y + condH + 16, nil
+		return y, nil
 	}
 
 	type lineSeg struct {

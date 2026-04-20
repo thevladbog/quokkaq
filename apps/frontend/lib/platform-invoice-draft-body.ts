@@ -12,11 +12,15 @@ import {
   validateVatRatePercentInput
 } from './format-price';
 import type { InvoiceLineCalcInput } from './invoice-line-totals';
+import { normalizeInvoiceLineCommentForSave } from './invoice-line-comment-display';
+
+const maxInvoiceLineCommentRunes = 512;
 
 export type DraftLineRow = {
   key: string;
   catalogItemId: string;
   descriptionPrint: string;
+  lineComment: string;
   quantity: string;
   measureUnit: string;
   unitPriceInput: string;
@@ -38,6 +42,7 @@ export function newDraftLineRow(key?: string): DraftLineRow {
         : String(Math.random())),
     catalogItemId: '',
     descriptionPrint: '',
+    lineComment: '',
     quantity: '1',
     measureUnit: '',
     unitPriceInput: '',
@@ -64,6 +69,7 @@ export function rowsFromInvoiceLines(
       key: l.id || newDraftLineRow().key,
       catalogItemId: (l.catalogItemId ?? '').trim(),
       descriptionPrint: l.descriptionPrint,
+      lineComment: (l.lineComment ?? '').trim(),
       quantity: String(l.quantity),
       measureUnit: (l.unit ?? '').trim(),
       unitPriceInput: minorUnitsToAmountInputString(
@@ -131,6 +137,12 @@ export function buildDraftBody(
       throw new Error('descriptionRequired');
     }
 
+    const rawComment = r.lineComment.trim();
+    if ([...rawComment].length > maxInvoiceLineCommentRunes) {
+      throw new Error('lineCommentTooLong');
+    }
+    const lineComment = normalizeInvoiceLineCommentForSave(rawComment);
+
     let vatRatePercent = 0;
     if (!r.vatExempt) {
       const v = validateVatRatePercentInput(r.vatRatePercent);
@@ -145,7 +157,8 @@ export function buildDraftBody(
       unit: r.measureUnit.trim(),
       unitPriceInclVatMinor: unit,
       vatExempt: r.vatExempt,
-      vatRatePercent
+      vatRatePercent,
+      lineComment
     };
 
     const cat = r.catalogItemId.trim();
@@ -212,6 +225,9 @@ export function invoiceToDraftUpsertBody(inv: Invoice): InvoiceDraftUpsertBody {
     .map((l) => {
       const line: InvoiceDraftLineInput = {
         descriptionPrint: l.descriptionPrint,
+        lineComment: normalizeInvoiceLineCommentForSave(
+          (l.lineComment ?? '').trim()
+        ),
         quantity: l.quantity,
         unit: l.unit ?? '',
         unitPriceInclVatMinor: l.unitPriceInclVatMinor,
