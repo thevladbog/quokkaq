@@ -1245,6 +1245,8 @@ export const CompanySchema = z.object({
   ownerUserId: z.string().optional(),
   subscriptionId: z.string().nullable().optional(),
   isSaasOperator: z.boolean().optional(),
+  /** Default «Условия оплаты» (markdown) for new invoices; SaaS operator company only. */
+  invoiceDefaultPaymentTerms: z.string().nullable().optional(),
   billingEmail: z.union([z.string().email(), z.literal('')]).optional(),
   billingAddress: z.record(z.string(), z.any()).optional(),
   paymentAccounts: PaymentAccountsSchema.optional(),
@@ -1346,6 +1348,8 @@ export const InvoiceSchema = z.object({
   buyerSnapshot: z
     .union([z.record(z.string(), z.unknown()), z.null()])
     .optional(),
+  /** Markdown in admin; PDF renders plain text. */
+  paymentTerms: z.string().nullable().optional(),
   lines: z.array(InvoiceLineSchema).optional()
 });
 
@@ -1410,6 +1414,8 @@ export const InvoiceDraftUpsertBodySchema = z.object({
   allowYookassaPaymentLink: z.boolean(),
   allowStripePaymentLink: z.boolean(),
   provisionSubscriptionsOnPayment: z.boolean(),
+  /** Omit on PATCH to keep existing; send empty string to clear. */
+  paymentTerms: z.string().optional(),
   lines: z.array(InvoiceDraftLineInputSchema)
 });
 

@@ -98,6 +98,7 @@ export function buildDraftBody(
   allowYookassa: boolean,
   allowStripe: boolean,
   provision: boolean,
+  paymentTerms: string,
   rows: DraftLineRow[],
   intlLocale: string
 ): InvoiceDraftCreateBody {
@@ -198,6 +199,7 @@ export function buildDraftBody(
     allowYookassaPaymentLink: allowYookassa,
     allowStripePaymentLink: allowStripe,
     provisionSubscriptionsOnPayment: provision,
+    paymentTerms,
     lines
   };
 }
@@ -239,6 +241,7 @@ export function invoiceToDraftUpsertBody(inv: Invoice): InvoiceDraftUpsertBody {
     allowStripePaymentLink: inv.allowStripePaymentLink ?? false,
     provisionSubscriptionsOnPayment:
       inv.provisionSubscriptionsOnPayment ?? false,
+    paymentTerms: inv.paymentTerms ?? '',
     lines
   };
 }

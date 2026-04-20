@@ -73,14 +73,34 @@ func legalAddressLine(cp counterpartyJSON) string {
 		return ""
 	}
 	l := cp.Addresses.Legal
-	parts := []string{}
-	if l.PostalCode != nil && strings.TrimSpace(*l.PostalCode) != "" {
-		parts = append(parts, strings.TrimSpace(*l.PostalCode))
+	postal := ""
+	if l.PostalCode != nil {
+		postal = strings.TrimSpace(*l.PostalCode)
 	}
-	if l.Unrestricted != nil && strings.TrimSpace(*l.Unrestricted) != "" {
-		parts = append(parts, strings.TrimSpace(*l.Unrestricted))
+	unrest := ""
+	if l.Unrestricted != nil {
+		unrest = strings.TrimSpace(*l.Unrestricted)
 	}
-	return strings.Join(parts, ", ")
+	if unrest == "" {
+		return postal
+	}
+	if postal == "" {
+		return unrest
+	}
+	// Avoid "123308, 123308, …" when unrestricted already starts with the same index.
+	for {
+		u := strings.TrimSpace(unrest)
+		if !strings.HasPrefix(u, postal) {
+			break
+		}
+		u = strings.TrimSpace(u[len(postal):])
+		u = strings.TrimLeft(u, ", ")
+		unrest = u
+	}
+	if unrest == "" {
+		return postal
+	}
+	return postal + ", " + unrest
 }
 
 func payeeLegalName(vendor *models.Company, cp counterpartyJSON) string {
@@ -246,6 +266,9 @@ func BuildInvoicePDF(inv *models.Invoice, vendor *models.Company) ([]byte, error
 	if err := pdf.AddTTFFontData("dejavubd", assets.DejaVuSansBoldTTF); err != nil {
 		return nil, err
 	}
+	if err := pdf.AddTTFFontDataWithOption("dejavu", assets.DejaVuSansTTF, gopdf.TtfOption{Style: gopdf.Italic}); err != nil {
+		return nil, err
+	}
 
 	setFont := func(size float64) {
 		_ = pdf.SetFont("dejavu", "", size)
@@ -255,6 +278,11 @@ func BuildInvoicePDF(inv *models.Invoice, vendor *models.Company) ([]byte, error
 	setFontBold := func(size float64) {
 		_ = pdf.SetFont("dejavubd", "", size)
 		pdf.SetTextColor(0, 0, 0)
+	}
+
+	setFontItalic := func(size float64) {
+		_ = pdf.SetFont("dejavu", "I", size)
+		pdf.SetTextColor(55, 55, 55)
 	}
 
 	contentRight := pdfPageW - pdfMargin
@@ -319,7 +347,7 @@ func BuildInvoicePDF(inv *models.Invoice, vendor *models.Company) ([]byte, error
 		if err := addInvoicePage(); err != nil {
 			return nil, err
 		}
-		y = pdfMargin + 8
+		y = pdfMargin + 8 + pdfContinuationBodyTopPad(&pdf)
 	}
 
 	qrSize := 100.0
@@ -331,7 +359,7 @@ func BuildInvoicePDF(inv *models.Invoice, vendor *models.Company) ([]byte, error
 	innerPayW := payBoxW - 2*pad
 
 	payLineH := 10.5
-	yBody := pdfDrawBoxHeader(&pdf, innerL, payY0+pad, innerPayW, "Реквизиты для оплаты", setFontBold)
+	yBody := pdfDrawBoxHeader(&pdf, innerL, payY0+pad, innerPayW, "РЕКВИЗИТЫ ДЛЯ ОПЛАТЫ")
 	yText := pdfDrawLabelValueRows(&pdf, innerL, yBody, innerPayW, payLineH, paymentDetailPairs(acct), setFont, setFontBold)
 
 	yText += 4
@@ -355,7 +383,7 @@ func BuildInvoicePDF(inv *models.Invoice, vendor *models.Company) ([]byte, error
 		if err := addInvoicePage(); err != nil {
 			return nil, err
 		}
-		y = pdfMargin + 8
+		y = pdfMargin + 8 + pdfContinuationBodyTopPad(&pdf)
 	}
 
 	colGap := 10.0
@@ -366,11 +394,11 @@ func BuildInvoicePDF(inv *models.Invoice, vendor *models.Company) ([]byte, error
 	ir := left + colW + colGap + 8
 
 	boxLineH := 10.5
-	yPayerBody := pdfDrawBoxHeader(&pdf, il, boxY0+pad, iw, "Плательщик", setFontBold)
+	yPayerBody := pdfDrawBoxHeader(&pdf, il, boxY0+pad, iw, "ПЛАТЕЛЬЩИК")
 	yl := pdfDrawLabelValueRows(&pdf, il, yPayerBody, iw, boxLineH, buyerLabelValuePairs(inv), setFont, setFontBold)
 	leftEnd := yl + pad
 
-	ySuppBody := pdfDrawBoxHeader(&pdf, ir, boxY0+pad, iw, "Поставщик", setFontBold)
+	ySuppBody := pdfDrawBoxHeader(&pdf, ir, boxY0+pad, iw, "ПОСТАВЩИК")
 	supPairs := legalEntityLabelValuePairs(vcp, vendor.Name)
 	if len(supPairs) == 0 {
 		supPairs = []pdfLabelValue{{"Наименование", strings.TrimSpace(vendor.Name)}}
@@ -440,7 +468,7 @@ func BuildInvoicePDF(inv *models.Invoice, vendor *models.Company) ([]byte, error
 			if err := addInvoicePage(); err != nil {
 				return nil, err
 			}
-			y = pdfMargin + 8
+			y = pdfMargin + 8 + pdfContinuationBodyTopPad(&pdf)
 			setFont(8)
 		}
 		x = left
@@ -578,23 +606,25 @@ func BuildInvoicePDF(inv *models.Invoice, vendor *models.Company) ([]byte, error
 		if err := addInvoicePage(); err != nil {
 			return nil, err
 		}
-		y = pdfMargin + 8
+		y = pdfMargin + 8 + pdfContinuationBodyTopPad(&pdf)
 	}
 
-	// --- Условия оплаты (пока без текста) ---
-	condH := 52.0
-	condY := y
-	pdfStrokeRectGray(&pdf, left, condY, contentW, condH)
-	setFont(10)
-	pdf.SetXY(left+pad, condY+pad)
-	_ = pdf.Cell(&gopdf.Rect{W: contentW - 2*pad, H: 12}, "Условия оплаты")
-	y = condY + condH + 16
+	// --- Условия оплаты ---
+	termsMD := ""
+	if inv.PaymentTermsMarkdown != nil {
+		termsMD = *inv.PaymentTermsMarkdown
+	}
+	nextY, errTerms := pdfDrawInvoicePaymentTermsSection(&pdf, left, y, contentW, pad, addInvoicePage, setFont, setFontBold, termsMD)
+	if errTerms != nil {
+		return nil, errTerms
+	}
+	y = nextY
 
 	if y+footerReserve > pdfPageH-pdfMargin {
 		if err := addInvoicePage(); err != nil {
 			return nil, err
 		}
-		y = pdfMargin + 8
+		y = pdfMargin + 8 + pdfContinuationBodyTopPad(&pdf)
 	}
 
 	// --- Подпись руководителя и м.п. ---
@@ -637,7 +667,7 @@ func BuildInvoicePDF(inv *models.Invoice, vendor *models.Company) ([]byte, error
 		if err := addInvoicePage(); err != nil {
 			return nil, err
 		}
-		y = pdfMargin + 8
+		y = pdfMargin + 8 + pdfContinuationBodyTopPad(&pdf)
 	}
 
 	// --- Сердце внизу ---
@@ -651,12 +681,32 @@ func BuildInvoicePDF(inv *models.Invoice, vendor *models.Company) ([]byte, error
 
 	barW := 168.0
 	barH := 18.0
-	barCornerX := left + 4
-	barCornerY := pdfPageH - pdfMargin - barH - 6
+	var barHold gopdf.ImageHolder
 	if barPNG, berr := encodeCode128PNG(barPayload, int(math.Max(barW*5, 520)), 40); berr == nil {
-		if barHold, herr := gopdf.ImageHolderByBytes(barPNG); herr == nil {
-			_ = pdf.ImageByHolder(barHold, barCornerX, barCornerY, &gopdf.Rect{W: barW, H: barH})
+		if bh, herr := gopdf.ImageHolderByBytes(barPNG); herr == nil {
+			barHold = bh
 		}
+	}
+
+	nPages := pdf.GetNumberOfPages()
+	if nPages > 1 {
+		if err := pdfStampInvoiceMultipageHeadersFooters(
+			&pdf,
+			nPages,
+			docNo,
+			issueDateStr(inv),
+			left,
+			contentRight,
+			pdfMargin,
+			pdfPageH,
+			setFontItalic,
+			setFont,
+		); err != nil {
+			return nil, err
+		}
+	}
+	if err := pdfStampFooterBarcodeEveryPage(&pdf, nPages, left, pdfMargin, pdfPageH, barHold, barW, barH); err != nil {
+		return nil, err
 	}
 
 	return pdf.GetBytesPdfReturnErr()

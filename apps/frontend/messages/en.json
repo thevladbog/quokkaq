@@ -2433,7 +2433,18 @@
       "documentNumber": "Document №",
       "draft": "Draft",
       "toastStatusUpdated": "Invoice status updated.",
-      "toastStatusError": "Could not update status: {message}"
+      "toastStatusError": "Could not update status: {message}",
+      "paymentTermsButton": "Payment terms (default)",
+      "paymentTermsModalTitle": "Default payment terms",
+      "paymentTermsModalHint": "This text is suggested when creating a new invoice. Each invoice can still override it.",
+      "paymentTermsLoading": "Loading…",
+      "paymentTermsNoOperator": "No SaaS operator company is configured.",
+      "paymentTermsPlaceholder": "Payment terms (markdown)…",
+      "paymentTermsCancel": "Cancel",
+      "paymentTermsSave": "Save",
+      "paymentTermsSaved": "Default payment terms saved.",
+      "paymentTermsSaveError": "Could not save: {message}",
+      "paymentTermsLoadError": "Could not load operator company: {message}"
     },
     "invoiceDraft": {
       "backToList": "← Invoices",
@@ -2500,7 +2511,10 @@
       "referenceCompaniesError": "Could not load organizations for this draft.",
       "referenceCompanyError": "Could not load the invoice company.",
       "referenceCatalogError": "Could not load catalog items.",
-      "referencePlansError": "Could not load subscription plans."
+      "referencePlansError": "Could not load subscription plans.",
+      "paymentTerms": "Payment terms",
+      "paymentTermsHint": "Printed on the invoice PDF as plain text (markdown is simplified). Set the deployment default from the invoices list page.",
+      "paymentTermsPlaceholder": "Payment terms (markdown)…"
     },
     "invoiceDetail": {
       "title": "Invoice",

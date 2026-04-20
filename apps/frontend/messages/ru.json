@@ -2433,7 +2433,18 @@
       "documentNumber": "№ документа",
       "draft": "Черновик",
       "toastStatusUpdated": "Статус счёта обновлён.",
-      "toastStatusError": "Не удалось обновить статус: {message}"
+      "toastStatusError": "Не удалось обновить статус: {message}",
+      "paymentTermsButton": "Условия оплаты (шаблон)",
+      "paymentTermsModalTitle": "Условия оплаты по умолчанию",
+      "paymentTermsModalHint": "Этот текст подставляется в новый счёт. В каждом счёте текст можно изменить отдельно.",
+      "paymentTermsLoading": "Загрузка…",
+      "paymentTermsNoOperator": "Не настроена организация SaaS-оператора.",
+      "paymentTermsPlaceholder": "Условия оплаты (markdown)…",
+      "paymentTermsCancel": "Отмена",
+      "paymentTermsSave": "Сохранить",
+      "paymentTermsSaved": "Шаблон условий оплаты сохранён.",
+      "paymentTermsSaveError": "Не удалось сохранить: {message}",
+      "paymentTermsLoadError": "Не удалось загрузить организацию оператора: {message}"
     },
     "invoiceDraft": {
       "backToList": "← Счета",
@@ -2500,7 +2511,10 @@
       "referenceCompaniesError": "Не удалось загрузить организации для черновика.",
       "referenceCompanyError": "Не удалось загрузить данные компании счёта.",
       "referenceCatalogError": "Не удалось загрузить номенклатуру.",
-      "referencePlansError": "Не удалось загрузить тарифные планы."
+      "referencePlansError": "Не удалось загрузить тарифные планы.",
+      "paymentTerms": "Условия оплаты",
+      "paymentTermsHint": "Печатается в PDF счёта обычным текстом (разметка markdown упрощается). Шаблон по умолчанию задаётся на странице списка счетов.",
+      "paymentTermsPlaceholder": "Условия оплаты (markdown)…"
     },
     "invoiceDetail": {
       "title": "Счёт",

@@ -284,6 +284,9 @@ components:
             $ref: '#/components/schemas/handlers.InvoiceDraftLineInput'
           minItems: 1
           type: array
+        paymentTerms:
+          description: PaymentTerms is optional markdown for «Условия оплаты». Omit on PATCH to leave unchanged; send "" to clear.
+          type: string
         provisionSubscriptionsOnPayment:
           type: boolean
       required:
@@ -335,6 +338,9 @@ components:
             $ref: '#/components/schemas/handlers.InvoiceDraftLineInput'
           minItems: 1
           type: array
+        paymentTerms:
+          description: PaymentTerms is optional markdown for «Условия оплаты». Omit on PATCH to leave unchanged; send "" to clear.
+          type: string
         provisionSubscriptionsOnPayment:
           type: boolean
       required:
@@ -412,6 +418,9 @@ components:
           type: boolean
         counterparty:
           type: object
+        invoiceDefaultPaymentTerms:
+          description: InvoiceDefaultPaymentTerms is markdown; only allowed when patching the SaaS operator company (isSaasOperator).
+          type: string
         isSaasOperator:
           type: boolean
         name:
@@ -1382,6 +1391,9 @@ components:
           type: string
         id:
           type: string
+        invoiceDefaultPaymentTerms:
+          description: InvoiceDefaultPaymentTerms is markdown used as default «Условия оплаты» on new platform invoices; only the SaaS operator row (IsSaaSOperator) is intended to hold a template.
+          type: string
         invoices:
           items:
             $ref: '#/components/schemas/models.Invoice'
@@ -1651,6 +1663,9 @@ components:
           type: string
         paymentProviderInvoiceId:
           description: external invoice ID
+          type: string
+        paymentTerms:
+          description: PaymentTermsMarkdown is per-invoice «Условия оплаты» (markdown in UI; PDF uses a plain-text rendering).
           type: string
         provisionSubscriptionsOnPayment:
           type: boolean

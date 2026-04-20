@@ -2060,6 +2060,23 @@ ADD COLUMN IF NOT EXISTS site_payment_system_name VARCHAR(256) NOT NULL DEFAULT 
 		return fmt.Errorf("failed to run v1.3.17_onec_site_payment_system_name migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.3.18_invoice_payment_terms", func(db *gorm.DB) error {
+		if err := db.Exec(`
+ALTER TABLE companies
+ADD COLUMN IF NOT EXISTS invoice_default_payment_terms TEXT`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+ALTER TABLE invoices
+ADD COLUMN IF NOT EXISTS payment_terms_markdown TEXT`).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.3.18_invoice_payment_terms migration: %w", err)
+	}
+
 	fmt.Println("✅ All migrations completed successfully")
 	return nil
 }
