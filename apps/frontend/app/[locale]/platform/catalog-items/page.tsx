@@ -65,6 +65,7 @@ const emptyForm = () => ({
   vatExempt: false,
   vatRatePercent: '20',
   subscriptionPlanId: '',
+  onecNomenclatureGuid: '',
   isActive: true
 });
 
@@ -134,6 +135,7 @@ export default function PlatformCatalogItemsPage() {
           ? String(item.vatRatePercent)
           : '20',
       subscriptionPlanId: item.subscriptionPlanId ?? '',
+      onecNomenclatureGuid: item.onecNomenclatureGuid?.trim() ?? '',
       isActive: item.isActive !== false
     });
     setDialogOpen(true);
@@ -161,6 +163,15 @@ export default function PlatformCatalogItemsPage() {
         vatRate = parsed;
       }
       const planPart = form.subscriptionPlanId.trim();
+      const nomGuid = form.onecNomenclatureGuid.trim();
+      if (nomGuid.length > 128) {
+        throw new Error(t('validationOnecNomenclatureGuid'));
+      }
+      const nomPart = editing
+        ? { onecNomenclatureGuid: nomGuid }
+        : nomGuid
+          ? { onecNomenclatureGuid: nomGuid }
+          : {};
       const base = {
         name: form.name.trim(),
         printName: form.printName.trim() || form.name.trim(),
@@ -171,7 +182,8 @@ export default function PlatformCatalogItemsPage() {
         vatExempt: form.vatExempt,
         vatRatePercent: vatRate,
         isActive: form.isActive,
-        ...(planPart ? { subscriptionPlanId: planPart } : {})
+        ...(planPart ? { subscriptionPlanId: planPart } : {}),
+        ...nomPart
       };
       if (editing) {
         return patchPlatformCatalogItemsId(
@@ -447,6 +459,32 @@ export default function PlatformCatalogItemsPage() {
                 <div className='hidden sm:block' aria-hidden />
               </div>
             )}
+            <div className='grid min-w-0 gap-2'>
+              <Label htmlFor='cat-onec-nom'>
+                {t('fieldOnecNomenclatureGuid')}
+              </Label>
+              <Input
+                id='cat-onec-nom'
+                className='font-mono text-sm'
+                maxLength={128}
+                autoComplete='off'
+                placeholder={t('fieldOnecNomenclatureGuidPlaceholder')}
+                aria-describedby='cat-onec-nom-hint'
+                value={form.onecNomenclatureGuid}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    onecNomenclatureGuid: e.target.value
+                  }))
+                }
+              />
+              <p
+                id='cat-onec-nom-hint'
+                className='text-muted-foreground text-xs leading-snug'
+              >
+                {t('fieldOnecNomenclatureGuidHint')}
+              </p>
+            </div>
             <div className='grid min-w-0 gap-2'>
               <Label>{t('fieldPlan')}</Label>
               <Select

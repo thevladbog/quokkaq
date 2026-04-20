@@ -1328,6 +1328,8 @@ export const CatalogItemSchema = z.object({
   vatRatePercent: z.number(),
   subscriptionPlanId: z.string().nullable().optional(),
   isActive: z.boolean(),
+  /** CommerceML: Ид номенклатуры в 1С (УНФ), до 128 символов. */
+  onecNomenclatureGuid: z.string().nullable().optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
   plan: SubscriptionPlanSchema.optional()
