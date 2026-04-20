@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"time"
 
 	"quokkaq-go-backend/internal/models"
@@ -176,7 +176,11 @@ func Run(db *gorm.DB, cfg Config) error {
 		zoneWhole := repository.StatisticsWholeSubdivisionServiceZoneID()
 		surveyAgg := repository.StatisticsSurveyAggregateSurveyID()
 
-		rng := rand.New(rand.NewSource(cfg.Anchor.UnixNano() ^ int64(cfg.HistoryDays)))
+		// Deterministic demo statistics (PCG); not for cryptographic use.
+		rng := rand.New(rand.NewPCG( // #nosec G404 -- demo fixture PRNG only, not for secrets or tokens
+			pcgSeedFromUnixNano(cfg.Anchor.UnixNano())^pcgSeedFromNonNegInt(cfg.HistoryDays),
+			pcgSeedFromNonNegInt(cfg.HistoryDays)^0x9e3779b97f4a7c15,
+		))
 		anchorCalDay := calendarDay(cfg.Anchor, 0)
 
 		for offset := cfg.HistoryDays; offset >= 0; offset-- {
@@ -191,7 +195,7 @@ func Run(db *gorm.DB, cfg Config) error {
 			if created < 2 {
 				created = 2 + offset%4
 			}
-			completed := created * (70 + rng.Intn(25)) / 100
+			completed := created * (70 + rng.IntN(25)) / 100
 			if completed > created {
 				completed = created
 			}
@@ -201,14 +205,14 @@ func Run(db *gorm.DB, cfg Config) error {
 				BucketDate:       dateStr,
 				ActorUserID:      actorAgg,
 				ServiceZoneID:    zoneWhole,
-				WaitSumMs:        int64(created) * (180_000 + int64(rng.Intn(120_000))),
+				WaitSumMs:        int64(created) * (180_000 + int64(rng.IntN(120_000))),
 				WaitCount:        created,
-				ServiceSumMs:     int64(completed) * (420_000 + int64(rng.Intn(180_000))),
+				ServiceSumMs:     int64(completed) * (420_000 + int64(rng.IntN(180_000))),
 				ServiceCount:     completed,
 				TicketsCreated:   created,
 				TicketsCompleted: completed,
-				NoShowCount:      rng.Intn(3),
-				SlaWaitMet:       completed - rng.Intn(2),
+				NoShowCount:      rng.IntN(3),
+				SlaWaitMet:       completed - rng.IntN(2),
 				SlaWaitTotal:     completed,
 				ComputedAt:       now,
 			}
@@ -270,7 +274,7 @@ type seedTicketsDayParams struct {
 	clientID     *string
 	createdN     int
 	completedN   int
-	rng          *rand.Rand
+	rng          *rand.Rand // math/rand/v2
 }
 
 func seedTicketsForDay(tx *gorm.DB, p *seedTicketsDayParams) error {
@@ -279,8 +283,8 @@ func seedTicketsForDay(tx *gorm.DB, p *seedTicketsDayParams) error {
 		if i%5 == 0 {
 			svc = p.serviceBID
 		}
-		hour := 9 + p.rng.Intn(8)
-		minute := p.rng.Intn(60)
+		hour := 9 + p.rng.IntN(8)
+		minute := p.rng.IntN(60)
 		created := time.Date(p.day.Year(), p.day.Month(), p.day.Day(), hour, minute, 0, 0, p.loc).UTC()
 
 		qn := fmt.Sprintf("D%s-%04d", p.day.Format("20060102"), i)
@@ -317,7 +321,7 @@ func seedTicketsForDay(tx *gorm.DB, p *seedTicketsDayParams) error {
 			tk.CounterID = p.counter1ID
 		}
 		if status == "completed" {
-			co := created.Add(12*time.Minute + time.Duration(p.rng.Intn(20))*time.Minute)
+			co := created.Add(12*time.Minute + time.Duration(p.rng.IntN(20))*time.Minute)
 			tk.CompletedAt = &co
 		}
 		if err := tx.Create(&tk).Error; err != nil {
@@ -347,6 +351,20 @@ func seedTicketsForDay(tx *gorm.DB, p *seedTicketsDayParams) error {
 		}
 	}
 	return nil
+}
+
+func pcgSeedFromUnixNano(n int64) uint64 {
+	if n < 0 {
+		return 0
+	}
+	return uint64(n)
+}
+
+func pcgSeedFromNonNegInt(v int) uint64 {
+	if v < 0 {
+		return 0
+	}
+	return uint64(v)
 }
 
 func calendarDay(ref time.Time, addDays int) time.Time {
