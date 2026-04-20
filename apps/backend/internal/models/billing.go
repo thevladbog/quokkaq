@@ -34,7 +34,10 @@ type Invoice struct {
 	ProvisioningDoneAt              *time.Time      `json:"provisioningDoneAt,omitempty"`
 	IssuedAt                        *time.Time      `json:"issuedAt,omitempty"`
 	BuyerSnapshot                   json.RawMessage `gorm:"type:jsonb" json:"buyerSnapshot,omitempty" swaggertype:"object"`
-	Lines                           []InvoiceLine   `gorm:"foreignKey:InvoiceID" json:"lines,omitempty"`
+	// OneCOrderSiteID is the document Ид in CommerceML (typically equals invoice id) for 1С УНФ order exchange.
+	OneCOrderSiteID    *string       `gorm:"column:onec_order_site_id" json:"onecOrderSiteId,omitempty"`
+	OneCLastExchangeAt *time.Time    `gorm:"column:onec_last_exchange_at" json:"onecLastExchangeAt,omitempty"`
+	Lines              []InvoiceLine `gorm:"foreignKey:InvoiceID" json:"lines,omitempty"`
 
 	// Relations — OnDelete:SET NULL on subscription keeps paid/open manual history if subscription row is removed.
 	Company      Company       `gorm:"foreignKey:CompanyID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;" json:"-" swaggerignore:"true"`

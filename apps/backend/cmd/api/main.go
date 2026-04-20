@@ -19,6 +19,7 @@ import (
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
 	"quokkaq-go-backend/internal/services/billing"
+	"quokkaq-go-backend/internal/services/commerceml"
 	"quokkaq-go-backend/internal/telemetry"
 	"quokkaq-go-backend/internal/ws"
 	"quokkaq-go-backend/pkg/database"
@@ -130,6 +131,7 @@ func run() error {
 			&models.StatisticsSurveyDaily{},
 			&models.SupportReport{},
 			&models.DeploymentSaaSSettings{},
+			&models.CompanyOneCSettings{},
 		)
 		if err != nil {
 			logger.Error("failed to run migrations", "err", err)
@@ -166,6 +168,8 @@ func run() error {
 	invoiceRepo := repository.NewInvoiceRepository()
 	catalogRepo := repository.NewCatalogRepository()
 	companyRepo := repository.NewCompanyRepository()
+	onecSettingsRepo := repository.NewOneCSettingsRepository()
+	onecSessionStore := commerceml.NewSessionStore(2 * time.Hour)
 	operatorIntervalRepo := repository.NewOperatorIntervalRepository()
 
 	jobWorker := jobs.NewJobWorker(ttsService, ticketRepo)
@@ -318,6 +322,8 @@ func run() error {
 		pubApp,
 	)
 	companyHandler := handlers.NewCompanyHandler(companyRepo, userRepo, tenantRBACRepo)
+	onecSettingsHandler := handlers.NewOneCSettingsHandler(companyRepo, userRepo, onecSettingsRepo)
+	commerceMLExchangeHandler := handlers.NewCommerceMLExchangeHandler(companyRepo, invoiceRepo, onecSettingsRepo, onecSessionStore)
 	platformHandler := handlers.NewPlatformHandler(companyRepo, subscriptionRepo, invoiceRepo, catalogRepo)
 	dadataHandler := handlers.NewDaDataHandler()
 
@@ -369,6 +375,8 @@ func run() error {
 	})
 
 	r.Post("/webhooks/yookassa", handlers.ServeYooKassaWebhook)
+
+	r.Handle("/commerceml/exchange", commerceMLExchangeHandler)
 
 	r.Route("/public", func(r chi.Router) {
 		r.Use(authmiddleware.SSOPublicRateLimit)
@@ -692,6 +700,8 @@ func run() error {
 			r.Use(authmiddleware.RequireAdminOrTenantPermission(userRepo, tenantRBACRepo, rbac.PermTenantAdmin))
 			r.Get("/me", companyHandler.GetMyCompany)
 			r.Patch("/me", companyHandler.PatchMyCompany)
+			r.Get("/me/onec-settings", onecSettingsHandler.GetMyOneCSettings)
+			r.Put("/me/onec-settings", onecSettingsHandler.PutMyOneCSettings)
 			r.Get("/me/rbac/permissions", tenantRBACHTTP.GetPermissionCatalog)
 			r.Get("/me/sso/group-mappings", tenantRBACHTTP.ListGroupMappings)
 			r.Post("/me/sso/group-mappings", tenantRBACHTTP.UpsertGroupMapping)
@@ -761,6 +771,8 @@ func run() error {
 		r.Patch("/integrations", integrationsHandler.PatchPlatformIntegrations)
 		r.Get("/saas-operator-company", platformHandler.GetSaaSOperatorCompany)
 		r.Get("/companies", platformHandler.ListCompanies)
+		r.Get("/companies/{id}/onec-settings", onecSettingsHandler.GetPlatformCompanyOneCSettings)
+		r.Put("/companies/{id}/onec-settings", onecSettingsHandler.PutPlatformCompanyOneCSettings)
 		r.Get("/companies/{id}", platformHandler.GetCompany)
 		r.Patch("/companies/{id}", platformHandler.PatchCompany)
 		r.Post("/dadata/party/find-by-inn", dadataHandler.FindPartyByInn)

@@ -41,6 +41,8 @@ type InvoiceRepository interface {
 	FindByIDWithLinesForCompany(id, companyID string) (*models.Invoice, error)
 	FindByCompanyID(companyID string) ([]models.Invoice, error)
 	FindByCompanyIDNonDraft(companyID string) ([]models.Invoice, error)
+	// FindNonDraftWithLinesForCompany loads issued invoices with ordered lines for CommerceML export.
+	FindNonDraftWithLinesForCompany(companyID string) ([]models.Invoice, error)
 	ListPaginated(companyID *string, limit, offset int) ([]models.Invoice, int64, error)
 	Update(invoice *models.Invoice) error
 	UpdateYookassaPayment(id, paymentID, confirmationURL string) error
@@ -115,6 +117,19 @@ func (r *invoiceRepository) FindByCompanyIDNonDraft(companyID string) ([]models.
 	var invoices []models.Invoice
 	err := database.DB.Where("company_id = ? AND status <> ?", companyID, "draft").
 		Order("created_at DESC, id DESC").
+		Find(&invoices).Error
+	return invoices, err
+}
+
+func (r *invoiceRepository) FindNonDraftWithLinesForCompany(companyID string) ([]models.Invoice, error) {
+	var invoices []models.Invoice
+	err := database.DB.
+		Preload("Lines", func(db *gorm.DB) *gorm.DB {
+			return db.Order("position ASC")
+		}).
+		Preload("Lines.CatalogItem").
+		Where("company_id = ? AND status <> ?", companyID, "draft").
+		Order("created_at ASC, id ASC").
 		Find(&invoices).Error
 	return invoices, err
 }

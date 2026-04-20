@@ -27,5 +27,6 @@ type InvoiceLine struct {
 	UpdatedAt               time.Time  `gorm:"autoUpdateTime" json:"updatedAt"`
 
 	Invoice          Invoice           `gorm:"foreignKey:InvoiceID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-"`
+	CatalogItem      *CatalogItem      `gorm:"foreignKey:CatalogItemID" json:"catalogItem,omitempty"`
 	SubscriptionPlan *SubscriptionPlan `gorm:"foreignKey:SubscriptionPlanID" json:"plan,omitempty"`
 }

@@ -545,9 +545,11 @@ export interface HandlersPatchPlatformCompanyBody {
   billingEmail?: string;
   clearBillingAddress?: boolean;
   clearCounterparty?: boolean;
+  clearOnecCounterpartyGuid?: boolean;
   counterparty?: HandlersPatchPlatformCompanyBodyCounterparty;
   isSaasOperator?: boolean;
   name?: string;
+  onecCounterpartyGuid?: string;
   opaqueLoginLinksOnly?: boolean;
   paymentAccounts?: HandlersPatchPlatformCompanyBodyPaymentAccountsItem[];
   slug?: string;
@@ -943,7 +945,28 @@ export interface ModelsSubscriptionPlan {
   updatedAt?: string;
 }
 
+export interface ModelsCatalogItem {
+  article?: string;
+  createdAt?: string;
+  currency?: string;
+  /** gross (incl. VAT) per unit */
+  defaultPriceMinor?: number;
+  id?: string;
+  isActive?: boolean;
+  name?: string;
+  onecNomenclatureGuid?: string;
+  plan?: ModelsSubscriptionPlan;
+  printName?: string;
+  subscriptionPlanId?: string;
+  unit?: string;
+  updatedAt?: string;
+  vatExempt?: boolean;
+  /** used when VatExempt is false */
+  vatRatePercent?: number;
+}
+
 export interface ModelsInvoiceLine {
+  catalogItem?: ModelsCatalogItem;
   catalogItemId?: string;
   createdAt?: string;
   descriptionPrint?: string;
@@ -1017,6 +1040,9 @@ export interface ModelsInvoice {
   id?: string;
   issuedAt?: string;
   lines?: ModelsInvoiceLine[];
+  onecLastExchangeAt?: string;
+  /** OneCOrderSiteID is the document Ид in CommerceML (typically equals invoice id) for 1С УНФ order exchange. */
+  onecOrderSiteId?: string;
   /** when payment was received */
   paidAt?: string;
   /** "stripe", "yookassa", "manual" */
@@ -1100,6 +1126,8 @@ export interface ModelsCompany {
   name?: string;
   /** onboarding progress */
   onboardingState?: ModelsCompanyOnboardingState;
+  /** OneCCounterpartyGUID maps this tenant company to Контрагент in 1С (УНФ) for CommerceML orders. */
+  onecCounterpartyGuid?: string;
   /** OpaqueLoginLinksOnly: deep links should use TenantLoginLink tokens instead of slug-based branding. */
   opaqueLoginLinksOnly?: boolean;
   /** owner of the organization */
@@ -1211,25 +1239,6 @@ export interface HandlersPatchVisitorTagDefinitionRequest {
   sortOrder?: number;
 }
 
-export interface ModelsCatalogItem {
-  article?: string;
-  createdAt?: string;
-  currency?: string;
-  /** gross (incl. VAT) per unit */
-  defaultPriceMinor?: number;
-  id?: string;
-  isActive?: boolean;
-  name?: string;
-  plan?: ModelsSubscriptionPlan;
-  printName?: string;
-  subscriptionPlanId?: string;
-  unit?: string;
-  updatedAt?: string;
-  vatExempt?: boolean;
-  /** used when VatExempt is false */
-  vatRatePercent?: number;
-}
-
 export interface HandlersPlatformListResponseModelsCatalogItem {
   items?: ModelsCatalogItem[];
   limit?: number;
@@ -1287,6 +1296,7 @@ export interface ModelsCatalogItemCreateRequest {
   defaultPriceMinor?: number;
   isActive?: boolean;
   name: string;
+  onecNomenclatureGuid?: string;
   printName?: string;
   subscriptionPlanId?: string;
   unit?: string;
@@ -1300,11 +1310,45 @@ export interface ModelsCatalogItemPatchRequest {
   defaultPriceMinor?: number;
   isActive?: boolean;
   name?: string;
+  onecNomenclatureGuid?: string;
   printName?: string;
   subscriptionPlanId?: string;
   unit?: string;
   vatExempt?: boolean;
   vatRatePercent?: number;
+}
+
+export interface ModelsOneCStatusMappingRuleDTO {
+  contains?: string;
+  equals?: string;
+  /** paid | void | uncollectible */
+  invoiceStatus?: string;
+}
+
+export interface ModelsOneCStatusMappingDTO {
+  rules?: ModelsOneCStatusMappingRuleDTO[];
+}
+
+export interface ModelsCompanyOneCSettingsPublic {
+  commerceMlVersion?: string;
+  companyId?: string;
+  exchangeEnabled?: boolean;
+  /** filled by handler from PUBLIC_APP_URL */
+  exchangeUrlHint?: string;
+  httpLogin?: string;
+  passwordSet?: boolean;
+  sitePaymentSystemName?: string;
+  statusMapping?: ModelsOneCStatusMappingDTO;
+}
+
+export interface ModelsCompanyOneCSettingsPutRequest {
+  commerceMlVersion?: string;
+  exchangeEnabled?: boolean;
+  httpLogin?: string;
+  /** empty string clears password; omit to leave unchanged */
+  httpPassword?: string;
+  sitePaymentSystemName?: string;
+  statusMapping?: ModelsOneCStatusMappingDTO;
 }
 
 export type ModelsCompanyPatchBillingAddress = { [key: string]: unknown };

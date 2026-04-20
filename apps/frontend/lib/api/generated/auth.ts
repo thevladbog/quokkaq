@@ -564,9 +564,11 @@ export interface HandlersPatchPlatformCompanyBody {
   billingEmail?: string;
   clearBillingAddress?: boolean;
   clearCounterparty?: boolean;
+  clearOnecCounterpartyGuid?: boolean;
   counterparty?: HandlersPatchPlatformCompanyBodyCounterparty;
   isSaasOperator?: boolean;
   name?: string;
+  onecCounterpartyGuid?: string;
   opaqueLoginLinksOnly?: boolean;
   paymentAccounts?: HandlersPatchPlatformCompanyBodyPaymentAccountsItem[];
   slug?: string;
@@ -962,7 +964,28 @@ export interface ModelsSubscriptionPlan {
   updatedAt?: string;
 }
 
+export interface ModelsCatalogItem {
+  article?: string;
+  createdAt?: string;
+  currency?: string;
+  /** gross (incl. VAT) per unit */
+  defaultPriceMinor?: number;
+  id?: string;
+  isActive?: boolean;
+  name?: string;
+  onecNomenclatureGuid?: string;
+  plan?: ModelsSubscriptionPlan;
+  printName?: string;
+  subscriptionPlanId?: string;
+  unit?: string;
+  updatedAt?: string;
+  vatExempt?: boolean;
+  /** used when VatExempt is false */
+  vatRatePercent?: number;
+}
+
 export interface ModelsInvoiceLine {
+  catalogItem?: ModelsCatalogItem;
   catalogItemId?: string;
   createdAt?: string;
   descriptionPrint?: string;
@@ -1036,6 +1059,9 @@ export interface ModelsInvoice {
   id?: string;
   issuedAt?: string;
   lines?: ModelsInvoiceLine[];
+  onecLastExchangeAt?: string;
+  /** OneCOrderSiteID is the document Ид in CommerceML (typically equals invoice id) for 1С УНФ order exchange. */
+  onecOrderSiteId?: string;
   /** when payment was received */
   paidAt?: string;
   /** "stripe", "yookassa", "manual" */
@@ -1119,6 +1145,8 @@ export interface ModelsCompany {
   name?: string;
   /** onboarding progress */
   onboardingState?: ModelsCompanyOnboardingState;
+  /** OneCCounterpartyGUID maps this tenant company to Контрагент in 1С (УНФ) for CommerceML orders. */
+  onecCounterpartyGuid?: string;
   /** OpaqueLoginLinksOnly: deep links should use TenantLoginLink tokens instead of slug-based branding. */
   opaqueLoginLinksOnly?: boolean;
   /** owner of the organization */
@@ -1230,25 +1258,6 @@ export interface HandlersPatchVisitorTagDefinitionRequest {
   sortOrder?: number;
 }
 
-export interface ModelsCatalogItem {
-  article?: string;
-  createdAt?: string;
-  currency?: string;
-  /** gross (incl. VAT) per unit */
-  defaultPriceMinor?: number;
-  id?: string;
-  isActive?: boolean;
-  name?: string;
-  plan?: ModelsSubscriptionPlan;
-  printName?: string;
-  subscriptionPlanId?: string;
-  unit?: string;
-  updatedAt?: string;
-  vatExempt?: boolean;
-  /** used when VatExempt is false */
-  vatRatePercent?: number;
-}
-
 export interface HandlersPlatformListResponseModelsCatalogItem {
   items?: ModelsCatalogItem[];
   limit?: number;
@@ -1306,6 +1315,7 @@ export interface ModelsCatalogItemCreateRequest {
   defaultPriceMinor?: number;
   isActive?: boolean;
   name: string;
+  onecNomenclatureGuid?: string;
   printName?: string;
   subscriptionPlanId?: string;
   unit?: string;
@@ -1319,11 +1329,45 @@ export interface ModelsCatalogItemPatchRequest {
   defaultPriceMinor?: number;
   isActive?: boolean;
   name?: string;
+  onecNomenclatureGuid?: string;
   printName?: string;
   subscriptionPlanId?: string;
   unit?: string;
   vatExempt?: boolean;
   vatRatePercent?: number;
+}
+
+export interface ModelsOneCStatusMappingRuleDTO {
+  contains?: string;
+  equals?: string;
+  /** paid | void | uncollectible */
+  invoiceStatus?: string;
+}
+
+export interface ModelsOneCStatusMappingDTO {
+  rules?: ModelsOneCStatusMappingRuleDTO[];
+}
+
+export interface ModelsCompanyOneCSettingsPublic {
+  commerceMlVersion?: string;
+  companyId?: string;
+  exchangeEnabled?: boolean;
+  /** filled by handler from PUBLIC_APP_URL */
+  exchangeUrlHint?: string;
+  httpLogin?: string;
+  passwordSet?: boolean;
+  sitePaymentSystemName?: string;
+  statusMapping?: ModelsOneCStatusMappingDTO;
+}
+
+export interface ModelsCompanyOneCSettingsPutRequest {
+  commerceMlVersion?: string;
+  exchangeEnabled?: boolean;
+  httpLogin?: string;
+  /** empty string clears password; omit to leave unchanged */
+  httpPassword?: string;
+  sitePaymentSystemName?: string;
+  statusMapping?: ModelsOneCStatusMappingDTO;
 }
 
 export type ModelsCompanyPatchBillingAddress = { [key: string]: unknown };
@@ -4220,6 +4264,241 @@ export const useCompaniesMeLoginLinkPost = <TError = unknown,
         TContext
       > => {
       return useMutation(getCompaniesMeLoginLinkPostMutationOptions(options), queryClient);
+    }
+
+/**
+ * @summary Get 1С УНФ CommerceML settings for current company
+ */
+export type getMyOneCSettingsResponse200 = {
+  data: ModelsCompanyOneCSettingsPublic
+  status: 200
+}
+
+export type getMyOneCSettingsResponse401 = {
+  data: string
+  status: 401
+}
+
+export type getMyOneCSettingsResponse403 = {
+  data: string
+  status: 403
+}
+
+export type getMyOneCSettingsResponse500 = {
+  data: string
+  status: 500
+}
+
+export type getMyOneCSettingsResponseSuccess = (getMyOneCSettingsResponse200) & {
+  headers: Headers;
+};
+export type getMyOneCSettingsResponseError = (getMyOneCSettingsResponse401 | getMyOneCSettingsResponse403 | getMyOneCSettingsResponse500) & {
+  headers: Headers;
+};
+
+export type getMyOneCSettingsResponse = (getMyOneCSettingsResponseSuccess | getMyOneCSettingsResponseError)
+
+export const getGetMyOneCSettingsUrl = () => {
+
+
+
+
+  return `/companies/me/onec-settings`
+}
+
+export const getMyOneCSettings = async ( options?: RequestInit): Promise<getMyOneCSettingsResponse> => {
+
+  return orvalMutator<getMyOneCSettingsResponse>(getGetMyOneCSettingsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMyOneCSettingsQueryKey = () => {
+    return [
+    `/companies/me/onec-settings`
+    ] as const;
+    }
+
+
+export const getGetMyOneCSettingsQueryOptions = <TData = Awaited<ReturnType<typeof getMyOneCSettings>>, TError = string>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMyOneCSettings>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMyOneCSettingsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMyOneCSettings>>> = ({ signal }) => getMyOneCSettings({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMyOneCSettings>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetMyOneCSettingsQueryResult = NonNullable<Awaited<ReturnType<typeof getMyOneCSettings>>>
+export type GetMyOneCSettingsQueryError = string
+
+
+export function useGetMyOneCSettings<TData = Awaited<ReturnType<typeof getMyOneCSettings>>, TError = string>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMyOneCSettings>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getMyOneCSettings>>,
+          TError,
+          Awaited<ReturnType<typeof getMyOneCSettings>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetMyOneCSettings<TData = Awaited<ReturnType<typeof getMyOneCSettings>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMyOneCSettings>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getMyOneCSettings>>,
+          TError,
+          Awaited<ReturnType<typeof getMyOneCSettings>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetMyOneCSettings<TData = Awaited<ReturnType<typeof getMyOneCSettings>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMyOneCSettings>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get 1С УНФ CommerceML settings for current company
+ */
+
+export function useGetMyOneCSettings<TData = Awaited<ReturnType<typeof getMyOneCSettings>>, TError = string>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMyOneCSettings>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetMyOneCSettingsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * @summary Update 1С УНФ CommerceML settings for current company
+ */
+export type putMyOneCSettingsResponse200 = {
+  data: ModelsCompanyOneCSettingsPublic
+  status: 200
+}
+
+export type putMyOneCSettingsResponse400 = {
+  data: string
+  status: 400
+}
+
+export type putMyOneCSettingsResponse401 = {
+  data: string
+  status: 401
+}
+
+export type putMyOneCSettingsResponse403 = {
+  data: string
+  status: 403
+}
+
+export type putMyOneCSettingsResponse500 = {
+  data: string
+  status: 500
+}
+
+export type putMyOneCSettingsResponseSuccess = (putMyOneCSettingsResponse200) & {
+  headers: Headers;
+};
+export type putMyOneCSettingsResponseError = (putMyOneCSettingsResponse400 | putMyOneCSettingsResponse401 | putMyOneCSettingsResponse403 | putMyOneCSettingsResponse500) & {
+  headers: Headers;
+};
+
+export type putMyOneCSettingsResponse = (putMyOneCSettingsResponseSuccess | putMyOneCSettingsResponseError)
+
+export const getPutMyOneCSettingsUrl = () => {
+
+
+
+
+  return `/companies/me/onec-settings`
+}
+
+export const putMyOneCSettings = async (modelsCompanyOneCSettingsPutRequest: ModelsCompanyOneCSettingsPutRequest, options?: RequestInit): Promise<putMyOneCSettingsResponse> => {
+
+  return orvalMutator<putMyOneCSettingsResponse>(getPutMyOneCSettingsUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      modelsCompanyOneCSettingsPutRequest,)
+  }
+);}
+
+
+
+
+export const getPutMyOneCSettingsMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putMyOneCSettings>>, TError,{data: ModelsCompanyOneCSettingsPutRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof putMyOneCSettings>>, TError,{data: ModelsCompanyOneCSettingsPutRequest}, TContext> => {
+
+const mutationKey = ['putMyOneCSettings'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putMyOneCSettings>>, {data: ModelsCompanyOneCSettingsPutRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  putMyOneCSettings(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PutMyOneCSettingsMutationResult = NonNullable<Awaited<ReturnType<typeof putMyOneCSettings>>>
+    export type PutMyOneCSettingsMutationBody = ModelsCompanyOneCSettingsPutRequest
+    export type PutMyOneCSettingsMutationError = string
+
+    /**
+ * @summary Update 1С УНФ CommerceML settings for current company
+ */
+export const usePutMyOneCSettings = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putMyOneCSettings>>, TError,{data: ModelsCompanyOneCSettingsPutRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof putMyOneCSettings>>,
+        TError,
+        {data: ModelsCompanyOneCSettingsPutRequest},
+        TContext
+      > => {
+      return useMutation(getPutMyOneCSettingsMutationOptions(options), queryClient);
     }
 
 /**
