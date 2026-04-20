@@ -26,14 +26,15 @@ func NewLeadHandler(leadIssues *services.LeadIssueService) *LeadHandler {
 
 // PublicLeadRequestBody is JSON for POST /public/leads/request.
 type PublicLeadRequestBody struct {
-	Name     string `json:"name" binding:"required"`
-	Email    string `json:"email" binding:"required" format:"email"`
-	Company  string `json:"company"`
-	Message  string `json:"message"`
-	Source   string `json:"source"`
-	Locale   string `json:"locale"`
-	Referrer string `json:"referrer"`
-	PlanCode string `json:"planCode"`
+	Name                   string `json:"name" binding:"required"`
+	Email                  string `json:"email" binding:"required" format:"email"`
+	Company                string `json:"company"`
+	Message                string `json:"message"`
+	Source                 string `json:"source"`
+	Locale                 string `json:"locale"`
+	Referrer               string `json:"referrer"`
+	PlanCode               string `json:"planCode"`
+	PrivacyConsentAccepted *bool  `json:"privacyConsentAccepted"`
 }
 
 // PostPublicLeadRequest godoc
@@ -73,6 +74,10 @@ func (h *LeadHandler) PostPublicLeadRequest(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "name and email are required", http.StatusBadRequest)
 		return
 	}
+	if req.PrivacyConsentAccepted == nil || !*req.PrivacyConsentAccepted {
+		http.Error(w, "privacy consent is required", http.StatusBadRequest)
+		return
+	}
 	ok, err := h.leadIssues.LeadsConfigured(r.Context())
 	if err != nil {
 		http.Error(w, "Failed to verify configuration", http.StatusInternalServerError)
@@ -83,7 +88,8 @@ func (h *LeadHandler) PostPublicLeadRequest(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	err = h.leadIssues.CreateLeadRequest(r.Context(), name, email, strings.TrimSpace(req.Company), strings.TrimSpace(req.Message),
-		strings.TrimSpace(req.Source), strings.TrimSpace(req.Locale), strings.TrimSpace(req.Referrer), strings.TrimSpace(req.PlanCode))
+		strings.TrimSpace(req.Source), strings.TrimSpace(req.Locale), strings.TrimSpace(req.Referrer), strings.TrimSpace(req.PlanCode),
+		true)
 	if err != nil {
 		logger.PrintfCtx(r.Context(), "PostPublicLeadRequest: CreateLeadRequest: %v", err)
 		if strings.Contains(strings.ToLower(err.Error()), "not configured") {

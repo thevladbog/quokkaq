@@ -12,8 +12,10 @@ import {
   CardHeader,
   CardTitle
 } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { marketingPrivacyPolicyUrl } from '@/lib/marketing-privacy-url';
 import { authSignup } from '@/lib/api/generated/auth';
 import { useLocale, useTranslations } from 'next-intl';
 import { useAuthContext } from '@/contexts/AuthContext';
@@ -39,6 +41,7 @@ export default function SignupPage() {
   const [password, setPassword] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [companySlugRaw, setCompanySlugRaw] = useState('');
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const router = useRouter();
@@ -57,6 +60,10 @@ export default function SignupPage() {
     const cn = companyName.trim();
     if (!n || !em || !password || !cn) {
       toast.error(t('error'));
+      return;
+    }
+    if (!privacyAccepted) {
+      toast.error(t('privacyConsentRequired'));
       return;
     }
     const slugTrim = companySlugRaw.trim();
@@ -78,7 +85,8 @@ export default function SignupPage() {
         password,
         companyName: cn,
         planCode,
-        companySlug
+        companySlug,
+        privacyConsentAccepted: privacyAccepted
       });
       if (res.status === 201 && res.data) {
         const token = res.data.accessToken ?? res.data.token;
@@ -196,6 +204,31 @@ export default function SignupPage() {
                     → <span className='font-mono'>{normalizedSlug}</span>
                   </p>
                 ) : null}
+              </div>
+              <div className='flex items-start gap-2'>
+                <Checkbox
+                  id='signup-privacy-consent'
+                  checked={privacyAccepted}
+                  onCheckedChange={(v) => setPrivacyAccepted(v === true)}
+                  className='mt-0.5'
+                />
+                <label
+                  htmlFor='signup-privacy-consent'
+                  className='text-muted-foreground text-sm leading-snug'
+                >
+                  {t.rich('privacyConsent', {
+                    link: (chunks) => (
+                      <a
+                        href={marketingPrivacyPolicyUrl(locale)}
+                        target='_blank'
+                        rel='noopener noreferrer'
+                        className='text-primary underline-offset-4 hover:underline'
+                      >
+                        {chunks}
+                      </a>
+                    )
+                  })}
+                </label>
               </div>
               <Button type='submit' className='w-full' disabled={submitting}>
                 {submitting ? (

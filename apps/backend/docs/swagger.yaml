@@ -685,6 +685,10 @@ components:
           type: string
         planCode:
           type: string
+        privacyConsentAccepted:
+          type: boolean
+          enum: &id001
+          - true
         referrer:
           type: string
         source:
@@ -692,6 +696,7 @@ components:
       required:
       - email
       - name
+      - privacyConsentAccepted
       type: object
     handlers.RefreshResponse:
       properties:
@@ -704,8 +709,16 @@ components:
           type: string
         password:
           type: string
+        privacyConsentAccepted:
+          type: boolean
+          enum: *id001
         token:
           type: string
+      required:
+      - name
+      - password
+      - privacyConsentAccepted
+      - token
       type: object
     handlers.RemoveUnitRequest:
       properties:
@@ -760,11 +773,15 @@ components:
         planCode:
           description: optional, defaults to starter with trial
           type: string
+        privacyConsentAccepted:
+          type: boolean
+          enum: *id001
       required:
       - companyName
       - email
       - name
       - password
+      - privacyConsentAccepted
       type: object
     handlers.TenantRoleBriefResponse:
       properties:
@@ -3257,7 +3274,7 @@ paths:
           headers:
             Set-Cookie:
               description: 'When present, sets or rotates browser session cookies: `quokkaq_access` and `quokkaq_refresh` HttpOnly JWTs (Path=/; SameSite=Lax; Secure). Used after successful login or token refresh; the JSON body may still include access tokens for legacy clients (refresh only via cookies). See components.securitySchemes.SessionCookie.'
-              schema: &id001
+              schema: &id002
                 type: string
         '400':
           content:
@@ -3425,7 +3442,7 @@ paths:
           headers:
             Set-Cookie:
               description: 'When present, sets or rotates browser session cookies: `quokkaq_access` and `quokkaq_refresh` HttpOnly JWTs (Path=/; SameSite=Lax; Secure). Used after successful login or token refresh; the JSON body may still include access tokens for legacy clients (refresh only via cookies). See components.securitySchemes.SessionCookie.'
-              schema: *id001
+              schema: *id002
         '401':
           content:
             application/json:

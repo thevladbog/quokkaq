@@ -1,5 +1,11 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
+import {
+  buildLocaleAlternates,
+  marketingCanonicalUrl,
+  ogLocale
+} from '@/lib/marketing-metadata';
 import {
   fetchMarketingSubscriptionPlans,
   marketingAppBaseUrl
@@ -14,11 +20,49 @@ import { LandingPricing } from '@/components/landing/landing-pricing';
 import { LandingStats } from '@/components/landing/landing-stats';
 import { LandingTopBar } from '@/components/landing/landing-top-bar';
 import { LandingUseCases } from '@/components/landing/landing-use-cases';
+import { HomePageJsonLd } from '@/components/seo/home-page-json-ld';
 import { isAppLocale, messages } from '@/src/messages';
 
 type PageProps = {
   params: Promise<{ locale: string }>;
 };
+
+export async function generateMetadata({
+  params
+}: PageProps): Promise<Metadata> {
+  const { locale: raw } = await params;
+  if (!isAppLocale(raw)) {
+    return {};
+  }
+  const t = messages[raw].home;
+  const brand = raw === 'ru' ? 'КвоккаКю' : 'QuokkaQ';
+  const alternates = buildLocaleAlternates(raw, []);
+  const canonicalUrl = marketingCanonicalUrl(raw, []);
+
+  return {
+    title: {
+      absolute: t.title
+    },
+    description: t.description,
+    alternates,
+    openGraph: {
+      type: 'website',
+      title: t.title,
+      description: t.description,
+      siteName: brand,
+      locale: ogLocale(raw),
+      alternateLocale: [raw === 'en' ? 'ru_RU' : 'en_US'],
+      url: canonicalUrl,
+      images: [{ url: `/${raw}/opengraph-image`, width: 1200, height: 630 }]
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: t.title,
+      description: t.description,
+      images: [`/${raw}/opengraph-image`]
+    }
+  };
+}
 
 export default async function HomePage({ params }: PageProps) {
   const { locale: raw } = await params;
@@ -32,6 +76,7 @@ export default async function HomePage({ params }: PageProps) {
 
   return (
     <div className='landing-page flex min-h-dvh flex-col'>
+      <HomePageJsonLd locale={raw} />
       <LandingTopBar copy={t.home} locale={raw} appBaseUrl={appBaseUrl} />
       <main className='relative z-10 flex min-w-0 flex-1 flex-col overflow-x-clip'>
         <LandingHero copy={t.home} locale={raw} appBaseUrl={appBaseUrl} />

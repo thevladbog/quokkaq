@@ -25,7 +25,7 @@ type InvitationService interface {
 	ResendInvitation(id, companyID string) error
 	DeleteInvitation(id, companyID string) error
 	GetInvitationByToken(token string) (*models.Invitation, error)
-	RegisterUser(token, name, password string) (*models.User, error)
+	RegisterUser(token, name, password string, privacyConsentAccepted bool) (*models.User, error)
 }
 
 type invitationService struct {
@@ -238,7 +238,10 @@ func (s *invitationService) GetInvitationByToken(token string) (*models.Invitati
 	return invitation, nil
 }
 
-func (s *invitationService) RegisterUser(token, name, password string) (*models.User, error) {
+func (s *invitationService) RegisterUser(token, name, password string, privacyConsentAccepted bool) (*models.User, error) {
+	if !privacyConsentAccepted {
+		return nil, errors.New("privacy consent is required")
+	}
 	invitation, err := s.repo.FindByToken(token)
 	if err != nil {
 		return nil, errors.New("invalid token")

@@ -172,6 +172,8 @@ jobs:
       NX_HEAD: ${{ github.event.merge_group.head_sha || github.sha }}
       # Nx exclude: `*` = all, `!tag:…` negates — keep only platform:web plus shared/ui libs (double-negative style).
       NX_EXCLUDE_WEB: '*,!tag:platform:web,!tag:scope:shared,!tag:scope:ui'
+      # Marketing `next build` uses NODE_ENV=production; there is no .env.local in CI — getMetadataBaseUrl() needs a canonical origin (see apps/marketing/lib/marketing-site-url.ts).
+      NEXT_PUBLIC_MARKETING_SITE_URL: https://quokkaq.com
     steps:
       - uses: actions/checkout@v6
         with:

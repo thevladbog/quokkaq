@@ -24,7 +24,7 @@ export const legalPages: Record<AppLocale, LegalPagesCopy> = {
   en: {
     backToHome: 'Back to home',
     lastUpdatedLabel: 'Last updated',
-    lastUpdatedDisplay: 'April 17, 2026',
+    lastUpdatedDisplay: 'April 20, 2026',
     footerNote:
       'This document is for information only and may change as the product evolves. For legal questions, contact us using the details below.',
     privacy: {
@@ -42,7 +42,8 @@ export const legalPages: Record<AppLocale, LegalPagesCopy> = {
           heading: '2. Data we collect',
           paragraphs: [
             'We may collect identifiers you provide (such as name, email, company) when you contact sales, sign up for a trial, or subscribe to updates.',
-            'We also collect technical data automatically: IP address, browser type, device identifiers, approximate location, and usage events needed for security, analytics, and service improvement.'
+            'We also collect technical data automatically: IP address, browser type, device identifiers, approximate location, and usage events needed for security, analytics, and service improvement.',
+            'Personal data processed in our cloud product is stored on servers located in the Russian Federation, unless we notify you otherwise for a specific service.'
           ]
         },
         {
@@ -52,15 +53,18 @@ export const legalPages: Record<AppLocale, LegalPagesCopy> = {
           ]
         },
         {
-          heading: '4. Cookies and similar technologies',
+          heading: '4. Cookies, Google Tag Manager, and analytics',
           paragraphs: [
-            'We use cookies and local storage where necessary for authentication, preferences (such as theme), and measurement. You can control cookies through your browser settings; some features may not work if you disable them.'
+            'We use cookies and local storage for essential functions of this site (for example language preference and theme). You can control cookies in your browser; some features may not work if you disable them.',
+            'If you accept non-essential cookies via the banner on this site, we load Google Tag Manager (GTM). Through GTM we may run Google Analytics (GA4) and Yandex Metrica to measure traffic and improve the site. Those tools may set their own cookies or use similar storage; they receive technical data from your browser (such as a client identifier, page URL, and interaction events) in line with their documentation.',
+            'Until you opt in, GTM and those analytics tags are not loaded; we still set a small cookie to remember your choice. You can change your mind by clearing site cookies for this domain; the banner may appear again on your next visit if no choice is stored.'
           ]
         },
         {
           heading: '5. Sharing',
           paragraphs: [
             'We use subprocessors (for example hosting, email, analytics) under contracts that require appropriate safeguards. We do not sell your personal data.',
+            'When you consent to analytics on this marketing site, data is processed by Google (Google Tag Manager / Google Analytics) and Yandex (Yandex Metrica) as described in their policies. That processing is separate from storage of your product account data on our servers in the Russian Federation.',
             'We may disclose information if required by law or to protect the rights, safety, and security of QuokkaQ, our customers, or the public.'
           ]
         },
@@ -79,7 +83,8 @@ export const legalPages: Record<AppLocale, LegalPagesCopy> = {
         {
           heading: '8. International transfers',
           paragraphs: [
-            'If we transfer data across borders, we use appropriate safeguards such as standard contractual clauses where required.'
+            'Personal data stored for our product is hosted in the Russian Federation as stated above.',
+            'Analytics and tag services loaded after your consent (Google Tag Manager, Google Analytics, Yandex Metrica) may involve processing outside Russia depending on the provider and your region; those providers describe their locations and safeguards in their own documentation. Where standard contractual clauses or other mechanisms apply, we rely on them where required by applicable law.'
           ]
         },
         {
@@ -191,7 +196,7 @@ export const legalPages: Record<AppLocale, LegalPagesCopy> = {
   ru: {
     backToHome: 'На главную',
     lastUpdatedLabel: 'Дата обновления',
-    lastUpdatedDisplay: '17 апреля 2026 г.',
+    lastUpdatedDisplay: '20 апреля 2026 г.',
     footerNote:
       'Документ носит информационный характер и может обновляться по мере развития продукта. По юридическим вопросам свяжитесь с нами указанным ниже способом.',
     privacy: {
@@ -209,7 +214,8 @@ export const legalPages: Record<AppLocale, LegalPagesCopy> = {
           heading: '2. Какие данные мы собираем',
           paragraphs: [
             'Мы можем обрабатывать идентификаторы, которые вы указываете сами (например, имя, email, компания) при обращении в продажи, регистрации пробного периода или подписке на рассылку.',
-            'Автоматически собираются технические данные: IP-адрес, тип браузера, идентификаторы устройства, приблизительное местоположение и события использования — для безопасности, аналитики и улучшения сервиса.'
+            'Автоматически собираются технические данные: IP-адрес, тип браузера, идентификаторы устройства, приблизительное местоположение и события использования — для безопасности, аналитики и улучшения сервиса.',
+            'Персональные данные, обрабатываемые в облачном продукте, хранятся на серверах, расположенных на территории Российской Федерации, если для отдельной услуги не указано иное.'
           ]
         },
         {
@@ -219,15 +225,18 @@ export const legalPages: Record<AppLocale, LegalPagesCopy> = {
           ]
         },
         {
-          heading: '4. Файлы cookie и похожие технологии',
+          heading: '4. Cookie, Google Tag Manager и аналитика',
           paragraphs: [
-            'Мы применяем cookie и локальное хранилище там, где это нужно для входа, настроек (например, темы) и измерений. Параметры cookie можно изменить в браузере; часть функций может стать недоступна при их отключении.'
+            'Мы используем cookie и локальное хранилище для работы сайта (например, язык и тема). Настройки cookie можно изменить в браузере; часть функций может стать недоступна при их отключении.',
+            'Если вы соглашаетесь на необязательные cookie через плашку на этом сайте, подключается Google Tag Manager (GTM). Через GTM могут запускаться Google Analytics (GA4) и Яндекс Метрика для оценки трафика и улучшения сайта. Указанные инструменты могут устанавливать собственные cookie или использовать похожие технологии; в браузер передаются технические данные (в том числе идентификатор клиента, URL страницы, события взаимодействия) в соответствии с документацией соответствующих сервисов.',
+            'Пока вы не дали согласие, GTM и перечисленные теги аналитики не загружаются; мы можем записать небольшой cookie, чтобы запомнить ваш выбор. Отозвать согласие можно, удалив cookie сайта для этого домена; при следующем визите плашка может снова отобразиться, если выбор не сохранён.'
           ]
         },
         {
           heading: '5. Передача третьим лицам',
           paragraphs: [
             'Мы привлекаем подрядчиков (хостинг, почта, аналитика) на условиях договоров с надлежащими гарантиями. Мы не продаём персональные данные.',
+            'Если вы дали согласие на аналитику на маркетинговом сайте, обработка может осуществляться Google (Google Tag Manager / Google Analytics) и Яндексом (Яндекс Метрика) на условиях их политик. Это отдельно от хранения данных учётной записи продукта на наших серверах в Российской Федерации.',
             'Раскрытие информации возможно по требованию закона либо для защиты прав, безопасности КвоккаКю, клиентов или общества.'
           ]
         },
@@ -246,7 +255,8 @@ export const legalPages: Record<AppLocale, LegalPagesCopy> = {
         {
           heading: '8. Трансграничная передача',
           paragraphs: [
-            'При передаче данных за рубеж мы используем подходящие механизмы, в том числе стандартные договорные условия, где это требуется.'
+            'Персональные данные, размещаемые в продукте, хранятся на серверах на территории Российской Федерации, как указано выше.',
+            'Сервисы аналитики и тегов, подключаемые после вашего согласия (Google Tag Manager, Google Analytics, Яндекс Метрика), могут включать обработку за пределами России в зависимости от провайдера и региона; сведения о локализации и мерах приводятся в документации соответствующих сервисов. Где применимы стандартные договорные условия или иные механизмы, мы опираемся на них при необходимости по применимому праву.'
           ]
         },
         {

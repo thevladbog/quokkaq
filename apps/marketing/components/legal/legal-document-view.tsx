@@ -1,5 +1,6 @@
 import Link from 'next/link';
 
+import { localeHomePath } from '@/lib/locale-paths';
 import type { AppLocale } from '@/src/messages';
 import type { LegalPageDefinition, LegalPagesCopy } from '@/src/legal-pages';
 
@@ -15,7 +16,7 @@ export function LegalDocumentView({ locale, copy, page }: Props) {
       <header className='border-b border-[color:var(--color-border)] bg-[color:var(--color-surface-elevated)]'>
         <div className='mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-4 sm:px-6'>
           <Link
-            href={`/${locale}`}
+            href={localeHomePath(locale)}
             prefetch={false}
             className='focus-ring text-sm font-medium text-[color:var(--color-primary)] transition hover:text-[color:var(--color-primary-hover)]'
           >

@@ -23,6 +23,9 @@ import (
 // ErrEmailAlreadyExists is returned from Signup when the email is already registered.
 var ErrEmailAlreadyExists = errors.New("email already exists")
 
+// ErrPrivacyConsentRequired is returned when Signup is called without accepted privacy consent.
+var ErrPrivacyConsentRequired = errors.New("privacy consent is required")
+
 // ErrInvalidCompanySlug is returned when optional companySlug fails format/reserved rules.
 var ErrInvalidCompanySlug = errors.New("invalid company slug")
 
@@ -61,7 +64,7 @@ type AuthService interface {
 	GetMe(userID string) (*models.User, error)
 	RequestPasswordReset(email string) error
 	ResetPassword(token, newPassword string) error
-	Signup(name, email, password, companyName, planCode string, preferredSlug *string) (*TokenPair, error)
+	Signup(name, email, password, companyName, planCode string, preferredSlug *string, privacyConsentAccepted bool) (*TokenPair, error)
 	Refresh(refreshToken string) (*TokenPair, error)
 	// IssueTokenPairForUserID issues JWT access+refresh for an existing user (e.g. after SSO).
 	IssueTokenPairForUserID(userID string) (*TokenPair, error)
@@ -279,7 +282,10 @@ func (s *authService) ResetPassword(token, newPassword string) error {
 	return s.userRepo.DeletePasswordResetToken(resetToken.ID)
 }
 
-func (s *authService) Signup(name, email, password, companyName, planCode string, preferredSlug *string) (*TokenPair, error) {
+func (s *authService) Signup(name, email, password, companyName, planCode string, preferredSlug *string, privacyConsentAccepted bool) (*TokenPair, error) {
+	if !privacyConsentAccepted {
+		return nil, ErrPrivacyConsentRequired
+	}
 	// Check if user already exists
 	existingUser, _ := s.userRepo.FindByEmail(context.Background(), email)
 	if existingUser != nil {

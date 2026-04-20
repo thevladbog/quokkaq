@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { HomeControls } from '@/app/home-controls';
+import { localeHomePath } from '@/lib/locale-paths';
 import type { AppLocale, HomeMessages } from '@/src/messages';
 
 import { TextLogoImg } from './text-logo-img';
@@ -34,7 +35,7 @@ export function LandingTopBar({ locale, copy, appBaseUrl }: Props) {
 
   const trialHref = appBaseUrl
     ? `${String(appBaseUrl).replace(/\/$/, '')}/${locale}/signup`
-    : `/${locale}/docs`;
+    : `${localeHomePath(locale)}#book-demo`;
 
   const headerSurface = scrolled
     ? 'border-[color:var(--color-border)]/55 bg-[color:var(--color-surface)]/52 backdrop-blur-xl dark:border-[color:var(--color-border)]/40 dark:bg-[color:var(--color-surface)]/42'
@@ -46,7 +47,7 @@ export function LandingTopBar({ locale, copy, appBaseUrl }: Props) {
     >
       <div className='mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3.5 sm:gap-4 sm:px-6 sm:py-4 lg:px-8'>
         <Link
-          href={`/${locale}`}
+          href={localeHomePath(locale)}
           prefetch={false}
           className='focus-ring shrink-0 rounded-md'
           aria-label={copy.logoAlt}

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { useRouter } from '@/src/i18n/navigation';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -12,8 +12,10 @@ import {
   CardHeader,
   CardTitle
 } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { marketingPrivacyPolicyUrl } from '@/lib/marketing-privacy-url';
 import { toast } from 'sonner';
 
 interface Invitation {
@@ -30,6 +32,7 @@ export default function RegisterPage() {
   const params = useParams();
   const router = useRouter();
   const t = useTranslations('register');
+  const locale = useLocale();
   const token = params.token as string;
 
   const [invitation, setInvitation] = useState<Invitation | null>(null);
@@ -38,6 +41,7 @@ export default function RegisterPage() {
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
 
   const fetchInvitation = useCallback(async () => {
     try {
@@ -70,6 +74,10 @@ export default function RegisterPage() {
       toast.error(t('passwords_dont_match'));
       return;
     }
+    if (!privacyAccepted) {
+      toast.error(t('privacyConsentRequired'));
+      return;
+    }
 
     setSubmitting(true);
 
@@ -82,7 +90,8 @@ export default function RegisterPage() {
         body: JSON.stringify({
           token,
           name,
-          password
+          password,
+          privacyConsentAccepted: privacyAccepted
         })
       });
 
@@ -186,6 +195,32 @@ export default function RegisterPage() {
                 minLength={6}
                 required
               />
+            </div>
+
+            <div className='flex items-start gap-2'>
+              <Checkbox
+                id='register-privacy-consent'
+                checked={privacyAccepted}
+                onCheckedChange={(v) => setPrivacyAccepted(v === true)}
+                className='mt-0.5'
+              />
+              <label
+                htmlFor='register-privacy-consent'
+                className='text-muted-foreground text-sm leading-snug'
+              >
+                {t.rich('privacyConsent', {
+                  link: (chunks) => (
+                    <a
+                      href={marketingPrivacyPolicyUrl(locale)}
+                      target='_blank'
+                      rel='noopener noreferrer'
+                      className='text-primary underline-offset-4 hover:underline'
+                    >
+                      {chunks}
+                    </a>
+                  )
+                })}
+              </label>
             </div>
 
             <Button type='submit' className='w-full' disabled={submitting}>

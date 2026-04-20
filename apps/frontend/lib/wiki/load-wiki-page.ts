@@ -6,22 +6,24 @@ import { defaultLocale, locales, type Locale } from '@/i18n';
 
 const wikiFallbackLocale: Locale = defaultLocale;
 
-function wikiRepoRootCandidates(): string[] {
+function wikiContentRootCandidates(): string[] {
   const cwd = /* turbopackIgnore: true */ process.cwd();
   return [
-    path.resolve(cwd, '..', '..', 'docs', 'wiki'),
-    path.resolve(cwd, 'docs', 'wiki')
+    path.resolve(cwd, '..', '..', 'apps', 'frontend', 'content', 'wiki'),
+    path.resolve(cwd, 'apps', 'frontend', 'content', 'wiki'),
+    path.resolve(cwd, '..', 'frontend', 'content', 'wiki'),
+    path.resolve(cwd, 'content', 'wiki')
   ];
 }
 
-/** Resolves monorepo `docs/wiki` (works when Next cwd is `apps/frontend` or repo root). */
+/** Resolves `apps/frontend/content/wiki` (MDX operator docs for `/help`; cwd may be repo root or `apps/frontend`). */
 export function resolveWikiRepoRootSync(): string {
-  for (const root of wikiRepoRootCandidates()) {
-    if (fs.existsSync(path.join(root, 'README.md'))) {
+  for (const root of wikiContentRootCandidates()) {
+    if (fs.existsSync(path.join(root, 'en', 'index.mdx'))) {
       return root;
     }
   }
-  return wikiRepoRootCandidates()[0];
+  return wikiContentRootCandidates()[0];
 }
 
 function isSupportedWikiLocale(value: string): value is Locale {
@@ -36,31 +38,40 @@ function isSafeSlugSegment(seg: string): boolean {
   return /^[a-zA-Z0-9_-]+$/.test(seg) && seg.length > 0 && seg.length <= 120;
 }
 
-async function tryResolveMarkdownFile(
+/** Strips leading YAML frontmatter from MDX before rendering as plain Markdown in the product app. */
+export function stripYamlFrontmatter(source: string): string {
+  const match = /^---\r?\n[\s\S]*?\r?\n---\r?\n?/.exec(source);
+  if (match) {
+    return source.slice(match[0].length);
+  }
+  return source;
+}
+
+async function tryResolveDocFile(
   localeDir: string,
   parts: string[]
 ): Promise<string | null> {
   if (parts.length === 0) {
-    const p = path.join(localeDir, 'README.md');
+    const indexMdx = path.join(localeDir, 'index.mdx');
     try {
-      await fsPromises.access(p);
-      return p;
+      await fsPromises.access(indexMdx);
+      return indexMdx;
     } catch {
       return null;
     }
   }
   const joined = path.join(localeDir, ...parts);
-  const asMd = `${joined}.md`;
+  const asMdx = `${joined}.mdx`;
   try {
-    await fsPromises.access(asMd);
-    return asMd;
+    await fsPromises.access(asMdx);
+    return asMdx;
   } catch {
     /* directory index */
   }
-  const asReadme = path.join(joined, 'README.md');
+  const indexInDir = path.join(joined, 'index.mdx');
   try {
-    await fsPromises.access(asReadme);
-    return asReadme;
+    await fsPromises.access(indexInDir);
+    return indexInDir;
   } catch {
     return null;
   }
@@ -74,14 +85,14 @@ export type WikiLoadResult = {
 };
 
 /**
- * Loads markdown from `docs/wiki/{locale}/...` with safe slug validation.
- * If `requestedLocale` is `ru` and the page is missing, falls back to `en` (see `docs/wiki/README.md`).
+ * Loads markdown from `apps/frontend/content/wiki/{locale}/...` with safe slug validation.
+ * If `requestedLocale` is `ru` and the page is missing, falls back to `en`.
  */
 export async function loadWikiPage(
   requestedLocale: string,
   slug: string[] | undefined
 ): Promise<WikiLoadResult | null> {
-  const wikiRoot = resolveWikiRepoRootSync();
+  const contentRoot = resolveWikiRepoRootSync();
   const parts = slug ?? [];
   for (const seg of parts) {
     if (!isSafeSlugSegment(seg)) {
@@ -98,13 +109,14 @@ export async function loadWikiPage(
   let fallbackFromLocale: Locale | undefined;
   for (let i = 0; i < order.length; i++) {
     const loc = order[i]!;
-    const localeDir = path.join(wikiRoot, loc);
-    const file = await tryResolveMarkdownFile(localeDir, parts);
+    const localeDir = path.join(contentRoot, loc);
+    const file = await tryResolveDocFile(localeDir, parts);
     if (file) {
       if (i > 0) {
         fallbackFromLocale = requested;
       }
-      const markdown = await fsPromises.readFile(file, 'utf8');
+      const raw = await fsPromises.readFile(file, 'utf8');
+      const markdown = stripYamlFrontmatter(raw);
       return { markdown, localeUsed: loc, fallbackFromLocale };
     }
   }

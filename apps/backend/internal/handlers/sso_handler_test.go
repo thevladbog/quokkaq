@@ -24,7 +24,7 @@ func (fakeAuthExchange) Login(string, string, string) (*services.TokenPair, erro
 func (fakeAuthExchange) GetMe(string) (*models.User, error) { panic("unexpected") }
 func (fakeAuthExchange) RequestPasswordReset(string) error  { panic("unexpected") }
 func (fakeAuthExchange) ResetPassword(string, string) error { panic("unexpected") }
-func (fakeAuthExchange) Signup(string, string, string, string, string, *string) (*services.TokenPair, error) {
+func (fakeAuthExchange) Signup(string, string, string, string, string, *string, bool) (*services.TokenPair, error) {
 	panic("unexpected")
 }
 func (fakeAuthExchange) Refresh(string) (*services.TokenPair, error) { panic("unexpected") }

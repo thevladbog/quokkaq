@@ -196,7 +196,7 @@ func (s *LeadIssueService) notifySignupFailureSync(ctx context.Context, companyN
 }
 
 // CreateLeadRequest creates a Tracker issue from the public marketing form ([REQ]).
-func (s *LeadIssueService) CreateLeadRequest(ctx context.Context, name, email, company, message, source, locale, referrer, planCode string) error {
+func (s *LeadIssueService) CreateLeadRequest(ctx context.Context, name, email, company, message, source, locale, referrer, planCode string, privacyConsentRecorded bool) error {
 	if s == nil || s.settingsRepo == nil || s.tracker == nil {
 		return fmt.Errorf("lead issue service not configured")
 	}
@@ -223,6 +223,9 @@ func (s *LeadIssueService) CreateLeadRequest(ctx context.Context, name, email, c
 	b.WriteString("\n\n")
 	fmt.Fprintf(&b, "- **Name**: %s\n", name)
 	fmt.Fprintf(&b, "- **Email**: %s\n", email)
+	if privacyConsentRecorded {
+		fmt.Fprintf(&b, "- **Personal data consent**: yes (privacy policy acknowledged)\n")
+	}
 	if strings.TrimSpace(company) != "" {
 		fmt.Fprintf(&b, "- **Company**: %s\n", company)
 	}

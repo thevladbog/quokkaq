@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 
+import { localeHomePath } from '@/lib/locale-paths';
 import type { AppLocale, HomeMessages } from '@/src/messages';
 
 import { LeadRequestCta } from '@/components/landing/lead-request-cta';
@@ -84,7 +85,7 @@ export function LandingHero({ locale, copy, appBaseUrl }: Props) {
               </a>
             ) : (
               <Link
-                href={`/${locale}#book-demo`}
+                href={`${localeHomePath(locale)}#book-demo`}
                 prefetch={false}
                 className={heroPrimaryClass}
               >

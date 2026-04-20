@@ -83,12 +83,13 @@ type ResetPasswordRequest struct {
 }
 
 type SignupRequest struct {
-	Name        string `json:"name" binding:"required"`
-	Email       string `json:"email" binding:"required"`
-	Password    string `json:"password" binding:"required"`
-	CompanyName string `json:"companyName" binding:"required"`
-	PlanCode    string `json:"planCode"`    // optional, defaults to starter with trial
-	CompanySlug string `json:"companySlug"` // optional; if empty, generated from company name
+	Name                   string `json:"name" binding:"required"`
+	Email                  string `json:"email" binding:"required"`
+	Password               string `json:"password" binding:"required"`
+	CompanyName            string `json:"companyName" binding:"required"`
+	PlanCode               string `json:"planCode"`    // optional, defaults to starter with trial
+	CompanySlug            string `json:"companySlug"` // optional; if empty, generated from company name
+	PrivacyConsentAccepted *bool  `json:"privacyConsentAccepted"`
 }
 
 // Login godoc
@@ -457,6 +458,10 @@ func (h *AuthHandler) Signup(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Missing required fields", http.StatusBadRequest)
 		return
 	}
+	if req.PrivacyConsentAccepted == nil || !*req.PrivacyConsentAccepted {
+		http.Error(w, "privacy consent is required", http.StatusBadRequest)
+		return
+	}
 
 	// Default to starter plan if not specified
 	if req.PlanCode == "" {
@@ -467,8 +472,12 @@ func (h *AuthHandler) Signup(w http.ResponseWriter, r *http.Request) {
 	if s := strings.TrimSpace(req.CompanySlug); s != "" {
 		preferredSlug = &s
 	}
-	pair, err := h.service.Signup(req.Name, req.Email, req.Password, req.CompanyName, req.PlanCode, preferredSlug)
+	pair, err := h.service.Signup(req.Name, req.Email, req.Password, req.CompanyName, req.PlanCode, preferredSlug, true)
 	if err != nil {
+		if errors.Is(err, services.ErrPrivacyConsentRequired) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		if errors.Is(err, services.ErrEmailAlreadyExists) {
 			http.Error(w, "An account with this email already exists", http.StatusConflict)
 			return
