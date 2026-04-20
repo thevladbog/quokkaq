@@ -75,6 +75,8 @@ Then open `https://<DEMO_APP_HOST>/` and sign in with the **tenant admin** email
 
 The `demo-scheduler` service runs [`demo-reset.sh`](demo-reset.sh) on a schedule (UTC 03:00 by default via [`supercronic-crontab`](supercronic-crontab)). It needs the **repository root** mounted at `/repo` and the Docker socket — enable with the Compose profile:
 
+Set **`DOCKER_GID`** in `.env.demo` to the numeric group owning `/var/run/docker.sock` on the host (e.g. `stat -c '%g' /var/run/docker.sock`) so the non-root scheduler user can call `docker compose`.
+
 ```bash
 docker compose -f deploy/demo/docker-compose.demo.yml --env-file deploy/demo/.env.demo --profile scheduler up -d
 ```

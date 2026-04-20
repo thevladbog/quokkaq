@@ -85,7 +85,7 @@ func (s *DeploymentSetupService) BootstrapSaaS(ctx context.Context, in Bootstrap
 	}
 
 	existing, err := s.userRepo.FindByEmail(ctx, email)
-	if err != nil {
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
 	}
 	if existing != nil {
@@ -137,6 +137,9 @@ func (s *DeploymentSetupService) BootstrapSaaS(ctx context.Context, in Bootstrap
 			IsSaaSOperator: true,
 		}
 		if err := tx.Create(&company).Error; err != nil {
+			if IsUniqueConstraintViolation(err) {
+				return ErrDeploymentAlreadyReady
+			}
 			return err
 		}
 

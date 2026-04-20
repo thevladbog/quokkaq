@@ -10,7 +10,7 @@ func TestLoadConfig_defaults(t *testing.T) {
 	t.Setenv("DEMO_ADMIN_PASSWORD", "")
 	t.Setenv("DEMO_OPERATOR_EMAIL", "")
 	t.Setenv("DEMO_OPERATOR_PASSWORD", "")
-	t.Setenv("DEMO_UNIT_TIMEZONE", "UTC")
+	t.Setenv("DEMO_UNIT_TIMEZONE", "")
 
 	c := LoadConfig()
 	if c.HistoryDays != defaultHistoryDays {
@@ -22,8 +22,8 @@ func TestLoadConfig_defaults(t *testing.T) {
 	if c.AdminPass != "demo-admin-change-me" {
 		t.Fatalf("admin pass default")
 	}
-	if c.UnitTimezone != "UTC" {
-		t.Fatalf("timezone: %s", c.UnitTimezone)
+	if c.UnitTimezone != defaultTimezone {
+		t.Fatalf("timezone default: got %q want %q", c.UnitTimezone, defaultTimezone)
 	}
 }
 

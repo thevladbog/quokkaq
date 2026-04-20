@@ -2229,6 +2229,7 @@
       "creating": "Creating…",
       "createDeployment": "Create deployment",
       "passwordsMismatch": "Passwords do not match",
+      "bootstrapRequestFailed": "Could not reach the server to create the deployment. Check your connection and try again.",
       "loginAfterBootstrapFailed": "Deployment created but automatic sign-in failed. Use Log in with the same email and password.",
       "integrationsLoadFailed": "Could not load integration settings.",
       "saveAndFinish": "Save & finish",

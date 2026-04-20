@@ -172,21 +172,31 @@ export function SaasSetupWizard() {
     setBootstrapError('');
     setBootstrapLoading(true);
     try {
-      const res = await fetch('/api/system/setup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...setupHeaders()
-        },
-        body: JSON.stringify({
-          companyName: values.companyName,
-          unitName: values.unitName || undefined,
-          timezone: values.timezone || undefined,
-          name: values.name,
-          email: values.email,
-          password: values.password
-        })
-      });
+      let res: Response;
+      try {
+        res = await fetch('/api/system/setup', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...setupHeaders()
+          },
+          body: JSON.stringify({
+            companyName: values.companyName,
+            unitName: values.unitName || undefined,
+            timezone: values.timezone || undefined,
+            name: values.name,
+            email: values.email,
+            password: values.password
+          })
+        });
+      } catch (fetchErr) {
+        setBootstrapError(
+          fetchErr instanceof Error
+            ? fetchErr.message
+            : t('bootstrapRequestFailed')
+        );
+        return;
+      }
       if (!res.ok) {
         setBootstrapError(await readErrorMessage(res));
         return;
@@ -199,6 +209,7 @@ export function SaasSetupWizard() {
         if (auth?.accessToken) {
           await login(auth.accessToken);
         }
+        sessionStorage.removeItem(SETUP_TOKEN_STORAGE_KEY);
       } catch (loginErr) {
         console.error(loginErr);
         toast.error(t('loginAfterBootstrapFailed'));

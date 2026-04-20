@@ -1820,6 +1820,12 @@
                         "type": "string"
                     }
                 },
+                "required": [
+                    "companyName",
+                    "email",
+                    "name",
+                    "password"
+                ],
                 "type": "object"
             },
             "handlers.ssoExchangeRequest": {
@@ -15284,8 +15290,18 @@
         },
         "/system/health": {
             "get": {
-                "description": "Probes PostgreSQL, Redis, S3, and SMTP. Requires X-Setup-Token when APP_ENV is production or staging and SETUP_TOKEN is set.",
+                "description": "Probes PostgreSQL, Redis, S3, and SMTP. Requires X-Setup-Token when APP_ENV is production or staging and SETUP_TOKEN is set (SetupWizardTokenGate).",
                 "operationId": "getSystemHealth",
+                "parameters": [
+                    {
+                        "description": "Setup token; required when APP_ENV is production or staging and SETUP_TOKEN is set",
+                        "in": "header",
+                        "name": "X-Setup-Token",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "content": {
@@ -15314,14 +15330,11 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "additionalProperties": {
-                                        "type": "string"
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/services.SetupHealthReport"
                                 }
                             }
                         },
-                        "description": "Service Unavailable"
+                        "description": "Service Unavailable — dependency checks failed; same body shape as 200"
                     }
                 },
                 "summary": "Setup wizard health checks",
@@ -15332,8 +15345,18 @@
         },
         "/system/setup": {
             "post": {
-                "description": "Creates SaaS operator company, root unit, anonymous kiosk client, and first admin with admin + platform_admin roles.",
+                "description": "Creates SaaS operator company, root unit, anonymous kiosk client, and first admin with admin + platform_admin roles. Requires X-Setup-Token when APP_ENV is production or staging and SETUP_TOKEN is set (SetupWizardTokenGate).",
                 "operationId": "setupFirstAdmin",
+                "parameters": [
+                    {
+                        "description": "Setup token; required when APP_ENV is production or staging and SETUP_TOKEN is set",
+                        "in": "header",
+                        "name": "X-Setup-Token",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
                 "requestBody": {
                     "content": {
                         "application/json": {
@@ -15405,7 +15428,8 @@
         },
         "/system/status": {
             "get": {
-                "description": "True when SaaS deployment bootstrap is complete (SaaS operator company + at least one platform_admin).",
+                "description": "initialized: app-level readiness. deploymentReady: SaaS operator company exists and at least one platform_admin (first-run wizard complete).",
+                "operationId": "getSystemStatus",
                 "responses": {
                     "200": {
                         "content": {

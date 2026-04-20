@@ -246,6 +246,7 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version-file: apps/backend/go.mod
+          cache: true
 
       - name: '📥 Install dependencies'
         run: pnpm install --frozen-lockfile
@@ -266,7 +267,7 @@ jobs:
   ci-backend-demoseed-smoke:
     name: '🌱 Backend demo seed (PostgreSQL smoke)'
     runs-on: ubuntu-latest
-    needs: affected
+    needs: [affected, ci-backend]
     if: ${{ needs.affected.outputs.backend == 'true' }}
     services:
       postgres:
@@ -284,12 +285,14 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgresql://quokkaq:quokkaq@localhost:5432/quokkaq?sslmode=disable
+      DEMOSEED_ALLOW_RESET: '1'
     steps:
       - uses: actions/checkout@v6
 
       - uses: actions/setup-go@v6
         with:
           go-version-file: apps/backend/go.mod
+          cache: true
 
       - name: '🌱 Run demoseed integration test'
         working-directory: apps/backend

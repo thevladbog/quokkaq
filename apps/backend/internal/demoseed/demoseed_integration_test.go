@@ -21,6 +21,9 @@ func TestDemoseedRun_smokeOnFreshPostgres(t *testing.T) {
 	if dsn == "" {
 		t.Fatal("DATABASE_URL is required for demoseed_integration tests (e.g. postgresql://user:pass@localhost:5432/db?sslmode=disable)")
 	}
+	if os.Getenv("DEMOSEED_ALLOW_RESET") != "1" {
+		t.Skip("skipping destructive schema reset: set DEMOSEED_ALLOW_RESET=1 to run (CI sets this)")
+	}
 
 	t.Setenv("DEMO_HISTORY_DAYS", "2")
 	t.Setenv("DEMO_UNIT_TIMEZONE", "UTC")

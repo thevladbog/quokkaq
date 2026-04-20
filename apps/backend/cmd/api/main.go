@@ -304,7 +304,7 @@ func run() error {
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   allowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
-		AllowedHeaders:   []string{"Accept", "Accept-Language", "Authorization", "Content-Type", "X-CSRF-Token", "X-Company-Id", "X-Request-Id", "traceparent", "tracestate"},
+		AllowedHeaders:   []string{"Accept", "Accept-Language", "Authorization", "Content-Type", "X-CSRF-Token", "X-Company-Id", "X-Request-Id", "X-Setup-Token", "traceparent", "tracestate"},
 		ExposedHeaders:   []string{"Link", "X-Request-Id", "traceparent", "tracestate"},
 		AllowCredentials: true,
 		MaxAge:           300,

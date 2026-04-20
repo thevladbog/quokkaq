@@ -1296,10 +1296,10 @@ export interface HandlersPutVisitorTagsRequest {
 }
 
 export interface HandlersSetupFirstAdminRequest {
-  companyName?: string;
-  email?: string;
-  name?: string;
-  password?: string;
+  companyName: string;
+  email: string;
+  name: string;
+  password: string;
   timezone?: string;
   unitName?: string;
 }
@@ -2113,8 +2113,6 @@ export interface HandlersLoginLinkResponse {
 
 export type GetSystemHealth401 = {[key: string]: string};
 
-export type GetSystemHealth503 = {[key: string]: string};
-
 export type SetupFirstAdmin400 = {[key: string]: string};
 
 export type SetupFirstAdmin403 = {[key: string]: string};
@@ -2128,7 +2126,7 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
 /**
- * Probes PostgreSQL, Redis, S3, and SMTP. Requires X-Setup-Token when APP_ENV is production or staging and SETUP_TOKEN is set.
+ * Probes PostgreSQL, Redis, S3, and SMTP. Requires X-Setup-Token when APP_ENV is production or staging and SETUP_TOKEN is set (SetupWizardTokenGate).
  * @summary Setup wizard health checks
  */
 export type getSystemHealthResponse200 = {
@@ -2142,7 +2140,7 @@ export type getSystemHealthResponse401 = {
 }
 
 export type getSystemHealthResponse503 = {
-  data: GetSystemHealth503
+  data: ServicesSetupHealthReport
   status: 503
 }
 
@@ -2185,7 +2183,7 @@ export const getGetSystemHealthQueryKey = () => {
     }
 
 
-export const getGetSystemHealthQueryOptions = <TData = Awaited<ReturnType<typeof getSystemHealth>>, TError = GetSystemHealth401 | GetSystemHealth503>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSystemHealth>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export const getGetSystemHealthQueryOptions = <TData = Awaited<ReturnType<typeof getSystemHealth>>, TError = GetSystemHealth401 | ServicesSetupHealthReport>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSystemHealth>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -2204,10 +2202,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetSystemHealthQueryResult = NonNullable<Awaited<ReturnType<typeof getSystemHealth>>>
-export type GetSystemHealthQueryError = GetSystemHealth401 | GetSystemHealth503
+export type GetSystemHealthQueryError = GetSystemHealth401 | ServicesSetupHealthReport
 
 
-export function useGetSystemHealth<TData = Awaited<ReturnType<typeof getSystemHealth>>, TError = GetSystemHealth401 | GetSystemHealth503>(
+export function useGetSystemHealth<TData = Awaited<ReturnType<typeof getSystemHealth>>, TError = GetSystemHealth401 | ServicesSetupHealthReport>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSystemHealth>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getSystemHealth>>,
@@ -2217,7 +2215,7 @@ export function useGetSystemHealth<TData = Awaited<ReturnType<typeof getSystemHe
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetSystemHealth<TData = Awaited<ReturnType<typeof getSystemHealth>>, TError = GetSystemHealth401 | GetSystemHealth503>(
+export function useGetSystemHealth<TData = Awaited<ReturnType<typeof getSystemHealth>>, TError = GetSystemHealth401 | ServicesSetupHealthReport>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSystemHealth>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getSystemHealth>>,
@@ -2227,7 +2225,7 @@ export function useGetSystemHealth<TData = Awaited<ReturnType<typeof getSystemHe
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetSystemHealth<TData = Awaited<ReturnType<typeof getSystemHealth>>, TError = GetSystemHealth401 | GetSystemHealth503>(
+export function useGetSystemHealth<TData = Awaited<ReturnType<typeof getSystemHealth>>, TError = GetSystemHealth401 | ServicesSetupHealthReport>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSystemHealth>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
@@ -2235,7 +2233,7 @@ export function useGetSystemHealth<TData = Awaited<ReturnType<typeof getSystemHe
  * @summary Setup wizard health checks
  */
 
-export function useGetSystemHealth<TData = Awaited<ReturnType<typeof getSystemHealth>>, TError = GetSystemHealth401 | GetSystemHealth503>(
+export function useGetSystemHealth<TData = Awaited<ReturnType<typeof getSystemHealth>>, TError = GetSystemHealth401 | ServicesSetupHealthReport>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSystemHealth>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -2254,7 +2252,7 @@ export function useGetSystemHealth<TData = Awaited<ReturnType<typeof getSystemHe
 
 
 /**
- * Creates SaaS operator company, root unit, anonymous kiosk client, and first admin with admin + platform_admin roles.
+ * Creates SaaS operator company, root unit, anonymous kiosk client, and first admin with admin + platform_admin roles. Requires X-Setup-Token when APP_ENV is production or staging and SETUP_TOKEN is set (SetupWizardTokenGate).
  * @summary SaaS first deployment bootstrap
  */
 export type setupFirstAdminResponse201 = {
@@ -2355,7 +2353,7 @@ export const useSetupFirstAdmin = <TError = SetupFirstAdmin400 | SetupFirstAdmin
     }
 
 /**
- * True when SaaS deployment bootstrap is complete (SaaS operator company + at least one platform_admin).
+ * initialized: app-level readiness. deploymentReady: SaaS operator company exists and at least one platform_admin (first-run wizard complete).
  * @summary Get system status
  */
 export type getSystemStatusResponse200 = {

@@ -97,6 +97,6 @@ jobs:
             cd ~/quokkaq-demo
 
             docker compose -f docker-compose.demo.yml --env-file .env.demo pull backend frontend
-            docker compose -f docker-compose.demo.yml --env-file .env.demo up -d --remove-orphans
+            docker compose -f docker-compose.demo.yml --env-file .env.demo up -d --remove-orphans --wait
 
             docker image prune -f

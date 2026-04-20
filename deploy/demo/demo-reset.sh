@@ -28,23 +28,27 @@ dc exec -T postgres sh -c 'psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER:-postgres
 echo "[demo-reset] Starting backend (migrations)..."
 dc up -d backend
 
+echo "[demo-reset] Waiting for backend container..."
+cid=""
+for _ in $(seq 1 30); do
+  cid="$(dc ps -q backend 2>/dev/null || true)"
+  [[ -n "${cid:-}" ]] && break
+  sleep 1
+done
+if [[ -z "${cid:-}" ]]; then
+  echo "[demo-reset] backend service not found (docker compose ps -q backend empty after 30s)" >&2
+  exit 1
+fi
+
 echo "[demo-reset] Waiting for backend health..."
 for _ in $(seq 1 90); do
-  cid="$(dc ps -q backend 2>/dev/null || true)"
-  if [[ -n "${cid:-}" ]]; then
-    st="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}unknown{{end}}' "$cid" 2>/dev/null || echo unknown)"
-    if [[ "$st" == "healthy" ]]; then
-      break
-    fi
+  st="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}unknown{{end}}' "$cid" 2>/dev/null || echo unknown)"
+  if [[ "$st" == "healthy" ]]; then
+    break
   fi
   sleep 2
 done
 
-cid="$(dc ps -q backend 2>/dev/null || true)"
-if [[ -z "${cid:-}" ]]; then
-  echo "Backend container not found" >&2
-  exit 1
-fi
 st="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}unknown{{end}}' "$cid" 2>/dev/null || echo unknown)"
 if [[ "$st" != "healthy" ]]; then
   echo "Backend did not become healthy (last status: $st)" >&2

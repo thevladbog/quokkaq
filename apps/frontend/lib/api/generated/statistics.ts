@@ -1296,10 +1296,10 @@ export interface HandlersPutVisitorTagsRequest {
 }
 
 export interface HandlersSetupFirstAdminRequest {
-  companyName?: string;
-  email?: string;
-  name?: string;
-  password?: string;
+  companyName: string;
+  email: string;
+  name: string;
+  password: string;
   timezone?: string;
   unitName?: string;
 }

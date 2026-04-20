@@ -8,6 +8,7 @@ import (
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"gorm.io/gorm"
@@ -429,8 +430,9 @@ func (h *UserHandler) GetUserUnits(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetSystemStatus godoc
+// @ID           getSystemStatus
 // @Summary      Get system status
-// @Description  True when SaaS deployment bootstrap is complete (SaaS operator company + at least one platform_admin).
+// @Description  initialized: app-level readiness. deploymentReady: SaaS operator company exists and at least one platform_admin (first-run wizard complete).
 // @Tags         system
 // @Produce      json
 // @Success      200  {object}  map[string]bool
@@ -442,43 +444,54 @@ func (h *UserHandler) GetSystemStatus(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	deploymentReady, err := h.deploymentSetup.IsDeploymentReady()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	RespondJSON(w, map[string]bool{
 		"initialized":     initialized,
-		"deploymentReady": initialized,
+		"deploymentReady": deploymentReady,
 	})
 }
 
 // GetSystemHealth godoc
 // @ID           getSystemHealth
 // @Summary      Setup wizard health checks
-// @Description  Probes PostgreSQL, Redis, S3, and SMTP. Requires X-Setup-Token when APP_ENV is production or staging and SETUP_TOKEN is set.
+// @Description  Probes PostgreSQL, Redis, S3, and SMTP. Requires X-Setup-Token when APP_ENV is production or staging and SETUP_TOKEN is set (SetupWizardTokenGate).
 // @Tags         system
 // @Produce      json
+// @Param        X-Setup-Token header string false "Setup token; required when APP_ENV is production or staging and SETUP_TOKEN is set"
 // @Success      200  {object}  services.SetupHealthReport
 // @Failure      401  {object}  map[string]string
-// @Failure      503  {object}  map[string]string
+// @Failure      503  {object}  services.SetupHealthReport "Service Unavailable — dependency checks failed; same body shape as 200"
 // @Router       /system/health [get]
 func (h *UserHandler) GetSystemHealth(w http.ResponseWriter, r *http.Request) {
 	report := services.CollectSetupHealth(r.Context(), h.storage)
+	if !report.OK {
+		RespondJSONWithStatus(w, http.StatusServiceUnavailable, report)
+		return
+	}
 	RespondJSON(w, report)
 }
 
 type setupFirstAdminRequest struct {
-	CompanyName string `json:"companyName"`
+	CompanyName string `json:"companyName" binding:"required"`
 	UnitName    string `json:"unitName"`
 	Timezone    string `json:"timezone"`
-	Name        string `json:"name"`
-	Email       string `json:"email"`
-	Password    string `json:"password"`
+	Name        string `json:"name" binding:"required"`
+	Email       string `json:"email" binding:"required"`
+	Password    string `json:"password" binding:"required"`
 }
 
 // SetupFirstAdmin godoc
 // @ID           setupFirstAdmin
 // @Summary      SaaS first deployment bootstrap
-// @Description  Creates SaaS operator company, root unit, anonymous kiosk client, and first admin with admin + platform_admin roles.
+// @Description  Creates SaaS operator company, root unit, anonymous kiosk client, and first admin with admin + platform_admin roles. Requires X-Setup-Token when APP_ENV is production or staging and SETUP_TOKEN is set (SetupWizardTokenGate).
 // @Tags         system
 // @Accept       json
 // @Produce      json
+// @Param        X-Setup-Token header string false "Setup token; required when APP_ENV is production or staging and SETUP_TOKEN is set"
 // @Param        request body setupFirstAdminRequest true "Bootstrap payload"
 // @Success      201  {object}  models.User
 // @Failure      400  {object}  map[string]string
@@ -495,7 +508,7 @@ func (h *UserHandler) SetupFirstAdmin(w http.ResponseWriter, r *http.Request) {
 		RespondJSONWithStatus(w, http.StatusBadRequest, map[string]string{"error": "companyName, name, email and password are required"})
 		return
 	}
-	email := req.Email
+	email := strings.TrimSpace(strings.ToLower(req.Email))
 	in := services.BootstrapSaaSInput{
 		CompanyName: req.CompanyName,
 		UnitName:    req.UnitName,
