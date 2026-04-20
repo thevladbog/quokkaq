@@ -9,6 +9,7 @@ import {
 } from '@quokkaq/subscription-pricing';
 
 import type { AppLocale, HomeMessages } from '@/src/messages';
+import { localeHomePath } from '@/lib/locale-paths';
 import { formatPricingRowLabel } from '@/lib/format-pricing-row-label';
 import { LeadRequestCta } from '@/components/landing/lead-request-cta';
 
@@ -72,7 +73,7 @@ export function LandingPricing({
                   if (!sellable) {
                     return '';
                   }
-                  return `/${locale}/docs`;
+                  return `${localeHomePath(locale)}#book-demo`;
                 })();
                 const ctaLabel = sellable
                   ? copy.pricingFromApi.startTrial
@@ -296,7 +297,7 @@ export function LandingPricing({
                     </ul>
 
                     <Link
-                      href={`/${locale}/docs`}
+                      href={`${localeHomePath(locale)}#book-demo`}
                       prefetch={false}
                       className={`focus-ring mt-auto inline-flex min-h-11 items-center justify-center rounded-xl px-6 py-3 text-sm font-semibold transition ${
                         plan.recommended

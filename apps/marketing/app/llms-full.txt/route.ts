@@ -42,9 +42,7 @@ export function GET() {
     '## Where to read more',
     '',
     `- Marketing (EN): ${origin}/en`,
-    `- Маркетинг (RU): ${origin}/ru`,
-    `- Docs (EN): ${origin}/en/docs`,
-    `- Документация (RU): ${origin}/ru/docs`
+    `- Маркетинг (RU): ${origin}/ru`
   ];
 
   if (product) {

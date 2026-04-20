@@ -1,0 +1,88 @@
+---
+title: Plane (self-hosted)
+description:
+  Self-hosted Plane как бэкенд обращений QuokkaQ — развёртывание, переменные окружения и проверка API.
+---
+
+# Plane (self-hosted)
+
+**Plane** — open-source система управления работами (work items). В связке с QuokkaQ её можно использовать как **бэкенд обращений в поддержку**: из приложения создаётся work item через REST API, статусы подтягиваются обратно в список обращений.
+
+Официальная документация Plane: [developers.plane.so](https://developers.plane.so/) (self-hosting, REST API).
+
+## Включение и отключение в QuokkaQ
+
+- Интеграция с Plane остаётся в коде. Чтобы **отключить Plane**, оставив переменные в окружении, задайте `PLANE_ENABLED=false` или выберите другой бэкенд через `SUPPORT_REPORT_PLATFORM` (см. [Яндекс.Трекер](./yandex-tracker)).
+- Чтобы новые обращения создавались в Plane: `SUPPORT_REPORT_PLATFORM=plane`, `PLANE_ENABLED=true` и заполненные переменные `PLANE_*` ниже.
+
+## Назначение в QuokkaQ
+
+- Пользователь отправляет **репорт** из интерфейса QuokkaQ.
+- Backend создаёт **work item** в выбранном проекте Plane и сохраняет связь в PostgreSQL.
+- Список обращений в приложении читается **из API QuokkaQ**, а не напрямую из Plane.
+
+## Требования к окружению
+
+Точные цифры зависят от версии Plane и нагрузки; ориентиры:
+
+- **CPU/RAM:** не менее **2 vCPU / 4 GB RAM** для небольшого инстанса под Docker Compose; для продакшена и команды — смотрите [официальные гайды по self-hosting](https://developers.plane.so/).
+- **Диск:** запас под БД Plane (PostgreSQL/Redis в составе стека) и логи; планируйте **десятки гигабайт** с запасом.
+- **ОС:** Linux с Docker (или Kubernetes по гайдам Plane).
+
+## Сеть и безопасность
+
+- Снаружи публикуйте **только HTTPS** (reverse proxy: Traefik, nginx, Caddy и т.д.).
+- API Plane и UI должны быть доступны **с сервера QuokkaQ** по сети (VPC, VPN или внутренний DNS).
+- **API Key** Plane храните **только на сервере** приложения (переменные окружения backend), не в репозитории и не на фронтенде.
+- Настройте **резервное копирование** БД Plane по регламенту организации.
+
+## Развёртывание (общий порядок)
+
+1. Следуйте [официальной инструкции Plane по self-hosting](https://developers.plane.so/) (Docker Compose или Kubernetes).
+2. Поднимите инстанс, выполните первичную настройку (создание первого workspace, администратора).
+3. Создайте **проект** для обращений поддержки (например «Поддержка»).
+4. В веб-интерфейсе Plane откройте URL workspace — из адресной строки возьмите **`workspace_slug`** (сегмент пути после хоста, например `https://plane.example.com/<workspace_slug>/...`).
+
+## Настройка для QuokkaQ
+
+В профиле пользователя Plane создайте **API Key** с правами на чтение/запись work items в нужном проекте (см. документацию Plane по scope: `projects.work_items:read`, `projects.work_items:write`).
+
+Зафиксируйте для переменных окружения backend:
+
+| Переменная | Описание |
+|------------|----------|
+| `PLANE_BASE_URL` | Базовый URL API, например `https://plane.example.com` (без завершающего `/`). Для self-hosted совпадает с origin веб-интерфейса, если API на том же хосте. |
+| `PLANE_API_KEY` | Секретный ключ (`X-API-Key`). |
+| `PLANE_WORKSPACE_SLUG` | Slug workspace. |
+| `PLANE_PROJECT_ID` | UUID проекта в Plane (из настроек проекта или API). |
+| `PLANE_TLS_INSECURE_SKIP_VERIFY` | Необязательно. Если `true`, клиент QuokkaQ к Plane **не проверяет** TLS-сертификат (только для стендов с корпоративным/самоподписанным CA). В проде надёжнее **добавить корневой CA в доверенные** на сервере API, а не отключать проверку. |
+
+Если интеграция временно не нужна, переменные можно не задавать — эндпоинты репортов вернут понятную ошибку о недоступности Plane.
+
+## Проверка API
+
+Подставьте свои значения (секрет не коммитьте в документацию):
+
+```bash
+curl -sS -X POST \
+  "${PLANE_BASE_URL}/api/v1/workspaces/${PLANE_WORKSPACE_SLUG}/projects/${PLANE_PROJECT_ID}/work-items/" \
+  -H "X-API-Key: ${PLANE_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"QuokkaQ connectivity test","description_html":"<p>ok</p>"}'
+```
+
+Ожидается ответ **201** и JSON с полем `id` созданного work item.
+
+## Типовые проблемы
+
+| Симптом | Что сделать |
+|--------|-------------|
+| `401` / `403` от Plane | Проверить API key, срок действия, scope на проект. |
+| `404` на `.../work-items/` | Неверны `workspace_slug` или `project_id` (UUID). |
+| `x509: certificate signed by unknown authority` | Сервер Plane с TLS от внутреннего CA: установить CA в ОС/контейнере API или временно `PLANE_TLS_INSECURE_SKIP_VERIFY=true` (только осознанно для непрода). |
+| QuokkaQ не достучаться до Plane | Firewall, DNS, TLS; с сервера API выполнить `curl` к `PLANE_BASE_URL`. |
+| Таймауты | Увеличить ресурсы хоста Plane, проверить сетевую задержку. |
+
+## Где настраивается в продукте
+
+Переменные задаются **только для backend** QuokkaQ (см. `apps/backend/.env.example`). В интерфейсе администратора отдельного экрана для ключей Plane может не быть — ключи задаёт DevOps/админ инфраструктуры.

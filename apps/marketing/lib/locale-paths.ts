@@ -1,0 +1,14 @@
+import type { AppLocale } from '@/src/messages';
+
+/** Avoid `` `/${locale}/...` `` in `<Link href>` — Next.js 16 treats that pattern as a dynamic App Router segment. */
+export function localeHomePath(locale: AppLocale): '/en' | '/ru' {
+  return locale === 'ru' ? '/ru' : '/en';
+}
+
+export function localePrivacyPath(locale: AppLocale): '/en/privacy' | '/ru/privacy' {
+  return locale === 'ru' ? '/ru/privacy' : '/en/privacy';
+}
+
+export function localeTermsPath(locale: AppLocale): '/en/terms' | '/ru/terms' {
+  return locale === 'ru' ? '/ru/terms' : '/en/terms';
+}

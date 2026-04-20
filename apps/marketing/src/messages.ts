@@ -147,7 +147,18 @@ export type HomeMessages = {
   };
 };
 
-export const messages: Record<AppLocale, { home: HomeMessages }> = {
+export type CookieConsentMessages = {
+  title: string;
+  description: string;
+  acceptAll: string;
+  rejectNonEssential: string;
+  privacyLinkLabel: string;
+};
+
+export const messages: Record<
+  AppLocale,
+  { home: HomeMessages; cookieConsent: CookieConsentMessages }
+> = {
   en: {
     home: {
       title: 'Queues in every branch—in one system.',
@@ -452,6 +463,14 @@ export const messages: Record<AppLocale, { home: HomeMessages }> = {
         copyrightBrand: 'Bogatyrev V.',
         copyrightReserved: 'All rights reserved.'
       }
+    },
+    cookieConsent: {
+      title: 'Cookies and analytics',
+      description:
+        'We use cookies for essential site functions. If you agree, we also load Google Tag Manager so Google Analytics and Yandex Metrica can measure traffic. Read more in the Privacy Policy.',
+      acceptAll: 'Accept all',
+      rejectNonEssential: 'Only essential',
+      privacyLinkLabel: 'Privacy Policy'
     }
   },
   ru: {
@@ -760,6 +779,14 @@ export const messages: Record<AppLocale, { home: HomeMessages }> = {
         copyrightBrand: 'Богатырев В.С.',
         copyrightReserved: 'Все права защищены.'
       }
+    },
+    cookieConsent: {
+      title: 'Файлы cookie и аналитика',
+      description:
+        'Мы используем cookie для работы сайта. Если вы согласны, подключается Google Tag Manager и через него — Google Analytics и Яндекс Метрика для оценки трафика. Подробности — в Политике конфиденциальности.',
+      acceptAll: 'Принять все',
+      rejectNonEssential: 'Только необходимые',
+      privacyLinkLabel: 'Политика конфиденциальности'
     }
   }
 };

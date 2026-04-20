@@ -10,7 +10,7 @@ For **Nx, CI, and general agent workflow**, use `quokkaq-agent-workflow.mdc`. Th
 
 ## Purpose
 
-Public landing and docs (Nextra + Next). Default dev port: **`3010`** (see [`apps/marketing/package.json`](apps/marketing/package.json)). Do not confuse with the product app [`apps/frontend`](apps/frontend).
+Public marketing landing (Next.js). Default dev port: **`3010`** (see [`apps/marketing/package.json`](apps/marketing/package.json)). Do not confuse with the product app [`apps/frontend`](apps/frontend).
 
 ## API and Orval
 

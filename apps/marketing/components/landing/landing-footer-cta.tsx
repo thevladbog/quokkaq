@@ -2,6 +2,11 @@ import Link from 'next/link';
 
 import { LeadRequestCta } from '@/components/landing/lead-request-cta';
 import { TextLogoImg } from '@/components/landing/text-logo-img';
+import {
+  localeHomePath,
+  localePrivacyPath,
+  localeTermsPath
+} from '@/lib/locale-paths';
 import type { AppLocale, HomeMessages } from '@/src/messages';
 
 type Props = {
@@ -31,9 +36,9 @@ export function LandingFooterCta({ locale, copy, appBaseUrl }: Props) {
   /** Without app URL, primary CTA scrolls to this anchor on the marketing site. */
   const trialHref = normalizedAppBase
     ? `${normalizedAppBase}/${locale}#book-demo`
-    : `/${locale}#book-demo`;
-  const privacyHref = `/${locale}/privacy`;
-  const termsHref = `/${locale}/terms`;
+    : `${localeHomePath(locale)}#book-demo`;
+  const privacyHref = localePrivacyPath(locale);
+  const termsHref = localeTermsPath(locale);
 
   return (
     <footer className='relative z-10'>
@@ -90,7 +95,7 @@ export function LandingFooterCta({ locale, copy, appBaseUrl }: Props) {
         <div className='mx-auto grid max-w-6xl grid-cols-1 items-center gap-4 text-sm text-neutral-500 sm:grid-cols-3 sm:gap-6 dark:text-[color:var(--color-text-muted)]'>
           <div className='flex justify-center sm:justify-start'>
             <Link
-              href={`/${locale}`}
+              href={localeHomePath(locale)}
               prefetch={false}
               className='focus-ring inline-flex rounded-md opacity-90 grayscale transition-[filter,opacity] duration-200 ease-out hover:opacity-100 hover:grayscale-0 focus-visible:opacity-100 focus-visible:grayscale-0 dark:opacity-85 dark:hover:opacity-100'
               aria-label={copy.logoAlt}

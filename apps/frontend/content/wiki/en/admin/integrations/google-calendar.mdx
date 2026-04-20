@@ -1,0 +1,58 @@
+---
+title: Google Calendar
+description:
+  Connect Google Calendar via OAuth CalDAV — configure in Settings, limits per unit, and typical server env vars.
+---
+
+# Google Calendar
+
+Connect **Google Calendar** so QuokkaQ can sync pre-registration slots with a calendar you control. Technically the integration is stored as **Google CalDAV** (`google_caldav`): the product uses a CalDAV-compatible endpoint with OAuth credentials.
+
+## Where to configure it
+
+1. Open **Settings** → **Integrations**.
+2. Open the **Calendars** tab.
+3. Use **Add calendar** → **Google Calendar**.
+4. Pick the **unit** that should use this calendar, then continue with Google.
+
+You can filter the list by unit using the unit selector on the same page.
+
+## What happens during setup
+
+1. You are redirected to **Google** to sign in and approve access (offline access so the server can refresh tokens).
+2. After consent, the browser returns to QuokkaQ with a short-lived **calendar pick** session.
+3. A dialog lists **calendars you can edit** (owner or writer). Choose the calendar for this unit and confirm.
+4. The integration appears in the calendars list for that unit.
+
+You are **not** limited to the primary calendar: any writable calendar in that Google account can be selected.
+
+## Limits
+
+- Up to **four** calendar connections **per unit** (Google + Yandex combined count toward the same limit).
+- Only calendars with **write** access appear in the picker.
+
+## What your IT team must provide
+
+The server must have **Google OAuth** for Calendar configured and **Redis** available (OAuth state and the short post-login “pick calendar” session are stored there).
+
+Typical environment variables (see also `apps/backend/.env.example` in the repository):
+
+- `GOOGLE_CALENDAR_OAUTH_CLIENT_ID`
+- `GOOGLE_CALENDAR_OAUTH_CLIENT_SECRET`
+- `GOOGLE_CALENDAR_OAUTH_REDIRECT_URL` — must match the redirect URI registered in Google Cloud Console (API origin + `/calendar-integrations/google/oauth/callback`).
+
+If OAuth is missing or Redis is down, the UI will show an error when starting Google connect or after returning from Google.
+
+## Common issues
+
+| Symptom | What to try |
+|--------|----------------|
+| “Google connection is not configured on the server” | Ask infra to set the three `GOOGLE_CALENDAR_OAUTH_*` variables and restart the API. |
+| “Google did not return a refresh token” | Start again; ensure you complete consent and that Google shows offline access for the app. |
+| “Invalid or expired calendar selection session” | The pick step timed out (~15 minutes). Start **Connect Google** again. |
+| “This unit already has the maximum of four calendar connections” | Remove an unused calendar integration or use another unit. |
+| Error after Google with “pick_save” / Redis | Redis must be reachable from the API for this flow. |
+
+## After connection
+
+CalDAV URL and Google identity fields are **fixed** when the row is created; you can still adjust display name, enabled flag, timezone where the product allows it, and remove the integration if no longer needed.

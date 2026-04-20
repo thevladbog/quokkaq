@@ -1,37 +1,17 @@
-# QuokkaQ wiki (operator / in-product help)
+# QuokkaQ operator documentation (canonical location)
 
-This tree is **operational documentation** for people using QuokkaQ (admins, staff). Developer and infrastructure docs stay in the repo root `README.md`, `SETUP.md`, and [`apps/backend/docs/`](../../apps/backend/docs/).
+Operational help for admins and staff **lives in the frontend app content tree**, not in this folder.
 
-## Supported locales
+## Where to edit
 
-| Code | Content path |
-|------|----------------|
-| `en` | [`en/`](en/) |
-| `ru` | [`ru/`](ru/) |
+| Role | Path |
+|------|------|
+| **Source files** | [`apps/frontend/content/wiki/en/`](../../apps/frontend/content/wiki/en/) and [`apps/frontend/content/wiki/ru/`](../../apps/frontend/content/wiki/ru/) (MDX) |
 
-Mirror **the same relative paths** under each locale (e.g. `en/admin/integrations/google-calendar.md` and `ru/admin/integrations/google-calendar.md`). File names stay **ASCII** (e.g. `google-calendar.md`) so routing and tooling stay predictable.
+Mirror the **same relative paths** under each locale. File names stay **ASCII** (e.g. `google-calendar.mdx`).
 
-## Fallback (for the web app)
+## In-product help (`/help`)
 
-When a page is opened in the UI for locale `ru` but the Russian file is missing, the app may show the **`en`** version and a short “translation in progress” notice. The canonical contract is: **prefer `en` as fallback** (configurable in code).
+The product app renders these MDX files under **`/{locale}/help/...`** via [`apps/frontend/lib/wiki/load-wiki-page.ts`](../../apps/frontend/lib/wiki/load-wiki-page.ts) (YAML frontmatter is stripped for the simple Markdown view). Fallback: if Russian is missing, `en` is used.
 
-## How to add articles
-
-1. Add or update markdown under **both** `en/` and `ru/` when the article is user-facing in both languages.
-2. Link new pages from the nearest `README.md` index (same locale).
-3. Use pull requests; keep product wiki separate from backend-only runbooks in `apps/backend/docs/`.
-
-## Viewing in the app
-
-The Next.js app serves these files under **`/{locale}/help/...`** (see `apps/frontend/app/[locale]/help/`). Example:
-
-- English: `/en/help/admin/integrations/google-calendar`
-- Russian: `/ru/help/admin/integrations/google-calendar`
-
----
-
-## Quick links (repository paths)
-
-- English hub: [`en/README.md`](en/README.md)
-- Russian hub: [`ru/README.md`](ru/README.md)
-- Calendar articles (both languages): `*/admin/integrations/google-calendar.md`, `*/admin/integrations/yandex-calendar.md`
+Developer and infrastructure docs remain in the repo root `README.md`, `SETUP.md`, and [`apps/backend/docs/`](../../apps/backend/docs/).

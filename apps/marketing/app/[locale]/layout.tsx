@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { notFound } from 'next/navigation';
 
+import { CookieConsentAndGtm } from '@/components/consent/cookie-consent-and-gtm';
 import { MarketingJsonLd } from '@/components/seo/marketing-json-ld';
 import { isAppLocale, locales } from '@/src/messages';
 
@@ -44,6 +45,7 @@ export default async function LocaleLayout({
     <>
       <MarketingJsonLd locale={raw} />
       {children}
+      <CookieConsentAndGtm appLocale={raw} />
     </>
   );
 }

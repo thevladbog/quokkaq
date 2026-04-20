@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useSyncExternalStore } from 'react';
 
 import { useMarketingTheme } from '@/app/marketing-theme';
+import { localeHomePath } from '@/lib/locale-paths';
 import { writeStoredMarketingLocale } from '@/lib/marketing-locale-preference';
 import type { AppLocale, HomeMessages } from '@/src/messages';
 
@@ -97,7 +98,7 @@ export function HomeControls({ locale, copy }: Props) {
     <div className='flex shrink-0 flex-wrap items-center justify-end gap-2'>
       <Link
         className={langPillClass}
-        href={`/${other}`}
+        href={localeHomePath(other)}
         prefetch={false}
         scroll={false}
         aria-label={other === 'en' ? 'English' : 'Русский'}

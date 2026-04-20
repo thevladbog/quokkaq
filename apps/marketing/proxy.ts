@@ -1,14 +1,12 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { proxy as nextraLocaleProxy } from 'nextra/locales';
 
 /**
- * Локаль без префикса → редирект по cookie или Accept-Language (nextra).
- * Явный выбор языка сохраняется в cookie через этот же proxy и в localStorage на клиенте.
+ * Next.js 16 proxy (replaces middleware for some flows). Pass-through; locale is handled by `app/[locale]`.
  */
-export default function proxy(request: NextRequest) {
-  const out = nextraLocaleProxy(request);
-  return out ?? NextResponse.next();
+export function proxy(request: NextRequest) {
+  void request;
+  return NextResponse.next();
 }
 
 export const config = {
