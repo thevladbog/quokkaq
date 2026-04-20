@@ -1,9 +1,10 @@
-import { cookies } from 'next/headers';
+import { headers } from 'next/headers';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 
+import { MARKETING_HTML_LANG_HEADER } from '@/lib/marketing-html-lang-header';
 import { getMetadataBaseUrl } from '@/lib/marketing-site-url';
-import { isAppLocale } from '@/src/messages';
+import { isAppLocale, locales, type AppLocale } from '@/src/messages';
 
 import { fontDisplay, fontSans } from './fonts';
 import { Providers } from './providers';
@@ -29,9 +30,9 @@ export default async function RootLayout({
 }: {
   children: ReactNode;
 }) {
-  const cookieStore = await cookies();
-  const cookieLocale = cookieStore.get('NEXT_LOCALE')?.value;
-  const lang = isAppLocale(cookieLocale ?? '') ? cookieLocale : 'en';
+  const headerStore = await headers();
+  const raw = headerStore.get(MARKETING_HTML_LANG_HEADER) ?? '';
+  const lang: AppLocale = isAppLocale(raw) ? raw : locales[0];
 
   return (
     <html

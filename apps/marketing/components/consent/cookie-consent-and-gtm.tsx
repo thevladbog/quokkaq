@@ -65,6 +65,11 @@ function injectGtm(gtmId: string) {
   if (typeof document === 'undefined' || gtmScriptInjected) {
     return;
   }
+  window.dataLayer = window.dataLayer || [];
+  window.dataLayer.push({
+    'gtm.start': new Date().getTime(),
+    event: 'gtm.js'
+  });
   const s = document.createElement('script');
   s.async = true;
   s.src = `https://www.googletagmanager.com/gtm.js?id=${encodeURIComponent(gtmId)}`;
@@ -168,9 +173,7 @@ export function CookieConsentAndGtm({ appLocale }: CookieConsentProps) {
   }
 
   return (
-    <div
-      role='dialog'
-      aria-modal='false'
+    <section
       aria-labelledby='cookie-consent-title'
       className='fixed right-0 bottom-0 left-0 z-[200] border-t border-[color:var(--color-border)] bg-[color:var(--color-surface-elevated)]/98 p-4 shadow-[0_-8px_32px_rgb(0_0_0/0.12)] backdrop-blur-md sm:p-5 dark:bg-[color:var(--color-surface-elevated)]/95'
     >
@@ -209,6 +212,6 @@ export function CookieConsentAndGtm({ appLocale }: CookieConsentProps) {
           </button>
         </div>
       </div>
-    </div>
+    </section>
   );
 }

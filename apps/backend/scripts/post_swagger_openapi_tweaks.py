@@ -879,8 +879,15 @@ def _patch_privacy_consent_schemas(components: dict[str, Any]) -> None:
 
     reg = _schema(components, "handlers.RegisterUserRequest")
     rp = reg.get("properties")
-    if isinstance(rp, dict) and "privacyConsentAccepted" in rp:
-        rp["privacyConsentAccepted"] = dict(true_only)
+    if not isinstance(rp, dict):
+        raise RuntimeError(
+            "handlers.RegisterUserRequest: missing or invalid `properties` (swag drift?)"
+        )
+    if "privacyConsentAccepted" not in rp:
+        raise RuntimeError(
+            "handlers.RegisterUserRequest: expected properties.privacyConsentAccepted (swag drift?)"
+        )
+    rp["privacyConsentAccepted"] = dict(true_only)
     _merge_schema_required(
         reg, ["name", "password", "privacyConsentAccepted", "token"]
     )
