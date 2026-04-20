@@ -84,7 +84,11 @@ func (s *DeploymentSetupService) BootstrapSaaS(ctx context.Context, in Bootstrap
 		return fmt.Errorf("%w: password too short", ErrBootstrapValidation)
 	}
 
-	if existing, _ := s.userRepo.FindByEmail(ctx, email); existing != nil {
+	existing, err := s.userRepo.FindByEmail(ctx, email)
+	if err != nil {
+		return err
+	}
+	if existing != nil {
 		return fmt.Errorf("%w: email already in use", ErrBootstrapValidation)
 	}
 

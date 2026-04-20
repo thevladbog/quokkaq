@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -506,7 +505,7 @@ func (h *UserHandler) SetupFirstAdmin(w http.ResponseWriter, r *http.Request) {
 		AdminPass:   req.Password,
 	}
 
-	if err := h.deploymentSetup.BootstrapSaaS(context.Background(), in); err != nil {
+	if err := h.deploymentSetup.BootstrapSaaS(r.Context(), in); err != nil {
 		if errors.Is(err, services.ErrDeploymentAlreadyReady) {
 			RespondJSONWithStatus(w, http.StatusForbidden, map[string]string{"error": err.Error()})
 			return

@@ -3,7 +3,9 @@ package services
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
+	"net"
 	"net/smtp"
 	"os"
 	"strconv"
@@ -80,57 +82,89 @@ func checkSMTP(ctx context.Context) SetupHealthCheck {
 	if portStr == "" {
 		portStr = "587"
 	}
-	port, _ := strconv.Atoi(portStr)
+	port, err := strconv.Atoi(portStr)
+	if err != nil || port < 1 || port > 65535 {
+		return SetupHealthCheck{OK: false, Message: fmt.Sprintf("invalid SMTP_PORT %q (must be a number 1-65535)", portStr)}
+	}
 	user := os.Getenv("SMTP_USER")
 	pass := os.Getenv("SMTP_PASS")
 	secure := strings.EqualFold(strings.TrimSpace(os.Getenv("SMTP_SECURE")), "true")
 
-	type res struct {
-		err error
-	}
-	ch := make(chan res, 1)
-	go func() {
-		ch <- res{err: smtpDialAndAuth(host, port, user, pass, secure)}
-	}()
-	select {
-	case <-ctx.Done():
-		return SetupHealthCheck{OK: false, Message: "timeout or cancelled"}
-	case r := <-ch:
-		if r.err != nil {
-			return SetupHealthCheck{OK: false, Message: r.err.Error()}
+	if err := smtpDialAndAuth(ctx, host, port, user, pass, secure); err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return SetupHealthCheck{OK: false, Message: "timeout or cancelled"}
 		}
-		return SetupHealthCheck{OK: true}
+		return SetupHealthCheck{OK: false, Message: err.Error()}
 	}
+	return SetupHealthCheck{OK: true}
 }
 
-func smtpDialAndAuth(host string, port int, user, pass string, ssl bool) error {
-	addr := fmt.Sprintf("%s:%d", host, port)
-	tlsCfg := &tls.Config{MinVersion: tls.VersionTLS12, ServerName: host}
+func smtpOpDeadline(ctx context.Context) time.Time {
+	if dl, ok := ctx.Deadline(); ok {
+		return dl
+	}
+	return time.Now().Add(10 * time.Second)
+}
+
+func smtpTLSConfig(host string) *tls.Config {
+	cfg := &tls.Config{MinVersion: tls.VersionTLS12, ServerName: host}
 	if os.Getenv("SMTP_TLS_INSECURE_SKIP_VERIFY") == "true" {
-		tlsCfg.InsecureSkipVerify = true
+		cfg.InsecureSkipVerify = true
+	}
+	return cfg
+}
+
+func smtpDialAndAuth(ctx context.Context, host string, port int, user, pass string, ssl bool) error {
+	addr := fmt.Sprintf("%s:%d", host, port)
+	deadline := smtpOpDeadline(ctx)
+
+	dialTimeout := time.Until(deadline)
+	if dialTimeout < time.Second {
+		dialTimeout = time.Second
+	}
+	if dialTimeout > 10*time.Second {
+		dialTimeout = 10 * time.Second
+	}
+	d := net.Dialer{Timeout: dialTimeout}
+	rawConn, err := d.DialContext(ctx, "tcp", addr)
+	if err != nil {
+		return err
 	}
 
+	tlsCfg := smtpTLSConfig(host)
+
 	if ssl || port == 465 {
-		conn, err := tls.Dial("tcp", addr, tlsCfg)
-		if err != nil {
+		if err := rawConn.SetDeadline(deadline); err != nil {
+			_ = rawConn.Close()
 			return err
 		}
-		defer func() { _ = conn.Close() }()
-		c, err := smtp.NewClient(conn, host)
+		tlsConn := tls.Client(rawConn, tlsCfg)
+		if err := tlsConn.HandshakeContext(ctx); err != nil {
+			_ = tlsConn.Close()
+			return err
+		}
+		if err := tlsConn.SetDeadline(deadline); err != nil {
+			_ = tlsConn.Close()
+			return err
+		}
+		c, err := smtp.NewClient(tlsConn, host)
 		if err != nil {
 			return err
 		}
 		defer func() { _ = c.Close() }()
 		if user != "" {
-			auth := smtp.PlainAuth("", user, pass, host)
-			if err := c.Auth(auth); err != nil {
+			if err := c.Auth(smtp.PlainAuth("", user, pass, host)); err != nil {
 				return err
 			}
 		}
 		return nil
 	}
 
-	c, err := smtp.Dial(addr)
+	if err := rawConn.SetDeadline(deadline); err != nil {
+		_ = rawConn.Close()
+		return err
+	}
+	c, err := smtp.NewClient(rawConn, host)
 	if err != nil {
 		return err
 	}
@@ -144,8 +178,7 @@ func smtpDialAndAuth(host string, port int, user, pass string, ssl bool) error {
 		}
 	}
 	if user != "" {
-		auth := smtp.PlainAuth("", user, pass, host)
-		if err := c.Auth(auth); err != nil {
+		if err := c.Auth(smtp.PlainAuth("", user, pass, host)); err != nil {
 			return err
 		}
 	}
