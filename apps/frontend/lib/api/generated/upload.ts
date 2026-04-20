@@ -473,10 +473,10 @@ export interface HandlersGoogleCalendarPickListResponse {
 export interface HandlersInvoiceDraftLineInput {
   catalogItemId?: string;
   descriptionPrint?: string;
-  /** Optional note under the line title in print (stored without outer parentheses). */
-  lineComment?: string;
   discountAmountMinor?: number;
   discountPercent?: number;
+  /** LineComment is optional text shown under the line title in print (parentheses in UI/PDF). */
+  lineComment?: string;
   quantity?: number;
   subscriptionPeriodStart?: string;
   subscriptionPlanId?: string;
@@ -988,12 +988,12 @@ export interface ModelsInvoiceLine {
   catalogItemId?: string;
   createdAt?: string;
   descriptionPrint?: string;
-  /** Optional print-only clarification under the line title. */
-  lineComment?: string;
   discountAmountMinor?: number;
   discountPercent?: number;
   id?: string;
   invoiceId?: string;
+  /** LineComment is optional print-only clarification (e.g. period); shown under description in UI/PDF. */
+  lineComment?: string;
   lineGrossMinor?: number;
   lineNetMinor?: number;
   plan?: ModelsSubscriptionPlan;
