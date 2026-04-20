@@ -7,6 +7,7 @@ import type {
   HandlersInvoiceDraftUpsertBody,
   HandlersPlatformListResponseModelsCatalogItem,
   ModelsCatalogItem,
+  ModelsCompany,
   ModelsInvoice,
   ModelsSubscriptionPlan
 } from '@/lib/api/generated/platform';
@@ -242,7 +243,11 @@ export function PlatformInvoiceDraftForm({
 
   const { data: saasOperator } = useQuery({
     queryKey: getGetSaaSOperatorCompanyQueryKey(),
-    queryFn: async () => (await getSaaSOperatorCompany()).data,
+    queryFn: async (): Promise<ModelsCompany | undefined> => {
+      const res = await getSaaSOperatorCompany();
+      if (res.status !== 200) return undefined;
+      return res.data;
+    },
     enabled: !isEdit
   });
 

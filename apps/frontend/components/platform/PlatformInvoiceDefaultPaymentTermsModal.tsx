@@ -4,7 +4,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   getGetSaaSOperatorCompanyQueryKey,
   getSaaSOperatorCompany,
-  patchCompany
+  patchCompany,
+  type ModelsCompany
 } from '@/lib/api/generated/platform';
 import { Button } from '@/components/ui/button';
 import {
@@ -40,7 +41,15 @@ export function PlatformInvoiceDefaultPaymentTermsModal({
     error: loadError
   } = useQuery({
     queryKey: getGetSaaSOperatorCompanyQueryKey(),
-    queryFn: async () => (await getSaaSOperatorCompany()).data,
+    queryFn: async (): Promise<ModelsCompany> => {
+      const res = await getSaaSOperatorCompany();
+      if (res.status !== 200) {
+        throw new Error(
+          typeof res.data === 'string' ? res.data : 'Operator company not found'
+        );
+      }
+      return res.data;
+    },
     enabled: open
   });
 
