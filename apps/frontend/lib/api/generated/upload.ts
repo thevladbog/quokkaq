@@ -716,6 +716,7 @@ export interface HandlersPublicLeadRequestBody {
   message?: string;
   name: string;
   planCode?: string;
+  privacyConsentAccepted: boolean;
   referrer?: string;
   source?: string;
 }

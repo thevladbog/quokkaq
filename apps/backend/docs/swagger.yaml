@@ -685,6 +685,8 @@ components:
           type: string
         planCode:
           type: string
+        privacyConsentAccepted:
+          type: boolean
         referrer:
           type: string
         source:
@@ -692,6 +694,7 @@ components:
       required:
       - email
       - name
+      - privacyConsentAccepted
       type: object
     handlers.RefreshResponse:
       properties:

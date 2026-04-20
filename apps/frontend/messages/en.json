@@ -1827,7 +1827,9 @@
     "error": "Registration failed. Please try again.",
     "conflict": "This email may already be registered, or the slug is taken.",
     "hasAccount": "Already have an account?",
-    "signIn": "Sign in"
+    "signIn": "Sign in",
+    "privacyConsent": "I agree to the processing of my personal data as described in the <link>Privacy Policy</link>.",
+    "privacyConsentRequired": "Please confirm that you agree to the processing of personal data."
   },
   "forgotPassword": {
     "title": "Forgot Password",
@@ -2144,7 +2146,9 @@
     "success": "Registration successful!",
     "error": "Registration error",
     "passwords_dont_match": "Passwords don't match",
-    "invalid_token": "Invalid or expired invitation link"
+    "invalid_token": "Invalid or expired invitation link",
+    "privacyConsent": "I agree to the processing of my personal data as described in the <link>Privacy Policy</link>.",
+    "privacyConsentRequired": "Please confirm that you agree to the processing of personal data."
   },
   "ticket_page": {
     "error_loading": "Failed to load ticket",

@@ -1,17 +1,20 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   postPublicLeadRequest,
   type HandlersPublicLeadRequestBody
 } from '@/lib/api/generated/leads';
+import { localePrivacyPath } from '@/lib/locale-paths';
 import type { AppLocale, HomeMessages } from '@/src/messages';
 
 function getFocusableElements(root: HTMLElement): HTMLElement[] {
   const selector =
-    'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [role="checkbox"]:not([disabled]), [tabindex]:not([tabindex="-1"])';
   return [...root.querySelectorAll<HTMLElement>(selector)].filter(
     (el) =>
       !el.hasAttribute('disabled') && el.getAttribute('aria-hidden') !== 'true'
@@ -42,6 +45,8 @@ export function LeadRequestModal({
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState(false);
+  const [consentError, setConsentError] = useState(false);
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
   /** Filled when API returns JSON { detail } (dev / PUBLIC_LEAD_DEBUG). */
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -98,6 +103,8 @@ export function LeadRequestModal({
     if (!open) {
       setSuccess(false);
       setError(false);
+      setConsentError(false);
+      setPrivacyAccepted(false);
       setErrorDetail(null);
       setSubmitting(false);
     }
@@ -114,11 +121,16 @@ export function LeadRequestModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(false);
+    setConsentError(false);
     setErrorDetail(null);
     const n = name.trim();
     const em = email.trim();
     if (!n || !em) {
       setError(true);
+      return;
+    }
+    if (!privacyAccepted) {
+      setConsentError(true);
       return;
     }
     setSubmitting(true);
@@ -134,7 +146,8 @@ export function LeadRequestModal({
           typeof window !== 'undefined'
             ? `${window.location.pathname}${window.location.search}`
             : '',
-        planCode: planCode?.trim() ?? ''
+        planCode: planCode?.trim() ?? '',
+        privacyConsentAccepted: true
       };
       const res = await postPublicLeadRequest(body);
       if (res.status === 201) {
@@ -300,6 +313,51 @@ export function LeadRequestModal({
                 onChange={(e) => setMessage(e.target.value)}
               />
             </div>
+            <div className='flex gap-3 pt-1'>
+              <Checkbox
+                id='lead-privacy-consent'
+                checked={privacyAccepted}
+                onCheckedChange={(v) => {
+                  setPrivacyAccepted(v === true);
+                  if (v === true) {
+                    setConsentError(false);
+                  }
+                }}
+                aria-invalid={consentError}
+                aria-describedby={
+                  consentError ? 'lead-privacy-consent-error' : undefined
+                }
+              />
+              <label
+                htmlFor='lead-privacy-consent'
+                className='text-sm leading-snug text-[color:var(--color-text)]'
+              >
+                <span className='text-[color:var(--color-text-muted)]'>
+                  {lead.privacyConsentPrefix}
+                </span>
+                <Link
+                  href={localePrivacyPath(locale)}
+                  target='_blank'
+                  rel='noopener noreferrer'
+                  className='text-[color:var(--color-primary)] underline-offset-2 hover:underline'
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {lead.privacyLinkLabel}
+                </Link>
+                <span className='text-[color:var(--color-text-muted)]'>
+                  {lead.privacyConsentSuffix}
+                </span>
+              </label>
+            </div>
+            {consentError ? (
+              <p
+                id='lead-privacy-consent-error'
+                className='text-sm text-red-600 dark:text-red-400'
+                role='alert'
+              >
+                {lead.privacyConsentRequired}
+              </p>
+            ) : null}
             {error ? (
               <div className='space-y-1' role='alert'>
                 <p className='text-sm text-red-600 dark:text-red-400'>

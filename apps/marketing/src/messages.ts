@@ -121,6 +121,14 @@ export type HomeMessages = {
     email: string;
     company: string;
     message: string;
+    /** Text before the privacy policy link. */
+    privacyConsentPrefix: string;
+    /** Link text for the privacy policy. */
+    privacyLinkLabel: string;
+    /** Text after the privacy policy link. */
+    privacyConsentSuffix: string;
+    /** Shown when the user submits without checking consent. */
+    privacyConsentRequired: string;
     submit: string;
     submitting: string;
     success: string;
@@ -402,6 +410,11 @@ export const messages: Record<
         email: 'Work email',
         company: 'Company',
         message: 'How can we help?',
+        privacyConsentPrefix: 'I agree to the processing of my personal data as described in the ',
+        privacyLinkLabel: 'Privacy Policy',
+        privacyConsentSuffix: '.',
+        privacyConsentRequired:
+          'Please confirm that you agree to the processing of personal data.',
         submit: 'Send request',
         submitting: 'Sending…',
         success: 'Thank you — we received your request.',
@@ -717,6 +730,11 @@ export const messages: Record<
         email: 'Рабочий email',
         company: 'Компания',
         message: 'Чем можем помочь?',
+        privacyConsentPrefix: 'Я согласен(а) на обработку персональных данных в соответствии с ',
+        privacyLinkLabel: 'политикой конфиденциальности',
+        privacyConsentSuffix: '.',
+        privacyConsentRequired:
+          'Подтвердите согласие на обработку персональных данных.',
         submit: 'Отправить запрос',
         submitting: 'Отправка…',
         success: 'Спасибо — мы получили ваш запрос.',

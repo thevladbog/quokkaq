@@ -1028,6 +1028,9 @@
                     "planCode": {
                         "type": "string"
                     },
+                    "privacyConsentAccepted": {
+                        "type": "boolean"
+                    },
                     "referrer": {
                         "type": "string"
                     },
@@ -1037,7 +1040,8 @@
                 },
                 "required": [
                     "email",
-                    "name"
+                    "name",
+                    "privacyConsentAccepted"
                 ],
                 "type": "object"
             },

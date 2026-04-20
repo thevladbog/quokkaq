@@ -1,7 +1,6 @@
 ---
 title: Google Calendar
-description:
-  Connect Google Calendar via OAuth CalDAV — configure in Settings, limits per unit, and typical server env vars.
+description: Connect Google Calendar via OAuth CalDAV — configure in Settings, limits per unit, and typical server env vars.
 ---
 
 # Google Calendar
@@ -45,13 +44,13 @@ If OAuth is missing or Redis is down, the UI will show an error when starting Go
 
 ## Common issues
 
-| Symptom | What to try |
-|--------|----------------|
-| “Google connection is not configured on the server” | Ask infra to set the three `GOOGLE_CALENDAR_OAUTH_*` variables and restart the API. |
-| “Google did not return a refresh token” | Start again; ensure you complete consent and that Google shows offline access for the app. |
-| “Invalid or expired calendar selection session” | The pick step timed out (~15 minutes). Start **Connect Google** again. |
-| “This unit already has the maximum of four calendar connections” | Remove an unused calendar integration or use another unit. |
-| Error after Google with “pick_save” / Redis | Redis must be reachable from the API for this flow. |
+| Symptom                                                          | What to try                                                                                |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| “Google connection is not configured on the server”              | Ask infra to set the three `GOOGLE_CALENDAR_OAUTH_*` variables and restart the API.        |
+| “Google did not return a refresh token”                          | Start again; ensure you complete consent and that Google shows offline access for the app. |
+| “Invalid or expired calendar selection session”                  | The pick step timed out (~15 minutes). Start **Connect Google** again.                     |
+| “This unit already has the maximum of four calendar connections” | Remove an unused calendar integration or use another unit.                                 |
+| Error after Google with “pick_save” / Redis                      | Redis must be reachable from the API for this flow.                                        |
 
 ## After connection
 
