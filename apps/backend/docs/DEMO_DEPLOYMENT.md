@@ -78,6 +78,10 @@ The workflow [`.github/workflows/deploy-demo.yml`](../../../.github/workflows/de
 
 See also [`deploy/demo/README.md`](../../../deploy/demo/README.md) (CI section).
 
+### CI: demo seed smoke (fresh PostgreSQL)
+
+From the monorepo root, with `DATABASE_URL` pointing at an **empty** PostgreSQL **16+** database: `pnpm nx run backend:test-demoseed-smoke` (migrations → subscription plans → `demoseed.Run` and basic invariants). Pull requests that affect the **`backend`** project also run job **`ci-backend-demoseed-smoke`** in [`.github/workflows/ci.yml`](../../../.github/workflows/ci.yml).
+
 ## Related
 
 - Product infrastructure overview: [`docs/saas/INFRASTRUCTURE.md`](../../../docs/saas/INFRASTRUCTURE.md)

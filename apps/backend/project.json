@@ -28,6 +28,13 @@
         "cwd": "apps/backend"
       }
     },
+    "test-demoseed-smoke": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "bash -lc 'set -euo pipefail; if [ -z \"${DATABASE_URL:-}\" ]; then echo \"DATABASE_URL must be set (PostgreSQL 16+ DSN, empty DB)\" >&2; exit 1; fi; go test -tags=demoseed_integration -count=1 ./internal/demoseed/...'",
+        "cwd": "apps/backend"
+      }
+    },
     "lint": {
       "executor": "nx:run-commands",
       "options": {

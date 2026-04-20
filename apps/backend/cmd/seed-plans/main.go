@@ -1,44 +1,14 @@
 package main
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
+
 	"quokkaq-go-backend/internal/config"
 	"quokkaq-go-backend/internal/logger"
-	"quokkaq-go-backend/internal/models"
+	"quokkaq-go-backend/internal/subscriptionplanseed"
 	"quokkaq-go-backend/pkg/database"
-	"quokkaq-go-backend/pkg/plans"
-
-	"gorm.io/gorm"
 )
-
-func displayOrderForPlanCode(code string) int {
-	switch code {
-	case "starter":
-		return 1
-	case "professional":
-		return 2
-	case "enterprise":
-		return 3
-	case "grandfathered":
-		return 99
-	default:
-		return 1000
-	}
-}
-
-func planSeedIsPublic(code string) bool {
-	return code != "grandfathered"
-}
-
-func planSeedAllowInstantPurchase(code string) bool {
-	if code == "grandfathered" || code == "enterprise" {
-		return false
-	}
-	return true
-}
 
 func main() {
 	config.Load()
@@ -50,73 +20,10 @@ func main() {
 
 	fmt.Println("Seeding subscription plans...")
 
-	db := database.DB
-
-	for _, planDef := range plans.Plans {
-		limitsJSON, err := planDef.LimitsJSON()
-		if err != nil {
-			logger.Error("failed to marshal limits for plan", "plan", planDef.Code, "err", err)
-			continue
-		}
-
-		featuresJSON, err := planDef.FeaturesJSON()
-		if err != nil {
-			logger.Error("failed to marshal features for plan", "plan", planDef.Code, "err", err)
-			continue
-		}
-
-		var existing models.SubscriptionPlan
-		err = db.Where("code = ?", planDef.Code).First(&existing).Error
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			plan := &models.SubscriptionPlan{
-				Name:                 planDef.Name,
-				NameEn:               planDef.Name,
-				Code:                 planDef.Code,
-				Price:                planDef.Price,
-				Currency:             planDef.Currency,
-				Interval:             planDef.Interval,
-				Limits:               limitsJSON,
-				Features:             featuresJSON,
-				IsActive:             true,
-				IsPublic:             planSeedIsPublic(planDef.Code),
-				IsPromoted:           planDef.Code == "professional",
-				DisplayOrder:         displayOrderForPlanCode(planDef.Code),
-				LimitsNegotiable:     json.RawMessage("{}"),
-				AllowInstantPurchase: planSeedAllowInstantPurchase(planDef.Code),
-			}
-			if err := db.Create(plan).Error; err != nil {
-				logger.Error("failed to create plan", "plan", planDef.Code, "err", err)
-				continue
-			}
-			fmt.Printf("✓ Created plan: %s (%s)\n", planDef.Name, planDef.Code)
-			continue
-		}
-		if err != nil {
-			logger.Error("failed to look up plan", "plan", planDef.Code, "err", err)
-			continue
-		}
-
-		// Keep DB in sync with pkg/plans (price is minor units: kopeks for RUB).
-		existing.Name = planDef.Name
-		existing.NameEn = planDef.Name
-		existing.Price = planDef.Price
-		existing.Currency = planDef.Currency
-		existing.Interval = planDef.Interval
-		existing.Limits = limitsJSON
-		existing.Features = featuresJSON
-		existing.IsActive = true
-		existing.IsPublic = planSeedIsPublic(planDef.Code)
-		existing.IsPromoted = planDef.Code == "professional"
-		existing.DisplayOrder = displayOrderForPlanCode(planDef.Code)
-		existing.AllowInstantPurchase = planSeedAllowInstantPurchase(planDef.Code)
-		if len(existing.LimitsNegotiable) == 0 {
-			existing.LimitsNegotiable = json.RawMessage("{}")
-		}
-		if err := db.Save(&existing).Error; err != nil {
-			logger.Error("failed to update plan", "plan", planDef.Code, "err", err)
-			continue
-		}
-		fmt.Printf("✓ Updated plan: %s (%s)\n", planDef.Name, planDef.Code)
+	if err := subscriptionplanseed.UpsertSubscriptionPlans(database.DB); err != nil {
+		logger.Error("subscription plan seed failed", "err", err)
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
 
 	fmt.Println("Subscription plans seeding completed!")

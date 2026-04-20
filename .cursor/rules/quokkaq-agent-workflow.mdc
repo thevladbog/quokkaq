@@ -29,6 +29,15 @@ alwaysApply: true
 - Backend: `pnpm nx run backend:test`
 - Frontend: `pnpm nx run frontend:test`
 
+### Demo / public demo data (PostgreSQL)
+
+When your changes touch **versioned migrations** ([`apps/backend/pkg/database/postgres.go`](../../apps/backend/pkg/database/postgres.go)), **GORM models** with new **required** columns or FKs on tables the demo seed writes, [`apps/backend/internal/demoseed`](../../apps/backend/internal/demoseed), [`apps/backend/cmd/seed-demo`](../../apps/backend/cmd/seed-demo), [`deploy/demo`](../../deploy/demo), or domain code paths that `demoseed.Run` depends on, before handing off:
+
+1. Run **`pnpm nx run backend:test-demoseed-smoke`** from the repo root with **`DATABASE_URL`** set to an **empty** PostgreSQL **16+** database (e.g. local `docker run postgres:16-alpine`). The target runs integration tests under [`apps/backend/internal/demoseed`](../../apps/backend/internal/demoseed) with build tag **`demoseed_integration`** (migrations → subscription plans → `demoseed.Run`).
+2. If the smoke fails, **update `demoseed`** (and helpers) so the pipeline completes on a fresh DB. The demo does **not** need every product feature in seed data, but **must not break** after schema changes.
+
+CI runs the same check in **`ci-backend-demoseed-smoke`** when the **backend** project is affected.
+
 ## Restart API + Next.js (default local ports)
 
 After frontend changes, or **any backend code / config change** that requires a new process (`.go`, `.env`, migrations, `go.mod`, etc.), **run the restart yourself**—even if you are unsure whether the user still has dev servers open.

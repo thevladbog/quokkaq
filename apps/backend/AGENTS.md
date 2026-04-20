@@ -24,6 +24,7 @@ handlers → services → repository → models (GORM)
 
 - Точка входа: `cmd/api/main.go`
 - **Миграции БД:** версионированные шаги в [`pkg/database/postgres.go`](pkg/database/postgres.go) через `RunMigration("v…", …)`. **Не менять уже существующие миграции** (тело уже применённых версий в БД не перезапускается) — только **добавлять новые** версии с новым ключом `vX.Y.Z_…` и нужной логикой/DDL.
+- **Публичное демо:** данные — [`internal/demoseed`](internal/demoseed), CLI — [`cmd/seed-demo`](cmd/seed-demo); порядок на чистой БД: миграции → [`cmd/seed-plans`](cmd/seed-plans) (пакет [`internal/subscriptionplanseed`](internal/subscriptionplanseed)) → `seed-demo`. После правок миграций/моделей, от которых зависит сид, из корня монорепо: `export DATABASE_URL=postgresql://…` (пустая PostgreSQL **16+**) → `pnpm nx run backend:test-demoseed-smoke`. Стек и деплой: [`../../deploy/demo/README.md`](../../deploy/demo/README.md), [`docs/DEMO_DEPLOYMENT.md`](docs/DEMO_DEPLOYMENT.md).
 - Конфиг: `internal/config/`, примеры env — `.env.example`
 - Типичные переменные: `DATABASE_URL`, `PORT` (по умолчанию **3001**), `APP_BASE_URL` (URL фронта), AWS/MinIO, SMTP, Redis, `JWT_SECRET`, `CORS_ALLOWED_ORIGINS` (через запятую), `RUN_AUTO_MIGRATE` (`false` — отключить AutoMigrate при старте).
 

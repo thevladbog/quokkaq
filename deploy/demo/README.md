@@ -49,6 +49,8 @@ Workflow: [`.github/workflows/deploy-demo.yml`](../../.github/workflows/deploy-d
 2. Place **`.env.demo`** there (not from git): copy from [`.env.demo.example`](.env.demo.example), set passwords, `JWT_SECRET`, hostnames, bucket, etc. Values for public URLs should align with `DEMO_NEXT_PUBLIC_*` in GitHub.
 3. First-time stack: from the repo (or after CI has pushed images), run `docker compose … up -d` and seed as in [First run](#first-run). Later pushes to `release` update only **backend** and **frontend** images via Actions.
 
+**Seed smoke (local / CI):** against an **empty** PostgreSQL **16+** database, set `DATABASE_URL`, then from the repo root run `pnpm nx run backend:test-demoseed-smoke` (migrations → plans → `demoseed.Run`). GitHub Actions runs the same flow in job **`ci-backend-demoseed-smoke`** when the **`backend`** project is affected.
+
 ## First run
 
 ```bash
