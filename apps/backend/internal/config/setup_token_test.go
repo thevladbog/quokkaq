@@ -17,6 +17,10 @@ func TestSetupTokenStrictEnv(t *testing.T) {
 	if !SetupTokenStrictEnv() {
 		t.Fatal("expected true for staging (case insensitive via strings)")
 	}
+	t.Setenv("APP_ENV", "demo")
+	if SetupTokenStrictEnv() {
+		t.Fatal("expected false for demo")
+	}
 }
 
 func TestSetupTokenMatches(t *testing.T) {

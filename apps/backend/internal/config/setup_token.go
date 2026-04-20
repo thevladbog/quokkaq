@@ -7,8 +7,12 @@ import (
 )
 
 // SetupTokenStrictEnv is true when first-run setup routes must enforce SETUP_TOKEN.
+// APP_ENV=demo is treated like local installs: token is not required (public demo stacks).
 func SetupTokenStrictEnv() bool {
 	app := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV")))
+	if app == "demo" {
+		return false
+	}
 	return app == "production" || app == "staging"
 }
 

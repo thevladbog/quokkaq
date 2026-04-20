@@ -1,0 +1,9 @@
+# Sidecar: daily demo DB reset (docker compose + host socket). Use only on an isolated demo VM.
+FROM alpine:3.20
+RUN apk add --no-cache bash curl docker-cli docker-cli-compose supercronic
+COPY deploy/demo/supercronic-crontab /etc/supercronic/crontab
+COPY deploy/demo/demo-reset.sh /usr/local/bin/demo-reset.sh
+RUN chmod +x /usr/local/bin/demo-reset.sh
+ENV COMPOSE_DIR=/repo/deploy/demo
+WORKDIR /repo
+CMD ["/usr/bin/supercronic", "/etc/supercronic/crontab"]

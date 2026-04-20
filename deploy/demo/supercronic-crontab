@@ -1,0 +1,2 @@
+# Daily reset (UTC). Adjust schedule as needed.
+0 3 * * * bash /usr/local/bin/demo-reset.sh

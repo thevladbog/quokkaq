@@ -57,6 +57,7 @@ bin/
 *.exe
 *.test
 *.out
+apps/backend/api
 
 # Tauri
 apps/kiosk-desktop/src-tauri/target/
