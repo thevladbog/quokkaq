@@ -14,6 +14,7 @@ Requires PyYAML for swagger.yaml (CI installs it; locally: pip install pyyaml).
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -668,6 +669,8 @@ def apply_openapi_tweaks(doc: dict[str, Any]) -> None:
         comp, "services.UpsertIntegrationRequest", "enabled"
     )
 
+    _patch_privacy_consent_schemas(comp)
+
     _patch_models_update_user_input(comp)
 
     _patch_company_me_patch_sso_access_security(doc)
@@ -844,8 +847,59 @@ def _patch_create_ticket_request(components: dict[str, Any]) -> None:
     }
 
 
+def _schema_object_properties_required_type_order(schema: dict[str, Any]) -> None:
+    """Normalize key order to properties → required → … → type (stable diffs vs kin/swag)."""
+    if "properties" not in schema:
+        return
+    props = schema["properties"]
+    req = schema.get("required")
+    typ = schema.get("type")
+    other = {k: v for k, v in schema.items() if k not in ("properties", "required", "type")}
+    schema.clear()
+    schema["properties"] = props
+    if req is not None:
+        schema["required"] = req
+    schema.update(other)
+    if typ is not None:
+        schema["type"] = typ
+
+
+def _patch_privacy_consent_schemas(components: dict[str, Any]) -> None:
+    """Lead / signup / invitation register: JSON uses *bool in Go; spec must require consent and true-only (Orval)."""
+    true_only: dict[str, Any] = {"type": "boolean", "enum": [True]}
+
+    lead = _schema(components, "handlers.PublicLeadRequestBody")
+    lp = lead.get("properties")
+    if isinstance(lp, dict) and "privacyConsentAccepted" in lp:
+        lp["privacyConsentAccepted"] = dict(true_only)
+    _merge_schema_required_if_prop_present(
+        components, "handlers.PublicLeadRequestBody", "privacyConsentAccepted"
+    )
+    _schema_object_properties_required_type_order(lead)
+
+    reg = _schema(components, "handlers.RegisterUserRequest")
+    rp = reg.get("properties")
+    if isinstance(rp, dict) and "privacyConsentAccepted" in rp:
+        rp["privacyConsentAccepted"] = dict(true_only)
+    _merge_schema_required(
+        reg, ["name", "password", "privacyConsentAccepted", "token"]
+    )
+    _schema_object_properties_required_type_order(reg)
+
+    signup = _schema(components, "handlers.SignupRequest")
+    sp = signup.get("properties")
+    if isinstance(sp, dict) and "privacyConsentAccepted" in sp:
+        sp["privacyConsentAccepted"] = dict(true_only)
+    _merge_schema_required_if_prop_present(
+        components, "handlers.SignupRequest", "privacyConsentAccepted"
+    )
+    _schema_object_properties_required_type_order(signup)
+
+
 def _write_json(path: Path, doc: dict[str, Any]) -> None:
     text = json.dumps(doc, indent=4, ensure_ascii=False) + "\n"
+    # json.dumps expands single-element arrays across lines; keep `enum: [true]` on one line (Orval / git noise).
+    text = re.sub(r'"enum": \[\s+true\s+\]', '"enum": [true]', text)
     path.write_text(text, encoding="utf-8")
 
 
