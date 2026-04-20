@@ -2189,13 +2189,20 @@
                     },
                     "httpPassword": {
                         "description": "empty string clears password; omit to leave unchanged",
-                        "type": "string"
+                        "type": "string",
+                        "writeOnly": true,
+                        "format": "password"
                     },
                     "sitePaymentSystemName": {
                         "type": "string"
                     },
                     "statusMapping": {
-                        "$ref": "#/components/schemas/models.OneCStatusMappingDTO"
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/models.OneCStatusMappingDTO"
+                            }
+                        ],
+                        "nullable": true
                     }
                 },
                 "type": "object"
@@ -2609,7 +2616,12 @@
                     },
                     "invoiceStatus": {
                         "description": "paid | void | uncollectible",
-                        "type": "string"
+                        "type": "string",
+                        "enum": [
+                            "paid",
+                            "void",
+                            "uncollectible"
+                        ]
                     }
                 },
                 "type": "object"
@@ -5957,6 +5969,276 @@
                 ]
             }
         },
+        "/commerceml/exchange": {
+            "get": {
+                "description": "Bitrix-style protocol: type=sale with mode=checkauth|query|import|file; session from checkauth via sessid or session query param. Import body is CommerceML XML (up to 8 MiB).",
+                "operationId": "CommerceMLExchange",
+                "parameters": [
+                    {
+                        "description": "Protocol branch (e.g. sale)",
+                        "in": "query",
+                        "name": "type",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "checkauth, query, import, file",
+                        "in": "query",
+                        "name": "mode",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Session id returned by checkauth",
+                        "in": "query",
+                        "name": "sessid",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Alias for sessid",
+                        "in": "query",
+                        "name": "session",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/xml": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            },
+                            "text/plain": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Plain-text success/failure lines or sale/query XML"
+                    },
+                    "400": {
+                        "content": {
+                            "application/xml": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            },
+                            "text/plain": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/xml": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            },
+                            "text/plain": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/xml": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            },
+                            "text/plain": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "429": {
+                        "content": {
+                            "application/xml": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            },
+                            "text/plain": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Too many requests"
+                    },
+                    "500": {
+                        "content": {
+                            "application/xml": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            },
+                            "text/plain": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal error"
+                    }
+                },
+                "summary": "CommerceML HTTP exchange (1С УНФ)",
+                "tags": [
+                    "CommerceML"
+                ]
+            },
+            "post": {
+                "description": "Bitrix-style protocol: type=sale with mode=checkauth|query|import|file; session from checkauth via sessid or session query param. Import body is CommerceML XML (up to 8 MiB).",
+                "operationId": "CommerceMLExchange",
+                "parameters": [
+                    {
+                        "description": "Protocol branch (e.g. sale)",
+                        "in": "query",
+                        "name": "type",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "checkauth, query, import, file",
+                        "in": "query",
+                        "name": "mode",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Session id returned by checkauth",
+                        "in": "query",
+                        "name": "sessid",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Alias for sessid",
+                        "in": "query",
+                        "name": "session",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/xml": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            },
+                            "text/plain": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Plain-text success/failure lines or sale/query XML"
+                    },
+                    "400": {
+                        "content": {
+                            "application/xml": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            },
+                            "text/plain": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/xml": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            },
+                            "text/plain": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/xml": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            },
+                            "text/plain": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "429": {
+                        "content": {
+                            "application/xml": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            },
+                            "text/plain": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Too many requests"
+                    },
+                    "500": {
+                        "content": {
+                            "application/xml": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            },
+                            "text/plain": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal error"
+                    }
+                },
+                "summary": "CommerceML HTTP exchange (1С УНФ)",
+                "tags": [
+                    "CommerceML"
+                ]
+            }
+        },
         "/companies/dadata/address/clean": {
             "post": {
                 "description": "Authenticated proxy to DaData Cleaner; request body is forwarded unchanged (see DaData Cleaner API). Requires cleaner API key on the server.",
@@ -7412,138 +7694,6 @@
                     }
                 ],
                 "summary": "Create opaque login link",
-                "tags": [
-                    "companies"
-                ]
-            }
-        },
-        "/companies/me/onec-settings": {
-            "get": {
-                "operationId": "GetMyOneCSettings",
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/models.CompanyOneCSettingsPublic"
-                                }
-                            }
-                        },
-                        "description": "OK"
-                    },
-                    "401": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "string"
-                                }
-                            }
-                        },
-                        "description": "Unauthorized"
-                    },
-                    "403": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "string"
-                                }
-                            }
-                        },
-                        "description": "Forbidden"
-                    },
-                    "500": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "string"
-                                }
-                            }
-                        },
-                        "description": "Internal Server Error"
-                    }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "summary": "Get 1С УНФ CommerceML settings for current company",
-                "tags": [
-                    "companies"
-                ]
-            },
-            "put": {
-                "operationId": "PutMyOneCSettings",
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/models.CompanyOneCSettingsPutRequest"
-                            }
-                        }
-                    },
-                    "description": "Settings",
-                    "required": true,
-                    "x-originalParamName": "body"
-                },
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/models.CompanyOneCSettingsPublic"
-                                }
-                            }
-                        },
-                        "description": "OK"
-                    },
-                    "400": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "string"
-                                }
-                            }
-                        },
-                        "description": "Bad request"
-                    },
-                    "401": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "string"
-                                }
-                            }
-                        },
-                        "description": "Unauthorized"
-                    },
-                    "403": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "string"
-                                }
-                            }
-                        },
-                        "description": "Forbidden"
-                    },
-                    "500": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "string"
-                                }
-                            }
-                        },
-                        "description": "Internal Server Error"
-                    }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "summary": "Update 1С УНФ CommerceML settings for current company",
                 "tags": [
                     "companies"
                 ]
@@ -11553,10 +11703,11 @@
         },
         "/platform/companies/{id}/onec-settings": {
             "get": {
+                "description": "Path id must be the company marked is_saas_operator. Returns 404 if none is marked; 403 if id is another company.",
                 "operationId": "GetPlatformCompanyOneCSettings",
                 "parameters": [
                     {
-                        "description": "Company ID",
+                        "description": "SaaS operator company ID",
                         "in": "path",
                         "name": "id",
                         "required": true,
@@ -11596,6 +11747,16 @@
                         },
                         "description": "Unauthorized"
                     },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden — id is not the SaaS operator company"
+                    },
                     "404": {
                         "content": {
                             "application/json": {
@@ -11622,16 +11783,17 @@
                         "BearerAuth": []
                     }
                 ],
-                "summary": "Get 1С УНФ CommerceML settings for a company (SaaS operator)",
+                "summary": "Get 1С УНФ CommerceML settings for the SaaS operator company",
                 "tags": [
                     "platform"
                 ]
             },
             "put": {
+                "description": "Path id must be the company marked is_saas_operator. Returns 404 if none is marked; 403 if id is another company.",
                 "operationId": "PutPlatformCompanyOneCSettings",
                 "parameters": [
                     {
-                        "description": "Company ID",
+                        "description": "SaaS operator company ID",
                         "in": "path",
                         "name": "id",
                         "required": true,
@@ -11683,6 +11845,16 @@
                         },
                         "description": "Unauthorized"
                     },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden — id is not the SaaS operator company"
+                    },
                     "404": {
                         "content": {
                             "application/json": {
@@ -11692,6 +11864,16 @@
                             }
                         },
                         "description": "Not found"
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Conflict"
                     },
                     "500": {
                         "content": {
@@ -11709,7 +11891,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "summary": "Update 1С УНФ CommerceML settings for a company (SaaS operator)",
+                "summary": "Update 1С УНФ CommerceML settings for the SaaS operator company",
                 "tags": [
                     "platform"
                 ]

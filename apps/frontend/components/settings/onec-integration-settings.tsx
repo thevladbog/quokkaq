@@ -17,7 +17,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { authenticatedApiFetch } from '@/lib/authenticated-api-fetch';
 import {
   getGetPlatformCompanyOneCSettingsQueryKey,
   getPlatformCompanyOneCSettings,
@@ -60,16 +59,6 @@ function mapPublicToDTO(p: ModelsCompanyOneCSettingsPublic): OneCSettingsDTO {
   };
 }
 
-async function fetchOneCSettings(): Promise<OneCSettingsDTO> {
-  const res = await authenticatedApiFetch('/companies/me/onec-settings', {
-    method: 'GET'
-  });
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status}`);
-  }
-  return res.json() as Promise<OneCSettingsDTO>;
-}
-
 async function fetchPlatformOneCSettings(
   companyId: string
 ): Promise<OneCSettingsDTO> {
@@ -98,7 +87,6 @@ function toPutRequest(body: PutOneCBody): ModelsCompanyOneCSettingsPutRequest {
     sitePaymentSystemName: body.sitePaymentSystemName
   };
   if (body.statusMapping === null) {
-    // Backend clears mapping only when the key is present with JSON null.
     return {
       ...base,
       statusMapping: null
@@ -112,19 +100,6 @@ function toPutRequest(body: PutOneCBody): ModelsCompanyOneCSettingsPutRequest {
     };
   }
   return base;
-}
-
-async function putOneCSettings(body: PutOneCBody): Promise<OneCSettingsDTO> {
-  const res = await authenticatedApiFetch('/companies/me/onec-settings', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text || `HTTP ${res.status}`);
-  }
-  return res.json() as Promise<OneCSettingsDTO>;
 }
 
 async function putPlatformOneCSettings(
@@ -152,18 +127,22 @@ function formatStatusMappingForForm(m: unknown | null | undefined): string {
   }
 }
 
+type OneCPasswordPayloadMode = 'omit' | 'set' | 'clear';
+
 function OneCIntegrationForm({
   data,
   platformCompanyId
 }: {
   data: OneCSettingsDTO;
-  platformCompanyId?: string;
+  platformCompanyId: string;
 }) {
   const t = useTranslations('admin.integrations.onec');
   const qc = useQueryClient();
   const [exchangeEnabled, setExchangeEnabled] = useState(data.exchangeEnabled);
   const [httpLogin, setHttpLogin] = useState(data.httpLogin);
   const [httpPassword, setHttpPassword] = useState('');
+  const [passwordPayloadMode, setPasswordPayloadMode] =
+    useState<OneCPasswordPayloadMode>('omit');
   const [commerceMlVersion, setCommerceMlVersion] = useState(
     data.commerceMlVersion || '2.10'
   );
@@ -176,16 +155,12 @@ function OneCIntegrationForm({
 
   const m = useMutation({
     mutationFn: (body: PutOneCBody) =>
-      platformCompanyId
-        ? putPlatformOneCSettings(platformCompanyId, body)
-        : putOneCSettings(body),
+      putPlatformOneCSettings(platformCompanyId, body),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['onec-settings'] });
-      if (platformCompanyId) {
-        void qc.invalidateQueries({
-          queryKey: getGetPlatformCompanyOneCSettingsQueryKey(platformCompanyId)
-        });
-      }
+      void qc.invalidateQueries({
+        queryKey: getGetPlatformCompanyOneCSettingsQueryKey(platformCompanyId)
+      });
       toast.success(t('saved'));
     },
     onError: (e: Error) => {
@@ -214,14 +189,19 @@ function OneCIntegrationForm({
                 return;
               }
             }
-            m.mutate({
+            const body: PutOneCBody = {
               exchangeEnabled,
               httpLogin: httpLogin.trim(),
               commerceMlVersion: commerceMlVersion.trim() || '2.10',
               statusMapping,
-              sitePaymentSystemName: sitePaymentSystemName.trim(),
-              ...(httpPassword !== '' ? { httpPassword } : {})
-            } satisfies PutOneCBody);
+              sitePaymentSystemName: sitePaymentSystemName.trim()
+            };
+            if (passwordPayloadMode === 'clear') {
+              body.httpPassword = '';
+            } else if (passwordPayloadMode === 'set' && httpPassword !== '') {
+              body.httpPassword = httpPassword;
+            }
+            m.mutate(body);
           }}
         >
           <div className='flex items-center justify-between gap-4'>
@@ -252,7 +232,10 @@ function OneCIntegrationForm({
             <Input
               id='httpPassword'
               value={httpPassword}
-              onChange={(e) => setHttpPassword(e.target.value)}
+              onChange={(e) => {
+                setPasswordPayloadMode('set');
+                setHttpPassword(e.target.value);
+              }}
               type='password'
               autoComplete='new-password'
               placeholder={
@@ -261,6 +244,19 @@ function OneCIntegrationForm({
                   : t('httpPasswordPlaceholder')
               }
             />
+            <div className='flex flex-wrap gap-2'>
+              <Button
+                type='button'
+                variant='outline'
+                size='sm'
+                onClick={() => {
+                  setPasswordPayloadMode('clear');
+                  setHttpPassword('');
+                }}
+              >
+                {t('clearStoredPassword')}
+              </Button>
+            </div>
             <p className='text-muted-foreground text-xs'>
               {t('httpPasswordHint')}
             </p>
@@ -328,22 +324,17 @@ function OneCIntegrationForm({
   );
 }
 
+/** SaaS operator only: `id` must be the deployment’s SaaS operator company (Platform → Integrations → 1C). API: `/platform/companies/{id}/onec-settings`. Not used in tenant-facing settings. */
 export function OneCIntegrationSettings({
   platformCompanyId
 }: {
-  /** SaaS operator: load/save via `/platform/companies/{id}/onec-settings`. */
-  platformCompanyId?: string;
-} = {}) {
+  platformCompanyId: string;
+}) {
   const t = useTranslations('admin.integrations.onec');
   const q = useQuery({
-    queryKey: platformCompanyId
-      ? ['onec-settings', 'platform', platformCompanyId]
-      : ['onec-settings'],
-    queryFn: () =>
-      platformCompanyId
-        ? fetchPlatformOneCSettings(platformCompanyId)
-        : fetchOneCSettings(),
-    enabled: platformCompanyId !== undefined ? Boolean(platformCompanyId) : true
+    queryKey: ['onec-settings', 'platform', platformCompanyId],
+    queryFn: () => fetchPlatformOneCSettings(platformCompanyId),
+    enabled: Boolean(platformCompanyId)
   });
 
   if (q.isLoading) {
@@ -360,7 +351,7 @@ export function OneCIntegrationSettings({
 
   return (
     <OneCIntegrationForm
-      key={`${platformCompanyId ?? 'me'}-${q.dataUpdatedAt}`}
+      key={`${platformCompanyId}-${q.dataUpdatedAt}`}
       data={q.data}
       platformCompanyId={platformCompanyId}
     />

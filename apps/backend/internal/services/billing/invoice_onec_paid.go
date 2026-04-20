@@ -2,7 +2,6 @@ package billing
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
@@ -13,21 +12,27 @@ import (
 )
 
 // ApplyOneCInvoicePaid marks invoice paid from 1С CommerceML status import (idempotent).
-func ApplyOneCInvoicePaid(tx *gorm.DB, invoiceID string, paidAt time.Time, now time.Time) error {
+// companyID scopes the row; provisioning runs before the status flip; already-paid rows retry provisioning only.
+func ApplyOneCInvoicePaid(tx *gorm.DB, invoiceID, companyID string, paidAt time.Time, now time.Time) error {
 	invoiceID = strings.TrimSpace(invoiceID)
-	if invoiceID == "" {
-		return errors.New("missing invoice id")
+	companyID = strings.TrimSpace(companyID)
+	if invoiceID == "" || companyID == "" {
+		return errors.New("missing invoice id or company id")
 	}
 	var inv models.Invoice
 	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 		Preload("Lines", func(db *gorm.DB) *gorm.DB {
 			return db.Order("position ASC")
 		}).
-		First(&inv, "id = ?", invoiceID).Error; err != nil {
+		Where("id = ? AND company_id = ?", invoiceID, companyID).
+		First(&inv).Error; err != nil {
 		return err
 	}
 	if inv.Status == "paid" {
-		return nil
+		return ProvisionInvoiceSubscriptionFromLines(tx, &inv, now)
+	}
+	if err := ProvisionInvoiceSubscriptionFromLines(tx, &inv, now); err != nil {
+		return err
 	}
 	extID := "onec:" + inv.ID
 	updates := map[string]interface{}{
@@ -36,12 +41,5 @@ func ApplyOneCInvoicePaid(tx *gorm.DB, invoiceID string, paidAt time.Time, now t
 		"payment_provider":            "manual",
 		"payment_provider_invoice_id": extID,
 	}
-	if err := tx.Model(&models.Invoice{}).Where("id = ?", inv.ID).Updates(updates).Error; err != nil {
-		return err
-	}
-	inv.Status = "paid"
-	if err := ProvisionInvoiceSubscriptionFromLines(tx, &inv, now); err != nil {
-		return fmt.Errorf("onec paid provision: %w", err)
-	}
-	return nil
+	return tx.Model(&models.Invoice{}).Where("id = ? AND company_id = ?", inv.ID, companyID).Updates(updates).Error
 }

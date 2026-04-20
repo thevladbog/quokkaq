@@ -15,7 +15,7 @@ type CatalogItem struct {
 	VatRatePercent       float64           `gorm:"not null;default:0" json:"vatRatePercent"` // used when VatExempt is false
 	SubscriptionPlanID   *string           `gorm:"index" json:"subscriptionPlanId,omitempty"`
 	IsActive             bool              `gorm:"not null;default:true" json:"isActive"`
-	OneCNomenclatureGUID *string           `gorm:"column:onec_nomenclature_guid" json:"onecNomenclatureGuid,omitempty"`
+	OneCNomenclatureGUID *string           `gorm:"column:onec_nomenclature_guid;size:128" json:"onecNomenclatureGuid,omitempty"`
 	CreatedAt            time.Time         `gorm:"default:now()" json:"createdAt"`
 	UpdatedAt            time.Time         `gorm:"autoUpdateTime" json:"updatedAt"`
 	SubscriptionPlan     *SubscriptionPlan `gorm:"foreignKey:SubscriptionPlanID" json:"plan,omitempty"`

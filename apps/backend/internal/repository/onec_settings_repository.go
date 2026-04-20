@@ -7,6 +7,7 @@ import (
 	"quokkaq-go-backend/pkg/database"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // ErrOneCSettingsNotFound is returned when no row exists for a company.
@@ -37,22 +38,22 @@ func (r *oneCSettingsRepository) GetByCompanyID(companyID string) (*models.Compa
 }
 
 func (r *oneCSettingsRepository) Upsert(settings *models.CompanyOneCSettings) error {
-	var count int64
-	if err := database.DB.Model(&models.CompanyOneCSettings{}).Where("company_id = ?", settings.CompanyID).Count(&count).Error; err != nil {
-		return err
+	if settings.CompanyID == "" {
+		return errors.New("company id required")
 	}
-	if count == 0 {
-		return database.DB.Create(settings).Error
-	}
-	return database.DB.Model(&models.CompanyOneCSettings{}).Where("company_id = ?", settings.CompanyID).Updates(map[string]interface{}{
-		"exchange_enabled":         settings.ExchangeEnabled,
-		"http_login":               settings.HTTPLogin,
-		"http_password_bcrypt":     settings.HTTPPasswordBcrypt,
-		"commerce_ml_version":      settings.CommerceMLVersion,
-		"status_mapping_json":      settings.StatusMappingJSON,
-		"site_payment_system_name": settings.SitePaymentSystemName,
-		"updated_at":               settings.UpdatedAt,
-	}).Error
+	row := *settings
+	return database.DB.Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "company_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{
+			"exchange_enabled",
+			"http_login",
+			"http_password_bcrypt",
+			"commerce_ml_version",
+			"status_mapping_json",
+			"site_payment_system_name",
+			"updated_at",
+		}),
+	}).Create(&row).Error
 }
 
 func (r *oneCSettingsRepository) FindByHTTPLogin(login string) (*models.CompanyOneCSettings, error) {

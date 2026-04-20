@@ -36,7 +36,6 @@ import { getUnitDisplayName } from '@/lib/unit-display';
 import { OrganizationSsoSettingsCard } from '@/components/organization/organization-sso-settings-card';
 import { OrganizationSsoAccessSourceCard } from '@/components/organization/organization-sso-access-source-card';
 import { OrganizationTenantRbacSettings } from '@/components/organization/organization-tenant-rbac-settings';
-import { OneCIntegrationSettings } from '@/components/settings/onec-integration-settings';
 
 export function IntegrationsSettingsContent() {
   const t = useTranslations('admin.integrations');
@@ -47,8 +46,7 @@ export function IntegrationsSettingsContent() {
   const searchParams = useSearchParams();
 
   const tabParam = searchParams.get('tab');
-  const activeTab =
-    tabParam === 'auth' ? 'auth' : tabParam === 'onec' ? 'onec' : 'calendars';
+  const activeTab = tabParam === 'auth' ? 'auth' : 'calendars';
 
   const setTab = (value: string) => {
     const q = new URLSearchParams(searchParams.toString());
@@ -218,7 +216,6 @@ export function IntegrationsSettingsContent() {
         <TabsList className='mb-6'>
           <TabsTrigger value='calendars'>{t('tab_calendars')}</TabsTrigger>
           <TabsTrigger value='auth'>{t('tab_authentication')}</TabsTrigger>
-          <TabsTrigger value='onec'>{t('tab_onec')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value='calendars' className='space-y-6'>
@@ -299,10 +296,6 @@ export function IntegrationsSettingsContent() {
               />
             )}
           <OrganizationTenantRbacSettings units={unitOptionsForProps} />
-        </TabsContent>
-
-        <TabsContent value='onec' className='space-y-6'>
-          <OneCIntegrationSettings />
         </TabsContent>
       </Tabs>
     </>

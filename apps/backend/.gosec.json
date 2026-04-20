@@ -41,6 +41,10 @@
       "rules": ["G705"]
     },
     {
+      "path": ".*/internal/handlers/commerceml_exchange_handler\\.go",
+      "rules": ["G705"]
+    },
+    {
       "path": ".*/internal/services/saml_flow\\.go",
       "rules": ["G705"]
     },

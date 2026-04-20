@@ -43,6 +43,8 @@ type InvoiceRepository interface {
 	FindByCompanyIDNonDraft(companyID string) ([]models.Invoice, error)
 	// FindNonDraftWithLinesForCompany loads issued invoices with ordered lines for CommerceML export.
 	FindNonDraftWithLinesForCompany(companyID string) ([]models.Invoice, error)
+	// StampOneCExchangeBatch sets onec_order_site_id = id and onec_last_exchange_at for the given invoice rows (tenant-scoped).
+	StampOneCExchangeBatch(companyID string, invoiceIDs []string, stamp time.Time) error
 	ListPaginated(companyID *string, limit, offset int) ([]models.Invoice, int64, error)
 	Update(invoice *models.Invoice) error
 	UpdateYookassaPayment(id, paymentID, confirmationURL string) error
@@ -132,6 +134,17 @@ func (r *invoiceRepository) FindNonDraftWithLinesForCompany(companyID string) ([
 		Order("created_at ASC, id ASC").
 		Find(&invoices).Error
 	return invoices, err
+}
+
+func (r *invoiceRepository) StampOneCExchangeBatch(companyID string, invoiceIDs []string, stamp time.Time) error {
+	if len(invoiceIDs) == 0 {
+		return nil
+	}
+	// Per-row onec_order_site_id = id requires SQL expression (not a constant Updates map).
+	return database.DB.Exec(
+		`UPDATE invoices SET onec_order_site_id = id, onec_last_exchange_at = ? WHERE company_id = ? AND id IN ?`,
+		stamp, companyID, invoiceIDs,
+	).Error
 }
 
 func (r *invoiceRepository) ListPaginated(companyID *string, limit, offset int) ([]models.Invoice, int64, error) {

@@ -37,11 +37,11 @@ func appendDocumentPayments(b *strings.Builder, inv *models.Invoice, sitePayment
 	if !ok {
 		return
 	}
-	sumMajor := float64(inv.Amount) / 100.0
+	sumStr := FormatAmountFromMinorUnits(inv.Amount)
 	fmt.Fprintf(b, "    <Оплаты>\n")
 	fmt.Fprintf(b, "      <Оплата>\n")
 	fmt.Fprintf(b, "        <Дата>%s</Дата>\n", escapeXML(paidDay))
-	fmt.Fprintf(b, "        <Сумма>%.2f</Сумма>\n", sumMajor)
+	fmt.Fprintf(b, "        <Сумма>%s</Сумма>\n", sumStr)
 	fmt.Fprintf(b, "        <ВидОплаты>%s</ВидОплаты>\n", escapeXML("Эквайринг"))
 	fmt.Fprintf(b, "        <НомерПлатежногоДокумента>%s</НомерПлатежногоДокумента>\n", escapeXML(docNum))
 	if s := strings.TrimSpace(sitePaymentSystemName); s != "" {

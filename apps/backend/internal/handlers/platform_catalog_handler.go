@@ -170,6 +170,10 @@ func (h *PlatformHandler) CreateCatalogItem(w http.ResponseWriter, r *http.Reque
 	if body.OneCNomenclatureGUID != nil {
 		s := strings.TrimSpace(*body.OneCNomenclatureGUID)
 		if s != "" {
+			if len(s) > 128 {
+				http.Error(w, "onecNomenclatureGuid must be at most 128 characters", http.StatusBadRequest)
+				return
+			}
 			item.OneCNomenclatureGUID = &s
 		}
 	}
@@ -273,6 +277,10 @@ func (h *PlatformHandler) PatchCatalogItem(w http.ResponseWriter, r *http.Reques
 		if s == "" {
 			item.OneCNomenclatureGUID = nil
 		} else {
+			if len(s) > 128 {
+				http.Error(w, "onecNomenclatureGuid must be at most 128 characters", http.StatusBadRequest)
+				return
+			}
 			item.OneCNomenclatureGUID = &s
 		}
 	}

@@ -30,6 +30,11 @@ func BuildSaleQueryXML(company *models.Company, invoices []models.Invoice, schem
 	for i := range invoices {
 		inv := &invoices[i]
 		docID := strings.TrimSpace(inv.ID)
+		if inv.OneCOrderSiteID != nil {
+			if alt := strings.TrimSpace(*inv.OneCOrderSiteID); alt != "" {
+				docID = alt
+			}
+		}
 		if docID == "" {
 			continue
 		}
@@ -42,7 +47,7 @@ func BuildSaleQueryXML(company *models.Company, invoices []models.Invoice, schem
 			dateStr = &inv.CreatedAt
 		}
 		day := dateStr.UTC().Format("2006-01-02")
-		sumMajor := float64(inv.Amount) / 100.0
+		sumStr := FormatAmountFromMinorUnits(inv.Amount)
 
 		cp := buildCounterpartyExport(company, inv)
 
@@ -54,7 +59,7 @@ func BuildSaleQueryXML(company *models.Company, invoices []models.Invoice, schem
 		fmt.Fprintf(&b, "    <Роль>%s</Роль>\n", escapeXML("Продавец"))
 		fmt.Fprintf(&b, "    <Валюта>%s</Валюта>\n", escapeXML(inv.Currency))
 		fmt.Fprintf(&b, "    <Курс>1</Курс>\n")
-		fmt.Fprintf(&b, "    <Сумма>%.2f</Сумма>\n", sumMajor)
+		fmt.Fprintf(&b, "    <Сумма>%s</Сумма>\n", sumStr)
 		fmt.Fprintf(&b, "    <Контрагенты>\n")
 		fmt.Fprintf(&b, "      <Контрагент>\n")
 		fmt.Fprintf(&b, "        <Ид>%s</Ид>\n", escapeXML(cp.SiteID))
@@ -84,8 +89,8 @@ func BuildSaleQueryXML(company *models.Company, invoices []models.Invoice, schem
 			if nomID == "" {
 				nomID = line.ID
 			}
-			lineSum := float64(line.LineGrossMinor) / 100.0
-			unitPrice := float64(line.UnitPriceInclVatMinor) / 100.0
+			lineSum := FormatAmountFromMinorUnits(line.LineGrossMinor)
+			unitPrice := FormatAmountFromMinorUnits(line.UnitPriceInclVatMinor)
 			name := line.DescriptionPrint
 			if name == "" {
 				name = "Line"
@@ -99,9 +104,9 @@ func BuildSaleQueryXML(company *models.Company, invoices []models.Invoice, schem
 			fmt.Fprintf(&b, "        <Наименование>%s</Наименование>\n", escapeXML(name))
 			fmt.Fprintf(&b, "        <БазоваяЕдиница Код=\"796\" НаименованиеПолное=\"%s\" МеждународноеСокращение=\"PCE\">%s</БазоваяЕдиница>\n",
 				escapeXML(uom), escapeXML(uom))
-			fmt.Fprintf(&b, "        <ЦенаЗаЕдиницу>%.2f</ЦенаЗаЕдиницу>\n", unitPrice)
+			fmt.Fprintf(&b, "        <ЦенаЗаЕдиницу>%s</ЦенаЗаЕдиницу>\n", unitPrice)
 			fmt.Fprintf(&b, "        <Количество>%.4f</Количество>\n", line.Quantity)
-			fmt.Fprintf(&b, "        <Сумма>%.2f</Сумма>\n", lineSum)
+			fmt.Fprintf(&b, "        <Сумма>%s</Сумма>\n", lineSum)
 			fmt.Fprintf(&b, "      </Товар>\n")
 		}
 		fmt.Fprintf(&b, "    </Товары>\n")

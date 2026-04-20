@@ -36,12 +36,25 @@ func ParseOrderDocuments(xmlBytes []byte) ([]OrderDocHint, error) {
 }
 
 // StatusLooksPaid returns true for common Russian 1С / exchange status strings (POC).
+// Negative phrases (e.g. "не оплачен", "unpaid") are rejected before positive checks.
 func StatusLooksPaid(status string) bool {
 	s := strings.ToLower(strings.TrimSpace(status))
 	if s == "" {
 		return false
 	}
-	if strings.Contains(s, "оплачен") || strings.Contains(s, "paid") || strings.Contains(s, "полностью оплачен") {
+	negatives := []string{
+		"не оплачен", "неоплачен", "не полностью оплачен", "частично оплачен",
+		"unpaid", "partially paid", "not paid",
+	}
+	for _, n := range negatives {
+		if strings.Contains(s, n) {
+			return false
+		}
+	}
+	if strings.Contains(s, "оплачен") || strings.Contains(s, "полностью оплачен") {
+		return true
+	}
+	if strings.Contains(s, "paid") {
 		return true
 	}
 	return false

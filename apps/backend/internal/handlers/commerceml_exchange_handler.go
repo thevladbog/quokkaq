@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -39,6 +40,26 @@ func NewCommerceMLExchangeHandler(
 	}
 }
 
+// ServeHTTP handles CommerceML HTTP exchange for 1С УНФ (GET/POST on one URL).
+// @Summary      CommerceML HTTP exchange (1С УНФ)
+// @Description  Bitrix-style protocol: type=sale with mode=checkauth|query|import|file; session from checkauth via sessid or session query param. Import body is CommerceML XML (up to 8 MiB).
+// @Tags         CommerceML
+// @ID           CommerceMLExchange
+// @Accept       application/xml
+// @Produce      text/plain
+// @Produce      application/xml
+// @Param        type    query string false "Protocol branch (e.g. sale)"
+// @Param        mode    query string false "checkauth, query, import, file"
+// @Param        sessid  query string false "Session id returned by checkauth"
+// @Param        session query string false "Alias for sessid"
+// @Success      200 {string} string "Plain-text success/failure lines or sale/query XML"
+// @Failure      400 {string} string "Bad request"
+// @Failure      401 {string} string "Unauthorized"
+// @Failure      403 {string} string "Forbidden"
+// @Failure      429 {string} string "Too many requests"
+// @Failure      500 {string} string "Internal error"
+// @Router       /commerceml/exchange [get]
+// @Router       /commerceml/exchange [post]
 func (h *CommerceMLExchangeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	typ := strings.TrimSpace(q.Get("type"))
@@ -77,7 +98,6 @@ func (h *CommerceMLExchangeHandler) saleCheckauth(w http.ResponseWriter, r *http
 		return
 	}
 	user = strings.TrimSpace(user)
-	pass = strings.TrimSpace(pass)
 	if user == "" || pass == "" {
 		http.Error(w, "failure\nmissing credentials\n", http.StatusUnauthorized)
 		return
@@ -85,7 +105,12 @@ func (h *CommerceMLExchangeHandler) saleCheckauth(w http.ResponseWriter, r *http
 
 	st, err := h.onecRepo.FindByHTTPLogin(user)
 	if err != nil {
-		http.Error(w, "failure\nunknown login\n", http.StatusUnauthorized)
+		if errors.Is(err, repository.ErrOneCSettingsNotFound) {
+			http.Error(w, "failure\nunknown login\n", http.StatusUnauthorized)
+			return
+		}
+		logger.ErrorfCtx(r.Context(), "commerceml FindByHTTPLogin: %v", err)
+		http.Error(w, "failure\ninternal error\n", http.StatusInternalServerError)
 		return
 	}
 	if !st.ExchangeEnabled {
@@ -101,9 +126,15 @@ func (h *CommerceMLExchangeHandler) saleCheckauth(w http.ResponseWriter, r *http
 		return
 	}
 
-	token := h.sessions.Create(st.CompanyID)
+	token, err := h.sessions.Create(st.CompanyID)
+	if err != nil {
+		logger.ErrorfCtx(r.Context(), "commerceml session Create: %v", err)
+		http.Error(w, "failure\nsession\n", http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	_, _ = w.Write([]byte("success\n" + user + "\n" + token + "\n"))
+	loginOut := strings.TrimSpace(st.HTTPLogin)
+	_, _ = w.Write([]byte("success\n" + loginOut + "\n" + token + "\n"))
 }
 
 func (h *CommerceMLExchangeHandler) saleQuery(w http.ResponseWriter, r *http.Request, companyID string) {
@@ -134,32 +165,21 @@ func (h *CommerceMLExchangeHandler) saleQuery(w http.ResponseWriter, r *http.Req
 		return
 	}
 	now := time.Now().UTC()
+	ids := make([]string, 0, len(invoices))
 	for i := range invoices {
-		id := invoices[i].ID
-		if err := database.DB.Model(&models.Invoice{}).Where("id = ?", id).Updates(map[string]interface{}{
-			"onec_order_site_id":    id,
-			"onec_last_exchange_at": now,
-		}).Error; err != nil {
-			logger.ErrorfCtx(r.Context(), "commerceml saleQuery stamp invoice: %v", err)
+		if id := strings.TrimSpace(invoices[i].ID); id != "" {
+			ids = append(ids, id)
 		}
 	}
+	if err := h.invoiceRepo.StampOneCExchangeBatch(companyID, ids, now); err != nil {
+		logger.ErrorfCtx(r.Context(), "commerceml saleQuery stamp batch: %v", err)
+	}
 	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+	//nosec G705 -- XML from BuildSaleQueryXML (server-built); not reflected user HTML
 	_, _ = w.Write([]byte(xml))
 }
 
 func (h *CommerceMLExchangeHandler) saleImport(w http.ResponseWriter, r *http.Request, companyID string) {
-	body, err := io.ReadAll(io.LimitReader(r.Body, 8<<20))
-	if err != nil {
-		http.Error(w, "failure\nread body\n", http.StatusBadRequest)
-		return
-	}
-	docs, err := commerceml.ParseOrderDocuments(body)
-	if err != nil {
-		logger.PrintfCtx(r.Context(), "commerceml import parse: %v", err)
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		_, _ = w.Write([]byte("success\n"))
-		return
-	}
 	st, err := h.onecRepo.GetByCompanyID(companyID)
 	if err != nil {
 		http.Error(w, "failure\nsettings\n", http.StatusInternalServerError)
@@ -169,9 +189,23 @@ func (h *CommerceMLExchangeHandler) saleImport(w http.ResponseWriter, r *http.Re
 		http.Error(w, "failure\nexchange disabled\n", http.StatusForbidden)
 		return
 	}
+
+	body, err := io.ReadAll(io.LimitReader(r.Body, 8<<20))
+	if err != nil {
+		http.Error(w, "failure\nread body\n", http.StatusBadRequest)
+		return
+	}
+	docs, err := commerceml.ParseOrderDocuments(body)
+	if err != nil {
+		logger.PrintfCtx(r.Context(), "commerceml import parse: %v", err)
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		// Respond success so broken payloads do not trigger aggressive 1C retries.
+		_, _ = w.Write([]byte("success\n"))
+		return
+	}
 	mappingJSON := st.StatusMappingJSON
 	now := time.Now().UTC()
-	_ = database.DB.Transaction(func(tx *gorm.DB) error {
+	if err := database.DB.Transaction(func(tx *gorm.DB) error {
 		for i := range docs {
 			target, ok := commerceml.ResolveInvoiceStatus(docs[i].Status, mappingJSON)
 			if !ok {
@@ -183,17 +217,21 @@ func (h *CommerceMLExchangeHandler) saleImport(w http.ResponseWriter, r *http.Re
 			}
 			switch target {
 			case "paid":
-				if err := billing.ApplyOneCInvoicePaid(tx, docs[i].ID, now, now); err != nil {
-					logger.PrintfCtx(r.Context(), "commerceml import paid %s: %v", docs[i].ID, err)
+				if err := billing.ApplyOneCInvoicePaid(tx, docs[i].ID, companyID, now, now); err != nil {
+					return err
 				}
 			case "void", "uncollectible":
 				if err := billing.ApplyOneCInvoiceVoidOrUncollectible(tx, docs[i].ID, companyID, target, now); err != nil {
-					logger.PrintfCtx(r.Context(), "commerceml import %s %s: %v", target, docs[i].ID, err)
+					return err
 				}
 			}
 		}
 		return nil
-	})
+	}); err != nil {
+		logger.ErrorfCtx(r.Context(), "commerceml import transaction: %v", err)
+		http.Error(w, "failure\nimport\n", http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	_, _ = w.Write([]byte("success\n"))
 }

@@ -1364,11 +1364,23 @@ export interface ModelsCatalogItemPatchRequest {
   vatRatePercent?: number;
 }
 
+/**
+ * paid | void | uncollectible
+ */
+export type ModelsOneCStatusMappingRuleDTOInvoiceStatus = typeof ModelsOneCStatusMappingRuleDTOInvoiceStatus[keyof typeof ModelsOneCStatusMappingRuleDTOInvoiceStatus];
+
+
+export const ModelsOneCStatusMappingRuleDTOInvoiceStatus = {
+  paid: 'paid',
+  void: 'void',
+  uncollectible: 'uncollectible',
+} as const;
+
 export interface ModelsOneCStatusMappingRuleDTO {
   contains?: string;
   equals?: string;
   /** paid | void | uncollectible */
-  invoiceStatus?: string;
+  invoiceStatus?: ModelsOneCStatusMappingRuleDTOInvoiceStatus;
 }
 
 export interface ModelsOneCStatusMappingDTO {
@@ -1394,7 +1406,7 @@ export interface ModelsCompanyOneCSettingsPutRequest {
   /** empty string clears password; omit to leave unchanged */
   httpPassword?: string;
   sitePaymentSystemName?: string;
-  statusMapping?: ModelsOneCStatusMappingDTO;
+  statusMapping?: ModelsOneCStatusMappingDTO | null;
 }
 
 export type ModelsCompanyPatchBillingAddress = { [key: string]: unknown };

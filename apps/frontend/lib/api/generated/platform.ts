@@ -1337,11 +1337,23 @@ export interface ModelsCatalogItemPatchRequest {
   vatRatePercent?: number;
 }
 
+/**
+ * paid | void | uncollectible
+ */
+export type ModelsOneCStatusMappingRuleDTOInvoiceStatus = typeof ModelsOneCStatusMappingRuleDTOInvoiceStatus[keyof typeof ModelsOneCStatusMappingRuleDTOInvoiceStatus];
+
+
+export const ModelsOneCStatusMappingRuleDTOInvoiceStatus = {
+  paid: 'paid',
+  void: 'void',
+  uncollectible: 'uncollectible',
+} as const;
+
 export interface ModelsOneCStatusMappingRuleDTO {
   contains?: string;
   equals?: string;
   /** paid | void | uncollectible */
-  invoiceStatus?: string;
+  invoiceStatus?: ModelsOneCStatusMappingRuleDTOInvoiceStatus;
 }
 
 export interface ModelsOneCStatusMappingDTO {
@@ -1367,7 +1379,7 @@ export interface ModelsCompanyOneCSettingsPutRequest {
   /** empty string clears password; omit to leave unchanged */
   httpPassword?: string;
   sitePaymentSystemName?: string;
-  statusMapping?: ModelsOneCStatusMappingDTO;
+  statusMapping?: ModelsOneCStatusMappingDTO | null;
 }
 
 export type ModelsCompanyPatchBillingAddress = { [key: string]: unknown };
@@ -3055,7 +3067,8 @@ export const usePatchCompany = <TError = unknown,
     }
 
 /**
- * @summary Get 1С УНФ CommerceML settings for a company (SaaS operator)
+ * Path id must be the company marked is_saas_operator. Returns 404 if none is marked; 403 if id is another company.
+ * @summary Get 1С УНФ CommerceML settings for the SaaS operator company
  */
 export type getPlatformCompanyOneCSettingsResponse200 = {
   data: ModelsCompanyOneCSettingsPublic
@@ -3072,6 +3085,11 @@ export type getPlatformCompanyOneCSettingsResponse401 = {
   status: 401
 }
 
+export type getPlatformCompanyOneCSettingsResponse403 = {
+  data: string
+  status: 403
+}
+
 export type getPlatformCompanyOneCSettingsResponse404 = {
   data: string
   status: 404
@@ -3085,7 +3103,7 @@ export type getPlatformCompanyOneCSettingsResponse500 = {
 export type getPlatformCompanyOneCSettingsResponseSuccess = (getPlatformCompanyOneCSettingsResponse200) & {
   headers: Headers;
 };
-export type getPlatformCompanyOneCSettingsResponseError = (getPlatformCompanyOneCSettingsResponse400 | getPlatformCompanyOneCSettingsResponse401 | getPlatformCompanyOneCSettingsResponse404 | getPlatformCompanyOneCSettingsResponse500) & {
+export type getPlatformCompanyOneCSettingsResponseError = (getPlatformCompanyOneCSettingsResponse400 | getPlatformCompanyOneCSettingsResponse401 | getPlatformCompanyOneCSettingsResponse403 | getPlatformCompanyOneCSettingsResponse404 | getPlatformCompanyOneCSettingsResponse500) & {
   headers: Headers;
 };
 
@@ -3168,7 +3186,7 @@ export function useGetPlatformCompanyOneCSettings<TData = Awaited<ReturnType<typ
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Get 1С УНФ CommerceML settings for a company (SaaS operator)
+ * @summary Get 1С УНФ CommerceML settings for the SaaS operator company
  */
 
 export function useGetPlatformCompanyOneCSettings<TData = Awaited<ReturnType<typeof getPlatformCompanyOneCSettings>>, TError = string>(
@@ -3190,7 +3208,8 @@ export function useGetPlatformCompanyOneCSettings<TData = Awaited<ReturnType<typ
 
 
 /**
- * @summary Update 1С УНФ CommerceML settings for a company (SaaS operator)
+ * Path id must be the company marked is_saas_operator. Returns 404 if none is marked; 403 if id is another company.
+ * @summary Update 1С УНФ CommerceML settings for the SaaS operator company
  */
 export type putPlatformCompanyOneCSettingsResponse200 = {
   data: ModelsCompanyOneCSettingsPublic
@@ -3207,9 +3226,19 @@ export type putPlatformCompanyOneCSettingsResponse401 = {
   status: 401
 }
 
+export type putPlatformCompanyOneCSettingsResponse403 = {
+  data: string
+  status: 403
+}
+
 export type putPlatformCompanyOneCSettingsResponse404 = {
   data: string
   status: 404
+}
+
+export type putPlatformCompanyOneCSettingsResponse409 = {
+  data: string
+  status: 409
 }
 
 export type putPlatformCompanyOneCSettingsResponse500 = {
@@ -3220,7 +3249,7 @@ export type putPlatformCompanyOneCSettingsResponse500 = {
 export type putPlatformCompanyOneCSettingsResponseSuccess = (putPlatformCompanyOneCSettingsResponse200) & {
   headers: Headers;
 };
-export type putPlatformCompanyOneCSettingsResponseError = (putPlatformCompanyOneCSettingsResponse400 | putPlatformCompanyOneCSettingsResponse401 | putPlatformCompanyOneCSettingsResponse404 | putPlatformCompanyOneCSettingsResponse500) & {
+export type putPlatformCompanyOneCSettingsResponseError = (putPlatformCompanyOneCSettingsResponse400 | putPlatformCompanyOneCSettingsResponse401 | putPlatformCompanyOneCSettingsResponse403 | putPlatformCompanyOneCSettingsResponse404 | putPlatformCompanyOneCSettingsResponse409 | putPlatformCompanyOneCSettingsResponse500) & {
   headers: Headers;
 };
 
@@ -3282,7 +3311,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PutPlatformCompanyOneCSettingsMutationError = string
 
     /**
- * @summary Update 1С УНФ CommerceML settings for a company (SaaS operator)
+ * @summary Update 1С УНФ CommerceML settings for the SaaS operator company
  */
 export const usePutPlatformCompanyOneCSettings = <TError = string,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putPlatformCompanyOneCSettings>>, TError,{id: string;data: ModelsCompanyOneCSettingsPutRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}

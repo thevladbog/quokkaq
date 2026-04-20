@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm, useFormState } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
@@ -9,7 +9,6 @@ import { toast } from 'sonner';
 import { OneCIntegrationSettings } from '@/components/settings/onec-integration-settings';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Form,
   FormControl,
@@ -20,17 +19,12 @@ import {
 } from '@/components/ui/form';
 import { Spinner } from '@/components/ui/spinner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@/components/ui/select';
+import { Link } from '@/src/i18n/navigation';
 import {
   getGetPlatformIntegrationsQueryKey,
+  getGetSaaSOperatorCompanyQueryKey,
   getPlatformIntegrations,
-  listCompanies,
+  getSaaSOperatorCompany,
   patchPlatformIntegrations,
   type HandlersPlatformIntegrationsResponse,
   type ServicesDeploymentSaaSSettingsPatch
@@ -64,6 +58,7 @@ function PlatformIntegrationsForm({
   data: HandlersPlatformIntegrationsResponse;
 }) {
   const t = useTranslations('platform.integrations');
+  const [integrationsTab, setIntegrationsTab] = useState('tracker');
   const queryClient = useQueryClient();
 
   const form = useForm<PlatformIntegrationsFormValues>({
@@ -107,7 +102,11 @@ function PlatformIntegrationsForm({
   });
 
   return (
-    <Tabs defaultValue='tracker' className='max-w-2xl'>
+    <Tabs
+      value={integrationsTab}
+      onValueChange={setIntegrationsTab}
+      className='max-w-2xl'
+    >
       <TabsList className='grid w-full max-w-2xl grid-cols-3'>
         <TabsTrigger value='tracker'>{t('tabTracker')}</TabsTrigger>
         <TabsTrigger value='support'>{t('tabSupport')}</TabsTrigger>
@@ -205,84 +204,55 @@ function PlatformIntegrationsForm({
           </Button>
         </TabsContent>
       </Form>
-      <PlatformOneCIntegrationsTab />
+      <PlatformOneCSaaSOperatorTab active={integrationsTab === 'onec'} />
     </Tabs>
   );
 }
 
-function PlatformOneCIntegrationsTab() {
-  const t = useTranslations('platform.integrations');
-  /** When null, the first company in the list is used until the user picks another. */
-  const [overrideCompanyId, setOverrideCompanyId] = useState<string | null>(
-    null
-  );
+type SaaSOperatorTabState =
+  | { kind: 'ok'; companyId: string }
+  | { kind: 'none' };
 
-  const companiesQ = useQuery({
-    queryKey: ['platform', 'companies', 'integrations-picker'],
-    queryFn: async () => {
-      const res = await listCompanies({ limit: 100, offset: 0 });
-      if (res.status !== 200 || !res.data) {
-        throw new Error('load');
+function PlatformOneCSaaSOperatorTab({ active }: { active: boolean }) {
+  const t = useTranslations('platform.integrations');
+  const operatorQ = useQuery({
+    queryKey: getGetSaaSOperatorCompanyQueryKey(),
+    enabled: active,
+    queryFn: async (): Promise<SaaSOperatorTabState> => {
+      const res = await getSaaSOperatorCompany();
+      if (res.status === 200 && res.data?.id) {
+        return { kind: 'ok', companyId: res.data.id };
       }
-      return res.data;
+      if (res.status === 404) {
+        return { kind: 'none' };
+      }
+      throw new Error('load');
     }
   });
-
-  const companies = useMemo(
-    () =>
-      [...(companiesQ.data?.items ?? [])]
-        .filter((c): c is typeof c & { id: string } => Boolean(c.id))
-        .sort((a, b) =>
-          (a.name ?? '').localeCompare(b.name ?? '', undefined, {
-            sensitivity: 'base'
-          })
-        ),
-    [companiesQ.data?.items]
-  );
-
-  const companyId = overrideCompanyId ?? companies[0]?.id ?? '';
 
   return (
     <TabsContent value='onec' className='mt-6 max-w-2xl space-y-6'>
       <p className='text-muted-foreground text-sm'>{t('onecIntro')}</p>
-      {companiesQ.isLoading ? (
+      {operatorQ.isLoading ? (
         <p className='text-muted-foreground text-sm'>
-          {t('onecCompaniesLoading')}
+          {t('onecOperatorLoading')}
         </p>
-      ) : companiesQ.isError ? (
-        <p className='text-destructive text-sm'>
-          {t('onecCompaniesLoadError')}
-        </p>
-      ) : (
-        <div className='space-y-2'>
-          <Label htmlFor='platform-onec-company'>{t('onecCompanyLabel')}</Label>
-          <Select
-            value={companyId || undefined}
-            onValueChange={setOverrideCompanyId}
-          >
-            <SelectTrigger id='platform-onec-company' className='max-w-md'>
-              <SelectValue placeholder={t('onecCompanyPlaceholder')} />
-            </SelectTrigger>
-            <SelectContent>
-              {companies.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.name ?? c.id}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-      {companyId ? (
-        <OneCIntegrationSettings platformCompanyId={companyId} />
-      ) : (
-        !companiesQ.isLoading &&
-        !companiesQ.isError && (
+      ) : operatorQ.isError ? (
+        <p className='text-destructive text-sm'>{t('onecOperatorLoadError')}</p>
+      ) : operatorQ.data?.kind === 'none' ? (
+        <div className='space-y-3'>
           <p className='text-muted-foreground text-sm'>
-            {t('onecSelectCompanyHint')}
+            {t('onecOperatorMissing')}
           </p>
-        )
-      )}
+          <Button variant='outline' size='sm' asChild>
+            <Link href='/platform/companies'>
+              {t('onecOperatorOpenCompanies')}
+            </Link>
+          </Button>
+        </div>
+      ) : operatorQ.data?.kind === 'ok' ? (
+        <OneCIntegrationSettings platformCompanyId={operatorQ.data.companyId} />
+      ) : null}
       <p className='text-muted-foreground text-xs'>{t('onecDocHint')}</p>
     </TabsContent>
   );

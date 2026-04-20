@@ -422,6 +422,10 @@ func (h *PlatformHandler) PatchCompany(w http.ResponseWriter, r *http.Request) {
 		if s == "" {
 			company.OneCCounterpartyGUID = nil
 		} else {
+			if len(s) > 128 {
+				http.Error(w, "onecCounterpartyGuid must be at most 128 characters", http.StatusBadRequest)
+				return
+			}
 			company.OneCCounterpartyGUID = &s
 		}
 	}

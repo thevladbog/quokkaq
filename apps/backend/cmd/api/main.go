@@ -170,6 +170,7 @@ func run() error {
 	companyRepo := repository.NewCompanyRepository()
 	onecSettingsRepo := repository.NewOneCSettingsRepository()
 	onecSessionStore := commerceml.NewSessionStore(2 * time.Hour)
+	slog.Info("CommerceML checkauth sessions use in-memory storage; multiple API replicas require sticky routing or a future shared session backend")
 	operatorIntervalRepo := repository.NewOperatorIntervalRepository()
 
 	jobWorker := jobs.NewJobWorker(ttsService, ticketRepo)
@@ -322,7 +323,7 @@ func run() error {
 		pubApp,
 	)
 	companyHandler := handlers.NewCompanyHandler(companyRepo, userRepo, tenantRBACRepo)
-	onecSettingsHandler := handlers.NewOneCSettingsHandler(companyRepo, userRepo, onecSettingsRepo)
+	onecSettingsHandler := handlers.NewOneCSettingsHandler(companyRepo, onecSettingsRepo)
 	commerceMLExchangeHandler := handlers.NewCommerceMLExchangeHandler(companyRepo, invoiceRepo, onecSettingsRepo, onecSessionStore)
 	platformHandler := handlers.NewPlatformHandler(companyRepo, subscriptionRepo, invoiceRepo, catalogRepo)
 	dadataHandler := handlers.NewDaDataHandler()
@@ -376,7 +377,10 @@ func run() error {
 
 	r.Post("/webhooks/yookassa", handlers.ServeYooKassaWebhook)
 
-	r.Handle("/commerceml/exchange", commerceMLExchangeHandler)
+	// CommerceML exchange: 1C UNF uses GET and POST on the same URL; constrain methods and rate-limit (see SSOPublicRateLimit).
+	mlExchange := http.HandlerFunc(commerceMLExchangeHandler.ServeHTTP)
+	r.With(authmiddleware.SSOPublicRateLimit).Post("/commerceml/exchange", mlExchange)
+	r.With(authmiddleware.SSOPublicRateLimit).Get("/commerceml/exchange", mlExchange)
 
 	r.Route("/public", func(r chi.Router) {
 		r.Use(authmiddleware.SSOPublicRateLimit)
@@ -700,8 +704,6 @@ func run() error {
 			r.Use(authmiddleware.RequireAdminOrTenantPermission(userRepo, tenantRBACRepo, rbac.PermTenantAdmin))
 			r.Get("/me", companyHandler.GetMyCompany)
 			r.Patch("/me", companyHandler.PatchMyCompany)
-			r.Get("/me/onec-settings", onecSettingsHandler.GetMyOneCSettings)
-			r.Put("/me/onec-settings", onecSettingsHandler.PutMyOneCSettings)
 			r.Get("/me/rbac/permissions", tenantRBACHTTP.GetPermissionCatalog)
 			r.Get("/me/sso/group-mappings", tenantRBACHTTP.ListGroupMappings)
 			r.Post("/me/sso/group-mappings", tenantRBACHTTP.UpsertGroupMapping)

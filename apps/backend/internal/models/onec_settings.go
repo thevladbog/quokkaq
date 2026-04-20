@@ -36,7 +36,7 @@ type OneCStatusMappingDTO struct {
 	Rules []OneCStatusMappingRuleDTO `json:"rules"`
 }
 
-// CompanyOneCSettingsPublic is returned from GET /companies/me/onec-settings (no secrets).
+// CompanyOneCSettingsPublic is returned from GET /platform/companies/{id}/onec-settings (no secrets).
 type CompanyOneCSettingsPublic struct {
 	CompanyID             string                `json:"companyId"`
 	ExchangeEnabled       bool                  `json:"exchangeEnabled"`
@@ -48,7 +48,7 @@ type CompanyOneCSettingsPublic struct {
 	ExchangeURLHint       string                `json:"exchangeUrlHint,omitempty"` // filled by handler from PUBLIC_APP_URL
 }
 
-// CompanyOneCSettingsPutBody is the subset of fields decoded from PUT /companies/me/onec-settings.
+// CompanyOneCSettingsPutBody is the subset of fields decoded from PUT /platform/companies/{id}/onec-settings.
 // Optional statusMapping is parsed separately so null vs omitted can be detected (see handler).
 type CompanyOneCSettingsPutBody struct {
 	ExchangeEnabled       *bool   `json:"exchangeEnabled"`
@@ -61,5 +61,5 @@ type CompanyOneCSettingsPutBody struct {
 // CompanyOneCSettingsPutRequest documents the full PUT body including optional statusMapping (OpenAPI / swag).
 type CompanyOneCSettingsPutRequest struct {
 	CompanyOneCSettingsPutBody
-	StatusMapping *OneCStatusMappingDTO `json:"statusMapping,omitempty"`
+	StatusMapping *OneCStatusMappingDTO `json:"statusMapping,omitempty" extensions:"x-nullable"`
 }
