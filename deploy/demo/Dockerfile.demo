@@ -1,0 +1,24 @@
+# Demo backend image: API + seed binaries (build from monorepo root).
+#   docker build -f deploy/demo/Dockerfile.demo -t quokkaq-backend-demo:local .
+FROM golang:1.26.2-alpine AS builder
+RUN apk add --no-cache git ca-certificates tzdata
+WORKDIR /build
+COPY apps/backend/go.mod apps/backend/go.sum ./
+RUN go mod download
+COPY apps/backend/ ./
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags='-w -s -extldflags "-static"' -o quokkaq-backend ./cmd/api
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags='-w -s -extldflags "-static"' -o seed-plans ./cmd/seed-plans
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags='-w -s -extldflags "-static"' -o seed-demo ./cmd/seed-demo
+
+FROM alpine:latest
+RUN apk --no-cache add ca-certificates tzdata wget
+RUN addgroup -g 1000 appuser && adduser -D -u 1000 -G appuser appuser
+WORKDIR /app
+COPY --from=builder /build/quokkaq-backend .
+COPY --from=builder /build/seed-plans .
+COPY --from=builder /build/seed-demo .
+COPY --from=builder /build/docs ./docs
+RUN chown -R appuser:appuser /app
+USER appuser
+EXPOSE 3001
+CMD ["./quokkaq-backend"]

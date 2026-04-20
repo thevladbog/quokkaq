@@ -1,0 +1,102 @@
+name: Deploy Demo
+
+# Pushes to `main` do not run this workflow. No workflow_dispatch.
+on:
+  push:
+    branches:
+      - release
+    paths:
+      - 'deploy/demo/**'
+      - 'apps/backend/**'
+      - 'apps/frontend/**'
+      - 'packages/shared-types/**'
+      - 'packages/kiosk-lib/**'
+      - '.github/workflows/deploy-demo.yml'
+
+concurrency:
+  group: demo-deploy-${{ github.repository }}
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-push:
+    name: Build and push demo images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Login to Yandex Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: cr.yandex
+          username: json_key
+          password: ${{ secrets.YC_SA_JSON_CREDENTIALS }}
+
+      - name: Build and push backend demo image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./deploy/demo/Dockerfile.demo
+          push: true
+          tags: |
+            cr.yandex/${{ secrets.YC_REGISTRY_ID }}/quokkaq-backend-demo:${{ github.sha }}
+            cr.yandex/${{ secrets.YC_REGISTRY_ID }}/quokkaq-backend-demo:latest
+
+      - name: Build and push frontend demo image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./apps/frontend/Dockerfile
+          push: true
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ secrets.DEMO_NEXT_PUBLIC_API_URL }}
+            NEXT_PUBLIC_WS_URL=${{ secrets.DEMO_NEXT_PUBLIC_WS_URL }}
+          tags: |
+            cr.yandex/${{ secrets.YC_REGISTRY_ID }}/quokkaq-frontend-demo:${{ github.sha }}
+            cr.yandex/${{ secrets.YC_REGISTRY_ID }}/quokkaq-frontend-demo:latest
+
+      - name: Copy demo Compose file to VM
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ secrets.DEMO_VM_HOST }}
+          username: ${{ secrets.DEMO_VM_USERNAME }}
+          key: ${{ secrets.DEMO_VM_SSH_KEY }}
+          source: 'deploy/demo/docker-compose.demo.yml'
+          target: '~/quokkaq-demo/'
+          strip_components: 2
+          debug: true
+
+      - name: Deploy on demo VM
+        uses: appleboy/ssh-action@v1.2.5
+        env:
+          YC_SA_JSON_CREDENTIALS: ${{ secrets.YC_SA_JSON_CREDENTIALS }}
+        with:
+          host: ${{ secrets.DEMO_VM_HOST }}
+          username: ${{ secrets.DEMO_VM_USERNAME }}
+          key: ${{ secrets.DEMO_VM_SSH_KEY }}
+          envs: YC_SA_JSON_CREDENTIALS
+          script: |
+            set -euo pipefail
+            export YC_REGISTRY_ID=${{ secrets.YC_REGISTRY_ID }}
+            export TAG=${{ github.sha }}
+
+            export DEMO_BACKEND_IMAGE="cr.yandex/$YC_REGISTRY_ID/quokkaq-backend-demo:$TAG"
+            export DEMO_FRONTEND_IMAGE="cr.yandex/$YC_REGISTRY_ID/quokkaq-frontend-demo:$TAG"
+
+            echo "Deploying demo images:"
+            echo "  DEMO_BACKEND_IMAGE=$DEMO_BACKEND_IMAGE"
+            echo "  DEMO_FRONTEND_IMAGE=$DEMO_FRONTEND_IMAGE"
+
+            echo "$YC_SA_JSON_CREDENTIALS" | docker login --username json_key --password-stdin cr.yandex
+
+            cd ~/quokkaq-demo
+
+            docker compose -f docker-compose.demo.yml --env-file .env.demo pull backend frontend
+            docker compose -f docker-compose.demo.yml --env-file .env.demo up -d --remove-orphans --wait
+
+            docker image prune -f

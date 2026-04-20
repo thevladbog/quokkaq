@@ -14,7 +14,6 @@ import (
 	"quokkaq-go-backend/internal/jobs"
 	"quokkaq-go-backend/internal/logger"
 	authmiddleware "quokkaq-go-backend/internal/middleware"
-	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/rbac"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
@@ -78,61 +77,7 @@ func run() error {
 	}
 	if runAutoMigrate {
 		// Use versioned migrations with tracking
-		err := database.RunVersionedMigrations(
-			// Core models (no dependencies)
-			&models.Company{},
-			&models.SubscriptionPlan{},
-			&models.Role{},
-
-			// Models with foreign keys (in dependency order)
-			&models.Subscription{},
-			&models.Invoice{},
-			&models.CatalogItem{},
-			&models.InvoiceLine{},
-			&models.InvoiceNumberSequence{},
-			&models.UsageRecord{},
-			&models.Unit{},
-			&models.User{},
-			&models.UserRole{},
-			&models.UserUnit{},
-			// Tenant RBAC & IdP group mappings (tenant = Company). Order: TenantRole → role-unit/user rows → optional TenantRole FK on group mapping.
-			&models.TenantRole{},
-			&models.TenantRoleUnit{},
-			&models.UserTenantRole{},
-			&models.CompanySSOGroupMapping{},
-			&models.Service{},
-			&models.Counter{},
-			&models.CounterOperatorInterval{},
-			&models.UnitClient{},
-			&models.UnitVisitorTagDefinition{},
-			&models.UnitClientTagAssignment{},
-			&models.UnitClientHistory{},
-			&models.Ticket{},
-			&models.TicketHistory{},
-			&models.TicketNumberSequence{},
-			&models.Booking{},
-			&models.Notification{},
-			&models.AuditLog{},
-			&models.UnitMaterial{},
-			&models.Invitation{},
-			&models.MessageTemplate{},
-			&models.PasswordResetToken{},
-			&models.PreRegistration{},
-			&models.UnitCalendarIntegration{},
-			&models.CalendarExternalSlot{},
-			&models.CalendarSyncIncident{},
-			&models.SlotConfig{},
-			&models.WeeklySlotCapacity{},
-			&models.DaySchedule{},
-			&models.ServiceSlot{},
-			&models.DesktopTerminal{},
-			&models.UnitOperationalState{},
-			&models.StatisticsDailyBucket{},
-			&models.StatisticsSurveyDaily{},
-			&models.SupportReport{},
-			&models.DeploymentSaaSSettings{},
-			&models.CompanyOneCSettings{},
-		)
+		err := database.RunVersionedMigrations(database.AllMigratableModels()...)
 		if err != nil {
 			logger.Error("failed to run migrations", "err", err)
 			return fmt.Errorf("failed to run migrations: %w", err)
@@ -179,7 +124,8 @@ func run() error {
 	}
 	defer jobWorker.Stop()
 
-	userService := services.NewUserService(userRepo)
+	userService := services.NewUserService(userRepo, companyRepo)
+	deploymentSetupService := services.NewDeploymentSetupService(userRepo, companyRepo)
 	mailService := services.NewMailService()
 	tenantRBACRepo := repository.NewTenantRBACRepository()
 	deploymentSaaSSettingsRepo := repository.NewDeploymentSaaSSettingsRepository()
@@ -246,7 +192,7 @@ func run() error {
 	surveyService := services.NewSurveyService(surveyRepo, unitRepo, userRepo, ticketRepo, desktopTerminalRepo, counterRepo, storageService)
 	quotaService := services.NewQuotaService()
 
-	userHandler := handlers.NewUserHandler(userService, userRepo, unitRepo)
+	userHandler := handlers.NewUserHandler(userService, userRepo, unitRepo, deploymentSetupService, storageService)
 	authHandler := handlers.NewAuthHandler(authService, userService, userRepo, tenantRBACRepo, leadIssueService)
 	integrationsHandler := handlers.NewIntegrationsHandler(deploymentSaaSSettingsService)
 	leadHandler := handlers.NewLeadHandler(leadIssueService)
@@ -358,7 +304,7 @@ func run() error {
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   allowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
-		AllowedHeaders:   []string{"Accept", "Accept-Language", "Authorization", "Content-Type", "X-CSRF-Token", "X-Company-Id", "X-Request-Id", "traceparent", "tracestate"},
+		AllowedHeaders:   []string{"Accept", "Accept-Language", "Authorization", "Content-Type", "X-CSRF-Token", "X-Company-Id", "X-Request-Id", "X-Setup-Token", "traceparent", "tracestate"},
 		ExposedHeaders:   []string{"Link", "X-Request-Id", "traceparent", "tracestate"},
 		AllowCredentials: true,
 		MaxAge:           300,
@@ -454,7 +400,8 @@ func run() error {
 
 	r.Route("/system", func(r chi.Router) {
 		r.Get("/status", userHandler.GetSystemStatus)
-		r.Post("/setup", userHandler.SetupFirstAdmin)
+		r.With(authmiddleware.SSOPublicRateLimit, authmiddleware.SetupWizardTokenGate).Get("/health", userHandler.GetSystemHealth)
+		r.With(authmiddleware.SSOPublicRateLimit, authmiddleware.SetupWizardTokenGate).Post("/setup", userHandler.SetupFirstAdmin)
 	})
 
 	r.Route("/users", func(r chi.Router) {

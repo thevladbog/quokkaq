@@ -32,6 +32,7 @@ async function proxy(req: NextRequest, ctx: RouteCtx): Promise<Response> {
     'accept-language',
     'accept',
     'x-company-id',
+    'x-setup-token',
     'x-request-id',
     'traceparent',
     'tracestate'

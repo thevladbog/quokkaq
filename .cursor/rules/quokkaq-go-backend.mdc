@@ -30,6 +30,7 @@ Use the existing flow: **handlers → services → repository → models**. Exte
 
 - Versioned steps live in [`apps/backend/pkg/database/postgres.go`](apps/backend/pkg/database/postgres.go) via `MigrationManager.RunMigration("v…", func)`.
 - **Do not edit already-committed migration bodies** (applied versions are recorded; changed code does not re-run on existing databases). **Add a new migration** with a new `vX.Y.Z_descriptive_name` key and the required DDL/logic instead.
+- **Demo seed parity:** new migrations or model fields that affect tables **`demoseed.Run`** writes to → run `pnpm nx run backend:test-demoseed-smoke` (with `DATABASE_URL` to an empty Postgres 16+ DB) and fix `internal/demoseed` if needed. New product areas you want visible in the **public** demo → extend the seed deliberately; otherwise ensure you do **not** break a clean `seed-plans` → `seed-demo` run.
 
 ## Configuration
 
