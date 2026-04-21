@@ -50,6 +50,10 @@ type Ticket struct {
 	ServedByName *string `json:"servedByName,omitempty" gorm:"-"`
 	// TransferTrail lists ticket.transferred events in chronological order (client visit APIs only).
 	TransferTrail []ClientVisitTransferEvent `json:"transferTrail,omitempty" gorm:"-"`
+	// QueuePosition is the 1-based position in the waiting queue (computed on-the-fly, not stored).
+	QueuePosition *int `json:"queuePosition,omitempty" gorm:"-"`
+	// EstimatedWaitSeconds is the estimated seconds until this ticket is called (computed on-the-fly).
+	EstimatedWaitSeconds *int `json:"estimatedWaitSeconds,omitempty" gorm:"-"`
 
 	// Relations
 	Unit    Unit     `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-" swaggerignore:"true"`

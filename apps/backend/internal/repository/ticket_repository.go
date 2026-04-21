@@ -205,6 +205,14 @@ type TicketRepository interface {
 	// GetInServiceTicketsWithSLA returns in_service (non-EOD) tickets for a unit that have a positive
 	// max_service_time snapshot and a non-null confirmed_at. Used by the SLA monitor.
 	GetInServiceTicketsWithSLA(unitID string) ([]models.Ticket, error)
+	// GetRecentCompletedServiceTimes returns the last `limit` service durations (seconds) for completed
+	// tickets of a given service in a unit. Duration = completed_at - confirmed_at.
+	GetRecentCompletedServiceTimes(unitID, serviceID string, limit int) ([]int, error)
+	// GetQueuePosition returns the 1-based position of a waiting ticket in its unit queue
+	// (number of waiting non-EOD tickets with higher priority or same priority and earlier createdAt, plus 1).
+	GetQueuePosition(ticket *models.Ticket) (int, error)
+	// CountWaitingByUnit returns the number of non-EOD waiting tickets for a unit (all services).
+	CountWaitingByUnit(unitID string) (int64, error)
 }
 
 type ticketRepository struct {
@@ -715,4 +723,48 @@ func (r *ticketRepository) ListTerminalVisitActorNamesByTicketIDs(ticketIDs []st
 		}
 	}
 	return out, nil
+}
+
+func (r *ticketRepository) GetRecentCompletedServiceTimes(unitID, serviceID string, limit int) ([]int, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	var durations []int
+	q := r.db.Model(&models.Ticket{}).
+		Select("EXTRACT(EPOCH FROM (completed_at - confirmed_at))::int AS duration_sec").
+		Where("unit_id = ? AND status = 'served' AND confirmed_at IS NOT NULL AND completed_at IS NOT NULL AND completed_at > confirmed_at AND is_eod = false", unitID)
+	if serviceID != "" {
+		q = q.Where("service_id = ?", serviceID)
+	}
+	q = q.Order("completed_at DESC").Limit(limit)
+	err := q.Scan(&durations).Error
+	if err != nil {
+		return nil, err
+	}
+	return durations, nil
+}
+
+func (r *ticketRepository) GetQueuePosition(ticket *models.Ticket) (int, error) {
+	var count int64
+	err := r.db.Model(&models.Ticket{}).
+		Where(
+			"unit_id = ? AND status = 'waiting' AND is_eod = false AND (priority > ? OR (priority = ? AND created_at < ?))",
+			ticket.UnitID, ticket.Priority, ticket.Priority, ticket.CreatedAt,
+		).
+		Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+	return int(count) + 1, nil
+}
+
+func (r *ticketRepository) CountWaitingByUnit(unitID string) (int64, error) {
+	var count int64
+	err := r.db.Model(&models.Ticket{}).
+		Where("unit_id = ? AND status = 'waiting' AND is_eod = false", unitID).
+		Count(&count).Error
+	return count, err
 }

@@ -33,6 +33,12 @@ type DeploymentSaaSSettingsPatch struct {
 	TrackerTypeError        *string `json:"trackerTypeError,omitempty"`
 	SupportTrackerQueue     *string `json:"supportTrackerQueue,omitempty"`
 	TrackerTypeSupport      *string `json:"trackerTypeSupport,omitempty"`
+	// SMS provider settings (all optional).
+	SmsProvider  *string `json:"smsProvider,omitempty"`
+	SmsApiKey    *string `json:"smsApiKey,omitempty"`    // full credential (write-only; never returned in GET)
+	SmsApiSecret *string `json:"smsApiSecret,omitempty"` // full credential (write-only; never returned in GET)
+	SmsFromName  *string `json:"smsFromName,omitempty"`
+	SmsEnabled   *bool   `json:"smsEnabled,omitempty"`
 }
 
 // PatchIntegrationSettings merges patch into stored settings, upserts, and returns the persisted row.
@@ -66,8 +72,36 @@ func (s *DeploymentSaaSSettingsService) PatchIntegrationSettings(patch *Deployme
 	if patch.TrackerTypeSupport != nil {
 		merged.TrackerTypeSupport = *patch.TrackerTypeSupport
 	}
+	if patch.SmsProvider != nil {
+		merged.SmsProvider = *patch.SmsProvider
+	}
+	if patch.SmsApiKey != nil && *patch.SmsApiKey != "" {
+		merged.SmsApiKey = *patch.SmsApiKey
+	}
+	if patch.SmsApiSecret != nil && *patch.SmsApiSecret != "" {
+		merged.SmsApiSecret = *patch.SmsApiSecret
+	}
+	if patch.SmsFromName != nil {
+		merged.SmsFromName = *patch.SmsFromName
+	}
+	if patch.SmsEnabled != nil {
+		merged.SmsEnabled = *patch.SmsEnabled
+	}
 	if err := s.repo.Upsert(&merged); err != nil {
 		return nil, err
 	}
 	return s.repo.Get()
+}
+
+// GetSMSProvider builds and returns the active SMSProvider based on persisted settings.
+// Returns a log-only provider when SMS is disabled or not configured.
+func (s *DeploymentSaaSSettingsService) GetSMSProvider() SMSProvider {
+	if s == nil || s.repo == nil {
+		return &LogSMSProvider{}
+	}
+	row, err := s.repo.Get()
+	if err != nil {
+		return &LogSMSProvider{}
+	}
+	return NewSMSProviderFromSettings(row)
 }

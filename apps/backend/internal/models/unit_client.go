@@ -6,12 +6,14 @@ import (
 
 // UnitClient is a per-unit directory entry (visitor / customer). One row per unit has is_anonymous=true (shared kiosk tickets).
 type UnitClient struct {
-	ID          string    `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
-	UnitID      string    `gorm:"not null;index" json:"unitId"`
-	FirstName   string    `gorm:"not null" json:"firstName"`
-	LastName    string    `gorm:"not null" json:"lastName"`
-	PhoneE164   *string   `gorm:"column:phone_e164" json:"phoneE164,omitempty"`
-	PhotoURL    *string   `gorm:"column:photo_url" json:"photoUrl,omitempty"`
+	ID        string  `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
+	UnitID    string  `gorm:"not null;index" json:"unitId"`
+	FirstName string  `gorm:"not null" json:"firstName"`
+	LastName  string  `gorm:"not null" json:"lastName"`
+	PhoneE164 *string `gorm:"column:phone_e164" json:"phoneE164,omitempty"`
+	PhotoURL  *string `gorm:"column:photo_url" json:"photoUrl,omitempty"`
+	// Locale is the visitor's preferred locale ("ru" or "en"), set from the kiosk/virtual-queue on first phone identification.
+	Locale      *string   `gorm:"column:locale" json:"locale,omitempty"`
 	IsAnonymous bool      `gorm:"not null;default:false" json:"isAnonymous"`
 	CreatedAt   time.Time `gorm:"default:now()" json:"createdAt"`
 	UpdatedAt   time.Time `gorm:"autoUpdateTime" json:"updatedAt"`

@@ -544,6 +544,8 @@ export const TicketModelSchema = z.object({
   operatorComment: z.string().nullable().optional(),
   servedByName: z.string().nullable().optional(),
   transferTrail: z.array(ClientVisitTransferEventSchema).optional(),
+  queuePosition: z.number().nullable().optional(),
+  estimatedWaitSeconds: z.number().nullable().optional(),
   service: z
     .object({
       id: z.string().optional(),

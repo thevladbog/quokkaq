@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/services"
+	"strings"
 )
 
 // IntegrationsHandler exposes SaaS deployment integration settings (platform admin).
@@ -19,12 +20,25 @@ func NewIntegrationsHandler(svc *services.DeploymentSaaSSettingsService) *Integr
 
 // PlatformIntegrationsResponse is the JSON body for GET /platform/integrations.
 type PlatformIntegrationsResponse struct {
-	LeadsTrackerQueue       string `json:"leadsTrackerQueue" binding:"required"`
-	TrackerTypeRegistration string `json:"trackerTypeRegistration" binding:"required"`
-	TrackerTypeRequest      string `json:"trackerTypeRequest" binding:"required"`
-	TrackerTypeError        string `json:"trackerTypeError" binding:"required"`
-	SupportTrackerQueue     string `json:"supportTrackerQueue" binding:"required"`
-	TrackerTypeSupport      string `json:"trackerTypeSupport" binding:"required"`
+	LeadsTrackerQueue       string `json:"leadsTrackerQueue"`
+	TrackerTypeRegistration string `json:"trackerTypeRegistration"`
+	TrackerTypeRequest      string `json:"trackerTypeRequest"`
+	TrackerTypeError        string `json:"trackerTypeError"`
+	SupportTrackerQueue     string `json:"supportTrackerQueue"`
+	TrackerTypeSupport      string `json:"trackerTypeSupport"`
+	// SMS integration (credentials are masked in read; never returned in plaintext).
+	SmsProvider     string `json:"smsProvider"`
+	SmsApiKeyMasked string `json:"smsApiKeyMasked"` // e.g. "****abcd" — last 4 chars only
+	SmsFromName     string `json:"smsFromName"`
+	SmsEnabled      bool   `json:"smsEnabled"`
+}
+
+// maskSecret returns a masked version of a secret (last 4 chars visible, rest starred).
+func maskSecret(s string) string {
+	if len(s) <= 4 {
+		return strings.Repeat("*", len(s))
+	}
+	return strings.Repeat("*", len(s)-4) + s[len(s)-4:]
 }
 
 func settingsToResponse(row *models.DeploymentSaaSSettings) PlatformIntegrationsResponse {
@@ -38,6 +52,10 @@ func settingsToResponse(row *models.DeploymentSaaSSettings) PlatformIntegrations
 		TrackerTypeError:        row.TrackerTypeError,
 		SupportTrackerQueue:     row.SupportTrackerQueue,
 		TrackerTypeSupport:      row.TrackerTypeSupport,
+		SmsProvider:             row.SmsProvider,
+		SmsApiKeyMasked:         maskSecret(row.SmsApiKey),
+		SmsFromName:             row.SmsFromName,
+		SmsEnabled:              row.SmsEnabled,
 	}
 }
 
@@ -90,4 +108,43 @@ func (h *IntegrationsHandler) PatchPlatformIntegrations(w http.ResponseWriter, r
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(settingsToResponse(saved))
+}
+
+// TestSMSIntegrationRequest is the body for POST /platform/integrations/sms/test.
+type TestSMSIntegrationRequest struct {
+	// Phone number in E.164 format to send the test SMS to.
+	Phone string `json:"phone"`
+}
+
+// TestSMSIntegration godoc
+// @ID           testSMSIntegration
+// @Summary      Send a test SMS to validate provider credentials
+// @Description  Sends a test SMS using the currently saved SMS provider settings. Returns 200 on success.
+// @Tags         platform
+// @Accept       json
+// @Produce      json
+// @Param        body  body      TestSMSIntegrationRequest  true  "Target phone number"
+// @Success      200   {object}  map[string]string  "ok"
+// @Failure      400   {string}  string  "Bad request"
+// @Failure      500   {string}  string  "SMS send failed"
+// @Router       /platform/integrations/sms/test [post]
+// @Security     BearerAuth
+func (h *IntegrationsHandler) TestSMSIntegration(w http.ResponseWriter, r *http.Request) {
+	var req TestSMSIntegrationRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+	phone := strings.TrimSpace(req.Phone)
+	if phone == "" {
+		http.Error(w, "phone is required", http.StatusBadRequest)
+		return
+	}
+	provider := h.svc.GetSMSProvider()
+	if err := provider.Send(phone, "QuokkaQ: тестовое сообщение / test message"); err != nil {
+		http.Error(w, "SMS send failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok", "provider": provider.Name()})
 }

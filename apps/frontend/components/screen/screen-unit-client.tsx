@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import QRCode from 'react-qr-code';
 import {
   formatAppDate,
   formatAppTime,
@@ -188,6 +189,26 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
     };
   }, [unitId, unit]);
 
+  // Queue status for ETA display
+  const [queueStatus, setQueueStatus] = useState<{
+    queueLength: number;
+    estimatedWaitMinutes: number;
+    activeCounters: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!unitId) return;
+    const fetch = () => {
+      unitsApi
+        .getQueueStatus(unitId)
+        .then(setQueueStatus)
+        .catch(() => null);
+    };
+    fetch();
+    const iv = setInterval(fetch, 30_000);
+    return () => clearInterval(iv);
+  }, [unitId]);
+
   if (isUnitLoading) {
     return (
       <div className='bg-background text-foreground flex min-h-screen items-center justify-center'>
@@ -249,6 +270,14 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
   const adConfig = config?.adScreen;
   const showAds = adConfig && adConfig.width > 0 && materials.length > 0;
   const adWidth = adConfig?.width || 0;
+
+  const virtualQueueEnabled =
+    (config as { virtualQueue?: { enabled?: boolean } } | null)?.virtualQueue
+      ?.enabled === true;
+  const queueUrl =
+    typeof window !== 'undefined'
+      ? `${window.location.origin}/${locale}/queue/${unitId}`
+      : `/${locale}/queue/${unitId}`;
 
   // Custom colors
   const isCustomColorsEnabled = adConfig?.isCustomColorsEnabled || false;
@@ -322,6 +351,46 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
           />
         </div>
       </div>
+
+      {/* Bottom: ETA stats + QR */}
+      {(queueStatus || virtualQueueEnabled) && (
+        <div className='bg-card/90 z-20 flex flex-none items-center justify-between gap-6 border-t px-8 py-2'>
+          {/* Queue stats */}
+          {queueStatus && (
+            <div className='flex items-center gap-6 text-sm'>
+              <span>
+                {t('queueLength')}: <strong>{queueStatus.queueLength}</strong>
+              </span>
+              {queueStatus.estimatedWaitMinutes > 0 && (
+                <span>
+                  {t('estimatedWait')}:{' '}
+                  <strong>
+                    ~{Math.round(queueStatus.estimatedWaitMinutes)}{' '}
+                    {t('minutes')}
+                  </strong>
+                </span>
+              )}
+              {queueStatus.activeCounters > 0 && (
+                <span>
+                  {t('activeCounters')}:{' '}
+                  <strong>{queueStatus.activeCounters}</strong>
+                </span>
+              )}
+            </div>
+          )}
+          {/* Virtual queue QR */}
+          {virtualQueueEnabled && (
+            <div className='flex items-center gap-3'>
+              <p className='text-muted-foreground max-w-[120px] text-right text-xs leading-tight'>
+                {t('scanToJoinQueue')}
+              </p>
+              <div className='rounded bg-white p-1'>
+                <QRCode value={queueUrl} size={64} />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Bottom: Ticker */}
       <div className='z-20 flex-none'>

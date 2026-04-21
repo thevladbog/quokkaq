@@ -514,6 +514,39 @@ export const unitsApi = {
       z.array(ServiceModelSchema)
     ),
 
+  getQueueStatus: async (unitId: string) => {
+    const res = await fetch(`${API_BASE_URL}/units/${unitId}/queue-status`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json() as Promise<{
+      queueLength: number;
+      estimatedWaitMinutes: number;
+      activeCounters: number;
+    }>;
+  },
+
+  joinVirtualQueue: async (
+    unitId: string,
+    body: { serviceId: string; phone?: string; locale?: string }
+  ) => {
+    const res = await fetch(`${API_BASE_URL}/units/${unitId}/virtual-queue`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || `HTTP ${res.status}`);
+    }
+    const json = (await res.json()) as {
+      ticket: unknown;
+      ticketPageUrl: string;
+    };
+    return {
+      ticket: TicketModelSchema.parse(json.ticket),
+      ticketPageUrl: json.ticketPageUrl as string
+    };
+  },
+
   create: async (data: {
     name: string;
     code: string;
@@ -800,6 +833,33 @@ export const ticketsApi = {
   pick: async (id: string, counterId: string) => {
     const res = await orvalTc.postTicketsIdPick(id, { counterId });
     return TicketModelSchema.parse(res.data);
+  },
+
+  visitorCancel: async (id: string) => {
+    const res = await fetch(`${API_BASE_URL}/tickets/${id}/cancel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(body || `HTTP ${res.status}`);
+    }
+    const json = await res.json();
+    return TicketModelSchema.parse(json);
+  },
+
+  attachPhone: async (id: string, phone: string, locale?: string) => {
+    const res = await fetch(`${API_BASE_URL}/tickets/${id}/phone`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, locale: locale ?? 'ru' })
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(body || `HTTP ${res.status}`);
+    }
+    const json = await res.json();
+    return TicketModelSchema.parse(json);
   },
 
   confirmArrival: async (id: string) => {

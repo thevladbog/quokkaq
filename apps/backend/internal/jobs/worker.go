@@ -13,16 +13,21 @@ import (
 	"github.com/hibiken/asynq"
 )
 
+// Ensure jobWorker implements JobWorker at compile time.
+var _ JobWorker = (*jobWorker)(nil)
+
 type JobWorker interface {
 	Start() error
 	Stop()
 }
 
 type jobWorker struct {
-	server     *asynq.Server
-	mux        *asynq.ServeMux
-	ttsService services.TtsService
-	ticketRepo repository.TicketRepository
+	server      *asynq.Server
+	mux         *asynq.ServeMux
+	ttsService  services.TtsService
+	ticketRepo  repository.TicketRepository
+	notifRepo   repository.NotificationRepository
+	smsProvider services.SMSProvider
 }
 
 func NewJobWorker(ttsService services.TtsService, ticketRepo repository.TicketRepository) JobWorker {
@@ -64,8 +69,22 @@ func NewJobWorker(ttsService services.TtsService, ticketRepo repository.TicketRe
 	}
 
 	mux.HandleFunc(TypeTTSGenerate, w.handleTtsGenerate)
+	mux.HandleFunc(TypeSMSSend, w.handleSMSSend)
 
 	return w
+}
+
+// NewJobWorkerWithSMS builds a worker that can also deliver SMS notifications.
+func NewJobWorkerWithSMS(
+	ttsService services.TtsService,
+	ticketRepo repository.TicketRepository,
+	notifRepo repository.NotificationRepository,
+	smsProvider services.SMSProvider,
+) JobWorker {
+	base := NewJobWorker(ttsService, ticketRepo).(*jobWorker)
+	base.notifRepo = notifRepo
+	base.smsProvider = smsProvider
+	return base
 }
 
 func (w *jobWorker) Start() error {
@@ -112,5 +131,46 @@ func (w *jobWorker) handleTtsGenerate(ctx context.Context, t *asynq.Task) error 
 		// Not returning error as TTS was generated successfully
 	}
 
+	return nil
+}
+
+func (w *jobWorker) handleSMSSend(ctx context.Context, t *asynq.Task) error {
+	var p SMSSendPayload
+	if err := json.Unmarshal(t.Payload(), &p); err != nil {
+		return fmt.Errorf("sms:send unmarshal failed: %v: %w", err, asynq.SkipRetry)
+	}
+
+	applogger.InfoContext(ctx, "processing SMS send", "notification_id", p.NotificationID, "to", p.To)
+
+	// Determine current attempt count from the notification row if repo is available.
+	attempts := 1
+	if w.notifRepo != nil && p.NotificationID != "" {
+		if n, err := w.notifRepo.FindByID(p.NotificationID); err == nil {
+			attempts = n.Attempts + 1
+		}
+	}
+
+	// Send via the configured provider (falls back to LogSMSProvider when nil).
+	provider := w.smsProvider
+	if provider == nil {
+		provider = &services.LogSMSProvider{}
+	}
+	sendErr := provider.Send(p.To, p.Body)
+
+	// Persist status back to Notification row.
+	if w.notifRepo != nil && p.NotificationID != "" {
+		status := "sent"
+		if sendErr != nil {
+			status = "failed"
+		}
+		if uErr := w.notifRepo.UpdateStatus(p.NotificationID, status, attempts); uErr != nil {
+			applogger.WarnContext(ctx, "failed to update notification status", "notification_id", p.NotificationID, "err", uErr)
+		}
+	}
+
+	if sendErr != nil {
+		return fmt.Errorf("SMS send via %s failed: %w", provider.Name(), sendErr)
+	}
+	applogger.InfoContext(ctx, "SMS sent successfully", "provider", provider.Name(), "to", p.To)
 	return nil
 }

@@ -2182,6 +2182,56 @@ ALTER TABLE statistics_daily_buckets
 		return fmt.Errorf("failed to run v1.6.0_service_time_sla migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.6.1_plan_features_virtual_queue_visitor_notifications", func(db *gorm.DB) error {
+		// Add virtual_queue and visitor_notifications feature keys to all existing subscription plan rows.
+		// Only backfills keys that are not already present in the features JSON to avoid overwriting manual overrides.
+		return db.Exec(`
+UPDATE subscription_plans
+SET features = features ||
+    CASE
+        WHEN NOT (features ? 'virtual_queue') THEN
+            CASE code
+                WHEN 'starter'       THEN '{"virtual_queue": false, "visitor_notifications": false}'::jsonb
+                WHEN 'professional'  THEN '{"virtual_queue": true,  "visitor_notifications": true}'::jsonb
+                WHEN 'enterprise'    THEN '{"virtual_queue": true,  "visitor_notifications": true}'::jsonb
+                WHEN 'grandfathered' THEN '{"virtual_queue": true,  "visitor_notifications": false}'::jsonb
+                ELSE                      '{"virtual_queue": false, "visitor_notifications": false}'::jsonb
+            END
+        ELSE '{}'::jsonb
+    END
+WHERE features IS NOT NULL;
+`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.6.1_plan_features_virtual_queue_visitor_notifications migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.6.2_deployment_saas_settings_sms", func(db *gorm.DB) error {
+		// Add SMS provider configuration columns to the deployment_saas_settings singleton row.
+		return db.Exec(`
+ALTER TABLE deployment_saas_settings
+    ADD COLUMN IF NOT EXISTS sms_provider   varchar(32)  NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS sms_api_key    text         NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS sms_api_secret text         NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS sms_from_name  varchar(128) NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS sms_enabled    boolean      NOT NULL DEFAULT false;
+`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.6.2_deployment_saas_settings_sms migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.6.3_unit_clients_locale", func(db *gorm.DB) error {
+		// Add preferred locale column to unit_clients, populated when a visitor identifies via phone (kiosk/virtual queue).
+		return db.Exec(`
+ALTER TABLE unit_clients
+    ADD COLUMN IF NOT EXISTS locale varchar(8) NULL DEFAULT NULL;
+`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.6.3_unit_clients_locale migration: %w", err)
+	}
+
 	fmt.Println("✅ All migrations completed successfully")
 	return nil
 }
