@@ -188,6 +188,9 @@ export interface ModelsUnit {
   parentId?: string;
   preRegistrations?: ModelsPreRegistration[];
   services?: ModelsService[];
+  /** SkillBasedRoutingEnabled activates operator-service skill matching when calling the next ticket.
+  When false (default) the system uses standard FIFO priority routing. */
+  skillBasedRoutingEnabled?: boolean;
   slotConfig?: ModelsSlotConfig;
   sortOrder?: number;
   tickets?: ModelsTicket[];
@@ -280,6 +283,8 @@ export interface ModelsTicket {
   queuePosition?: number;
   /** ServedByName is hydrated for client visit lists from ticket_histories (not stored on tickets). */
   servedByName?: string;
+  /** ServedByUserID is set when a ticket is called/picked; records the operator (counter.AssignedTo at call time). */
+  servedByUserId?: string;
   service?: ModelsService;
   serviceId?: string;
   /** ServiceZoneID: waiting pool within the subdivision; NULL = subdivision-wide pool. */
@@ -1018,6 +1023,16 @@ export interface HandlersAddSupportReportShareRequest {
   userId?: string;
 }
 
+export interface HandlersOperatorSkillInput {
+  priority?: number;
+  serviceId?: string;
+  userId?: string;
+}
+
+export interface HandlersBulkUpsertSkillsRequest {
+  skills?: HandlersOperatorSkillInput[];
+}
+
 /**
  * PricingModel determines how the price field is interpreted.
 Default: "per_unit".
@@ -1641,6 +1656,16 @@ export interface ModelsMessageTemplate {
   updatedAt?: string;
 }
 
+export interface ModelsOperatorSkill {
+  id?: string;
+  /** Priority: 1 = primary, 2 = secondary, 3 = backup.
+  Lower value = higher precedence when selecting the next ticket for this operator. */
+  priority?: number;
+  serviceId?: string;
+  unitId?: string;
+  userId?: string;
+}
+
 export interface ModelsPreRegCalendarSlotItem {
   calendarIntegrationId?: string;
   externalEventEtag?: string;
@@ -1938,6 +1963,14 @@ export interface ServicesCreateCalendarIntegrationRequest {
   username: string;
 }
 
+export interface ServicesDailyStaffingSummary {
+  avgRecommendedStaff?: number;
+  maxRecommendedStaff?: number;
+  peakArrivals?: number;
+  peakHour?: number;
+  totalExpectedArrivals?: number;
+}
+
 export interface ServicesDeploymentSaaSSettingsPatch {
   leadsTrackerQueue?: string;
   /** full credential (write-only; never returned in GET) */
@@ -2000,6 +2033,19 @@ export interface ServicesGuestSurveySession {
   idleScreen?: ServicesGuestSurveySessionIdleScreen;
   survey?: ServicesGuestSurveySessionSurvey;
   unitConfig?: ServicesGuestSurveySessionUnitConfig;
+}
+
+export interface ServicesHourlyStaffingForecast {
+  /** avg handle time in minutes */
+  avgServiceTimeMin?: number;
+  /** avg tickets expected this hour */
+  expectedArrivals?: number;
+  /** Erlang C P(wait≤target) with recommended agents */
+  expectedSlaPct?: number;
+  /** 0–23 */
+  hour?: number;
+  /** minimum agents to meet SLA */
+  recommendedStaff?: number;
 }
 
 export interface ServicesLoadPoint {
@@ -2140,6 +2186,59 @@ export interface ServicesSlaSummaryResponse {
   slaWaitMet?: number;
   slaWaitTotal?: number;
   withinPct?: number;
+}
+
+export interface ServicesStaffDailyTrendPoint {
+  avgServiceMs?: number;
+  date?: string;
+  slaServicePct?: number;
+  slaWaitPct?: number;
+  ticketsCompleted?: number;
+}
+
+export interface ServicesStaffPerformanceResponse {
+  avgServiceMs?: number;
+  avgWaitMs?: number;
+  computedAt?: string;
+  /** CSAT */
+  csatAvg?: number;
+  csatCount?: number;
+  /** 0–100, derived from csatAvg */
+  csatNorm?: number;
+  /** Daily trend (only populated in detail mode) */
+  dailyTrend?: ServicesStaffDailyTrendPoint[];
+  noShowCount?: number;
+  slaService?: number;
+  slaServiceMet?: number;
+  slaServiceTotal?: number;
+  /** Normalized radar axes (0–100) */
+  slaWait?: number;
+  slaWaitMet?: number;
+  slaWaitTotal?: number;
+  /** Absolute metrics */
+  ticketsCompleted?: number;
+  ticketsCreated?: number;
+  ticketsPerHour?: number;
+  totalBreakMin?: number;
+  totalIdleMin?: number;
+  totalServiceMin?: number;
+  userId?: string;
+  userName?: string;
+  utilizationPct?: number;
+}
+
+export interface ServicesStaffPerformanceListResponse {
+  items?: ServicesStaffPerformanceResponse[];
+}
+
+export interface ServicesStaffingForecastResponse {
+  dailySummary?: ServicesDailyStaffingSummary;
+  dayOfWeek?: string;
+  hourlyForecasts?: ServicesHourlyStaffingForecast[];
+  targetDate?: string;
+  targetMaxWaitMin?: number;
+  targetSlaPct?: number;
+  unitId?: string;
 }
 
 export interface ServicesSupportReportCommentItem {

@@ -46,8 +46,7 @@ const useListUnitOperatorSkillsImpl = vi.fn(() => ({
 }));
 
 vi.mock('@/lib/api/generated/units', () => ({
-  useListUnitOperatorSkills: (...args: unknown[]) =>
-    useListUnitOperatorSkillsImpl(...args),
+  useListUnitOperatorSkills: () => useListUnitOperatorSkillsImpl(),
   useUpsertUnitOperatorSkills: () => ({
     mutate: upsertMutate,
     isPending: false

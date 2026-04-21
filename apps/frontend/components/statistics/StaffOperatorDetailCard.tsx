@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { enUS, ru } from 'date-fns/locale';
 import {
@@ -105,11 +105,17 @@ export function StaffOperatorDetailCard({
   );
 
   const fmtTooltipLabel = useMemo(
-    () => (label: string | number) =>
-      formatStatisticsTooltipLabel(label, {
-        hourly: false,
-        locale: dateLocale
-      }),
+    () =>
+      (label: ReactNode): ReactNode => {
+        if (label == null || typeof label === 'boolean') return '';
+        if (typeof label === 'string' || typeof label === 'number') {
+          return formatStatisticsTooltipLabel(label, {
+            hourly: false,
+            locale: dateLocale
+          });
+        }
+        return label;
+      },
     [dateLocale]
   );
 
