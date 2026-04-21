@@ -213,6 +213,14 @@ type TicketRepository interface {
 	GetQueuePosition(ticket *models.Ticket) (int, error)
 	// CountWaitingByUnit returns the number of non-EOD waiting tickets for a unit (all services).
 	CountWaitingByUnit(unitID string) (int64, error)
+	// CountWaitingByService returns the waiting non-EOD ticket count grouped by service_id for a unit.
+	CountWaitingByService(unitID string) ([]ServiceWaitingCount, error)
+}
+
+// ServiceWaitingCount holds the waiting queue length for a single service.
+type ServiceWaitingCount struct {
+	ServiceID string
+	Count     int64
 }
 
 type ticketRepository struct {
@@ -767,4 +775,25 @@ func (r *ticketRepository) CountWaitingByUnit(unitID string) (int64, error) {
 		Where("unit_id = ? AND status = 'waiting' AND is_eod = false", unitID).
 		Count(&count).Error
 	return count, err
+}
+
+func (r *ticketRepository) CountWaitingByService(unitID string) ([]ServiceWaitingCount, error) {
+	type row struct {
+		ServiceID string `gorm:"column:service_id"`
+		Count     int64  `gorm:"column:cnt"`
+	}
+	var rows []row
+	err := r.db.Model(&models.Ticket{}).
+		Select("service_id, COUNT(*) AS cnt").
+		Where("unit_id = ? AND status = 'waiting' AND is_eod = false", unitID).
+		Group("service_id").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	out := make([]ServiceWaitingCount, len(rows))
+	for i, r := range rows {
+		out[i] = ServiceWaitingCount{ServiceID: r.ServiceID, Count: r.Count}
+	}
+	return out, nil
 }

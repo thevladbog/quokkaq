@@ -194,6 +194,12 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
     queueLength: number;
     estimatedWaitMinutes: number;
     activeCounters: number;
+    services?: Array<{
+      serviceId: string;
+      serviceName: string;
+      queueLength: number;
+      estimatedWaitMinutes: number;
+    }>;
   } | null>(null);
 
   useEffect(() => {
@@ -357,24 +363,47 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
         <div className='bg-card/90 z-20 flex flex-none items-center justify-between gap-6 border-t px-8 py-2'>
           {/* Queue stats */}
           {queueStatus && (
-            <div className='flex items-center gap-6 text-sm'>
-              <span>
-                {t('queueLength')}: <strong>{queueStatus.queueLength}</strong>
-              </span>
-              {queueStatus.estimatedWaitMinutes > 0 && (
-                <span>
-                  {t('estimatedWait')}:{' '}
-                  <strong>
-                    ~{Math.round(queueStatus.estimatedWaitMinutes)}{' '}
-                    {t('minutes')}
-                  </strong>
-                </span>
-              )}
-              {queueStatus.activeCounters > 0 && (
-                <span>
-                  {t('activeCounters')}:{' '}
-                  <strong>{queueStatus.activeCounters}</strong>
-                </span>
+            <div className='flex flex-wrap items-center gap-4 text-sm'>
+              {/* Per-service breakdown (when multiple services have waiting tickets) */}
+              {queueStatus.services && queueStatus.services.length > 1 ? (
+                queueStatus.services.map((svc) => (
+                  <span
+                    key={svc.serviceId}
+                    className='bg-muted/60 flex items-center gap-1.5 rounded-full px-3 py-0.5'
+                  >
+                    <strong className='max-w-[140px] truncate'>
+                      {svc.serviceName}
+                    </strong>
+                    <span className='text-muted-foreground'>
+                      {t('serviceQueue', { count: svc.queueLength })}
+                      {svc.estimatedWaitMinutes > 0 &&
+                        ` · ~${Math.round(svc.estimatedWaitMinutes)} ${t('minutes')}`}
+                    </span>
+                  </span>
+                ))
+              ) : (
+                // Aggregate view (single service or no breakdown)
+                <>
+                  <span>
+                    {t('queueLength')}:{' '}
+                    <strong>{queueStatus.queueLength}</strong>
+                  </span>
+                  {queueStatus.estimatedWaitMinutes > 0 && (
+                    <span>
+                      {t('estimatedWait')}:{' '}
+                      <strong>
+                        ~{Math.round(queueStatus.estimatedWaitMinutes)}{' '}
+                        {t('minutes')}
+                      </strong>
+                    </span>
+                  )}
+                  {queueStatus.activeCounters > 0 && (
+                    <span>
+                      {t('activeCounters')}:{' '}
+                      <strong>{queueStatus.activeCounters}</strong>
+                    </span>
+                  )}
+                </>
               )}
             </div>
           )}

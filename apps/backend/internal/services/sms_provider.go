@@ -1,6 +1,9 @@
 package services
 
 import (
+	"os"
+	"strings"
+
 	"quokkaq-go-backend/internal/models"
 )
 
@@ -21,18 +24,43 @@ type SMSConfig struct {
 }
 
 // NewSMSProviderFromSettings builds the correct SMSProvider based on deployment settings.
-// Returns a LogSMSProvider (no-op logger) when provider is empty or disabled.
+// Env vars SMS_PROVIDER, SMS_API_KEY, SMS_API_SECRET, SMS_FROM_NAME override DB values:
+//   - SMS_API_KEY and SMS_API_SECRET always win (keep secrets out of DB in prod).
+//   - SMS_PROVIDER and SMS_FROM_NAME are used only when the DB field is empty.
+//   - If SMS_PROVIDER env is set, SMS is considered enabled even if SmsEnabled=false in DB.
 func NewSMSProviderFromSettings(s *models.DeploymentSaaSSettings) SMSProvider {
-	if s == nil || !s.SmsEnabled || s.SmsProvider == "" {
+	cfg := SMSConfig{}
+	if s != nil {
+		cfg.Provider = s.SmsProvider
+		cfg.APIKey = s.SmsApiKey
+		cfg.APISecret = s.SmsApiSecret
+		cfg.FromName = s.SmsFromName
+	}
+	applySMSEnvOverrides(&cfg)
+
+	// Determine whether SMS is effectively enabled.
+	smsEnabled := (s != nil && s.SmsEnabled) || cfg.Provider != ""
+	if !smsEnabled || cfg.Provider == "" {
 		return &LogSMSProvider{}
 	}
-	cfg := SMSConfig{
-		Provider:  s.SmsProvider,
-		APIKey:    s.SmsApiKey,
-		APISecret: s.SmsApiSecret,
-		FromName:  s.SmsFromName,
-	}
 	return NewSMSProviderFromConfig(cfg)
+}
+
+// applySMSEnvOverrides merges environment variable overrides into cfg.
+// API credentials from env always win; provider and sender name only fill empty DB fields.
+func applySMSEnvOverrides(cfg *SMSConfig) {
+	if v := strings.TrimSpace(os.Getenv("SMS_PROVIDER")); v != "" && cfg.Provider == "" {
+		cfg.Provider = v
+	}
+	if v := os.Getenv("SMS_API_KEY"); v != "" {
+		cfg.APIKey = v
+	}
+	if v := os.Getenv("SMS_API_SECRET"); v != "" {
+		cfg.APISecret = v
+	}
+	if v := strings.TrimSpace(os.Getenv("SMS_FROM_NAME")); v != "" && cfg.FromName == "" {
+		cfg.FromName = v
+	}
 }
 
 // NewSMSProviderFromConfig creates the correct provider from a config struct.

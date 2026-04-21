@@ -521,6 +521,12 @@ export const unitsApi = {
       queueLength: number;
       estimatedWaitMinutes: number;
       activeCounters: number;
+      services?: Array<{
+        serviceId: string;
+        serviceName: string;
+        queueLength: number;
+        estimatedWaitMinutes: number;
+      }>;
     }>;
   },
 

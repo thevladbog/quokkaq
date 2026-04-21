@@ -1780,7 +1780,8 @@
     "estimatedWait": "Примерное ожидание",
     "minutes": "мин.",
     "activeCounters": "Операторов",
-    "scanToJoinQueue": "Отсканируйте QR,\nчтобы занять место"
+    "scanToJoinQueue": "Отсканируйте QR,\nчтобы занять место",
+    "serviceQueue": "{count} чел."
   },
   "common": {
     "loading": "Загрузка...",

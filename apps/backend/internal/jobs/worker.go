@@ -22,12 +22,13 @@ type JobWorker interface {
 }
 
 type jobWorker struct {
-	server      *asynq.Server
-	mux         *asynq.ServeMux
-	ttsService  services.TtsService
-	ticketRepo  repository.TicketRepository
-	notifRepo   repository.NotificationRepository
-	smsProvider services.SMSProvider
+	server       *asynq.Server
+	mux          *asynq.ServeMux
+	ttsService   services.TtsService
+	ticketRepo   repository.TicketRepository
+	notifRepo    repository.NotificationRepository
+	smsProvider  services.SMSProvider
+	notifService *services.NotificationService
 }
 
 func NewJobWorker(ttsService services.TtsService, ticketRepo repository.TicketRepository) JobWorker {
@@ -70,6 +71,7 @@ func NewJobWorker(ttsService services.TtsService, ticketRepo repository.TicketRe
 
 	mux.HandleFunc(TypeTTSGenerate, w.handleTtsGenerate)
 	mux.HandleFunc(TypeSMSSend, w.handleSMSSend)
+	mux.HandleFunc(TypeVisitorNotify, w.handleVisitorNotify)
 
 	return w
 }
@@ -85,6 +87,15 @@ func NewJobWorkerWithSMS(
 	base.notifRepo = notifRepo
 	base.smsProvider = smsProvider
 	return base
+}
+
+// WithNotificationService attaches a NotificationService so the visitor:notify handler
+// can delegate to the correct high-level send method.
+func WithNotificationService(w JobWorker, ns *services.NotificationService) JobWorker {
+	if jw, ok := w.(*jobWorker); ok {
+		jw.notifService = ns
+	}
+	return w
 }
 
 func (w *jobWorker) Start() error {
@@ -172,5 +183,34 @@ func (w *jobWorker) handleSMSSend(ctx context.Context, t *asynq.Task) error {
 		return fmt.Errorf("SMS send via %s failed: %w", provider.Name(), sendErr)
 	}
 	applogger.InfoContext(ctx, "SMS sent successfully", "provider", provider.Name(), "to", p.To)
+	return nil
+}
+
+func (w *jobWorker) handleVisitorNotify(ctx context.Context, t *asynq.Task) error {
+	var p VisitorNotifyPayload
+	if err := json.Unmarshal(t.Payload(), &p); err != nil {
+		return fmt.Errorf("visitor:notify unmarshal failed: %v: %w", err, asynq.SkipRetry)
+	}
+
+	applogger.InfoContext(ctx, "processing visitor notify", "ticket_id", p.TicketID, "type", p.Type)
+
+	if w.notifService == nil || w.ticketRepo == nil {
+		applogger.WarnContext(ctx, "visitor:notify: notifService or ticketRepo not wired, skipping")
+		return nil
+	}
+
+	ticket, err := w.ticketRepo.FindByID(p.TicketID)
+	if err != nil {
+		return fmt.Errorf("visitor:notify: ticket not found %s: %w", p.TicketID, err)
+	}
+
+	switch p.Type {
+	case "ticket_called":
+		w.notifService.SendTicketCalledSMS(ticket)
+	case "queue_position_alert":
+		w.notifService.SendQueuePositionAlert(ticket)
+	default:
+		applogger.WarnContext(ctx, "visitor:notify: unknown type", "type", p.Type)
+	}
 	return nil
 }

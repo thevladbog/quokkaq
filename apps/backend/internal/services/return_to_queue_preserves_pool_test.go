@@ -13,8 +13,9 @@ import (
 
 type noopJobEnqueuer struct{}
 
-func (noopJobEnqueuer) EnqueueTtsGenerate(TtsJobPayload) error { return nil }
-func (noopJobEnqueuer) EnqueueSMSSend(SMSSendJobPayload) error { return nil }
+func (noopJobEnqueuer) EnqueueTtsGenerate(TtsJobPayload) error             { return nil }
+func (noopJobEnqueuer) EnqueueSMSSend(SMSSendJobPayload) error             { return nil }
+func (noopJobEnqueuer) EnqueueVisitorNotify(VisitorNotifyJobPayload) error { return nil }
 
 func TestReturnToQueue_preservesServiceZoneAndService(t *testing.T) {
 	db, err := gorm.Open(glebarezsqlite.Open(":memory:"), &gorm.Config{

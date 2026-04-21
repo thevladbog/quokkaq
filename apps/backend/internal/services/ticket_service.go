@@ -736,7 +736,27 @@ func (s *ticketService) CallNext(unitID, counterID string, serviceIDs []string, 
 		go s.notifService.SendTicketCalledSMS(ticket)
 	}
 
+	// Notify the new first-in-queue visitor that they're next (queue position = 1).
+	if s.notifService != nil {
+		go s.notifyNextInLine(ticket.UnitID, serviceIDs)
+	}
+
 	return ticket, nil
+}
+
+// notifyNextInLine finds the current first-waiting ticket and sends a "you're next" SMS
+// if they have a phone. Called after a ticket is called (position of remaining tickets shifts).
+func (s *ticketService) notifyNextInLine(unitID string, serviceIDs []string) {
+	next, err := s.repo.FindWaiting(unitID, serviceIDs, nil)
+	if err != nil || next == nil {
+		return
+	}
+	// Only alert if they are genuinely first (position 1).
+	pos, err := s.repo.GetQueuePosition(next)
+	if err != nil || pos != 1 {
+		return
+	}
+	s.notifService.SendQueuePositionAlert(next)
 }
 
 func (s *ticketService) UpdateStatus(ticketID, status string, actorUserID *string) (*models.Ticket, error) {
@@ -917,6 +937,11 @@ func (s *ticketService) Recall(ticketID string, actorUserID *string) (*models.Ti
 
 	if ticket.CounterID != nil {
 		s.enqueueTTS(ticket, *ticket.CounterID)
+	}
+
+	// Fire-and-forget SMS notification to visitor (parity with CallNext / Pick).
+	if s.notifService != nil {
+		go s.notifService.SendTicketCalledSMS(ticket)
 	}
 
 	return ticket, nil

@@ -71,6 +71,40 @@ func (ns *NotificationService) SendTicketCalledSMS(ticket *models.Ticket) {
 	ns.enqueueNotification(ticket.ID, phone, body, "ticket_called")
 }
 
+// SendQueuePositionAlert enqueues an SMS notification when the visitor reaches position 1 in the queue.
+// Silently no-ops if the visitor has no phone, the unit lacks the feature, or SMS is not configured.
+func (ns *NotificationService) SendQueuePositionAlert(ticket *models.Ticket) {
+	if ticket == nil {
+		return
+	}
+	phone := ns.resolvePhone(ticket)
+	if phone == "" {
+		return
+	}
+	if ok, _ := CompanyHasPlanFeature(ns.resolveCompanyID(ticket.UnitID), "visitor_notifications"); !ok {
+		return
+	}
+
+	locale := "ru"
+	if ticket.Client != nil && ticket.Client.Locale != nil && *ticket.Client.Locale != "" {
+		locale = *ticket.Client.Locale
+	} else if ticket.ClientID != nil {
+		if c, err := ns.clientRepo.GetByID(*ticket.ClientID); err == nil && c != nil && c.Locale != nil && *c.Locale != "" {
+			locale = *c.Locale
+		}
+	}
+
+	body := ns.buildNextInLineBody(ticket.QueueNumber, locale)
+	ns.enqueueNotification(ticket.ID, phone, body, "queue_position_alert")
+}
+
+func (ns *NotificationService) buildNextInLineBody(queueNumber, locale string) string {
+	if locale == "en" {
+		return fmt.Sprintf("Your number %s — you're next in line! Please be ready.", queueNumber)
+	}
+	return fmt.Sprintf("Ваш номер %s — вы следующий в очереди! Приготовьтесь.", queueNumber)
+}
+
 // resolvePhone looks up the visitor's E.164 phone from the associated UnitClient.
 func (ns *NotificationService) resolvePhone(ticket *models.Ticket) string {
 	if ticket.Client != nil && ticket.Client.PhoneE164 != nil && *ticket.Client.PhoneE164 != "" {

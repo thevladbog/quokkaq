@@ -6,6 +6,7 @@ package services
 type JobEnqueuer interface {
 	EnqueueTtsGenerate(payload TtsJobPayload) error
 	EnqueueSMSSend(payload SMSSendJobPayload) error
+	EnqueueVisitorNotify(payload VisitorNotifyJobPayload) error
 }
 
 // TtsJobPayload represents the data needed for a TTS generation job.
@@ -21,4 +22,11 @@ type SMSSendJobPayload struct {
 	NotificationID string
 	To             string
 	Body           string
+}
+
+// VisitorNotifyJobPayload is the services-layer DTO for enqueuing a visitor:notify job.
+type VisitorNotifyJobPayload struct {
+	TicketID string
+	// Type is the notification event: "ticket_called" | "queue_position_alert".
+	Type string
 }

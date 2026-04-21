@@ -1780,7 +1780,8 @@
     "estimatedWait": "Est. wait",
     "minutes": "min.",
     "activeCounters": "Operators",
-    "scanToJoinQueue": "Scan QR to\njoin queue"
+    "scanToJoinQueue": "Scan QR to\njoin queue",
+    "serviceQueue": "{count} waiting"
   },
   "common": {
     "loading": "Loading...",

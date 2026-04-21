@@ -161,6 +161,8 @@ func run() error {
 	ticketService := services.NewTicketServiceWithQuota(ticketRepo, counterRepo, serviceRepo, unitRepo, operatorIntervalRepo, unitClientRepo, visitorTagDefRepo, unitClientHistRepo, preRegRepo, calendarIntegrationService, hub, jobEnqueuerAdapter, quotaService, operationalService)
 	notificationService := services.NewNotificationService(notifRepo, unitRepo, unitClientRepo, jobEnqueuerAdapter, deploymentSaaSSettingsService)
 	ticketService.SetNotificationService(notificationService)
+	// Wire notification service into the Asynq worker so visitor:notify jobs can delegate to it.
+	jobs.WithNotificationService(jobWorker, notificationService)
 	serviceService := services.NewServiceServiceWithQuota(serviceRepo, unitRepo, quotaService)
 	counterService := services.NewCounterServiceWithQuota(counterRepo, ticketRepo, serviceRepo, userRepo, operatorIntervalRepo, unitRepo, hub, quotaService)
 	bookingService := services.NewBookingService(bookingRepo)
@@ -208,7 +210,7 @@ func run() error {
 	companySSOHTTP := handlers.NewCompanySSOHTTP(ssoService, userRepo, companyRepo)
 	tenantRBACHTTP := handlers.NewTenantRBACHTTP(tenantRBACRepo, userRepo, ssoService)
 	unitHandler := handlers.NewUnitHandler(unitService, storageService, operationalService, userRepo)
-	etaService := services.NewETAService(ticketRepo, counterRepo)
+	etaService := services.NewETAServiceWithServiceRepo(ticketRepo, counterRepo, serviceRepo)
 	ticketHandler := handlers.NewTicketHandlerFull(ticketService, operationalService, etaService, unitService).WithSettingsService(deploymentSaaSSettingsService)
 	serviceHandler := handlers.NewServiceHandler(serviceService, userRepo)
 	counterHandler := handlers.NewCounterHandler(counterService, counterRepo, operationalService, userRepo, unitRepo)
@@ -937,5 +939,12 @@ func (a *jobEnqueuerAdapter) EnqueueSMSSend(payload services.SMSSendJobPayload) 
 		NotificationID: payload.NotificationID,
 		To:             payload.To,
 		Body:           payload.Body,
+	})
+}
+
+func (a *jobEnqueuerAdapter) EnqueueVisitorNotify(payload services.VisitorNotifyJobPayload) error {
+	return a.client.EnqueueVisitorNotifyRaw(jobs.VisitorNotifyPayload{
+		TicketID: payload.TicketID,
+		Type:     payload.Type,
 	})
 }

@@ -15,6 +15,7 @@ const (
 type ETAService struct {
 	ticketRepo  repository.TicketRepository
 	counterRepo repository.CounterRepository
+	serviceRepo repository.ServiceRepository
 }
 
 // NewETAService creates a new ETAService.
@@ -22,6 +23,15 @@ func NewETAService(ticketRepo repository.TicketRepository, counterRepo repositor
 	return &ETAService{
 		ticketRepo:  ticketRepo,
 		counterRepo: counterRepo,
+	}
+}
+
+// NewETAServiceWithServiceRepo creates an ETAService that can also produce per-service breakdowns.
+func NewETAServiceWithServiceRepo(ticketRepo repository.TicketRepository, counterRepo repository.CounterRepository, serviceRepo repository.ServiceRepository) *ETAService {
+	return &ETAService{
+		ticketRepo:  ticketRepo,
+		counterRepo: counterRepo,
+		serviceRepo: serviceRepo,
 	}
 }
 
@@ -55,11 +65,22 @@ func (s *ETAService) QueuePositionAndETA(ticket *models.Ticket) (QueuePositionRe
 	}, nil
 }
 
+// ServiceQueueInfo holds queue stats for a single service within a unit.
+type ServiceQueueInfo struct {
+	ServiceID            string  `json:"serviceId"`
+	ServiceName          string  `json:"serviceName"`
+	QueueLength          int64   `json:"queueLength"`
+	EstimatedWaitMinutes float64 `json:"estimatedWaitMinutes"`
+}
+
 // UnitQueueSummary returns a lightweight summary for the public queue-status endpoint.
 type UnitQueueSummary struct {
 	QueueLength          int64   `json:"queueLength"`
 	EstimatedWaitMinutes float64 `json:"estimatedWaitMinutes"`
 	ActiveCounters       int64   `json:"activeCounters"`
+	// Services contains per-service breakdown when multiple services have waiting tickets.
+	// Omitted when only one service is active (redundant with the top-level fields).
+	Services []ServiceQueueInfo `json:"services,omitempty"`
 }
 
 // GetUnitQueueSummary returns queue length, estimated wait (minutes), and active counter count
@@ -90,11 +111,49 @@ func (s *ETAService) GetUnitQueueSummary(unitID string) (UnitQueueSummary, error
 		}
 	}
 
-	return UnitQueueSummary{
+	summary := UnitQueueSummary{
 		QueueLength:          queueLength,
 		EstimatedWaitMinutes: estimatedWaitMinutes,
 		ActiveCounters:       activeCounters,
-	}, nil
+	}
+
+	// Populate per-service breakdown when serviceRepo is available and more than one service has waiting tickets.
+	if s.serviceRepo != nil {
+		perService, sErr := s.ticketRepo.CountWaitingByService(unitID)
+		if sErr == nil && len(perService) > 1 {
+			serviceMap, mErr := s.serviceRepo.FindMapByIDs(func() []string {
+				ids := make([]string, len(perService))
+				for i, p := range perService {
+					ids[i] = p.ServiceID
+				}
+				return ids
+			}())
+			for _, sc := range perService {
+				info := ServiceQueueInfo{
+					ServiceID:   sc.ServiceID,
+					QueueLength: sc.Count,
+				}
+				if mErr == nil {
+					if svc, ok := serviceMap[sc.ServiceID]; ok {
+						info.ServiceName = svc.Name
+					}
+				}
+				if sc.Count > 0 {
+					avgSec, _ := s.rollingAvgServiceSec(unitID, sc.ServiceID)
+					if avgSec > 0 {
+						divisor := activeCounters
+						if divisor <= 0 {
+							divisor = 1
+						}
+						info.EstimatedWaitMinutes = float64(sc.Count) * float64(avgSec) / float64(divisor) / 60.0
+					}
+				}
+				summary.Services = append(summary.Services, info)
+			}
+		}
+	}
+
+	return summary, nil
 }
 
 // estimateWaitSeconds estimates how long in seconds `ticket` at `position` will wait.
