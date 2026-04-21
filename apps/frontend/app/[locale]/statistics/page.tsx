@@ -71,8 +71,10 @@ import {
   useGetUnitStatisticsUtilization,
   useGetUnitStatisticsSurveyScores,
   useGetUnitStatisticsTicketsByService,
-  useGetUnitStatisticsSlaSummary
+  useGetUnitStatisticsSlaSummary,
+  useGetUnitStatisticsSlaHeatmap
 } from '@/lib/api/generated/statistics';
+import { SLAHeatmapChart } from '@/components/statistics/SLAHeatmapChart';
 import { useGetUnitsUnitIdShiftActivityActors } from '@/lib/api/generated/shift';
 import { useGetUnitsUnitIdServices } from '@/lib/api/generated/services';
 import { normalizeChildUnitsQueryData } from '@/lib/child-units-query';
@@ -674,6 +676,27 @@ export default function StatisticsPage() {
     loadQuery.data?.status === 200 ? loadQuery.data.data : undefined;
   const slaStatsBody =
     slaQuery.data?.status === 200 ? slaQuery.data.data : undefined;
+
+  const [slaHeatmapType, setSlaHeatmapType] = useState<'wait' | 'service'>(
+    'wait'
+  );
+  const slaHeatmapEnabled = statsEnabled && slaStatsBody?.granularity === 'day';
+  const slaHeatmapQuery = useGetUnitStatisticsSlaHeatmap(
+    statsSubdivisionId,
+    {
+      dateFrom: from,
+      dateTo: dateToForApi,
+      type: slaHeatmapType,
+      userId: userIdParam,
+      serviceZoneId: serviceZoneParam
+    },
+    { query: { enabled: slaHeatmapEnabled } }
+  );
+  const slaHeatmapBody =
+    slaHeatmapQuery.data?.status === 200
+      ? slaHeatmapQuery.data.data
+      : undefined;
+
   const surveyStatsBody =
     surveyQuery.data?.status === 200 ? surveyQuery.data.data : undefined;
 
@@ -723,23 +746,39 @@ export default function StatisticsPage() {
     const pts = body?.points ?? [];
     let sumTot = 0;
     let sumMet = 0;
+    let sumSvcTot = 0;
+    let sumSvcMet = 0;
     for (const p of pts) {
       sumTot += p.slaWaitTotal ?? 0;
       sumMet += p.slaWaitMet ?? 0;
+      sumSvcTot += p.slaServiceTotal ?? 0;
+      sumSvcMet += p.slaServiceMet ?? 0;
     }
     const overallPct = sumTot > 0 ? (100 * sumMet) / sumTot : 0;
+    const overallSvcPct = sumSvcTot > 0 ? (100 * sumSvcMet) / sumSvcTot : null;
 
     if (slaDisplayMode === 'percent') {
-      const data = pts.map((p) => ({
-        date: p.date ?? '',
-        within: Math.round((p.withinPct ?? 0) * 10) / 10,
-        breach: Math.round((p.breachPct ?? 0) * 10) / 10
-      }));
+      const data = pts.map((p) => {
+        const svcTot = p.slaServiceTotal ?? 0;
+        const svcMet = p.slaServiceMet ?? 0;
+        return {
+          date: p.date ?? '',
+          within: Math.round((p.withinPct ?? 0) * 10) / 10,
+          breach: Math.round((p.breachPct ?? 0) * 10) / 10,
+          svcPct:
+            svcTot > 0
+              ? Math.round(((100 * svcMet) / svcTot) * 10) / 10
+              : undefined
+        };
+      });
       return {
         data,
         yDomain: [0, 100] as [number, number],
         sumTot,
-        overallPct
+        overallPct,
+        sumSvcTot,
+        sumSvcMet,
+        overallSvcPct
       };
     }
 
@@ -750,7 +789,8 @@ export default function StatisticsPage() {
       return {
         date: p.date ?? '',
         within: met,
-        breach
+        breach,
+        svcPct: undefined as number | undefined
       };
     });
     const maxStack = data.reduce((m, d) => Math.max(m, d.within + d.breach), 0);
@@ -759,7 +799,10 @@ export default function StatisticsPage() {
       data,
       yDomain: [0, yMax] as [number, number],
       sumTot,
-      overallPct
+      overallPct,
+      sumSvcTot,
+      sumSvcMet,
+      overallSvcPct
     };
   }, [slaQuery.data, slaDisplayMode]);
 
@@ -984,8 +1027,12 @@ export default function StatisticsPage() {
   const slaChartConfig = useMemo(
     () =>
       ({
-        within: { label: t('legend_sla_within'), color: '#94a3b8' },
-        breach: { label: t('legend_sla_breach'), color: 'var(--destructive)' }
+        within: { label: t('legend_sla_wait_within'), color: '#94a3b8' },
+        breach: {
+          label: t('legend_sla_wait_breach'),
+          color: 'var(--destructive)'
+        },
+        svcPct: { label: t('legend_sla_service_pct'), color: 'var(--chart-2)' }
       }) satisfies ChartConfig,
     [t]
   );
@@ -1313,7 +1360,7 @@ export default function StatisticsPage() {
                     openCalendar: t('open_calendar'),
                     rangeAwaitingEnd: t('date_range_awaiting_end')
                   }}
-                  className='min-w-[min(100%,280px)]'
+                  className='w-[280px] max-w-full'
                 />
               </div>
               {showSubdivisionFilter && (
@@ -1632,6 +1679,36 @@ export default function StatisticsPage() {
                     </RadialBarChart>
                   </ChartContainer>
                 )}
+                {/* Service-time SLA summary — from the same GetSlaSummary query (respects service filter) */}
+                <div className='border-border mt-4 w-full border-t pt-3'>
+                  <p className='text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase'>
+                    {t('sla_service_summary_label')}
+                  </p>
+                  {(() => {
+                    const svcTot = slaSummaryBody?.slaServiceTotal ?? 0;
+                    const svcMet = slaSummaryBody?.slaServiceMet ?? 0;
+                    const svcPct =
+                      svcTot > 0
+                        ? ((100 * svcMet) / svcTot).toLocaleString(appLocale, {
+                            minimumFractionDigits: 1,
+                            maximumFractionDigits: 1
+                          })
+                        : null;
+                    return svcTot > 0 ? (
+                      <p className='text-foreground text-sm font-medium'>
+                        {t('sla_service_met_of_total', {
+                          met: svcMet,
+                          total: svcTot,
+                          pct: svcPct ?? '—'
+                        })}
+                      </p>
+                    ) : (
+                      <p className='text-muted-foreground text-sm'>
+                        {t('sla_service_no_data')}
+                      </p>
+                    );
+                  })()}
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -2010,19 +2087,71 @@ export default function StatisticsPage() {
                   )}
                 </div>
               </CardHeader>
-              <CardContent className='h-[320px]'>
+              {/* Multi-day: heatmap toggle */}
+              {slaHeatmapEnabled &&
+                !(slaQuery.isLoading || slaQuery.isError) && (
+                  <div className='border-border flex gap-0 border-b'>
+                    <button
+                      type='button'
+                      onClick={() => setSlaHeatmapType('wait')}
+                      className={cn(
+                        'border-border flex-1 border-r px-4 py-2.5 text-center text-sm font-medium transition-colors',
+                        slaHeatmapType === 'wait'
+                          ? 'bg-muted/60'
+                          : 'hover:bg-muted/40'
+                      )}
+                    >
+                      {t('sla_heatmap_toggle_wait')}
+                    </button>
+                    <button
+                      type='button'
+                      onClick={() => setSlaHeatmapType('service')}
+                      className={cn(
+                        'flex-1 px-4 py-2.5 text-center text-sm font-medium transition-colors',
+                        slaHeatmapType === 'service'
+                          ? 'bg-muted/60'
+                          : 'hover:bg-muted/40'
+                      )}
+                    >
+                      {t('sla_heatmap_toggle_service')}
+                    </button>
+                  </div>
+                )}
+              <CardContent className={slaHeatmapEnabled ? 'py-4' : 'h-[320px]'}>
                 {slaQuery.isLoading ? (
                   <p className='text-muted-foreground text-sm'>
                     {t('loading')}
                   </p>
                 ) : slaQuery.isError ? (
                   <p className='text-destructive text-sm'>{t('error')}</p>
+                ) : slaHeatmapEnabled ? (
+                  /* Multi-day view → heatmap */
+                  slaHeatmapQuery.isLoading ? (
+                    <p className='text-muted-foreground text-sm'>
+                      {t('loading')}
+                    </p>
+                  ) : slaHeatmapQuery.isError ? (
+                    <p className='text-destructive text-sm'>{t('error')}</p>
+                  ) : !slaHeatmapBody?.cells?.length ? (
+                    <p className='text-muted-foreground text-sm'>
+                      {slaHeatmapType === 'service'
+                        ? t('sla_heatmap_no_service_limit')
+                        : t('sla_heatmap_no_data')}
+                    </p>
+                  ) : (
+                    <SLAHeatmapChart
+                      cells={slaHeatmapBody.cells}
+                      dateFrom={from}
+                      dateTo={dateToForApi}
+                    />
+                  )
                 ) : (
+                  /* Single-day view → existing bar chart */
                   <ChartContainer
                     config={slaChartConfig}
                     className='h-full w-full'
                   >
-                    <BarChart data={slaChart.data}>
+                    <ComposedChart data={slaChart.data}>
                       <CartesianGrid
                         strokeDasharray='3 3'
                         className='stroke-muted'
@@ -2044,16 +2173,16 @@ export default function StatisticsPage() {
                             footer={
                               slaDisplayMode === 'count'
                                 ? ({ payload: tipPayload }) => {
-                                    const row = tipPayload?.[0]?.payload as
+                                    const tipRow = tipPayload?.[0]?.payload as
                                       | {
                                           within?: number;
                                           breach?: number;
                                         }
                                       | undefined;
-                                    if (!row) return null;
+                                    if (!tipRow) return null;
                                     const total = Math.round(
-                                      (Number(row.within) || 0) +
-                                        (Number(row.breach) || 0)
+                                      (Number(tipRow.within) || 0) +
+                                        (Number(tipRow.breach) || 0)
                                     );
                                     return (
                                       <div className='flex w-full justify-between gap-4 leading-none'>
@@ -2076,17 +2205,29 @@ export default function StatisticsPage() {
                       <Legend />
                       <Bar
                         dataKey='within'
-                        name={t('legend_sla_within')}
+                        name={t('legend_sla_wait_within')}
                         stackId='sla'
                         fill='#94a3b8'
                       />
                       <Bar
                         dataKey='breach'
-                        name={t('legend_sla_breach')}
+                        name={t('legend_sla_wait_breach')}
                         stackId='sla'
                         fill='var(--destructive)'
                       />
-                    </BarChart>
+                      {slaDisplayMode === 'percent' &&
+                        slaChart.sumSvcTot > 0 && (
+                          <Line
+                            dataKey='svcPct'
+                            name={t('legend_sla_service_pct')}
+                            type='monotone'
+                            stroke='var(--chart-2)'
+                            strokeWidth={2}
+                            dot={false}
+                            connectNulls
+                          />
+                        )}
+                    </ComposedChart>
                   </ChartContainer>
                 )}
               </CardContent>

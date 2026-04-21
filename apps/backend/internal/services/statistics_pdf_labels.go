@@ -33,6 +33,9 @@ type StatsPDFLabels struct {
 	ColBreachPct      string
 	ColMet            string
 	ColTotal          string
+	ColSvcSLAMetPct   string
+	ColSvcMet         string
+	ColSvcTotal       string
 	ColService        string
 	ColCount          string
 	ColAvgScoreNorm   string
@@ -79,11 +82,14 @@ func StatsPDFLabelsEN() StatsPDFLabels {
 		ColCreated:        "Created",
 		ColCompleted:      "Completed",
 		ColNoShow:         "No-Show",
-		ColSLAMetPct:      "SLA Met %",
-		ColWithinPct:      "Within %",
-		ColBreachPct:      "Breach %",
-		ColMet:            "Met",
-		ColTotal:          "Total",
+		ColSLAMetPct:      "SLA Met % (wait)",
+		ColWithinPct:      "Within % (wait)",
+		ColBreachPct:      "Breach % (wait)",
+		ColMet:            "Met (wait)",
+		ColTotal:          "Total (wait)",
+		ColSvcSLAMetPct:   "SLA Met % (service)",
+		ColSvcMet:         "Met (service)",
+		ColSvcTotal:       "Total (service)",
 		ColService:        "Service",
 		ColCount:          "Count",
 		ColAvgScoreNorm:   "Avg Score (norm 5)",
@@ -131,11 +137,14 @@ func StatsPDFLabelsRU() StatsPDFLabels {
 		ColCreated:        "Создано",
 		ColCompleted:      "Завершено",
 		ColNoShow:         "Неявка",
-		ColSLAMetPct:      "SLA выполнен %",
-		ColWithinPct:      "В пределах %",
-		ColBreachPct:      "Нарушение %",
-		ColMet:            "Выполнено",
-		ColTotal:          "Итого",
+		ColSLAMetPct:      "SLA выполнен % (ожид.)",
+		ColWithinPct:      "В пределах % (ожид.)",
+		ColBreachPct:      "Нарушение % (ожид.)",
+		ColMet:            "Выполнено (ожид.)",
+		ColTotal:          "Итого (ожид.)",
+		ColSvcSLAMetPct:   "SLA выполнен % (обсл.)",
+		ColSvcMet:         "Выполнено (обсл.)",
+		ColSvcTotal:       "Итого (обсл.)",
 		ColService:        "Услуга",
 		ColCount:          "Кол-во",
 		ColAvgScoreNorm:   "Ср. балл (норм. 5)",

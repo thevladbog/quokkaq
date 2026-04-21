@@ -570,6 +570,7 @@ func run() error {
 			r.Get("/{unitId}/statistics/load", statisticsHandler.GetLoad)
 			r.Get("/{unitId}/statistics/tickets-by-service", statisticsHandler.GetTicketsByService)
 			r.Get("/{unitId}/statistics/sla-summary", statisticsHandler.GetSlaSummary)
+			r.Get("/{unitId}/statistics/sla-heatmap", statisticsHandler.GetSLAHeatmap)
 			r.Get("/{unitId}/statistics/utilization", statisticsHandler.GetUtilization)
 			r.Get("/{unitId}/statistics/survey-scores", statisticsHandler.GetSurveyScores)
 			r.Get("/{unitId}/statistics/employee-radar", statisticsHandler.GetEmployeeRadar)

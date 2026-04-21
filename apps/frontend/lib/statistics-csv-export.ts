@@ -23,6 +23,9 @@ type SlaDeviationsPoint = {
   breachPct?: number | null;
   slaWaitMet?: number;
   slaWaitTotal?: number;
+  slaServiceMet?: number;
+  slaServiceTotal?: number;
+  slaServiceMetPct?: number;
 };
 
 type SlaSummary = {
@@ -167,26 +170,39 @@ function buildSlaDeviationsSection(
   t: TranslateFn
 ): string[] {
   if (!points.length) return [];
+  const hasServiceSla = points.some((p) => (p.slaServiceTotal ?? 0) > 0);
   const lines: string[] = ['', row([`[${t('chart_sla_deviations')}]`])];
-  lines.push(
-    row([
-      t('export_date'),
-      t('legend_sla_within') + ' %',
-      t('legend_sla_breach') + ' %',
-      t('legend_sla_within') + ' #',
-      t('tooltip_total')
-    ])
-  );
-  for (const p of points) {
-    lines.push(
-      row([
-        p.date,
-        fmtNum(p.withinPct, 1),
-        fmtNum(p.breachPct, 1),
-        p.slaWaitMet,
-        p.slaWaitTotal
-      ])
+  const header = [
+    t('export_date'),
+    t('legend_sla_within') + ' % (wait)',
+    t('legend_sla_breach') + ' % (wait)',
+    t('legend_sla_within') + ' # (wait)',
+    t('tooltip_total') + ' (wait)'
+  ];
+  if (hasServiceSla) {
+    header.push(
+      t('legend_sla_service_pct'),
+      t('legend_sla_within') + ' # (service)',
+      t('tooltip_total') + ' (service)'
     );
+  }
+  lines.push(row(header));
+  for (const p of points) {
+    const cells: (string | number | null | undefined)[] = [
+      p.date,
+      fmtNum(p.withinPct, 1),
+      fmtNum(p.breachPct, 1),
+      p.slaWaitMet,
+      p.slaWaitTotal
+    ];
+    if (hasServiceSla) {
+      cells.push(
+        fmtNum(p.slaServiceMetPct, 1),
+        p.slaServiceMet,
+        p.slaServiceTotal
+      );
+    }
+    lines.push(row(cells));
   }
   return lines;
 }

@@ -343,18 +343,28 @@ func drawStatsSectionTimeseries(
 	}
 	y = drawStatsSectionHeader(pdf, left, y, innerW, l.SectionTimeseries)
 
+	hasServiceSLA := false
+	for _, p := range data.Points {
+		if p.SlaServiceTotal > 0 {
+			hasServiceSLA = true
+			break
+		}
+	}
 	cols := []pdfColumnDef{
 		{l.ColDate, 2.0, pdfAlignLeft},
-		{l.ColAvgWait, 1.5, pdfAlignRight},
-		{l.ColAvgService, 1.5, pdfAlignRight},
-		{l.ColCreated, 1.0, pdfAlignRight},
-		{l.ColCompleted, 1.0, pdfAlignRight},
-		{l.ColNoShow, 1.0, pdfAlignRight},
+		{l.ColAvgWait, 1.4, pdfAlignRight},
+		{l.ColAvgService, 1.4, pdfAlignRight},
+		{l.ColCreated, 0.9, pdfAlignRight},
+		{l.ColCompleted, 0.9, pdfAlignRight},
+		{l.ColNoShow, 0.9, pdfAlignRight},
 		{l.ColSLAMetPct, 1.0, pdfAlignRight},
+	}
+	if hasServiceSLA {
+		cols = append(cols, pdfColumnDef{l.ColSvcSLAMetPct, 1.1, pdfAlignRight})
 	}
 	rows := make([][]string, 0, len(data.Points))
 	for _, p := range data.Points {
-		rows = append(rows, []string{
+		row := []string{
 			p.Date,
 			fmtOptFloat(p.AvgWaitMinutes, 2),
 			fmtOptFloat(p.AvgServiceMinutes, 2),
@@ -362,7 +372,11 @@ func drawStatsSectionTimeseries(
 			fmt.Sprintf("%d", p.TicketsCompleted),
 			fmt.Sprintf("%d", p.NoShowCount),
 			fmtOptPct(p.SlaWaitMetPct),
-		})
+		}
+		if hasServiceSLA {
+			row = append(row, fmtOptPct(p.SlaServiceMetPct))
+		}
+		rows = append(rows, row)
 	}
 
 	return statsPdfDrawTable(pdf, left, y, innerW, cols, rows, cfg, addPage)
@@ -421,22 +435,44 @@ func drawStatsSectionSLADeviations(
 	}
 	y = drawStatsSectionHeader(pdf, left, y, innerW, l.SectionSLADeviations)
 
+	hasSvcSLA := false
+	for _, p := range data.Points {
+		if p.SlaServiceTotal > 0 {
+			hasSvcSLA = true
+			break
+		}
+	}
 	cols := []pdfColumnDef{
 		{l.ColDate, 2.0, pdfAlignLeft},
-		{l.ColWithinPct, 1.5, pdfAlignRight},
-		{l.ColBreachPct, 1.5, pdfAlignRight},
+		{l.ColWithinPct, 1.4, pdfAlignRight},
+		{l.ColBreachPct, 1.4, pdfAlignRight},
 		{l.ColMet, 1.0, pdfAlignRight},
 		{l.ColTotal, 1.0, pdfAlignRight},
 	}
+	if hasSvcSLA {
+		cols = append(cols,
+			pdfColumnDef{l.ColSvcSLAMetPct, 1.4, pdfAlignRight},
+			pdfColumnDef{l.ColSvcMet, 1.0, pdfAlignRight},
+			pdfColumnDef{l.ColSvcTotal, 1.0, pdfAlignRight},
+		)
+	}
 	rows := make([][]string, 0, len(data.Points))
 	for _, p := range data.Points {
-		rows = append(rows, []string{
+		row := []string{
 			p.Date,
 			fmt.Sprintf("%.1f", p.WithinPct),
 			fmt.Sprintf("%.1f", p.BreachPct),
 			fmt.Sprintf("%d", p.SlaWaitMet),
 			fmt.Sprintf("%d", p.SlaWaitTotal),
-		})
+		}
+		if hasSvcSLA {
+			row = append(row,
+				fmt.Sprintf("%.1f", p.SlaServiceMetPct),
+				fmt.Sprintf("%d", p.SlaServiceMet),
+				fmt.Sprintf("%d", p.SlaServiceTotal),
+			)
+		}
+		rows = append(rows, row)
 	}
 
 	return statsPdfDrawTable(pdf, left, y, innerW, cols, rows, cfg, addPage)
