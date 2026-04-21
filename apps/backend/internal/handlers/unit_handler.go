@@ -67,9 +67,7 @@ func (h *UnitHandler) CreateUnit(w http.ResponseWriter, r *http.Request) {
 	if err := h.service.CreateUnit(&unit); err != nil {
 		switch {
 		case errors.Is(err, services.ErrUnitQuotaExceeded), errors.Is(err, services.ErrZoneQuotaExceeded):
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusPaymentRequired)
-			_, _ = w.Write([]byte(`{"error":"quota_exceeded","message":"` + err.Error() + `"}`))
+			writeQuotaExceeded(w, "", err)
 		case errors.Is(err, services.ErrInvalidUnitKind), errors.Is(err, services.ErrInvalidParentKind):
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		case errors.Is(err, services.ErrParentNotFound):

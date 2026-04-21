@@ -9176,69 +9176,6 @@
                 ]
             }
         },
-        "/counters": {
-            "post": {
-                "description": "Creates a new counter for a unit",
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/models.Counter"
-                            }
-                        }
-                    },
-                    "description": "Counter Data",
-                    "required": true,
-                    "x-originalParamName": "counter"
-                },
-                "responses": {
-                    "201": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/models.Counter"
-                                }
-                            }
-                        },
-                        "description": "Created"
-                    },
-                    "400": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "string"
-                                }
-                            }
-                        },
-                        "description": "Bad Request"
-                    },
-                    "402": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object"
-                                }
-                            }
-                        },
-                        "description": "Quota Exceeded"
-                    },
-                    "500": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "string"
-                                }
-                            }
-                        },
-                        "description": "Internal Server Error"
-                    }
-                },
-                "summary": "Create a new counter",
-                "tags": [
-                    "counters"
-                ]
-            }
-        },
         "/counters/{id}": {
             "delete": {
                 "description": "Deletes a counter by its ID",
@@ -18278,6 +18215,78 @@
                 "tags": [
                     "counters"
                 ]
+            },
+            "post": {
+                "description": "Creates a new counter for a unit",
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/models.Counter"
+                            }
+                        }
+                    },
+                    "description": "Counter Data",
+                    "required": true,
+                    "x-originalParamName": "counter"
+                },
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/models.Counter"
+                                }
+                            }
+                        },
+                        "description": "Created"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "402": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Quota Exceeded"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "summary": "Create a new counter",
+                "tags": [
+                    "counters"
+                ]
             }
         },
         "/units/{unitId}/guest-survey/completion-images/{fileName}": {
@@ -19619,6 +19628,16 @@
                             }
                         },
                         "description": "Bad Request"
+                    },
+                    "402": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Quota Exceeded"
                     },
                     "500": {
                         "content": {

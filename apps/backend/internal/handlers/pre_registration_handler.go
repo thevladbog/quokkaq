@@ -345,9 +345,7 @@ func (h *PreRegistrationHandler) Redeem(w http.ResponseWriter, r *http.Request) 
 	ticket, err := h.ticketService.CreateTicketWithPreRegistration(preReg.UnitID, preReg.ServiceID, preReg.ID, nil)
 	if err != nil {
 		if errors.Is(err, services.ErrTicketQuotaExhausted) {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusPaymentRequired)
-			_, _ = w.Write([]byte(`{"error":"quota_exceeded","metric":"tickets_per_month","message":"` + err.Error() + `"}`))
+			writeQuotaExceeded(w, "tickets_per_month", err)
 			return
 		}
 		if errors.Is(err, phoneutil.ErrInvalidPhone) ||

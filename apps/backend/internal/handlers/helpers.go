@@ -73,6 +73,19 @@ func RespondJSONWithStatus(w http.ResponseWriter, status int, data interface{}) 
 	return true
 }
 
+// writeQuotaExceeded writes a structured HTTP 402 response for quota-exceeded errors.
+// The error message is JSON-marshalled so that special characters cannot cause XSS.
+func writeQuotaExceeded(w http.ResponseWriter, metric string, err error) {
+	body := map[string]string{
+		"error":   "quota_exceeded",
+		"message": err.Error(),
+	}
+	if metric != "" {
+		body["metric"] = metric
+	}
+	RespondJSONWithStatus(w, http.StatusPaymentRequired, body)
+}
+
 // getActorFromRequest returns a pointer to the authenticated user ID for audit fields, or nil if absent.
 func getActorFromRequest(r *http.Request) *string {
 	if uid, ok := middleware.GetUserIDFromContext(r.Context()); ok && uid != "" {

@@ -27,6 +27,7 @@ CREATE TABLE tickets (
 	status text DEFAULT 'waiting',
 	priority integer DEFAULT 0,
 	is_eod integer DEFAULT 0,
+	is_credit integer DEFAULT 0,
 	created_at datetime
 );
 `).Error; err != nil {

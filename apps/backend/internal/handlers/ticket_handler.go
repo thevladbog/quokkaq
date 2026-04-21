@@ -100,9 +100,7 @@ func (h *TicketHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrTicketQuotaExhausted):
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusPaymentRequired)
-			_, _ = w.Write([]byte(`{"error":"quota_exceeded","metric":"tickets_per_month","message":"` + err.Error() + `"}`))
+			writeQuotaExceeded(w, "tickets_per_month", err)
 			return
 		case errors.Is(err, services.ErrTicketServiceNotInUnit),
 			errors.Is(err, services.ErrVisitorAnonymousNotAllowed),

@@ -82,9 +82,7 @@ func (h *InvitationHandler) CreateInvitation(w http.ResponseWriter, r *http.Requ
 	invitation, err := h.service.CreateInvitation(companyID, req.Email, req.TargetUnits, req.TargetRoles, req.TemplateID)
 	if err != nil {
 		if errors.Is(err, services.ErrUserQuotaExceeded) {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusPaymentRequired)
-			_, _ = w.Write([]byte(`{"error":"quota_exceeded","metric":"users","message":"` + err.Error() + `"}`))
+			writeQuotaExceeded(w, "users", err)
 			return
 		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)

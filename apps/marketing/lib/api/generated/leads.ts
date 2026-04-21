@@ -250,6 +250,9 @@ export interface ModelsTicket {
   counterId?: string;
   createdAt?: string;
   id?: string;
+  /** IsCredit marks a ticket issued when the monthly tickets_per_month quota was exhausted but
+  the working day (EOD) was still open. Credit tickets are counted against the next billing period. */
+  isCredit?: boolean;
   isEod?: boolean;
   lastCalledAt?: string;
   /** Snapshot from Service at creation */
@@ -674,6 +677,8 @@ export interface HandlersPlatformCreateSubscriptionPlanBody {
   features?: HandlersPlatformCreateSubscriptionPlanBodyFeatures;
   interval?: string;
   isActive?: boolean;
+  /** IsFree when true: plan is always free (price must be 0). Shown as "Free" in UI, not "Custom pricing". */
+  isFree?: boolean;
   /** IsPromoted when true: this plan becomes the only promoted tier (others cleared in the same transaction). */
   isPromoted?: boolean;
   /** IsPublic omitted or null defaults to true (backward compatible). */
@@ -683,6 +688,8 @@ export interface HandlersPlatformCreateSubscriptionPlanBody {
   name?: string;
   nameEn?: string;
   price?: number;
+  /** PricingModel: "flat" (fixed price) or "per_unit" (price per subdivision). Defaults to "per_unit". */
+  pricingModel?: string;
 }
 
 export interface HandlersPlatformIntegrationsResponse {
@@ -708,6 +715,8 @@ export interface HandlersPlatformUpdateSubscriptionPlanBody {
   features?: HandlersPlatformUpdateSubscriptionPlanBodyFeatures;
   interval?: string;
   isActive?: boolean;
+  /** IsFree when true: plan is always free (price must be 0). Omit to leave unchanged. */
+  isFree?: boolean;
   /** IsPromoted omitted: leave unchanged. When true, other plans are demoted in the same transaction. */
   isPromoted?: boolean;
   isPublic?: boolean;
@@ -716,6 +725,8 @@ export interface HandlersPlatformUpdateSubscriptionPlanBody {
   name?: string;
   nameEn?: string;
   price?: number;
+  /** PricingModel: "flat" or "per_unit". Omit to leave unchanged. */
+  pricingModel?: string;
 }
 
 export interface HandlersPublicLeadRequestBody {
@@ -948,6 +959,9 @@ export interface ModelsSubscriptionPlan {
   /** "month", "year" */
   interval?: string;
   isActive?: boolean;
+  /** IsFree when true: plan is always free (price=0 by contract); UI shows "Free" instead of "Custom pricing".
+  Distinct from enterprise (also price=0 but not free). Set by platform operator in plan constructor. */
+  isFree?: boolean;
   /** IsPromoted marks the single catalog recommended plan (marketing + in-app pricing highlight). */
   isPromoted?: boolean;
   isPublic?: boolean;
@@ -960,6 +974,10 @@ export interface ModelsSubscriptionPlan {
   nameEn?: string;
   /** price in minor units (cents/kopeks) */
   price?: number;
+  /** PricingModel determines how the price field is interpreted:
+    "flat"     – fixed price per billing period (legacy default)
+    "per_unit" – price per subdivision per billing period; total = price * active_subdivisions */
+  pricingModel?: string;
   updatedAt?: string;
 }
 

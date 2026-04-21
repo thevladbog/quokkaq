@@ -73,9 +73,7 @@ func (h *CounterHandler) CreateCounter(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.service.CreateCounter(&counter); err != nil {
 		if errors.Is(err, services.ErrCounterQuotaExceeded) {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusPaymentRequired)
-			_, _ = w.Write([]byte(`{"error":"quota_exceeded","message":"` + err.Error() + `"}`))
+			writeQuotaExceeded(w, "", err)
 			return
 		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)

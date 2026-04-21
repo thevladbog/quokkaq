@@ -65,9 +65,7 @@ func (h *ServiceHandler) CreateService(w http.ResponseWriter, r *http.Request) {
 	if err := h.service.CreateService(&service); err != nil {
 		switch {
 		case errors.Is(err, services.ErrServiceQuotaExceeded):
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusPaymentRequired)
-			_, _ = w.Write([]byte(`{"error":"quota_exceeded","message":"` + err.Error() + `"}`))
+			writeQuotaExceeded(w, "", err)
 		case errors.Is(err, services.ErrDuplicateCalendarSlotKey):
 			http.Error(w, err.Error(), http.StatusConflict)
 		default:

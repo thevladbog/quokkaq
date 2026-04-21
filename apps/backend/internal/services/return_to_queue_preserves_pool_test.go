@@ -36,6 +36,7 @@ CREATE TABLE tickets (
 	status text,
 	priority integer DEFAULT 0,
 	is_eod integer DEFAULT 0,
+	is_credit integer DEFAULT 0,
 	tts_url text,
 	created_at datetime,
 	called_at datetime,

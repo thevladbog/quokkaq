@@ -827,7 +827,7 @@ export const ticketsApi = {
     }
     if (transferData.toServiceId) body.toServiceId = transferData.toServiceId;
     if (transferData.operatorComment !== undefined) {
-      body.operatorComment = transferData.operatorComment;
+      body.operatorComment = transferData.operatorComment ?? undefined;
     }
     const res = await orvalTc.postTicketsIdTransfer(id, body);
     return TicketModelSchema.parse(res.data);
@@ -840,7 +840,8 @@ export const ticketsApi = {
 
   updateOperatorComment: async (id: string, operatorComment: string | null) => {
     const res = await orvalTc.patchTicketsIdOperatorComment(id, {
-      operatorComment
+      // Orval generates `string` but the backend accepts JSON null to clear the field.
+      operatorComment: operatorComment as string
     });
     return TicketModelSchema.parse(res.data);
   },
