@@ -243,16 +243,20 @@ func drawStatsReportHeader(pdf *gopdf.GoPdf, left, y, innerW float64, input Stat
 // SLA Summary card
 // ─────────────────────────────────────────────────────────────────────────────
 
+// slaSummaryCardHeight returns the pixel height of the SLA summary card
+// based on which SLA types have data. Exported for tests.
+func slaSummaryCardHeight(hasWait, hasSvc bool) float64 {
+	if hasWait && hasSvc {
+		return 96.0
+	}
+	return 48.0
+}
+
 func drawStatsSLASummaryCard(pdf *gopdf.GoPdf, left, y, innerW float64, sla *SlaSummaryResponse, l StatsPDFLabels) float64 {
 	hasWait := sla.SlaWaitTotal > 0
 	hasSvc := sla.SlaServiceTotal > 0
 	hasBoth := hasWait && hasSvc
-
-	// Card height: 48 for a single section; 96 when showing both wait + service rows.
-	cardH := 48.0
-	if hasBoth {
-		cardH = 96.0
-	}
+	cardH := slaSummaryCardHeight(hasWait, hasSvc)
 
 	pdf.SetFillColor(240, 249, 255)
 	pdf.RectFromUpperLeftWithStyle(left, y, innerW, cardH, "F")

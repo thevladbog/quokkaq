@@ -7,14 +7,9 @@ import { useTranslations } from 'next-intl';
 
 import { socketClient, type SlaAlertPayload } from '@/lib/socket';
 import { logger } from '@/lib/logger';
+import { formatSlaDuration } from '@/lib/format-sla-duration';
 
 export type { SlaAlertPayload };
-
-function formatMinutes(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return s === 0 ? `${m} min` : `${m}m ${s}s`;
-}
 
 function playSlaBreachSound() {
   if (typeof window === 'undefined') return;
@@ -64,8 +59,8 @@ export function useSlaAlerts(unitId: string | null | undefined) {
       if (seenRef.current.has(key)) return;
       seenRef.current.add(key);
 
-      const elapsed = formatMinutes(payload.elapsedSec);
-      const maxWait = formatMinutes(payload.maxWaitTimeSec);
+      const elapsed = formatSlaDuration(payload.elapsedSec);
+      const maxWait = formatSlaDuration(payload.maxWaitTimeSec);
 
       const isServiceAlert = alertType === 'service';
 
