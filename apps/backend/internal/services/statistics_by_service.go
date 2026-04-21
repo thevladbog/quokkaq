@@ -394,7 +394,7 @@ func (s *StatisticsService) GetSLAHeatmap(
 	if slaType == "wait" {
 		var sb strings.Builder
 		var args []interface{}
-		sb.WriteString(fmt.Sprintf(`
+		fmt.Fprintf(&sb, `
 SELECT
   (t.called_at AT TIME ZONE '%s')::date::text AS day,
   EXTRACT(HOUR FROM (t.called_at AT TIME ZONE '%s'))::int AS hr,
@@ -406,7 +406,7 @@ FROM tickets t
 WHERE t.unit_id::text = ?
   AND t.called_at >= ? AND t.called_at < ?
   AND t.max_waiting_time IS NOT NULL AND t.max_waiting_time > 0
-`, tzName, tzName))
+`, tzName, tzName)
 		args = append(args, subdivisionID, startUTC, endUTC)
 		appendTicketZoneFilter(&sb, &args, zq)
 		if effectiveUser != nil && strings.TrimSpace(*effectiveUser) != "" {
@@ -419,7 +419,7 @@ WHERE t.unit_id::text = ?
 	} else {
 		var sb strings.Builder
 		var args []interface{}
-		sb.WriteString(fmt.Sprintf(`
+		fmt.Fprintf(&sb, `
 SELECT
   (t.completed_at AT TIME ZONE '%s')::date::text AS day,
   EXTRACT(HOUR FROM (t.completed_at AT TIME ZONE '%s'))::int AS hr,
@@ -433,7 +433,7 @@ WHERE t.unit_id::text = ?
   AND t.confirmed_at IS NOT NULL
   AND t.completed_at >= ? AND t.completed_at < ?
   AND t.max_service_time IS NOT NULL AND t.max_service_time > 0
-`, tzName, tzName))
+`, tzName, tzName)
 		args = append(args, subdivisionID, startUTC, endUTC)
 		appendTicketZoneFilter(&sb, &args, zq)
 		if effectiveUser != nil && strings.TrimSpace(*effectiveUser) != "" {

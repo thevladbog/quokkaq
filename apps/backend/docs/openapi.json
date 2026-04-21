@@ -3027,7 +3027,7 @@
                         "type": "string"
                     },
                     "duration": {
-                        "description": "In seconds",
+                        "description": "In seconds (expected / nominal service length for progress display)",
                         "type": "integer"
                     },
                     "gridCol": {
@@ -3052,8 +3052,12 @@
                     "isLeaf": {
                         "type": "boolean"
                     },
+                    "maxServiceTime": {
+                        "description": "In seconds (service-time SLA — copied to Ticket.MaxServiceTime on in_service)",
+                        "type": "integer"
+                    },
                     "maxWaitingTime": {
-                        "description": "In seconds",
+                        "description": "In seconds (queue-wait SLA — copied to Ticket.MaxWaitingTime on create)",
                         "type": "integer"
                     },
                     "name": {
@@ -3575,6 +3579,10 @@
                     },
                     "lastCalledAt": {
                         "type": "string"
+                    },
+                    "maxServiceTime": {
+                        "description": "Snapshot from Service at in_service; cleared on transfer/return",
+                        "type": "integer"
                     },
                     "maxWaitingTime": {
                         "description": "Snapshot from Service at creation",
@@ -4471,6 +4479,15 @@
                     "date": {
                         "type": "string"
                     },
+                    "slaServiceMet": {
+                        "type": "integer"
+                    },
+                    "slaServiceMetPct": {
+                        "type": "number"
+                    },
+                    "slaServiceTotal": {
+                        "type": "integer"
+                    },
                     "slaWaitMet": {
                         "type": "integer"
                     },
@@ -4496,6 +4513,47 @@
                             "$ref": "#/components/schemas/services.SLADeviationsPoint"
                         },
                         "type": "array"
+                    }
+                },
+                "type": "object"
+            },
+            "services.SLAHeatmapCell": {
+                "properties": {
+                    "date": {
+                        "description": "\"YYYY-MM-DD\"",
+                        "type": "string"
+                    },
+                    "hour": {
+                        "description": "0–23",
+                        "type": "integer"
+                    },
+                    "met": {
+                        "type": "integer"
+                    },
+                    "pct": {
+                        "description": "0–100; 0 when total == 0",
+                        "type": "number"
+                    },
+                    "total": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "services.SLAHeatmapResponse": {
+                "properties": {
+                    "cells": {
+                        "items": {
+                            "$ref": "#/components/schemas/services.SLAHeatmapCell"
+                        },
+                        "type": "array"
+                    },
+                    "computedAt": {
+                        "type": "string"
+                    },
+                    "type": {
+                        "description": "\"wait\" | \"service\"",
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -4637,6 +4695,12 @@
                     },
                     "serviceId": {
                         "type": "string"
+                    },
+                    "slaServiceMet": {
+                        "type": "integer"
+                    },
+                    "slaServiceTotal": {
+                        "type": "integer"
                     },
                     "slaWaitMet": {
                         "type": "integer"
@@ -4801,6 +4865,15 @@
                         "type": "string"
                     },
                     "noShowCount": {
+                        "type": "integer"
+                    },
+                    "slaServiceMet": {
+                        "type": "integer"
+                    },
+                    "slaServiceMetPct": {
+                        "type": "number"
+                    },
+                    "slaServiceTotal": {
                         "type": "integer"
                     },
                     "slaWaitMetPct": {
@@ -21560,6 +21633,136 @@
                     }
                 ],
                 "summary": "SLA waiting compliance vs breach per day",
+                "tags": [
+                    "statistics"
+                ]
+            }
+        },
+        "/units/{unitId}/statistics/sla-heatmap": {
+            "get": {
+                "operationId": "getUnitStatisticsSlaHeatmap",
+                "parameters": [
+                    {
+                        "description": "Subdivision unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "YYYY-MM-DD",
+                        "in": "query",
+                        "name": "dateFrom",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "YYYY-MM-DD",
+                        "in": "query",
+                        "name": "dateTo",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "SLA type: wait or service",
+                        "in": "query",
+                        "name": "type",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Filter by operator (expanded scope only)",
+                        "in": "query",
+                        "name": "userId",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Service zone unit id",
+                        "in": "query",
+                        "name": "serviceZoneId",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/services.SLAHeatmapResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unit not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Per-hour SLA compliance heatmap for a date range",
                 "tags": [
                     "statistics"
                 ]
