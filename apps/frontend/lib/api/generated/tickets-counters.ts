@@ -41,6 +41,11 @@ export interface HandlersAssignUnitRequest {
   unitId?: string;
 }
 
+export interface HandlersAttachPhoneRequest {
+  locale?: string;
+  phone?: string;
+}
+
 export interface HandlersCallNextRequest {
   counterId: string;
   serviceId?: string;
@@ -79,6 +84,8 @@ export interface ModelsUnitClient {
   id?: string;
   isAnonymous?: boolean;
   lastName?: string;
+  /** Locale is the visitor's preferred locale ("ru" or "en"), set from the kiosk/virtual-queue on first phone identification. */
+  locale?: string;
   phoneE164?: string;
   photoUrl?: string;
   unitId?: string;
@@ -270,6 +277,8 @@ export interface ModelsTicket {
   counter?: ModelsCounter;
   counterId?: string;
   createdAt?: string;
+  /** EstimatedWaitSeconds is the estimated seconds until this ticket is called (computed on-the-fly). */
+  estimatedWaitSeconds?: number;
   id?: string;
   /** IsCredit marks a ticket issued when the monthly tickets_per_month quota was exhausted but
   the working day (EOD) was still open. Credit tickets are counted against the next billing period. */
@@ -286,6 +295,8 @@ export interface ModelsTicket {
   preRegistrationId?: string;
   priority?: number;
   queueNumber?: string;
+  /** QueuePosition is the 1-based position in the waiting queue (computed on-the-fly, not stored). */
+  queuePosition?: number;
   /** ServedByName is hydrated for client visit lists from ticket_histories (not stored on tickets). */
   servedByName?: string;
   service?: ModelsService;
@@ -298,6 +309,9 @@ export interface ModelsTicket {
   /** URL to the generated TTS audio file */
   ttsUrl?: string;
   unitId?: string;
+  /** VisitorToken is a secret UUID issued at ticket creation. Visitor endpoints require it in
+  the X-Visitor-Token header to prevent IDOR on cancel and phone opt-in. */
+  visitorToken?: string;
 }
 
 export interface HandlersClientVisitsResponse {
@@ -736,12 +750,18 @@ export interface HandlersPlatformCreateSubscriptionPlanBody {
 }
 
 export interface HandlersPlatformIntegrationsResponse {
-  leadsTrackerQueue: string;
-  supportTrackerQueue: string;
-  trackerTypeError: string;
-  trackerTypeRegistration: string;
-  trackerTypeRequest: string;
-  trackerTypeSupport: string;
+  leadsTrackerQueue?: string;
+  /** e.g. "****abcd" — last 4 chars only */
+  smsApiKeyMasked?: string;
+  smsEnabled?: boolean;
+  smsFromName?: string;
+  /** SMS integration (credentials are masked in read; never returned in plaintext). */
+  smsProvider?: string;
+  supportTrackerQueue?: string;
+  trackerTypeError?: string;
+  trackerTypeRegistration?: string;
+  trackerTypeRequest?: string;
+  trackerTypeSupport?: string;
 }
 
 export type HandlersPlatformUpdateSubscriptionPlanBodyFeatures = {[key: string]: boolean};
@@ -883,6 +903,11 @@ export interface HandlersTerminalBootstrapResponse {
   unitId?: string;
 }
 
+export interface HandlersTestSMSIntegrationRequest {
+  /** Phone number in E.164 format to send the test SMS to. */
+  phone?: string;
+}
+
 export interface HandlersTransferRequest {
   /** @nullable */
   operatorComment?: string | null;
@@ -988,6 +1013,17 @@ export interface HandlersUserResponse {
   tenantRoles?: HandlersTenantRoleBriefResponse[];
   type?: string;
   units?: HandlersUserUnitDTO[];
+}
+
+export interface HandlersVirtualQueueJoinRequest {
+  locale?: string;
+  phone?: string;
+  serviceId?: string;
+}
+
+export interface HandlersVirtualQueueJoinResponse {
+  ticket?: unknown;
+  ticketPageUrl?: string;
 }
 
 export type HandlersYooKassaWebhookNotificationObject = { [key: string]: unknown };
@@ -1923,6 +1959,14 @@ export interface ServicesCreateCalendarIntegrationRequest {
 
 export interface ServicesDeploymentSaaSSettingsPatch {
   leadsTrackerQueue?: string;
+  /** full credential (write-only; never returned in GET) */
+  smsApiKey?: string;
+  /** full credential (write-only; never returned in GET) */
+  smsApiSecret?: string;
+  smsEnabled?: boolean;
+  smsFromName?: string;
+  /** SMS provider settings (all optional). */
+  smsProvider?: string;
   supportTrackerQueue?: string;
   trackerTypeError?: string;
   trackerTypeRegistration?: string;
@@ -2043,6 +2087,13 @@ export interface ServicesSLAHeatmapResponse {
   computedAt?: string;
   /** "wait" | "service" */
   type?: string;
+}
+
+export interface ServicesServiceQueueInfo {
+  estimatedWaitMinutes?: number;
+  queueLength?: number;
+  serviceId?: string;
+  serviceName?: string;
 }
 
 export interface ServicesSetupHealthCheck {
@@ -2216,6 +2267,15 @@ export interface ServicesUnitClientHistoryListResponse {
 export interface ServicesUnitClientListResponse {
   items?: ModelsUnitClient[];
   nextCursor?: string;
+}
+
+export interface ServicesUnitQueueSummary {
+  activeCounters?: number;
+  estimatedWaitMinutes?: number;
+  queueLength?: number;
+  /** Services contains per-service breakdown when multiple services have waiting tickets.
+  Omitted when only one service is active (redundant with the top-level fields). */
+  services?: ServicesServiceQueueInfo[];
 }
 
 export interface ServicesUpdateCalendarIntegrationRequest {
@@ -3191,42 +3251,57 @@ export const usePostCountersIdRelease = <TError = string,
     }
 
 /**
- * Retrieves a ticket by its ID
- * @summary Get ticket by ID
+ * Allows a visitor to cancel their own waiting ticket. Only tickets in 'waiting' status can be cancelled this way. Requires the X-Visitor-Token header matching the token issued at ticket creation.
+ * @summary Cancel a waiting ticket (visitor self-service)
  */
-export type getTicketsIdResponse200 = {
+export type visitorCancelTicketResponse200 = {
   data: ModelsTicket
   status: 200
 }
 
-export type getTicketsIdResponse404 = {
+export type visitorCancelTicketResponse403 = {
+  data: string
+  status: 403
+}
+
+export type visitorCancelTicketResponse404 = {
   data: string
   status: 404
 }
 
-export type getTicketsIdResponseSuccess = (getTicketsIdResponse200) & {
-  headers: Headers;
-};
-export type getTicketsIdResponseError = (getTicketsIdResponse404) & {
-  headers: Headers;
-};
-
-export type getTicketsIdResponse = (getTicketsIdResponseSuccess | getTicketsIdResponseError)
-
-export const getGetTicketsIdUrl = (id: string,) => {
-
-
-
-
-  return `/tickets/${id}`
+export type visitorCancelTicketResponse409 = {
+  data: string
+  status: 409
 }
 
-export const getTicketsId = async (id: string, options?: RequestInit): Promise<getTicketsIdResponse> => {
+export type visitorCancelTicketResponse500 = {
+  data: string
+  status: 500
+}
 
-  return orvalMutator<getTicketsIdResponse>(getGetTicketsIdUrl(id),
+export type visitorCancelTicketResponseSuccess = (visitorCancelTicketResponse200) & {
+  headers: Headers;
+};
+export type visitorCancelTicketResponseError = (visitorCancelTicketResponse403 | visitorCancelTicketResponse404 | visitorCancelTicketResponse409 | visitorCancelTicketResponse500) & {
+  headers: Headers;
+};
+
+export type visitorCancelTicketResponse = (visitorCancelTicketResponseSuccess | visitorCancelTicketResponseError)
+
+export const getVisitorCancelTicketUrl = (id: string,) => {
+
+
+
+
+  return `/tickets/${id}/cancel`
+}
+
+export const visitorCancelTicket = async (id: string, options?: RequestInit): Promise<visitorCancelTicketResponse> => {
+
+  return orvalMutator<visitorCancelTicketResponse>(getVisitorCancelTicketUrl(id),
   {
     ...options,
-    method: 'GET'
+    method: 'POST'
 
 
   }
@@ -3235,81 +3310,50 @@ export const getTicketsId = async (id: string, options?: RequestInit): Promise<g
 
 
 
+export const getVisitorCancelTicketMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof visitorCancelTicket>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof visitorCancelTicket>>, TError,{id: string}, TContext> => {
 
-export const getGetTicketsIdQueryKey = (id: string,) => {
-    return [
-    `/tickets/${id}`
-    ] as const;
-    }
-
-
-export const getGetTicketsIdQueryOptions = <TData = Awaited<ReturnType<typeof getTicketsId>>, TError = string>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTicketsId>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetTicketsIdQueryKey(id);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTicketsId>>> = ({ signal }) => getTicketsId(id, { signal, ...requestOptions });
+const mutationKey = ['visitorCancelTicket'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
 
 
 
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof visitorCancelTicket>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
 
-   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTicketsId>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type GetTicketsIdQueryResult = NonNullable<Awaited<ReturnType<typeof getTicketsId>>>
-export type GetTicketsIdQueryError = string
+          return  visitorCancelTicket(id,requestOptions)
+        }
 
 
-export function useGetTicketsId<TData = Awaited<ReturnType<typeof getTicketsId>>, TError = string>(
- id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTicketsId>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getTicketsId>>,
-          TError,
-          Awaited<ReturnType<typeof getTicketsId>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetTicketsId<TData = Awaited<ReturnType<typeof getTicketsId>>, TError = string>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTicketsId>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getTicketsId>>,
-          TError,
-          Awaited<ReturnType<typeof getTicketsId>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetTicketsId<TData = Awaited<ReturnType<typeof getTicketsId>>, TError = string>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTicketsId>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get ticket by ID
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type VisitorCancelTicketMutationResult = NonNullable<Awaited<ReturnType<typeof visitorCancelTicket>>>
+
+    export type VisitorCancelTicketMutationError = string
+
+    /**
+ * @summary Cancel a waiting ticket (visitor self-service)
  */
-
-export function useGetTicketsId<TData = Awaited<ReturnType<typeof getTicketsId>>, TError = string>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTicketsId>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getGetTicketsIdQueryOptions(id,options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-
-
-
-
-
+export const useVisitorCancelTicket = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof visitorCancelTicket>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof visitorCancelTicket>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getVisitorCancelTicketMutationOptions(options), queryClient);
+    }
 
 /**
  * Body must include operatorComment. Send a string to set the comment, or JSON null to clear it.
@@ -3416,6 +3460,113 @@ export const usePatchTicketsIdOperatorComment = <TError = string,
         TContext
       > => {
       return useMutation(getPatchTicketsIdOperatorCommentMutationOptions(options), queryClient);
+    }
+
+/**
+ * Associates a phone number with the visitor of a waiting ticket so they receive SMS notifications. Only valid while the ticket is in 'waiting' status. Normalizes and validates the phone to E.164 format. Requires X-Visitor-Token header.
+ * @summary Attach phone number to a ticket for SMS opt-in
+ */
+export type attachTicketPhoneResponse200 = {
+  data: ModelsTicket
+  status: 200
+}
+
+export type attachTicketPhoneResponse400 = {
+  data: string
+  status: 400
+}
+
+export type attachTicketPhoneResponse403 = {
+  data: string
+  status: 403
+}
+
+export type attachTicketPhoneResponse404 = {
+  data: string
+  status: 404
+}
+
+export type attachTicketPhoneResponse409 = {
+  data: string
+  status: 409
+}
+
+export type attachTicketPhoneResponseSuccess = (attachTicketPhoneResponse200) & {
+  headers: Headers;
+};
+export type attachTicketPhoneResponseError = (attachTicketPhoneResponse400 | attachTicketPhoneResponse403 | attachTicketPhoneResponse404 | attachTicketPhoneResponse409) & {
+  headers: Headers;
+};
+
+export type attachTicketPhoneResponse = (attachTicketPhoneResponseSuccess | attachTicketPhoneResponseError)
+
+export const getAttachTicketPhoneUrl = (id: string,) => {
+
+
+
+
+  return `/tickets/${id}/phone`
+}
+
+export const attachTicketPhone = async (id: string,
+    handlersAttachPhoneRequest: HandlersAttachPhoneRequest, options?: RequestInit): Promise<attachTicketPhoneResponse> => {
+
+  return orvalMutator<attachTicketPhoneResponse>(getAttachTicketPhoneUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersAttachPhoneRequest,)
+  }
+);}
+
+
+
+
+export const getAttachTicketPhoneMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof attachTicketPhone>>, TError,{id: string;data: HandlersAttachPhoneRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof attachTicketPhone>>, TError,{id: string;data: HandlersAttachPhoneRequest}, TContext> => {
+
+const mutationKey = ['attachTicketPhone'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof attachTicketPhone>>, {id: string;data: HandlersAttachPhoneRequest}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  attachTicketPhone(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AttachTicketPhoneMutationResult = NonNullable<Awaited<ReturnType<typeof attachTicketPhone>>>
+    export type AttachTicketPhoneMutationBody = HandlersAttachPhoneRequest
+    export type AttachTicketPhoneMutationError = string
+
+    /**
+ * @summary Attach phone number to a ticket for SMS opt-in
+ */
+export const useAttachTicketPhone = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof attachTicketPhone>>, TError,{id: string;data: HandlersAttachPhoneRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof attachTicketPhone>>,
+        TError,
+        {id: string;data: HandlersAttachPhoneRequest},
+        TContext
+      > => {
+      return useMutation(getAttachTicketPhoneMutationOptions(options), queryClient);
     }
 
 /**
@@ -4464,6 +4615,127 @@ export const useCreateUnitCounter = <TError = string | HandlersQuotaExceededErro
     }
 
 /**
+ * Returns queue length, estimated wait time (minutes), and active counter count. Public endpoint, no authentication required.
+ * @summary Get public queue status for a unit
+ */
+export type getUnitQueueStatusResponse200 = {
+  data: ServicesUnitQueueSummary
+  status: 200
+}
+
+export type getUnitQueueStatusResponse500 = {
+  data: string
+  status: 500
+}
+
+export type getUnitQueueStatusResponseSuccess = (getUnitQueueStatusResponse200) & {
+  headers: Headers;
+};
+export type getUnitQueueStatusResponseError = (getUnitQueueStatusResponse500) & {
+  headers: Headers;
+};
+
+export type getUnitQueueStatusResponse = (getUnitQueueStatusResponseSuccess | getUnitQueueStatusResponseError)
+
+export const getGetUnitQueueStatusUrl = (unitId: string,) => {
+
+
+
+
+  return `/units/${unitId}/queue-status`
+}
+
+export const getUnitQueueStatus = async (unitId: string, options?: RequestInit): Promise<getUnitQueueStatusResponse> => {
+
+  return orvalMutator<getUnitQueueStatusResponse>(getGetUnitQueueStatusUrl(unitId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetUnitQueueStatusQueryKey = (unitId: string,) => {
+    return [
+    `/units/${unitId}/queue-status`
+    ] as const;
+    }
+
+
+export const getGetUnitQueueStatusQueryOptions = <TData = Awaited<ReturnType<typeof getUnitQueueStatus>>, TError = string>(unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitQueueStatus>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetUnitQueueStatusQueryKey(unitId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUnitQueueStatus>>> = ({ signal }) => getUnitQueueStatus(unitId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUnitQueueStatus>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetUnitQueueStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getUnitQueueStatus>>>
+export type GetUnitQueueStatusQueryError = string
+
+
+export function useGetUnitQueueStatus<TData = Awaited<ReturnType<typeof getUnitQueueStatus>>, TError = string>(
+ unitId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitQueueStatus>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getUnitQueueStatus>>,
+          TError,
+          Awaited<ReturnType<typeof getUnitQueueStatus>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetUnitQueueStatus<TData = Awaited<ReturnType<typeof getUnitQueueStatus>>, TError = string>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitQueueStatus>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getUnitQueueStatus>>,
+          TError,
+          Awaited<ReturnType<typeof getUnitQueueStatus>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetUnitQueueStatus<TData = Awaited<ReturnType<typeof getUnitQueueStatus>>, TError = string>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitQueueStatus>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get public queue status for a unit
+ */
+
+export function useGetUnitQueueStatus<TData = Awaited<ReturnType<typeof getUnitQueueStatus>>, TError = string>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitQueueStatus>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetUnitQueueStatusQueryOptions(unitId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
  * Subdivision: all non-EOD tickets for that unit (all service zones + subdivision-wide pool). Service zone: non-EOD tickets for the parent subdivision with service_zone_id equal to this zone's id.
  * @summary Get tickets by unit
  */
@@ -4689,4 +4961,111 @@ export const useCreateUnitTicket = <TError = string | HandlersQuotaExceededError
         TContext
       > => {
       return useMutation(getCreateUnitTicketMutationOptions(options), queryClient);
+    }
+
+/**
+ * Allows a visitor to join a unit's queue remotely without visiting the kiosk. Requires the unit to have virtualQueue.enabled=true in its config and the company to have the virtual_queue feature. Phone is required for status SMS notifications (optional if not used). Returns the created ticket and a link to the ticket tracking page.
+ * @summary Join a virtual queue remotely
+ */
+export type joinVirtualQueueResponse201 = {
+  data: HandlersVirtualQueueJoinResponse
+  status: 201
+}
+
+export type joinVirtualQueueResponse400 = {
+  data: string
+  status: 400
+}
+
+export type joinVirtualQueueResponse402 = {
+  data: HandlersQuotaExceededError
+  status: 402
+}
+
+export type joinVirtualQueueResponse403 = {
+  data: string
+  status: 403
+}
+
+export type joinVirtualQueueResponse503 = {
+  data: string
+  status: 503
+}
+
+export type joinVirtualQueueResponseSuccess = (joinVirtualQueueResponse201) & {
+  headers: Headers;
+};
+export type joinVirtualQueueResponseError = (joinVirtualQueueResponse400 | joinVirtualQueueResponse402 | joinVirtualQueueResponse403 | joinVirtualQueueResponse503) & {
+  headers: Headers;
+};
+
+export type joinVirtualQueueResponse = (joinVirtualQueueResponseSuccess | joinVirtualQueueResponseError)
+
+export const getJoinVirtualQueueUrl = (unitId: string,) => {
+
+
+
+
+  return `/units/${unitId}/virtual-queue`
+}
+
+export const joinVirtualQueue = async (unitId: string,
+    handlersVirtualQueueJoinRequest: HandlersVirtualQueueJoinRequest, options?: RequestInit): Promise<joinVirtualQueueResponse> => {
+
+  return orvalMutator<joinVirtualQueueResponse>(getJoinVirtualQueueUrl(unitId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersVirtualQueueJoinRequest,)
+  }
+);}
+
+
+
+
+export const getJoinVirtualQueueMutationOptions = <TError = string | HandlersQuotaExceededError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof joinVirtualQueue>>, TError,{unitId: string;data: HandlersVirtualQueueJoinRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof joinVirtualQueue>>, TError,{unitId: string;data: HandlersVirtualQueueJoinRequest}, TContext> => {
+
+const mutationKey = ['joinVirtualQueue'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof joinVirtualQueue>>, {unitId: string;data: HandlersVirtualQueueJoinRequest}> = (props) => {
+          const {unitId,data} = props ?? {};
+
+          return  joinVirtualQueue(unitId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type JoinVirtualQueueMutationResult = NonNullable<Awaited<ReturnType<typeof joinVirtualQueue>>>
+    export type JoinVirtualQueueMutationBody = HandlersVirtualQueueJoinRequest
+    export type JoinVirtualQueueMutationError = string | HandlersQuotaExceededError
+
+    /**
+ * @summary Join a virtual queue remotely
+ */
+export const useJoinVirtualQueue = <TError = string | HandlersQuotaExceededError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof joinVirtualQueue>>, TError,{unitId: string;data: HandlersVirtualQueueJoinRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof joinVirtualQueue>>,
+        TError,
+        {unitId: string;data: HandlersVirtualQueueJoinRequest},
+        TContext
+      > => {
+      return useMutation(getJoinVirtualQueueMutationOptions(options), queryClient);
     }
