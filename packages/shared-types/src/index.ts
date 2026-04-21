@@ -546,6 +546,7 @@ export const TicketModelSchema = z.object({
   transferTrail: z.array(ClientVisitTransferEventSchema).optional(),
   queuePosition: z.number().nullable().optional(),
   estimatedWaitSeconds: z.number().nullable().optional(),
+  smsOptInAvailable: z.boolean().optional(),
   service: z
     .object({
       id: z.string().optional(),

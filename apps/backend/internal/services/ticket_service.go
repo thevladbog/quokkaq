@@ -151,6 +151,9 @@ var ErrClientVisitsInvalidCursor = errors.New("invalid visits cursor")
 // ErrTicketNotCancellable is returned when visitor tries to cancel a ticket that is not in waiting status.
 var ErrTicketNotCancellable = errors.New("ticket cannot be cancelled: only waiting tickets can be cancelled by visitor")
 
+// ErrTicketNotWaiting is returned when an operation requires the ticket to be in waiting status.
+var ErrTicketNotWaiting = errors.New("ticket is not in waiting status")
+
 // ErrTransferConflictingTargets is returned when both counter/user and zone targets are set.
 var ErrTransferConflictingTargets = errors.New("cannot combine counter transfer with zone transfer")
 
@@ -865,7 +868,7 @@ func (s *ticketService) AttachPhoneToTicket(ticketID, phoneE164, locale string) 
 		ticket = t
 
 		if t.Status != "waiting" {
-			return ErrTicketNotCancellable
+			return ErrTicketNotWaiting
 		}
 
 		// Resolve or create a client with the provided phone.
@@ -1001,6 +1004,8 @@ func (s *ticketService) Pick(ticketID, counterID string, actorUserID *string) (*
 	// Fire-and-forget SMS notification to visitor (parity with CallNext).
 	if s.notifService != nil {
 		go s.notifService.SendTicketCalledSMS(ticket)
+		// Notify the new first-in-queue visitor (parity with CallNext).
+		go s.notifyNextInLine(ticket.UnitID, nil)
 	}
 
 	return ticket, nil

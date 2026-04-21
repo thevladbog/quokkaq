@@ -823,6 +823,10 @@ func (h *TicketHandler) AttachPhone(w http.ResponseWriter, r *http.Request) {
 
 	updated, aErr := h.service.AttachPhoneToTicket(id, phoneE164, locale)
 	if aErr != nil {
+		if errors.Is(aErr, services.ErrTicketNotWaiting) {
+			http.Error(w, aErr.Error(), http.StatusConflict)
+			return
+		}
 		http.Error(w, aErr.Error(), http.StatusInternalServerError)
 		return
 	}
