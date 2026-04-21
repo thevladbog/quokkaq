@@ -163,6 +163,12 @@ func applyForecastDefaults(p StaffingForecastParams) StaffingForecastParams {
 
 // historicalSameDayDates returns the last n dates with the same weekday before targetDate.
 func historicalSameDayDates(targetDate time.Time, weekday time.Weekday, n int) []string {
+	if n <= 0 {
+		return []string{}
+	}
+	if n > 52 {
+		n = 52
+	}
 	out := make([]string, 0, n)
 	d := targetDate.AddDate(0, 0, -7)
 	for len(out) < n {
