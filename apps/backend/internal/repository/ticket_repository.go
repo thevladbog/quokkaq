@@ -793,7 +793,7 @@ func (r *ticketRepository) CountWaitingByService(unitID string) ([]ServiceWaitin
 	}
 	out := make([]ServiceWaitingCount, len(rows))
 	for i, r := range rows {
-		out[i] = ServiceWaitingCount{ServiceID: r.ServiceID, Count: r.Count}
+		out[i] = ServiceWaitingCount(r)
 	}
 	return out, nil
 }

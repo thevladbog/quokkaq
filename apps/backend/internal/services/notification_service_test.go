@@ -48,17 +48,6 @@ func (s *stubUnitClientRepo) GetByID(_ string) (*models.UnitClient, error) {
 	return s.client, s.err
 }
 
-// stubUnitRepoForNotif returns a preset unit so companyID can be resolved.
-type stubUnitRepoForNotif struct {
-	repository.UnitRepository
-	unit *models.Unit
-	err  error
-}
-
-func (s *stubUnitRepoForNotif) FindByID(_ string) (*models.Unit, error) {
-	return s.unit, s.err
-}
-
 // --- helpers ---
 
 // newNotifSvc builds a NotificationService that skips the CompanyHasPlanFeature gate by
