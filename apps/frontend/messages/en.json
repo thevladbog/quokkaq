@@ -165,6 +165,7 @@
     "utilization_metric_idle": "Idle & break",
     "export_csv": "Export CSV",
     "export_pdf": "Export PDF",
+    "export_pdf_error": "Failed to download PDF report",
     "export_button": "Export",
     "export_report_title": "QuokkaQ Statistics Report",
     "export_generated_at": "Generated at",

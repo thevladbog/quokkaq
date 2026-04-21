@@ -116,7 +116,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
+import { toast } from 'sonner';
 import { Download, FileSpreadsheet, FileText } from 'lucide-react';
+import { logger } from '@/lib/logger';
 import {
   downloadStatisticsCSV,
   type StatisticsExportData,
@@ -1208,8 +1210,9 @@ export default function StatisticsPage() {
         parseFilenameFromContentDisposition(contentDisposition);
       const filename = fromHeader ?? `statistics_${from}_${dateToForApi}.pdf`;
       triggerBlobDownload(blob, filename);
-    } catch {
-      // Silent failure — the user sees no file download
+    } catch (error) {
+      logger.error('Statistics PDF export failed', error);
+      toast.error(t('export_pdf_error'));
     } finally {
       setPdfExporting(false);
     }

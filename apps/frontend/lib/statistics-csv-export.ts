@@ -76,10 +76,11 @@ export type StatisticsExportFilters = {
 type TranslateFn = (key: string) => string;
 
 function escapeCSV(value: string): string {
-  if (value.includes(',') || value.includes('"') || value.includes('\n')) {
-    return `"${value.replace(/"/g, '""')}"`;
+  const safe = /^[=+\-@]/.test(value) ? `'${value}` : value;
+  if (safe.includes(',') || safe.includes('"') || safe.includes('\n')) {
+    return `"${safe.replace(/"/g, '""')}"`;
   }
-  return value;
+  return safe;
 }
 
 function row(cells: (string | number | null | undefined)[]): string {

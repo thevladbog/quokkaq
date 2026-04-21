@@ -3,6 +3,8 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"net/url"
+	"regexp"
 	"strings"
 
 	"quokkaq-go-backend/internal/middleware"
@@ -33,7 +35,7 @@ func NewStatisticsExportHandler(
 // @Description  Generates a branded A4 PDF with all available statistics sections for the chosen date range. Same auth as individual statistics endpoints.
 // @Tags         statistics
 // @Security     BearerAuth
-// @Produce      application/pdf
+// @Produce      application/pdf,text/plain
 // @Param        unitId path string true "Subdivision unit ID"
 // @Param        dateFrom query string true "Start date YYYY-MM-DD"
 // @Param        dateTo query string true "End date YYYY-MM-DD"
@@ -85,41 +87,80 @@ func (h *StatisticsExportHandler) ExportPDF(w http.ResponseWriter, r *http.Reque
 		DateFrom: dateFrom,
 		DateTo:   dateTo,
 	}
-
-	// Collect all statistics sections; individual errors are non-fatal — the section is simply omitted.
-
-	if ts, err := h.service.GetTimeseries(ctx, unitID, companyID, user, viewerID, dateFrom, dateTo, "wait_time", reqUser, svcZone); err == nil {
-		input.Timeseries = ts
+	if reqUser != nil {
+		input.FilterOperator = *reqUser
+	}
+	if svcZone != "" {
+		input.FilterZone = svcZone
 	}
 
-	if sla, err := h.service.GetSLADeviations(ctx, unitID, companyID, user, viewerID, dateFrom, dateTo, reqUser, svcZone); err == nil {
-		input.SLADeviations = sla
+	responded := false
+	handleStatsErr := func(err error) bool {
+		if err == nil {
+			return false
+		}
+		if respondStatisticsServiceErr(w, err) {
+			responded = true
+			return true
+		}
+		http.Error(w, "Failed to export statistics PDF", http.StatusInternalServerError)
+		responded = true
+		return true
 	}
 
-	if load, err := h.service.GetLoad(ctx, unitID, companyID, user, viewerID, dateFrom, dateTo, reqUser, svcZone); err == nil {
-		input.Load = load
+	ts, err := h.service.GetTimeseries(ctx, unitID, companyID, user, viewerID, dateFrom, dateTo, "wait_time", reqUser, svcZone)
+	if handleStatsErr(err) {
+		return
 	}
+	input.Timeseries = ts
 
-	if tbs, err := h.service.GetTicketsByService(ctx, unitID, companyID, user, viewerID, dateFrom, dateTo, reqUser, svcZone); err == nil {
-		input.TicketsSvc = tbs
+	sla, err := h.service.GetSLADeviations(ctx, unitID, companyID, user, viewerID, dateFrom, dateTo, reqUser, svcZone)
+	if handleStatsErr(err) {
+		return
 	}
+	input.SLADeviations = sla
 
-	if sum, err := h.service.GetSlaSummary(ctx, unitID, companyID, user, viewerID, dateFrom, dateTo, reqUser, svcZone, ""); err == nil {
-		input.SlaSummary = sum
+	load, err := h.service.GetLoad(ctx, unitID, companyID, user, viewerID, dateFrom, dateTo, reqUser, svcZone)
+	if handleStatsErr(err) {
+		return
 	}
+	input.Load = load
 
-	if scores, err := h.service.GetSurveyScores(ctx, unitID, companyID, user, viewerID, dateFrom, dateTo, nil, nil); err == nil {
+	tbs, err := h.service.GetTicketsByService(ctx, unitID, companyID, user, viewerID, dateFrom, dateTo, reqUser, svcZone)
+	if handleStatsErr(err) {
+		return
+	}
+	input.TicketsSvc = tbs
+
+	sum, err := h.service.GetSlaSummary(ctx, unitID, companyID, user, viewerID, dateFrom, dateTo, reqUser, svcZone, "")
+	if handleStatsErr(err) {
+		return
+	}
+	input.SlaSummary = sum
+
+	if repository.UserCanViewSurveyScoreAggregates(user, unitID) {
+		scores, err := h.service.GetSurveyScores(ctx, unitID, companyID, user, viewerID, dateFrom, dateTo, nil, nil)
+		if handleStatsErr(err) {
+			return
+		}
 		input.SurveyScores = scores
 	}
 
 	if reqUser != nil && strings.TrimSpace(*reqUser) != "" {
-		if util, err := h.service.GetUtilization(ctx, unitID, companyID, user, viewerID, *reqUser, dateFrom, dateTo); err == nil {
-			input.Utilization = util
+		util, err := h.service.GetUtilization(ctx, unitID, companyID, user, viewerID, *reqUser, dateFrom, dateTo)
+		if handleStatsErr(err) {
+			return
 		}
-		if radar, err := h.service.GetEmployeeRadar(ctx, unitID, companyID, user, viewerID, *reqUser); err == nil {
-			input.EmployeeRadar = radar
+		input.Utilization = util
+
+		radar, err := h.service.GetEmployeeRadar(ctx, unitID, companyID, user, viewerID, *reqUser)
+		if handleStatsErr(err) {
+			return
 		}
+		input.EmployeeRadar = radar
 	}
+
+	_ = responded
 
 	pdfBytes, err := services.BuildStatisticsPDF(input)
 	if err != nil {
@@ -127,20 +168,28 @@ func (h *StatisticsExportHandler) ExportPDF(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	safeName := strings.Map(func(r rune) rune {
+	utf8Name := statisticsPDFFilename(unit.Name, dateFrom, dateTo)
+	asciiName := nonASCIIReplacer.ReplaceAllString(utf8Name, "_")
+
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Disposition",
+		`attachment; filename="`+asciiName+`"; filename*=UTF-8''`+url.PathEscape(utf8Name))
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(pdfBytes)))
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(pdfBytes)
+}
+
+var nonASCIIReplacer = regexp.MustCompile(`[^\x20-\x7E]`)
+
+func statisticsPDFFilename(unitName, dateFrom, dateTo string) string {
+	safe := strings.Map(func(r rune) rune {
 		if r == '/' || r == '\\' || r == ':' || r == '*' || r == '?' || r == '"' || r == '<' || r == '>' || r == '|' {
 			return '_'
 		}
 		return r
-	}, unit.Name)
-	if len(safeName) > 60 {
-		safeName = safeName[:60]
+	}, unitName)
+	if len(safe) > 60 {
+		safe = safe[:60]
 	}
-	filename := fmt.Sprintf("%s_%s_%s.pdf", safeName, dateFrom, dateTo)
-
-	w.Header().Set("Content-Type", "application/pdf")
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
-	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(pdfBytes)))
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(pdfBytes)
+	return fmt.Sprintf("%s_%s_%s.pdf", safe, dateFrom, dateTo)
 }

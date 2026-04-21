@@ -21236,6 +21236,12 @@
                                     "format": "binary",
                                     "type": "string"
                                 }
+                            },
+                            "text/plain": {
+                                "schema": {
+                                    "format": "binary",
+                                    "type": "string"
+                                }
                             }
                         },
                         "description": "PDF report"
@@ -21243,6 +21249,11 @@
                     "400": {
                         "content": {
                             "application/pdf": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            },
+                            "text/plain": {
                                 "schema": {
                                     "type": "string"
                                 }
@@ -21256,6 +21267,11 @@
                                 "schema": {
                                     "type": "string"
                                 }
+                            },
+                            "text/plain": {
+                                "schema": {
+                                    "type": "string"
+                                }
                             }
                         },
                         "description": "Unauthorized"
@@ -21263,6 +21279,11 @@
                     "403": {
                         "content": {
                             "application/pdf": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            },
+                            "text/plain": {
                                 "schema": {
                                     "type": "string"
                                 }
@@ -21276,6 +21297,11 @@
                                 "schema": {
                                     "type": "string"
                                 }
+                            },
+                            "text/plain": {
+                                "schema": {
+                                    "type": "string"
+                                }
                             }
                         },
                         "description": "Unit not found"
@@ -21283,6 +21309,11 @@
                     "500": {
                         "content": {
                             "application/pdf": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            },
+                            "text/plain": {
                                 "schema": {
                                     "type": "string"
                                 }
