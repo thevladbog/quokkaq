@@ -33,6 +33,7 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { formatApiToastErrorMessage } from '@/lib/format-api-toast-error';
+import { isQuotaExceededError } from '@/lib/quota-error';
 import { toast } from 'sonner';
 import type { UnitKind } from '@quokkaq/shared-types';
 import { buildUnitForest } from '@/lib/unit-tree';
@@ -124,11 +125,15 @@ export default function UnitsIndexPage() {
       toast.success(t('units.create_success'));
     } catch (error) {
       console.error('Failed to create unit:', error);
-      toast.error(
-        t('units.create_error', {
-          message: formatApiToastErrorMessage(error, tCommon('error'))
-        })
-      );
+      if (isQuotaExceededError(error)) {
+        toast.error(t('units.quota_exceeded_unit'));
+      } else {
+        toast.error(
+          t('units.create_error', {
+            message: formatApiToastErrorMessage(error, tCommon('error'))
+          })
+        );
+      }
     }
   };
 

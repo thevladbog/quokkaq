@@ -17,6 +17,9 @@ import (
 	"gorm.io/gorm"
 )
 
+// ErrUserQuotaExceeded is returned when the company's plan does not allow inviting another user.
+var ErrUserQuotaExceeded = errors.New("user quota exceeded for current subscription plan")
+
 type InvitationService interface {
 	CreateInvitation(companyID, email string, targetUnits []byte, targetRoles []byte, templateID string) (*models.Invitation, error)
 	GetAllInvitations(companyID string) ([]models.Invitation, error)
@@ -34,6 +37,7 @@ type invitationService struct {
 	userRepo        repository.UserRepository
 	unitRepo        repository.UnitRepository
 	templateService TemplateService
+	quota           QuotaService
 }
 
 func NewInvitationService(
@@ -49,6 +53,25 @@ func NewInvitationService(
 		userRepo:        userRepo,
 		unitRepo:        unitRepo,
 		templateService: templateService,
+	}
+}
+
+// NewInvitationServiceWithQuota creates an InvitationService with quota enforcement enabled.
+func NewInvitationServiceWithQuota(
+	repo repository.InvitationRepository,
+	mailService MailService,
+	userRepo repository.UserRepository,
+	unitRepo repository.UnitRepository,
+	templateService TemplateService,
+	quota QuotaService,
+) InvitationService {
+	return &invitationService{
+		repo:            repo,
+		mailService:     mailService,
+		userRepo:        userRepo,
+		unitRepo:        unitRepo,
+		templateService: templateService,
+		quota:           quota,
 	}
 }
 
@@ -106,6 +129,16 @@ func (s *invitationService) CreateInvitation(companyID, email string, targetUnit
 
 	if err := validateInvitationTargetUnits(s.unitRepo, companyID, targetUnits); err != nil {
 		return nil, err
+	}
+
+	if s.quota != nil {
+		ok, err := s.quota.CheckQuota(companyID, "users")
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			return nil, ErrUserQuotaExceeded
+		}
 	}
 
 	token := uuid.New().String()

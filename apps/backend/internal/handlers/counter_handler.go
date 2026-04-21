@@ -53,11 +53,13 @@ func writeCounterServiceError(w http.ResponseWriter, err error) {
 // @Tags         counters
 // @Accept       json
 // @Produce      json
-// @Param        counter body models.Counter true "Counter Data"
+// @Param        unitId  path   string        true  "Unit ID"
+// @Param        counter body   models.Counter true  "Counter Data"
 // @Success      201  {object}  models.Counter
 // @Failure      400  {string}  string "Bad Request"
+// @Failure      402  {object}  object "Quota Exceeded"
 // @Failure      500  {string}  string "Internal Server Error"
-// @Router       /counters [post]
+// @Router       /units/{unitId}/counters [post]
 func (h *CounterHandler) CreateCounter(w http.ResponseWriter, r *http.Request) {
 	var counter models.Counter
 	if err := json.NewDecoder(r.Body).Decode(&counter); err != nil {
@@ -70,6 +72,12 @@ func (h *CounterHandler) CreateCounter(w http.ResponseWriter, r *http.Request) {
 	counter.UnitID = unitID
 
 	if err := h.service.CreateCounter(&counter); err != nil {
+		if errors.Is(err, services.ErrCounterQuotaExceeded) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusPaymentRequired)
+			_, _ = w.Write([]byte(`{"error":"quota_exceeded","message":"` + err.Error() + `"}`))
+			return
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

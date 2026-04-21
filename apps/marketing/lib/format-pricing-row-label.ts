@@ -5,7 +5,8 @@ const LIMIT_ROW_KEYS = new Set([
   'features.users',
   'features.tickets',
   'features.services',
-  'features.counters'
+  'features.counters',
+  'features.zonesPerUnit'
 ]);
 
 function ruPluralCategory(n: number): 'one' | 'few' | 'many' {
@@ -35,6 +36,10 @@ function formatRuLimitRow(key: string, n: number): string {
       if (p === 'one') return `До ${n} окна обслуживания`;
       if (p === 'few') return `До ${n} окон обслуживания`;
       return `До ${n} окон обслуживания`;
+    case 'features.zonesPerUnit':
+      if (p === 'one') return `До ${n} сервисной зоны на подразделение`;
+      if (p === 'few') return `До ${n} сервисных зон на подразделение`;
+      return `До ${n} сервисных зон на подразделение`;
     default:
       return '';
   }
@@ -56,6 +61,10 @@ function formatEnLimitRow(key: string, n: number): string {
       return one ? `Up to ${n} service` : `Up to ${n} services`;
     case 'features.counters':
       return one ? `Up to ${n} service counter` : `Up to ${n} service counters`;
+    case 'features.zonesPerUnit':
+      return one
+        ? `Up to ${n} service zone per unit`
+        : `Up to ${n} service zones per unit`;
     default:
       return '';
   }

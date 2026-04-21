@@ -336,6 +336,10 @@
       "go_to_units_list": "Go to units list",
       "go_to_stations_tab": "Open Stations tab",
       "create_hierarchy_hint": "Child units can only be created under a subdivision or service zone. Typical setup: Subdivision (root) → optional service zones → optional nested subdivisions → stations on the unit where you run the queue.",
+      "quota_exceeded_unit": "Plan limit reached. Upgrade your plan to add more.",
+      "quota_exceeded_service": "Service quota exceeded for your current plan.",
+      "quota_exceeded_counter": "Counter quota exceeded for your current plan.",
+      "quota_exceeded_user": "User quota exceeded for your current plan.",
       "visitor_tags": {
         "tab": "Visitor tags",
         "title": "Visitor tags",
@@ -430,6 +434,7 @@
       "unsaved_changes": "You have unsaved changes",
       "unsaved_discard_confirm": "You have unsaved changes. Discard them and continue?",
       "delete_confirm": "Are you sure you want to delete this service?",
+      "save_error": "Failed to save service. Please try again.",
       "calendar_slot_key": "Calendar slot label (optional)",
       "calendar_slot_key_hint": "Used in pre-registration and when syncing with connected calendars. If two services share the same display name, this label distinguishes them; it is included in calendar event titles so the correct slots are created.",
       "calendar_slot_placeholder": "e.g. Returns-Desk-A"
@@ -1571,6 +1576,7 @@
     "checkInButton": "Check-in",
     "ticketCreated": "Ticket created successfully! {service}",
     "ticketCreationFailed": "Failed to create ticket. Please try again.",
+    "ticketQuotaExceeded": "Tickets are temporarily unavailable. Please contact staff.",
     "back": "Back",
     "close": "Close",
     "processing": "Processing...",
@@ -2424,7 +2430,13 @@
       "limitNegotiable": "By agreement",
       "allowInstantPurchase": "Pay and activate online",
       "allowInstantPurchaseHint": "If off, checkout is blocked for this plan (public plans will use a sales request flow later).",
-      "checkoutColumn": "Online pay"
+      "checkoutColumn": "Online pay",
+      "isFree": "Free plan",
+      "isFreeHint": "Plan is free (price = 0 by contract). Distinct from enterprise custom pricing.",
+      "pricingModel": "Pricing model",
+      "pricingModelFlat": "Fixed (flat)",
+      "pricingModelPerUnit": "Per subdivision",
+      "pricingModelHint": "Flat: one monthly price. Per subdivision: price × number of active subdivisions."
     },
     "invoices": {
       "title": "Invoices",
@@ -2988,6 +3000,9 @@
       "addPaymentMethod": "Add Payment Method",
       "perMonth": "/mo",
       "perYear": "/yr",
+      "perUnitPerMonth": "/ unit / mo",
+      "freePlan": "Free",
+      "startFree": "Start for free",
       "intervalMonth": "mo",
       "intervalYear": "yr",
       "status": {
@@ -3026,6 +3041,9 @@
         "contactUs": "Contact us",
         "customPricing": "Custom pricing",
         "moreFeatures": "+{count} more",
+        "freePlan": "Free",
+        "perUnitPerMonth": "/ unit / mo",
+        "startFree": "Start for free",
         "limits": {
           "negotiable": "By agreement",
           "unlimited": "Unlimited",
@@ -3033,7 +3051,8 @@
           "users": "Users",
           "tickets_per_month": "Tickets per month",
           "services": "Services",
-          "counters": "Counters"
+          "counters": "Counters",
+          "zones_per_unit": "Service zones per unit"
         },
         "features": {
           "basic_support": "Basic support",

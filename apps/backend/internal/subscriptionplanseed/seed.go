@@ -38,6 +38,18 @@ func planSeedAllowInstantPurchase(code string) bool {
 	return true
 }
 
+func planSeedIsFree(code string) bool {
+	// grandfathered is a legacy zero-price plan but not semantically "free" (it's a legacy tier).
+	// No seeded plan is currently marked as isFree; that flag is set by platform operators via the constructor.
+	return false
+}
+
+// planSeedPricingModel returns the pricing model for seeded plans.
+// All new plans default to per_unit (price per subdivision per month).
+func planSeedPricingModel(_ string) string {
+	return "per_unit"
+}
+
 // UpsertSubscriptionPlans creates or updates rows for every entry in plans.Plans.
 func UpsertSubscriptionPlans(db *gorm.DB) error {
 	for _, planDef := range plans.Plans {
@@ -69,6 +81,8 @@ func UpsertSubscriptionPlans(db *gorm.DB) error {
 				DisplayOrder:         displayOrderForPlanCode(planDef.Code),
 				LimitsNegotiable:     json.RawMessage("{}"),
 				AllowInstantPurchase: planSeedAllowInstantPurchase(planDef.Code),
+				IsFree:               planSeedIsFree(planDef.Code),
+				PricingModel:         planSeedPricingModel(planDef.Code),
 			}
 			if err := db.Create(plan).Error; err != nil {
 				return fmt.Errorf("create plan %s: %w", planDef.Code, err)
@@ -91,6 +105,10 @@ func UpsertSubscriptionPlans(db *gorm.DB) error {
 		existing.IsPromoted = planDef.Code == "professional"
 		existing.DisplayOrder = displayOrderForPlanCode(planDef.Code)
 		existing.AllowInstantPurchase = planSeedAllowInstantPurchase(planDef.Code)
+		// Preserve operator-set isFree/pricingModel; seed does not override platform customizations.
+		if existing.PricingModel == "" {
+			existing.PricingModel = planSeedPricingModel(planDef.Code)
+		}
 		if len(existing.LimitsNegotiable) == 0 {
 			existing.LimitsNegotiable = json.RawMessage("{}")
 		}

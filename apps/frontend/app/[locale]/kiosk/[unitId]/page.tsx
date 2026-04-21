@@ -42,6 +42,7 @@ import {
 import { intlLocaleFromAppLocale } from '@/lib/format-datetime';
 import { logger } from '@/lib/logger';
 import { getUnitDisplayName } from '@/lib/unit-display';
+import { isQuotaExceededError } from '@/lib/quota-error';
 import {
   GRID_ZONE_SCOPE_NONE,
   SERVICE_GRID_CELL_COUNT,
@@ -392,6 +393,15 @@ export default function UnitKioskPage() {
       openTicketSuccessFlow(ticket, service);
     } catch (error) {
       console.error('Failed to create ticket:', error);
+      if (isQuotaExceededError(error)) {
+        const quotaMsg = t('ticketQuotaExceeded');
+        if (failTarget === 'phoneModal') {
+          setPhoneIdentificationError(quotaMsg);
+        } else {
+          setMessage(quotaMsg);
+        }
+        return;
+      }
       const failDefault = t('ticketCreationFailed', {
         defaultValue: 'Failed to create ticket. Please try again.'
       });

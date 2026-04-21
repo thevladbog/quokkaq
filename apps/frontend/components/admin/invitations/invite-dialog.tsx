@@ -23,6 +23,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { useUnits } from '@/lib/hooks';
+import { isQuotaExceededError } from '@/lib/quota-error';
 import {
   PermAccessStaffPanel,
   permissionListMessageKey,
@@ -55,6 +56,7 @@ export default function InviteDialog({
   const t = useTranslations('invitations');
   const tTemplates = useTranslations('templates');
   const tPermissions = useTranslations('admin.users.permissions_list');
+  const tAdmin = useTranslations('admin');
   const locale = useLocale();
   const [email, setEmail] = useState('');
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -140,12 +142,18 @@ export default function InviteDialog({
         onSuccess();
         onOpenChange(false);
         resetForm();
+      } else if (response.status === 402) {
+        toast.error(tAdmin('units.quota_exceeded_user'));
       } else {
         const error = await response.json();
         toast.error(error.message || t('error_sending'));
       }
-    } catch {
-      toast.error(t('error_sending'));
+    } catch (err) {
+      if (isQuotaExceededError(err)) {
+        toast.error(tAdmin('units.quota_exceeded_user'));
+      } else {
+        toast.error(t('error_sending'));
+      }
     } finally {
       setLoading(false);
     }

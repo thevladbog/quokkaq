@@ -9,7 +9,8 @@ const UNLIMITED_BY_LIMIT: Record<(typeof PLAN_LIMIT_KEYS)[number], string> = {
   users: 'unlimitedUsers',
   tickets_per_month: 'unlimitedTickets',
   services: 'unlimitedServices',
-  counters: 'unlimitedCounters'
+  counters: 'unlimitedCounters',
+  zones_per_unit: 'unlimitedZonesPerUnit'
 };
 
 const NEGOTIABLE_BY_LIMIT: Record<(typeof PLAN_LIMIT_KEYS)[number], string> = {
@@ -17,13 +18,15 @@ const NEGOTIABLE_BY_LIMIT: Record<(typeof PLAN_LIMIT_KEYS)[number], string> = {
   users: 'negotiableUsers',
   tickets_per_month: 'negotiableTickets',
   services: 'negotiableServices',
-  counters: 'negotiableCounters'
+  counters: 'negotiableCounters',
+  zones_per_unit: 'negotiableZonesPerUnit'
 };
 
 function limitToPricingFeatureKey(
   limitKey: (typeof PLAN_LIMIT_KEYS)[number]
 ): string {
   if (limitKey === 'tickets_per_month') return 'tickets';
+  if (limitKey === 'zones_per_unit') return 'zonesPerUnit';
   return limitKey;
 }
 

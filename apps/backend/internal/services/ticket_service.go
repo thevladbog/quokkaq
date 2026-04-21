@@ -224,6 +224,8 @@ type ticketService struct {
 	hub                *ws.Hub
 	jobClient          JobEnqueuer
 	log                *slog.Logger
+	quota              QuotaService
+	operational        *OperationalService
 }
 
 func NewTicketService(
@@ -257,6 +259,42 @@ func NewTicketService(
 	}
 }
 
+// NewTicketServiceWithQuota creates a TicketService with quota enforcement and credit mechanism.
+func NewTicketServiceWithQuota(
+	repo repository.TicketRepository,
+	counterRepo repository.CounterRepository,
+	serviceRepo repository.ServiceRepository,
+	unitRepo repository.UnitRepository,
+	intervalRepo repository.OperatorIntervalRepository,
+	clientRepo repository.UnitClientRepository,
+	tagDefRepo repository.VisitorTagDefinitionRepository,
+	unitClientHistRepo repository.UnitClientHistoryRepository,
+	preRegRepo *repository.PreRegistrationRepository,
+	calendar *CalendarIntegrationService,
+	hub *ws.Hub,
+	jobClient JobEnqueuer,
+	quota QuotaService,
+	operational *OperationalService,
+) TicketService {
+	return &ticketService{
+		repo:               repo,
+		counterRepo:        counterRepo,
+		serviceRepo:        serviceRepo,
+		unitRepo:           unitRepo,
+		intervalRepo:       intervalRepo,
+		clientRepo:         clientRepo,
+		tagDefRepo:         tagDefRepo,
+		unitClientHistRepo: unitClientHistRepo,
+		preRegRepo:         preRegRepo,
+		calendar:           calendar,
+		hub:                hub,
+		jobClient:          jobClient,
+		log:                slog.Default(),
+		quota:              quota,
+		operational:        operational,
+	}
+}
+
 func (s *ticketService) writeTicketHistoryTx(tx *gorm.DB, ticketID string, actorUserID *string, action string, payload map[string]interface{}) error {
 	h, err := ticketaudit.NewHistory(ticketID, action, actorUserID, payload)
 	if err != nil {
@@ -265,15 +303,98 @@ func (s *ticketService) writeTicketHistoryTx(tx *gorm.DB, ticketID string, actor
 	return s.repo.CreateTicketHistoryTx(tx, h)
 }
 
+// ErrTicketQuotaExhausted is returned when the monthly ticket quota is exhausted
+// and the working day has already been closed (EOD completed), so credit issuance is not allowed.
+var ErrTicketQuotaExhausted = errors.New("monthly ticket quota exhausted; close the working day to stop credit issuance")
+
+// isWorkingDayOpen returns true when the subdivision has NOT completed EOD today,
+// meaning the kiosk is not frozen and the phase is still idle.
+func (s *ticketService) isWorkingDayOpen(unitID string) (bool, error) {
+	if s.operational == nil {
+		return true, nil // no operational service wired — treat as open
+	}
+	subID, err := s.operational.ResolveSubdivisionForOperationalState(unitID)
+	if err != nil {
+		return true, nil // resolution failure — allow creation, don't block
+	}
+	frozen, err := s.operational.IsKioskFrozen(subID)
+	if err != nil {
+		return true, nil
+	}
+	return !frozen, nil
+}
+
+func (s *ticketService) checkTicketQuota(unitID string) (isCredit bool, err error) {
+	if s.quota == nil {
+		return false, nil
+	}
+	// Resolve companyID from unit.
+	unit, err := s.unitRepo.FindByIDLight(unitID)
+	if err != nil {
+		return false, err
+	}
+	companyID := unit.CompanyID
+
+	allowed, err := s.quota.CheckQuota(companyID, "tickets_per_month")
+	if err != nil {
+		return false, err
+	}
+	if allowed {
+		return false, nil
+	}
+	// Quota exhausted — check if working day is still open (credit issuance).
+	open, err := s.isWorkingDayOpen(unitID)
+	if err != nil {
+		return false, err
+	}
+	if open {
+		// Working day is open: issue ticket on credit.
+		return true, nil
+	}
+	return false, ErrTicketQuotaExhausted
+}
+
+func (s *ticketService) incrementTicketUsage(unitID string) {
+	if s.quota == nil {
+		return
+	}
+	unit, err := s.unitRepo.FindByIDLight(unitID)
+	if err != nil {
+		s.log.Warn("incrementTicketUsage: could not resolve unit", "unitID", unitID, "err", err)
+		return
+	}
+	if err := s.quota.IncrementUsage(unit.CompanyID, "tickets_per_month", 1); err != nil {
+		s.log.Warn("incrementTicketUsage: increment failed", "companyID", unit.CompanyID, "err", err)
+	}
+}
+
 func (s *ticketService) CreateTicket(unitID, serviceID string, optionalStaffClientID *string, visitorPhone *string, visitorLocale *string, actorUserID *string) (*models.Ticket, error) {
-	return s.createTicketInternal(unitID, serviceID, nil, optionalStaffClientID, visitorPhone, visitorLocale, actorUserID)
+	isCredit, err := s.checkTicketQuota(unitID)
+	if err != nil {
+		return nil, err
+	}
+	ticket, err := s.createTicketInternal(unitID, serviceID, nil, optionalStaffClientID, visitorPhone, visitorLocale, actorUserID, isCredit)
+	if err != nil {
+		return nil, err
+	}
+	go s.incrementTicketUsage(unitID)
+	return ticket, nil
 }
 
 func (s *ticketService) CreateTicketWithPreRegistration(unitID, serviceID, preRegID string, actorUserID *string) (*models.Ticket, error) {
-	return s.createTicketInternal(unitID, serviceID, &preRegID, nil, nil, nil, actorUserID)
+	isCredit, err := s.checkTicketQuota(unitID)
+	if err != nil {
+		return nil, err
+	}
+	ticket, err := s.createTicketInternal(unitID, serviceID, &preRegID, nil, nil, nil, actorUserID, isCredit)
+	if err != nil {
+		return nil, err
+	}
+	go s.incrementTicketUsage(unitID)
+	return ticket, nil
 }
 
-func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID *string, optionalStaffClientID *string, visitorPhone *string, visitorLocale *string, actorUserID *string) (*models.Ticket, error) {
+func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID *string, optionalStaffClientID *string, visitorPhone *string, visitorLocale *string, actorUserID *string, isCredit bool) (*models.Ticket, error) {
 	var preReg *models.PreRegistration
 	if preRegID != nil {
 		if s.preRegRepo == nil {
@@ -409,6 +530,7 @@ func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID 
 			MaxWaitingTime:    service.MaxWaitingTime,
 			PreRegistrationID: preRegID,
 			ClientID:          &resolvedClientID,
+			IsCredit:          isCredit,
 		}
 
 		payload := map[string]interface{}{

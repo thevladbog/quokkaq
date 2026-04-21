@@ -64,7 +64,8 @@ const DEFAULT_LIMITS: Record<PlanLimitKey, number> = {
   users: 3,
   tickets_per_month: 100,
   services: 5,
-  counters: 2
+  counters: 2,
+  zones_per_unit: 0
 };
 
 function defaultFeatureMap(): Record<
@@ -90,6 +91,10 @@ type PlanForm = {
   isPromoted: boolean;
   displayOrder: string;
   allowInstantPurchase: boolean;
+  /** When true: plan is free (price locked to 0). */
+  isFree: boolean;
+  /** "flat" = fixed price, "per_unit" = price × active subdivisions. */
+  pricingModel: 'flat' | 'per_unit';
   /** Raw input strings; validated to integers only on submit (see `parseLimitsFromForm`). */
   limits: Record<PlanLimitKey, string>;
   limitsNegotiable: Record<PlanLimitKey, boolean>;
@@ -109,6 +114,8 @@ function emptyForm(): PlanForm {
     isPromoted: false,
     displayOrder: '1000',
     allowInstantPurchase: true,
+    isFree: false,
+    pricingModel: 'per_unit',
     limits: Object.fromEntries(
       PLAN_LIMIT_KEYS.map((k) => [k, String(DEFAULT_LIMITS[k])])
     ) as Record<PlanLimitKey, string>,
@@ -179,6 +186,10 @@ function formFromPlan(p: ModelsSubscriptionPlan, locale: string): PlanForm {
     isPromoted: p.isPromoted === true,
     displayOrder: String(p.displayOrder ?? 1000),
     allowInstantPurchase: p.allowInstantPurchase !== false,
+    isFree: (p as { isFree?: boolean }).isFree === true,
+    pricingModel: ((p as { pricingModel?: string }).pricingModel === 'flat'
+      ? 'flat'
+      : 'per_unit') as 'flat' | 'per_unit',
     limits,
     limitsNegotiable,
     features
@@ -307,7 +318,7 @@ export default function PlatformPlansPage() {
         name: form.name.trim(),
         nameEn: form.nameEn.trim(),
         code: form.code.trim().toLowerCase(),
-        price: priceMinor,
+        price: form.isFree ? 0 : priceMinor,
         currency: form.currency || 'RUB',
         interval: form.interval,
         features: featuresPayload(),
@@ -317,8 +328,10 @@ export default function PlatformPlansPage() {
         isPublic: form.isPublic,
         isPromoted: form.isPromoted,
         displayOrder,
-        allowInstantPurchase: form.allowInstantPurchase
-      } satisfies HandlersPlatformCreateSubscriptionPlanBody);
+        allowInstantPurchase: form.isFree ? true : form.allowInstantPurchase,
+        isFree: form.isFree,
+        pricingModel: form.pricingModel
+      } as HandlersPlatformCreateSubscriptionPlanBody);
     },
     onSuccess: () => {
       qc.invalidateQueries({
@@ -364,7 +377,7 @@ export default function PlatformPlansPage() {
         name: form.name.trim(),
         nameEn: form.nameEn.trim(),
         code: form.code.trim().toLowerCase(),
-        price: priceMinor,
+        price: form.isFree ? 0 : priceMinor,
         currency: form.currency || 'RUB',
         interval: form.interval,
         features: featuresPayload(),
@@ -374,8 +387,10 @@ export default function PlatformPlansPage() {
         isPublic: form.isPublic,
         isPromoted: form.isPromoted,
         displayOrder,
-        allowInstantPurchase: form.allowInstantPurchase
-      } satisfies HandlersPlatformUpdateSubscriptionPlanBody);
+        allowInstantPurchase: form.isFree ? true : form.allowInstantPurchase,
+        isFree: form.isFree,
+        pricingModel: form.pricingModel
+      } as HandlersPlatformUpdateSubscriptionPlanBody);
     },
     onSuccess: () => {
       qc.invalidateQueries({
@@ -448,7 +463,8 @@ export default function PlatformPlansPage() {
           type='text'
           inputMode='decimal'
           autoComplete='off'
-          value={form.price}
+          value={form.isFree ? '0' : form.price}
+          disabled={form.isFree}
           onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
           placeholder={locale.startsWith('ru') ? '2900,50' : '2900.50'}
         />
@@ -538,7 +554,8 @@ export default function PlatformPlansPage() {
         <div className='flex items-center gap-2'>
           <Switch
             id={fid('allowInstantPurchase')}
-            checked={form.allowInstantPurchase}
+            checked={form.isFree || form.allowInstantPurchase}
+            disabled={form.isFree}
             onCheckedChange={(v) =>
               setForm((f) => ({ ...f, allowInstantPurchase: v }))
             }
@@ -549,6 +566,62 @@ export default function PlatformPlansPage() {
         </div>
         <p className='text-muted-foreground text-xs'>
           {t('allowInstantPurchaseHint')}
+        </p>
+      </div>
+
+      <div className='flex flex-col gap-1'>
+        <div className='flex items-center gap-2'>
+          <Switch
+            id={fid('isFree')}
+            checked={form.isFree}
+            onCheckedChange={(v) =>
+              setForm((f) => ({
+                ...f,
+                isFree: v,
+                price: v ? '0' : f.price,
+                allowInstantPurchase: v ? true : f.allowInstantPurchase
+              }))
+            }
+          />
+          <Label htmlFor={fid('isFree')}>
+            {t('isFree', { defaultValue: 'Бесплатный тариф' })}
+          </Label>
+        </div>
+        <p className='text-muted-foreground text-xs'>
+          {t('isFreeHint', {
+            defaultValue:
+              'Цена всегда 0, тариф отображается как «Бесплатно» (не «Индивидуальная цена»)'
+          })}
+        </p>
+      </div>
+
+      <div className='grid gap-2'>
+        <Label htmlFor={fid('pricingModel')}>
+          {t('pricingModel', { defaultValue: 'Модель ценообразования' })}
+        </Label>
+        <select
+          id={fid('pricingModel')}
+          className='border-input bg-background h-9 w-full rounded-md border px-2 text-sm'
+          value={form.pricingModel}
+          onChange={(e) =>
+            setForm((f) => ({
+              ...f,
+              pricingModel: e.target.value as 'flat' | 'per_unit'
+            }))
+          }
+        >
+          <option value='per_unit'>
+            {t('pricingModelPerUnit', { defaultValue: 'За подразделение' })}
+          </option>
+          <option value='flat'>
+            {t('pricingModelFlat', { defaultValue: 'Фиксированная' })}
+          </option>
+        </select>
+        <p className='text-muted-foreground text-xs'>
+          {t('pricingModelHint', {
+            defaultValue:
+              'За подразделение: итог = цена × кол-во активных подразделений'
+          })}
         </p>
       </div>
 

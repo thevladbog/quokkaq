@@ -15,20 +15,23 @@ type PlanDefinition struct {
 	Features map[string]bool
 }
 
-// Plans contains all available subscription plans
+// Plans contains all available subscription plans.
+// Price is in minor units (kopeks) and represents the per-subdivision monthly rate
+// when PricingModel == "per_unit". Total billing = price × active_subdivisions.
 var Plans = map[string]PlanDefinition{
 	"starter": {
 		Name:     "Starter",
 		Code:     "starter",
-		Price:    290000, // 2900 руб in kopeks
+		Price:    300000, // 3 000 руб/мес за подразделение (per-unit)
 		Currency: "RUB",
 		Interval: "month",
 		Limits: map[string]int{
-			"units":             1,
+			"units":             3, // max 3 subdivisions on this plan
 			"users":             5,
 			"tickets_per_month": 1000,
 			"services":          10,
 			"counters":          5,
+			"zones_per_unit":    2, // max service zones per subdivision
 		},
 		Features: map[string]bool{
 			"websocket_updates":    true,
@@ -45,15 +48,16 @@ var Plans = map[string]PlanDefinition{
 	"professional": {
 		Name:     "Professional",
 		Code:     "professional",
-		Price:    990000, // 9900 руб in kopeks
+		Price:    250000, // 2 500 руб/мес за подразделение (per-unit; volume discount)
 		Currency: "RUB",
 		Interval: "month",
 		Limits: map[string]int{
-			"units":             5,
+			"units":             10, // max 10 subdivisions on this plan
 			"users":             20,
 			"tickets_per_month": 10000,
 			"services":          50,
 			"counters":          25,
+			"zones_per_unit":    5, // max service zones per subdivision
 		},
 		Features: map[string]bool{
 			"websocket_updates":    true,
@@ -72,7 +76,7 @@ var Plans = map[string]PlanDefinition{
 	"enterprise": {
 		Name:     "Enterprise",
 		Code:     "enterprise",
-		Price:    0, // Custom pricing
+		Price:    0, // Custom pricing (not isFree — sales-led)
 		Currency: "RUB",
 		Interval: "month",
 		Limits: map[string]int{
@@ -81,6 +85,7 @@ var Plans = map[string]PlanDefinition{
 			"tickets_per_month": -1,
 			"services":          -1,
 			"counters":          -1,
+			"zones_per_unit":    -1, // unlimited zones
 		},
 		Features: map[string]bool{
 			"websocket_updates":    true,
@@ -102,7 +107,7 @@ var Plans = map[string]PlanDefinition{
 	"grandfathered": {
 		Name:     "Grandfathered",
 		Code:     "grandfathered",
-		Price:    0, // Free for existing customers
+		Price:    0, // Free for existing legacy customers
 		Currency: "RUB",
 		Interval: "month",
 		Limits: map[string]int{
@@ -111,6 +116,7 @@ var Plans = map[string]PlanDefinition{
 			"tickets_per_month": -1,
 			"services":          -1,
 			"counters":          -1,
+			"zones_per_unit":    -1, // unlimited zones
 		},
 		Features: map[string]bool{
 			"websocket_updates":    true,

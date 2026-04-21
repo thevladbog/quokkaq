@@ -87,8 +87,13 @@ export function SubscriptionCard({
     return Math.max(0, raw);
   }, [subscription.trialEnd, nowMs]);
 
+  const isFree =
+    (subscription.plan as typeof subscription.plan & { isFree?: boolean })
+      ?.isFree === true;
+
   const showFooter = useMemo(() => {
     const s = subscription;
+    if (isFree) return Boolean(onUpgrade); // free plans only show upgrade button
     if (s.status === 'trial' && onAddPaymentMethod) return true;
     if (
       s.status === 'active' &&
@@ -100,7 +105,14 @@ export function SubscriptionCard({
     if (s.cancelAtPeriodEnd && onManageBilling) return true;
     if (s.status === 'past_due' && onManageBilling) return true;
     return false;
-  }, [subscription, onAddPaymentMethod, onUpgrade, onCancel, onManageBilling]);
+  }, [
+    subscription,
+    onAddPaymentMethod,
+    onUpgrade,
+    onCancel,
+    onManageBilling,
+    isFree
+  ]);
 
   return (
     <Card className='w-full'>
@@ -118,19 +130,45 @@ export function SubscriptionCard({
 
       <CardContent className='space-y-6'>
         {/* Price */}
-        {subscription.plan && subscription.plan.price > 0 && (
-          <div className='flex items-baseline gap-2'>
-            <span className='text-4xl font-bold'>
-              {formatPrice(subscription.plan.price, subscription.plan.currency)}
-            </span>
-            <span className='text-gray-500'>
-              /{' '}
-              {subscription.plan.interval === 'month'
-                ? t('intervalMonth')
-                : t('intervalYear')}
-            </span>
-          </div>
-        )}
+        {subscription.plan &&
+          (() => {
+            const planExt = subscription.plan as typeof subscription.plan & {
+              isFree?: boolean;
+              pricingModel?: string;
+            };
+            if (planExt.isFree) {
+              return (
+                <div className='flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 p-4'>
+                  <span className='text-2xl font-bold text-green-700'>
+                    {t('freePlan', { defaultValue: 'Бесплатный тариф' })}
+                  </span>
+                </div>
+              );
+            }
+            if (subscription.plan.price > 0) {
+              const isPerUnit = planExt.pricingModel === 'per_unit';
+              return (
+                <div className='flex items-baseline gap-2'>
+                  <span className='text-4xl font-bold'>
+                    {formatPrice(
+                      subscription.plan.price,
+                      subscription.plan.currency
+                    )}
+                  </span>
+                  <span className='text-sm text-gray-500'>
+                    {isPerUnit
+                      ? t('perUnitPerMonth', {
+                          defaultValue: '/ подр. / мес'
+                        })
+                      : subscription.plan.interval === 'month'
+                        ? `/ ${t('intervalMonth')}`
+                        : `/ ${t('intervalYear')}`}
+                  </span>
+                </div>
+              );
+            }
+            return null;
+          })()}
 
         {/* Trial Warning */}
         {subscription.status === 'trial' && subscription.trialEnd && (
@@ -239,7 +277,7 @@ export function SubscriptionCard({
 
       {showFooter ? (
         <CardFooter className='flex gap-3'>
-          {subscription.status === 'trial' && onAddPaymentMethod && (
+          {!isFree && subscription.status === 'trial' && onAddPaymentMethod && (
             <Button onClick={onAddPaymentMethod} className='flex-1'>
               <CreditCard className='mr-2 h-4 w-4' />
               {t('addPaymentMethod')}

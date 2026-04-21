@@ -54,6 +54,7 @@ func NewUnitHandler(service services.UnitService, storageService services.Storag
 // @Param        unit body models.Unit true "Unit Data"
 // @Success      201  {object}  models.Unit
 // @Failure      400  {string}  string "Bad Request"
+// @Failure      402  {object}  object "Quota Exceeded"
 // @Failure      500  {string}  string "Internal Server Error"
 // @Router       /units [post]
 func (h *UnitHandler) CreateUnit(w http.ResponseWriter, r *http.Request) {
@@ -64,7 +65,20 @@ func (h *UnitHandler) CreateUnit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.service.CreateUnit(&unit); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		switch {
+		case errors.Is(err, services.ErrUnitQuotaExceeded), errors.Is(err, services.ErrZoneQuotaExceeded):
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusPaymentRequired)
+			_, _ = w.Write([]byte(`{"error":"quota_exceeded","message":"` + err.Error() + `"}`))
+		case errors.Is(err, services.ErrInvalidUnitKind), errors.Is(err, services.ErrInvalidParentKind):
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		case errors.Is(err, services.ErrParentNotFound):
+			http.Error(w, err.Error(), http.StatusNotFound)
+		case errors.Is(err, services.ErrCrossCompanyParent):
+			http.Error(w, err.Error(), http.StatusForbidden)
+		default:
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 		return
 	}
 

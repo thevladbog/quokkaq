@@ -2114,6 +2114,56 @@ ADD COLUMN IF NOT EXISTS payment_terms_markdown TEXT`).Error; err != nil {
 		return fmt.Errorf("failed to run v1.4.2_legacy_staff_supervisor_operator_unit_permissions migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.5.0_subscription_plans_pricing_model_and_free_flag", func(db *gorm.DB) error {
+		// Add is_free flag to distinguish truly free plans from custom/enterprise zero-price plans.
+		if err := db.Exec(`
+ALTER TABLE subscription_plans
+ADD COLUMN IF NOT EXISTS is_free BOOLEAN NOT NULL DEFAULT false`).Error; err != nil {
+			return err
+		}
+		// Add pricing_model: "flat" (legacy fixed price) or "per_unit" (price × active subdivisions).
+		// Existing plans default to "per_unit" (new standard model going forward).
+		if err := db.Exec(`
+ALTER TABLE subscription_plans
+ADD COLUMN IF NOT EXISTS pricing_model VARCHAR(32) NOT NULL DEFAULT 'per_unit'`).Error; err != nil {
+			return err
+		}
+		// Add zones_per_unit limit key to existing subscription plan limits JSON.
+		// -1 = unlimited for grandfathered/enterprise; starter=2, professional=5.
+		if err := db.Exec(`
+UPDATE subscription_plans
+SET limits = limits || jsonb_build_object('zones_per_unit',
+  CASE code
+    WHEN 'starter'       THEN 2
+    WHEN 'professional'  THEN 5
+    WHEN 'enterprise'    THEN -1
+    WHEN 'grandfathered' THEN -1
+    ELSE 0
+  END
+)
+WHERE limits IS NOT NULL AND NOT (limits ? 'zones_per_unit')`).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.5.0_subscription_plans_pricing_model_and_free_flag migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.5.1_tickets_is_credit", func(db *gorm.DB) error {
+		// is_credit marks tickets issued on quota credit (quota exhausted but working day still open).
+		// Credit ticket count is deducted from the next billing period.
+		if err := db.Exec(`
+ALTER TABLE tickets
+ADD COLUMN IF NOT EXISTS is_credit BOOLEAN NOT NULL DEFAULT false`).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.5.1_tickets_is_credit migration: %w", err)
+	}
+
 	fmt.Println("✅ All migrations completed successfully")
 	return nil
 }

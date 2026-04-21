@@ -14,6 +14,9 @@ var ErrServiceUnitImmutable = errors.New("service unit cannot be reassigned")
 // ErrDuplicateCalendarSlotKey is returned when another service in the same unit already uses this calendar slot key.
 var ErrDuplicateCalendarSlotKey = errors.New("calendar slot key already in use for this unit")
 
+// ErrServiceQuotaExceeded is returned when the company's plan does not allow creating another service.
+var ErrServiceQuotaExceeded = errors.New("service quota exceeded for current subscription plan")
+
 type ServiceService interface {
 	CreateService(service *models.Service) error
 	GetServicesByUnit(unitID string) ([]models.Service, error)
@@ -25,10 +28,16 @@ type ServiceService interface {
 type serviceService struct {
 	repo     repository.ServiceRepository
 	unitRepo repository.UnitRepository
+	quota    QuotaService
 }
 
 func NewServiceService(repo repository.ServiceRepository, unitRepo repository.UnitRepository) ServiceService {
 	return &serviceService{repo: repo, unitRepo: unitRepo}
+}
+
+// NewServiceServiceWithQuota creates a ServiceService with quota enforcement enabled.
+func NewServiceServiceWithQuota(repo repository.ServiceRepository, unitRepo repository.UnitRepository, quota QuotaService) ServiceService {
+	return &serviceService{repo: repo, unitRepo: unitRepo, quota: quota}
 }
 
 func normalizeCalendarSlotKeyPtr(p *string) *string {
@@ -73,6 +82,19 @@ func (s *serviceService) CreateService(service *models.Service) error {
 	}
 	if err := ValidateOptionalChildServiceZone(s.unitRepo, service.UnitID, &service.RestrictedServiceZoneID); err != nil {
 		return err
+	}
+	if s.quota != nil {
+		unit, err := s.unitRepo.FindByIDLight(service.UnitID)
+		if err != nil {
+			return err
+		}
+		ok, err := s.quota.CheckQuota(unit.CompanyID, "services")
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return ErrServiceQuotaExceeded
+		}
 	}
 	if err := s.repo.Create(service); err != nil {
 		if errors.Is(err, repository.ErrDuplicateCalendarSlotKey) {
