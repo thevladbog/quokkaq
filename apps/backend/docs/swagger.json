@@ -16232,6 +16232,48 @@
                 ]
             }
         },
+        "/tickets/{id}": {
+            "get": {
+                "description": "Retrieves a ticket by its ID. For waiting tickets, also returns queuePosition and estimatedWaitSeconds.",
+                "parameters": [
+                    {
+                        "description": "Ticket ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/models.Ticket"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Ticket not found"
+                    }
+                },
+                "summary": "Get ticket by ID",
+                "tags": [
+                    "tickets"
+                ]
+            }
+        },
         "/tickets/{id}/cancel": {
             "post": {
                 "description": "Allows a visitor to cancel their own waiting ticket. Only tickets in 'waiting' status can be cancelled this way. Requires the X-Visitor-Token header matching the token issued at ticket creation.",

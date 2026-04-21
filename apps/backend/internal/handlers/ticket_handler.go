@@ -155,8 +155,13 @@ func (h *TicketHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 	RespondJSON(w, ticket)
 }
 
+// ticketWithExtras wraps a Ticket for the public GET response, adding virtual fields that depend on platform settings.
+type ticketWithExtras struct {
+	*models.Ticket
+	SmsOptInAvailable bool `json:"smsOptInAvailable"`
+}
+
 // GetTicketByID godoc
-// @ID           getTicketByID
 // @Summary      Get ticket by ID
 // @Description  Retrieves a ticket by its ID. For waiting tickets, also returns queuePosition and estimatedWaitSeconds.
 // @Tags         tickets
@@ -165,12 +170,6 @@ func (h *TicketHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 // @Success      200  {object}  models.Ticket
 // @Failure      404  {string}  string "Ticket not found"
 // @Router       /tickets/{id} [get]
-// ticketWithExtras wraps a Ticket for the public GET response, adding virtual fields that depend on platform settings.
-type ticketWithExtras struct {
-	*models.Ticket
-	SmsOptInAvailable bool `json:"smsOptInAvailable"`
-}
-
 func (h *TicketHandler) GetTicketByID(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	ticket, err := h.service.GetTicketByID(id)

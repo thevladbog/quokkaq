@@ -3251,6 +3251,127 @@ export const usePostCountersIdRelease = <TError = string,
     }
 
 /**
+ * Retrieves a ticket by its ID. For waiting tickets, also returns queuePosition and estimatedWaitSeconds.
+ * @summary Get ticket by ID
+ */
+export type getTicketsIdResponse200 = {
+  data: ModelsTicket
+  status: 200
+}
+
+export type getTicketsIdResponse404 = {
+  data: string
+  status: 404
+}
+
+export type getTicketsIdResponseSuccess = (getTicketsIdResponse200) & {
+  headers: Headers;
+};
+export type getTicketsIdResponseError = (getTicketsIdResponse404) & {
+  headers: Headers;
+};
+
+export type getTicketsIdResponse = (getTicketsIdResponseSuccess | getTicketsIdResponseError)
+
+export const getGetTicketsIdUrl = (id: string,) => {
+
+
+
+
+  return `/tickets/${id}`
+}
+
+export const getTicketsId = async (id: string, options?: RequestInit): Promise<getTicketsIdResponse> => {
+
+  return orvalMutator<getTicketsIdResponse>(getGetTicketsIdUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTicketsIdQueryKey = (id: string,) => {
+    return [
+    `/tickets/${id}`
+    ] as const;
+    }
+
+
+export const getGetTicketsIdQueryOptions = <TData = Awaited<ReturnType<typeof getTicketsId>>, TError = string>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTicketsId>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTicketsIdQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTicketsId>>> = ({ signal }) => getTicketsId(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTicketsId>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetTicketsIdQueryResult = NonNullable<Awaited<ReturnType<typeof getTicketsId>>>
+export type GetTicketsIdQueryError = string
+
+
+export function useGetTicketsId<TData = Awaited<ReturnType<typeof getTicketsId>>, TError = string>(
+ id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTicketsId>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTicketsId>>,
+          TError,
+          Awaited<ReturnType<typeof getTicketsId>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetTicketsId<TData = Awaited<ReturnType<typeof getTicketsId>>, TError = string>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTicketsId>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTicketsId>>,
+          TError,
+          Awaited<ReturnType<typeof getTicketsId>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetTicketsId<TData = Awaited<ReturnType<typeof getTicketsId>>, TError = string>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTicketsId>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get ticket by ID
+ */
+
+export function useGetTicketsId<TData = Awaited<ReturnType<typeof getTicketsId>>, TError = string>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTicketsId>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetTicketsIdQueryOptions(id,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
  * Allows a visitor to cancel their own waiting ticket. Only tickets in 'waiting' status can be cancelled this way. Requires the X-Visitor-Token header matching the token issued at ticket creation.
  * @summary Cancel a waiting ticket (visitor self-service)
  */
