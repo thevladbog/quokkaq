@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { Ticket } from './api';
 import { logger } from './logger';
 
@@ -7,19 +8,20 @@ export interface TicketUpdate {
   ticket: Ticket;
 }
 
-/** Matches SlaAlertPayload on the Go backend (services/sla_monitor_service.go). */
-export interface SlaAlertPayload {
-  ticketId: string;
-  queueNumber: string;
-  serviceName: string;
-  unitId: string;
-  /** 50, 80, or 100 */
-  thresholdPct: number;
-  elapsedSec: number;
-  maxWaitTimeSec: number;
+/** Runtime schema matching SlaAlertPayload on the Go backend (services/sla_monitor_service.go). */
+const SlaAlertPayloadSchema = z.object({
+  ticketId: z.string(),
+  queueNumber: z.string(),
+  serviceName: z.string(),
+  unitId: z.string(),
+  thresholdPct: z.number(),
+  elapsedSec: z.number(),
+  maxWaitTimeSec: z.number(),
   /** "wait" for queue-wait SLA alerts, "service" for service-time SLA alerts */
-  alertType: 'wait' | 'service';
-}
+  alertType: z.enum(['wait', 'service'])
+});
+
+export type SlaAlertPayload = z.infer<typeof SlaAlertPayloadSchema>;
 
 export interface QueueSnapshot {
   unitId: string;
@@ -35,8 +37,10 @@ export class SocketClient {
   private listeners: Map<string, Set<Listener>> = new Map();
   private reconnectTimer: NodeJS.Timeout | null = null;
   private isExplicitDisconnect = false;
+  private refCount = 0;
 
   connect(unitId: string) {
+    this.refCount++;
     this.unitId = unitId;
     this.isExplicitDisconnect = false;
 
@@ -157,6 +161,9 @@ export class SocketClient {
   }
 
   disconnect() {
+    this.refCount = Math.max(0, this.refCount - 1);
+    if (this.refCount > 0) return;
+
     this.isExplicitDisconnect = true;
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
@@ -249,24 +256,31 @@ export class SocketClient {
     );
   }
 
+  private onSlaEvent(event: string, callback: (data: SlaAlertPayload) => void) {
+    this.on(event, (data) => {
+      const parsed = SlaAlertPayloadSchema.safeParse(data);
+      if (!parsed.success) {
+        logger.error('Invalid SLA WebSocket payload:', parsed.error);
+        return;
+      }
+      callback(parsed.data);
+    });
+  }
+
   onSlaWarning(callback: (data: SlaAlertPayload) => void) {
-    this.on('unit.sla_warning', (data) => callback(data as SlaAlertPayload));
+    this.onSlaEvent('unit.sla_warning', callback);
   }
 
   onSlaBreach(callback: (data: SlaAlertPayload) => void) {
-    this.on('unit.sla_breach', (data) => callback(data as SlaAlertPayload));
+    this.onSlaEvent('unit.sla_breach', callback);
   }
 
   onServiceSlaWarning(callback: (data: SlaAlertPayload) => void) {
-    this.on('unit.service_sla_warning', (data) =>
-      callback(data as SlaAlertPayload)
-    );
+    this.onSlaEvent('unit.service_sla_warning', callback);
   }
 
   onServiceSlaBreach(callback: (data: SlaAlertPayload) => void) {
-    this.on('unit.service_sla_breach', (data) =>
-      callback(data as SlaAlertPayload)
-    );
+    this.onSlaEvent('unit.service_sla_breach', callback);
   }
 
   // Emit events - Backend currently doesn't handle these, but keeping for compatibility

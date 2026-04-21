@@ -327,8 +327,8 @@ func computeServiceSLAForTicketsCompletedInRange(
 	return slaMet, slaTotal, nil
 }
 
-// ticketdurationServiceSeconds wraps the ticketduration package computation to avoid a circular import.
-// Returns floor(completed_at - confirmed_at) in seconds; second return is false when timestamps are absent/invalid.
+// ticketdurationServiceSeconds computes the service duration as (completed_at - confirmed_at) in seconds.
+// Returns the truncated integer seconds and true; returns 0, false when timestamps are absent or invalid.
 func ticketdurationServiceSeconds(t *models.Ticket) (int, bool) {
 	if t.ConfirmedAt == nil || t.CompletedAt == nil {
 		return 0, false

@@ -1680,35 +1680,40 @@ export default function StatisticsPage() {
                   </ChartContainer>
                 )}
                 {/* Service-time SLA summary — from the same GetSlaSummary query (respects service filter) */}
-                <div className='border-border mt-4 w-full border-t pt-3'>
-                  <p className='text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase'>
-                    {t('sla_service_summary_label')}
-                  </p>
-                  {(() => {
-                    const svcTot = slaSummaryBody?.slaServiceTotal ?? 0;
-                    const svcMet = slaSummaryBody?.slaServiceMet ?? 0;
-                    const svcPct =
-                      svcTot > 0
-                        ? ((100 * svcMet) / svcTot).toLocaleString(appLocale, {
-                            minimumFractionDigits: 1,
-                            maximumFractionDigits: 1
-                          })
-                        : null;
-                    return svcTot > 0 ? (
-                      <p className='text-foreground text-sm font-medium'>
-                        {t('sla_service_met_of_total', {
-                          met: svcMet,
-                          total: svcTot,
-                          pct: svcPct ?? '—'
-                        })}
-                      </p>
-                    ) : (
-                      <p className='text-muted-foreground text-sm'>
-                        {t('sla_service_no_data')}
-                      </p>
-                    );
-                  })()}
-                </div>
+                {!slaSummaryQuery.isLoading && !slaSummaryQuery.isError && (
+                  <div className='border-border mt-4 w-full border-t pt-3'>
+                    <p className='text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase'>
+                      {t('sla_service_summary_label')}
+                    </p>
+                    {(() => {
+                      const svcTot = slaSummaryBody?.slaServiceTotal ?? 0;
+                      const svcMet = slaSummaryBody?.slaServiceMet ?? 0;
+                      const svcPct =
+                        svcTot > 0
+                          ? ((100 * svcMet) / svcTot).toLocaleString(
+                              appLocale,
+                              {
+                                minimumFractionDigits: 1,
+                                maximumFractionDigits: 1
+                              }
+                            )
+                          : null;
+                      return svcTot > 0 ? (
+                        <p className='text-foreground text-sm font-medium'>
+                          {t('sla_service_met_of_total', {
+                            met: svcMet,
+                            total: svcTot,
+                            pct: svcPct ?? '—'
+                          })}
+                        </p>
+                      ) : (
+                        <p className='text-muted-foreground text-sm'>
+                          {t('sla_service_no_data')}
+                        </p>
+                      );
+                    })()}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -2224,7 +2229,7 @@ export default function StatisticsPage() {
                             stroke='var(--chart-2)'
                             strokeWidth={2}
                             dot={false}
-                            connectNulls
+                            connectNulls={false}
                           />
                         )}
                     </ComposedChart>

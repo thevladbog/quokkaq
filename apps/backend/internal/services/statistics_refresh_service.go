@@ -305,8 +305,9 @@ WHERE t.unit_id = ? AND h.user_id = ?
 			pr.WaitCount = int64(wN)
 			pr.SlaWaitMet = int64(slaM)
 			pr.SlaWaitTotal = int64(slaT)
-			// Service SLA for operator: check touched served tickets with max_service_time set.
+			// Service SLA for operator: only count tickets where the operator had an in_service segment.
 			var svcSLAMet, svcSLATotal int
+			op := strings.TrimSpace(ur.UserID)
 			for _, tid := range touchedIDs {
 				t, ok := opTicketMap[tid]
 				if !ok || t.MaxServiceTime == nil || *t.MaxServiceTime <= 0 {
@@ -316,6 +317,20 @@ WHERE t.unit_id = ? AND h.user_id = ?
 					continue
 				}
 				if t.CompletedAt.Before(startUTC) || !t.CompletedAt.Before(endUTC) {
+					continue
+				}
+				// Verify this operator actually served the ticket.
+				hasOperatorServiceSegment := false
+				for _, seg := range buildServiceTimeSegments(opHistMap[tid], t) {
+					if seg.DurationMs <= 0 || seg.OperatorUserID == nil {
+						continue
+					}
+					if strings.TrimSpace(*seg.OperatorUserID) == op {
+						hasOperatorServiceSegment = true
+						break
+					}
+				}
+				if !hasOperatorServiceSegment {
 					continue
 				}
 				secs, ok := ticketdurationServiceSeconds(&t)

@@ -122,11 +122,13 @@ func (s *SlaMonitorService) tick() {
 
 	now := time.Now()
 	seenStateKeys := make(map[string]struct{}, 128)
+	hadRepoError := false
 
 	for _, unitID := range rooms {
 		// --- Wait SLA (waiting tickets) ---
 		waitTickets, err := s.ticketRepo.GetWaitingTicketsWithSLA(unitID)
 		if err != nil {
+			hadRepoError = true
 			slog.Error("sla monitor: GetWaitingTicketsWithSLA", "unit_id", unitID, "err", err)
 		} else {
 			for i := range waitTickets {
@@ -140,6 +142,7 @@ func (s *SlaMonitorService) tick() {
 		// --- Service-time SLA (in_service tickets) ---
 		svcTickets, err := s.ticketRepo.GetInServiceTicketsWithSLA(unitID)
 		if err != nil {
+			hadRepoError = true
 			slog.Error("sla monitor: GetInServiceTicketsWithSLA", "unit_id", unitID, "err", err)
 		} else {
 			for i := range svcTickets {
@@ -149,6 +152,11 @@ func (s *SlaMonitorService) tick() {
 				s.evaluateServiceSLA(t, now, key)
 			}
 		}
+	}
+
+	// Skip eviction on transient repo failures to avoid clearing dedupe state.
+	if hadRepoError {
+		return
 	}
 
 	// Evict state for tickets no longer tracked.

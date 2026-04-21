@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
@@ -388,16 +387,20 @@ func (s *StatisticsService) GetSLAHeatmap(
 	if err != nil {
 		return nil, err
 	}
+	// Validate tzName against the IANA timezone database to prevent SQL injection.
+	if _, tzErr := time.LoadLocation(tzName); tzErr != nil {
+		tzName = "UTC"
+	}
 
 	var rows []slaHeatmapScanRow
 
 	if slaType == "wait" {
 		var sb strings.Builder
 		var args []interface{}
-		fmt.Fprintf(&sb, `
+		sb.WriteString(`
 SELECT
-  (t.called_at AT TIME ZONE '%s')::date::text AS day,
-  EXTRACT(HOUR FROM (t.called_at AT TIME ZONE '%s'))::int AS hr,
+  timezone(?, t.called_at)::date::text AS day,
+  EXTRACT(HOUR FROM timezone(?, t.called_at))::int AS hr,
   COUNT(*) FILTER (
     WHERE EXTRACT(EPOCH FROM (t.called_at - t.created_at)) <= t.max_waiting_time
   )::int AS met,
@@ -406,8 +409,8 @@ FROM tickets t
 WHERE t.unit_id::text = ?
   AND t.called_at >= ? AND t.called_at < ?
   AND t.max_waiting_time IS NOT NULL AND t.max_waiting_time > 0
-`, tzName, tzName)
-		args = append(args, subdivisionID, startUTC, endUTC)
+`)
+		args = append(args, tzName, tzName, subdivisionID, startUTC, endUTC)
 		appendTicketZoneFilter(&sb, &args, zq)
 		if effectiveUser != nil && strings.TrimSpace(*effectiveUser) != "" {
 			appendTouchedTicketsFilter(&sb, &args, subdivisionID, strings.TrimSpace(*effectiveUser), startUTC, endUTC)
@@ -419,10 +422,10 @@ WHERE t.unit_id::text = ?
 	} else {
 		var sb strings.Builder
 		var args []interface{}
-		fmt.Fprintf(&sb, `
+		sb.WriteString(`
 SELECT
-  (t.completed_at AT TIME ZONE '%s')::date::text AS day,
-  EXTRACT(HOUR FROM (t.completed_at AT TIME ZONE '%s'))::int AS hr,
+  timezone(?, t.completed_at)::date::text AS day,
+  EXTRACT(HOUR FROM timezone(?, t.completed_at))::int AS hr,
   COUNT(*) FILTER (
     WHERE EXTRACT(EPOCH FROM (t.completed_at - t.confirmed_at)) <= t.max_service_time
   )::int AS met,
@@ -433,8 +436,8 @@ WHERE t.unit_id::text = ?
   AND t.confirmed_at IS NOT NULL
   AND t.completed_at >= ? AND t.completed_at < ?
   AND t.max_service_time IS NOT NULL AND t.max_service_time > 0
-`, tzName, tzName)
-		args = append(args, subdivisionID, startUTC, endUTC)
+`)
+		args = append(args, tzName, tzName, subdivisionID, startUTC, endUTC)
 		appendTicketZoneFilter(&sb, &args, zq)
 		if effectiveUser != nil && strings.TrimSpace(*effectiveUser) != "" {
 			appendTouchedTicketsFilter(&sb, &args, subdivisionID, strings.TrimSpace(*effectiveUser), startUTC, endUTC)

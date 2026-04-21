@@ -126,7 +126,14 @@ export function SLAHeatmapChart({
                         <Tooltip key={h}>
                           <TooltipTrigger asChild>
                             <div
-                              className='aspect-square w-full rounded-[2px] transition-opacity hover:opacity-80'
+                              role='img'
+                              tabIndex={0}
+                              aria-label={
+                                hasData
+                                  ? `${dayLabel} ${String(h).padStart(2, '0')}:00–${String(h + 1).padStart(2, '0')}:00, ${cell!.met ?? 0}/${cell!.total ?? 0}, ${pct!.toLocaleString(appLocale, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
+                                  : `${dayLabel} ${String(h).padStart(2, '0')}:00–${String(h + 1).padStart(2, '0')}:00, ${t('sla_heatmap_legend_no_data')}`
+                              }
+                              className='focus-visible:ring-ring aspect-square w-full rounded-[2px] transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:outline-none'
                               style={{
                                 backgroundColor: hasData
                                   ? pctToColor(pct!)

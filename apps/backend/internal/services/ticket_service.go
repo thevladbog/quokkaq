@@ -736,10 +736,14 @@ func (s *ticketService) UpdateStatus(ticketID, status string, actorUserID *strin
 		case "in_service":
 			ticket.ConfirmedAt = &now
 			// Snapshot the service-time SLA from the current leaf service.
-			if svc, svcErr := s.serviceRepo.FindByIDTx(tx, ticket.ServiceID); svcErr == nil {
-				if svc.MaxServiceTime != nil && *svc.MaxServiceTime > 0 {
-					ticket.MaxServiceTime = svc.MaxServiceTime
-				}
+			ticket.MaxServiceTime = nil
+			svc, svcErr := s.serviceRepo.FindByIDTx(tx, ticket.ServiceID)
+			if svcErr != nil {
+				return svcErr
+			}
+			if svc.MaxServiceTime != nil && *svc.MaxServiceTime > 0 {
+				maxServiceTime := *svc.MaxServiceTime
+				ticket.MaxServiceTime = &maxServiceTime
 			}
 		}
 

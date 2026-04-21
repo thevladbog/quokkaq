@@ -277,8 +277,9 @@ func drawStatsSLASummaryCard(pdf *gopdf.GoPdf, left, y, innerW float64, sla *Sla
 	col4X := left + innerW*0.75
 
 	drawSLARow := func(rowY float64, rowLabel string, within, breach string, met, total int) {
-		// Optional section sub-header when both sections are present
-		if hasBoth {
+		// Show sub-header when both sections are present, or when only service SLA exists
+		// (so the row isn't ambiguous without a wait row above it).
+		if hasBoth || (!hasWait && rowLabel == l.SLAServiceTitle) {
 			_ = pdf.SetFont("dejavubd", "", 7.5)
 			pdf.SetTextColor(80, 100, 180)
 			pdf.SetXY(col1X, rowY)

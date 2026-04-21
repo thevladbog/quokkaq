@@ -1,9 +1,13 @@
 package ws
 
 import (
+	"context"
 	"encoding/json"
 	"quokkaq-go-backend/internal/logger"
+	"time"
 )
+
+const activeRoomsQueryTimeout = time.Second
 
 type activeRoomsRequest struct {
 	reply chan []string
@@ -130,8 +134,24 @@ func (h *Hub) BroadcastEvent(event string, data interface{}, roomID string) {
 
 // ActiveRooms returns a snapshot of unit IDs (room IDs) that currently have
 // at least one connected WebSocket subscriber. Safe to call from any goroutine.
+// Returns nil if the hub loop is unavailable within the timeout.
 func (h *Hub) ActiveRooms() []string {
+	ctx, cancel := context.WithTimeout(context.Background(), activeRoomsQueryTimeout)
+	defer cancel()
+
 	reply := make(chan []string, 1)
-	h.activeRoomsQuery <- activeRoomsRequest{reply: reply}
-	return <-reply
+	select {
+	case h.activeRoomsQuery <- activeRoomsRequest{reply: reply}:
+	case <-ctx.Done():
+		logger.Println("Timed out requesting active websocket rooms:", ctx.Err())
+		return nil
+	}
+
+	select {
+	case rooms := <-reply:
+		return rooms
+	case <-ctx.Done():
+		logger.Println("Timed out waiting for active websocket rooms:", ctx.Err())
+		return nil
+	}
 }

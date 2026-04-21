@@ -145,13 +145,14 @@ function WorkstationCard({
     ticket?.status === 'in_service' && ticket.service?.duration
       ? ticket.service.duration
       : undefined;
+  const serviceProgressLimitSec = serviceSLASec ?? serviceDurationSec;
 
   const serviceTimer = useTicketTimer(
     ticket?.status === 'in_service' && ticket.confirmedAt
       ? ticket.confirmedAt
       : undefined,
     // Drive the timer with the SLA cap if set, otherwise nominal duration.
-    serviceSLASec ?? serviceDurationSec
+    serviceProgressLimitSec
   );
 
   const waitSec = ticket ? ticketPreCallWaitSeconds(ticket) : null;
@@ -172,9 +173,7 @@ function WorkstationCard({
 
   const priority = Boolean(ticket?.preRegistration);
   const showProgress =
-    inService &&
-    ticket.service?.duration != null &&
-    ticket.service.duration > 0;
+    inService && serviceProgressLimitSec != null && serviceProgressLimitSec > 0;
 
   const dotClass = stationStatusDotClass(counter, ticket);
   const statusText = stationStatusLabel(t, counter, ticket);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
@@ -144,9 +144,14 @@ export function useSlaAlerts(unitId: string | null | undefined) {
 
   const dismissAllAlerts = useCallback(() => {
     setActiveSlaAlerts([]);
+    seenRef.current.clear();
   }, []);
 
   useEffect(() => {
+    // Mutating a ref is always safe in an effect. Clear dedupe markers so a
+    // fresh subscription for the new unit starts with no suppressed keys.
+    seenRef.current.clear();
+
     if (!unitId) return;
 
     const handleWarning = (data: unknown) =>
@@ -171,5 +176,12 @@ export function useSlaAlerts(unitId: string | null | undefined) {
     };
   }, [unitId, handleAlert]);
 
-  return { activeSlaAlerts, dismissAlert, dismissAllAlerts };
+  // Derive alerts scoped to the current unit rather than imperatively resetting
+  // state when unitId changes (avoids setState-in-effect cascading renders).
+  const unitSlaAlerts = useMemo(
+    () => (unitId ? activeSlaAlerts.filter((a) => a.unitId === unitId) : []),
+    [activeSlaAlerts, unitId]
+  );
+
+  return { activeSlaAlerts: unitSlaAlerts, dismissAlert, dismissAllAlerts };
 }

@@ -61,7 +61,9 @@ export function StaffCurrentTicketHero({
     isOverdue: serviceIsOverdue,
     isWarning: serviceIsWarning
   } = useTicketTimer(
-    isInService ? ticket.calledAt || undefined : undefined,
+    isInService
+      ? ticket.confirmedAt || ticket.calledAt || undefined
+      : undefined,
     isInService ? ticket.maxServiceTime : undefined
   );
 

@@ -13544,8 +13544,11 @@ paths:
                 - description: 'SLA type: wait or service'
                   in: query
                   name: type
-                  required: true
                   schema:
+                    default: wait
+                    enum:
+                        - wait
+                        - service
                     type: string
                 - description: Filter by operator (expanded scope only)
                   in: query

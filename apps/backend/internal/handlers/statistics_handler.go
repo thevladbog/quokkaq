@@ -559,7 +559,7 @@ func (h *StatisticsHandler) GetEmployeeRadar(w http.ResponseWriter, r *http.Requ
 // @Param        unitId path string true "Subdivision unit ID"
 // @Param        dateFrom query string true "YYYY-MM-DD"
 // @Param        dateTo query string true "YYYY-MM-DD"
-// @Param        type query string true "SLA type: wait or service"
+// @Param        type query string false "SLA type: wait or service" Enums(wait,service) default(wait)
 // @Param        userId query string false "Filter by operator (expanded scope only)"
 // @Param        serviceZoneId query string false "Service zone unit id"
 // @Success      200 {object} services.SLAHeatmapResponse
@@ -595,6 +595,10 @@ func (h *StatisticsHandler) GetSLAHeatmap(w http.ResponseWriter, r *http.Request
 	slaType := strings.TrimSpace(r.URL.Query().Get("type"))
 	if slaType == "" {
 		slaType = "wait"
+	}
+	if slaType != "wait" && slaType != "service" {
+		http.Error(w, "type must be wait or service", http.StatusBadRequest)
+		return
 	}
 	var reqUser *string
 	if v := strings.TrimSpace(r.URL.Query().Get("userId")); v != "" {

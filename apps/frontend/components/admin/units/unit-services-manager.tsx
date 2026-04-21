@@ -308,7 +308,12 @@ function buildInitialFormValues(
       isLeaf: editingService.isLeaf ?? false,
       parentId: editingService.parentId ?? '',
       restrictedServiceZoneId: editingService.restrictedServiceZoneId ?? null,
-      calendarSlotKey: editingService.calendarSlotKey ?? ''
+      calendarSlotKey: editingService.calendarSlotKey ?? '',
+      numberSequence: editingService.numberSequence ?? undefined,
+      gridRow: editingService.gridRow ?? undefined,
+      gridCol: editingService.gridCol ?? undefined,
+      gridRowSpan: editingService.gridRowSpan ?? undefined,
+      gridColSpan: editingService.gridColSpan ?? undefined
     };
   }
   if (isCreating) {
@@ -902,10 +907,10 @@ function ServiceForm({
             type='button'
             variant='outline'
             onClick={() =>
-              setFormValues((prev) => ({ ...prev, maxServiceTime: undefined }))
+              setFormValues((prev) => ({ ...prev, maxServiceTime: null }))
             }
             disabled={
-              formValues.maxServiceTime === undefined ||
+              formValues.maxServiceTime == null ||
               formValues.maxServiceTime === 0
             }
           >
