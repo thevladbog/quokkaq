@@ -23,6 +23,8 @@ import {
   PermAccessStaffPanel,
   PermAccessSupervisorPanel,
   PermAccessTicketScreen,
+  PermCounterOperate,
+  PermTicketsWrite,
   userHasCanonicalUnitPermissionInAnyUnit
 } from '@/lib/permission-variants';
 import { isTenantAdminUser } from '@/lib/tenant-admin-access';
@@ -60,15 +62,23 @@ export default function Home() {
     }
   }, [isLoading, isAuthenticated, router, systemChecked, token]);
 
-  // Operators with no staff-panel access: land on staff panel.
+  // Counter/ticket operators without staff or supervisor UI: land on staff panel (legacy "operator" role).
   useEffect(() => {
     if (!systemChecked || isLoading || !user) return;
-    const roles = user.roles ?? [];
-    if (!roles.includes('operator')) return;
     if (isTenantAdminUser(user)) return;
     if (userHasCanonicalUnitPermissionInAnyUnit(user, PermAccessStaffPanel)) {
       return;
     }
+    if (
+      userHasCanonicalUnitPermissionInAnyUnit(user, PermAccessSupervisorPanel)
+    ) {
+      return;
+    }
+    const hasOperatorLike =
+      userHasCanonicalUnitPermissionInAnyUnit(user, PermCounterOperate) ||
+      userHasCanonicalUnitPermissionInAnyUnit(user, PermTicketsWrite) ||
+      userHasCanonicalUnitPermissionInAnyUnit(user, PermAccessTicketScreen);
+    if (!hasOperatorLike) return;
     router.replace('/staff');
   }, [systemChecked, isLoading, user, router]);
 

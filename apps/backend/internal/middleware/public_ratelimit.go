@@ -10,6 +10,13 @@ import (
 
 const publicLimiterEntryTTL = 10 * time.Minute
 
+// Public API rate: one token every publicAPIRateInterval (20/min sustained), burst publicAPIBurst.
+const (
+	publicAPIRateInterval = 3 * time.Second
+	publicAPIBurst        = 10
+	maxPublicAPILimiters  = 50_000
+)
+
 type publicLimiterEntry struct {
 	lim      *rate.Limiter
 	lastSeen time.Time
@@ -35,15 +42,21 @@ func init() {
 	}()
 }
 
-// PublicAPIRateLimit limits unauthenticated or low-trust public endpoints per client IP (~20/min burst).
+// PublicAPIRateLimit limits unauthenticated or low-trust public endpoints per client IP
+// (20 req/min sustained, burst publicAPIBurst).
 func PublicAPIRateLimit(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ip := clientIPForRateLimit(r)
 		publicAPILimiterMu.Lock()
 		ent, ok := publicAPILimiters[ip]
 		if !ok {
+			if len(publicAPILimiters) >= maxPublicAPILimiters {
+				publicAPILimiterMu.Unlock()
+				http.Error(w, "Too many requests", http.StatusTooManyRequests)
+				return
+			}
 			ent = &publicLimiterEntry{
-				lim:      rate.NewLimiter(rate.Every(3*time.Second), 10),
+				lim:      rate.NewLimiter(rate.Every(publicAPIRateInterval), publicAPIBurst),
 				lastSeen: time.Now(),
 			}
 			publicAPILimiters[ip] = ent

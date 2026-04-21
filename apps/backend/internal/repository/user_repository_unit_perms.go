@@ -23,6 +23,7 @@ func (r *userRepository) UserHasUnitPermissionInCompany(userID, companyID, canon
 	}
 	var rows []models.UserUnit
 	err := r.db.Model(&models.UserUnit{}).
+		Select("user_units.id", "user_units.permissions").
 		Joins("INNER JOIN units ON units.id = user_units.unit_id AND units.company_id = ?", companyID).
 		Where("user_units.user_id = ?", userID).
 		Find(&rows).Error
@@ -50,7 +51,7 @@ func (r *userRepository) UserMatchesUnitPermission(userID, unitID, canonicalPerm
 		return false, nil
 	}
 	var uu models.UserUnit
-	err := r.db.Where("user_id = ? AND unit_id = ?", userID, unitID).First(&uu).Error
+	err := r.db.Select("id", "permissions").Where("user_id = ? AND unit_id = ?", userID, unitID).First(&uu).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return false, nil
@@ -71,13 +72,27 @@ func (r *userRepository) UserMatchesUnitPermission(userID, unitID, canonicalPerm
 
 // UserMatchesAnyUnitPermission is true if any canonical permission matches user_units for the unit.
 func (r *userRepository) UserMatchesAnyUnitPermission(userID, unitID string, canonicalPerms []string) (bool, error) {
-	for _, p := range canonicalPerms {
-		ok, err := r.UserMatchesUnitPermission(userID, unitID, p)
-		if err != nil {
-			return false, err
+	userID, unitID = strings.TrimSpace(userID), strings.TrimSpace(unitID)
+	if userID == "" || unitID == "" || len(canonicalPerms) == 0 {
+		return false, nil
+	}
+	var uu models.UserUnit
+	err := r.db.Select("id", "permissions").Where("user_id = ? AND unit_id = ?", userID, unitID).First(&uu).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
 		}
-		if ok {
-			return true, nil
+		return false, err
+	}
+	for _, canonical := range canonicalPerms {
+		variants := rbac.CanonicalPermissionVariants(canonical)
+		for _, stored := range uu.Permissions {
+			stored = strings.TrimSpace(stored)
+			for _, v := range variants {
+				if stored == v {
+					return true, nil
+				}
+			}
 		}
 	}
 	return false, nil

@@ -2092,10 +2092,9 @@ ADD COLUMN IF NOT EXISTS payment_terms_markdown TEXT`).Error; err != nil {
 	}
 
 	err = manager.RunMigration("v1.4.0_rbac_permissions_catalog_expand", func(db *gorm.DB) error {
-		// RBAC: permission catalog expanded in code (rbac.All); no DDL — tenant role TRU rows
-		// pick up new keys when roles are edited in UI. Global admin/system_admin behavior is enforced in middleware.
-		_ = db
-		return nil
+		// RBAC: permission catalog expanded in code (rbac.All); no DDL. Refresh merged user_units for
+		// system_admin users so TRU-backed permissions include the full catalog without UI edits.
+		return tenantroleseed.BackfillSystemAdminUserUnits(db)
 	})
 	if err != nil {
 		return fmt.Errorf("failed to run v1.4.0_rbac_permissions_catalog_expand migration: %w", err)

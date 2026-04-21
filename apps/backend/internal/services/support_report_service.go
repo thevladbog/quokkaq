@@ -580,6 +580,8 @@ func (s *SupportReportService) AddSupportReportShare(ctx context.Context, viewer
 	if !okAccess {
 		return nil, ErrSupportReportShareInvalidTarget
 	}
+	// TODO: Re-evaluate removing HasCompanyAccess once TenantPermissionAllowed is proven to imply
+	// company membership for all share targets (tenant roles + user_units).
 	okCo, err := s.userRepo.HasCompanyAccess(targetUserID, authorCompany)
 	if err != nil {
 		return nil, err

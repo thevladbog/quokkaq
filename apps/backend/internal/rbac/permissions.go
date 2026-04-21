@@ -1,6 +1,9 @@
 // Package rbac defines the global permission catalog (same keys for all tenants).
 package rbac
 
+// LegacyGlobalRoleAdmin is the legacy global roles.name for tenant-wide superuser (pre–tenant RBAC).
+const LegacyGlobalRoleAdmin = "admin"
+
 // Company-scoped (tenant-wide) permissions.
 const (
 	PermTenantAdmin       = "tenant.admin"

@@ -2,14 +2,17 @@ package middleware
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"os"
 	"strings"
 
+	"quokkaq-go-backend/internal/logger"
 	"quokkaq-go-backend/internal/pkg/authcookie"
 	"quokkaq-go-backend/internal/repository"
 
 	"github.com/golang-jwt/jwt/v5"
+	"gorm.io/gorm"
 )
 
 // jwtStringClaim returns a non-empty string claim, normalized to lowercase for UUID comparisons.
@@ -65,18 +68,38 @@ func ContextFromJWTAccessToken(base context.Context, tokenString string) (contex
 	if !ok {
 		return base, jwt.ErrTokenInvalidClaims
 	}
-	if typ, ok := claims["typ"].(string); ok && typ == "refresh" {
-		return base, jwt.ErrTokenInvalidClaims
-	}
 	userID, ok := claims["sub"].(string)
 	if !ok {
 		return base, jwt.ErrTokenInvalidClaims
 	}
 	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return base, jwt.ErrTokenInvalidClaims
+	}
+
+	var typ string
+	if raw, ok := claims["typ"]; ok && raw != nil {
+		s, ok := raw.(string)
+		if !ok {
+			return base, jwt.ErrTokenInvalidClaims
+		}
+		typ = strings.TrimSpace(s)
+	}
+	// Allowlist: staff JWTs use typ "access" or omit typ; desktop terminals use "terminal".
+	switch typ {
+	case "refresh":
+		return base, jwt.ErrTokenInvalidClaims
+	case "", "access":
+		// staff session
+	case "terminal":
+		// handled below
+	default:
+		return base, jwt.ErrTokenInvalidClaims
+	}
 
 	ctx := base
 	tokenType := "user"
-	if typ, ok := claims["typ"].(string); ok && typ == "terminal" {
+	if typ == "terminal" {
 		tokenType = "terminal"
 		userID = strings.ToLower(userID)
 		if uid, ok := jwtStringClaim(claims, "unit_id"); ok {
@@ -132,7 +155,12 @@ func RequireHumanUserActive(userRepo repository.UserRepository) func(http.Handle
 			}
 			u, err := userRepo.FindByID(r.Context(), userID)
 			if err != nil {
-				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					http.Error(w, "Unauthorized", http.StatusUnauthorized)
+					return
+				}
+				logger.ErrorfCtx(r.Context(), "RequireHumanUserActive: FindByID: %v", err)
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
 			if !u.IsActive {

@@ -44,6 +44,7 @@ import {
   PermAccessStatsZone,
   PermAccessSurveyResponses,
   PermStatisticsRead,
+  userHasCanonicalUnitPermission,
   userHasCanonicalUnitPermissionInAnyUnit,
   userUnitPermissionMatches
 } from '@/lib/permission-variants';
@@ -475,15 +476,28 @@ export default function StatisticsPage() {
     return z;
   }, [serviceZoneId, zoneOptions]);
 
-  const isExpanded =
-    (user && isTenantAdminUser(user)) ||
-    (user &&
-      (userHasCanonicalUnitPermissionInAnyUnit(user, PermStatisticsRead) ||
-        userHasCanonicalUnitPermissionInAnyUnit(
-          user,
-          PermAccessStatsSubdivision
-        ) ||
-        userHasCanonicalUnitPermissionInAnyUnit(user, PermAccessStatsZone)));
+  const isExpanded = useMemo(() => {
+    if (!user) return false;
+    if (isTenantAdminUser(user)) return true;
+    if (userHasCanonicalUnitPermissionInAnyUnit(user, PermStatisticsRead)) {
+      return true;
+    }
+    if (!statsSubdivisionId) return false;
+    const subPerms = user.permissions?.[statsSubdivisionId] ?? [];
+    if (userUnitPermissionMatches(subPerms, PermAccessStatsSubdivision)) {
+      return true;
+    }
+    for (const z of zoneOptions) {
+      const zid = z.id?.trim();
+      if (
+        zid &&
+        userHasCanonicalUnitPermission(user, zid, PermAccessStatsZone)
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }, [user, statsSubdivisionId, zoneOptions]);
 
   const actorsQuery = useGetUnitsUnitIdShiftActivityActors(statsSubdivisionId, {
     query: {

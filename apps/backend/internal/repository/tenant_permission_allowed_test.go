@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"errors"
 	"testing"
 
 	"quokkaq-go-backend/internal/rbac"
@@ -90,5 +91,14 @@ func TestTenantPermissionAllowed_NilTRStillChecksUnit(t *testing.T) {
 	ok, err := TenantPermissionAllowed(tpUserRepoStub{unitPerm: true}, nil, "u", "c", rbac.PermSupportReports)
 	if err != nil || !ok {
 		t.Fatalf("got ok=%v err=%v", ok, err)
+	}
+}
+
+func TestTenantPermissionAllowed_UserUnitPermissionPropagatesError(t *testing.T) {
+	t.Parallel()
+	want := errors.New("db unavailable")
+	_, err := TenantPermissionAllowed(tpUserRepoStub{unitPermErr: want}, tpTRStub{catalogOK: false}, "u", "c", rbac.PermSupportReports)
+	if !errors.Is(err, want) {
+		t.Fatalf("got err=%v want %v", err, want)
 	}
 }

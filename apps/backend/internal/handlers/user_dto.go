@@ -22,7 +22,7 @@ type UserResponse struct {
 	CreatedAt string  `json:"createdAt,omitempty"`
 	PhotoURL  *string `json:"photoUrl,omitempty"`
 	// Roles is deprecated; use tenantRoles and unit permissions instead.
-	Roles       []RoleDTO                 `json:"roles,omitempty"`
+	Roles       []RoleDTO                 `json:"roles,omitempty" extensions:"x-deprecated=true"`
 	Units       []UserUnitDTO             `json:"units,omitempty"`
 	Permissions map[string][]string       `json:"permissions,omitempty"`
 	TenantRoles []TenantRoleBriefResponse `json:"tenantRoles,omitempty"`

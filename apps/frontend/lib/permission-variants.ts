@@ -88,6 +88,18 @@ export function permissionListMessageKey(id: string): string {
   return CANONICAL_TO_LEGACY[id] ?? id;
 }
 
+/** True if `user` has `canonical` (or legacy alias) on the given unit. */
+export function userHasCanonicalUnitPermission(
+  user: User | null | undefined,
+  unitId: string,
+  canonical: string
+): boolean {
+  if (!user?.permissions || !unitId) return false;
+  const perms = user.permissions[unitId];
+  if (!perms?.length) return false;
+  return userUnitPermissionMatches(perms, canonical);
+}
+
 /** True if `user` has `canonical` (or legacy alias) on at least one unit. */
 export function userHasCanonicalUnitPermissionInAnyUnit(
   user: User | null | undefined,

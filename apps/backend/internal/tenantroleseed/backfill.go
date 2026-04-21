@@ -63,8 +63,8 @@ func BackfillLegacyGlobalAdminsToSystemTenantRole(tx *gorm.DB) error {
 SELECT DISTINCT ur.user_id AS user_id
 FROM user_roles ur
 INNER JOIN roles r ON r.id = ur.role_id
-WHERE r.name = 'admin'
-`).Scan(&adminUsers).Error; err != nil {
+WHERE r.name = ?
+`, rbac.LegacyGlobalRoleAdmin).Scan(&adminUsers).Error; err != nil {
 		return err
 	}
 	for _, row := range adminUsers {

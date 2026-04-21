@@ -996,6 +996,7 @@ components:
           items:
             $ref: '#/components/schemas/handlers.RoleDTO'
           type: array
+          x-deprecated: 'true'
         tenantRoles:
           items:
             $ref: '#/components/schemas/handlers.TenantRoleBriefResponse'

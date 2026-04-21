@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"quokkaq-go-backend/internal/logger"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -18,12 +19,40 @@ const (
 	maxMessageSize = 512
 )
 
+var (
+	wsAllowedOriginsMu sync.RWMutex
+	wsAllowedOrigins   []string
+)
+
+// SetWebSocketAllowedOrigins sets allowed Origin header values for browser WebSocket upgrades.
+// Call from main with the same list as HTTP CORS (e.g. CORS_ALLOWED_ORIGINS).
+func SetWebSocketAllowedOrigins(origins []string) {
+	wsAllowedOriginsMu.Lock()
+	defer wsAllowedOriginsMu.Unlock()
+	wsAllowedOrigins = append([]string(nil), origins...)
+}
+
+func checkWebSocketOrigin(r *http.Request) bool {
+	origin := strings.TrimSpace(r.Header.Get("Origin"))
+	if origin == "" {
+		// Non-browser clients may omit Origin.
+		return true
+	}
+	wsAllowedOriginsMu.RLock()
+	list := wsAllowedOrigins
+	wsAllowedOriginsMu.RUnlock()
+	for _, o := range list {
+		if o == origin {
+			return true
+		}
+	}
+	return false
+}
+
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
-	CheckOrigin: func(r *http.Request) bool {
-		return true // Allow all origins for now
-	},
+	CheckOrigin:     checkWebSocketOrigin,
 }
 
 // SubscribeAuthorizer returns whether the client may join the unit room (JWT context is on the client).

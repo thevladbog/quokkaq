@@ -122,6 +122,7 @@ func RequireTenantPermission(userRepo repository.UserRepository, tr repository.T
 // RequireTerminalUnitMatchOrUnitPermission allows desktop terminal JWT for the same unit as the URL,
 // otherwise the same checks as RequireUnitPermission (staff users).
 func RequireTerminalUnitMatchOrUnitPermission(userRepo repository.UserRepository, tr repository.TenantRBACRepository, unitRepo repository.UnitRepository, urlUnitParam string, permission string) func(http.Handler) http.Handler {
+	unitPermMiddleware := RequireUnitPermission(userRepo, tr, unitRepo, urlUnitParam, permission)
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			unitID := unitIDFromRequest(r, urlUnitParam)
@@ -138,7 +139,7 @@ func RequireTerminalUnitMatchOrUnitPermission(userRepo repository.UserRepository
 				next.ServeHTTP(w, r)
 				return
 			}
-			RequireUnitPermission(userRepo, tr, unitRepo, urlUnitParam, permission)(next).ServeHTTP(w, r)
+			unitPermMiddleware(next).ServeHTTP(w, r)
 		})
 	}
 }
@@ -295,16 +296,16 @@ func RequireUnitStatisticsAccess(userRepo repository.UserRepository, tr reposito
 				return
 			}
 			variants := rbac.StatisticsAccessPermissionVariants()
+			direct, err := userRepo.UserMatchesAnyUnitPermission(userID, unitID, variants)
+			if err != nil {
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+			if direct {
+				next.ServeHTTP(w, r)
+				return
+			}
 			for _, p := range variants {
-				direct, err := userRepo.UserMatchesUnitPermission(userID, unitID, p)
-				if err != nil {
-					http.Error(w, "Internal server error", http.StatusInternalServerError)
-					return
-				}
-				if direct {
-					next.ServeHTTP(w, r)
-					return
-				}
 				okTenant, err := tr.UserHasTenantPermission(userID, u.CompanyID, unitID, p)
 				if err != nil {
 					http.Error(w, "Internal server error", http.StatusInternalServerError)

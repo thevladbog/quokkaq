@@ -53,14 +53,12 @@ func CanonicalPermissionVariants(required string) []string {
 	return out
 }
 
-// StatisticsAccessPermissionVariants matches any permission that grants statistics API access
-// (tenant catalog + legacy zone/subdivision flags).
+// StatisticsAccessPermissionVariants returns canonical keys whose variants (see CanonicalPermissionVariants)
+// grant statistics API access. Legacy SCREAMING_SNAKE aliases are covered via those variants.
 func StatisticsAccessPermissionVariants() []string {
 	return []string{
 		PermStatisticsRead,
 		PermAccessStatsSubdivision,
 		PermAccessStatsZone,
-		"ACCESS_STATISTICS_SUBDIVISION",
-		"ACCESS_STATISTICS_ZONE",
 	}
 }

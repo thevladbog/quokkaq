@@ -39,7 +39,8 @@ import {
   PermAccessSupervisorPanel,
   PermStatisticsRead,
   PermSupportReports,
-  userHasCanonicalUnitPermissionInAnyUnit
+  userHasCanonicalUnitPermissionInAnyUnit,
+  userUnitPermissionMatches
 } from '@/lib/permission-variants';
 import { isTenantAdminUser } from '@/lib/tenant-admin-access';
 import { Link, usePathname } from '@/src/i18n/navigation';
@@ -86,6 +87,12 @@ const AppSidebar = () => {
 
   const hasPermissionInAnyUnit = (permission: string) =>
     userHasCanonicalUnitPermissionInAnyUnit(user, permission);
+
+  const hasPermissionInActiveUnit = (permission: string) => {
+    if (!activeUnitId) return false;
+    const perms = user?.permissions?.[activeUnitId] ?? [];
+    return userUnitPermissionMatches(perms, permission);
+  };
 
   const auditJournalHref =
     activeUnitId != null && activeUnitId !== ''
@@ -142,7 +149,8 @@ const AppSidebar = () => {
             requiredAnyPermission: [
               PermAccessStaffPanel,
               PermAccessSupervisorPanel
-            ] as const
+            ] as const,
+            permissionScope: 'activeUnit' as const
           }
         ]
       : []),
@@ -156,7 +164,8 @@ const AppSidebar = () => {
             requiredAnyPermission: [
               PermAccessStaffPanel,
               PermAccessSupervisorPanel
-            ] as const
+            ] as const,
+            permissionScope: 'activeUnit' as const
           }
         ]
       : []),
@@ -187,7 +196,12 @@ const AppSidebar = () => {
     if (isTenantAdminUser(user)) return true;
 
     if ('requiredAnyPermission' in item && item.requiredAnyPermission) {
-      return item.requiredAnyPermission.some((p) => hasPermissionInAnyUnit(p));
+      const useActive =
+        'permissionScope' in item && item.permissionScope === 'activeUnit';
+      const check = useActive
+        ? hasPermissionInActiveUnit
+        : hasPermissionInAnyUnit;
+      return item.requiredAnyPermission.some((p) => check(p));
     }
     if ('requiredPermission' in item && item.requiredPermission) {
       return hasPermissionInAnyUnit(item.requiredPermission);

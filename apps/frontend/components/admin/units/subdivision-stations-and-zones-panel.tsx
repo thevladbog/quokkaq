@@ -35,8 +35,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { useCreateUnit, useUnits } from '@/lib/hooks';
 import { Link, useRouter } from '@/src/i18n/navigation';
-import { useAuthContext } from '@/contexts/AuthContext';
-import { isTenantAdminUser } from '@/lib/tenant-admin-access';
+import PermissionGuard from '@/components/auth/permission-guard';
+import { PermUnitSettingsManage } from '@/lib/permission-variants';
 import { formatApiToastErrorMessage } from '@/lib/format-api-toast-error';
 import { UnitCountersSection } from '@/components/admin/units/counters-list';
 import {
@@ -187,7 +187,6 @@ export function SubdivisionStationsAndZonesPanel({
   const locale = useLocale();
   const queryClient = useQueryClient();
   const createUnitMutation = useCreateUnit();
-  const { user } = useAuthContext();
 
   const {
     data: allUnits = [],
@@ -276,7 +275,12 @@ export function SubdivisionStationsAndZonesPanel({
               {t('stations_and_zones_panel_description')}
             </CardDescription>
           </div>
-          {isTenantAdminUser(user) ? (
+          <PermissionGuard
+            tenantAdminBypass
+            permissions={[PermUnitSettingsManage]}
+            unitId={subdivisionId}
+            fallback={null}
+          >
             <div className='flex shrink-0 flex-wrap gap-2'>
               <Button
                 size='sm'
@@ -295,7 +299,7 @@ export function SubdivisionStationsAndZonesPanel({
                 {t('add_child_subdivision')}
               </Button>
             </div>
-          ) : null}
+          </PermissionGuard>
         </CardHeader>
         <CardContent className='space-y-10'>
           <section className='space-y-4'>

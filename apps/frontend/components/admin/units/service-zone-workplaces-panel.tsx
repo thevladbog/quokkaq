@@ -36,8 +36,8 @@ import { Badge } from '@/components/ui/badge';
 import { unitsApi } from '@/lib/api';
 import { useCreateUnit } from '@/lib/hooks';
 import { useRouter } from '@/src/i18n/navigation';
-import { useAuthContext } from '@/contexts/AuthContext';
-import { isTenantAdminUser } from '@/lib/tenant-admin-access';
+import PermissionGuard from '@/components/auth/permission-guard';
+import { PermUnitSettingsManage } from '@/lib/permission-variants';
 import { formatApiToastErrorMessage } from '@/lib/format-api-toast-error';
 import {
   childSubdivisionsQueryKey,
@@ -63,7 +63,6 @@ export function ServiceZoneWorkplacesPanel({
   const router = useRouter();
   const queryClient = useQueryClient();
   const createUnitMutation = useCreateUnit();
-  const { user } = useAuthContext();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [createKind, setCreateKind] = useState<CreateKind>('service_zone');
@@ -150,28 +149,31 @@ export function ServiceZoneWorkplacesPanel({
               {t('zone_children_description')}
             </CardDescription>
           </div>
-          <div className='flex shrink-0 flex-wrap gap-2'>
-            {isTenantAdminUser(user) ? (
-              <>
-                <Button
-                  size='sm'
-                  variant='secondary'
-                  onClick={() => openDialog('subdivision')}
-                >
-                  <Plus className='mr-2 h-4 w-4' />
-                  {t('add_child_subdivision')}
-                </Button>
-                <Button
-                  size='sm'
-                  variant='outline'
-                  onClick={() => openDialog('service_zone')}
-                >
-                  <Plus className='mr-2 h-4 w-4' />
-                  {t('add_child_service_zone')}
-                </Button>
-              </>
-            ) : null}
-          </div>
+          <PermissionGuard
+            tenantAdminBypass
+            permissions={[PermUnitSettingsManage]}
+            unitId={parentUnitId}
+            fallback={null}
+          >
+            <div className='flex shrink-0 flex-wrap gap-2'>
+              <Button
+                size='sm'
+                variant='secondary'
+                onClick={() => openDialog('subdivision')}
+              >
+                <Plus className='mr-2 h-4 w-4' />
+                {t('add_child_subdivision')}
+              </Button>
+              <Button
+                size='sm'
+                variant='outline'
+                onClick={() => openDialog('service_zone')}
+              >
+                <Plus className='mr-2 h-4 w-4' />
+                {t('add_child_service_zone')}
+              </Button>
+            </div>
+          </PermissionGuard>
         </CardHeader>
         <CardContent>
           {isLoading ? (

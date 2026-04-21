@@ -697,7 +697,7 @@ WHERE (
     INNER JOIN tenant_role_units tru ON tru.tenant_role_id = utr.tenant_role_id
     INNER JOIN units un3 ON un3.id = tru.unit_id AND un3.company_id = utr.company_id
     WHERE utr.user_id = u.id AND utr.company_id = ?
-      AND ? = ANY(COALESCE(tru.permissions, '{}'::text[]))
+      AND COALESCE(tru.permissions, '{}'::text[]) && %s
   )
 )
 AND u.id <> ?
@@ -709,18 +709,20 @@ AND (u.name ILIKE ? ESCAPE '\' OR u.email ILIKE ? ESCAPE '\')
 GROUP BY u.id, u.name, u.email
 ORDER BY name ASC NULLS LAST, u.id ASC
 LIMIT ?
-`, arrLit)
+`, arrLit, arrLit)
 	var out []SupportReportShareCandidate
 	err := r.db.Raw(sql,
 		companyID,
 		companyID, rbac.TenantRoleSlugSystemAdmin,
 		companyID,
-		companyID, rbac.PermSupportReports,
+		companyID,
 		authorUserID, reportID, term, term, limit,
 	).Scan(&out).Error
 	return out, err
 }
 
+// postgresTextArrayLiteral builds a SQL ARRAY[...]::text[] literal for use in Raw queries.
+// Callers must pass only controlled catalog strings (e.g. rbac permission keys), never raw user input.
 func postgresTextArrayLiteral(values []string) string {
 	var b strings.Builder
 	b.WriteString("ARRAY[")

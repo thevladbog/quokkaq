@@ -301,6 +301,8 @@ func run() error {
 			"https://app.quokkaq.v-b.tech",
 		}
 	}
+	ws.SetWebSocketAllowedOrigins(allowedOrigins)
+
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   allowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},

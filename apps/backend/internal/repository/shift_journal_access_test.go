@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"quokkaq-go-backend/internal/models"
+	"quokkaq-go-backend/internal/rbac"
 )
 
 func TestShiftJournalSeesAllActivityFromLoadedUser(t *testing.T) {
@@ -70,7 +71,7 @@ func TestShiftJournalSeesAllActivityFromLoadedUser(t *testing.T) {
 				Roles: []models.UserRole{{Role: models.Role{Name: "operator"}}},
 				Units: []models.UserUnit{{
 					UnitID:      unitA,
-					Permissions: models.StringArray{"ACCESS_STAFF_PANEL", "ACCESS_SUPERVISOR_PANEL"},
+					Permissions: models.StringArray{rbac.PermAccessStaffPanel, rbac.PermAccessSupervisorPanel},
 				}},
 			},
 			unitID: unitA,
@@ -82,7 +83,7 @@ func TestShiftJournalSeesAllActivityFromLoadedUser(t *testing.T) {
 				Roles: []models.UserRole{{Role: models.Role{Name: "operator"}}},
 				Units: []models.UserUnit{{
 					UnitID:      otherUnit,
-					Permissions: models.StringArray{"ACCESS_SUPERVISOR_PANEL"},
+					Permissions: models.StringArray{rbac.PermAccessSupervisorPanel},
 				}},
 			},
 			unitID: unitA,
