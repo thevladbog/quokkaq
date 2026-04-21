@@ -4,6 +4,7 @@ import {
   ArrowRightLeft,
   Ban,
   CheckCircle2,
+  PhoneCall,
   PhoneForwarded,
   Undo2
 } from 'lucide-react';
@@ -28,12 +29,14 @@ export interface StaffWorkstationActionPanelProps {
   transferPending: boolean;
   noShowPending: boolean;
   returnToQueuePending?: boolean;
+  recallPending?: boolean;
   onCallNext: () => void;
   onConfirmArrival: () => void;
   onComplete: () => void;
   onOpenTransfer: () => void;
   onNoShow: () => void;
   onReturnToQueue?: () => void;
+  onRecall?: () => void;
 }
 
 export function StaffWorkstationActionPanel({
@@ -47,12 +50,14 @@ export function StaffWorkstationActionPanel({
   transferPending,
   noShowPending,
   returnToQueuePending = false,
+  recallPending = false,
   onCallNext,
   onConfirmArrival,
   onComplete,
   onOpenTransfer,
   onNoShow,
-  onReturnToQueue
+  onReturnToQueue,
+  onRecall
 }: StaffWorkstationActionPanelProps) {
   const hasCurrent = Boolean(currentTicket);
   const callNextDisabled =
@@ -63,6 +68,9 @@ export function StaffWorkstationActionPanel({
     Boolean(onReturnToQueue) &&
     (currentTicket?.status === 'called' ||
       currentTicket?.status === 'in_service');
+
+  // Recall is only useful while the ticket is in "called" status (visitor hasn't arrived yet).
+  const showRecall = Boolean(onRecall) && currentTicket?.status === 'called';
 
   return (
     <div className='border-border/60 bg-muted/20 flex flex-col gap-3 rounded-lg border p-2.5'>
@@ -123,28 +131,44 @@ export function StaffWorkstationActionPanel({
           {t('actions.noShow')}
         </Button>
       </div>
-      {showReturnToQueue ? (
+      {showReturnToQueue || showRecall ? (
         <div className='flex flex-wrap items-start gap-3'>
-          <Button
-            type='button'
-            size='sm'
-            variant='outline'
-            className='h-9 min-w-[9rem] shrink-0 font-medium'
-            title={t('actions.returnToQueue_hint')}
-            onClick={onReturnToQueue}
-            disabled={
-              workstationOnBreak ||
-              returnToQueuePending ||
-              transferPending ||
-              completePending ||
-              noShowPending
-            }
-          >
-            <Undo2 className='mr-1.5 h-4 w-4 shrink-0' />
-            {returnToQueuePending
-              ? t('processing')
-              : t('actions.returnToQueue')}
-          </Button>
+          {showRecall && (
+            <Button
+              type='button'
+              size='sm'
+              variant='outline'
+              className='h-9 min-w-[9rem] shrink-0 font-medium'
+              title={t('actions.recall_hint')}
+              onClick={onRecall}
+              disabled={workstationOnBreak || recallPending}
+            >
+              <PhoneCall className='mr-1.5 h-4 w-4 shrink-0' />
+              {recallPending ? t('processing') : t('actions.recall')}
+            </Button>
+          )}
+          {showReturnToQueue && (
+            <Button
+              type='button'
+              size='sm'
+              variant='outline'
+              className='h-9 min-w-[9rem] shrink-0 font-medium'
+              title={t('actions.returnToQueue_hint')}
+              onClick={onReturnToQueue}
+              disabled={
+                workstationOnBreak ||
+                returnToQueuePending ||
+                transferPending ||
+                completePending ||
+                noShowPending
+              }
+            >
+              <Undo2 className='mr-1.5 h-4 w-4 shrink-0' />
+              {returnToQueuePending
+                ? t('processing')
+                : t('actions.returnToQueue')}
+            </Button>
+          )}
         </div>
       ) : null}
     </div>

@@ -1330,6 +1330,8 @@
       "transfer": "Transfer",
       "returnToQueue": "Back to queue",
       "returnToQueue_hint": "Return this ticket to waiting in the same service zone (queue number unchanged).",
+      "recall": "Re-call",
+      "recall_hint": "Announce the ticket number again (visitor has not arrived yet but may still come).",
       "startService": "Start Service",
       "createTicket": "Create Ticket"
     },
@@ -1495,6 +1497,7 @@
     },
     "messages": {
       "called": "Called ticket {number}",
+      "recalled": "Re-called ticket {number}",
       "completed": "Completed ticket {number}",
       "noShow": "Marked ticket {number} as no-show",
       "transferred": "Transferred ticket {number}",
@@ -2301,6 +2304,8 @@
     "subtitle": "Join the queue remotely — no need to visit in person.",
     "select_service": "Select a service",
     "service_placeholder": "Select service...",
+    "service_search_placeholder": "Search service...",
+    "service_not_found": "No service found",
     "phone_label": "Phone (for SMS notifications)",
     "phone_placeholder": "+1 XXX XXX XXXX",
     "phone_hint": "Optional. We'll send an SMS when your turn approaches.",

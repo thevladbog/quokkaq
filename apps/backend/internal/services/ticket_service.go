@@ -730,6 +730,9 @@ func (s *ticketService) CallNext(unitID, counterID string, serviceIDs []string, 
 		return nil, err
 	}
 
+	if c, err := s.counterRepo.FindByID(counterID); err == nil {
+		ticket.Counter = c
+	}
 	s.hub.BroadcastEvent("ticket.called", ticket, ticket.UnitID)
 
 	s.enqueueTTS(ticket, counterID)
@@ -936,6 +939,11 @@ func (s *ticketService) Recall(ticketID string, actorUserID *string) (*models.Ti
 		return nil, err
 	}
 
+	if ticket.CounterID != nil {
+		if c, err := s.counterRepo.FindByID(*ticket.CounterID); err == nil {
+			ticket.Counter = c
+		}
+	}
 	s.hub.BroadcastEvent("ticket.called", ticket, ticket.UnitID)
 
 	if ticket.CounterID != nil {
@@ -998,6 +1006,9 @@ func (s *ticketService) Pick(ticketID, counterID string, actorUserID *string) (*
 		return nil, err
 	}
 
+	if c, err := s.counterRepo.FindByID(counterID); err == nil {
+		ticket.Counter = c
+	}
 	s.hub.BroadcastEvent("ticket.called", ticket, ticket.UnitID)
 	s.enqueueTTS(ticket, counterID)
 

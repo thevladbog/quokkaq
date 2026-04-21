@@ -78,9 +78,17 @@ export default function TicketPage() {
   useEffect(() => {
     if (!ticketId) return;
 
+    let cancelled = false;
+
     const load = async () => {
       try {
         const t_data = await ticketsApi.getById(ticketId);
+
+        // Guard: if this effect was cleaned up while the request was in-flight
+        // (e.g. React Strict Mode double-invoke or dependency change), bail out
+        // before registering socket listeners — otherwise duplicate handlers pile up.
+        if (cancelled) return;
+
         ticketRef.current = t_data;
         setTicket(t_data);
 
@@ -91,9 +99,7 @@ export default function TicketPage() {
             socketClient.onTicketCalled((data) => {
               if (data?.ticket?.id === t_data.id) {
                 const counterName =
-                  data.ticket?.counter?.name ||
-                  (data.ticket as { counterId?: string })?.counterId ||
-                  t('counterUnknown');
+                  data.ticket?.counter?.name || t('counterUnknown');
                 toast.success(
                   t('your_ticket_called', {
                     number: t_data.queueNumber,
@@ -135,6 +141,7 @@ export default function TicketPage() {
     void load();
 
     return () => {
+      cancelled = true;
       socketClient.off('ticket.called');
       socketClient.off('ticket.updated');
       socketClient.disconnect();
@@ -205,11 +212,12 @@ export default function TicketPage() {
       <Card className='flex w-full max-w-md flex-col items-center pt-6'>
         {/* Logo */}
         {unit?.config?.kiosk?.logoUrl && (
-          <div className='mb-4 h-16 w-auto'>
+          <div className='relative mb-4 h-16 w-48'>
             <Image
               src={unit.config.kiosk.logoUrl}
               alt='Logo'
-              className='h-full w-auto object-contain'
+              fill
+              className='object-contain'
             />
           </div>
         )}

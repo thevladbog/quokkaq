@@ -4,6 +4,7 @@ import {
   DesktopTerminalKindSchema,
   DesktopTerminalSchema,
   effectiveDesktopTerminalKind,
+  TicketModelSchema,
   UnitKindSchema,
   UserModelSchema
 } from './index';
@@ -188,6 +189,110 @@ describe('BookingModelSchema', () => {
       serviceId: 'svc-1',
       status: 'confirmed'
     });
+    expect(r.success).toBe(false);
+  });
+});
+
+const minimalTicket = {
+  id: 'ticket-1',
+  queueNumber: 'А-42',
+  unitId: 'unit-1',
+  serviceId: 'svc-1',
+  status: 'waiting'
+};
+
+describe('TicketModelSchema', () => {
+  it('parses a minimal valid ticket', () => {
+    const r = TicketModelSchema.safeParse(minimalTicket);
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.id).toBe('ticket-1');
+      expect(r.data.queueNumber).toBe('А-42');
+      expect(r.data.status).toBe('waiting');
+    }
+  });
+
+  it('preserves queuePosition and estimatedWaitSeconds when present', () => {
+    const r = TicketModelSchema.safeParse({
+      ...minimalTicket,
+      queuePosition: 3,
+      estimatedWaitSeconds: 180
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.queuePosition).toBe(3);
+      expect(r.data.estimatedWaitSeconds).toBe(180);
+    }
+  });
+
+  it('preserves smsOptInAvailable: true (Bug 1 regression)', () => {
+    const r = TicketModelSchema.safeParse({
+      ...minimalTicket,
+      smsOptInAvailable: true
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.smsOptInAvailable).toBe(true);
+    }
+  });
+
+  it('preserves smsOptInAvailable: false', () => {
+    const r = TicketModelSchema.safeParse({
+      ...minimalTicket,
+      smsOptInAvailable: false
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.smsOptInAvailable).toBe(false);
+    }
+  });
+
+  it('smsOptInAvailable is undefined when absent (optional field)', () => {
+    const r = TicketModelSchema.safeParse(minimalTicket);
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.smsOptInAvailable).toBeUndefined();
+    }
+  });
+
+  it('strips truly unknown fields', () => {
+    const r = TicketModelSchema.safeParse({
+      ...minimalTicket,
+      unknownField: 'should-be-stripped',
+      anotherUnknown: 42
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(
+        (r.data as Record<string, unknown>)['unknownField']
+      ).toBeUndefined();
+      expect(
+        (r.data as Record<string, unknown>)['anotherUnknown']
+      ).toBeUndefined();
+    }
+  });
+
+  it('allows optional fields to be absent', () => {
+    const r = TicketModelSchema.safeParse(minimalTicket);
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.client).toBeUndefined();
+      expect(r.data.counter).toBeUndefined();
+      expect(r.data.service).toBeUndefined();
+      expect(r.data.preRegistration).toBeUndefined();
+    }
+  });
+
+  it('accepts nullable counter set to null', () => {
+    const r = TicketModelSchema.safeParse({ ...minimalTicket, counter: null });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.counter).toBeNull();
+    }
+  });
+
+  it('fails when required fields are missing', () => {
+    const r = TicketModelSchema.safeParse({ id: 'ticket-1' });
     expect(r.success).toBe(false);
   });
 });

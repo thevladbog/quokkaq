@@ -215,15 +215,15 @@ export class SocketClient {
 
   // Specific typed helpers matching previous interface
   onTicketCreated(callback: (data: TicketUpdate) => void) {
-    this.on('ticket.created', (data) => callback(data as TicketUpdate));
+    this.on('ticket.created', callback as Listener);
   }
 
   onTicketUpdated(callback: (data: TicketUpdate) => void) {
-    this.on('ticket.updated', (data) => callback(data as TicketUpdate));
+    this.on('ticket.updated', callback as Listener);
   }
 
   onTicketCalled(callback: (data: TicketUpdate) => void) {
-    this.on('ticket.called', (data) => callback(data as TicketUpdate));
+    this.on('ticket.called', callback as Listener);
   }
 
   onQueueSnapshot(callback: (data: QueueSnapshot) => void) {

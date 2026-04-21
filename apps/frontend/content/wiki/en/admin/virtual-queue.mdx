@@ -1,0 +1,95 @@
+---
+title: Virtual Queue
+description: Enable and use Virtual Queue — visitors join the queue online and arrive when it's their turn.
+---
+
+# Virtual Queue
+
+Virtual Queue allows visitors to reserve their place in line **remotely** — through a QR code or link — without being physically present. They arrive when called or when the queue reaches them.
+
+> **Plan requirement:** this feature requires the `virtual_queue` capability to be included in the company's subscription plan.
+
+---
+
+## Enabling for a unit
+
+1. Go to **Settings → Units** and select the unit.
+2. Open the **Virtual Queue** section.
+3. Toggle **Virtual Queue enabled**.
+4. Save.
+
+Once enabled, the unit display screen shows a QR code pointing to `/queue/{unitId}`.
+
+---
+
+## How a visitor joins the queue
+
+1. The visitor scans the QR code on the display screen or opens the link directly.
+2. The queue page shows:
+   - available services;
+   - current queue length and estimated wait time.
+3. The visitor selects a service and clicks **Join Queue**.
+4. The system creates a ticket and opens the tracking page (`/ticket/{id}`).
+
+### Optional phone attachment
+
+On the join page or the ticket tracking page, visitors can add their phone number. Once attached, they will receive SMS notifications:
+
+- when their ticket is called;
+- when they reach the front of the queue ("You're next").
+
+---
+
+## Estimated Wait Time (ETA)
+
+The queue page and ticket tracking page automatically refresh the estimated wait time every 30 seconds.
+
+**Algorithm:**
+
+- a rolling average of service duration is calculated from the last 20 completed tickets;
+- the result is divided by the number of active counters;
+- when fewer than 3 completed tickets are available, the `MaxWaitingTime` value from the service settings is used as a fallback.
+
+When the unit has more than one service with waiting tickets, the display screen and the API also show a per-service breakdown (`services[]` in the `/units/{unitId}/queue-status` response).
+
+---
+
+## Visitor self-cancel
+
+Visitors can cancel their own waiting ticket directly on the `/ticket/{id}` page:
+
+1. Click **Cancel ticket**.
+2. Status changes to `no_show`; history is updated with action `ticket.visitor_cancelled`.
+3. A **Get a new ticket** button appears, linking back to the unit's queue page.
+
+> Self-cancellation is only possible for tickets in **waiting** status.
+
+---
+
+## Public queue-status API
+
+The endpoint `GET /units/{unitId}/queue-status` is publicly accessible (no authentication) and returns:
+
+```json
+{
+  "queueLength": 5,
+  "estimatedWaitMinutes": 12.5,
+  "activeCounters": 2,
+  "services": [
+    {
+      "serviceId": "...",
+      "serviceName": "Consultation",
+      "queueLength": 3,
+      "estimatedWaitMinutes": 7.5
+    },
+    {
+      "serviceId": "...",
+      "serviceName": "Documents",
+      "queueLength": 2,
+      "estimatedWaitMinutes": 5.0
+    }
+  ]
+}
+```
+
+The `services` array is included only when more than one service has waiting tickets.

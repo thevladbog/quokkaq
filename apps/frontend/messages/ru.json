@@ -1330,6 +1330,8 @@
       "transfer": "Передать",
       "returnToQueue": "В очередь",
       "returnToQueue_hint": "Вернуть талон в ожидание в той же сервисной зоне (номер не меняется).",
+      "recall": "Вызвать повторно",
+      "recall_hint": "Повторно объявить номер талона (посетитель не пришел, но ещё может подойти).",
       "startService": "Начать обслуживание",
       "createTicket": "Создать талон"
     },
@@ -1495,6 +1497,7 @@
     },
     "messages": {
       "called": "Вызван талон {number}",
+      "recalled": "Повторный вызов талона {number}",
       "completed": "Завершен талон {number}",
       "noShow": "Талон {number} отмечен как не пришел",
       "transferred": "Передан талон {number}",
@@ -2301,6 +2304,8 @@
     "subtitle": "Запишитесь в очередь дистанционно — без визита в отделение.",
     "select_service": "Выберите услугу",
     "service_placeholder": "Выберите услугу...",
+    "service_search_placeholder": "Поиск услуги...",
+    "service_not_found": "Услуга не найдена",
     "phone_label": "Телефон (для SMS-уведомлений)",
     "phone_placeholder": "+7 XXX XXX XX XX",
     "phone_hint": "Необязательно. Мы пришлём SMS, когда подойдёт ваша очередь.",

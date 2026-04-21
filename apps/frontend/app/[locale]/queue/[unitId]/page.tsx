@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslations, useLocale } from 'next-intl';
 import { toast } from 'sonner';
@@ -12,13 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@/components/ui/select';
+import { Combobox } from '@/components/ui/combobox';
 
 interface QueueStatus {
   queueLength: number;
@@ -35,6 +29,20 @@ export default function VirtualQueuePage() {
   const [services, setServices] = useState<Service[]>([]);
   const [queueStatus, setQueueStatus] = useState<QueueStatus | null>(null);
   const [selectedServiceId, setSelectedServiceId] = useState('');
+
+  const serviceOptions = useMemo(
+    () =>
+      services.map((svc) => ({
+        value: svc.id,
+        label: getLocalizedName(
+          svc.name,
+          svc.nameRu ?? null,
+          svc.nameEn ?? null,
+          locale
+        )
+      })),
+    [services, locale]
+  );
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
@@ -136,26 +144,16 @@ export default function VirtualQueuePage() {
           {/* Service selector */}
           <div className='space-y-2'>
             <Label htmlFor='service-select'>{t('select_service')}</Label>
-            <Select
+            <Combobox
+              id='service-select'
+              options={serviceOptions}
               value={selectedServiceId}
-              onValueChange={setSelectedServiceId}
-            >
-              <SelectTrigger id='service-select'>
-                <SelectValue placeholder={t('service_placeholder')} />
-              </SelectTrigger>
-              <SelectContent>
-                {services.map((svc) => (
-                  <SelectItem key={svc.id} value={svc.id}>
-                    {getLocalizedName(
-                      svc.name,
-                      svc.nameRu ?? null,
-                      svc.nameEn ?? null,
-                      locale
-                    )}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              onChange={setSelectedServiceId}
+              placeholder={t('service_placeholder')}
+              searchPlaceholder={t('service_search_placeholder')}
+              emptyText={t('service_not_found')}
+              allowClear={false}
+            />
           </div>
 
           {/* Phone (optional) */}
