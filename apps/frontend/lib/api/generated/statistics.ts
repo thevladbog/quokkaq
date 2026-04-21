@@ -2229,6 +2229,25 @@ export type GetUnitStatisticsEmployeeRadarParams = {
 userId: string;
 };
 
+export type ExportStatisticsPDFParams = {
+/**
+ * Start date YYYY-MM-DD
+ */
+dateFrom: string;
+/**
+ * End date YYYY-MM-DD
+ */
+dateTo: string;
+/**
+ * Operator filter
+ */
+userId?: string;
+/**
+ * Service zone filter
+ */
+serviceZoneId?: string;
+};
+
 export type GetUnitStatisticsLoadParams = {
 /**
  * YYYY-MM-DD
@@ -2865,6 +2884,162 @@ export function useGetUnitStatisticsEmployeeRadar<TData = Awaited<ReturnType<typ
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetUnitStatisticsEmployeeRadarQueryOptions(unitId,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * Generates a branded A4 PDF with all available statistics sections for the chosen date range. Same auth as individual statistics endpoints.
+ * @summary Export statistics as PDF report
+ */
+export type exportStatisticsPDFResponse200 = {
+  data: Blob
+  status: 200
+}
+
+export type exportStatisticsPDFResponse400 = {
+  data: Blob
+  status: 400
+}
+
+export type exportStatisticsPDFResponse401 = {
+  data: Blob
+  status: 401
+}
+
+export type exportStatisticsPDFResponse403 = {
+  data: Blob
+  status: 403
+}
+
+export type exportStatisticsPDFResponse404 = {
+  data: Blob
+  status: 404
+}
+
+export type exportStatisticsPDFResponse500 = {
+  data: Blob
+  status: 500
+}
+
+export type exportStatisticsPDFResponseSuccess = (exportStatisticsPDFResponse200) & {
+  headers: Headers;
+};
+export type exportStatisticsPDFResponseError = (exportStatisticsPDFResponse400 | exportStatisticsPDFResponse401 | exportStatisticsPDFResponse403 | exportStatisticsPDFResponse404 | exportStatisticsPDFResponse500) & {
+  headers: Headers;
+};
+
+export type exportStatisticsPDFResponse = (exportStatisticsPDFResponseSuccess | exportStatisticsPDFResponseError)
+
+export const getExportStatisticsPDFUrl = (unitId: string,
+    params: ExportStatisticsPDFParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/units/${unitId}/statistics/export/pdf?${stringifiedParams}` : `/units/${unitId}/statistics/export/pdf`
+}
+
+export const exportStatisticsPDF = async (unitId: string,
+    params: ExportStatisticsPDFParams, options?: RequestInit): Promise<exportStatisticsPDFResponse> => {
+
+  return orvalMutator<exportStatisticsPDFResponse>(getExportStatisticsPDFUrl(unitId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getExportStatisticsPDFQueryKey = (unitId: string,
+    params?: ExportStatisticsPDFParams,) => {
+    return [
+    `/units/${unitId}/statistics/export/pdf`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getExportStatisticsPDFQueryOptions = <TData = Awaited<ReturnType<typeof exportStatisticsPDF>>, TError = Blob>(unitId: string,
+    params: ExportStatisticsPDFParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportStatisticsPDF>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getExportStatisticsPDFQueryKey(unitId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportStatisticsPDF>>> = ({ signal }) => exportStatisticsPDF(unitId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof exportStatisticsPDF>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ExportStatisticsPDFQueryResult = NonNullable<Awaited<ReturnType<typeof exportStatisticsPDF>>>
+export type ExportStatisticsPDFQueryError = Blob
+
+
+export function useExportStatisticsPDF<TData = Awaited<ReturnType<typeof exportStatisticsPDF>>, TError = Blob>(
+ unitId: string,
+    params: ExportStatisticsPDFParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportStatisticsPDF>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof exportStatisticsPDF>>,
+          TError,
+          Awaited<ReturnType<typeof exportStatisticsPDF>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useExportStatisticsPDF<TData = Awaited<ReturnType<typeof exportStatisticsPDF>>, TError = Blob>(
+ unitId: string,
+    params: ExportStatisticsPDFParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportStatisticsPDF>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof exportStatisticsPDF>>,
+          TError,
+          Awaited<ReturnType<typeof exportStatisticsPDF>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useExportStatisticsPDF<TData = Awaited<ReturnType<typeof exportStatisticsPDF>>, TError = Blob>(
+ unitId: string,
+    params: ExportStatisticsPDFParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportStatisticsPDF>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Export statistics as PDF report
+ */
+
+export function useExportStatisticsPDF<TData = Awaited<ReturnType<typeof exportStatisticsPDF>>, TError = Blob>(
+ unitId: string,
+    params: ExportStatisticsPDFParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportStatisticsPDF>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getExportStatisticsPDFQueryOptions(unitId,params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

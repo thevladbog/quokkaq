@@ -206,6 +206,7 @@ func run() error {
 	bookingHandler := handlers.NewBookingHandler(bookingService, userRepo)
 	shiftHandler := handlers.NewShiftHandler(shiftService, operationalService)
 	statisticsHandler := handlers.NewStatisticsHandler(statsService, userRepo, unitRepo)
+	statisticsExportHandler := handlers.NewStatisticsExportHandler(statsService, userRepo, unitRepo)
 	operationsHandler := handlers.NewOperationsHandler(operationalService, userRepo, auditLogRepo)
 	templateHandler := handlers.NewTemplateHandler(templateService, userRepo)
 	invitationHandler := handlers.NewInvitationHandler(invitationService, userRepo)
@@ -570,6 +571,7 @@ func run() error {
 			r.Get("/{unitId}/statistics/utilization", statisticsHandler.GetUtilization)
 			r.Get("/{unitId}/statistics/survey-scores", statisticsHandler.GetSurveyScores)
 			r.Get("/{unitId}/statistics/employee-radar", statisticsHandler.GetEmployeeRadar)
+			r.Get("/{unitId}/statistics/export/pdf", statisticsExportHandler.ExportPDF)
 		})
 
 		r.Group(func(r chi.Router) {

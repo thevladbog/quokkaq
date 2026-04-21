@@ -13231,6 +13231,82 @@ paths:
             summary: Employee radar chart metrics
             tags:
                 - statistics
+    /units/{unitId}/statistics/export/pdf:
+        get:
+            description: Generates a branded A4 PDF with all available statistics sections for the chosen date range. Same auth as individual statistics endpoints.
+            operationId: exportStatisticsPDF
+            parameters:
+                - description: Subdivision unit ID
+                  in: path
+                  name: unitId
+                  required: true
+                  schema:
+                    type: string
+                - description: Start date YYYY-MM-DD
+                  in: query
+                  name: dateFrom
+                  required: true
+                  schema:
+                    type: string
+                - description: End date YYYY-MM-DD
+                  in: query
+                  name: dateTo
+                  required: true
+                  schema:
+                    type: string
+                - description: Operator filter
+                  in: query
+                  name: userId
+                  schema:
+                    type: string
+                - description: Service zone filter
+                  in: query
+                  name: serviceZoneId
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    content:
+                        application/pdf:
+                            schema:
+                                format: binary
+                                type: string
+                    description: PDF report
+                "400":
+                    content:
+                        application/pdf:
+                            schema:
+                                type: string
+                    description: Bad Request
+                "401":
+                    content:
+                        application/pdf:
+                            schema:
+                                type: string
+                    description: Unauthorized
+                "403":
+                    content:
+                        application/pdf:
+                            schema:
+                                type: string
+                    description: Forbidden
+                "404":
+                    content:
+                        application/pdf:
+                            schema:
+                                type: string
+                    description: Unit not found
+                "500":
+                    content:
+                        application/pdf:
+                            schema:
+                                type: string
+                    description: Internal server error
+            security:
+                - BearerAuth: []
+            summary: Export statistics as PDF report
+            tags:
+                - statistics
     /units/{unitId}/statistics/load:
         get:
             description: Same daily bucket source as timeseries volume; wait/service semantics match timeseries when those metrics are derived from the same warehouse rows.
