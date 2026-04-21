@@ -25,10 +25,7 @@ func UserCanViewSurveyResponses(user *models.User, unitID string) bool {
 			return true
 		}
 	}
-	if UserHasCanonicalUnitPermission(user, unitID, rbac.PermAccessSurveyResponses) {
-		return true
-	}
-	return false
+	return UserHasCanonicalUnitPermission(user, unitID, rbac.PermAccessSurveyResponses)
 }
 
 // UserCanViewSurveyScoreAggregates is true when the user may read aggregated guest-survey score statistics

@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### API / auth behavior
 
 - `/support/*` routes use `RequireTenantPermission(PermSupportReports)` with `TenantPermissionAllowed` (platform/global admin, tenant `system_admin`, tenant-catalog permission, or matching `user_units` permission).
-- `GET /auth/me`-style user DTO: `roles` is deprecated and omitted (empty); clients should use `tenantRoles` and per-unit `permissions`.
+- `GET /auth/me`-style user DTO: legacy `roles` is still serialized for backward compatibility (global role names such as `platform_admin`); clients should prefer `tenantRoles` and per-unit `permissions` for authorization, while some clients may still derive flags (e.g. platform admin) from legacy role names until a dedicated schema field is adopted everywhere.
 - Removed unused middleware: `RequireSupportReportAccess`, `RequireAdminOrTenantPermission`, `EnsureTenantAccess`, `RequireCompanyOwner`; removed `HasSupportReportAccess` from the user repository.
 
 - Initial release with core queue management functionality

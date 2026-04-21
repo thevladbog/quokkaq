@@ -67,7 +67,12 @@ export class SocketClient {
       }
     }
     const wsUrl = baseWs + tokenQs;
-    logger.log('Connecting to WebSocket:', wsUrl);
+    // Never log wsUrl: query string may contain access_token (browser logs / copy-paste risk).
+    logger.log(
+      'Connecting to WebSocket:',
+      baseWs,
+      tokenQs ? '(access_token in query)' : '(no token query)'
+    );
 
     this.socket = new WebSocket(wsUrl);
 
