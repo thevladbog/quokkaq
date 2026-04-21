@@ -44,11 +44,17 @@ import {
   usePatchExternalIdentity,
   usePatchUserSSOFlags
 } from '@/lib/api/generated/auth';
+import {
+  permissionListMessageKey,
+  unitPermissionVariants,
+  userUnitPermissionMatches
+} from '@/lib/permission-variants';
 import { UNIT_PERMISSIONS } from '@/lib/unit-permissions';
 import { cn } from '@/lib/utils';
 import { getUnitDisplayName } from '@/lib/unit-display';
 import { toast } from 'sonner';
 import { isTenantSystemAdminSlug } from '@/lib/tenant-roles';
+import { isTenantAdminUser } from '@/lib/tenant-admin-access';
 
 interface SheetUserUnit {
   id: string;
@@ -73,7 +79,9 @@ function UserSettingsSheetBody({
   const locale = useLocale();
   const qc = useQueryClient();
   const { data: currentUser } = useCurrentUser();
-  const viewerIsGlobalAdmin = currentUser?.roles?.includes('admin');
+  const viewerIsGlobalAdmin = Boolean(
+    currentUser && isTenantAdminUser(currentUser)
+  );
   const ssoSettingsQ = useCompaniesMeSSOGet({
     query: { enabled: open && !!viewerIsGlobalAdmin }
   });
@@ -128,12 +136,9 @@ function UserSettingsSheetBody({
     [user.tenantRoles]
   );
 
-  const viewerCanAssignSystemTenantRole =
-    currentUser?.roles?.includes('platform_admin') ||
-    currentUser?.roles?.includes('admin') ||
-    (currentUser?.tenantRoles ?? []).some((r) =>
-      isTenantSystemAdminSlug(r.slug)
-    );
+  const viewerCanAssignSystemTenantRole = Boolean(
+    currentUser && isTenantAdminUser(currentUser)
+  );
 
   const targetHasSystemTenantAdmin = (user.tenantRoles ?? []).some((r) =>
     isTenantSystemAdminSlug(r.slug)
@@ -308,18 +313,16 @@ function UserSettingsSheetBody({
       });
   }, [availableUnits, selectedUnitIds, searchAvailable, locale]);
 
-  /** Global roles with org-wide access; unit/tenant-role matrices are not applied. */
-  const isFullAccessGlobalRole =
-    user?.roles?.includes('admin') ||
-    user?.roles?.includes('platform_admin') ||
-    targetHasSystemTenantAdmin;
+  /** Global admin, platform operator, or tenant system_admin: org-wide access; unit matrices not applied. */
+  const isFullAccessGlobalRole = isTenantAdminUser(user);
   /** Tenant roles drive user_units via sync; manual per-unit permissions would collide. */
   const hasTenantRoles = (user.tenantRoles?.length ?? 0) > 0;
   const unitManualAccessLocked = isFullAccessGlobalRole || hasTenantRoles;
 
   const getPermissionLabel = (permissionId: string) =>
-    (t as (key: string) => string)(`permissions_list.${permissionId}`) ||
-    permissionId;
+    (t as (key: string) => string)(
+      `permissions_list.${permissionListMessageKey(permissionId)}`
+    ) || permissionId;
 
   const handleSaveName = async () => {
     if (!editName.trim()) return;
@@ -360,8 +363,10 @@ function UserSettingsSheetBody({
     permissionId: string
   ) => {
     const current = uu.permissions ?? [];
-    const next = current.includes(permissionId)
-      ? current.filter((p) => p !== permissionId)
+    const variants = new Set(unitPermissionVariants(permissionId));
+    const has = current.some((p) => variants.has(p));
+    const next = has
+      ? current.filter((p) => !variants.has(p))
       : [...current, permissionId];
     await applyUnitPermissions(uu.unitId, next);
   };
@@ -389,11 +394,14 @@ function UserSettingsSheetBody({
   };
 
   const toggleAssignPerm = (permissionId: string) => {
-    setAssignPerms((prev) =>
-      prev.includes(permissionId)
-        ? prev.filter((p) => p !== permissionId)
-        : [...prev, permissionId]
-    );
+    const variants = new Set(unitPermissionVariants(permissionId));
+    setAssignPerms((prev) => {
+      const has = prev.some((p) => variants.has(p));
+      if (has) {
+        return prev.filter((p) => !variants.has(p));
+      }
+      return [...prev, permissionId];
+    });
   };
 
   return (
@@ -596,7 +604,8 @@ function UserSettingsSheetBody({
                               >
                                 <Checkbox
                                   id={`${uu.id}-${permission.id}`}
-                                  checked={rowPermissions.includes(
+                                  checked={userUnitPermissionMatches(
+                                    rowPermissions,
                                     permission.id
                                   )}
                                   onCheckedChange={() =>
@@ -695,7 +704,10 @@ function UserSettingsSheetBody({
                           >
                             <Checkbox
                               id={`new-${unit.id}-${permission.id}`}
-                              checked={assignPerms.includes(permission.id)}
+                              checked={userUnitPermissionMatches(
+                                assignPerms,
+                                permission.id
+                              )}
                               onCheckedChange={() =>
                                 toggleAssignPerm(permission.id)
                               }

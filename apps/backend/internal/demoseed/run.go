@@ -9,6 +9,7 @@ import (
 
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/pkg/tenantslug"
+	"quokkaq-go-backend/internal/rbac"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/tenantroleseed"
 	"quokkaq-go-backend/internal/ticketaudit"
@@ -150,7 +151,15 @@ func Run(db *gorm.DB, cfg Config) error {
 		if err := tx.Create(&models.UserUnit{UserID: adminUser.ID, UnitID: unit.ID}).Error; err != nil {
 			return err
 		}
-		if err := tx.Create(&models.UserUnit{UserID: opUser.ID, UnitID: unit.ID}).Error; err != nil {
+		opUnitPerms := append(
+			append([]string{}, rbac.DefaultInvitationUnitPermissions()...),
+			rbac.PermSupportReports,
+		)
+		if err := tx.Create(&models.UserUnit{
+			UserID:      opUser.ID,
+			UnitID:      unit.ID,
+			Permissions: opUnitPerms,
+		}).Error; err != nil {
 			return err
 		}
 

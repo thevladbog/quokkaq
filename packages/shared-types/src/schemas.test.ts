@@ -125,6 +125,8 @@ describe('UserModelSchema', () => {
       expect(r.data.roles).toEqual([]);
       expect(r.data.tenantRoles).toEqual([]);
       expect(r.data.isActive).toBe(true);
+      expect(r.data.isPlatformAdmin).toBe(false);
+      expect(r.data.isTenantAdmin).toBe(false);
     }
   });
 
@@ -137,6 +139,32 @@ describe('UserModelSchema', () => {
     expect(r.success).toBe(true);
     if (r.success) {
       expect(r.data.tenantRoles).toEqual([]);
+    }
+  });
+
+  it('sets isPlatformAdmin when roles include platform_admin', () => {
+    const r = UserModelSchema.safeParse({
+      id: 'u1',
+      name: 'Op',
+      roles: ['platform_admin']
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.isPlatformAdmin).toBe(true);
+      expect(r.data.isTenantAdmin).toBe(false);
+    }
+  });
+
+  it('sets isTenantAdmin when tenantRoles include system_admin', () => {
+    const r = UserModelSchema.safeParse({
+      id: 'u1',
+      name: 'Sys',
+      tenantRoles: [{ id: 'tr1', name: 'System', slug: 'system_admin' }]
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.isTenantAdmin).toBe(true);
+      expect(r.data.isPlatformAdmin).toBe(false);
     }
   });
 });

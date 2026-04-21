@@ -23,6 +23,12 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { useUnits } from '@/lib/hooks';
+import {
+  PermAccessStaffPanel,
+  permissionListMessageKey,
+  unitPermissionVariants,
+  userUnitPermissionMatches
+} from '@/lib/permission-variants';
 import { UNIT_PERMISSIONS } from '@/lib/unit-permissions';
 import { getUnitDisplayName } from '@/lib/unit-display';
 
@@ -174,7 +180,7 @@ export default function InviteDialog({
         // Add unit with default permissions
         setUnitPermissions((prevPerms) => ({
           ...prevPerms,
-          [unitId]: ['ACCESS_STAFF_PANEL']
+          [unitId]: [PermAccessStaffPanel]
         }));
         return [...prev, unitId];
       }
@@ -184,8 +190,10 @@ export default function InviteDialog({
   const toggleUnitPermission = (unitId: string, permission: string) => {
     setUnitPermissions((prev) => {
       const current = prev[unitId] || [];
-      const updated = current.includes(permission)
-        ? current.filter((p) => p !== permission)
+      const variants = new Set(unitPermissionVariants(permission));
+      const has = current.some((p) => variants.has(p));
+      const updated = has
+        ? current.filter((p) => !variants.has(p))
         : [...current, permission];
       return { ...prev, [unitId]: updated };
     });
@@ -271,9 +279,10 @@ export default function InviteDialog({
                           >
                             <Checkbox
                               id={`unit-${unit.id}-${perm.id}`}
-                              checked={(
-                                unitPermissions[unit.id] || []
-                              ).includes(perm.id)}
+                              checked={userUnitPermissionMatches(
+                                unitPermissions[unit.id] || [],
+                                perm.id
+                              )}
                               onCheckedChange={() =>
                                 toggleUnitPermission(unit.id, perm.id)
                               }
@@ -282,7 +291,7 @@ export default function InviteDialog({
                               htmlFor={`unit-${unit.id}-${perm.id}`}
                               className='cursor-pointer text-sm font-normal'
                             >
-                              {tPermissions(perm.id)}
+                              {tPermissions(permissionListMessageKey(perm.id))}
                             </Label>
                           </div>
                         ))}

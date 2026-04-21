@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	"quokkaq-go-backend/internal/models"
@@ -50,11 +51,10 @@ type UserRepository interface {
 	Count() (int64, error)
 	EnsureRoleExists(name string) (*models.Role, error)
 	EnsureRoleExistsTx(tx *gorm.DB, name string) (*models.Role, error)
+	// IsAdmin is true when the user has the legacy global role name "admin". Deprecated for new product logic in favor of tenant RBAC (system_admin, catalog permissions); still used by middleware and several handlers.
 	IsAdmin(userID string) (bool, error)
 	// ListUserIDsByRoleNames returns distinct user ids that have at least one of the given role names.
 	ListUserIDsByRoleNames(roleNames []string) ([]string, error)
-	// HasSupportReportAccess is true for roles that may use /support/reports (admin, staff, supervisor, operator).
-	HasSupportReportAccess(userID string) (bool, error)
 	IsPlatformAdmin(userID string) (bool, error)
 	IsAdminOrHasUnitAccess(userID, unitID string) (bool, error)
 	HasCompanyAccess(userID, companyID string) (bool, error)
@@ -69,7 +69,8 @@ type UserRepository interface {
 	ListAccessibleCompanies(userID string, q string) ([]AccessibleCompanySummary, error)
 	// GetFirstUserUnit returns the first user_units row joined to units for the user (same shape as legacy usage handler query).
 	GetFirstUserUnit(userID string) (UserUnitResult, error)
-	// ListSupportReportShareCandidates lists users in the same company with support roles (admin, staff, supervisor, operator), matching name/email.
+	// ListSupportReportShareCandidates lists users in the same company who may receive support report shares
+	// (legacy global roles, tenant system_admin, support.reports on unit or tenant-role catalog), matching name/email.
 	// reportID and authorUserID exclude users who already have access as author or an existing share row.
 	ListSupportReportShareCandidates(companyID, reportID, authorUserID, q string, limit int) ([]SupportReportShareCandidate, error)
 	// ResolveJournalActorDisplayNames returns a display label per user id (non-empty trimmed name, else email). Omitted ids are not in the map.
@@ -94,6 +95,13 @@ type UserRepository interface {
 	ListCompanyIDsForSupportReportTenantWideAccess(userID string) ([]string, error)
 	// ListUserIDsWithTenantSystemAdminInCompany returns user ids with the system_admin tenant role in the company.
 	ListUserIDsWithTenantSystemAdminInCompany(companyID string) ([]string, error)
+
+	// UserMatchesUnitPermission is true if user_units.permissions for the unit contains the permission (or legacy alias).
+	UserMatchesUnitPermission(userID, unitID, canonicalPerm string) (bool, error)
+	// UserMatchesAnyUnitPermission is true if any of the canonical permissions match user_units for the unit.
+	UserMatchesAnyUnitPermission(userID, unitID string, canonicalPerms []string) (bool, error)
+	// UserHasUnitPermissionInCompany is true if any user_units row for the company grants the canonical permission (or legacy alias).
+	UserHasUnitPermissionInCompany(userID, companyID, canonicalPerm string) (bool, error)
 }
 
 type userRepository struct {
@@ -407,23 +415,6 @@ func (r *userRepository) ListUserIDsByRoleNames(roleNames []string) ([]string, e
 	return ids, err
 }
 
-func (r *userRepository) HasSupportReportAccess(userID string) (bool, error) {
-	user, err := r.FindByID(context.Background(), userID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return false, nil
-		}
-		return false, err
-	}
-	for _, ur := range user.Roles {
-		switch ur.Role.Name {
-		case "admin", "staff", "supervisor", "operator":
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
 func (r *userRepository) IsPlatformAdmin(userID string) (bool, error) {
 	user, err := r.FindByID(context.Background(), userID)
 	if err != nil {
@@ -672,19 +663,42 @@ func (r *userRepository) ListSupportReportShareCandidates(companyID, reportID, a
 		limit = 50
 	}
 	term := "%" + escapeSQLLikePattern(q) + "%"
-	var out []SupportReportShareCandidate
-	err := r.db.Raw(`
+	variants := rbac.CanonicalPermissionVariants(rbac.PermSupportReports)
+	if len(variants) == 0 {
+		variants = []string{rbac.PermSupportReports}
+	}
+	arrLit := postgresTextArrayLiteral(variants)
+	sql := fmt.Sprintf(`
 SELECT u.id AS user_id,
        COALESCE(NULLIF(TRIM(u.name), ''), '') AS name,
        COALESCE(TRIM(u.email), '') AS email
 FROM users u
 INNER JOIN user_units uu ON uu.user_id = u.id
 INNER JOIN units un ON un.id = uu.unit_id AND un.company_id = ?
-WHERE EXISTS (
-  SELECT 1 FROM user_roles ur
-  INNER JOIN roles ro ON ro.id = ur.role_id
-  WHERE ur.user_id = u.id
-    AND ro.name IN ('admin','staff','supervisor','operator')
+WHERE (
+  EXISTS (
+    SELECT 1 FROM user_roles ur
+    INNER JOIN roles ro ON ro.id = ur.role_id
+    WHERE ur.user_id = u.id
+      AND ro.name IN ('admin','platform_admin','staff','supervisor','operator')
+  )
+  OR EXISTS (
+    SELECT 1 FROM user_tenant_roles utr
+    INNER JOIN tenant_roles tr ON tr.id = utr.tenant_role_id AND tr.company_id = utr.company_id
+    WHERE utr.user_id = u.id AND utr.company_id = ? AND tr.slug = ?
+  )
+  OR EXISTS (
+    SELECT 1 FROM user_units uu2
+    INNER JOIN units un2 ON un2.id = uu2.unit_id AND un2.company_id = ?
+    WHERE uu2.user_id = u.id AND uu2.permissions && %s
+  )
+  OR EXISTS (
+    SELECT 1 FROM user_tenant_roles utr
+    INNER JOIN tenant_role_units tru ON tru.tenant_role_id = utr.tenant_role_id
+    INNER JOIN units un3 ON un3.id = tru.unit_id AND un3.company_id = utr.company_id
+    WHERE utr.user_id = u.id AND utr.company_id = ?
+      AND COALESCE(tru.permissions, '{}'::text[]) && %s
+  )
 )
 AND u.id <> ?
 AND NOT EXISTS (
@@ -695,8 +709,33 @@ AND (u.name ILIKE ? ESCAPE '\' OR u.email ILIKE ? ESCAPE '\')
 GROUP BY u.id, u.name, u.email
 ORDER BY name ASC NULLS LAST, u.id ASC
 LIMIT ?
-`, companyID, authorUserID, reportID, term, term, limit).Scan(&out).Error
+`, arrLit, arrLit)
+	var out []SupportReportShareCandidate
+	err := r.db.Raw(sql,
+		companyID,
+		companyID, rbac.TenantRoleSlugSystemAdmin,
+		companyID,
+		companyID,
+		authorUserID, reportID, term, term, limit,
+	).Scan(&out).Error
 	return out, err
+}
+
+// postgresTextArrayLiteral builds a SQL ARRAY[...]::text[] literal for use in Raw queries.
+// Callers must pass only controlled catalog strings (e.g. rbac permission keys), never raw user input.
+func postgresTextArrayLiteral(values []string) string {
+	var b strings.Builder
+	b.WriteString("ARRAY[")
+	for i, v := range values {
+		if i > 0 {
+			b.WriteByte(',')
+		}
+		b.WriteByte('\'')
+		b.WriteString(strings.ReplaceAll(v, "'", "''"))
+		b.WriteByte('\'')
+	}
+	b.WriteString("]::text[]")
+	return b.String()
 }
 
 func userHasEffectiveAccessDB(db *gorm.DB, userID string) (bool, error) {

@@ -1,9 +1,12 @@
 package ws
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"quokkaq-go-backend/internal/logger"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -16,18 +19,51 @@ const (
 	maxMessageSize = 512
 )
 
+var (
+	wsAllowedOriginsMu sync.RWMutex
+	wsAllowedOrigins   []string
+)
+
+// SetWebSocketAllowedOrigins sets allowed Origin header values for browser WebSocket upgrades.
+// Call from main with the same list as HTTP CORS (e.g. CORS_ALLOWED_ORIGINS).
+func SetWebSocketAllowedOrigins(origins []string) {
+	wsAllowedOriginsMu.Lock()
+	defer wsAllowedOriginsMu.Unlock()
+	wsAllowedOrigins = append([]string(nil), origins...)
+}
+
+func checkWebSocketOrigin(r *http.Request) bool {
+	origin := strings.TrimSpace(r.Header.Get("Origin"))
+	if origin == "" {
+		// Non-browser clients may omit Origin.
+		return true
+	}
+	wsAllowedOriginsMu.RLock()
+	list := wsAllowedOrigins
+	wsAllowedOriginsMu.RUnlock()
+	for _, o := range list {
+		if o == origin {
+			return true
+		}
+	}
+	return false
+}
+
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
-	CheckOrigin: func(r *http.Request) bool {
-		return true // Allow all origins for now
-	},
+	CheckOrigin:     checkWebSocketOrigin,
 }
 
+// SubscribeAuthorizer returns whether the client may join the unit room (JWT context is on the client).
+type SubscribeAuthorizer func(ctx context.Context, unitID string) bool
+
 type Client struct {
-	hub  *Hub
-	conn *websocket.Conn
-	send chan []byte
+	hub          *Hub
+	conn         *websocket.Conn
+	send         chan []byte
+	reqCtx       context.Context
+	canSubscribe SubscribeAuthorizer
 }
 
 func (c *Client) readPump() {
@@ -50,12 +86,15 @@ func (c *Client) readPump() {
 			break
 		}
 
-		// Handle subscription
+		// Handle subscription (requires access to unit room)
 		var msg map[string]string
 		if err := json.Unmarshal(message, &msg); err == nil {
 			if action, ok := msg["action"]; ok && action == "subscribe" {
 				if unitID, ok := msg["unitId"]; ok {
-					c.hub.subscribe <- Subscription{Client: c, RoomID: unitID}
+					unitID = strings.TrimSpace(unitID)
+					if unitID != "" && c.canSubscribe != nil && c.canSubscribe(c.reqCtx, unitID) {
+						c.hub.subscribe <- Subscription{Client: c, RoomID: unitID}
+					}
 				}
 			}
 		}
@@ -97,15 +136,27 @@ func (c *Client) writePump() {
 	}
 }
 
-func ServeWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
+// ServeWsAuthenticated upgrades after JWT validation; canSubscribe enforces unit room membership.
+func ServeWsAuthenticated(hub *Hub, canSubscribe SubscribeAuthorizer, w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		logger.Println(err)
 		return
 	}
-	client := &Client{hub: hub, conn: conn, send: make(chan []byte, 256)}
+	client := &Client{
+		hub:          hub,
+		conn:         conn,
+		send:         make(chan []byte, 256),
+		reqCtx:       r.Context(),
+		canSubscribe: canSubscribe,
+	}
 	client.hub.register <- client
 
 	go client.writePump()
 	go client.readPump()
+}
+
+// ServeWs upgrades without auth (tests only).
+func ServeWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
+	ServeWsAuthenticated(hub, nil, w, r)
 }

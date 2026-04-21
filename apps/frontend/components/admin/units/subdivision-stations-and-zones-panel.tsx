@@ -36,6 +36,7 @@ import { Badge } from '@/components/ui/badge';
 import { useCreateUnit, useUnits } from '@/lib/hooks';
 import { Link, useRouter } from '@/src/i18n/navigation';
 import PermissionGuard from '@/components/auth/permission-guard';
+import { PermUnitSettingsManage } from '@/lib/permission-variants';
 import { formatApiToastErrorMessage } from '@/lib/format-api-toast-error';
 import { UnitCountersSection } from '@/components/admin/units/counters-list';
 import {
@@ -274,7 +275,12 @@ export function SubdivisionStationsAndZonesPanel({
               {t('stations_and_zones_panel_description')}
             </CardDescription>
           </div>
-          <PermissionGuard permissions={['UNIT_CREATE']}>
+          <PermissionGuard
+            tenantAdminBypass
+            permissions={[PermUnitSettingsManage]}
+            unitId={subdivisionId}
+            fallback={null}
+          >
             <div className='flex shrink-0 flex-wrap gap-2'>
               <Button
                 size='sm'

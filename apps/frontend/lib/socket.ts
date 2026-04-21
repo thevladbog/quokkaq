@@ -54,8 +54,25 @@ export class SocketClient {
       return;
     }
 
-    const wsUrl = WS_BASE_URL.replace(/^http/, 'ws') + '/ws';
-    logger.log('Connecting to WebSocket:', wsUrl);
+    const baseWs = WS_BASE_URL.replace(/^http/, 'ws') + '/ws';
+    let tokenQs = '';
+    if (typeof window !== 'undefined') {
+      try {
+        const t = window.localStorage.getItem('access_token');
+        if (t) {
+          tokenQs = `?access_token=${encodeURIComponent(t)}`;
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    const wsUrl = baseWs + tokenQs;
+    // Never log wsUrl: query string may contain access_token (browser logs / copy-paste risk).
+    logger.log(
+      'Connecting to WebSocket:',
+      baseWs,
+      tokenQs ? '(access_token in query)' : '(no token query)'
+    );
 
     this.socket = new WebSocket(wsUrl);
 

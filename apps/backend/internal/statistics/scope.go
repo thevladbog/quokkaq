@@ -4,12 +4,22 @@ import (
 	"strings"
 
 	"quokkaq-go-backend/internal/models"
+	"quokkaq-go-backend/internal/rbac"
+	"quokkaq-go-backend/internal/repository"
 )
 
+// PermStatisticsSubdivision and PermStatisticsZone are legacy SCREAMING_CASE strings used in tests
+// and historical user_units rows; rbac.CanonicalPermissionVariants maps them to dot-notation catalog keys.
 const (
 	PermStatisticsSubdivision = "ACCESS_STATISTICS_SUBDIVISION"
 	PermStatisticsZone        = "ACCESS_STATISTICS_ZONE"
 )
+
+// Tenant system_admin coverage (statistics scope):
+// ResolveScope does not inspect the system_admin tenant-role slug. Users with that role receive
+// statistics.read and access.statistics.* on all units through merged user_units (tenant RBAC).
+// Expanded team scope is therefore reached via UserHasCanonicalUnitPermission on those catalog keys,
+// or via legacy global roles (admin, platform_admin, supervisor) in user.Roles.
 
 // Scope describes what a viewer may read for statistics APIs.
 type Scope struct {
@@ -24,8 +34,9 @@ type Scope struct {
 }
 
 // ResolveScope computes statistics access for subdivisionID (branch), mirroring shift journal role bypass.
-// When branchUnitIDs is non-nil, ACCESS_STATISTICS_ZONE grants on user_units rows are kept only if uu.UnitID is in that set
+// When branchUnitIDs is non-nil, zone-scoped grants on user_units rows are kept only if uu.UnitID is in that set
 // (subdivision root and descendants), so zone-only access from other branches does not expand the requested branch.
+// Tenant system_admin users typically have statistics.read / access.statistics.* on all units via merged user_units.
 func ResolveScope(user *models.User, subdivisionID string, viewerUserID string, branchUnitIDs map[string]struct{}) Scope {
 	viewer := strings.TrimSpace(viewerUserID)
 	if user == nil || subdivisionID == "" {
@@ -46,22 +57,13 @@ func ResolveScope(user *models.User, subdivisionID string, viewerUserID string, 
 		}
 	}
 
-	hasSubdiv := false
+	hasSubdiv := repository.UserHasCanonicalUnitPermission(user, subdivisionID, rbac.PermStatisticsRead) ||
+		repository.UserHasCanonicalUnitPermission(user, subdivisionID, rbac.PermAccessStatsSubdivision)
+
 	zones := make(map[string]struct{})
 	for _, uu := range user.Units {
-		if uu.UnitID != subdivisionID {
-			continue
-		}
 		for _, p := range uu.Permissions {
-			switch strings.TrimSpace(p) {
-			case PermStatisticsSubdivision:
-				hasSubdiv = true
-			}
-		}
-	}
-	for _, uu := range user.Units {
-		for _, p := range uu.Permissions {
-			if strings.TrimSpace(p) != PermStatisticsZone {
+			if !repository.UserUnitPermissionsMatchCanonical([]string{p}, rbac.PermAccessStatsZone) {
 				continue
 			}
 			if uu.UnitID == subdivisionID {

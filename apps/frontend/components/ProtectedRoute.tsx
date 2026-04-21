@@ -2,22 +2,68 @@
 
 import { Spinner } from '@/components/ui/spinner';
 import { useAuthContext } from '@/contexts/AuthContext';
+import type { User } from '@/lib/api';
+import { flatPermissionsInclude } from '@/lib/permission-variants';
+import { isTenantAdminUser } from '@/lib/tenant-admin-access';
 import { useRouter } from '@/src/i18n/navigation';
 import { ReactNode, useEffect } from 'react';
 import { useLocale } from 'next-intl';
 
 interface ProtectedRouteProps {
   children: ReactNode;
-  allowedRoles?: string[]; // Optional: array of allowed roles
-  requiredPermission?: string; // Optional: permission required in at least one unit
-  fallbackComponent?: ReactNode; // Optional: component to show if access denied
-  loadingComponent?: ReactNode; // Optional: component to show while loading
+  /** Only SaaS `platform_admin` may access (e.g. /platform). */
+  requirePlatformOperator?: boolean;
+  /** Tenant admin: global admin, platform_admin, or tenant role `system_admin`. */
+  requireTenantAdmin?: boolean;
+  /** Single permission (canonical or legacy) in at least one unit, unless tenant admin. */
+  requiredPermission?: string;
+  /** Any of these permissions in any unit grants access, unless tenant admin. */
+  requiredAnyPermission?: string[];
+  fallbackComponent?: ReactNode;
+  loadingComponent?: ReactNode;
+}
+
+function permissionsFlat(user: User | null): string[] {
+  if (!user?.permissions) return [];
+  return (Object.values(user.permissions) as string[][]).flat();
+}
+
+function userHasAccess(
+  user: User,
+  opts: {
+    requirePlatformOperator?: boolean;
+    requireTenantAdmin?: boolean;
+    requiredPermission?: string;
+    requiredAnyPermission?: string[];
+  }
+): boolean {
+  if (opts.requirePlatformOperator) {
+    return user.isPlatformAdmin === true;
+  }
+  if (opts.requireTenantAdmin) {
+    return isTenantAdminUser(user);
+  }
+  if (isTenantAdminUser(user)) {
+    return true;
+  }
+  const flat = permissionsFlat(user);
+  if (opts.requiredAnyPermission && opts.requiredAnyPermission.length > 0) {
+    return opts.requiredAnyPermission.some((p) =>
+      flatPermissionsInclude(flat, p)
+    );
+  }
+  if (opts.requiredPermission) {
+    return flatPermissionsInclude(flat, opts.requiredPermission);
+  }
+  return true;
 }
 
 export default function ProtectedRoute({
   children,
-  allowedRoles,
+  requirePlatformOperator,
+  requireTenantAdmin,
   requiredPermission,
+  requiredAnyPermission,
   fallbackComponent,
   loadingComponent
 }: ProtectedRouteProps) {
@@ -31,43 +77,13 @@ export default function ProtectedRoute({
     }
   }, [isAuthenticated, isLoading, router, locale, token]);
 
-  // Check access if user is loaded
   if (user) {
-    let hasAccess = true;
-
-    // Check roles if specified
-    if (allowedRoles && allowedRoles.length > 0) {
-      const hasRole = allowedRoles.some((role) => user.roles?.includes(role));
-
-      // If user doesn't have role, check for permission if specified
-      if (!hasRole) {
-        if (requiredPermission && user.permissions) {
-          // Check if user has the permission in ANY unit
-          const hasPermission = (
-            Object.values(user.permissions) as string[][]
-          ).some((perms: string[]) => perms.includes(requiredPermission));
-          if (!hasPermission) {
-            hasAccess = false;
-          }
-        } else {
-          // No permission specified or no permissions object, so role check failure is final
-          hasAccess = false;
-        }
-      }
-    } else if (requiredPermission) {
-      // Only permission specified
-      if (user.permissions) {
-        const hasPermission = (
-          Object.values(user.permissions) as string[][]
-        ).some((perms: string[]) => perms.includes(requiredPermission));
-        if (!hasPermission) {
-          hasAccess = false;
-        }
-      } else {
-        hasAccess = false;
-      }
-    }
-
+    const hasAccess = userHasAccess(user, {
+      requirePlatformOperator,
+      requireTenantAdmin,
+      requiredPermission,
+      requiredAnyPermission
+    });
     if (!hasAccess) {
       return fallbackComponent || <div>Access Denied</div>;
     }
@@ -75,7 +91,6 @@ export default function ProtectedRoute({
 
   const sessionResolving = Boolean(token && !user);
 
-  // Show loading while auth is resolving (including token present but /auth/me not yet applied)
   if (isLoading || sessionResolving) {
     return (
       loadingComponent || (

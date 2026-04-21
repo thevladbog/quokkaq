@@ -18,6 +18,16 @@ import { useRouter } from '../../src/i18n/navigation';
 import { useEffect, useState } from 'react';
 import { getWordmarkSrc } from '@/lib/wordmark-src';
 import { cn } from '@/lib/utils';
+import {
+  PermAccessKiosk,
+  PermAccessStaffPanel,
+  PermAccessSupervisorPanel,
+  PermAccessTicketScreen,
+  PermCounterOperate,
+  PermTicketsWrite,
+  userHasCanonicalUnitPermissionInAnyUnit
+} from '@/lib/permission-variants';
+import { isTenantAdminUser } from '@/lib/tenant-admin-access';
 
 export default function Home() {
   const locale = useLocale();
@@ -27,7 +37,6 @@ export default function Home() {
   const router = useRouter();
   const [systemChecked, setSystemChecked] = useState(false);
 
-  // Check system initialization status first
   useEffect(() => {
     const checkSystemStatus = async () => {
       try {
@@ -35,7 +44,6 @@ export default function Home() {
         if (res.ok) {
           const data = await res.json();
           if (!data.initialized) {
-            // System not initialized, redirect handled by SystemStatusGuard
             return;
           }
         }
@@ -49,25 +57,28 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    // Do not send to login while a token exists but /auth/me is still resolving (avoids flash after sign-in).
     if (systemChecked && !isLoading && !isAuthenticated && token == null) {
       router.push('/login');
     }
   }, [isLoading, isAuthenticated, router, systemChecked, token]);
 
-  // Operators without admin/staff/supervisor: land on staff panel.
+  // Counter/ticket operators without staff or supervisor UI: land on staff panel (legacy "operator" role).
   useEffect(() => {
     if (!systemChecked || isLoading || !user) return;
-    const roles = user.roles ?? [];
-    if (!roles.includes('operator')) return;
+    if (isTenantAdminUser(user)) return;
+    if (userHasCanonicalUnitPermissionInAnyUnit(user, PermAccessStaffPanel)) {
+      return;
+    }
     if (
-      roles.includes('admin') ||
-      roles.includes('platform_admin') ||
-      roles.includes('staff') ||
-      roles.includes('supervisor')
+      userHasCanonicalUnitPermissionInAnyUnit(user, PermAccessSupervisorPanel)
     ) {
       return;
     }
+    const hasOperatorLike =
+      userHasCanonicalUnitPermissionInAnyUnit(user, PermCounterOperate) ||
+      userHasCanonicalUnitPermissionInAnyUnit(user, PermTicketsWrite) ||
+      userHasCanonicalUnitPermissionInAnyUnit(user, PermAccessTicketScreen);
+    if (!hasOperatorLike) return;
     router.replace('/staff');
   }, [systemChecked, isLoading, user, router]);
 
@@ -82,19 +93,13 @@ export default function Home() {
   }
 
   if (!isAuthenticated) {
-    return null; // Redirecting to login (guest with no token)
+    return null;
   }
 
-  // Helper to check if user has specific permission in ANY unit
-  const hasPermissionInAnyUnit = (permission: string) => {
-    if (!user?.permissions) return false;
-    return (Object.values(user.permissions) as string[][]).some(
-      (perms: string[]) => perms.includes(permission)
-    );
-  };
+  const hasPermissionInAnyUnit = (permission: string) =>
+    userHasCanonicalUnitPermissionInAnyUnit(user, permission);
 
-  const hasRole = (role: string) => user?.roles?.includes(role);
-  const isAdmin = hasRole('admin');
+  const tenantAdmin = isTenantAdminUser(user);
 
   const menuItems = [
     {
@@ -106,7 +111,7 @@ export default function Home() {
       icon: LayoutDashboard,
       color: 'bg-blue-500',
       hoverColor: 'hover:bg-blue-600',
-      disabled: !isAdmin
+      disabled: !tenantAdmin
     },
     {
       href: '/staff',
@@ -117,10 +122,7 @@ export default function Home() {
       icon: Users,
       color: 'bg-green-500',
       hoverColor: 'hover:bg-green-600',
-      disabled:
-        !isAdmin &&
-        !hasRole('staff') &&
-        !hasPermissionInAnyUnit('ACCESS_STAFF_PANEL')
+      disabled: !tenantAdmin && !hasPermissionInAnyUnit(PermAccessStaffPanel)
     },
     {
       href: '/supervisor',
@@ -132,9 +134,7 @@ export default function Home() {
       color: 'bg-indigo-500',
       hoverColor: 'hover:bg-indigo-600',
       disabled:
-        !isAdmin &&
-        !hasRole('supervisor') &&
-        !hasPermissionInAnyUnit('ACCESS_SUPERVISOR_PANEL')
+        !tenantAdmin && !hasPermissionInAnyUnit(PermAccessSupervisorPanel)
     },
     {
       href: '/kiosk',
@@ -145,7 +145,7 @@ export default function Home() {
       icon: Monitor,
       color: 'bg-orange-500',
       hoverColor: 'hover:bg-orange-600',
-      disabled: !isAdmin && !hasPermissionInAnyUnit('ACCESS_KIOSK')
+      disabled: !tenantAdmin && !hasPermissionInAnyUnit(PermAccessKiosk)
     },
     {
       href: '/screen',
@@ -156,7 +156,7 @@ export default function Home() {
       icon: MonitorSpeaker,
       color: 'bg-purple-500',
       hoverColor: 'hover:bg-purple-600',
-      disabled: !isAdmin && !hasPermissionInAnyUnit('ACCESS_TICKET_SCREEN')
+      disabled: !tenantAdmin && !hasPermissionInAnyUnit(PermAccessTicketScreen)
     },
     {
       href: '/counter-display',
@@ -167,7 +167,7 @@ export default function Home() {
       icon: Tablet,
       color: 'bg-teal-500',
       hoverColor: 'hover:bg-teal-600',
-      disabled: !isAdmin && !hasPermissionInAnyUnit('ACCESS_KIOSK')
+      disabled: !tenantAdmin && !hasPermissionInAnyUnit(PermAccessKiosk)
     }
   ];
 

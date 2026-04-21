@@ -37,6 +37,7 @@ import { unitsApi } from '@/lib/api';
 import { useCreateUnit } from '@/lib/hooks';
 import { useRouter } from '@/src/i18n/navigation';
 import PermissionGuard from '@/components/auth/permission-guard';
+import { PermUnitSettingsManage } from '@/lib/permission-variants';
 import { formatApiToastErrorMessage } from '@/lib/format-api-toast-error';
 import {
   childSubdivisionsQueryKey,
@@ -148,11 +149,13 @@ export function ServiceZoneWorkplacesPanel({
               {t('zone_children_description')}
             </CardDescription>
           </div>
-          <div className='flex shrink-0 flex-wrap gap-2'>
-            <PermissionGuard
-              permissions={['UNIT_CREATE']}
-              unitId={parentUnitId}
-            >
+          <PermissionGuard
+            tenantAdminBypass
+            permissions={[PermUnitSettingsManage]}
+            unitId={parentUnitId}
+            fallback={null}
+          >
+            <div className='flex shrink-0 flex-wrap gap-2'>
               <Button
                 size='sm'
                 variant='secondary'
@@ -169,8 +172,8 @@ export function ServiceZoneWorkplacesPanel({
                 <Plus className='mr-2 h-4 w-4' />
                 {t('add_child_service_zone')}
               </Button>
-            </PermissionGuard>
-          </div>
+            </div>
+          </PermissionGuard>
         </CardHeader>
         <CardContent>
           {isLoading ? (

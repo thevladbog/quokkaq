@@ -225,7 +225,7 @@ func run() error {
 	supportReportShareRepo := repository.NewSupportReportShareRepository()
 	planeClient := services.NewPlaneClientFromEnv()
 	supportReportCreatePlatform := services.ParseSupportReportCreatePlatform()
-	supportReportService := services.NewSupportReportService(supportReportRepo, supportReportShareRepo, planeClient, trackerClient, deploymentSaaSSettingsRepo, supportReportCreatePlatform, userRepo, companyRepo)
+	supportReportService := services.NewSupportReportService(supportReportRepo, supportReportShareRepo, planeClient, trackerClient, deploymentSaaSSettingsRepo, supportReportCreatePlatform, userRepo, tenantRBACRepo, companyRepo)
 	supportReportHandler := handlers.NewSupportReportHandler(supportReportService)
 
 	var paymentProvider services.PaymentProvider
@@ -301,6 +301,8 @@ func run() error {
 			"https://app.quokkaq.v-b.tech",
 		}
 	}
+	ws.SetWebSocketAllowedOrigins(allowedOrigins)
+
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   allowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
@@ -334,9 +336,7 @@ func run() error {
 		r.Post("/leads/request", leadHandler.PostPublicLeadRequest)
 	})
 
-	r.Get("/ws", func(w http.ResponseWriter, r *http.Request) {
-		ws.ServeWs(hub, w, r)
-	})
+	r.Get("/ws", authmiddleware.WebSocketHandler(hub, userRepo))
 
 	r.Get("/swagger/*", func(w http.ResponseWriter, r *http.Request) {
 		content, err := os.ReadFile("./docs/swagger.json")
@@ -388,7 +388,7 @@ func run() error {
 		r.With(authmiddleware.TerminalBootstrapRateLimit).Post("/terminal/bootstrap", desktopTerminalHandler.Bootstrap)
 
 		r.Group(func(r chi.Router) {
-			r.Use(authmiddleware.JWTAuth)
+			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
 			r.Get("/me", authHandler.GetMe)
 			r.Patch("/me", authHandler.PatchMe)
 			r.Get("/accessible-companies", authHandler.ListAccessibleCompanies)
@@ -405,8 +405,8 @@ func run() error {
 	})
 
 	r.Route("/users", func(r chi.Router) {
-		r.Use(authmiddleware.JWTAuth)
-		r.Use(authmiddleware.RequireAdmin(userRepo))
+		r.Use(authmiddleware.JWTAuthAndActive(userRepo))
+		r.Use(authmiddleware.RequireTenantPermission(userRepo, tenantRBACRepo, rbac.PermUsersManage))
 		r.Post("/", userHandler.CreateUser)
 		r.Get("/", userHandler.GetAllUsers)
 		r.Get("/{id}", userHandler.GetUserByID)
@@ -419,58 +419,82 @@ func run() error {
 
 	r.Route("/units", func(r chi.Router) {
 		r.Group(func(r chi.Router) {
-			r.Use(authmiddleware.JWTAuth)
+			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
 			r.Get("/", unitHandler.GetAllUnits)
 			r.Get("/{id}", unitHandler.GetUnitByID)
 		})
-		r.Post("/{unitId}/tickets", ticketHandler.CreateTicket)
-		r.Get("/{unitId}/tickets", ticketHandler.GetTicketsByUnit)
-		r.Get("/{unitId}/services", serviceHandler.GetServicesByUnit)
-		r.Get("/{unitId}/services-tree", serviceHandler.GetServicesByUnit)
-		r.Get("/{unitId}/counters", counterHandler.GetCountersByUnit)
-		r.Get("/{unitId}/materials", unitHandler.GetMaterials)
-		r.Get("/{unitId}/pre-registrations/slots", preRegHandler.GetAvailableSlots)
-		r.Post("/{unitId}/pre-registrations/validate", preRegHandler.Validate)
-		r.Post("/{unitId}/pre-registrations", preRegHandler.Create)
-		r.Post("/{unitId}/pre-registrations/redeem", preRegHandler.Redeem)
 
 		r.Group(func(r chi.Router) {
-			r.Use(authmiddleware.JWTAuth)
+			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
+			r.Use(authmiddleware.RequireTerminalUnitMatchOrUnitPermission(userRepo, tenantRBACRepo, unitRepo, "unitId", rbac.PermTicketsWrite))
+			r.Post("/{unitId}/tickets", ticketHandler.CreateTicket)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
+			r.Use(authmiddleware.RequireTerminalUnitMatchOrUnitPermission(userRepo, tenantRBACRepo, unitRepo, "unitId", rbac.PermTicketsRead))
+			r.Get("/{unitId}/tickets", ticketHandler.GetTicketsByUnit)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
+			r.Use(authmiddleware.RequireTerminalUnitMatchOrUnitPermission(userRepo, tenantRBACRepo, unitRepo, "unitId", rbac.PermAccessKiosk))
+			r.Get("/{unitId}/services", serviceHandler.GetServicesByUnit)
+			r.Get("/{unitId}/services-tree", serviceHandler.GetServicesByUnit)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
+			r.Use(authmiddleware.RequireTerminalUnitMatchOrUnitPermission(userRepo, tenantRBACRepo, unitRepo, "unitId", rbac.PermAccessStaffPanel))
+			r.Get("/{unitId}/counters", counterHandler.GetCountersByUnit)
+		})
+
+		r.With(authmiddleware.PublicAPIRateLimit).Get("/{unitId}/materials", unitHandler.GetMaterials)
+
+		r.Group(func(r chi.Router) {
+			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
+			r.Use(authmiddleware.RequireUnitPermission(userRepo, tenantRBACRepo, unitRepo, "unitId", rbac.PermUnitSettingsManage))
+			r.Get("/{unitId}/pre-registrations/slots", preRegHandler.GetAvailableSlots)
+			r.Post("/{unitId}/pre-registrations", preRegHandler.Create)
+		})
+		r.With(authmiddleware.PublicAPIRateLimit).Post("/{unitId}/pre-registrations/validate", preRegHandler.Validate)
+		r.With(authmiddleware.PublicAPIRateLimit).Post("/{unitId}/pre-registrations/redeem", preRegHandler.Redeem)
+
+		r.Group(func(r chi.Router) {
+			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
 			r.Use(authmiddleware.RequireAdminTerminalOrUnitMemberForUnit(userRepo, "unitId"))
 			r.Patch("/{unitId}/kiosk-config", unitHandler.PatchUnitKioskConfig)
 		})
 
 		r.Group(func(r chi.Router) {
-			r.Use(authmiddleware.JWTAuth)
+			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
 			r.Use(authmiddleware.RequireTerminalWithCounter("unitId"))
 			r.Get("/{unitId}/guest-survey/session", guestSurveyHandler.Session)
 			r.Post("/{unitId}/guest-survey/responses", guestSurveyHandler.SubmitResponse)
 		})
 
 		r.Group(func(r chi.Router) {
-			r.Use(authmiddleware.JWTAuth)
+			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
 			r.Use(authmiddleware.RequireTerminalUnitMatch("unitId"))
 			r.Get("/{unitId}/counter-board/session", counterBoardHandler.Session)
 		})
 
 		r.Group(func(r chi.Router) {
-			r.Use(authmiddleware.JWTAuth)
+			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
 			r.Use(authmiddleware.RequireGuestSurveyCompletionImageRead(userRepo, "unitId"))
 			r.Get("/{unitId}/guest-survey/completion-images/{fileName}", surveyHandler.GetSurveyCompletionImage)
 			r.Get("/{unitId}/guest-survey/idle-media/{fileName}", surveyHandler.GetSurveyIdleMedia)
 		})
 
 		r.Group(func(r chi.Router) {
-			r.Use(authmiddleware.JWTAuth)
-			r.Use(authmiddleware.RequireAdmin(userRepo))
+			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
+			r.Use(authmiddleware.RequireTenantAdmin(userRepo, tenantRBACRepo))
 			r.Post("/", unitHandler.CreateUnit)
 			r.Patch("/{id}", unitHandler.UpdateUnit)
 			r.Delete("/{id}", unitHandler.DeleteUnit)
 		})
 
+		// Staff operational (queue, shift, clients)
 		r.Group(func(r chi.Router) {
-			r.Use(authmiddleware.JWTAuth)
-			r.Use(authmiddleware.RequireUnitMember(userRepo))
+			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
+			r.Use(authmiddleware.RequireUnitPermission(userRepo, tenantRBACRepo, unitRepo, "unitId", rbac.PermAccessStaffPanel))
 			r.Post("/{unitId}/call-next", ticketHandler.CallNext)
 			r.Get("/{unitId}/bookings", bookingHandler.GetBookingsByUnit)
 			r.Get("/{unitId}/shift/dashboard", shiftHandler.GetDashboardStats)
@@ -481,21 +505,6 @@ func run() error {
 			r.Get("/{unitId}/shift/activity/actors", shiftHandler.ListShiftActivityActors)
 			r.Get("/{unitId}/shift/activity", shiftHandler.GetShiftActivity)
 			r.Post("/{unitId}/shift/eod", shiftHandler.ExecuteEndOfDay)
-			r.Post("/{unitId}/materials", unitHandler.AddMaterial)
-			r.Delete("/{unitId}/materials/{materialId}", unitHandler.DeleteMaterial)
-			r.Patch("/{unitId}/ad-settings", unitHandler.UpdateAdSettings)
-			r.Get("/{unitId}/slots/config", slotHandler.GetConfig)
-			r.Put("/{unitId}/slots/config", slotHandler.UpdateConfig)
-			r.Get("/{unitId}/slots/capacities", slotHandler.GetCapacities)
-			r.Put("/{unitId}/slots/capacities", slotHandler.UpdateCapacities)
-			r.Post("/{unitId}/slots/generate", slotHandler.Generate)
-			r.Get("/{unitId}/slots/day/{date}", slotHandler.GetDay)
-			r.Put("/{unitId}/slots/day/{date}", slotHandler.UpdateDay)
-			r.Get("/{unitId}/pre-registrations", preRegHandler.GetByUnit)
-			r.Get("/{unitId}/pre-registrations/calendar-slots", preRegHandler.GetCalendarSlots)
-			r.Put("/{unitId}/pre-registrations/{id}", preRegHandler.Update)
-			r.Get("/{unitId}/calendar-integration", calendarIntegrationHandler.Get)
-			r.Put("/{unitId}/calendar-integration", calendarIntegrationHandler.Put)
 			r.Get("/{unitId}/clients/search", unitClientHandler.SearchClients)
 			r.Get("/{unitId}/clients/{clientId}/history", unitClientHandler.ListClientHistory)
 			r.Get("/{unitId}/clients/{clientId}/visits", unitClientHandler.ListClientVisits)
@@ -503,16 +512,49 @@ func run() error {
 			r.Get("/{unitId}/clients", unitClientHandler.ListUnitClients)
 			r.Get("/{unitId}/clients/{clientId}", unitClientHandler.GetUnitClient)
 			r.Patch("/{unitId}/clients/{clientId}", unitClientHandler.PatchUnitClient)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
+			r.Use(authmiddleware.RequireUnitPermission(userRepo, tenantRBACRepo, unitRepo, "unitId", rbac.PermUnitSettingsManage))
+			r.Post("/{unitId}/materials", unitHandler.AddMaterial)
+			r.Delete("/{unitId}/materials/{materialId}", unitHandler.DeleteMaterial)
+			r.Patch("/{unitId}/ad-settings", unitHandler.UpdateAdSettings)
+			r.Get("/{unitId}/pre-registrations", preRegHandler.GetByUnit)
+			r.Get("/{unitId}/pre-registrations/calendar-slots", preRegHandler.GetCalendarSlots)
+			r.Put("/{unitId}/pre-registrations/{id}", preRegHandler.Update)
 			r.Get("/{unitId}/visitor-tag-definitions", visitorTagHandler.ListVisitorTagDefinitions)
 			r.Post("/{unitId}/visitor-tag-definitions", visitorTagHandler.CreateVisitorTagDefinition)
 			r.Patch("/{unitId}/visitor-tag-definitions/{definitionId}", visitorTagHandler.PatchVisitorTagDefinition)
 			r.Delete("/{unitId}/visitor-tag-definitions/{definitionId}", visitorTagHandler.DeleteVisitorTagDefinition)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
+			r.Use(authmiddleware.RequireUnitPermission(userRepo, tenantRBACRepo, unitRepo, "unitId", rbac.PermUnitGridManage))
+			r.Get("/{unitId}/slots/config", slotHandler.GetConfig)
+			r.Put("/{unitId}/slots/config", slotHandler.UpdateConfig)
+			r.Get("/{unitId}/slots/capacities", slotHandler.GetCapacities)
+			r.Put("/{unitId}/slots/capacities", slotHandler.UpdateCapacities)
+			r.Post("/{unitId}/slots/generate", slotHandler.Generate)
+			r.Get("/{unitId}/slots/day/{date}", slotHandler.GetDay)
+			r.Put("/{unitId}/slots/day/{date}", slotHandler.UpdateDay)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
+			r.Use(authmiddleware.RequireUnitPermission(userRepo, tenantRBACRepo, unitRepo, "unitId", rbac.PermCalendarManage))
+			r.Get("/{unitId}/calendar-integration", calendarIntegrationHandler.Get)
+			r.Put("/{unitId}/calendar-integration", calendarIntegrationHandler.Put)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
+			r.Use(authmiddleware.RequireUnitPermission(userRepo, tenantRBACRepo, unitRepo, "unitId", rbac.PermUnitServicesManage))
 			r.Post("/{unitId}/counters", counterHandler.CreateCounter)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
+			r.Use(authmiddleware.RequireUnitPermission(userRepo, tenantRBACRepo, unitRepo, "unitId", rbac.PermSurveyManage))
 			r.Get("/{unitId}/surveys", surveyHandler.ListDefinitions)
 			r.Post("/{unitId}/surveys", surveyHandler.CreateDefinition)
-			// Not under .../surveys/{surveyId}: chi would match "upload-completion-image" as surveyId → POST → 405.
 			r.Post("/{unitId}/survey-completion-images", surveyHandler.UploadCompletionImage)
-			// POST collection URL (same prefix as GET/DELETE idle-media) — avoids proxies missing /survey-idle-media.
 			r.Post("/{unitId}/guest-survey/idle-media", surveyHandler.UploadIdleMedia)
 			r.Delete("/{unitId}/guest-survey/idle-media/{fileName}", surveyHandler.DeleteSurveyIdleMedia)
 			r.Patch("/{unitId}/surveys/{surveyId}", surveyHandler.PatchDefinition)
@@ -521,8 +563,8 @@ func run() error {
 		})
 
 		r.Group(func(r chi.Router) {
-			r.Use(authmiddleware.JWTAuth)
-			r.Use(authmiddleware.RequireUnitBranchMember(userRepo))
+			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
+			r.Use(authmiddleware.RequireUnitStatisticsAccess(userRepo, tenantRBACRepo, unitRepo))
 			r.Get("/{unitId}/statistics/timeseries", statisticsHandler.GetTimeseries)
 			r.Get("/{unitId}/statistics/sla-deviations", statisticsHandler.GetSLADeviations)
 			r.Get("/{unitId}/statistics/load", statisticsHandler.GetLoad)
@@ -534,8 +576,8 @@ func run() error {
 		})
 
 		r.Group(func(r chi.Router) {
-			r.Use(authmiddleware.JWTAuth)
-			r.Use(authmiddleware.RequireAdmin(userRepo))
+			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
+			r.Use(authmiddleware.RequireTenantAdmin(userRepo, tenantRBACRepo))
 			r.Get("/{unitId}/operations/status", operationsHandler.GetOperationsStatus)
 			r.Post("/{unitId}/operations/emergency-unlock", operationsHandler.PostEmergencyUnlock)
 			r.Post("/{unitId}/operations/clear-statistics-quiet", operationsHandler.PostClearStatisticsQuiet)
@@ -543,7 +585,7 @@ func run() error {
 	})
 
 	r.Route("/services", func(r chi.Router) {
-		r.Use(authmiddleware.JWTAuth)
+		r.Use(authmiddleware.JWTAuthAndActive(userRepo))
 		r.Post("/", serviceHandler.CreateService)
 		r.Group(func(r chi.Router) {
 			r.Use(authmiddleware.RequireServiceUnit(userRepo, serviceRepo))
@@ -555,11 +597,11 @@ func run() error {
 
 	r.Route("/counters", func(r chi.Router) {
 		r.Group(func(r chi.Router) {
-			r.Use(authmiddleware.JWTAuth)
+			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
 			r.Get("/{id}", counterHandler.GetCounterByID)
 		})
 		r.Group(func(r chi.Router) {
-			r.Use(authmiddleware.JWTAuth)
+			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
 			r.Use(authmiddleware.RequireCounterUnit(userRepo, counterRepo))
 			r.Put("/{id}", counterHandler.UpdateCounter)
 			r.Delete("/{id}", counterHandler.DeleteCounter)
@@ -573,7 +615,7 @@ func run() error {
 	})
 
 	r.Route("/bookings", func(r chi.Router) {
-		r.Use(authmiddleware.JWTAuth)
+		r.Use(authmiddleware.JWTAuthAndActive(userRepo))
 		r.Post("/", bookingHandler.CreateBooking)
 		r.Group(func(r chi.Router) {
 			r.Use(authmiddleware.RequireBookingUnit(userRepo, bookingRepo))
@@ -584,8 +626,8 @@ func run() error {
 	})
 
 	r.Route("/templates", func(r chi.Router) {
-		r.Use(authmiddleware.JWTAuth)
-		r.Use(authmiddleware.RequireAdmin(userRepo))
+		r.Use(authmiddleware.JWTAuthAndActive(userRepo))
+		r.Use(authmiddleware.RequireTenantPermission(userRepo, tenantRBACRepo, rbac.PermTemplatesManage))
 		r.Post("/", templateHandler.CreateTemplate)
 		r.Get("/", templateHandler.GetAllTemplates)
 		r.Get("/{id}", templateHandler.GetTemplateByID)
@@ -595,8 +637,8 @@ func run() error {
 	})
 
 	r.Route("/desktop-terminals", func(r chi.Router) {
-		r.Use(authmiddleware.JWTAuth)
-		r.Use(authmiddleware.RequireAdmin(userRepo))
+		r.Use(authmiddleware.JWTAuthAndActive(userRepo))
+		r.Use(authmiddleware.RequireTenantPermission(userRepo, tenantRBACRepo, rbac.PermKioskManage))
 		r.Post("/", desktopTerminalHandler.Create)
 		r.Get("/", desktopTerminalHandler.List)
 		r.Get("/{id}", desktopTerminalHandler.GetByID)
@@ -608,8 +650,8 @@ func run() error {
 		r.Get("/token/{token}", invitationHandler.GetInvitationByToken)
 		r.Post("/register", invitationHandler.RegisterUser)
 		r.Group(func(r chi.Router) {
-			r.Use(authmiddleware.JWTAuth)
-			r.Use(authmiddleware.RequireAdmin(userRepo))
+			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
+			r.Use(authmiddleware.RequireTenantPermission(userRepo, tenantRBACRepo, rbac.PermInvitationsManage))
 			r.Post("/", invitationHandler.CreateInvitation)
 			r.Get("/", invitationHandler.GetAllInvitations)
 			r.Delete("/{id}", invitationHandler.DeleteInvitation)
@@ -618,8 +660,8 @@ func run() error {
 	})
 
 	r.Group(func(r chi.Router) {
-		r.Use(authmiddleware.JWTAuth)
-		r.Use(authmiddleware.RequireAdmin(userRepo))
+		r.Use(authmiddleware.JWTAuthAndActive(userRepo))
+		r.Use(authmiddleware.RequireTenantAdmin(userRepo, tenantRBACRepo))
 		// Printer logo: flat path is canonical; nested path kept for older frontends.
 		r.Post("/upload-printer-logo", uploadHandler.UploadPrinterLogo)
 		r.Post("/upload/printer-logo", uploadHandler.UploadPrinterLogo)
@@ -627,9 +669,9 @@ func run() error {
 	})
 
 	r.Route("/companies", func(r chi.Router) {
-		r.Use(authmiddleware.JWTAuth)
+		r.Use(authmiddleware.JWTAuthAndActive(userRepo))
 		r.Group(func(r chi.Router) {
-			r.Use(authmiddleware.RequireAdmin(userRepo))
+			r.Use(authmiddleware.RequireTenantAdmin(userRepo, tenantRBACRepo))
 			r.Get("/me/sso", companySSOHTTP.GetCompanySSO)
 			r.Patch("/me/sso", companySSOHTTP.PatchCompanySSO)
 			r.Patch("/me/slug", companySSOHTTP.PatchCompanySlug)
@@ -648,7 +690,7 @@ func run() error {
 			r.Post("/dadata/address/clean", dadataHandler.CleanAddress)
 		})
 		r.Group(func(r chi.Router) {
-			r.Use(authmiddleware.RequireAdminOrTenantPermission(userRepo, tenantRBACRepo, rbac.PermTenantAdmin))
+			r.Use(authmiddleware.RequireTenantAdmin(userRepo, tenantRBACRepo))
 			r.Get("/me", companyHandler.GetMyCompany)
 			r.Patch("/me", companyHandler.PatchMyCompany)
 			r.Get("/me/rbac/permissions", tenantRBACHTTP.GetPermissionCatalog)
@@ -665,18 +707,21 @@ func run() error {
 			r.Get("/me/users/{userId}/external-identity", tenantRBACHTTP.GetExternalIdentity)
 			r.Patch("/me/users/{userId}/external-identity", tenantRBACHTTP.PatchExternalIdentity)
 		})
-		r.Post("/me/complete-onboarding", companyHandler.CompleteOnboarding)
+		r.Group(func(r chi.Router) {
+			r.Use(authmiddleware.RequireTenantAdmin(userRepo, tenantRBACRepo))
+			r.Post("/me/complete-onboarding", companyHandler.CompleteOnboarding)
+		})
 		r.Get("/{companyId}/usage-metrics", usageHandler.GetUsageMetrics)
 	})
 
 	r.Route("/usage-metrics", func(r chi.Router) {
-		r.Use(authmiddleware.JWTAuth)
+		r.Use(authmiddleware.JWTAuthAndActive(userRepo))
 		r.Get("/me", usageHandler.GetMyUsageMetrics)
 	})
 
 	r.Route("/support", func(r chi.Router) {
-		r.Use(authmiddleware.JWTAuth)
-		r.Use(authmiddleware.RequireSupportReportAccess(userRepo))
+		r.Use(authmiddleware.JWTAuthAndActive(userRepo))
+		r.Use(authmiddleware.RequireTenantPermission(userRepo, tenantRBACRepo, rbac.PermSupportReports))
 		r.Post("/reports", supportReportHandler.Create)
 		r.Get("/reports", supportReportHandler.List)
 		r.Get("/reports/{id}/share-candidates", supportReportHandler.ListShareCandidates)
@@ -691,7 +736,7 @@ func run() error {
 
 	r.Route("/subscriptions", func(r chi.Router) {
 		r.Group(func(r chi.Router) {
-			r.Use(authmiddleware.JWTAuth)
+			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
 			r.Get("/me/plans", subscriptionHandler.GetMySubscriptionPlans)
 			r.Get("/me", subscriptionHandler.GetMySubscription)
 			r.Post("/checkout", subscriptionHandler.CreateCheckout)
@@ -703,7 +748,7 @@ func run() error {
 	})
 
 	r.Route("/invoices", func(r chi.Router) {
-		r.Use(authmiddleware.JWTAuth)
+		r.Use(authmiddleware.JWTAuthAndActive(userRepo))
 		r.Get("/me", invoiceHandler.GetMyInvoices)
 		// Must live under /me/... so chi does not treat the last segment as /{id} (e.g. "saas-vendor").
 		r.Get("/me/vendor", invoiceHandler.GetSaaSVendor)
@@ -713,7 +758,7 @@ func run() error {
 	})
 
 	r.Route("/platform", func(r chi.Router) {
-		r.Use(authmiddleware.JWTAuth)
+		r.Use(authmiddleware.JWTAuthAndActive(userRepo))
 		r.Use(authmiddleware.RequirePlatformAdmin(userRepo))
 		r.Get("/features", platformHandler.GetFeatures)
 		r.Get("/integrations", integrationsHandler.GetPlatformIntegrations)
@@ -749,9 +794,9 @@ func run() error {
 	})
 
 	r.Route("/tickets", func(r chi.Router) {
-		r.Get("/{id}", ticketHandler.GetTicketByID)
+		r.With(authmiddleware.PublicAPIRateLimit).Get("/{id}", ticketHandler.GetTicketByID)
 		r.Group(func(r chi.Router) {
-			r.Use(authmiddleware.JWTAuth)
+			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
 			r.Use(authmiddleware.RequireTicketUnit(userRepo, ticketRepo))
 			r.Patch("/{id}/status", ticketHandler.UpdateStatus)
 			r.Patch("/{id}/operator-comment", ticketHandler.UpdateOperatorComment)

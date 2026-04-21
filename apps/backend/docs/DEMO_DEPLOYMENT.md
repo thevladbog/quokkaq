@@ -14,7 +14,7 @@ This document complements the runnable stack in [`deploy/demo`](../../../deploy/
 ## Security notes
 
 - **`demo-scheduler`** mounts the Docker socket and the repo tree. Treat this as **root-equivalent** on the host. Use a **dedicated demo VM**, not a shared CI runner or laptop.
-- Demo seeds **do not** grant `platform_admin` to public users; keep **`NEXT_PUBLIC_PLATFORM_ALLOW_TENANT_ADMIN`** unset or `false` on the frontend so tenant `admin` cannot open `/{locale}/platform`.
+- Demo seeds **do not** grant `platform_admin` to public users; the operator UI (`/{locale}/platform`) is available only to **`platform_admin`** accounts.
 
 ## Fallback: systemd timer (no scheduler container)
 

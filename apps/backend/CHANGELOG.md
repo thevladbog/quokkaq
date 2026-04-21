@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+#### RBAC / tenant permissions (database migrations v1.4.x)
+
+- **v1.4.0** — Expanded permission catalog in code (`internal/rbac`); tenant role TRU rows pick up new keys when edited in UI.
+- **v1.4.1** — Backfill: legacy global `admin` users receive the reserved tenant role `system_admin` per company where they have units (`BackfillLegacyGlobalAdminsToSystemTenantRole`).
+- **v1.4.2** — Backfill: users with legacy global roles `staff`, `supervisor`, or `operator` get default unit permissions merged into `user_units.permissions` (`BackfillLegacyStaffSupervisorOperatorUnitPermissions`), including `support.reports` where applicable.
+
+#### API / auth behavior
+
+- `/support/*` routes use `RequireTenantPermission(PermSupportReports)` with `TenantPermissionAllowed` (platform/global admin, tenant `system_admin`, tenant-catalog permission, or matching `user_units` permission).
+- `GET /auth/me`-style user DTO: legacy `roles` is still serialized for backward compatibility (global role names such as `platform_admin`); clients should prefer `tenantRoles` and per-unit `permissions` for authorization, while some clients may still derive flags (e.g. platform admin) from legacy role names until a dedicated schema field is adopted everywhere.
+- Removed unused middleware: `RequireSupportReportAccess`, `RequireAdminOrTenantPermission`, `EnsureTenantAccess`, `RequireCompanyOwner`; removed `HasSupportReportAccess` from the user repository.
+
 - Initial release with core queue management functionality
 - WebSocket support for real-time updates
 - User authentication and authorization with JWT

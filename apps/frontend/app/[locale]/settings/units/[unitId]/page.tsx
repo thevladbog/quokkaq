@@ -36,6 +36,12 @@ import ServiceGridEditor from '@/components/ServiceGridEditor';
 
 import { useRouter } from '@/src/i18n/navigation';
 import PermissionGuard from '@/components/auth/permission-guard';
+import {
+  PermUnitGridManage,
+  PermUnitServicesManage,
+  PermUnitSettingsManage,
+  PermUnitTicketScreenManage
+} from '@/lib/permission-variants';
 import { toast } from 'sonner';
 import { getUnitDisplayName } from '@/lib/unit-display';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -128,7 +134,7 @@ export default function UnitPage({ params }: UnitPageProps) {
 
   const stationsAndStructure = (
     <PermissionGuard
-      permissions={['UNIT_SETTINGS_MANAGE']}
+      permissions={[PermUnitSettingsManage]}
       unitId={unitId}
       fallback={<div>{t('access_denied')}</div>}
     >
@@ -169,7 +175,7 @@ export default function UnitPage({ params }: UnitPageProps) {
   if (isServiceZone) {
     const serviceZoneCountersContent = (
       <PermissionGuard
-        permissions={['UNIT_SETTINGS_MANAGE']}
+        permissions={[PermUnitSettingsManage]}
         unitId={unitId}
         fallback={<div>{t('access_denied')}</div>}
       >
@@ -214,14 +220,14 @@ export default function UnitPage({ params }: UnitPageProps) {
         >
           <TabsList>
             <PermissionGuard
-              permissions={['UNIT_SETTINGS_MANAGE']}
+              permissions={[PermUnitSettingsManage]}
               unitId={unitId}
             >
               <TabsTrigger value='general'>
                 {t('units.general_settings')}
               </TabsTrigger>
             </PermissionGuard>
-            <PermissionGuard permissions={['UNIT_GRID_MANAGE']} unitId={unitId}>
+            <PermissionGuard permissions={[PermUnitGridManage]} unitId={unitId}>
               <TabsTrigger value='grid-configuration'>
                 {t('grid_configuration.title', {
                   defaultValue: 'Grid Configuration'
@@ -229,7 +235,7 @@ export default function UnitPage({ params }: UnitPageProps) {
               </TabsTrigger>
             </PermissionGuard>
             <PermissionGuard
-              permissions={['UNIT_SETTINGS_MANAGE']}
+              permissions={[PermUnitSettingsManage]}
               unitId={unitId}
             >
               <TabsTrigger value='counters'>
@@ -237,7 +243,7 @@ export default function UnitPage({ params }: UnitPageProps) {
               </TabsTrigger>
             </PermissionGuard>
             <PermissionGuard
-              permissions={['UNIT_SETTINGS_MANAGE']}
+              permissions={[PermUnitSettingsManage]}
               unitId={unitId}
             >
               <TabsTrigger value='kiosk'>
@@ -245,7 +251,7 @@ export default function UnitPage({ params }: UnitPageProps) {
               </TabsTrigger>
             </PermissionGuard>
             <PermissionGuard
-              permissions={['UNIT_SETTINGS_MANAGE']}
+              permissions={[PermUnitSettingsManage]}
               unitId={unitId}
             >
               <TabsTrigger value='guest-survey'>
@@ -253,7 +259,7 @@ export default function UnitPage({ params }: UnitPageProps) {
               </TabsTrigger>
             </PermissionGuard>
             <PermissionGuard
-              permissions={['UNIT_TICKET_SCREEN_MANAGE']}
+              permissions={[PermUnitTicketScreenManage]}
               unitId={unitId}
             >
               <TabsTrigger value='ad-screen'>
@@ -264,7 +270,7 @@ export default function UnitPage({ params }: UnitPageProps) {
 
           <TabsContent value='general' className='mt-6'>
             <PermissionGuard
-              permissions={['UNIT_SETTINGS_MANAGE']}
+              permissions={[PermUnitSettingsManage]}
               unitId={unitId}
               fallback={<div>{t('access_denied')}</div>}
             >
@@ -329,7 +335,7 @@ export default function UnitPage({ params }: UnitPageProps) {
 
           <TabsContent value='grid-configuration' className='mt-6'>
             <PermissionGuard
-              permissions={['UNIT_GRID_MANAGE']}
+              permissions={[PermUnitGridManage]}
               unitId={unitId}
               fallback={<div>{t('access_denied')}</div>}
             >
@@ -358,7 +364,7 @@ export default function UnitPage({ params }: UnitPageProps) {
 
           <TabsContent value='kiosk' className='mt-6'>
             <PermissionGuard
-              permissions={['UNIT_SETTINGS_MANAGE']}
+              permissions={[PermUnitSettingsManage]}
               unitId={unitId}
               fallback={<div>{t('access_denied')}</div>}
             >
@@ -373,7 +379,7 @@ export default function UnitPage({ params }: UnitPageProps) {
 
           <TabsContent value='guest-survey' className='mt-6'>
             <PermissionGuard
-              permissions={['UNIT_SETTINGS_MANAGE']}
+              permissions={[PermUnitSettingsManage]}
               unitId={unitId}
               fallback={<div>{t('access_denied')}</div>}
             >
@@ -383,7 +389,7 @@ export default function UnitPage({ params }: UnitPageProps) {
 
           <TabsContent value='ad-screen' className='mt-6'>
             <PermissionGuard
-              permissions={['UNIT_TICKET_SCREEN_MANAGE']}
+              permissions={[PermUnitTicketScreenManage]}
               unitId={unitId}
               fallback={<div>{t('access_denied')}</div>}
             >
@@ -436,7 +442,7 @@ export default function UnitPage({ params }: UnitPageProps) {
       >
         <TabsList>
           <PermissionGuard
-            permissions={['UNIT_SETTINGS_MANAGE']}
+            permissions={[PermUnitSettingsManage]}
             unitId={unitId}
           >
             <TabsTrigger value='general'>
@@ -444,7 +450,7 @@ export default function UnitPage({ params }: UnitPageProps) {
             </TabsTrigger>
           </PermissionGuard>
           <PermissionGuard
-            permissions={['UNIT_SETTINGS_MANAGE']}
+            permissions={[PermUnitSettingsManage]}
             unitId={unitId}
           >
             <TabsTrigger value='slots'>
@@ -452,12 +458,12 @@ export default function UnitPage({ params }: UnitPageProps) {
             </TabsTrigger>
           </PermissionGuard>
           <PermissionGuard
-            permissions={['UNIT_SERVICES_MANAGE']}
+            permissions={[PermUnitServicesManage]}
             unitId={unitId}
           >
             <TabsTrigger value='services'>{t('services.title')}</TabsTrigger>
           </PermissionGuard>
-          <PermissionGuard permissions={['UNIT_GRID_MANAGE']} unitId={unitId}>
+          <PermissionGuard permissions={[PermUnitGridManage]} unitId={unitId}>
             <TabsTrigger value='grid-configuration'>
               {t('grid_configuration.title', {
                 defaultValue: 'Grid Configuration'
@@ -465,7 +471,7 @@ export default function UnitPage({ params }: UnitPageProps) {
             </TabsTrigger>
           </PermissionGuard>
           <PermissionGuard
-            permissions={['UNIT_SETTINGS_MANAGE']}
+            permissions={[PermUnitSettingsManage]}
             unitId={unitId}
           >
             <TabsTrigger value='counters'>
@@ -475,19 +481,19 @@ export default function UnitPage({ params }: UnitPageProps) {
             </TabsTrigger>
           </PermissionGuard>
           <PermissionGuard
-            permissions={['UNIT_TICKET_SCREEN_MANAGE']}
+            permissions={[PermUnitTicketScreenManage]}
             unitId={unitId}
           >
             <TabsTrigger value='ad-screen'>{t('ad_screen.title')}</TabsTrigger>
           </PermissionGuard>
           <PermissionGuard
-            permissions={['UNIT_SETTINGS_MANAGE']}
+            permissions={[PermUnitSettingsManage]}
             unitId={unitId}
           >
             <TabsTrigger value='kiosk'>{t('kiosk_settings.title')}</TabsTrigger>
           </PermissionGuard>
           <PermissionGuard
-            permissions={['UNIT_SETTINGS_MANAGE']}
+            permissions={[PermUnitSettingsManage]}
             unitId={unitId}
           >
             <TabsTrigger value='guest-survey'>
@@ -495,7 +501,7 @@ export default function UnitPage({ params }: UnitPageProps) {
             </TabsTrigger>
           </PermissionGuard>
           <PermissionGuard
-            permissions={['UNIT_SETTINGS_MANAGE']}
+            permissions={[PermUnitSettingsManage]}
             unitId={unitId}
           >
             <TabsTrigger value='visitor-tags'>
@@ -506,7 +512,7 @@ export default function UnitPage({ params }: UnitPageProps) {
 
         <TabsContent value='general' className='mt-6'>
           <PermissionGuard
-            permissions={['UNIT_SETTINGS_MANAGE']}
+            permissions={[PermUnitSettingsManage]}
             unitId={unitId}
             fallback={<div>{t('access_denied')}</div>}
           >
@@ -584,7 +590,7 @@ export default function UnitPage({ params }: UnitPageProps) {
 
         <TabsContent value='slots' className='mt-6'>
           <PermissionGuard
-            permissions={['UNIT_SETTINGS_MANAGE']}
+            permissions={[PermUnitSettingsManage]}
             unitId={unitId}
             fallback={<div>{t('access_denied')}</div>}
           >
@@ -612,7 +618,7 @@ export default function UnitPage({ params }: UnitPageProps) {
 
         <TabsContent value='services' className='mt-6'>
           <PermissionGuard
-            permissions={['UNIT_SERVICES_MANAGE']}
+            permissions={[PermUnitServicesManage]}
             unitId={unitId}
             fallback={<div>{t('access_denied')}</div>}
           >
@@ -621,7 +627,7 @@ export default function UnitPage({ params }: UnitPageProps) {
         </TabsContent>
         <TabsContent value='grid-configuration' className='mt-6'>
           <PermissionGuard
-            permissions={['UNIT_GRID_MANAGE']}
+            permissions={[PermUnitGridManage]}
             unitId={unitId}
             fallback={<div>{t('access_denied')}</div>}
           >
@@ -633,7 +639,7 @@ export default function UnitPage({ params }: UnitPageProps) {
         </TabsContent>
         <TabsContent value='ad-screen' className='mt-6'>
           <PermissionGuard
-            permissions={['UNIT_TICKET_SCREEN_MANAGE']}
+            permissions={[PermUnitTicketScreenManage]}
             unitId={unitId}
             fallback={<div>{t('access_denied')}</div>}
           >
@@ -646,7 +652,7 @@ export default function UnitPage({ params }: UnitPageProps) {
         </TabsContent>
         <TabsContent value='kiosk' className='mt-6'>
           <PermissionGuard
-            permissions={['UNIT_SETTINGS_MANAGE']}
+            permissions={[PermUnitSettingsManage]}
             unitId={unitId}
             fallback={<div>{t('access_denied')}</div>}
           >
@@ -660,7 +666,7 @@ export default function UnitPage({ params }: UnitPageProps) {
         </TabsContent>
         <TabsContent value='guest-survey' className='mt-6'>
           <PermissionGuard
-            permissions={['UNIT_SETTINGS_MANAGE']}
+            permissions={[PermUnitSettingsManage]}
             unitId={unitId}
             fallback={<div>{t('access_denied')}</div>}
           >
@@ -669,7 +675,7 @@ export default function UnitPage({ params }: UnitPageProps) {
         </TabsContent>
         <TabsContent value='visitor-tags' className='mt-6'>
           <PermissionGuard
-            permissions={['UNIT_SETTINGS_MANAGE']}
+            permissions={[PermUnitSettingsManage]}
             unitId={unitId}
             fallback={<div>{t('access_denied')}</div>}
           >

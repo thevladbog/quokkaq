@@ -32,6 +32,17 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import { useAuthContext } from '@/contexts/AuthContext';
+import {
+  PermAccessStaffPanel,
+  PermAccessStatsSubdivision,
+  PermAccessStatsZone,
+  PermAccessSupervisorPanel,
+  PermStatisticsRead,
+  PermSupportReports,
+  userHasCanonicalUnitPermissionInAnyUnit,
+  userUnitPermissionMatches
+} from '@/lib/permission-variants';
+import { isTenantAdminUser } from '@/lib/tenant-admin-access';
 import { Link, usePathname } from '@/src/i18n/navigation';
 import {
   DropdownMenu,
@@ -68,18 +79,19 @@ const AppSidebar = () => {
   const { activeUnitId } = useActiveUnit();
   const pathname = usePathname();
   const loginNavLabel = tNav('login', { defaultValue: 'Login' });
-
   const isActive = (path: string) => pathname === path;
   const isActiveSub = (path: string) =>
     pathname.startsWith(path) && pathname !== path;
   const isActiveStatistics =
     pathname === '/statistics' || pathname.startsWith('/statistics/');
 
-  const hasPermissionInAnyUnit = (permission: string) => {
-    if (!user?.permissions) return false;
-    return (Object.values(user.permissions) as string[][]).some(
-      (perms: string[]) => perms.includes(permission)
-    );
+  const hasPermissionInAnyUnit = (permission: string) =>
+    userHasCanonicalUnitPermissionInAnyUnit(user, permission);
+
+  const hasPermissionInActiveUnit = (permission: string) => {
+    if (!activeUnitId) return false;
+    const perms = user?.permissions?.[activeUnitId] ?? [];
+    return userUnitPermissionMatches(perms, permission);
   };
 
   const auditJournalHref =
@@ -100,8 +112,7 @@ const AppSidebar = () => {
       icon: Home,
       label: tNav('home', { defaultValue: 'Home' }),
       href: '/',
-      active: isActive('/'),
-      roles: ['admin', 'staff', 'supervisor', 'user', 'operator']
+      active: isActive('/')
     },
     {
       icon: Users,
@@ -110,16 +121,14 @@ const AppSidebar = () => {
       active:
         (pathname === '/staff' || pathname.startsWith('/staff/')) &&
         !pathname.startsWith('/staff/support'),
-      roles: ['admin', 'staff', 'operator'],
-      requiredPermission: 'ACCESS_STAFF_PANEL'
+      requiredPermission: PermAccessStaffPanel
     },
     {
       icon: ClipboardList,
       label: tNav('supervisor', { defaultValue: 'Supervisor' }),
       href: '/supervisor',
       active: isActive('/supervisor') || isActiveSub('/supervisor'),
-      roles: ['admin', 'supervisor'],
-      requiredPermission: 'ACCESS_SUPERVISOR_PANEL'
+      requiredPermission: PermAccessSupervisorPanel
     },
     {
       icon: CalendarClock,
@@ -128,7 +137,7 @@ const AppSidebar = () => {
       }),
       href: '/pre-registrations',
       active: pathname.startsWith('/pre-registrations'),
-      roles: ['admin', 'staff', 'supervisor']
+      requiredPermission: PermAccessStaffPanel
     },
     ...(auditJournalHref
       ? [
@@ -137,7 +146,11 @@ const AppSidebar = () => {
             label: tNav('audit_journal', { defaultValue: 'Audit log' }),
             href: auditJournalHref,
             active: pathname.startsWith(`/journal/${activeUnitId}`),
-            roles: ['admin', 'staff', 'supervisor', 'operator'] as const
+            requiredAnyPermission: [
+              PermAccessStaffPanel,
+              PermAccessSupervisorPanel
+            ] as const,
+            permissionScope: 'activeUnit' as const
           }
         ]
       : []),
@@ -148,7 +161,11 @@ const AppSidebar = () => {
             label: tNav('clients', { defaultValue: 'Clients' }),
             href: clientsHref,
             active: pathname.startsWith(`/clients/${activeUnitId}`),
-            roles: ['admin', 'staff', 'supervisor', 'operator'] as const
+            requiredAnyPermission: [
+              PermAccessStaffPanel,
+              PermAccessSupervisorPanel
+            ] as const,
+            permissionScope: 'activeUnit' as const
           }
         ]
       : []),
@@ -159,7 +176,11 @@ const AppSidebar = () => {
             label: tNav('statistics', { defaultValue: 'Statistics' }),
             href: statisticsHref,
             active: isActiveStatistics,
-            roles: ['admin', 'staff', 'supervisor', 'operator'] as const
+            requiredAnyPermission: [
+              PermAccessStatsSubdivision,
+              PermAccessStatsZone,
+              PermStatisticsRead
+            ] as const
           }
         ]
       : []),
@@ -168,20 +189,24 @@ const AppSidebar = () => {
       label: tNav('support_requests', { defaultValue: 'Support requests' }),
       href: '/staff/support',
       active: pathname.startsWith('/staff/support'),
-      roles: ['admin', 'staff', 'supervisor', 'operator']
+      requiredPermission: PermSupportReports
     }
   ].filter((item) => {
-    if (!isAuthenticated) return false;
-    if (user?.roles?.includes('admin')) return true;
+    if (!isAuthenticated || !user) return false;
+    if (isTenantAdminUser(user)) return true;
 
-    const roles = item.roles as readonly string[] | undefined;
-    const hasRole = !roles || user?.roles?.some((role) => roles.includes(role));
-
-    const hasPermission = item.requiredPermission
-      ? hasPermissionInAnyUnit(item.requiredPermission)
-      : false;
-
-    return hasRole || hasPermission;
+    if ('requiredAnyPermission' in item && item.requiredAnyPermission) {
+      const useActive =
+        'permissionScope' in item && item.permissionScope === 'activeUnit';
+      const check = useActive
+        ? hasPermissionInActiveUnit
+        : hasPermissionInAnyUnit;
+      return item.requiredAnyPermission.some((p) => check(p));
+    }
+    if ('requiredPermission' in item && item.requiredPermission) {
+      return hasPermissionInAnyUnit(item.requiredPermission);
+    }
+    return true;
   });
 
   return (
@@ -366,7 +391,7 @@ const AppSidebar = () => {
                         </DropdownMenuSubContent>
                       </DropdownMenuSub>
 
-                      {user?.roles?.includes('admin') ? (
+                      {isTenantAdminUser(user) ? (
                         <>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem asChild>
@@ -382,7 +407,7 @@ const AppSidebar = () => {
 
                       {userCanOpenPlatformOperatorUI(user) ? (
                         <>
-                          {user?.roles?.includes('admin') ? null : (
+                          {isTenantAdminUser(user) ? null : (
                             <DropdownMenuSeparator />
                           )}
                           <DropdownMenuItem asChild>

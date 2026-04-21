@@ -475,7 +475,14 @@
         "ACCESS_SUPERVISOR_PANEL": "Доступ к панели супервайзера",
         "ACCESS_SURVEY_RESPONSES": "Видеть оценки гостевого опроса",
         "ACCESS_STATISTICS_SUBDIVISION": "Статистика: всё подразделение",
-        "ACCESS_STATISTICS_ZONE": "Статистика: только назначенные зоны обслуживания"
+        "ACCESS_STATISTICS_ZONE": "Статистика: только назначенные зоны обслуживания",
+        "TICKETS_READ": "Просмотр талонов",
+        "TICKETS_WRITE": "Создание и изменение талонов",
+        "COUNTER_OPERATE": "Работа на окнах",
+        "SURVEY_MANAGE": "Управление опросами",
+        "CALENDAR_MANAGE": "Интеграция с календарём",
+        "STATISTICS_READ": "Просмотр статистики",
+        "SUPPORT_REPORTS": "Обращения в поддержку (организация)"
       },
       "system_admin": "Системный администратор",
       "system_admin_desc": "Полный доступ к системе",

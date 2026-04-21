@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"quokkaq-go-backend/internal/models"
+	"quokkaq-go-backend/internal/rbac"
 )
 
 func TestResolveScope_DeniedBlankViewerEarlyPath(t *testing.T) {
@@ -40,6 +41,20 @@ func TestResolveScope_AdminBlankViewerNotDenied(t *testing.T) {
 	sc := ResolveScope(u, "branch-1", "", nil)
 	if sc.Denied || !sc.Expanded {
 		t.Fatalf("expected expanded team scope, got %#v", sc)
+	}
+}
+
+// Simulates tenant system_admin after TRU merge: no global Roles, but full catalog on user_units.
+func TestResolveScope_ExpandedViaMergedStatisticsReadOnBranch(t *testing.T) {
+	u := &models.User{
+		Units: []models.UserUnit{{
+			UnitID:      "branch-1",
+			Permissions: models.StringArray{rbac.PermStatisticsRead},
+		}},
+	}
+	sc := ResolveScope(u, "branch-1", "viewer-1", nil)
+	if sc.Denied || !sc.Expanded || sc.ForceUserID != "" {
+		t.Fatalf("expected expanded team scope from merged perms, got %#v", sc)
 	}
 }
 

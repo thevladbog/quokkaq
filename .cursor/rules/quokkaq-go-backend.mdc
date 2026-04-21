@@ -40,3 +40,10 @@ Use the existing flow: **handlers → services → repository → models**. Exte
 ## Lint
 
 - [`apps/backend/.golangci.yml`](apps/backend/.golangci.yml) — standard golangci-lint preset; fix all reported issues before finishing a task.
+
+## RBAC and authorization
+
+- **New routes** — prefer [`internal/middleware/rbac_middleware.go`](apps/backend/internal/middleware/rbac_middleware.go): `RequireTenantAdmin`, `RequireTenantPermission`, `RequireUnitPermission`, `RequirePlatformAdmin` as appropriate. Avoid ad-hoc `IsAdmin` checks in `main.go` for whole route groups unless the endpoint is legacy-global-admin only.
+- **Permission strings** — add to [`internal/rbac/permissions.go`](apps/backend/internal/rbac/permissions.go) and reuse everywhere (handlers, TRU seeds, migrations).
+- **Inline checks** in repositories/services — prefer `UserHasCanonicalUnitPermission` / catalog helpers over string-matching global role names where possible; tenant `system_admin` is often covered via merged `user_units` (see comments in survey/shift/statistics code).
+- **Migrations** — only new `vX.Y.Z_description` keys in [`pkg/database/postgres.go`](apps/backend/pkg/database/postgres.go); never rewrite applied migration bodies.

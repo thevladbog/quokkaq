@@ -387,16 +387,15 @@ The command creates the `platform_admin` role in the database if it is missing, 
 
 ### Local dev: tenant `admin` without `platform_admin`
 
-If you log in as the usual organization **admin** (not `platform_admin`), the UI and API allow `/platform` **only when you opt in explicitly** (never by default):
+The **operator UI** (`/{locale}/platform`) and **`/platform/*` APIs** are restricted to users with the global **`platform_admin`** role. Legacy tenant/global `admin` and tenant `system_admin` do **not** grant platform operator access.
 
-- **Backend:** Tenant `admin` can call `/platform/*` only when `APP_ENV` is **not** `production` **and** `PLATFORM_ALLOW_TENANT_ADMIN` is **`true`**, **`1`**, or **`yes`**. Unset or `false`/`0`/`no` means only **`platform_admin`** may use `/platform` APIs. **`docker-compose.yml` under `apps/backend` defaults `PLATFORM_ALLOW_TENANT_ADMIN` to `false`**; set `PLATFORM_ALLOW_TENANT_ADMIN=true` in your environment or compose `.env` when you intentionally want tenant admins on `/platform` in that stack (still never for production).
-- **Frontend:** Set `NEXT_PUBLIC_PLATFORM_ALLOW_TENANT_ADMIN=true` or `1` in the frontend env so tenant `admin` sees the operator UI and routes; without it, only `platform_admin` does.
+For **non-production** backends only, `PLATFORM_ALLOW_TENANT_ADMIN` may still allow the legacy global `admin` **role** to call `/platform/*` APIs (see `RequirePlatformAdmin` in the Go middleware). The Next.js app does not expose the operator UI to tenant admins.
 
 In **production** (`APP_ENV=production`), only users with **`platform_admin`** can use `/platform`.
 
 ### API
 
-Operator endpoints are under **`/platform/*`** on the Go API (JWT + `platform_admin`, or tenant `admin` when allowed as above). The Next.js app calls them via `/api` (proxied to the Go server). Use **`POST /platform/subscriptions`** with `companyId`, `planId`, and optional `currentPeriodStart` / `currentPeriodEnd` to create a subscription for an organization. **Multiple subscriptions per company are allowed** (e.g. for future billing periods); the operator is responsible for ensuring periods don't overlap or align with billing logic. The latest created subscription updates `company.subscription_id`. The operator UI exposes this on the **Subscriptions** page with a combobox search (by company name or ID) and date/time pickers for the billing period.
+Operator endpoints are under **`/platform/*`** on the Go API (JWT + `platform_admin`, or legacy global `admin` when `PLATFORM_ALLOW_TENANT_ADMIN` is enabled on the backend as above). The Next.js app calls them via `/api` (proxied to the Go server). Use **`POST /platform/subscriptions`** with `companyId`, `planId`, and optional `currentPeriodStart` / `currentPeriodEnd` to create a subscription for an organization. **Multiple subscriptions per company are allowed** (e.g. for future billing periods); the operator is responsible for ensuring periods don't overlap or align with billing logic. The latest created subscription updates `company.subscription_id`. The operator UI exposes this on the **Subscriptions** page with a combobox search (by company name or ID) and date/time pickers for the billing period.
 
 If the browser shows **`API Error: 404`** for `/api/platform/...`, the running API binary is older than the repo: rebuild and restart the Go backend so it registers the `/platform` route group. Check `NEXT_PUBLIC_API_URL` points at that server.
 

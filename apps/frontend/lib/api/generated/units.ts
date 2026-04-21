@@ -945,6 +945,7 @@ export interface HandlersUserResponse {
   name?: string;
   permissions?: HandlersUserResponsePermissions;
   photoUrl?: string;
+  /** Roles is deprecated; use tenantRoles and unit permissions instead. */
   roles?: HandlersRoleDTO[];
   tenantRoles?: HandlersTenantRoleBriefResponse[];
   type?: string;

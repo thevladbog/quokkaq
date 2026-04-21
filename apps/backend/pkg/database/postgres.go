@@ -2091,6 +2091,29 @@ ADD COLUMN IF NOT EXISTS payment_terms_markdown TEXT`).Error; err != nil {
 		return fmt.Errorf("failed to run v1.3.19_invoice_lines_line_comment migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.4.0_rbac_permissions_catalog_expand", func(db *gorm.DB) error {
+		// RBAC: permission catalog expanded in code (rbac.All); no DDL. Refresh merged user_units for
+		// system_admin users so TRU-backed permissions include the full catalog without UI edits.
+		return tenantroleseed.BackfillSystemAdminUserUnits(db)
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.4.0_rbac_permissions_catalog_expand migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.4.1_legacy_global_admin_to_system_tenant_role", func(db *gorm.DB) error {
+		return tenantroleseed.BackfillLegacyGlobalAdminsToSystemTenantRole(db)
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.4.1_legacy_global_admin_to_system_tenant_role migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.4.2_legacy_staff_supervisor_operator_unit_permissions", func(db *gorm.DB) error {
+		return tenantroleseed.BackfillLegacyStaffSupervisorOperatorUnitPermissions(db)
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.4.2_legacy_staff_supervisor_operator_unit_permissions migration: %w", err)
+	}
+
 	fmt.Println("✅ All migrations completed successfully")
 	return nil
 }

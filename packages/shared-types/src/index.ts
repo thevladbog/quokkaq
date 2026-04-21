@@ -14,70 +14,79 @@ export {
 // Zod Schemas
 // ==========================
 
-export const UserModelSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  email: z.string().nullable().optional(),
-  photoUrl: z.string().nullable().optional(),
-  /** When false, login is denied until access is restored. */
-  isActive: z.boolean().optional().default(true),
-  createdAt: z.string().nullable().optional(),
-  exemptFromSsoSync: z.boolean().optional(),
-  ssoProfileSyncOptOut: z.boolean().optional(),
-  unitIds: z.array(z.string()).optional(),
-  roles: z
-    .union([
-      z.array(z.string()),
-      z.array(
-        z.object({
-          role: z.object({
-            name: z.string()
+export const UserModelSchema = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    email: z.string().nullable().optional(),
+    photoUrl: z.string().nullable().optional(),
+    /** When false, login is denied until access is restored. */
+    isActive: z.boolean().optional().default(true),
+    createdAt: z.string().nullable().optional(),
+    exemptFromSsoSync: z.boolean().optional(),
+    ssoProfileSyncOptOut: z.boolean().optional(),
+    unitIds: z.array(z.string()).optional(),
+    /** @deprecated Prefer tenantRoles and unit permissions; kept for API compatibility. */
+    roles: z
+      .union([
+        z.array(z.string()),
+        z.array(
+          z.object({
+            role: z.object({
+              name: z.string()
+            })
           })
+        )
+      ])
+      .optional()
+      .transform((val): string[] => {
+        if (!val) return [];
+        return val.map((v) => {
+          if (typeof v === 'string') return v;
+          return v.role.name;
+        });
+      }),
+    type: z.string().optional(),
+    permissions: z.record(z.string(), z.array(z.string())).optional(),
+    units: z
+      .array(
+        z.object({
+          unitId: z.string(),
+          companyId: z.string().optional(),
+          permissions: z.array(z.string()).optional().default([]),
+          unit: z
+            .object({
+              companyId: z.string().optional(),
+              id: z.string().optional(),
+              name: z.string().optional(),
+              nameEn: z.string().nullable().optional(),
+              code: z.string().optional(),
+              kind: z.string().optional()
+            })
+            .nullable()
+            .optional()
         })
       )
-    ])
-    .optional()
-    .transform((val): string[] => {
-      if (!val) return [];
-      return val.map((v) => {
-        if (typeof v === 'string') return v;
-        return v.role.name;
-      });
-    }),
-  type: z.string().optional(),
-  permissions: z.record(z.string(), z.array(z.string())).optional(),
-  units: z
-    .array(
-      z.object({
-        unitId: z.string(),
-        companyId: z.string().optional(),
-        permissions: z.array(z.string()).optional().default([]),
-        unit: z
-          .object({
-            companyId: z.string().optional(),
-            id: z.string().optional(),
-            name: z.string().optional(),
-            nameEn: z.string().nullable().optional(),
-            code: z.string().optional(),
-            kind: z.string().optional()
-          })
-          .nullable()
-          .optional()
-      })
-    )
-    .optional(),
-  /** Tenant-defined roles for the active company (from GET /companies/me/users). */
-  tenantRoles: z
-    .array(
-      z.object({
-        id: z.string(),
-        name: z.string(),
-        slug: z.string()
-      })
-    )
-    .nullish()
-    .transform((v) => v ?? [])
-});
+      .optional(),
+    /** Tenant-defined roles for the active company (from GET /companies/me/users). */
+    tenantRoles: z
+      .array(
+        z.object({
+          id: z.string(),
+          name: z.string(),
+          slug: z.string()
+        })
+      )
+      .nullish()
+      .transform((v) => v ?? [])
+  })
+  .transform((data) => ({
+    ...data,
+    /** True when the user has the global platform_admin role. */
+    isPlatformAdmin: data.roles.includes('platform_admin'),
+    /** True when the user holds the reserved tenant role `system_admin` for the active company. */
+    isTenantAdmin: data.tenantRoles.some((r) => r.slug === 'system_admin')
+  }));
 
 // Service Model Schema (recursive)
 export type ServiceModel = {
