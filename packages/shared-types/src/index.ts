@@ -108,6 +108,7 @@ export type ServiceModel = {
   numberSequence?: string | null;
   duration?: number | null;
   maxWaitingTime?: number | null;
+  maxServiceTime?: number | null;
   prebook?: boolean;
   offerIdentification?: boolean;
   isLeaf?: boolean;
@@ -142,6 +143,7 @@ export const ServiceModelSchema: z.ZodType<ServiceModel> = z.object({
   numberSequence: z.string().nullable().optional(),
   duration: z.number().nullable().optional(),
   maxWaitingTime: z.number().nullable().optional(),
+  maxServiceTime: z.number().nullable().optional(),
   prebook: z.boolean().optional(),
   offerIdentification: z.boolean().optional(),
   isLeaf: z.boolean().optional(),
@@ -538,6 +540,7 @@ export const TicketModelSchema = z.object({
   calledAt: z.string().nullable().optional(),
   confirmedAt: z.string().nullable().optional(),
   maxWaitingTime: z.number().nullable().optional(),
+  maxServiceTime: z.number().nullable().optional(),
   operatorComment: z.string().nullable().optional(),
   servedByName: z.string().nullable().optional(),
   transferTrail: z.array(ClientVisitTransferEventSchema).optional(),

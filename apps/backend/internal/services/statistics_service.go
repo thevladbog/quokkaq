@@ -191,6 +191,9 @@ type TimeseriesPoint struct {
 	TicketsCompleted  int      `json:"ticketsCompleted"`
 	NoShowCount       int      `json:"noShowCount"`
 	SlaWaitMetPct     *float64 `json:"slaWaitMetPct,omitempty"`
+	SlaServiceMetPct  *float64 `json:"slaServiceMetPct,omitempty"`
+	SlaServiceMet     int      `json:"slaServiceMet"`
+	SlaServiceTotal   int      `json:"slaServiceTotal"`
 }
 
 type TimeseriesResponse struct {
@@ -273,6 +276,12 @@ func (s *StatisticsService) GetTimeseries(
 				v := 100.0 * float64(r.SlaWaitMet) / float64(r.SlaWaitTotal)
 				p.SlaWaitMetPct = &v
 			}
+			p.SlaServiceMet = r.SlaServiceMet
+			p.SlaServiceTotal = r.SlaServiceTotal
+			if r.SlaServiceTotal > 0 {
+				v := 100.0 * float64(r.SlaServiceMet) / float64(r.SlaServiceTotal)
+				p.SlaServiceMetPct = &v
+			}
 			out.Points = append(out.Points, p)
 		}
 	}
@@ -284,13 +293,16 @@ func (s *StatisticsService) GetTimeseries(
 	return out, nil
 }
 
-// SLADeviationsPoint is daily compliant vs breach share (waiting SLA).
+// SLADeviationsPoint is daily compliant vs breach share (waiting and service-time SLA).
 type SLADeviationsPoint struct {
-	Date         string  `json:"date"`
-	WithinPct    float64 `json:"withinPct"`
-	BreachPct    float64 `json:"breachPct"`
-	SlaWaitMet   int     `json:"slaWaitMet"`
-	SlaWaitTotal int     `json:"slaWaitTotal"`
+	Date             string  `json:"date"`
+	WithinPct        float64 `json:"withinPct"`
+	BreachPct        float64 `json:"breachPct"`
+	SlaWaitMet       int     `json:"slaWaitMet"`
+	SlaWaitTotal     int     `json:"slaWaitTotal"`
+	SlaServiceMet    int     `json:"slaServiceMet"`
+	SlaServiceTotal  int     `json:"slaServiceTotal"`
+	SlaServiceMetPct float64 `json:"slaServiceMetPct"`
 }
 
 type SLADeviationsResponse struct {
@@ -355,23 +367,34 @@ func (s *StatisticsService) GetSLADeviations(
 		out.Granularity = "day"
 		for _, r := range rows {
 			met, tot := r.SlaWaitMet, r.SlaWaitTotal
+			svcMet, svcTot := r.SlaServiceMet, r.SlaServiceTotal
+			var svcMetPct float64
+			if svcTot > 0 {
+				svcMetPct = 100.0 * float64(svcMet) / float64(svcTot)
+			}
 			if tot <= 0 {
 				out.Points = append(out.Points, SLADeviationsPoint{
-					Date:         r.BucketDate,
-					WithinPct:    0,
-					BreachPct:    0,
-					SlaWaitMet:   met,
-					SlaWaitTotal: tot,
+					Date:             r.BucketDate,
+					WithinPct:        0,
+					BreachPct:        0,
+					SlaWaitMet:       met,
+					SlaWaitTotal:     tot,
+					SlaServiceMet:    svcMet,
+					SlaServiceTotal:  svcTot,
+					SlaServiceMetPct: svcMetPct,
 				})
 				continue
 			}
 			within := 100.0 * float64(met) / float64(tot)
 			out.Points = append(out.Points, SLADeviationsPoint{
-				Date:         r.BucketDate,
-				WithinPct:    within,
-				BreachPct:    100.0 - within,
-				SlaWaitMet:   met,
-				SlaWaitTotal: tot,
+				Date:             r.BucketDate,
+				WithinPct:        within,
+				BreachPct:        100.0 - within,
+				SlaWaitMet:       met,
+				SlaWaitTotal:     tot,
+				SlaServiceMet:    svcMet,
+				SlaServiceTotal:  svcTot,
+				SlaServiceMetPct: svcMetPct,
 			})
 		}
 	}

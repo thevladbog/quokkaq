@@ -17,8 +17,9 @@ type Service struct {
 	TextColor       *string `json:"textColor,omitempty"`
 	Prefix          *string `json:"prefix,omitempty"`
 	NumberSequence  *string `json:"numberSequence,omitempty"`
-	Duration        *int    `json:"duration,omitempty"`       // In seconds
-	MaxWaitingTime  *int    `json:"maxWaitingTime,omitempty"` // In seconds
+	Duration        *int    `json:"duration,omitempty"`       // In seconds (expected / nominal service length for progress display)
+	MaxWaitingTime  *int    `json:"maxWaitingTime,omitempty"` // In seconds (queue-wait SLA — copied to Ticket.MaxWaitingTime on create)
+	MaxServiceTime  *int    `json:"maxServiceTime,omitempty"` // In seconds (service-time SLA — copied to Ticket.MaxServiceTime on in_service)
 	Prebook         bool    `gorm:"default:false" json:"prebook"`
 	// CalendarSlotKey optional label segment in [QQ] SUMMARY when names collide (calendar integration).
 	// When non-empty (after trim), it must be unique per unit — enforced by DB partial unique index and create/update validation.

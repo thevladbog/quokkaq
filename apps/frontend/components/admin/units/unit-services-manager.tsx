@@ -302,12 +302,18 @@ function buildInitialFormValues(
       prefix: editingService.prefix ?? '',
       duration: editingService.duration ?? undefined,
       maxWaitingTime: editingService.maxWaitingTime ?? undefined,
+      maxServiceTime: editingService.maxServiceTime ?? undefined,
       prebook: editingService.prebook ?? false,
       offerIdentification: editingService.offerIdentification ?? false,
       isLeaf: editingService.isLeaf ?? false,
       parentId: editingService.parentId ?? '',
       restrictedServiceZoneId: editingService.restrictedServiceZoneId ?? null,
-      calendarSlotKey: editingService.calendarSlotKey ?? ''
+      calendarSlotKey: editingService.calendarSlotKey ?? '',
+      numberSequence: editingService.numberSequence ?? undefined,
+      gridRow: editingService.gridRow ?? undefined,
+      gridCol: editingService.gridCol ?? undefined,
+      gridRowSpan: editingService.gridRowSpan ?? undefined,
+      gridColSpan: editingService.gridColSpan ?? undefined
     };
   }
   if (isCreating) {
@@ -324,6 +330,7 @@ function buildInitialFormValues(
       prefix: '',
       duration: undefined,
       maxWaitingTime: undefined,
+      maxServiceTime: undefined,
       prebook: false,
       offerIdentification: false,
       isLeaf: false,
@@ -349,6 +356,7 @@ function snapshotServiceFormValues(v: Partial<Service>): string {
     prefix: v.prefix ?? '',
     duration: v.duration ?? null,
     maxWaitingTime: v.maxWaitingTime ?? null,
+    maxServiceTime: v.maxServiceTime ?? null,
     prebook: !!v.prebook,
     offerIdentification: !!v.offerIdentification,
     isLeaf: !!v.isLeaf,
@@ -833,6 +841,85 @@ function ServiceForm({
         <p className='text-muted-foreground text-xs'>
           {tRoot('forms.fields.total', { defaultValue: 'Total' })}:{' '}
           {formValues.maxWaitingTime || 0}{' '}
+          {tRoot('forms.fields.seconds', { defaultValue: 'seconds' })}
+        </p>
+      </div>
+
+      <div className='space-y-2'>
+        <Label htmlFor='maxServiceTime'>
+          {tRoot('forms.fields.max_service_time', {
+            defaultValue: 'Max Service Time (SLA)'
+          })}
+        </Label>
+        <div className='flex items-end gap-2'>
+          <div className='flex-1'>
+            <Label
+              htmlFor='mst_minutes'
+              className='text-muted-foreground mb-1 block text-xs'
+            >
+              {tRoot('forms.fields.minutes', { defaultValue: 'min' })}
+            </Label>
+            <Input
+              id='mst_minutes'
+              type='number'
+              min='0'
+              value={
+                formValues.maxServiceTime
+                  ? Math.floor(formValues.maxServiceTime / 60)
+                  : 0
+              }
+              onChange={(e) => {
+                const mins = parseInt(e.target.value) || 0;
+                const secs = (formValues.maxServiceTime || 0) % 60;
+                setFormValues((prev) => ({
+                  ...prev,
+                  maxServiceTime: mins * 60 + secs
+                }));
+              }}
+            />
+          </div>
+          <div className='flex-1'>
+            <Label
+              htmlFor='mst_seconds'
+              className='text-muted-foreground mb-1 block text-xs'
+            >
+              {tRoot('forms.fields.seconds', { defaultValue: 'sec' })}
+            </Label>
+            <Input
+              id='mst_seconds'
+              type='number'
+              min='0'
+              max='59'
+              value={
+                formValues.maxServiceTime ? formValues.maxServiceTime % 60 : 0
+              }
+              onChange={(e) => {
+                const secs = parseInt(e.target.value) || 0;
+                const mins = Math.floor((formValues.maxServiceTime || 0) / 60);
+                setFormValues((prev) => ({
+                  ...prev,
+                  maxServiceTime: mins * 60 + secs
+                }));
+              }}
+            />
+          </div>
+          <Button
+            type='button'
+            variant='outline'
+            onClick={() =>
+              setFormValues((prev) => ({ ...prev, maxServiceTime: null }))
+            }
+            disabled={
+              formValues.maxServiceTime == null ||
+              formValues.maxServiceTime === 0
+            }
+          >
+            {tRoot('general.clear', { defaultValue: 'Clear' })}
+          </Button>
+        </div>
+        <p className='text-muted-foreground text-xs'>
+          {tRoot('forms.fields.total', { defaultValue: 'Total' })}:{' '}
+          {formValues.maxServiceTime || 0}{' '}
           {tRoot('forms.fields.seconds', { defaultValue: 'seconds' })}
         </p>
       </div>

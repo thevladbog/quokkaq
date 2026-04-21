@@ -2164,6 +2164,24 @@ ADD COLUMN IF NOT EXISTS is_credit BOOLEAN NOT NULL DEFAULT false`).Error; err !
 		return fmt.Errorf("failed to run v1.5.1_tickets_is_credit migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.6.0_service_time_sla", func(db *gorm.DB) error {
+		// Service.MaxServiceTime: service-time SLA limit in seconds (optional, like MaxWaitingTime for wait SLA).
+		// Ticket.MaxServiceTime: snapshot of Service.MaxServiceTime taken at the moment the ticket moves to in_service.
+		// statistics_daily_buckets: sla_service_met / sla_service_total mirrors sla_wait_* for service-time SLA.
+		return db.Exec(`
+ALTER TABLE services
+    ADD COLUMN IF NOT EXISTS max_service_time integer;
+ALTER TABLE tickets
+    ADD COLUMN IF NOT EXISTS max_service_time integer;
+ALTER TABLE statistics_daily_buckets
+    ADD COLUMN IF NOT EXISTS sla_service_met integer NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS sla_service_total integer NOT NULL DEFAULT 0;
+`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.6.0_service_time_sla migration: %w", err)
+	}
+
 	fmt.Println("✅ All migrations completed successfully")
 	return nil
 }

@@ -136,13 +136,23 @@ function WorkstationCard({
   const idleFree = !counter.isOccupied;
   const occupiedNoTicket = counter.isOccupied && ticket == null;
 
+  // Use maxServiceTime (SLA snapshot) when available; fallback to service.duration for the progress anchor.
+  const serviceSLASec =
+    ticket?.status === 'in_service' && ticket.maxServiceTime
+      ? ticket.maxServiceTime
+      : undefined;
+  const serviceDurationSec =
+    ticket?.status === 'in_service' && ticket.service?.duration
+      ? ticket.service.duration
+      : undefined;
+  const serviceProgressLimitSec = serviceSLASec ?? serviceDurationSec;
+
   const serviceTimer = useTicketTimer(
     ticket?.status === 'in_service' && ticket.confirmedAt
       ? ticket.confirmedAt
       : undefined,
-    ticket?.status === 'in_service' && ticket.service?.duration
-      ? ticket.service.duration
-      : undefined
+    // Drive the timer with the SLA cap if set, otherwise nominal duration.
+    serviceProgressLimitSec
   );
 
   const waitSec = ticket ? ticketPreCallWaitSeconds(ticket) : null;
@@ -156,16 +166,14 @@ function WorkstationCard({
     ? formatWaitDurationSeconds(serviceTimer.elapsed)
     : t('counterMetricEmpty');
 
+  // Use SLA cap if configured, otherwise fallback to the global long-service constant.
+  const longServiceThreshold = serviceSLASec ?? SUPERVISOR_LONG_SERVICE_SEC;
   const longDuration =
-    ticket != null &&
-    inService &&
-    serviceTimer.elapsed >= SUPERVISOR_LONG_SERVICE_SEC;
+    ticket != null && inService && serviceTimer.elapsed >= longServiceThreshold;
 
   const priority = Boolean(ticket?.preRegistration);
   const showProgress =
-    inService &&
-    ticket.service?.duration != null &&
-    ticket.service.duration > 0;
+    inService && serviceProgressLimitSec != null && serviceProgressLimitSec > 0;
 
   const dotClass = stationStatusDotClass(counter, ticket);
   const statusText = stationStatusLabel(t, counter, ticket);
@@ -375,11 +383,16 @@ function WorkstationListRow({
   const locale = useLocale();
   const ticket = counter.activeTicket;
 
+  const rowServiceSLASec =
+    ticket?.status === 'in_service' && ticket.maxServiceTime
+      ? ticket.maxServiceTime
+      : undefined;
+
   const durationTimer = useTicketTimer(
     ticket?.status === 'in_service' && ticket.confirmedAt
       ? ticket.confirmedAt
       : undefined,
-    undefined
+    rowServiceSLASec
   );
 
   const visitorName = ticket ? ticketVisitorDisplayName(ticket) : null;
@@ -395,10 +408,12 @@ function WorkstationListRow({
       ? formatWaitDurationSeconds(durationTimer.elapsed)
       : t('counterMetricEmpty');
 
+  const rowLongServiceThreshold =
+    rowServiceSLASec ?? SUPERVISOR_LONG_SERVICE_SEC;
   const longDuration =
     ticket != null &&
     ticket.status === 'in_service' &&
-    durationTimer.elapsed >= SUPERVISOR_LONG_SERVICE_SEC;
+    durationTimer.elapsed >= rowLongServiceThreshold;
 
   const dotClass = stationStatusDotClass(counter, ticket);
   const statusText = stationStatusLabel(t, counter, ticket);

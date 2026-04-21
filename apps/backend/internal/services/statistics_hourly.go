@@ -171,23 +171,28 @@ func hourRangeUTC(bucketDate string, hour int, loc *time.Location) (startUTC, en
 }
 
 // rollupWaitServiceSLAForHour matches daily RollupUnitDay semantics but for [startUTC,endUTC):
-// wait/SLA from tickets whose qualifying call is in range; service segments for tickets completed in range.
+// wait/SLA from tickets whose qualifying call is in range; service segments and service-time SLA
+// for tickets completed in range.
 func (s *StatisticsService) rollupWaitServiceSLAForHour(
 	ctx context.Context,
 	subdivisionID string,
 	startUTC, endUTC time.Time,
 	zoneQ repository.StatisticsZoneQuery,
-) (waitSumMs int64, waitCount int, slaMet int, slaTotal int, servSumMs int64, servCount int, err error) {
+) (waitSumMs int64, waitCount int, slaMet int, slaTotal int, servSumMs int64, servCount int, svcSlaMet int, svcSlaTotal int, err error) {
 	_ = ctx
 	zones := zoneFilterStrings(zoneQ)
 	for _, z := range zones {
 		ws, wc, sm, st, e := computeWaitSLAForTicketsCalledInRange(s.segmentsRepo, subdivisionID, startUTC, endUTC, z)
 		if e != nil {
-			return 0, 0, 0, 0, 0, 0, e
+			return 0, 0, 0, 0, 0, 0, 0, 0, e
 		}
 		ss, sc, e := aggregateServiceTimeForServedTicketsCompletedInRange(s.segmentsRepo, subdivisionID, z, startUTC, endUTC)
 		if e != nil {
-			return 0, 0, 0, 0, 0, 0, e
+			return 0, 0, 0, 0, 0, 0, 0, 0, e
+		}
+		ssm, sst, e := computeServiceSLAForTicketsCompletedInRange(s.segmentsRepo, subdivisionID, startUTC, endUTC, z)
+		if e != nil {
+			return 0, 0, 0, 0, 0, 0, 0, 0, e
 		}
 		waitSumMs += ws
 		waitCount += wc
@@ -195,8 +200,10 @@ func (s *StatisticsService) rollupWaitServiceSLAForHour(
 		slaTotal += st
 		servSumMs += ss
 		servCount += sc
+		svcSlaMet += ssm
+		svcSlaTotal += sst
 	}
-	return waitSumMs, waitCount, slaMet, slaTotal, servSumMs, servCount, nil
+	return waitSumMs, waitCount, slaMet, slaTotal, servSumMs, servCount, svcSlaMet, svcSlaTotal, nil
 }
 
 func buildTimeseriesPointFromHourlyRollup(
@@ -208,6 +215,7 @@ func buildTimeseriesPointFromHourlyRollup(
 	slaMet, slaTotal int,
 	servSumMs int64,
 	servCount int,
+	svcSlaMet, svcSlaTotal int,
 ) TimeseriesPoint {
 	p := TimeseriesPoint{
 		Date:             dateStr,
@@ -226,6 +234,12 @@ func buildTimeseriesPointFromHourlyRollup(
 	if slaTotal > 0 {
 		v := 100.0 * float64(slaMet) / float64(slaTotal)
 		p.SlaWaitMetPct = &v
+	}
+	p.SlaServiceMet = svcSlaMet
+	p.SlaServiceTotal = svcSlaTotal
+	if svcSlaTotal > 0 {
+		v := 100.0 * float64(svcSlaMet) / float64(svcSlaTotal)
+		p.SlaServiceMetPct = &v
 	}
 	return p
 }
@@ -253,13 +267,13 @@ func (s *StatisticsService) buildHourlyTimeseriesPoints(
 	out := make([]TimeseriesPoint, 0, 24)
 	for h := 0; h < 24; h++ {
 		startUTC, endUTC := hourRangeUTC(bucketDate, h, loc)
-		ws, wc, sm, st, ss, sc, err := s.rollupWaitServiceSLAForHour(ctx, subdivisionID, startUTC, endUTC, zoneQ)
+		ws, wc, sm, st, ss, sc, ssm, sst, err := s.rollupWaitServiceSLAForHour(ctx, subdivisionID, startUTC, endUTC, zoneQ)
 		if err != nil {
 			return nil, err
 		}
 		out = append(out, buildTimeseriesPointFromHourlyRollup(
 			hourlyDateLabel(bucketDate, h),
-			vol, h, ws, wc, sm, st, ss, sc,
+			vol, h, ws, wc, sm, st, ss, sc, ssm, sst,
 		))
 	}
 	return out, nil
@@ -282,7 +296,7 @@ func (s *StatisticsService) buildHourlySLADeviationPoints(
 	out := make([]SLADeviationsPoint, 0, 24)
 	for h := 0; h < 24; h++ {
 		startUTC, endUTC := hourRangeUTC(bucketDate, h, loc)
-		_, _, slaMet, slaTotal, _, _, err := s.rollupWaitServiceSLAForHour(ctx, subdivisionID, startUTC, endUTC, zoneQ)
+		_, _, slaMet, slaTotal, _, _, svcSlaMet, svcSlaTotal, err := s.rollupWaitServiceSLAForHour(ctx, subdivisionID, startUTC, endUTC, zoneQ)
 		if err != nil {
 			return nil, err
 		}
@@ -296,6 +310,11 @@ func (s *StatisticsService) buildHourlySLADeviationPoints(
 		} else {
 			pt.WithinPct = 100.0 * float64(slaMet) / float64(slaTotal)
 			pt.BreachPct = 100.0 - pt.WithinPct
+		}
+		pt.SlaServiceMet = svcSlaMet
+		pt.SlaServiceTotal = svcSlaTotal
+		if svcSlaTotal > 0 {
+			pt.SlaServiceMetPct = 100.0 * float64(svcSlaMet) / float64(svcSlaTotal)
 		}
 		out = append(out, pt)
 	}

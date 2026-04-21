@@ -157,9 +157,42 @@ func (r *serviceRepository) CountByUnitAndCalendarSlotKey(unitID, calendarSlotKe
 	return n, err
 }
 
+// updatableServiceColumns lists all mutable columns for a service update.
+// Using Select with an explicit column list forces GORM to write nil/zero pointer fields
+// (e.g. clearing MaxWaitingTime, MaxServiceTime, Duration when the admin removes the value).
+var updatableServiceColumns = []string{
+	"parent_id",
+	"name",
+	"name_ru",
+	"name_en",
+	"description",
+	"description_ru",
+	"description_en",
+	"image_url",
+	"background_color",
+	"text_color",
+	"prefix",
+	"number_sequence",
+	"duration",
+	"max_waiting_time",
+	"max_service_time",
+	"prebook",
+	"calendar_slot_key",
+	"offer_identification",
+	"is_leaf",
+	"restricted_service_zone_id",
+	"grid_row",
+	"grid_col",
+	"grid_row_span",
+	"grid_col_span",
+}
+
 func (r *serviceRepository) Update(service *models.Service) error {
-	// Use Updates to update only the provided fields without touching associations
-	err := r.db.Model(&models.Service{}).Where("id = ?", service.ID).Updates(service).Error
+	// Select explicit columns so GORM writes nil pointer fields (e.g. clearing MaxServiceTime / MaxWaitingTime / Duration).
+	err := r.db.Model(&models.Service{}).
+		Where("id = ?", service.ID).
+		Select(updatableServiceColumns).
+		Updates(service).Error
 	if err != nil && isCalendarSlotKeyUniqueViolation(err) {
 		return ErrDuplicateCalendarSlotKey
 	}

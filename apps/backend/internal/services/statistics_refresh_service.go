@@ -87,6 +87,8 @@ func (s *StatisticsRefreshService) RollupUnitDay(unitID, bucketDate string) erro
 			ServiceCount     int64
 			SlaWaitMet       int64
 			SlaWaitTotal     int64
+			SlaServiceMet    int64
+			SlaServiceTotal  int64
 		}
 
 		rollup := func(zoneFilter string) (aggRow, error) {
@@ -109,6 +111,12 @@ func (s *StatisticsRefreshService) RollupUnitDay(unitID, bucketDate string) erro
 			}
 			row.ServiceSumMs = ssum
 			row.ServiceCount = int64(scnt)
+			ssm, sst, err := computeServiceSLAForTicketsCompletedInRange(segTx, unitID, startUTC, endUTC, zoneFilter)
+			if err != nil {
+				return row, err
+			}
+			row.SlaServiceMet = int64(ssm)
+			row.SlaServiceTotal = int64(sst)
 			return row, nil
 		}
 
@@ -130,6 +138,8 @@ func (s *StatisticsRefreshService) RollupUnitDay(unitID, bucketDate string) erro
 			NoShowCount:      int(row.NoShowCount),
 			SlaWaitMet:       int(row.SlaWaitMet),
 			SlaWaitTotal:     int(row.SlaWaitTotal),
+			SlaServiceMet:    int(row.SlaServiceMet),
+			SlaServiceTotal:  int(row.SlaServiceTotal),
 		}
 		if err := statsTx.UpsertDailyBucket(&bucket); err != nil {
 			return err
@@ -174,6 +184,8 @@ WHERE unit_id = ?
 				NoShowCount:      int(zr.NoShowCount),
 				SlaWaitMet:       int(zr.SlaWaitMet),
 				SlaWaitTotal:     int(zr.SlaWaitTotal),
+				SlaServiceMet:    int(zr.SlaServiceMet),
+				SlaServiceTotal:  int(zr.SlaServiceTotal),
 			}
 			if err := statsTx.UpsertDailyBucket(&zb); err != nil {
 				return err
@@ -293,6 +305,45 @@ WHERE t.unit_id = ? AND h.user_id = ?
 			pr.WaitCount = int64(wN)
 			pr.SlaWaitMet = int64(slaM)
 			pr.SlaWaitTotal = int64(slaT)
+			// Service SLA for operator: only count tickets where the operator had an in_service segment.
+			var svcSLAMet, svcSLATotal int
+			op := strings.TrimSpace(ur.UserID)
+			for _, tid := range touchedIDs {
+				t, ok := opTicketMap[tid]
+				if !ok || t.MaxServiceTime == nil || *t.MaxServiceTime <= 0 {
+					continue
+				}
+				if t.Status != "served" || t.ConfirmedAt == nil || t.CompletedAt == nil {
+					continue
+				}
+				if t.CompletedAt.Before(startUTC) || !t.CompletedAt.Before(endUTC) {
+					continue
+				}
+				// Verify this operator actually served the ticket.
+				hasOperatorServiceSegment := false
+				for _, seg := range buildServiceTimeSegments(opHistMap[tid], t) {
+					if seg.DurationMs <= 0 || seg.OperatorUserID == nil {
+						continue
+					}
+					if strings.TrimSpace(*seg.OperatorUserID) == op {
+						hasOperatorServiceSegment = true
+						break
+					}
+				}
+				if !hasOperatorServiceSegment {
+					continue
+				}
+				secs, ok := ticketdurationServiceSeconds(&t)
+				if !ok {
+					continue
+				}
+				svcSLATotal++
+				if secs <= *t.MaxServiceTime {
+					svcSLAMet++
+				}
+			}
+			pr.SlaServiceMet = int64(svcSLAMet)
+			pr.SlaServiceTotal = int64(svcSLATotal)
 			ub := models.StatisticsDailyBucket{
 				UnitID:           unitID,
 				BucketDate:       bucketDate,
@@ -307,6 +358,8 @@ WHERE t.unit_id = ? AND h.user_id = ?
 				NoShowCount:      int(pr.NoShowCount),
 				SlaWaitMet:       int(pr.SlaWaitMet),
 				SlaWaitTotal:     int(pr.SlaWaitTotal),
+				SlaServiceMet:    int(pr.SlaServiceMet),
+				SlaServiceTotal:  int(pr.SlaServiceTotal),
 			}
 			if err := statsTx.UpsertDailyBucket(&ub); err != nil {
 				return err

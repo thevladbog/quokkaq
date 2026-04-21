@@ -81,7 +81,7 @@ func BuildStatisticsPDF(input StatisticsPDFInput) ([]byte, error) {
 	y = drawStatsReportHeader(&pdf, left, y, innerW, input)
 
 	// ── SLA Summary (highlighted card) ──────────────────────────────
-	if input.SlaSummary != nil && input.SlaSummary.SlaWaitTotal > 0 {
+	if input.SlaSummary != nil && (input.SlaSummary.SlaWaitTotal > 0 || input.SlaSummary.SlaServiceTotal > 0) {
 		y = drawStatsSLASummaryCard(&pdf, left, y, innerW, input.SlaSummary, l)
 		y += statsPdfSectionGap
 	}
@@ -243,8 +243,21 @@ func drawStatsReportHeader(pdf *gopdf.GoPdf, left, y, innerW float64, input Stat
 // SLA Summary card
 // ─────────────────────────────────────────────────────────────────────────────
 
+// slaSummaryCardHeight returns the pixel height of the SLA summary card
+// based on which SLA types have data. Exported for tests.
+func slaSummaryCardHeight(hasWait, hasSvc bool) float64 {
+	if hasWait && hasSvc {
+		return 96.0
+	}
+	return 48.0
+}
+
 func drawStatsSLASummaryCard(pdf *gopdf.GoPdf, left, y, innerW float64, sla *SlaSummaryResponse, l StatsPDFLabels) float64 {
-	cardH := 48.0
+	hasWait := sla.SlaWaitTotal > 0
+	hasSvc := sla.SlaServiceTotal > 0
+	hasBoth := hasWait && hasSvc
+	cardH := slaSummaryCardHeight(hasWait, hasSvc)
+
 	pdf.SetFillColor(240, 249, 255)
 	pdf.RectFromUpperLeftWithStyle(left, y, innerW, cardH, "F")
 	pdf.SetLineWidth(0.5)
@@ -252,6 +265,7 @@ func drawStatsSLASummaryCard(pdf *gopdf.GoPdf, left, y, innerW float64, sla *Sla
 	pdf.RectFromUpperLeftWithStyle(left, y, innerW, cardH, "D")
 	pdf.SetStrokeColor(0, 0, 0)
 
+	// Title
 	_ = pdf.SetFont("dejavubd", "", 10)
 	pdf.SetTextColor(30, 64, 175)
 	pdf.SetXY(left+10, y+6)
@@ -261,36 +275,63 @@ func drawStatsSLASummaryCard(pdf *gopdf.GoPdf, left, y, innerW float64, sla *Sla
 	col2X := left + innerW*0.25
 	col3X := left + innerW*0.5
 	col4X := left + innerW*0.75
-	valY := y + 24
 
-	_ = pdf.SetFont("dejavu", "", 8)
-	pdf.SetTextColor(80, 80, 80)
-	labels := []struct {
-		x    float64
-		text string
-	}{
-		{col1X, l.SLAWithin}, {col2X, l.SLABreach}, {col3X, l.SLAMet}, {col4X, l.SLATotal},
-	}
-	for _, lb := range labels {
-		pdf.SetXY(lb.x, valY)
-		_ = pdf.Cell(&gopdf.Rect{W: 90, H: 10}, lb.text)
-	}
-	valY += 11
+	drawSLARow := func(rowY float64, rowLabel string, within, breach string, met, total int) {
+		// Show sub-header when both sections are present, or when only service SLA exists
+		// (so the row isn't ambiguous without a wait row above it).
+		if hasBoth || (!hasWait && rowLabel == l.SLAServiceTitle) {
+			_ = pdf.SetFont("dejavubd", "", 7.5)
+			pdf.SetTextColor(80, 100, 180)
+			pdf.SetXY(col1X, rowY)
+			_ = pdf.Cell(&gopdf.Rect{W: innerW, H: 9}, rowLabel)
+			rowY += 9
+		}
 
-	_ = pdf.SetFont("dejavubd", "", 11)
-	pdf.SetTextColor(0, 0, 0)
-	values := []struct {
-		x    float64
-		text string
-	}{
-		{col1X, fmt.Sprintf("%.1f%%", sla.WithinPct)},
-		{col2X, fmt.Sprintf("%.1f%%", sla.BreachPct)},
-		{col3X, fmt.Sprintf("%d", sla.SlaWaitMet)},
-		{col4X, fmt.Sprintf("%d", sla.SlaWaitTotal)},
+		// Column labels
+		_ = pdf.SetFont("dejavu", "", 8)
+		pdf.SetTextColor(80, 80, 80)
+		for _, lb := range []struct {
+			x    float64
+			text string
+		}{
+			{col1X, l.SLAWithin}, {col2X, l.SLABreach}, {col3X, l.SLAMet}, {col4X, l.SLATotal},
+		} {
+			pdf.SetXY(lb.x, rowY)
+			_ = pdf.Cell(&gopdf.Rect{W: 90, H: 10}, lb.text)
+		}
+		rowY += 11
+
+		// Values
+		_ = pdf.SetFont("dejavubd", "", 11)
+		pdf.SetTextColor(0, 0, 0)
+		for _, v := range []struct {
+			x    float64
+			text string
+		}{
+			{col1X, within},
+			{col2X, breach},
+			{col3X, fmt.Sprintf("%d", met)},
+			{col4X, fmt.Sprintf("%d", total)},
+		} {
+			pdf.SetXY(v.x, rowY)
+			_ = pdf.Cell(&gopdf.Rect{W: 90, H: 14}, v.text)
+		}
 	}
-	for _, v := range values {
-		pdf.SetXY(v.x, valY)
-		_ = pdf.Cell(&gopdf.Rect{W: 90, H: 14}, v.text)
+
+	curY := y + 20
+	if hasWait {
+		drawSLARow(curY, l.SLAWaitTitle, fmt.Sprintf("%.1f%%", sla.WithinPct), fmt.Sprintf("%.1f%%", sla.BreachPct), sla.SlaWaitMet, sla.SlaWaitTotal)
+		if hasBoth {
+			curY += 36
+		}
+	}
+	if hasSvc {
+		var svcPct float64
+		if sla.SlaServiceTotal > 0 {
+			svcPct = float64(sla.SlaServiceMet) / float64(sla.SlaServiceTotal) * 100
+		}
+		breachPct := 100.0 - svcPct
+		drawSLARow(curY, l.SLAServiceTitle, fmt.Sprintf("%.1f%%", svcPct), fmt.Sprintf("%.1f%%", breachPct), sla.SlaServiceMet, sla.SlaServiceTotal)
 	}
 
 	return y + cardH + 4
@@ -343,18 +384,28 @@ func drawStatsSectionTimeseries(
 	}
 	y = drawStatsSectionHeader(pdf, left, y, innerW, l.SectionTimeseries)
 
+	hasServiceSLA := false
+	for _, p := range data.Points {
+		if p.SlaServiceTotal > 0 {
+			hasServiceSLA = true
+			break
+		}
+	}
 	cols := []pdfColumnDef{
 		{l.ColDate, 2.0, pdfAlignLeft},
-		{l.ColAvgWait, 1.5, pdfAlignRight},
-		{l.ColAvgService, 1.5, pdfAlignRight},
-		{l.ColCreated, 1.0, pdfAlignRight},
-		{l.ColCompleted, 1.0, pdfAlignRight},
-		{l.ColNoShow, 1.0, pdfAlignRight},
+		{l.ColAvgWait, 1.4, pdfAlignRight},
+		{l.ColAvgService, 1.4, pdfAlignRight},
+		{l.ColCreated, 0.9, pdfAlignRight},
+		{l.ColCompleted, 0.9, pdfAlignRight},
+		{l.ColNoShow, 0.9, pdfAlignRight},
 		{l.ColSLAMetPct, 1.0, pdfAlignRight},
+	}
+	if hasServiceSLA {
+		cols = append(cols, pdfColumnDef{l.ColSvcSLAMetPct, 1.1, pdfAlignRight})
 	}
 	rows := make([][]string, 0, len(data.Points))
 	for _, p := range data.Points {
-		rows = append(rows, []string{
+		row := []string{
 			p.Date,
 			fmtOptFloat(p.AvgWaitMinutes, 2),
 			fmtOptFloat(p.AvgServiceMinutes, 2),
@@ -362,7 +413,11 @@ func drawStatsSectionTimeseries(
 			fmt.Sprintf("%d", p.TicketsCompleted),
 			fmt.Sprintf("%d", p.NoShowCount),
 			fmtOptPct(p.SlaWaitMetPct),
-		})
+		}
+		if hasServiceSLA {
+			row = append(row, fmtOptPct(p.SlaServiceMetPct))
+		}
+		rows = append(rows, row)
 	}
 
 	return statsPdfDrawTable(pdf, left, y, innerW, cols, rows, cfg, addPage)
@@ -421,22 +476,44 @@ func drawStatsSectionSLADeviations(
 	}
 	y = drawStatsSectionHeader(pdf, left, y, innerW, l.SectionSLADeviations)
 
+	hasSvcSLA := false
+	for _, p := range data.Points {
+		if p.SlaServiceTotal > 0 {
+			hasSvcSLA = true
+			break
+		}
+	}
 	cols := []pdfColumnDef{
 		{l.ColDate, 2.0, pdfAlignLeft},
-		{l.ColWithinPct, 1.5, pdfAlignRight},
-		{l.ColBreachPct, 1.5, pdfAlignRight},
+		{l.ColWithinPct, 1.4, pdfAlignRight},
+		{l.ColBreachPct, 1.4, pdfAlignRight},
 		{l.ColMet, 1.0, pdfAlignRight},
 		{l.ColTotal, 1.0, pdfAlignRight},
 	}
+	if hasSvcSLA {
+		cols = append(cols,
+			pdfColumnDef{l.ColSvcSLAMetPct, 1.4, pdfAlignRight},
+			pdfColumnDef{l.ColSvcMet, 1.0, pdfAlignRight},
+			pdfColumnDef{l.ColSvcTotal, 1.0, pdfAlignRight},
+		)
+	}
 	rows := make([][]string, 0, len(data.Points))
 	for _, p := range data.Points {
-		rows = append(rows, []string{
+		row := []string{
 			p.Date,
 			fmt.Sprintf("%.1f", p.WithinPct),
 			fmt.Sprintf("%.1f", p.BreachPct),
 			fmt.Sprintf("%d", p.SlaWaitMet),
 			fmt.Sprintf("%d", p.SlaWaitTotal),
-		})
+		}
+		if hasSvcSLA {
+			row = append(row,
+				fmt.Sprintf("%.1f", p.SlaServiceMetPct),
+				fmt.Sprintf("%d", p.SlaServiceMet),
+				fmt.Sprintf("%d", p.SlaServiceTotal),
+			)
+		}
+		rows = append(rows, row)
 	}
 
 	return statsPdfDrawTable(pdf, left, y, innerW, cols, rows, cfg, addPage)

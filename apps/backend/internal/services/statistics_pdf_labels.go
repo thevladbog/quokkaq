@@ -9,6 +9,8 @@ type StatsPDFLabels struct {
 	Generated   string
 
 	SLASummaryTitle string
+	SLAWaitTitle    string
+	SLAServiceTitle string
 	SLAWithin       string
 	SLABreach       string
 	SLAMet          string
@@ -33,6 +35,9 @@ type StatsPDFLabels struct {
 	ColBreachPct      string
 	ColMet            string
 	ColTotal          string
+	ColSvcSLAMetPct   string
+	ColSvcMet         string
+	ColSvcTotal       string
 	ColService        string
 	ColCount          string
 	ColAvgScoreNorm   string
@@ -59,7 +64,9 @@ func StatsPDFLabelsEN() StatsPDFLabels {
 		Operator:    "Operator:",
 		Generated:   "Generated:",
 
-		SLASummaryTitle: "WAITING SLA SUMMARY",
+		SLASummaryTitle: "SLA SUMMARY",
+		SLAWaitTitle:    "WAIT SLA",
+		SLAServiceTitle: "SERVICE SLA",
 		SLAWithin:       "Within SLA",
 		SLABreach:       "Breach",
 		SLAMet:          "Met",
@@ -79,11 +86,14 @@ func StatsPDFLabelsEN() StatsPDFLabels {
 		ColCreated:        "Created",
 		ColCompleted:      "Completed",
 		ColNoShow:         "No-Show",
-		ColSLAMetPct:      "SLA Met %",
-		ColWithinPct:      "Within %",
-		ColBreachPct:      "Breach %",
-		ColMet:            "Met",
-		ColTotal:          "Total",
+		ColSLAMetPct:      "SLA Met % (wait)",
+		ColWithinPct:      "Within % (wait)",
+		ColBreachPct:      "Breach % (wait)",
+		ColMet:            "Met (wait)",
+		ColTotal:          "Total (wait)",
+		ColSvcSLAMetPct:   "SLA Met % (service)",
+		ColSvcMet:         "Met (service)",
+		ColSvcTotal:       "Total (service)",
 		ColService:        "Service",
 		ColCount:          "Count",
 		ColAvgScoreNorm:   "Avg Score (norm 5)",
@@ -111,7 +121,9 @@ func StatsPDFLabelsRU() StatsPDFLabels {
 		Operator:    "Оператор:",
 		Generated:   "Сформирован:",
 
-		SLASummaryTitle: "СВОДКА SLA ОЖИДАНИЯ",
+		SLASummaryTitle: "СВОДКА SLA",
+		SLAWaitTitle:    "SLA ОЖИДАНИЯ",
+		SLAServiceTitle: "SLA ОБСЛУЖИВАНИЯ",
 		SLAWithin:       "В пределах SLA",
 		SLABreach:       "Нарушение",
 		SLAMet:          "Выполнено",
@@ -131,11 +143,14 @@ func StatsPDFLabelsRU() StatsPDFLabels {
 		ColCreated:        "Создано",
 		ColCompleted:      "Завершено",
 		ColNoShow:         "Неявка",
-		ColSLAMetPct:      "SLA выполнен %",
-		ColWithinPct:      "В пределах %",
-		ColBreachPct:      "Нарушение %",
-		ColMet:            "Выполнено",
-		ColTotal:          "Итого",
+		ColSLAMetPct:      "SLA выполнен % (ожид.)",
+		ColWithinPct:      "В пределах % (ожид.)",
+		ColBreachPct:      "Нарушение % (ожид.)",
+		ColMet:            "Выполнено (ожид.)",
+		ColTotal:          "Итого (ожид.)",
+		ColSvcSLAMetPct:   "SLA выполнен % (обсл.)",
+		ColSvcMet:         "Выполнено (обсл.)",
+		ColSvcTotal:       "Итого (обсл.)",
 		ColService:        "Услуга",
 		ColCount:          "Кол-во",
 		ColAvgScoreNorm:   "Ср. балл (норм. 5)",

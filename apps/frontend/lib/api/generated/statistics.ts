@@ -112,7 +112,7 @@ export interface ModelsService {
   description?: string;
   descriptionEn?: string;
   descriptionRu?: string;
-  /** In seconds */
+  /** In seconds (expected / nominal service length for progress display) */
   duration?: number;
   gridCol?: number;
   gridColSpan?: number;
@@ -122,7 +122,9 @@ export interface ModelsService {
   id?: string;
   imageUrl?: string;
   isLeaf?: boolean;
-  /** In seconds */
+  /** In seconds (service-time SLA — copied to Ticket.MaxServiceTime on in_service) */
+  maxServiceTime?: number;
+  /** In seconds (queue-wait SLA — copied to Ticket.MaxWaitingTime on create) */
   maxWaitingTime?: number;
   name?: string;
   nameEn?: string;
@@ -274,6 +276,8 @@ export interface ModelsTicket {
   isCredit?: boolean;
   isEod?: boolean;
   lastCalledAt?: string;
+  /** Snapshot from Service at in_service; cleared on transfer/return */
+  maxServiceTime?: number;
   /** Snapshot from Service at creation */
   maxWaitingTime?: number;
   operatorComment?: string;
@@ -2009,6 +2013,9 @@ export interface ServicesPublicTenantResponse {
 export interface ServicesSLADeviationsPoint {
   breachPct?: number;
   date?: string;
+  slaServiceMet?: number;
+  slaServiceMetPct?: number;
+  slaServiceTotal?: number;
   slaWaitMet?: number;
   slaWaitTotal?: number;
   withinPct?: number;
@@ -2018,6 +2025,24 @@ export interface ServicesSLADeviationsResponse {
   computedAt?: string;
   granularity?: string;
   points?: ServicesSLADeviationsPoint[];
+}
+
+export interface ServicesSLAHeatmapCell {
+  /** "YYYY-MM-DD" */
+  date?: string;
+  /** 0–23 */
+  hour?: number;
+  met?: number;
+  /** 0–100; 0 when total == 0 */
+  pct?: number;
+  total?: number;
+}
+
+export interface ServicesSLAHeatmapResponse {
+  cells?: ServicesSLAHeatmapCell[];
+  computedAt?: string;
+  /** "wait" | "service" */
+  type?: string;
 }
 
 export interface ServicesSetupHealthCheck {
@@ -2078,6 +2103,8 @@ export interface ServicesSlaSummaryResponse {
   breachPct?: number;
   computedAt?: string;
   serviceId?: string;
+  slaServiceMet?: number;
+  slaServiceTotal?: number;
   slaWaitMet?: number;
   slaWaitTotal?: number;
   withinPct?: number;
@@ -2152,6 +2179,9 @@ export interface ServicesTimeseriesPoint {
   avgWaitMinutes?: number;
   date?: string;
   noShowCount?: number;
+  slaServiceMet?: number;
+  slaServiceMetPct?: number;
+  slaServiceTotal?: number;
   slaWaitMetPct?: number;
   ticketsCompleted?: number;
   ticketsCreated?: number;
@@ -2293,6 +2323,37 @@ userId?: string;
  */
 serviceZoneId?: string;
 };
+
+export type GetUnitStatisticsSlaHeatmapParams = {
+/**
+ * YYYY-MM-DD
+ */
+dateFrom: string;
+/**
+ * YYYY-MM-DD
+ */
+dateTo: string;
+/**
+ * SLA type: wait or service
+ */
+type?: GetUnitStatisticsSlaHeatmapType;
+/**
+ * Filter by operator (expanded scope only)
+ */
+userId?: string;
+/**
+ * Service zone unit id
+ */
+serviceZoneId?: string;
+};
+
+export type GetUnitStatisticsSlaHeatmapType = typeof GetUnitStatisticsSlaHeatmapType[keyof typeof GetUnitStatisticsSlaHeatmapType];
+
+
+export const GetUnitStatisticsSlaHeatmapType = {
+  wait: 'wait',
+  service: 'service',
+} as const;
 
 export type GetUnitStatisticsSlaSummaryParams = {
 /**
@@ -3360,6 +3421,161 @@ export function useGetUnitStatisticsSlaDeviations<TData = Awaited<ReturnType<typ
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetUnitStatisticsSlaDeviationsQueryOptions(unitId,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * @summary Per-hour SLA compliance heatmap for a date range
+ */
+export type getUnitStatisticsSlaHeatmapResponse200 = {
+  data: ServicesSLAHeatmapResponse
+  status: 200
+}
+
+export type getUnitStatisticsSlaHeatmapResponse400 = {
+  data: string
+  status: 400
+}
+
+export type getUnitStatisticsSlaHeatmapResponse401 = {
+  data: string
+  status: 401
+}
+
+export type getUnitStatisticsSlaHeatmapResponse403 = {
+  data: string
+  status: 403
+}
+
+export type getUnitStatisticsSlaHeatmapResponse404 = {
+  data: string
+  status: 404
+}
+
+export type getUnitStatisticsSlaHeatmapResponse500 = {
+  data: string
+  status: 500
+}
+
+export type getUnitStatisticsSlaHeatmapResponseSuccess = (getUnitStatisticsSlaHeatmapResponse200) & {
+  headers: Headers;
+};
+export type getUnitStatisticsSlaHeatmapResponseError = (getUnitStatisticsSlaHeatmapResponse400 | getUnitStatisticsSlaHeatmapResponse401 | getUnitStatisticsSlaHeatmapResponse403 | getUnitStatisticsSlaHeatmapResponse404 | getUnitStatisticsSlaHeatmapResponse500) & {
+  headers: Headers;
+};
+
+export type getUnitStatisticsSlaHeatmapResponse = (getUnitStatisticsSlaHeatmapResponseSuccess | getUnitStatisticsSlaHeatmapResponseError)
+
+export const getGetUnitStatisticsSlaHeatmapUrl = (unitId: string,
+    params: GetUnitStatisticsSlaHeatmapParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/units/${unitId}/statistics/sla-heatmap?${stringifiedParams}` : `/units/${unitId}/statistics/sla-heatmap`
+}
+
+export const getUnitStatisticsSlaHeatmap = async (unitId: string,
+    params: GetUnitStatisticsSlaHeatmapParams, options?: RequestInit): Promise<getUnitStatisticsSlaHeatmapResponse> => {
+
+  return orvalMutator<getUnitStatisticsSlaHeatmapResponse>(getGetUnitStatisticsSlaHeatmapUrl(unitId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetUnitStatisticsSlaHeatmapQueryKey = (unitId: string,
+    params?: GetUnitStatisticsSlaHeatmapParams,) => {
+    return [
+    `/units/${unitId}/statistics/sla-heatmap`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetUnitStatisticsSlaHeatmapQueryOptions = <TData = Awaited<ReturnType<typeof getUnitStatisticsSlaHeatmap>>, TError = string>(unitId: string,
+    params: GetUnitStatisticsSlaHeatmapParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSlaHeatmap>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetUnitStatisticsSlaHeatmapQueryKey(unitId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUnitStatisticsSlaHeatmap>>> = ({ signal }) => getUnitStatisticsSlaHeatmap(unitId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSlaHeatmap>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetUnitStatisticsSlaHeatmapQueryResult = NonNullable<Awaited<ReturnType<typeof getUnitStatisticsSlaHeatmap>>>
+export type GetUnitStatisticsSlaHeatmapQueryError = string
+
+
+export function useGetUnitStatisticsSlaHeatmap<TData = Awaited<ReturnType<typeof getUnitStatisticsSlaHeatmap>>, TError = string>(
+ unitId: string,
+    params: GetUnitStatisticsSlaHeatmapParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSlaHeatmap>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getUnitStatisticsSlaHeatmap>>,
+          TError,
+          Awaited<ReturnType<typeof getUnitStatisticsSlaHeatmap>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetUnitStatisticsSlaHeatmap<TData = Awaited<ReturnType<typeof getUnitStatisticsSlaHeatmap>>, TError = string>(
+ unitId: string,
+    params: GetUnitStatisticsSlaHeatmapParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSlaHeatmap>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getUnitStatisticsSlaHeatmap>>,
+          TError,
+          Awaited<ReturnType<typeof getUnitStatisticsSlaHeatmap>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetUnitStatisticsSlaHeatmap<TData = Awaited<ReturnType<typeof getUnitStatisticsSlaHeatmap>>, TError = string>(
+ unitId: string,
+    params: GetUnitStatisticsSlaHeatmapParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSlaHeatmap>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Per-hour SLA compliance heatmap for a date range
+ */
+
+export function useGetUnitStatisticsSlaHeatmap<TData = Awaited<ReturnType<typeof getUnitStatisticsSlaHeatmap>>, TError = string>(
+ unitId: string,
+    params: GetUnitStatisticsSlaHeatmapParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsSlaHeatmap>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetUnitStatisticsSlaHeatmapQueryOptions(unitId,params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

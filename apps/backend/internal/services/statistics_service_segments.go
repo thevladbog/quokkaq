@@ -286,3 +286,55 @@ WHERE t.unit_id::text = ? AND h.user_id::text = ?
 	}
 	return out, nil
 }
+
+// computeServiceSLAForTicketsCompletedInRange counts served tickets in [startUTC, endUTC) whose
+// confirmed_at→completed_at duration is within max_service_time (SLA met) vs total with max_service_time set.
+// Uses ticketduration.ServiceSeconds (floor seconds from confirmed_at), consistent with the supervisor UI anchor.
+func computeServiceSLAForTicketsCompletedInRange(
+	seg repository.StatisticsTicketSegmentsRepository,
+	unitID string,
+	startUTC, endUTC time.Time,
+	zoneID string,
+) (slaMet int, slaTotal int, err error) {
+	ids, err := seg.ListTicketIDsServedCompletedInRangeForService(unitID, startUTC, endUTC, zoneID)
+	if err != nil {
+		return 0, 0, err
+	}
+	if len(ids) == 0 {
+		return 0, 0, nil
+	}
+	ticketMap, err := seg.BatchTicketsByIDs(ids)
+	if err != nil {
+		return 0, 0, err
+	}
+	for _, tid := range ids {
+		t, ok := ticketMap[tid]
+		if !ok {
+			continue
+		}
+		if t.MaxServiceTime == nil || *t.MaxServiceTime <= 0 {
+			continue
+		}
+		secs, ok := ticketdurationServiceSeconds(&t)
+		if !ok {
+			continue
+		}
+		slaTotal++
+		if secs <= *t.MaxServiceTime {
+			slaMet++
+		}
+	}
+	return slaMet, slaTotal, nil
+}
+
+// ticketdurationServiceSeconds computes the service duration as (completed_at - confirmed_at) in seconds.
+// Returns the truncated integer seconds and true; returns 0, false when timestamps are absent or invalid.
+func ticketdurationServiceSeconds(t *models.Ticket) (int, bool) {
+	if t.ConfirmedAt == nil || t.CompletedAt == nil {
+		return 0, false
+	}
+	if t.CompletedAt.Before(*t.ConfirmedAt) {
+		return 0, false
+	}
+	return int(t.CompletedAt.Sub(*t.ConfirmedAt).Seconds()), true
+}

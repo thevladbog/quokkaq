@@ -25,6 +25,9 @@ type StatisticsDailyBucket struct {
 	SlaWaitMet   int `gorm:"not null;default:0" json:"slaWaitMet"`
 	SlaWaitTotal int `gorm:"not null;default:0" json:"slaWaitTotal"`
 
+	SlaServiceMet   int `gorm:"not null;default:0" json:"slaServiceMet"`
+	SlaServiceTotal int `gorm:"not null;default:0" json:"slaServiceTotal"`
+
 	ComputedAt time.Time `gorm:"not null" json:"computedAt"`
 
 	Unit Unit `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-" swaggerignore:"true"`

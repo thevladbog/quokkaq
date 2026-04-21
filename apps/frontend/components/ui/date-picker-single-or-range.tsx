@@ -85,22 +85,35 @@ export function DatePickerSingleOrRange({
     return `${format(a, 'PPP', { locale: dateLocale })} — ${format(b, 'PPP', { locale: dateLocale })}`;
   }, [from, to, dateLocale, labels.openCalendar, labels.rangeAwaitingEnd]);
 
-  const handleRangeSelect = (r: DateRange | undefined) => {
+  const [open, setOpen] = React.useState(false);
+
+  const handleRangeSelect = (r: DateRange | undefined, selectedDay: Date) => {
+    // react-day-picker v9 extends an existing complete range when the user clicks outside it
+    // (before `from` → keeps `to`; after `to` → keeps `from`).
+    // We always want the first click after a complete range to start a fresh selection,
+    // so we ignore the computed extension and use the actually clicked day as the new start.
+    if (rangeSelected?.from && rangeSelected?.to) {
+      onRangeChange(toYmd(selectedDay), undefined);
+      return;
+    }
     if (!r?.from) return;
     const start = toYmd(r.from);
     const end = r.to ? toYmd(r.to) : undefined;
     onRangeChange(start, end);
+    if (end) {
+      setOpen(false);
+    }
   };
 
   return (
     <div className={cn(className)}>
-      <Popover>
+      <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
             type='button'
             variant='outline'
             className={cn(
-              'min-w-[240px] justify-start text-left font-normal',
+              'w-full justify-start text-left font-normal',
               summary === labels.openCalendar && 'text-muted-foreground'
             )}
             disabled={disabled}

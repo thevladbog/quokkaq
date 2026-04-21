@@ -44,6 +44,7 @@ CREATE TABLE tickets (
 	completed_at datetime,
 	last_called_at datetime,
 	max_waiting_time integer,
+	max_service_time integer,
 	operator_comment text
 );
 CREATE TABLE ticket_histories (

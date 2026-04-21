@@ -550,3 +550,68 @@ func (h *StatisticsHandler) GetEmployeeRadar(w http.ResponseWriter, r *http.Requ
 	}
 	RespondJSON(w, resp)
 }
+
+// GetSLAHeatmap godoc
+// @ID           getUnitStatisticsSlaHeatmap
+// @Summary      Per-hour SLA compliance heatmap for a date range
+// @Tags         statistics
+// @Security     BearerAuth
+// @Param        unitId path string true "Subdivision unit ID"
+// @Param        dateFrom query string true "YYYY-MM-DD"
+// @Param        dateTo query string true "YYYY-MM-DD"
+// @Param        type query string false "SLA type: wait or service" Enums(wait,service) default(wait)
+// @Param        userId query string false "Filter by operator (expanded scope only)"
+// @Param        serviceZoneId query string false "Service zone unit id"
+// @Success      200 {object} services.SLAHeatmapResponse
+// @Failure      400 {string} string "Bad Request"
+// @Failure      401 {string} string "Unauthorized"
+// @Failure      403 {string} string "Forbidden"
+// @Failure      404 {string} string "Unit not found"
+// @Failure      500 {string} string "Internal server error"
+// @Router       /units/{unitId}/statistics/sla-heatmap [get]
+func (h *StatisticsHandler) GetSLAHeatmap(w http.ResponseWriter, r *http.Request) {
+	unitID := chi.URLParam(r, "unitId")
+	viewerID, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok || viewerID == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	user, err := h.userRepo.FindByID(r.Context(), viewerID)
+	if err != nil {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+	companyID, err := h.subdivisionCompanyID(r.Context(), unitID)
+	if err != nil {
+		http.Error(w, "Unit not found", http.StatusNotFound)
+		return
+	}
+	dateFrom := strings.TrimSpace(r.URL.Query().Get("dateFrom"))
+	dateTo := strings.TrimSpace(r.URL.Query().Get("dateTo"))
+	if dateFrom == "" || dateTo == "" {
+		http.Error(w, "dateFrom and dateTo are required", http.StatusBadRequest)
+		return
+	}
+	slaType := strings.TrimSpace(r.URL.Query().Get("type"))
+	if slaType == "" {
+		slaType = "wait"
+	}
+	if slaType != "wait" && slaType != "service" {
+		http.Error(w, "type must be wait or service", http.StatusBadRequest)
+		return
+	}
+	var reqUser *string
+	if v := strings.TrimSpace(r.URL.Query().Get("userId")); v != "" {
+		reqUser = &v
+	}
+	svcZone := strings.TrimSpace(r.URL.Query().Get("serviceZoneId"))
+	resp, err := h.service.GetSLAHeatmap(r.Context(), unitID, companyID, user, viewerID, dateFrom, dateTo, slaType, reqUser, svcZone)
+	if err != nil {
+		if respondStatisticsServiceErr(w, err) {
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	RespondJSON(w, resp)
+}
