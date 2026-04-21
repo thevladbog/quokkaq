@@ -2120,7 +2120,22 @@
       "listCountersTitle": "Рабочие места",
       "listCountersDescription": "Стойки и принудительное освобождение",
       "timelineTitle": "Лента очереди",
-      "timelineDescription": "Талоны по времени выдачи (сначала новые)"
+      "timelineDescription": "Талоны по времени выдачи (сначала новые)",
+      "sla": {
+        "warningTitle": "SLA-предупреждение — талон {queueNumber}",
+        "warningBody": "Услуга: {serviceName}. Ожидание {elapsed} из {maxWait} мин.",
+        "breachTitle": "SLA нарушен — талон {queueNumber}",
+        "breachBody": "Услуга: {serviceName}. Ожидание {elapsed}, лимит {maxWait} мин.",
+        "bannerWarning": "{count, plural, one {# талон} few {# талона} other {# талонов}} приближается к лимиту SLA",
+        "bannerBreach": "{count, plural, one {# талон} few {# талона} other {# талонов}} нарушил SLA",
+        "dismiss": "Закрыть",
+        "dismissAll": "Закрыть всё",
+        "browserNotificationTitle": "SLA Alert — QuokkaQ",
+        "enableNotifications": "Включить браузерные уведомления об SLA",
+        "threshold50": "50% от SLA",
+        "threshold80": "80% от SLA",
+        "threshold100": "SLA нарушен"
+      }
     }
   },
   "invitations": {

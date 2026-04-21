@@ -7,6 +7,18 @@ export interface TicketUpdate {
   ticket: Ticket;
 }
 
+/** Matches SlaAlertPayload on the Go backend (services/sla_monitor_service.go). */
+export interface SlaAlertPayload {
+  ticketId: string;
+  queueNumber: string;
+  serviceName: string;
+  unitId: string;
+  /** 50, 80, or 100 */
+  thresholdPct: number;
+  elapsedSec: number;
+  maxWaitTimeSec: number;
+}
+
 export interface QueueSnapshot {
   unitId: string;
   now: string;
@@ -233,6 +245,14 @@ export class SocketClient {
         }
       )
     );
+  }
+
+  onSlaWarning(callback: (data: SlaAlertPayload) => void) {
+    this.on('unit.sla_warning', (data) => callback(data as SlaAlertPayload));
+  }
+
+  onSlaBreach(callback: (data: SlaAlertPayload) => void) {
+    this.on('unit.sla_breach', (data) => callback(data as SlaAlertPayload));
   }
 
   // Emit events - Backend currently doesn't handle these, but keeping for compatibility

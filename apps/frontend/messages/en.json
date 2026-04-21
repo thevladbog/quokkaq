@@ -2120,7 +2120,22 @@
       "listCountersTitle": "Stations",
       "listCountersDescription": "Counters and force release",
       "timelineTitle": "Queue timeline",
-      "timelineDescription": "Tickets by issue time (newest first)"
+      "timelineDescription": "Tickets by issue time (newest first)",
+      "sla": {
+        "warningTitle": "SLA warning — ticket {queueNumber}",
+        "warningBody": "Service: {serviceName}. Waited {elapsed} of {maxWait} max.",
+        "breachTitle": "SLA breached — ticket {queueNumber}",
+        "breachBody": "Service: {serviceName}. Waited {elapsed}, limit is {maxWait}.",
+        "bannerWarning": "{count, plural, one {# ticket} other {# tickets}} approaching SLA limit",
+        "bannerBreach": "{count, plural, one {# ticket} other {# tickets}} breached SLA",
+        "dismiss": "Dismiss",
+        "dismissAll": "Dismiss all",
+        "browserNotificationTitle": "SLA Alert — QuokkaQ",
+        "enableNotifications": "Enable browser notifications for SLA alerts",
+        "threshold50": "50% of SLA",
+        "threshold80": "80% of SLA",
+        "threshold100": "SLA breached"
+      }
     }
   },
   "invitations": {

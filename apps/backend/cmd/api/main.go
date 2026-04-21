@@ -162,6 +162,8 @@ func run() error {
 	refreshCtx, refreshCancel := context.WithCancel(context.Background())
 	defer refreshCancel()
 	statsRefresh.StartPeriodicRefresh(refreshCtx)
+	slaMonitor := services.NewSlaMonitorService(ticketRepo, hub)
+	slaMonitor.Start(refreshCtx)
 	go func() {
 		ticker := time.NewTicker(3 * time.Minute)
 		defer ticker.Stop()

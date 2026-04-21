@@ -21,9 +21,11 @@ import { Loader2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { PreRegistrationDetailsModal } from '@/components/staff/PreRegistrationDetailsModal';
 import { SupervisorShiftDashboard } from '@/components/supervisor/SupervisorShiftDashboard';
+import { SlaAlertBanner } from '@/components/supervisor/SlaAlertBanner';
 import type { ShiftCounterRow } from '@/components/supervisor/SupervisorWorkstationMonitoring';
 import { useSyncActiveUnit } from '@/contexts/ActiveUnitContext';
 import { getUnitDisplayName } from '@/lib/unit-display';
+import { useSlaAlerts } from '@/hooks/use-sla-alerts';
 
 export default function ShiftDashboardPage({
   params
@@ -35,6 +37,8 @@ export default function ShiftDashboardPage({
   const locale = useLocale();
   const queryClient = useQueryClient();
   useSyncActiveUnit(unitId);
+  const { activeSlaAlerts, dismissAlert, dismissAllAlerts } =
+    useSlaAlerts(unitId);
   const [showEODDialog, setShowEODDialog] = useState(false);
   const [forceReleaseDialogOpen, setForceReleaseDialogOpen] = useState(false);
   const [selectedCounter, setSelectedCounter] = useState<{
@@ -176,6 +180,15 @@ export default function ShiftDashboardPage({
 
   return (
     <>
+      {activeSlaAlerts.length > 0 && (
+        <div className='container mx-auto max-w-7xl px-4 pt-4'>
+          <SlaAlertBanner
+            alerts={activeSlaAlerts}
+            onDismiss={dismissAlert}
+            onDismissAll={dismissAllAlerts}
+          />
+        </div>
+      )}
       <SupervisorShiftDashboard
         unitName={unit ? getUnitDisplayName(unit, locale) : undefined}
         stats={stats}

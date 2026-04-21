@@ -5,6 +5,10 @@ import (
 	"quokkaq-go-backend/internal/logger"
 )
 
+type activeRoomsRequest struct {
+	reply chan []string
+}
+
 type Hub struct {
 	// Registered clients.
 	clients map[*Client]bool
@@ -23,6 +27,9 @@ type Hub struct {
 
 	// Subscribe client to a room
 	subscribe chan Subscription
+
+	// activeRoomsQuery requests a snapshot of rooms that have at least one client.
+	activeRoomsQuery chan activeRoomsRequest
 }
 
 type BroadcastMessage struct {
@@ -37,12 +44,13 @@ type Subscription struct {
 
 func NewHub() *Hub {
 	return &Hub{
-		broadcast:  make(chan BroadcastMessage),
-		register:   make(chan *Client),
-		unregister: make(chan *Client),
-		subscribe:  make(chan Subscription),
-		clients:    make(map[*Client]bool),
-		rooms:      make(map[string]map[*Client]bool),
+		broadcast:        make(chan BroadcastMessage),
+		register:         make(chan *Client),
+		unregister:       make(chan *Client),
+		subscribe:        make(chan Subscription),
+		clients:          make(map[*Client]bool),
+		rooms:            make(map[string]map[*Client]bool),
+		activeRoomsQuery: make(chan activeRoomsRequest),
 	}
 }
 
@@ -65,6 +73,15 @@ func (h *Hub) Run() {
 				h.rooms[sub.RoomID] = make(map[*Client]bool)
 			}
 			h.rooms[sub.RoomID][sub.Client] = true
+
+		case req := <-h.activeRoomsQuery:
+			ids := make([]string, 0, len(h.rooms))
+			for roomID, clients := range h.rooms {
+				if len(clients) > 0 {
+					ids = append(ids, roomID)
+				}
+			}
+			req.reply <- ids
 
 		case message := <-h.broadcast:
 			if message.RoomID != "" {
@@ -109,4 +126,12 @@ func (h *Hub) BroadcastEvent(event string, data interface{}, roomID string) {
 		RoomID:  roomID,
 		Message: bytes,
 	}
+}
+
+// ActiveRooms returns a snapshot of unit IDs (room IDs) that currently have
+// at least one connected WebSocket subscriber. Safe to call from any goroutine.
+func (h *Hub) ActiveRooms() []string {
+	reply := make(chan []string, 1)
+	h.activeRoomsQuery <- activeRoomsRequest{reply: reply}
+	return <-reply
 }
