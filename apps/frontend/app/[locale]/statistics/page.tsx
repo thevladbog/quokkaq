@@ -1225,7 +1225,8 @@ export default function StatisticsPage() {
     Boolean(ticketsByServiceBody?.items?.length) ||
     Boolean(surveyStatsBody?.points?.length) ||
     Boolean(slaSummaryBody?.slaWaitTotal) ||
-    Boolean(utilizationQuery.data?.data?.points?.length);
+    (utilizationQuery.data?.status === 200 &&
+      Boolean(utilizationQuery.data.data?.points?.length));
 
   const showZoneFilter = zoneOptions.length > 0;
   const showSubdivisionFilter = subdivisionOptions.length > 0;
