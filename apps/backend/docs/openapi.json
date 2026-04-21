@@ -21194,7 +21194,7 @@
                         }
                     },
                     {
-                        "description": "Start date YYYY-MM-DD",
+                        "description": "Start date (YYYY-MM-DD)",
                         "in": "query",
                         "name": "dateFrom",
                         "required": true,
@@ -21203,7 +21203,7 @@
                         }
                     },
                     {
-                        "description": "End date YYYY-MM-DD",
+                        "description": "End date (YYYY-MM-DD)",
                         "in": "query",
                         "name": "dateTo",
                         "required": true,
@@ -21212,7 +21212,7 @@
                         }
                     },
                     {
-                        "description": "Operator filter",
+                        "description": "Filter by operator/user ID (exact match)",
                         "in": "query",
                         "name": "userId",
                         "schema": {
@@ -21220,11 +21220,30 @@
                         }
                     },
                     {
-                        "description": "Service zone filter",
+                        "description": "Filter by service zone ID (exact match)",
                         "in": "query",
                         "name": "serviceZoneId",
                         "schema": {
                             "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Filter survey scores by survey definition ID",
+                        "in": "query",
+                        "name": "surveyId",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Filter survey scores by question IDs (repeatable)",
+                        "in": "query",
+                        "name": "questionIds",
+                        "schema": {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
                         }
                     }
                 ],
@@ -21236,23 +21255,12 @@
                                     "format": "binary",
                                     "type": "string"
                                 }
-                            },
-                            "text/plain": {
-                                "schema": {
-                                    "format": "binary",
-                                    "type": "string"
-                                }
                             }
                         },
                         "description": "PDF report"
                     },
                     "400": {
                         "content": {
-                            "application/pdf": {
-                                "schema": {
-                                    "type": "string"
-                                }
-                            },
                             "text/plain": {
                                 "schema": {
                                     "type": "string"
@@ -21263,11 +21271,6 @@
                     },
                     "401": {
                         "content": {
-                            "application/pdf": {
-                                "schema": {
-                                    "type": "string"
-                                }
-                            },
                             "text/plain": {
                                 "schema": {
                                     "type": "string"
@@ -21278,11 +21281,6 @@
                     },
                     "403": {
                         "content": {
-                            "application/pdf": {
-                                "schema": {
-                                    "type": "string"
-                                }
-                            },
                             "text/plain": {
                                 "schema": {
                                     "type": "string"
@@ -21293,11 +21291,6 @@
                     },
                     "404": {
                         "content": {
-                            "application/pdf": {
-                                "schema": {
-                                    "type": "string"
-                                }
-                            },
                             "text/plain": {
                                 "schema": {
                                     "type": "string"
@@ -21308,11 +21301,6 @@
                     },
                     "500": {
                         "content": {
-                            "application/pdf": {
-                                "schema": {
-                                    "type": "string"
-                                }
-                            },
                             "text/plain": {
                                 "schema": {
                                     "type": "string"

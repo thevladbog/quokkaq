@@ -1203,7 +1203,7 @@ export default function StatisticsPage() {
         await statisticsExportApi.downloadPDF(statsSubdivisionId, {
           dateFrom: from,
           dateTo: dateToForApi,
-          userId: filterUserId || undefined,
+          userId: userIdParam,
           serviceZoneId: serviceZoneParam || undefined
         });
       const fromHeader =
@@ -1222,7 +1222,10 @@ export default function StatisticsPage() {
     Boolean(tsStatsBody?.points?.length) ||
     Boolean(loadStatsBody?.points?.length) ||
     Boolean(slaStatsBody?.points?.length) ||
-    Boolean(ticketsByServiceBody?.items?.length);
+    Boolean(ticketsByServiceBody?.items?.length) ||
+    Boolean(surveyStatsBody?.points?.length) ||
+    Boolean(slaSummaryBody?.slaWaitTotal) ||
+    Boolean(utilizationQuery.data?.data?.points?.length);
 
   const showZoneFilter = zoneOptions.length > 0;
   const showSubdivisionFilter = subdivisionOptions.length > 0;

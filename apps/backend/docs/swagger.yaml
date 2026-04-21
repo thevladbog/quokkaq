@@ -13242,28 +13242,40 @@ paths:
                   required: true
                   schema:
                     type: string
-                - description: Start date YYYY-MM-DD
+                - description: Start date (YYYY-MM-DD)
                   in: query
                   name: dateFrom
                   required: true
                   schema:
                     type: string
-                - description: End date YYYY-MM-DD
+                - description: End date (YYYY-MM-DD)
                   in: query
                   name: dateTo
                   required: true
                   schema:
                     type: string
-                - description: Operator filter
+                - description: Filter by operator/user ID (exact match)
                   in: query
                   name: userId
                   schema:
                     type: string
-                - description: Service zone filter
+                - description: Filter by service zone ID (exact match)
                   in: query
                   name: serviceZoneId
                   schema:
                     type: string
+                - description: Filter survey scores by survey definition ID
+                  in: query
+                  name: surveyId
+                  schema:
+                    type: string
+                - description: Filter survey scores by question IDs (repeatable)
+                  in: query
+                  name: questionIds
+                  schema:
+                    items:
+                        type: string
+                    type: array
             responses:
                 "200":
                     content:
@@ -13271,52 +13283,33 @@ paths:
                             schema:
                                 format: binary
                                 type: string
-                        text/plain:
-                            schema:
-                                format: binary
-                                type: string
                     description: PDF report
                 "400":
                     content:
-                        application/pdf:
-                            schema:
-                                type: string
                         text/plain:
                             schema:
                                 type: string
                     description: Bad Request
                 "401":
                     content:
-                        application/pdf:
-                            schema:
-                                type: string
                         text/plain:
                             schema:
                                 type: string
                     description: Unauthorized
                 "403":
                     content:
-                        application/pdf:
-                            schema:
-                                type: string
                         text/plain:
                             schema:
                                 type: string
                     description: Forbidden
                 "404":
                     content:
-                        application/pdf:
-                            schema:
-                                type: string
                         text/plain:
                             schema:
                                 type: string
                     description: Unit not found
                 "500":
                     content:
-                        application/pdf:
-                            schema:
-                                type: string
                         text/plain:
                             schema:
                                 type: string

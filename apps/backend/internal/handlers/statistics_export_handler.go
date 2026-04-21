@@ -37,10 +37,12 @@ func NewStatisticsExportHandler(
 // @Security     BearerAuth
 // @Produce      application/pdf,text/plain
 // @Param        unitId path string true "Subdivision unit ID"
-// @Param        dateFrom query string true "Start date YYYY-MM-DD"
-// @Param        dateTo query string true "End date YYYY-MM-DD"
-// @Param        userId query string false "Operator filter"
-// @Param        serviceZoneId query string false "Service zone filter"
+// @Param        dateFrom query string true "Start date (YYYY-MM-DD)"
+// @Param        dateTo query string true "End date (YYYY-MM-DD)"
+// @Param        userId query string false "Filter by operator/user ID (exact match)"
+// @Param        serviceZoneId query string false "Filter by service zone ID (exact match)"
+// @Param        surveyId query string false "Filter survey scores by survey definition ID"
+// @Param        questionIds query []string false "Filter survey scores by question IDs (repeatable)"
 // @Success      200 {file} binary "PDF report"
 // @Failure      400 {string} string "Bad Request"
 // @Failure      401 {string} string "Unauthorized"
@@ -81,11 +83,24 @@ func (h *StatisticsExportHandler) ExportPDF(w http.ResponseWriter, r *http.Reque
 	}
 	svcZone := strings.TrimSpace(r.URL.Query().Get("serviceZoneId"))
 
+	var surveyID *string
+	if v := strings.TrimSpace(r.URL.Query().Get("surveyId")); v != "" {
+		surveyID = &v
+	}
+	questionIDs := parseStatisticsQuestionIDs(r.URL.Query())
+
+	locale := middleware.GetLocale(r.Context())
+	labels := services.StatsPDFLabelsEN()
+	if locale == "ru" {
+		labels = services.StatsPDFLabelsRU()
+	}
+
 	ctx := r.Context()
 	input := services.StatisticsPDFInput{
 		UnitName: unit.Name,
 		DateFrom: dateFrom,
 		DateTo:   dateTo,
+		Labels:   labels,
 	}
 	if reqUser != nil {
 		input.FilterOperator = *reqUser
@@ -139,7 +154,7 @@ func (h *StatisticsExportHandler) ExportPDF(w http.ResponseWriter, r *http.Reque
 	input.SlaSummary = sum
 
 	if repository.UserCanViewSurveyScoreAggregates(user, unitID) {
-		scores, err := h.service.GetSurveyScores(ctx, unitID, companyID, user, viewerID, dateFrom, dateTo, nil, nil)
+		scores, err := h.service.GetSurveyScores(ctx, unitID, companyID, user, viewerID, dateFrom, dateTo, surveyID, questionIDs)
 		if handleStatsErr(err) {
 			return
 		}
@@ -188,8 +203,9 @@ func statisticsPDFFilename(unitName, dateFrom, dateTo string) string {
 		}
 		return r
 	}, unitName)
-	if len(safe) > 60 {
-		safe = safe[:60]
+	runes := []rune(safe)
+	if len(runes) > 60 {
+		safe = string(runes[:60])
 	}
 	return fmt.Sprintf("%s_%s_%s.pdf", safe, dateFrom, dateTo)
 }

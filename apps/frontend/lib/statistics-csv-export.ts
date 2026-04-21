@@ -76,7 +76,7 @@ export type StatisticsExportFilters = {
 type TranslateFn = (key: string) => string;
 
 function escapeCSV(value: string): string {
-  const safe = /^[=+\-@]/.test(value) ? `'${value}` : value;
+  const safe = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
   if (safe.includes(',') || safe.includes('"') || safe.includes('\n')) {
     return `"${safe.replace(/"/g, '""')}"`;
   }
@@ -192,6 +192,7 @@ function buildSlaDeviationsSection(
 }
 
 function buildSlaSummarySection(summary: SlaSummary, t: TranslateFn): string[] {
+  if (!summary.slaWaitTotal || summary.slaWaitTotal <= 0) return [];
   const lines: string[] = ['', row([`[${t('chart_sla_radial')}]`])];
   lines.push(
     row([
@@ -328,7 +329,7 @@ export function buildStatisticsCSV(
     lines.push(...buildUtilizationSection(util, t));
   }
 
-  return lines.join('\n');
+  return lines.join('\r\n');
 }
 
 export function downloadStatisticsCSV(

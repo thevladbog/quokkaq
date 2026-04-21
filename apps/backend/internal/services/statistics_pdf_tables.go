@@ -84,14 +84,36 @@ func statsPdfDrawTable(
 	}
 	colWidths := computeColumnWidths(cols, tableWidth, cfg.ColGutter)
 
+	truncateToFit := func(text string, maxW float64) string {
+		tw, _ := pdf.MeasureTextWidth(text)
+		if tw <= maxW {
+			return text
+		}
+		const ellipsis = "…"
+		ew, _ := pdf.MeasureTextWidth(ellipsis)
+		runes := []rune(text)
+		lo, hi := 0, len(runes)
+		for lo < hi {
+			mid := (lo + hi + 1) / 2
+			cw, _ := pdf.MeasureTextWidth(string(runes[:mid]))
+			if cw+ew <= maxW {
+				lo = mid
+			} else {
+				hi = mid - 1
+			}
+		}
+		return string(runes[:lo]) + ellipsis
+	}
+
 	drawCell := func(cellX, cellY, cellW, cellH float64, text string, align pdfColAlign) {
+		display := truncateToFit(text, cellW)
 		if align == pdfAlignRight {
-			tw, _ := pdf.MeasureTextWidth(text)
+			tw, _ := pdf.MeasureTextWidth(display)
 			pdf.SetXY(cellX+cellW-tw, cellY)
 		} else {
 			pdf.SetXY(cellX, cellY)
 		}
-		_ = pdf.Cell(&gopdf.Rect{W: cellW, H: cellH}, text)
+		_ = pdf.Cell(&gopdf.Rect{W: cellW, H: cellH}, display)
 	}
 
 	// Header row
