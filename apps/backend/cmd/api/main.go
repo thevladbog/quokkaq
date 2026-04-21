@@ -94,6 +94,8 @@ func run() error {
 			slog.Error("error closing job client", "err", err)
 		}
 	}()
+	// jobEnqueuerAdapter bridges jobs.JobClient to services.JobEnqueuer without circular imports.
+	jobEnqueuerAdapter := &jobEnqueuerAdapter{client: jobClient}
 
 	storageService := services.NewStorageService()
 	ttsService := services.NewTtsService(storageService)
@@ -119,11 +121,7 @@ func run() error {
 	slog.Info("CommerceML checkauth sessions use in-memory storage; multiple API replicas require sticky routing or a future shared session backend")
 	operatorIntervalRepo := repository.NewOperatorIntervalRepository()
 
-	jobWorker := jobs.NewJobWorker(ttsService, ticketRepo)
-	if err := jobWorker.Start(); err != nil {
-		return err
-	}
-	defer jobWorker.Stop()
+	notifRepo := repository.NewNotificationRepository()
 
 	userService := services.NewUserService(userRepo, companyRepo)
 	deploymentSetupService := services.NewDeploymentSetupService(userRepo, companyRepo)
@@ -131,6 +129,12 @@ func run() error {
 	tenantRBACRepo := repository.NewTenantRBACRepository()
 	deploymentSaaSSettingsRepo := repository.NewDeploymentSaaSSettingsRepository()
 	deploymentSaaSSettingsService := services.NewDeploymentSaaSSettingsService(deploymentSaaSSettingsRepo)
+
+	jobWorker := jobs.NewJobWorkerWithSMS(ttsService, ticketRepo, notifRepo, deploymentSaaSSettingsService)
+	if err := jobWorker.Start(); err != nil {
+		return err
+	}
+	defer jobWorker.Stop()
 	trackerClient := services.NewYandexTrackerClientFromEnv()
 	leadIssueService := services.NewLeadIssueService(deploymentSaaSSettingsRepo, trackerClient)
 	authService, err := services.NewAuthService(userRepo, companyRepo, mailService, subscriptionRepo, tenantRBACRepo, leadIssueService)
@@ -154,7 +158,11 @@ func run() error {
 	statsSegmentsRepo := repository.NewStatisticsTicketSegmentsRepository()
 	statsRefresh := services.NewStatisticsRefreshService(statsRepo, unitRepo, opStateRepo, statsSegmentsRepo)
 	operationalService := services.NewOperationalService(opStateRepo, unitRepo, statsRefresh)
-	ticketService := services.NewTicketServiceWithQuota(ticketRepo, counterRepo, serviceRepo, unitRepo, operatorIntervalRepo, unitClientRepo, visitorTagDefRepo, unitClientHistRepo, preRegRepo, calendarIntegrationService, hub, jobClient, quotaService, operationalService)
+	ticketService := services.NewTicketServiceWithQuota(ticketRepo, counterRepo, serviceRepo, unitRepo, operatorIntervalRepo, unitClientRepo, visitorTagDefRepo, unitClientHistRepo, preRegRepo, calendarIntegrationService, hub, jobEnqueuerAdapter, quotaService, operationalService)
+	notificationService := services.NewNotificationService(notifRepo, unitRepo, unitClientRepo, jobEnqueuerAdapter, deploymentSaaSSettingsService)
+	ticketService.SetNotificationService(notificationService)
+	// Wire notification service into the Asynq worker so visitor:notify jobs can delegate to it.
+	jobs.WithNotificationService(jobWorker, notificationService)
 	serviceService := services.NewServiceServiceWithQuota(serviceRepo, unitRepo, quotaService)
 	counterService := services.NewCounterServiceWithQuota(counterRepo, ticketRepo, serviceRepo, userRepo, operatorIntervalRepo, unitRepo, hub, quotaService)
 	bookingService := services.NewBookingService(bookingRepo)
@@ -202,7 +210,8 @@ func run() error {
 	companySSOHTTP := handlers.NewCompanySSOHTTP(ssoService, userRepo, companyRepo)
 	tenantRBACHTTP := handlers.NewTenantRBACHTTP(tenantRBACRepo, userRepo, ssoService)
 	unitHandler := handlers.NewUnitHandler(unitService, storageService, operationalService, userRepo)
-	ticketHandler := handlers.NewTicketHandler(ticketService, operationalService)
+	etaService := services.NewETAServiceWithServiceRepo(ticketRepo, counterRepo, serviceRepo)
+	ticketHandler := handlers.NewTicketHandlerFull(ticketService, operationalService, etaService, unitService).WithSettingsService(deploymentSaaSSettingsService)
 	serviceHandler := handlers.NewServiceHandler(serviceService, userRepo)
 	counterHandler := handlers.NewCounterHandler(counterService, counterRepo, operationalService, userRepo, unitRepo)
 	bookingHandler := handlers.NewBookingHandler(bookingService, userRepo)
@@ -447,6 +456,8 @@ func run() error {
 		})
 
 		r.With(authmiddleware.PublicAPIRateLimit).Get("/{unitId}/materials", unitHandler.GetMaterials)
+		r.With(authmiddleware.PublicAPIRateLimit).Get("/{unitId}/queue-status", ticketHandler.GetUnitQueueStatus)
+		r.With(authmiddleware.PublicAPIRateLimit).Post("/{unitId}/virtual-queue", ticketHandler.JoinVirtualQueue)
 
 		r.Group(func(r chi.Router) {
 			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
@@ -765,6 +776,7 @@ func run() error {
 		r.Get("/features", platformHandler.GetFeatures)
 		r.Get("/integrations", integrationsHandler.GetPlatformIntegrations)
 		r.Patch("/integrations", integrationsHandler.PatchPlatformIntegrations)
+		r.Post("/integrations/sms/test", integrationsHandler.TestSMSIntegration)
 		r.Get("/saas-operator-company", platformHandler.GetSaaSOperatorCompany)
 		r.Get("/companies", platformHandler.ListCompanies)
 		r.Get("/companies/{id}/onec-settings", onecSettingsHandler.GetPlatformCompanyOneCSettings)
@@ -797,6 +809,8 @@ func run() error {
 
 	r.Route("/tickets", func(r chi.Router) {
 		r.With(authmiddleware.PublicAPIRateLimit).Get("/{id}", ticketHandler.GetTicketByID)
+		r.With(authmiddleware.PublicAPIRateLimit).Post("/{id}/cancel", ticketHandler.VisitorCancelTicket)
+		r.With(authmiddleware.PublicAPIRateLimit).Post("/{id}/phone", ticketHandler.AttachPhone)
 		r.Group(func(r chi.Router) {
 			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
 			r.Use(authmiddleware.RequireTicketUnit(userRepo, ticketRepo))
@@ -908,4 +922,29 @@ func listenAndServeWithBindRetry(srv *http.Server, retryFor time.Duration) error
 		}
 		time.Sleep(250 * time.Millisecond)
 	}
+}
+
+// jobEnqueuerAdapter wraps jobs.JobClient to satisfy the services.JobEnqueuer interface,
+// avoiding a circular import between the services and jobs packages.
+type jobEnqueuerAdapter struct {
+	client jobs.JobClient
+}
+
+func (a *jobEnqueuerAdapter) EnqueueTtsGenerate(payload services.TtsJobPayload) error {
+	return a.client.EnqueueTtsGenerate(payload)
+}
+
+func (a *jobEnqueuerAdapter) EnqueueSMSSend(payload services.SMSSendJobPayload) error {
+	return a.client.EnqueueSMSSendRaw(jobs.SMSSendPayload{
+		NotificationID: payload.NotificationID,
+		To:             payload.To,
+		Body:           payload.Body,
+	})
+}
+
+func (a *jobEnqueuerAdapter) EnqueueVisitorNotify(payload services.VisitorNotifyJobPayload) error {
+	return a.client.EnqueueVisitorNotifyRaw(jobs.VisitorNotifyPayload{
+		TicketID: payload.TicketID,
+		Type:     payload.Type,
+	})
 }

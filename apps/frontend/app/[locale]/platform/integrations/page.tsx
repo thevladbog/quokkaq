@@ -19,6 +19,15 @@ import {
 } from '@/components/ui/form';
 import { Spinner } from '@/components/ui/spinner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select';
 import { Link } from '@/src/i18n/navigation';
 import {
   getGetPlatformIntegrationsQueryKey,
@@ -29,6 +38,10 @@ import {
   type HandlersPlatformIntegrationsResponse,
   type ServicesDeploymentSaaSSettingsPatch
 } from '@/lib/api/generated/platform';
+import {
+  API_BASE_URL,
+  authenticatedApiFetch
+} from '@/lib/authenticated-api-fetch';
 
 type PlatformIntegrationsFormValues = {
   leadsTrackerQueue: string;
@@ -37,6 +50,11 @@ type PlatformIntegrationsFormValues = {
   trackerTypeError: string;
   supportTrackerQueue: string;
   trackerTypeSupport: string;
+  smsProvider: string;
+  smsApiKey: string;
+  smsApiSecret: string;
+  smsFromName: string;
+  smsEnabled: boolean;
 };
 
 function toFormValues(
@@ -48,7 +66,18 @@ function toFormValues(
     trackerTypeRequest: data.trackerTypeRequest ?? '',
     trackerTypeError: data.trackerTypeError ?? '',
     supportTrackerQueue: data.supportTrackerQueue ?? '',
-    trackerTypeSupport: data.trackerTypeSupport ?? ''
+    trackerTypeSupport: data.trackerTypeSupport ?? '',
+    smsProvider:
+      (data as PlatformIntegrationsFormValues & { smsProvider?: string })
+        .smsProvider ?? '',
+    smsApiKey: '',
+    smsApiSecret: '',
+    smsFromName:
+      (data as PlatformIntegrationsFormValues & { smsFromName?: string })
+        .smsFromName ?? '',
+    smsEnabled:
+      (data as PlatformIntegrationsFormValues & { smsEnabled?: boolean })
+        .smsEnabled ?? false
   };
 }
 
@@ -81,8 +110,13 @@ function PlatformIntegrationsForm({
         trackerTypeRequest: values.trackerTypeRequest ?? '',
         trackerTypeError: values.trackerTypeError ?? '',
         supportTrackerQueue: values.supportTrackerQueue ?? '',
-        trackerTypeSupport: values.trackerTypeSupport ?? ''
-      } satisfies ServicesDeploymentSaaSSettingsPatch),
+        trackerTypeSupport: values.trackerTypeSupport ?? '',
+        smsProvider: values.smsProvider || undefined,
+        smsApiKey: values.smsApiKey || undefined,
+        smsApiSecret: values.smsApiSecret || undefined,
+        smsFromName: values.smsFromName || undefined,
+        smsEnabled: values.smsEnabled
+      } as ServicesDeploymentSaaSSettingsPatch),
     onSuccess: (res) => {
       if (res.status === 200 && res.data) {
         toast.success(t('saved'));
@@ -101,15 +135,45 @@ function PlatformIntegrationsForm({
     mutation.mutate(values);
   });
 
+  const [smsTestPhone, setSmsTestPhone] = useState('');
+  const [smsTestLoading, setSmsTestLoading] = useState(false);
+
+  const handleTestSMS = async () => {
+    if (!smsTestPhone.trim()) return;
+    setSmsTestLoading(true);
+    try {
+      const res = await authenticatedApiFetch(
+        `${API_BASE_URL}/platform/integrations/sms/test`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: smsTestPhone })
+        }
+      );
+      if (!res.ok) {
+        const text = await res.text();
+        toast.error(t('smsTestError') + ': ' + text);
+        return;
+      }
+      const json = (await res.json()) as { provider?: string };
+      toast.success(t('smsTestSuccess', { provider: json.provider ?? '' }));
+    } catch {
+      toast.error(t('smsTestError'));
+    } finally {
+      setSmsTestLoading(false);
+    }
+  };
+
   return (
     <Tabs
       value={integrationsTab}
       onValueChange={setIntegrationsTab}
       className='max-w-2xl'
     >
-      <TabsList className='grid w-full max-w-2xl grid-cols-3'>
+      <TabsList className='grid w-full max-w-2xl grid-cols-4'>
         <TabsTrigger value='tracker'>{t('tabTracker')}</TabsTrigger>
         <TabsTrigger value='support'>{t('tabSupport')}</TabsTrigger>
+        <TabsTrigger value='sms'>{t('tabSMS')}</TabsTrigger>
         <TabsTrigger value='onec'>{t('tabOneC')}</TabsTrigger>
       </TabsList>
       <Form {...form}>
@@ -202,6 +266,135 @@ function PlatformIntegrationsForm({
           <Button type='button' disabled={mutation.isPending} onClick={onSave}>
             {mutation.isPending ? <Spinner className='size-4' /> : t('save')}
           </Button>
+        </TabsContent>
+        <TabsContent value='sms' className='mt-6 space-y-6'>
+          <p className='text-muted-foreground text-sm'>{t('smsIntro')}</p>
+
+          <FormField
+            control={form.control}
+            name='smsProvider'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('smsProvider')}</FormLabel>
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder={t('smsProviderPlaceholder')} />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value=''>{t('smsProviderDisabled')}</SelectItem>
+                    <SelectItem value='smsc'>{t('smsProviderSMSC')}</SelectItem>
+                    <SelectItem value='smsru'>
+                      {t('smsProviderSMSRu')}
+                    </SelectItem>
+                    <SelectItem value='smsaero'>
+                      {t('smsProviderSMSAero')}
+                    </SelectItem>
+                    <SelectItem value='twilio'>
+                      {t('smsProviderTwilio')}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name='smsApiKey'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('smsApiKey')}</FormLabel>
+                <FormControl>
+                  <Input
+                    {...field}
+                    type='password'
+                    autoComplete='off'
+                    placeholder='•••••••••••••'
+                  />
+                </FormControl>
+                <FormDescription>{t('smsApiKeyHint')}</FormDescription>
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name='smsApiSecret'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('smsApiSecret')}</FormLabel>
+                <FormControl>
+                  <Input
+                    {...field}
+                    type='password'
+                    autoComplete='off'
+                    placeholder='•••••••••••••'
+                  />
+                </FormControl>
+                <FormDescription>{t('smsApiSecretHint')}</FormDescription>
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name='smsFromName'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('smsFromName')}</FormLabel>
+                <FormControl>
+                  <Input {...field} autoComplete='off' />
+                </FormControl>
+                <FormDescription>{t('smsFromNameHint')}</FormDescription>
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name='smsEnabled'
+            render={({ field }) => (
+              <FormItem className='flex flex-row items-center gap-3'>
+                <FormControl>
+                  <Switch
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                </FormControl>
+                <Label className='cursor-pointer'>{t('smsEnabled')}</Label>
+              </FormItem>
+            )}
+          />
+
+          <Button type='button' disabled={mutation.isPending} onClick={onSave}>
+            {mutation.isPending ? <Spinner className='size-4' /> : t('save')}
+          </Button>
+
+          <div className='border-t pt-6'>
+            <p className='mb-3 text-sm font-medium'>{t('smsTestButton')}</p>
+            <div className='flex gap-2'>
+              <Input
+                value={smsTestPhone}
+                onChange={(e) => setSmsTestPhone(e.target.value)}
+                placeholder={t('smsTestPhonePlaceholder')}
+                className='max-w-xs'
+              />
+              <Button
+                type='button'
+                variant='outline'
+                onClick={handleTestSMS}
+                disabled={smsTestLoading || !smsTestPhone.trim()}
+              >
+                {smsTestLoading ? (
+                  <Spinner className='size-4' />
+                ) : (
+                  t('smsTestButton')
+                )}
+              </Button>
+            </div>
+          </div>
         </TabsContent>
       </Form>
       <PlatformOneCSaaSOperatorTab active={integrationsTab === 'onec'} />

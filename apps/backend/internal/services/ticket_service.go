@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +13,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"quokkaq-go-backend/internal/localeutil"
@@ -148,6 +151,12 @@ var ErrTagDefinitionIDsContainEmpty = errors.New("tagDefinitionIds must not cont
 // ErrClientVisitsInvalidCursor is returned when the visits list cursor cannot be parsed.
 var ErrClientVisitsInvalidCursor = errors.New("invalid visits cursor")
 
+// ErrTicketNotCancellable is returned when visitor tries to cancel a ticket that is not in waiting status.
+var ErrTicketNotCancellable = errors.New("ticket cannot be cancelled: only waiting tickets can be cancelled by visitor")
+
+// ErrTicketNotWaiting is returned when an operation requires the ticket to be in waiting status.
+var ErrTicketNotWaiting = errors.New("ticket is not in waiting status")
+
 // ErrTransferConflictingTargets is returned when both counter/user and zone targets are set.
 var ErrTransferConflictingTargets = errors.New("cannot combine counter transfer with zone transfer")
 
@@ -208,6 +217,12 @@ type TicketService interface {
 	UpdateTicketVisitor(ticketID string, in PatchTicketVisitorInput, actorUserID *string) (*models.Ticket, error)
 	SetVisitorTagsForTicket(ticketID string, tagDefinitionIDs []string, operatorComment string, actorUserID *string) (*models.Ticket, error)
 	ListVisitsByClient(unitID, clientID string, limit int, cursor *string) ([]models.Ticket, *string, error)
+	// VisitorCancelTicket cancels a waiting ticket on behalf of the visitor (no auth required beyond knowing the ticket ID).
+	VisitorCancelTicket(ticketID string) (*models.Ticket, error)
+	// AttachPhoneToTicket links a phone number (E.164) to the UnitClient of a waiting ticket for SMS opt-in.
+	AttachPhoneToTicket(ticketID, phoneE164, locale string) (*models.Ticket, error)
+	// SetNotificationService injects the SMS notification service after construction.
+	SetNotificationService(ns *NotificationService)
 }
 
 type ticketService struct {
@@ -226,6 +241,13 @@ type ticketService struct {
 	log                *slog.Logger
 	quota              QuotaService
 	operational        *OperationalService
+	notifService       *NotificationService
+}
+
+// SetNotificationService wires in the SMS notification service after construction
+// (avoids a circular initialisation dependency).
+func (s *ticketService) SetNotificationService(ns *NotificationService) {
+	s.notifService = ns
 }
 
 func NewTicketService(
@@ -479,11 +501,13 @@ func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID 
 			c, err := s.clientRepo.FindByUnitAndPhoneE164Tx(tx, unitID, phoneE164)
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				ph := phoneE164
+				loc := derefString(visitorLocale)
 				c = &models.UnitClient{
 					UnitID:      unitID,
 					FirstName:   fn,
 					LastName:    ln,
 					PhoneE164:   &ph,
+					Locale:      &loc,
 					IsAnonymous: false,
 				}
 				if err := s.clientRepo.CreateTx(tx, c); err != nil {
@@ -531,6 +555,7 @@ func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID 
 			PreRegistrationID: preRegID,
 			ClientID:          &resolvedClientID,
 			IsCredit:          isCredit,
+			VisitorToken:      uuid.New().String(),
 		}
 
 		payload := map[string]interface{}{
@@ -709,11 +734,40 @@ func (s *ticketService) CallNext(unitID, counterID string, serviceIDs []string, 
 		return nil, err
 	}
 
+	if c, err := s.counterRepo.FindByID(counterID); err == nil {
+		ticket.Counter = c
+	}
 	s.hub.BroadcastEvent("ticket.called", ticket, ticket.UnitID)
 
 	s.enqueueTTS(ticket, counterID)
 
+	// Fire-and-forget SMS notification to visitor.
+	if s.notifService != nil {
+		go s.notifService.SendTicketCalledSMS(ticket)
+	}
+
+	// Notify the new first-in-queue visitor that they're next (queue position = 1).
+	if s.notifService != nil {
+		go s.notifyNextInLine(ticket.UnitID, serviceIDs, ticket.ServiceZoneID)
+	}
+
 	return ticket, nil
+}
+
+// notifyNextInLine finds the current first-waiting ticket and sends a "you're next" SMS
+// if they have a phone. Called after a ticket is called (position of remaining tickets shifts).
+// zoneID scopes the lookup to the same service zone as the called ticket.
+func (s *ticketService) notifyNextInLine(unitID string, serviceIDs []string, zoneID *string) {
+	next, err := s.repo.FindWaiting(unitID, serviceIDs, zoneID)
+	if err != nil || next == nil {
+		return
+	}
+	// Only alert if they are genuinely first (position 1).
+	pos, err := s.repo.GetQueuePosition(next)
+	if err != nil || pos != 1 {
+		return
+	}
+	s.notifService.SendQueuePositionAlert(next)
 }
 
 func (s *ticketService) UpdateStatus(ticketID, status string, actorUserID *string) (*models.Ticket, error) {
@@ -777,6 +831,97 @@ func (s *ticketService) UpdateStatus(ticketID, status string, actorUserID *strin
 	return ticket, nil
 }
 
+func (s *ticketService) VisitorCancelTicket(ticketID string) (*models.Ticket, error) {
+	var ticket *models.Ticket
+	err := s.repo.Transaction(func(tx *gorm.DB) error {
+		t, err := s.repo.FindByIDForUpdateTx(tx, ticketID)
+		if err != nil {
+			return err
+		}
+		ticket = t
+		if ticket.Status != "waiting" {
+			return ErrTicketNotCancellable
+		}
+		now := time.Now()
+		ticket.Status = "no_show"
+		ticket.CompletedAt = &now
+		payload := map[string]interface{}{
+			"unit_id":     ticket.UnitID,
+			"from_status": "waiting",
+			"to_status":   "no_show",
+			"reason":      "visitor_cancel",
+		}
+		if err := s.repo.UpdateTx(tx, ticket); err != nil {
+			return err
+		}
+		return s.writeTicketHistoryTx(tx, ticket.ID, nil, ticketaudit.ActionTicketVisitorCancelled, payload)
+	})
+	if err != nil {
+		return nil, err
+	}
+	s.hub.BroadcastEvent("ticket.updated", ticket, ticket.UnitID)
+	return ticket, nil
+}
+
+// AttachPhoneToTicket links an E.164 phone number to the UnitClient of a waiting ticket.
+// If the ticket's client already has a phone, it is updated. If the ticket uses the anonymous client,
+// a new named client is created and linked to the ticket.
+func (s *ticketService) AttachPhoneToTicket(ticketID, phoneE164, locale string) (*models.Ticket, error) {
+	var ticket *models.Ticket
+	err := s.repo.Transaction(func(tx *gorm.DB) error {
+		t, err := s.repo.FindByIDForUpdateTx(tx, ticketID)
+		if err != nil {
+			return err
+		}
+		ticket = t
+
+		if t.Status != "waiting" {
+			return ErrTicketNotWaiting
+		}
+
+		// Resolve or create a client with the provided phone.
+		c, lookupErr := s.clientRepo.FindByUnitAndPhoneE164Tx(tx, t.UnitID, phoneE164)
+		if lookupErr != nil && !errors.Is(lookupErr, gorm.ErrRecordNotFound) {
+			return lookupErr
+		}
+
+		if errors.Is(lookupErr, gorm.ErrRecordNotFound) {
+			// Create a new client for this phone if none exists.
+			fn, ln, nameErr := localeutil.UnknownVisitorPlaceholderNames(locale)
+			if nameErr != nil {
+				fn, ln = "Неизвестно", "Неизвестно"
+			}
+			ph := phoneE164
+			c = &models.UnitClient{
+				UnitID:      t.UnitID,
+				FirstName:   fn,
+				LastName:    ln,
+				PhoneE164:   &ph,
+				Locale:      &locale,
+				IsAnonymous: false,
+			}
+			if cErr := s.clientRepo.CreateTx(tx, c); cErr != nil {
+				return cErr
+			}
+		}
+
+		// Link the client to the ticket.
+		ticket.ClientID = &c.ID
+		if err := s.repo.UpdateTx(tx, ticket); err != nil {
+			return err
+		}
+		// Audit log: record phone attachment with a hashed phone number (no PII in history).
+		h := sha256.Sum256([]byte(phoneE164))
+		return s.writeTicketHistoryTx(tx, ticket.ID, nil, ticketaudit.ActionTicketPhoneAttached, map[string]interface{}{
+			"phone_sha256": hex.EncodeToString(h[:]),
+		})
+	})
+	if err != nil {
+		return nil, err
+	}
+	return ticket, nil
+}
+
 func (s *ticketService) Recall(ticketID string, actorUserID *string) (*models.Ticket, error) {
 	var ticket *models.Ticket
 	err := s.repo.Transaction(func(tx *gorm.DB) error {
@@ -806,10 +951,20 @@ func (s *ticketService) Recall(ticketID string, actorUserID *string) (*models.Ti
 		return nil, err
 	}
 
+	if ticket.CounterID != nil {
+		if c, err := s.counterRepo.FindByID(*ticket.CounterID); err == nil {
+			ticket.Counter = c
+		}
+	}
 	s.hub.BroadcastEvent("ticket.called", ticket, ticket.UnitID)
 
 	if ticket.CounterID != nil {
 		s.enqueueTTS(ticket, *ticket.CounterID)
+	}
+
+	// Fire-and-forget SMS notification to visitor (parity with CallNext / Pick).
+	if s.notifService != nil {
+		go s.notifService.SendTicketCalledSMS(ticket)
 	}
 
 	return ticket, nil
@@ -863,8 +1018,18 @@ func (s *ticketService) Pick(ticketID, counterID string, actorUserID *string) (*
 		return nil, err
 	}
 
+	if c, err := s.counterRepo.FindByID(counterID); err == nil {
+		ticket.Counter = c
+	}
 	s.hub.BroadcastEvent("ticket.called", ticket, ticket.UnitID)
 	s.enqueueTTS(ticket, counterID)
+
+	// Fire-and-forget SMS notification to visitor (parity with CallNext).
+	if s.notifService != nil {
+		go s.notifService.SendTicketCalledSMS(ticket)
+		// Notify the new first-in-queue visitor (parity with CallNext).
+		go s.notifyNextInLine(ticket.UnitID, nil, ticket.ServiceZoneID)
+	}
 
 	return ticket, nil
 }

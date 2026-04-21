@@ -18,6 +18,7 @@ import {
   usePickTicket,
   useConfirmArrivalTicket,
   useReturnToQueueTicket,
+  useRecallTicket,
   useUnitServices
 } from '@/lib/hooks';
 import { getGetUnitsUnitIdCountersQueryKey } from '@/lib/api/generated/tickets-counters';
@@ -142,6 +143,7 @@ export default function StaffWorkspacePage({
   const pickMutation = usePickTicket();
   const confirmArrivalMutation = useConfirmArrivalTicket();
   const returnToQueueMutation = useReturnToQueueTicket();
+  const recallMutation = useRecallTicket();
 
   const createTicketMutation = useMutation({
     mutationFn: (vars: { serviceId: string; clientId?: string }) =>
@@ -504,6 +506,20 @@ export default function StaffWorkspacePage({
         unitId
       });
       toast.error(t('messages.failed', { action: 'return to queue' }));
+    }
+  };
+
+  const handleRecall = async () => {
+    if (!currentTicket) return;
+    try {
+      await recallMutation.mutateAsync(currentTicket.id);
+      toast.success(
+        t('messages.recalled', { number: currentTicket.queueNumber })
+      );
+      await refetch();
+    } catch (error) {
+      logger.error('Failed to recall ticket', { error });
+      toast.error(t('messages.failed', { action: 're-call' }));
     }
   };
 
@@ -967,12 +983,14 @@ export default function StaffWorkspacePage({
                     transferPending={transferMutation.isPending}
                     noShowPending={noShowMutation.isPending}
                     returnToQueuePending={returnToQueueMutation.isPending}
+                    recallPending={recallMutation.isPending}
                     onCallNext={handleCallNext}
                     onConfirmArrival={handleConfirmArrival}
                     onComplete={handleComplete}
                     onOpenTransfer={openTransferDialog}
                     onNoShow={handleNoShow}
                     onReturnToQueue={handleReturnToQueue}
+                    onRecall={handleRecall}
                   />
                 )}
                 {currentTicket && !workstationOnBreak && (

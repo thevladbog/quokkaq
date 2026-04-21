@@ -24,6 +24,9 @@ type Ticket struct {
 	ID          string `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
 	QueueNumber string `gorm:"not null" json:"queueNumber"`
 	UnitID      string `gorm:"not null" json:"unitId"`
+	// VisitorToken is a secret UUID issued at ticket creation. Visitor endpoints require it in
+	// the X-Visitor-Token header to prevent IDOR on cancel and phone opt-in.
+	VisitorToken string `gorm:"not null;default:gen_random_uuid()" json:"visitorToken,omitempty"`
 	// ServiceZoneID: waiting pool within the subdivision; NULL = subdivision-wide pool.
 	ServiceZoneID     *string `json:"serviceZoneId,omitempty" gorm:"column:service_zone_id"`
 	ServiceID         string  `gorm:"not null" json:"serviceId"`
@@ -50,6 +53,10 @@ type Ticket struct {
 	ServedByName *string `json:"servedByName,omitempty" gorm:"-"`
 	// TransferTrail lists ticket.transferred events in chronological order (client visit APIs only).
 	TransferTrail []ClientVisitTransferEvent `json:"transferTrail,omitempty" gorm:"-"`
+	// QueuePosition is the 1-based position in the waiting queue (computed on-the-fly, not stored).
+	QueuePosition *int `json:"queuePosition,omitempty" gorm:"-"`
+	// EstimatedWaitSeconds is the estimated seconds until this ticket is called (computed on-the-fly).
+	EstimatedWaitSeconds *int `json:"estimatedWaitSeconds,omitempty" gorm:"-"`
 
 	// Relations
 	Unit    Unit     `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-" swaggerignore:"true"`

@@ -12,6 +12,11 @@ import (
 
 type JobClient interface {
 	EnqueueTtsGenerate(payload services.TtsJobPayload) error
+	// EnqueueSMSSendRaw enqueues an sms:send job with a pre-formed payload struct.
+	// Use the services.JobEnqueuer interface (with services.SMSSendJobPayload) at service layer.
+	EnqueueSMSSendRaw(payload SMSSendPayload) error
+	// EnqueueVisitorNotifyRaw enqueues a visitor:notify job with a pre-formed payload struct.
+	EnqueueVisitorNotifyRaw(payload VisitorNotifyPayload) error
 	Close() error
 }
 
@@ -47,6 +52,26 @@ func (c *jobClient) EnqueueTtsGenerate(payload services.TtsJobPayload) error {
 	}
 
 	task := asynq.NewTask(TypeTTSGenerate, data)
+	_, err = c.client.Enqueue(task, asynq.Queue("default"), asynq.MaxRetry(3))
+	return err
+}
+
+func (c *jobClient) EnqueueSMSSendRaw(payload SMSSendPayload) error {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	task := asynq.NewTask(TypeSMSSend, data)
+	_, err = c.client.Enqueue(task, asynq.Queue("default"), asynq.MaxRetry(3))
+	return err
+}
+
+func (c *jobClient) EnqueueVisitorNotifyRaw(payload VisitorNotifyPayload) error {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	task := asynq.NewTask(TypeVisitorNotify, data)
 	_, err = c.client.Enqueue(task, asynq.Queue("default"), asynq.MaxRetry(3))
 	return err
 }

@@ -31,6 +31,7 @@ import { Link } from '@/src/i18n/navigation';
 import { SlotConfiguration } from '@/components/admin/units/slot-configuration';
 import { UnitVisitorTagsSettings } from '@/components/admin/units/unit-visitor-tags-settings';
 import { UnitGuestSurveySettings } from '@/components/admin/units/unit-guest-survey-settings';
+import { VirtualQueueSettings } from '@/components/admin/units/virtual-queue-settings';
 
 import ServiceGridEditor from '@/components/ServiceGridEditor';
 
@@ -259,6 +260,14 @@ export default function UnitPage({ params }: UnitPageProps) {
               </TabsTrigger>
             </PermissionGuard>
             <PermissionGuard
+              permissions={[PermUnitSettingsManage]}
+              unitId={unitId}
+            >
+              <TabsTrigger value='virtual-queue'>
+                {t('virtual_queue_settings.tab')}
+              </TabsTrigger>
+            </PermissionGuard>
+            <PermissionGuard
               permissions={[PermUnitTicketScreenManage]}
               unitId={unitId}
             >
@@ -387,6 +396,19 @@ export default function UnitPage({ params }: UnitPageProps) {
             </PermissionGuard>
           </TabsContent>
 
+          <TabsContent value='virtual-queue' className='mt-6'>
+            <PermissionGuard
+              permissions={[PermUnitSettingsManage]}
+              unitId={unitId}
+              fallback={<div>{t('access_denied')}</div>}
+            >
+              <VirtualQueueSettings
+                unitId={unitId}
+                currentConfig={unit.config}
+              />
+            </PermissionGuard>
+          </TabsContent>
+
           <TabsContent value='ad-screen' className='mt-6'>
             <PermissionGuard
               permissions={[PermUnitTicketScreenManage]}
@@ -506,6 +528,14 @@ export default function UnitPage({ params }: UnitPageProps) {
           >
             <TabsTrigger value='visitor-tags'>
               {t('units.visitor_tags.tab')}
+            </TabsTrigger>
+          </PermissionGuard>
+          <PermissionGuard
+            permissions={[PermUnitSettingsManage]}
+            unitId={unitId}
+          >
+            <TabsTrigger value='virtual-queue'>
+              {t('virtual_queue_settings.tab')}
             </TabsTrigger>
           </PermissionGuard>
         </TabsList>
@@ -680,6 +710,15 @@ export default function UnitPage({ params }: UnitPageProps) {
             fallback={<div>{t('access_denied')}</div>}
           >
             <UnitVisitorTagsSettings unitId={unitId} />
+          </PermissionGuard>
+        </TabsContent>
+        <TabsContent value='virtual-queue' className='mt-6'>
+          <PermissionGuard
+            permissions={[PermUnitSettingsManage]}
+            unitId={unitId}
+            fallback={<div>{t('access_denied')}</div>}
+          >
+            <VirtualQueueSettings unitId={unitId} currentConfig={unit.config} />
           </PermissionGuard>
         </TabsContent>
       </Tabs>

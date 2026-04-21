@@ -23,6 +23,8 @@ const (
 	ActionTicketOperatorCommentUpdated = "ticket.operator_comment_updated"
 	ActionTicketVisitorUpdated         = "ticket.visitor_updated"
 	ActionTicketVisitorTagsUpdated     = "ticket.visitor_tags_updated"
+	ActionTicketVisitorCancelled       = "ticket.visitor_cancelled"
+	ActionTicketPhoneAttached          = "ticket.phone_attached"
 )
 
 // NewHistory builds a TicketHistory row. Payload keys should be snake_case JSON for consumers.

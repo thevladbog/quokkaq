@@ -13,7 +13,9 @@ import (
 
 type noopJobEnqueuer struct{}
 
-func (noopJobEnqueuer) EnqueueTtsGenerate(TtsJobPayload) error { return nil }
+func (noopJobEnqueuer) EnqueueTtsGenerate(TtsJobPayload) error             { return nil }
+func (noopJobEnqueuer) EnqueueSMSSend(SMSSendJobPayload) error             { return nil }
+func (noopJobEnqueuer) EnqueueVisitorNotify(VisitorNotifyJobPayload) error { return nil }
 
 func TestReturnToQueue_preservesServiceZoneAndService(t *testing.T) {
 	db, err := gorm.Open(glebarezsqlite.Open(":memory:"), &gorm.Config{
@@ -27,6 +29,7 @@ CREATE TABLE tickets (
 	id text PRIMARY KEY,
 	queue_number text NOT NULL,
 	unit_id text NOT NULL,
+	visitor_token text NOT NULL DEFAULT (lower(hex(randomblob(16)))),
 	service_zone_id text,
 	service_id text NOT NULL,
 	booking_id text,

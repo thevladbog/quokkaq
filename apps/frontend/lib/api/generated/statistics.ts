@@ -41,6 +41,11 @@ export interface HandlersAssignUnitRequest {
   unitId?: string;
 }
 
+export interface HandlersAttachPhoneRequest {
+  locale?: string;
+  phone?: string;
+}
+
 export interface HandlersCallNextRequest {
   counterId: string;
   serviceId?: string;
@@ -79,6 +84,8 @@ export interface ModelsUnitClient {
   id?: string;
   isAnonymous?: boolean;
   lastName?: string;
+  /** Locale is the visitor's preferred locale ("ru" or "en"), set from the kiosk/virtual-queue on first phone identification. */
+  locale?: string;
   phoneE164?: string;
   photoUrl?: string;
   unitId?: string;
@@ -270,6 +277,8 @@ export interface ModelsTicket {
   counter?: ModelsCounter;
   counterId?: string;
   createdAt?: string;
+  /** EstimatedWaitSeconds is the estimated seconds until this ticket is called (computed on-the-fly). */
+  estimatedWaitSeconds?: number;
   id?: string;
   /** IsCredit marks a ticket issued when the monthly tickets_per_month quota was exhausted but
   the working day (EOD) was still open. Credit tickets are counted against the next billing period. */
@@ -286,6 +295,8 @@ export interface ModelsTicket {
   preRegistrationId?: string;
   priority?: number;
   queueNumber?: string;
+  /** QueuePosition is the 1-based position in the waiting queue (computed on-the-fly, not stored). */
+  queuePosition?: number;
   /** ServedByName is hydrated for client visit lists from ticket_histories (not stored on tickets). */
   servedByName?: string;
   service?: ModelsService;
@@ -298,6 +309,9 @@ export interface ModelsTicket {
   /** URL to the generated TTS audio file */
   ttsUrl?: string;
   unitId?: string;
+  /** VisitorToken is a secret UUID issued at ticket creation. Visitor endpoints require it in
+  the X-Visitor-Token header to prevent IDOR on cancel and phone opt-in. */
+  visitorToken?: string;
 }
 
 export interface HandlersClientVisitsResponse {
@@ -736,12 +750,18 @@ export interface HandlersPlatformCreateSubscriptionPlanBody {
 }
 
 export interface HandlersPlatformIntegrationsResponse {
-  leadsTrackerQueue: string;
-  supportTrackerQueue: string;
-  trackerTypeError: string;
-  trackerTypeRegistration: string;
-  trackerTypeRequest: string;
-  trackerTypeSupport: string;
+  leadsTrackerQueue?: string;
+  /** e.g. "****abcd" — last 4 chars only */
+  smsApiKeyMasked?: string;
+  smsEnabled?: boolean;
+  smsFromName?: string;
+  /** SMS integration (credentials are masked in read; never returned in plaintext). */
+  smsProvider?: string;
+  supportTrackerQueue?: string;
+  trackerTypeError?: string;
+  trackerTypeRegistration?: string;
+  trackerTypeRequest?: string;
+  trackerTypeSupport?: string;
 }
 
 export type HandlersPlatformUpdateSubscriptionPlanBodyFeatures = {[key: string]: boolean};
@@ -883,6 +903,11 @@ export interface HandlersTerminalBootstrapResponse {
   unitId?: string;
 }
 
+export interface HandlersTestSMSIntegrationRequest {
+  /** Phone number in E.164 format to send the test SMS to. */
+  phone?: string;
+}
+
 export interface HandlersTransferRequest {
   /** @nullable */
   operatorComment?: string | null;
@@ -988,6 +1013,17 @@ export interface HandlersUserResponse {
   tenantRoles?: HandlersTenantRoleBriefResponse[];
   type?: string;
   units?: HandlersUserUnitDTO[];
+}
+
+export interface HandlersVirtualQueueJoinRequest {
+  locale?: string;
+  phone?: string;
+  serviceId?: string;
+}
+
+export interface HandlersVirtualQueueJoinResponse {
+  ticket?: unknown;
+  ticketPageUrl?: string;
 }
 
 export type HandlersYooKassaWebhookNotificationObject = { [key: string]: unknown };
@@ -1923,6 +1959,14 @@ export interface ServicesCreateCalendarIntegrationRequest {
 
 export interface ServicesDeploymentSaaSSettingsPatch {
   leadsTrackerQueue?: string;
+  /** full credential (write-only; never returned in GET) */
+  smsApiKey?: string;
+  /** full credential (write-only; never returned in GET) */
+  smsApiSecret?: string;
+  smsEnabled?: boolean;
+  smsFromName?: string;
+  /** SMS provider settings (all optional). */
+  smsProvider?: string;
   supportTrackerQueue?: string;
   trackerTypeError?: string;
   trackerTypeRegistration?: string;
@@ -2043,6 +2087,13 @@ export interface ServicesSLAHeatmapResponse {
   computedAt?: string;
   /** "wait" | "service" */
   type?: string;
+}
+
+export interface ServicesServiceQueueInfo {
+  estimatedWaitMinutes?: number;
+  queueLength?: number;
+  serviceId?: string;
+  serviceName?: string;
 }
 
 export interface ServicesSetupHealthCheck {
@@ -2216,6 +2267,15 @@ export interface ServicesUnitClientHistoryListResponse {
 export interface ServicesUnitClientListResponse {
   items?: ModelsUnitClient[];
   nextCursor?: string;
+}
+
+export interface ServicesUnitQueueSummary {
+  activeCounters?: number;
+  estimatedWaitMinutes?: number;
+  queueLength?: number;
+  /** Services contains per-service breakdown when multiple services have waiting tickets.
+  Omitted when only one service is active (redundant with the top-level fields). */
+  services?: ServicesServiceQueueInfo[];
 }
 
 export interface ServicesUpdateCalendarIntegrationRequest {

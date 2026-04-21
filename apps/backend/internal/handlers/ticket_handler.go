@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"quokkaq-go-backend/internal/logger"
 	"strings"
 
 	"quokkaq-go-backend/internal/localeutil"
+	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/phoneutil"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
@@ -21,10 +24,29 @@ import (
 type TicketHandler struct {
 	service     services.TicketService
 	operational *services.OperationalService
+	eta         *services.ETAService
+	unitService services.UnitService
+	settingsSvc *services.DeploymentSaaSSettingsService
 }
 
 func NewTicketHandler(service services.TicketService, operational *services.OperationalService) *TicketHandler {
 	return &TicketHandler{service: service, operational: operational}
+}
+
+// NewTicketHandlerWithETA creates a TicketHandler with ETA support.
+func NewTicketHandlerWithETA(service services.TicketService, operational *services.OperationalService, eta *services.ETAService) *TicketHandler {
+	return &TicketHandler{service: service, operational: operational, eta: eta}
+}
+
+// NewTicketHandlerFull creates a TicketHandler with all optional services wired.
+func NewTicketHandlerFull(service services.TicketService, operational *services.OperationalService, eta *services.ETAService, unitService services.UnitService) *TicketHandler {
+	return &TicketHandler{service: service, operational: operational, eta: eta, unitService: unitService}
+}
+
+// WithSettingsService attaches the deployment SaaS settings service (needed for smsOptInAvailable check).
+func (h *TicketHandler) WithSettingsService(svc *services.DeploymentSaaSSettingsService) *TicketHandler {
+	h.settingsSvc = svc
+	return h
 }
 
 // CreateTicketRequest is the JSON body for POST /units/{unitId}/tickets (unit comes from the path).
@@ -133,9 +155,15 @@ func (h *TicketHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 	RespondJSON(w, ticket)
 }
 
+// ticketWithExtras wraps a Ticket for the public GET response, adding virtual fields that depend on platform settings.
+type ticketWithExtras struct {
+	*models.Ticket
+	SmsOptInAvailable bool `json:"smsOptInAvailable"`
+}
+
 // GetTicketByID godoc
 // @Summary      Get ticket by ID
-// @Description  Retrieves a ticket by its ID
+// @Description  Retrieves a ticket by its ID. For waiting tickets, also returns queuePosition and estimatedWaitSeconds.
 // @Tags         tickets
 // @Produce      json
 // @Param        id   path      string  true  "Ticket ID"
@@ -149,7 +177,36 @@ func (h *TicketHandler) GetTicketByID(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	RespondJSON(w, ticket)
+	// Enrich with ETA for waiting tickets when service is available.
+	if h.eta != nil && ticket.Status == "waiting" {
+		if result, etaErr := h.eta.QueuePositionAndETA(ticket); etaErr == nil && result.Position > 0 {
+			ticket.QueuePosition = &result.Position
+			if result.EstimatedWaitSec > 0 {
+				ticket.EstimatedWaitSeconds = &result.EstimatedWaitSec
+			}
+		}
+	}
+
+	// Compute smsOptInAvailable: SMS must be effectively active (including env overrides) and the
+	// company must have the visitor_notifications plan feature. Guard against nil unitService which
+	// can occur when the handler is wired without full service dependencies.
+	smsOptIn := false
+	if h.settingsSvc != nil && h.unitService != nil && ticket.Status == "waiting" {
+		settings, sErr := h.settingsSvc.GetIntegrationSettings()
+		if sErr == nil {
+			provider := services.NewSMSProviderFromSettings(settings)
+			if provider.Name() != "log" {
+				unit, uErr := h.unitService.GetUnitByID(ticket.UnitID)
+				if uErr == nil {
+					if ok, _ := services.CompanyHasPlanFeature(unit.CompanyID, "visitor_notifications"); ok {
+						smsOptIn = true
+					}
+				}
+			}
+		}
+	}
+
+	RespondJSON(w, ticketWithExtras{Ticket: ticket, SmsOptInAvailable: smsOptIn})
 }
 
 // GetTicketsByUnit godoc
@@ -680,4 +737,322 @@ func (h *TicketHandler) SetVisitorTags(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	RespondJSON(w, ticket)
+}
+
+// validateVisitorToken reads the X-Visitor-Token header, fetches the ticket by id, and returns
+// false (writing an appropriate HTTP error) if the token is absent or does not match.
+// Returns true when the token is valid and the handler may proceed.
+func (h *TicketHandler) validateVisitorToken(w http.ResponseWriter, r *http.Request, ticketID string) bool {
+	token := strings.TrimSpace(r.Header.Get("X-Visitor-Token"))
+	if token == "" {
+		http.Error(w, "X-Visitor-Token header is required", http.StatusForbidden)
+		return false
+	}
+	ticket, err := h.service.GetTicketByID(ticketID)
+	if err != nil {
+		http.Error(w, "ticket not found", http.StatusNotFound)
+		return false
+	}
+	if ticket.VisitorToken != token {
+		http.Error(w, "invalid visitor token", http.StatusForbidden)
+		return false
+	}
+	return true
+}
+
+// VisitorCancelTicket godoc
+// @ID           visitorCancelTicket
+// @Summary      Cancel a waiting ticket (visitor self-service)
+// @Description  Allows a visitor to cancel their own waiting ticket. Only tickets in 'waiting' status can be cancelled this way. Requires the X-Visitor-Token header matching the token issued at ticket creation.
+// @Tags         tickets
+// @Produce      json
+// @Param        id                path      string  true  "Ticket ID"
+// @Param        X-Visitor-Token   header    string  true  "Visitor ownership token"
+// @Success      200 {object}  models.Ticket
+// @Failure      403 {string}  string "Forbidden"
+// @Failure      404 {string}  string "Ticket not found"
+// @Failure      409 {string}  string "Ticket cannot be cancelled"
+// @Failure      500 {string}  string "Internal Server Error"
+// @Router       /tickets/{id}/cancel [post]
+func (h *TicketHandler) VisitorCancelTicket(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	// Validate visitor ownership token before mutating.
+	if !h.validateVisitorToken(w, r, id) {
+		return
+	}
+
+	ticket, err := h.service.VisitorCancelTicket(id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "ticket not found", http.StatusNotFound)
+			return
+		}
+		if errors.Is(err, services.ErrTicketNotCancellable) {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	RespondJSON(w, ticket)
+}
+
+// AttachPhoneRequest is the body for POST /tickets/{id}/phone.
+type AttachPhoneRequest struct {
+	Phone  string `json:"phone"`
+	Locale string `json:"locale"`
+}
+
+// AttachPhone godoc
+// @ID           attachTicketPhone
+// @Summary      Attach phone number to a ticket for SMS opt-in
+// @Description  Associates a phone number with the visitor of a waiting ticket so they receive SMS notifications. Only valid while the ticket is in 'waiting' status. Normalizes and validates the phone to E.164 format. Requires X-Visitor-Token header.
+// @Tags         tickets
+// @Accept       json
+// @Produce      json
+// @Param        id                path      string              true  "Ticket ID"
+// @Param        X-Visitor-Token   header    string              true  "Visitor ownership token"
+// @Param        request           body      AttachPhoneRequest  true  "Phone opt-in request"
+// @Success      200     {object}  models.Ticket
+// @Failure      400     {string}  string "Bad Request"
+// @Failure      403     {string}  string "Forbidden"
+// @Failure      404     {string}  string "Ticket not found"
+// @Failure      409     {string}  string "Ticket no longer in waiting state"
+// @Router       /tickets/{id}/phone [post]
+func (h *TicketHandler) AttachPhone(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	// Validate visitor ownership token before accepting PII.
+	if !h.validateVisitorToken(w, r, id) {
+		return
+	}
+
+	var req AttachPhoneRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	phone := strings.TrimSpace(req.Phone)
+	if phone == "" {
+		http.Error(w, "phone is required", http.StatusBadRequest)
+		return
+	}
+
+	phoneE164, err := phoneutil.ParseAndNormalize(phone, phoneutil.DefaultRegion())
+	if err != nil {
+		http.Error(w, "invalid phone number", http.StatusBadRequest)
+		return
+	}
+
+	locale := strings.TrimSpace(req.Locale)
+	if locale == "" {
+		locale = "ru"
+	}
+
+	ticket, tErr := h.service.GetTicketByID(id)
+	if tErr != nil {
+		http.Error(w, "ticket not found", http.StatusNotFound)
+		return
+	}
+	if ticket.Status != "waiting" {
+		http.Error(w, "ticket is not in waiting state", http.StatusConflict)
+		return
+	}
+
+	// Enforce SMS feature gate before accepting PII.
+	if h.settingsSvc != nil && h.unitService != nil {
+		smsSettings, sErr := h.settingsSvc.GetIntegrationSettings()
+		if sErr != nil || services.NewSMSProviderFromSettings(smsSettings).Name() == "log" {
+			http.Error(w, "SMS notifications are not configured", http.StatusForbidden)
+			return
+		}
+		if unit, uErr := h.unitService.GetUnitByID(ticket.UnitID); uErr == nil {
+			if ok, _ := services.CompanyHasPlanFeature(unit.CompanyID, "visitor_notifications"); !ok {
+				http.Error(w, "visitor notifications feature not available on current plan", http.StatusForbidden)
+				return
+			}
+		}
+	}
+
+	updated, aErr := h.service.AttachPhoneToTicket(id, phoneE164, locale)
+	if aErr != nil {
+		if errors.Is(aErr, services.ErrTicketNotWaiting) {
+			http.Error(w, aErr.Error(), http.StatusConflict)
+			return
+		}
+		http.Error(w, aErr.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	RespondJSON(w, updated)
+}
+
+// GetUnitQueueStatus godoc
+// @ID           getUnitQueueStatus
+// @Summary      Get public queue status for a unit
+// @Description  Returns queue length, estimated wait time (minutes), and active counter count. Public endpoint, no authentication required.
+// @Tags         tickets
+// @Produce      json
+// @Param        unitId  path      string  true  "Unit ID"
+// @Success      200     {object}  services.UnitQueueSummary
+// @Failure      500     {string}  string "Internal Server Error"
+// @Router       /units/{unitId}/queue-status [get]
+func (h *TicketHandler) GetUnitQueueStatus(w http.ResponseWriter, r *http.Request) {
+	unitID := chi.URLParam(r, "unitId")
+	if h.eta == nil {
+		RespondJSON(w, map[string]interface{}{
+			"queueLength":          0,
+			"estimatedWaitMinutes": 0.0,
+			"activeCounters":       0,
+		})
+		return
+	}
+	summary, err := h.eta.GetUnitQueueSummary(unitID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	RespondJSON(w, summary)
+}
+
+// VirtualQueueJoinRequest is the body for POST /units/{unitId}/virtual-queue.
+type VirtualQueueJoinRequest struct {
+	ServiceID string `json:"serviceId"`
+	Phone     string `json:"phone"`
+	Locale    string `json:"locale"`
+}
+
+// VirtualQueueJoinResponse wraps the created ticket and a visitor-facing page URL.
+type VirtualQueueJoinResponse struct {
+	Ticket        interface{} `json:"ticket"`
+	TicketPageURL string      `json:"ticketPageUrl"`
+}
+
+// JoinVirtualQueue godoc
+// @ID           joinVirtualQueue
+// @Summary      Join a virtual queue remotely
+// @Description  Allows a visitor to join a unit's queue remotely without visiting the kiosk. Requires the unit to have virtualQueue.enabled=true in its config and the company to have the virtual_queue feature. Phone is required for status SMS notifications (optional if not used). Returns the created ticket and a link to the ticket tracking page.
+// @Tags         tickets
+// @Accept       json
+// @Produce      json
+// @Param        unitId  path      string                    true  "Unit ID"
+// @Param        request body      VirtualQueueJoinRequest   true  "Join request"
+// @Success      201     {object}  VirtualQueueJoinResponse
+// @Failure      400     {string}  string "Bad Request"
+// @Failure      403     {string}  string "Virtual queue not enabled for this unit"
+// @Failure      402     {object}  handlers.QuotaExceededError "Quota Exceeded"
+// @Failure      503     {string}  string "Service Unavailable (kiosk frozen)"
+// @Router       /units/{unitId}/virtual-queue [post]
+func (h *TicketHandler) JoinVirtualQueue(w http.ResponseWriter, r *http.Request) {
+	unitID := chi.URLParam(r, "unitId")
+
+	// Check unit exists and has virtual queue enabled.
+	if h.unitService == nil {
+		http.Error(w, "service unavailable", http.StatusInternalServerError)
+		return
+	}
+	unit, err := h.unitService.GetUnitByID(unitID)
+	if err != nil {
+		http.Error(w, "unit not found", http.StatusNotFound)
+		return
+	}
+	if !unitVirtualQueueEnabled(unit.Config) {
+		http.Error(w, "virtual queue is not enabled for this unit", http.StatusForbidden)
+		return
+	}
+	// Check plan feature.
+	if ok, fErr := services.CompanyHasPlanFeature(unit.CompanyID, "virtual_queue"); fErr != nil || !ok {
+		http.Error(w, "virtual queue feature not available on current plan", http.StatusForbidden)
+		return
+	}
+
+	var req VirtualQueueJoinRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	serviceID := strings.TrimSpace(req.ServiceID)
+	if serviceID == "" {
+		http.Error(w, "serviceId is required", http.StatusBadRequest)
+		return
+	}
+
+	if h.operational != nil {
+		frozen, err := h.operational.IsKioskFrozen(unitID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if frozen {
+			http.Error(w, "queue admission is currently closed", http.StatusServiceUnavailable)
+			return
+		}
+	}
+
+	locale := strings.TrimSpace(req.Locale)
+	if locale == "" {
+		locale = "ru"
+	}
+
+	var visitorPhone *string
+	var visitorLocale *string
+	phone := strings.TrimSpace(req.Phone)
+	if phone != "" {
+		visitorPhone = &phone
+		visitorLocale = &locale
+	}
+
+	ticket, err := h.service.CreateTicket(unitID, serviceID, nil, visitorPhone, visitorLocale, nil)
+	if err != nil {
+		switch {
+		case errors.Is(err, services.ErrTicketQuotaExhausted):
+			writeQuotaExceeded(w, "tickets_per_month", err)
+			return
+		case errors.Is(err, services.ErrTicketServiceNotInUnit),
+			errors.Is(err, services.ErrVisitorAnonymousNotAllowed),
+			errors.Is(err, services.ErrVisitorPhoneInvalid),
+			errors.Is(err, localeutil.ErrKioskVisitorLocaleInvalid):
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		default:
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("APP_BASE_URL")), "/")
+	if baseURL == "" {
+		baseURL = "http://localhost:3000"
+	}
+	ticketURL := fmt.Sprintf("%s/%s/ticket/%s", baseURL, locale, ticket.ID)
+
+	w.WriteHeader(http.StatusCreated)
+	RespondJSON(w, VirtualQueueJoinResponse{
+		Ticket:        ticket,
+		TicketPageURL: ticketURL,
+	})
+}
+
+// unitVirtualQueueEnabled reads config.virtualQueue.enabled from a unit's JSONB config.
+func unitVirtualQueueEnabled(configRaw json.RawMessage) bool {
+	if len(configRaw) == 0 || string(configRaw) == "null" {
+		return false
+	}
+	var cfg map[string]json.RawMessage
+	if err := json.Unmarshal(configRaw, &cfg); err != nil {
+		return false
+	}
+	vqRaw, ok := cfg["virtualQueue"]
+	if !ok {
+		return false
+	}
+	var vq struct {
+		Enabled bool `json:"enabled"`
+	}
+	if err := json.Unmarshal(vqRaw, &vq); err != nil {
+		return false
+	}
+	return vq.Enabled
 }

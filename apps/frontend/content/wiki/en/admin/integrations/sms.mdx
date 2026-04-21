@@ -1,0 +1,74 @@
+---
+title: SMS Notifications
+description: Configure an SMS provider to automatically notify visitors when their ticket is called and when they reach the front of the queue.
+---
+
+# SMS Notifications
+
+QuokkaQ can automatically send SMS messages to visitors:
+
+- **"Your ticket has been called"** — when an operator presses Call Next, Recall, or manually picks a ticket.
+- **"You're next in line"** — when a visitor becomes first in the queue.
+
+> **Plan requirement:** this feature requires the `visitor_notifications` capability to be included in the company's subscription plan.
+
+---
+
+## Supported Providers
+
+| Provider    | Identifier | Notes                                                     |
+| ----------- | ---------- | --------------------------------------------------------- |
+| **SMSC**    | `smsc`     | Popular Russian gateway; supports alphanumeric sender IDs |
+| **SMS.ru**  | `smsru`    | Russian service; API ID only, no password required        |
+| **SMSAero** | `smsaero`  | Russian service; email + API key authentication           |
+| **Twilio**  | `twilio`   | International provider; Account SID + Auth Token          |
+
+---
+
+## Configuration via UI
+
+1. Go to **Platform → Integrations**.
+2. Find the **SMS Notifications** section.
+3. Select a provider from the dropdown.
+4. Enter credentials:
+   - **API Key** — login, Account SID, or API ID depending on the provider.
+   - **API Secret** — password or Auth Token (not required for SMS.ru).
+   - **Sender Name** — alphanumeric sender ID displayed in SMS messages (if supported by the provider).
+5. Toggle **SMS enabled**.
+6. Click **Save**.
+
+### Validating the configuration
+
+After saving, use the **Test SMS** field — enter a phone number in E.164 format (e.g. `+14155552671`) and click **Send Test**. On success, the response shows the provider name used.
+
+---
+
+## Environment Variable Overrides
+
+For production deployments it is recommended to pass credentials through environment variables rather than storing them in the database:
+
+| Variable         | Behaviour                                                      |
+| ---------------- | -------------------------------------------------------------- |
+| `SMS_API_KEY`    | Always overrides the database value                            |
+| `SMS_API_SECRET` | Always overrides the database value                            |
+| `SMS_PROVIDER`   | Fills the provider field only when the database value is empty |
+| `SMS_FROM_NAME`  | Fills the sender name only when the database value is empty    |
+
+> When `SMS_PROVIDER` is set via environment, SMS is treated as enabled even if `sms_enabled = false` in the database.
+
+---
+
+## Behaviour without configuration
+
+When SMS is not configured or is disabled, the system falls back to a `log` provider: messages are written to the server log and **are not sent** to real visitors. This is the safe default for development and testing environments.
+
+---
+
+## Visitor opt-in
+
+A visitor who receives a ticket through the kiosk or virtual queue can add their phone number directly on the ticket tracking page (`/ticket/{id}`). The opt-in form is displayed when:
+
+- the ticket is in **waiting** status;
+- SMS notifications are enabled and configured (`smsOptInAvailable = true`).
+
+Once a phone number is attached, the visitor will receive call notifications and queue-position alerts.

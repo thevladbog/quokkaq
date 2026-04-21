@@ -9,6 +9,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Customer Experience and Communications (Phase 3)
+
+##### Customer Notifications (SMS)
+
+- `SMSProvider` interface with four production implementations: **SMSC** (`smsc`), **SMS.ru** (`smsru`), **SMSAero** (`smsaero`), and **Twilio** (`twilio`); `LogSMSProvider` for development/fallback.
+- `NewSMSProviderFromSettings` and `applySMSEnvOverrides`: environment variables `SMS_API_KEY` and `SMS_API_SECRET` always override DB credentials; `SMS_PROVIDER` and `SMS_FROM_NAME` fill when the DB value is empty.
+- `NotificationService`: orchestrates visitor-facing SMS — creates a `notifications` row for persistence and retry tracking, then enqueues an `sms:send` Asynq job.
+- `SendTicketCalledSMS`: fires automatically when an operator calls (`CallNext`), re-calls (`Recall`), or manually picks (`Pick`) a ticket.
+- `SendQueuePositionAlert` ("you're next" SMS): fires via `notifyNextInLine` in `CallNext` and `Pick` when the next-waiting visitor reaches position 1.
+- Visitor locale (`UnitClient.locale` column, migration `v1.6.3_unit_clients_locale`) drives RU/EN SMS message language.
+
+##### Virtual Queue / Remote Check-in
+
+- `POST /units/{unitId}/virtual-queue` — visitor joins the queue remotely; gated on plan feature `virtual_queue` and unit config `virtualQueue.enabled`.
+- `GET /units/{unitId}/queue-status` — unauthenticated public endpoint returning queue length, estimated wait minutes, active counter count, and optional per-service breakdowns.
+- Frontend virtual queue join page (`/[locale]/queue/[unitId]`) with 30-second polling for live queue stats.
+
+##### Estimated Wait Time (ETA)
+
+- `ETAService`: computes 1-based queue position and estimated wait seconds per ticket using a rolling average of the last 20 completed service durations; falls back to `MaxWaitingTime` from the service snapshot when fewer than 3 samples are available.
+- `GetUnitQueueSummary`: returns aggregate and per-service queue stats; per-service breakdown is populated only when `serviceRepo` is injected and more than one service has waiting tickets.
+- `GET /tickets/{id}` now includes `queuePosition` and `estimatedWaitSeconds` virtual fields for waiting tickets.
+- `packages/shared-types`: `TicketModelSchema` extended with `queuePosition`, `estimatedWaitSeconds`, and `smsOptInAvailable` (Zod optional fields).
+
+##### Two-Way Communication
+
+- `POST /tickets/{id}/cancel` — visitor self-cancels a waiting ticket; transitions status to `no_show` and writes a `ticket.visitor_cancelled` history entry.
+- `POST /tickets/{id}/phone` — SMS opt-in: visitor attaches an E.164 phone to a waiting ticket; creates or links a `UnitClient`; returns `HTTP 409` (`ErrTicketNotWaiting`) when ticket is not in waiting status.
+- `ErrTicketNotWaiting` sentinel error added to `ticket_service.go`.
+- Ticket page (`/[locale]/ticket/[ticketId]`) shows inline SMS opt-in form when `smsOptInAvailable` is true and ticket is waiting.
+
+##### SaaS Integrations Admin
+
+- `GET /platform/integrations` — returns SMS provider name, masked API key (last 4 chars), sender name, and enabled flag alongside existing tracker fields.
+- `PATCH /platform/integrations` — accepts SMS patch fields (`smsProvider`, `smsApiKey`, `smsApiSecret`, `smsFromName`, `smsEnabled`); API credentials are write-only and never returned in plaintext.
+- `POST /platform/integrations/sms/test` — sends a test SMS using the current provider configuration; useful for credential validation.
+- `DeploymentSaaSSettings` model extended with SMS columns (`sms_provider`, `sms_api_key`, `sms_api_secret`, `sms_from_name`, `sms_enabled`).
+- Frontend integrations page (`/platform/integrations`) includes SMS section with provider selector, credential inputs, enable toggle, and test-send button.
+
+---
+
 #### RBAC / tenant permissions (database migrations v1.4.x)
 
 - **v1.4.0** — Expanded permission catalog in code (`internal/rbac`); tenant role TRU rows pick up new keys when edited in UI.
