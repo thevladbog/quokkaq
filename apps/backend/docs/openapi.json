@@ -43,6 +43,17 @@
                 },
                 "type": "object"
             },
+            "handlers.AttachPhoneRequest": {
+                "properties": {
+                    "locale": {
+                        "type": "string"
+                    },
+                    "phone": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "handlers.CallNextRequest": {
                 "properties": {
                     "counterId": {
@@ -1036,6 +1047,20 @@
                     "leadsTrackerQueue": {
                         "type": "string"
                     },
+                    "smsApiKeyMasked": {
+                        "description": "e.g. \"****abcd\" — last 4 chars only",
+                        "type": "string"
+                    },
+                    "smsEnabled": {
+                        "type": "boolean"
+                    },
+                    "smsFromName": {
+                        "type": "string"
+                    },
+                    "smsProvider": {
+                        "description": "SMS integration (credentials are masked in read; never returned in plaintext).",
+                        "type": "string"
+                    },
                     "supportTrackerQueue": {
                         "type": "string"
                     },
@@ -1052,14 +1077,6 @@
                         "type": "string"
                     }
                 },
-                "required": [
-                    "leadsTrackerQueue",
-                    "supportTrackerQueue",
-                    "trackerTypeError",
-                    "trackerTypeRegistration",
-                    "trackerTypeRequest",
-                    "trackerTypeSupport"
-                ],
                 "type": "object"
             },
             "handlers.PlatformUpdateSubscriptionPlanBody": {
@@ -1388,6 +1405,15 @@
                 },
                 "type": "object"
             },
+            "handlers.TestSMSIntegrationRequest": {
+                "properties": {
+                    "phone": {
+                        "description": "Phone number in E.164 format to send the test SMS to.",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "handlers.TransferRequest": {
                 "properties": {
                     "operatorComment": {
@@ -1648,6 +1674,29 @@
                         "$ref": "#/components/schemas/handlers.UnitSummaryDTO"
                     },
                     "unitId": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "handlers.VirtualQueueJoinRequest": {
+                "properties": {
+                    "locale": {
+                        "type": "string"
+                    },
+                    "phone": {
+                        "type": "string"
+                    },
+                    "serviceId": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "handlers.VirtualQueueJoinResponse": {
+                "properties": {
+                    "ticket": {},
+                    "ticketPageUrl": {
                         "type": "string"
                     }
                 },
@@ -3567,6 +3616,10 @@
                     "createdAt": {
                         "type": "string"
                     },
+                    "estimatedWaitSeconds": {
+                        "description": "EstimatedWaitSeconds is the estimated seconds until this ticket is called (computed on-the-fly).",
+                        "type": "integer"
+                    },
                     "id": {
                         "type": "string"
                     },
@@ -3607,6 +3660,10 @@
                     },
                     "queueNumber": {
                         "type": "string"
+                    },
+                    "queuePosition": {
+                        "description": "QueuePosition is the 1-based position in the waiting queue (computed on-the-fly, not stored).",
+                        "type": "integer"
                     },
                     "servedByName": {
                         "description": "ServedByName is hydrated for client visit lists from ticket_histories (not stored on tickets).",
@@ -3747,6 +3804,10 @@
                         "type": "boolean"
                     },
                     "lastName": {
+                        "type": "string"
+                    },
+                    "locale": {
+                        "description": "Locale is the visitor's preferred locale (\"ru\" or \"en\"), set from the kiosk/virtual-queue on first phone identification.",
                         "type": "string"
                     },
                     "phoneE164": {
@@ -4269,6 +4330,24 @@
                     "leadsTrackerQueue": {
                         "type": "string"
                     },
+                    "smsApiKey": {
+                        "description": "full credential (write-only; never returned in GET)",
+                        "type": "string"
+                    },
+                    "smsApiSecret": {
+                        "description": "full credential (write-only; never returned in GET)",
+                        "type": "string"
+                    },
+                    "smsEnabled": {
+                        "type": "boolean"
+                    },
+                    "smsFromName": {
+                        "type": "string"
+                    },
+                    "smsProvider": {
+                        "description": "SMS provider settings (all optional).",
+                        "type": "string"
+                    },
                     "supportTrackerQueue": {
                         "type": "string"
                     },
@@ -4553,6 +4632,23 @@
                     },
                     "type": {
                         "description": "\"wait\" | \"service\"",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "services.ServiceQueueInfo": {
+                "properties": {
+                    "estimatedWaitMinutes": {
+                        "type": "number"
+                    },
+                    "queueLength": {
+                        "type": "integer"
+                    },
+                    "serviceId": {
+                        "type": "string"
+                    },
+                    "serviceName": {
                         "type": "string"
                     }
                 },
@@ -4963,6 +5059,27 @@
                     },
                     "nextCursor": {
                         "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "services.UnitQueueSummary": {
+                "properties": {
+                    "activeCounters": {
+                        "type": "integer"
+                    },
+                    "estimatedWaitMinutes": {
+                        "type": "number"
+                    },
+                    "queueLength": {
+                        "type": "integer"
+                    },
+                    "services": {
+                        "description": "Services contains per-service breakdown when multiple services have waiting tickets.\nOmitted when only one service is active (redundant with the top-level fields).",
+                        "items": {
+                            "$ref": "#/components/schemas/services.ServiceQueueInfo"
+                        },
+                        "type": "array"
                     }
                 },
                 "type": "object"
@@ -12678,6 +12795,68 @@
                 ]
             }
         },
+        "/platform/integrations/sms/test": {
+            "post": {
+                "description": "Sends a test SMS using the currently saved SMS provider settings. Returns 200 on success.",
+                "operationId": "testSMSIntegration",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.TestSMSIntegrationRequest"
+                            }
+                        }
+                    },
+                    "description": "Target phone number",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": {
+                                        "type": "string"
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "ok"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad request"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "SMS send failed"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Send a test SMS to validate provider credentials",
+                "tags": [
+                    "platform"
+                ]
+            }
+        },
         "/platform/invoices": {
             "get": {
                 "operationId": "ListInvoices",
@@ -16049,9 +16228,10 @@
                 ]
             }
         },
-        "/tickets/{id}": {
-            "get": {
-                "description": "Retrieves a ticket by its ID",
+        "/tickets/{id}/cancel": {
+            "post": {
+                "description": "Allows a visitor to cancel their own waiting ticket. Only tickets in 'waiting' status can be cancelled this way. No authentication required — the ticket UUID acts as a bearer token.",
+                "operationId": "visitorCancelTicket",
                 "parameters": [
                     {
                         "description": "Ticket ID",
@@ -16083,9 +16263,29 @@
                             }
                         },
                         "description": "Ticket not found"
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Ticket cannot be cancelled"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
                     }
                 },
-                "summary": "Get ticket by ID",
+                "summary": "Cancel a waiting ticket (visitor self-service)",
                 "tags": [
                     "tickets"
                 ]
@@ -16175,6 +16375,81 @@
                     }
                 ],
                 "summary": "Update operator comment on ticket",
+                "tags": [
+                    "tickets"
+                ]
+            }
+        },
+        "/tickets/{id}/phone": {
+            "post": {
+                "description": "Associates a phone number with the visitor of a waiting ticket so they receive SMS notifications. Only valid while the ticket is in 'waiting' status. Normalizes and validates the phone to E.164 format.",
+                "operationId": "attachTicketPhone",
+                "parameters": [
+                    {
+                        "description": "Ticket ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.AttachPhoneRequest"
+                            }
+                        }
+                    },
+                    "description": "Phone opt-in request",
+                    "required": true,
+                    "x-originalParamName": "request"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/models.Ticket"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Ticket not found"
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Ticket no longer in waiting state"
+                    }
+                },
+                "summary": "Attach phone number to a ticket for SMS opt-in",
                 "tags": [
                     "tickets"
                 ]
@@ -20048,6 +20323,49 @@
                 ]
             }
         },
+        "/units/{unitId}/queue-status": {
+            "get": {
+                "description": "Returns queue length, estimated wait time (minutes), and active counter count. Public endpoint, no authentication required.",
+                "operationId": "getUnitQueueStatus",
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/services.UnitQueueSummary"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "summary": "Get public queue status for a unit",
+                "tags": [
+                    "tickets"
+                ]
+            }
+        },
         "/units/{unitId}/services": {
             "get": {
                 "description": "Retrieves all services for a specific unit",
@@ -22857,6 +23175,91 @@
                     }
                 },
                 "summary": "Create a new ticket",
+                "tags": [
+                    "tickets"
+                ]
+            }
+        },
+        "/units/{unitId}/virtual-queue": {
+            "post": {
+                "description": "Allows a visitor to join a unit's queue remotely without visiting the kiosk. Requires the unit to have virtualQueue.enabled=true in its config and the company to have the virtual_queue feature. Phone is required for status SMS notifications (optional if not used). Returns the created ticket and a link to the ticket tracking page.",
+                "operationId": "joinVirtualQueue",
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.VirtualQueueJoinRequest"
+                            }
+                        }
+                    },
+                    "description": "Join request",
+                    "required": true,
+                    "x-originalParamName": "request"
+                },
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.VirtualQueueJoinResponse"
+                                }
+                            }
+                        },
+                        "description": "Created"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "402": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.QuotaExceededError"
+                                }
+                            }
+                        },
+                        "description": "Quota Exceeded"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Virtual queue not enabled for this unit"
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Service Unavailable (kiosk frozen)"
+                    }
+                },
+                "summary": "Join a virtual queue remotely",
                 "tags": [
                     "tickets"
                 ]
