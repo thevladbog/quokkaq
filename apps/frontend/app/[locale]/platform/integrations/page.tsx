@@ -38,7 +38,10 @@ import {
   type HandlersPlatformIntegrationsResponse,
   type ServicesDeploymentSaaSSettingsPatch
 } from '@/lib/api/generated/platform';
-import { API_BASE_URL } from '@/lib/authenticated-api-fetch';
+import {
+  API_BASE_URL,
+  authenticatedApiFetch
+} from '@/lib/authenticated-api-fetch';
 
 type PlatformIntegrationsFormValues = {
   leadsTrackerQueue: string;
@@ -139,14 +142,11 @@ function PlatformIntegrationsForm({
     if (!smsTestPhone.trim()) return;
     setSmsTestLoading(true);
     try {
-      const res = await fetch(
+      const res = await authenticatedApiFetch(
         `${API_BASE_URL}/platform/integrations/sms/test`,
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${typeof window !== 'undefined' ? (window.localStorage.getItem('access_token') ?? '') : ''}`
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ phone: smsTestPhone })
         }
       );

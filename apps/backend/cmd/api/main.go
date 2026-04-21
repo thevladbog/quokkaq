@@ -130,7 +130,7 @@ func run() error {
 	deploymentSaaSSettingsRepo := repository.NewDeploymentSaaSSettingsRepository()
 	deploymentSaaSSettingsService := services.NewDeploymentSaaSSettingsService(deploymentSaaSSettingsRepo)
 
-	jobWorker := jobs.NewJobWorkerWithSMS(ttsService, ticketRepo, notifRepo, deploymentSaaSSettingsService.GetSMSProvider())
+	jobWorker := jobs.NewJobWorkerWithSMS(ttsService, ticketRepo, notifRepo, deploymentSaaSSettingsService)
 	if err := jobWorker.Start(); err != nil {
 		return err
 	}

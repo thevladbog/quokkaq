@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"quokkaq-go-backend/internal/models"
+	"quokkaq-go-backend/internal/phoneutil"
 	"quokkaq-go-backend/internal/services"
 	"strings"
 )
@@ -140,8 +141,13 @@ func (h *IntegrationsHandler) TestSMSIntegration(w http.ResponseWriter, r *http.
 		http.Error(w, "phone is required", http.StatusBadRequest)
 		return
 	}
+	normalized, err := phoneutil.ParseAndNormalize(phone, "")
+	if err != nil {
+		http.Error(w, "invalid phone number: "+err.Error(), http.StatusBadRequest)
+		return
+	}
 	provider := h.svc.GetSMSProvider()
-	if err := provider.Send(phone, "QuokkaQ: тестовое сообщение / test message"); err != nil {
+	if err := provider.Send(normalized, "QuokkaQ: тестовое сообщение / test message"); err != nil {
 		http.Error(w, "SMS send failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}

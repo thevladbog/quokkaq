@@ -22,12 +22,13 @@ type JobWorker interface {
 }
 
 type jobWorker struct {
-	server       *asynq.Server
-	mux          *asynq.ServeMux
-	ttsService   services.TtsService
-	ticketRepo   repository.TicketRepository
-	notifRepo    repository.NotificationRepository
-	smsProvider  services.SMSProvider
+	server     *asynq.Server
+	mux        *asynq.ServeMux
+	ttsService services.TtsService
+	ticketRepo repository.TicketRepository
+	notifRepo  repository.NotificationRepository
+	// settingsSvc is resolved per-job so runtime SMS config changes take effect immediately.
+	settingsSvc  *services.DeploymentSaaSSettingsService
 	notifService *services.NotificationService
 }
 
@@ -77,15 +78,17 @@ func NewJobWorker(ttsService services.TtsService, ticketRepo repository.TicketRe
 }
 
 // NewJobWorkerWithSMS builds a worker that can also deliver SMS notifications.
+// settingsSvc is stored (not eagerly resolved) so that runtime changes to SMS
+// configuration are picked up on every job without restarting the process.
 func NewJobWorkerWithSMS(
 	ttsService services.TtsService,
 	ticketRepo repository.TicketRepository,
 	notifRepo repository.NotificationRepository,
-	smsProvider services.SMSProvider,
+	settingsSvc *services.DeploymentSaaSSettingsService,
 ) JobWorker {
 	base := NewJobWorker(ttsService, ticketRepo).(*jobWorker)
 	base.notifRepo = notifRepo
-	base.smsProvider = smsProvider
+	base.settingsSvc = settingsSvc
 	return base
 }
 
@@ -161,9 +164,11 @@ func (w *jobWorker) handleSMSSend(ctx context.Context, t *asynq.Task) error {
 		}
 	}
 
-	// Send via the configured provider (falls back to LogSMSProvider when nil).
-	provider := w.smsProvider
-	if provider == nil {
+	// Resolve the SMS provider per-job so admin config changes take effect immediately.
+	var provider services.SMSProvider
+	if w.settingsSvc != nil {
+		provider = w.settingsSvc.GetSMSProvider()
+	} else {
 		provider = &services.LogSMSProvider{}
 	}
 	sendErr := provider.Send(p.To, p.Body)

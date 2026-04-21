@@ -37,10 +37,26 @@ func NewNotificationService(
 	}
 }
 
+// isSMSActive returns true only when SMS is effectively enabled (including env overrides).
+// Prevents creating notification rows and enqueueing jobs when SMS is not configured.
+func (ns *NotificationService) isSMSActive() bool {
+	if ns.settingsSvc == nil {
+		return false
+	}
+	settings, err := ns.settingsSvc.GetIntegrationSettings()
+	if err != nil {
+		return false
+	}
+	return NewSMSProviderFromSettings(settings).Name() != "log"
+}
+
 // SendTicketCalledSMS enqueues an SMS notification for the visitor when their ticket is called.
 // Silently no-ops if the visitor has no phone, the unit lacks the feature, or SMS is not configured.
 func (ns *NotificationService) SendTicketCalledSMS(ticket *models.Ticket) {
 	if ticket == nil {
+		return
+	}
+	if !ns.isSMSActive() {
 		return
 	}
 	phone := ns.resolvePhone(ticket)
@@ -75,6 +91,9 @@ func (ns *NotificationService) SendTicketCalledSMS(ticket *models.Ticket) {
 // Silently no-ops if the visitor has no phone, the unit lacks the feature, or SMS is not configured.
 func (ns *NotificationService) SendQueuePositionAlert(ticket *models.Ticket) {
 	if ticket == nil {
+		return
+	}
+	if !ns.isSMSActive() {
 		return
 	}
 	phone := ns.resolvePhone(ticket)

@@ -79,6 +79,8 @@ export default function TicketPage() {
     if (!ticketId) return;
 
     let cancelled = false;
+    let onCalledHandler: ((data: unknown) => void) | null = null;
+    let onUpdatedHandler: ((data: unknown) => void) | null = null;
 
     const load = async () => {
       try {
@@ -96,10 +98,13 @@ export default function TicketPage() {
           try {
             socketClient.connect(t_data.unitId);
 
-            socketClient.onTicketCalled((data) => {
-              if (data?.ticket?.id === t_data.id) {
+            onCalledHandler = (data) => {
+              const update = data as {
+                ticket?: { id?: string; counter?: { name?: string } };
+              };
+              if (update?.ticket?.id === t_data.id) {
                 const counterName =
-                  data.ticket?.counter?.name || t('counterUnknown');
+                  update.ticket?.counter?.name || t('counterUnknown');
                 toast.success(
                   t('your_ticket_called', {
                     number: t_data.queueNumber,
@@ -108,13 +113,17 @@ export default function TicketPage() {
                 );
                 void refreshTicket();
               }
-            });
+            };
 
-            socketClient.onTicketUpdated((data) => {
-              if (data?.ticket?.id === t_data.id) {
+            onUpdatedHandler = (data) => {
+              const update = data as { ticket?: { id?: string } };
+              if (update?.ticket?.id === t_data.id) {
                 void refreshTicket();
               }
-            });
+            };
+
+            socketClient.on('ticket.called', onCalledHandler);
+            socketClient.on('ticket.updated', onUpdatedHandler);
           } catch (e) {
             console.warn('Socket connect failed', e);
           }
@@ -142,8 +151,9 @@ export default function TicketPage() {
 
     return () => {
       cancelled = true;
-      socketClient.off('ticket.called');
-      socketClient.off('ticket.updated');
+      if (onCalledHandler) socketClient.off('ticket.called', onCalledHandler);
+      if (onUpdatedHandler)
+        socketClient.off('ticket.updated', onUpdatedHandler);
       socketClient.disconnect();
       if (pollingRef.current) clearInterval(pollingRef.current);
     };

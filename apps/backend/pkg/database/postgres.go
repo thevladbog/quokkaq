@@ -2184,21 +2184,33 @@ ALTER TABLE statistics_daily_buckets
 
 	err = manager.RunMigration("v1.6.1_plan_features_virtual_queue_visitor_notifications", func(db *gorm.DB) error {
 		// Add virtual_queue and visitor_notifications feature keys to all existing subscription plan rows.
-		// Only backfills keys that are not already present in the features JSON to avoid overwriting manual overrides.
+		// Each key is checked and backfilled independently so that rows already containing one key
+		// but missing the other are still updated correctly.
 		return db.Exec(`
 UPDATE subscription_plans
-SET features = features ||
-    CASE
-        WHEN NOT (features ? 'virtual_queue') THEN
-            CASE code
-                WHEN 'starter'       THEN '{"virtual_queue": false, "visitor_notifications": false}'::jsonb
-                WHEN 'professional'  THEN '{"virtual_queue": true,  "visitor_notifications": true}'::jsonb
-                WHEN 'enterprise'    THEN '{"virtual_queue": true,  "visitor_notifications": true}'::jsonb
-                WHEN 'grandfathered' THEN '{"virtual_queue": true,  "visitor_notifications": false}'::jsonb
-                ELSE                      '{"virtual_queue": false, "visitor_notifications": false}'::jsonb
-            END
-        ELSE '{}'::jsonb
-    END
+SET features = features
+    || CASE
+           WHEN NOT (features ? 'virtual_queue') THEN
+               CASE code
+                   WHEN 'starter'       THEN '{"virtual_queue": false}'::jsonb
+                   WHEN 'professional'  THEN '{"virtual_queue": true}'::jsonb
+                   WHEN 'enterprise'    THEN '{"virtual_queue": true}'::jsonb
+                   WHEN 'grandfathered' THEN '{"virtual_queue": true}'::jsonb
+                   ELSE                     '{"virtual_queue": false}'::jsonb
+               END
+           ELSE '{}'::jsonb
+       END
+    || CASE
+           WHEN NOT (features ? 'visitor_notifications') THEN
+               CASE code
+                   WHEN 'starter'       THEN '{"visitor_notifications": false}'::jsonb
+                   WHEN 'professional'  THEN '{"visitor_notifications": true}'::jsonb
+                   WHEN 'enterprise'    THEN '{"visitor_notifications": true}'::jsonb
+                   WHEN 'grandfathered' THEN '{"visitor_notifications": false}'::jsonb
+                   ELSE                     '{"visitor_notifications": false}'::jsonb
+               END
+           ELSE '{}'::jsonb
+       END
 WHERE features IS NOT NULL;
 `).Error
 	})

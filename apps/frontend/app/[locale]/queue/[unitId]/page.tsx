@@ -88,7 +88,9 @@ export default function VirtualQueuePage() {
         phone: phone.trim() || undefined,
         locale
       });
-      router.push(result.ticketPageUrl || `/ticket/${result.ticket.id}`);
+      router.push(
+        result.ticketPageUrl || `/${locale}/ticket/${result.ticket.id}`
+      );
     } catch (e) {
       toast.error(t('join_error'));
       console.error(e);

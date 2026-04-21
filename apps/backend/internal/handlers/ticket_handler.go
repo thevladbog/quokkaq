@@ -188,15 +188,20 @@ func (h *TicketHandler) GetTicketByID(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Compute smsOptInAvailable: SMS must be enabled + company must have visitor_notifications feature.
+	// Compute smsOptInAvailable: SMS must be effectively active (including env overrides) and the
+	// company must have the visitor_notifications plan feature. Guard against nil unitService which
+	// can occur when the handler is wired without full service dependencies.
 	smsOptIn := false
-	if h.settingsSvc != nil && ticket.Status == "waiting" {
+	if h.settingsSvc != nil && h.unitService != nil && ticket.Status == "waiting" {
 		settings, sErr := h.settingsSvc.GetIntegrationSettings()
-		if sErr == nil && settings.SmsEnabled {
-			unit, uErr := h.unitService.GetUnitByID(ticket.UnitID)
-			if uErr == nil {
-				if ok, _ := services.CompanyHasPlanFeature(unit.CompanyID, "visitor_notifications"); ok {
-					smsOptIn = true
+		if sErr == nil {
+			provider := services.NewSMSProviderFromSettings(settings)
+			if provider.Name() != "log" {
+				unit, uErr := h.unitService.GetUnitByID(ticket.UnitID)
+				if uErr == nil {
+					if ok, _ := services.CompanyHasPlanFeature(unit.CompanyID, "visitor_notifications"); ok {
+						smsOptIn = true
+					}
 				}
 			}
 		}
@@ -966,7 +971,10 @@ func (h *TicketHandler) JoinVirtualQueue(w http.ResponseWriter, r *http.Request)
 	}
 
 	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("APP_BASE_URL")), "/")
-	ticketURL := fmt.Sprintf("%s/ticket/%s", baseURL, ticket.ID)
+	if baseURL == "" {
+		baseURL = "http://localhost:3000"
+	}
+	ticketURL := fmt.Sprintf("%s/%s/ticket/%s", baseURL, locale, ticket.ID)
 
 	w.WriteHeader(http.StatusCreated)
 	RespondJSON(w, VirtualQueueJoinResponse{
