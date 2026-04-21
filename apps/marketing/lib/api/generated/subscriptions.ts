@@ -93,7 +93,7 @@ export interface ModelsService {
   description?: string;
   descriptionEn?: string;
   descriptionRu?: string;
-  /** In seconds */
+  /** In seconds (expected / nominal service length for progress display) */
   duration?: number;
   gridCol?: number;
   gridColSpan?: number;
@@ -103,7 +103,9 @@ export interface ModelsService {
   id?: string;
   imageUrl?: string;
   isLeaf?: boolean;
-  /** In seconds */
+  /** In seconds (service-time SLA — copied to Ticket.MaxServiceTime on in_service) */
+  maxServiceTime?: number;
+  /** In seconds (queue-wait SLA — copied to Ticket.MaxWaitingTime on create) */
   maxWaitingTime?: number;
   name?: string;
   nameEn?: string;
@@ -255,6 +257,8 @@ export interface ModelsTicket {
   isCredit?: boolean;
   isEod?: boolean;
   lastCalledAt?: string;
+  /** Snapshot from Service at in_service; cleared on transfer/return */
+  maxServiceTime?: number;
   /** Snapshot from Service at creation */
   maxWaitingTime?: number;
   operatorComment?: string;
@@ -1990,6 +1994,9 @@ export interface ServicesPublicTenantResponse {
 export interface ServicesSLADeviationsPoint {
   breachPct?: number;
   date?: string;
+  slaServiceMet?: number;
+  slaServiceMetPct?: number;
+  slaServiceTotal?: number;
   slaWaitMet?: number;
   slaWaitTotal?: number;
   withinPct?: number;
@@ -1999,6 +2006,24 @@ export interface ServicesSLADeviationsResponse {
   computedAt?: string;
   granularity?: string;
   points?: ServicesSLADeviationsPoint[];
+}
+
+export interface ServicesSLAHeatmapCell {
+  /** "YYYY-MM-DD" */
+  date?: string;
+  /** 0–23 */
+  hour?: number;
+  met?: number;
+  /** 0–100; 0 when total == 0 */
+  pct?: number;
+  total?: number;
+}
+
+export interface ServicesSLAHeatmapResponse {
+  cells?: ServicesSLAHeatmapCell[];
+  computedAt?: string;
+  /** "wait" | "service" */
+  type?: string;
 }
 
 export interface ServicesSetupHealthCheck {
@@ -2059,6 +2084,8 @@ export interface ServicesSlaSummaryResponse {
   breachPct?: number;
   computedAt?: string;
   serviceId?: string;
+  slaServiceMet?: number;
+  slaServiceTotal?: number;
   slaWaitMet?: number;
   slaWaitTotal?: number;
   withinPct?: number;
@@ -2133,6 +2160,9 @@ export interface ServicesTimeseriesPoint {
   avgWaitMinutes?: number;
   date?: string;
   noShowCount?: number;
+  slaServiceMet?: number;
+  slaServiceMetPct?: number;
+  slaServiceTotal?: number;
   slaWaitMetPct?: number;
   ticketsCompleted?: number;
   ticketsCreated?: number;
