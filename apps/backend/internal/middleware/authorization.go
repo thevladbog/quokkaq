@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"os"
 	"quokkaq-go-backend/internal/logger"
@@ -30,103 +29,6 @@ func RespondRepoFindError(ctx context.Context, w http.ResponseWriter, err error,
 	logger.ErrorfCtx(ctx, "%s: %v", op, err)
 	http.Error(w, "Internal server error", http.StatusInternalServerError)
 	return true
-}
-
-// RequireSupportReportAccess allows only user JWTs (not kiosk/terminal) with admin, staff, supervisor, or operator role.
-func RequireSupportReportAccess(userRepo repository.UserRepository) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if tokenType, _ := r.Context().Value(TokenTypeKey).(string); tokenType == "terminal" {
-				http.Error(w, "Forbidden", http.StatusForbidden)
-				return
-			}
-			userID, ok := GetUserIDFromContext(r.Context())
-			if !ok {
-				http.Error(w, "Unauthorized", http.StatusUnauthorized)
-				return
-			}
-			allowed, err := userRepo.HasSupportReportAccess(userID)
-			if err != nil {
-				logger.ErrorfCtx(r.Context(), "RequireSupportReportAccess: userID=%s: %v", userID, err)
-				http.Error(w, "Internal server error", http.StatusInternalServerError)
-				return
-			}
-			if !allowed {
-				http.Error(w, "Forbidden", http.StatusForbidden)
-				return
-			}
-			next.ServeHTTP(w, r)
-		})
-	}
-}
-
-// RequireAdmin allows only users with the "admin" role.
-func RequireAdmin(userRepo repository.UserRepository) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			userID, ok := GetUserIDFromContext(r.Context())
-			if !ok {
-				http.Error(w, "Unauthorized", http.StatusUnauthorized)
-				return
-			}
-			allowed, err := userRepo.IsAdmin(userID)
-			if err != nil {
-				http.Error(w, "Internal server error", http.StatusInternalServerError)
-				return
-			}
-			if !allowed {
-				http.Error(w, "Forbidden", http.StatusForbidden)
-				return
-			}
-			next.ServeHTTP(w, r)
-		})
-	}
-}
-
-// RequireAdminOrTenantPermission allows global role "admin" users who have resolved tenant context, or users who have the given tenant RBAC
-// permission on at least one unit in the resolved company (see X-Company-Id). Company resolution runs first so global admins cannot skip tenant checks.
-func RequireAdminOrTenantPermission(userRepo repository.UserRepository, tr repository.TenantRBACRepository, permission string) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			userID, ok := GetUserIDFromContext(r.Context())
-			if !ok {
-				http.Error(w, "Unauthorized", http.StatusUnauthorized)
-				return
-			}
-			cid, err := userRepo.ResolveCompanyIDForRequest(userID, r.Header.Get("X-Company-Id"))
-			if err != nil {
-				if errors.Is(err, repository.ErrCompanyAccessDenied) {
-					http.Error(w, "Forbidden", http.StatusForbidden)
-					return
-				}
-				if repository.IsNotFound(err) {
-					http.Error(w, "Not found", http.StatusNotFound)
-					return
-				}
-				http.Error(w, "Internal server error", http.StatusInternalServerError)
-				return
-			}
-			allowed, err := userRepo.IsAdmin(userID)
-			if err != nil {
-				http.Error(w, "Internal server error", http.StatusInternalServerError)
-				return
-			}
-			if allowed {
-				next.ServeHTTP(w, r)
-				return
-			}
-			okPerm, err := tr.UserHasPermissionInCompany(userID, cid, permission)
-			if err != nil {
-				http.Error(w, "Internal server error", http.StatusInternalServerError)
-				return
-			}
-			if !okPerm {
-				http.Error(w, "Forbidden", http.StatusForbidden)
-				return
-			}
-			next.ServeHTTP(w, r)
-		})
-	}
 }
 
 // platformAllowTenantAdmin is true when tenant "admin" may call /platform APIs.

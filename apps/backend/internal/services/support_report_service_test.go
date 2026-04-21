@@ -64,7 +64,7 @@ func TestSupportReportService_List_FiltersByConfiguredPlatform(t *testing.T) {
 		{ID: "1", CreatedByUserID: "u", TicketBackend: models.TicketBackendPlane, Title: "plane"},
 		{ID: "2", CreatedByUserID: "u", TicketBackend: models.TicketBackendYandexTracker, Title: "yt"},
 	}}
-	svc := NewSupportReportService(repo, nil, nil, nil, nil, models.TicketBackendYandexTracker, listUserStub{}, nil)
+	svc := NewSupportReportService(repo, nil, nil, nil, nil, models.TicketBackendYandexTracker, listUserStub{}, nil, nil)
 	out, err := svc.List(context.Background(), "u")
 	if err != nil {
 		t.Fatal(err)
@@ -79,7 +79,7 @@ func TestSupportReportService_GetByID_WrongPlatform_NotFound(t *testing.T) {
 		ID: "x", CreatedByUserID: "u", TicketBackend: models.TicketBackendPlane, Title: "p",
 	}
 	repo := testSupportReportRepoFind{row: row}
-	svc := NewSupportReportService(repo, nil, nil, nil, nil, models.TicketBackendYandexTracker, listUserStub{}, nil)
+	svc := NewSupportReportService(repo, nil, nil, nil, nil, models.TicketBackendYandexTracker, listUserStub{}, nil, nil)
 	_, err := svc.GetByID(context.Background(), "u", "x")
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		t.Fatalf("want ErrRecordNotFound, got %v", err)

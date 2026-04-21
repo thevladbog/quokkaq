@@ -83,7 +83,7 @@ func (stubSupportUserRepo) ListUserIDsWithTenantSystemAdminInCompany(string) ([]
 	return nil, nil
 }
 
-func (stubSupportUserRepo) HasSupportReportAccess(string) (bool, error) {
+func (stubSupportUserRepo) UserHasUnitPermissionInCompany(string, string, string) (bool, error) {
 	return true, nil
 }
 
@@ -92,12 +92,12 @@ func (stubSupportUserRepo) ListUserIDsByRoleNames([]string) ([]string, error) {
 }
 
 func newTestSupportReportHandler(repo repository.SupportReportRepository) *SupportReportHandler {
-	svc := services.NewSupportReportService(repo, nil, nil, nil, nil, services.SupportReportPlatformNone, stubSupportUserRepo{}, nil)
+	svc := services.NewSupportReportService(repo, nil, nil, nil, nil, services.SupportReportPlatformNone, stubSupportUserRepo{}, nil, nil)
 	return NewSupportReportHandler(svc)
 }
 
 func newTestSupportReportHandlerWithPlane(repo repository.SupportReportRepository, plane services.SupportReportTicketClient) *SupportReportHandler {
-	svc := services.NewSupportReportService(repo, nil, plane, nil, nil, models.TicketBackendPlane, stubSupportUserRepo{}, nil)
+	svc := services.NewSupportReportService(repo, nil, plane, nil, nil, models.TicketBackendPlane, stubSupportUserRepo{}, nil, nil)
 	return NewSupportReportHandler(svc)
 }
 
@@ -503,7 +503,7 @@ func TestSupportReportHandler_MarkIrrelevant_Author_OK(t *testing.T) {
 		CreatedAt:       now,
 		UpdatedAt:       now,
 	})
-	svc := services.NewSupportReportService(mem, nil, stub, nil, nil, models.TicketBackendPlane, stubSupportUserRepo{}, nil)
+	svc := services.NewSupportReportService(mem, nil, stub, nil, nil, models.TicketBackendPlane, stubSupportUserRepo{}, nil, nil)
 	h := NewSupportReportHandler(svc)
 	r := chi.NewRouter()
 	r.Post("/support/reports/{id}/mark-irrelevant", h.MarkIrrelevant)
@@ -543,7 +543,7 @@ func TestSupportReportHandler_MarkIrrelevant_Idempotent(t *testing.T) {
 		CreatedAt:                now,
 		UpdatedAt:                now,
 	})
-	svc := services.NewSupportReportService(mem, nil, stub, nil, nil, models.TicketBackendPlane, stubSupportUserRepo{}, nil)
+	svc := services.NewSupportReportService(mem, nil, stub, nil, nil, models.TicketBackendPlane, stubSupportUserRepo{}, nil, nil)
 	h := NewSupportReportHandler(svc)
 	r := chi.NewRouter()
 	r.Post("/support/reports/{id}/mark-irrelevant", h.MarkIrrelevant)
@@ -573,7 +573,7 @@ func TestSupportReportHandler_MarkIrrelevant_Forbidden(t *testing.T) {
 		CreatedAt:       now,
 		UpdatedAt:       now,
 	})
-	svc := services.NewSupportReportService(mem, nil, stub, nil, nil, models.TicketBackendPlane, stubSupportUserRepo{}, nil)
+	svc := services.NewSupportReportService(mem, nil, stub, nil, nil, models.TicketBackendPlane, stubSupportUserRepo{}, nil, nil)
 	h := NewSupportReportHandler(svc)
 	r := chi.NewRouter()
 	r.Post("/support/reports/{id}/mark-irrelevant", h.MarkIrrelevant)
@@ -600,7 +600,7 @@ func TestSupportReportHandler_MarkIrrelevant_Admin_OK(t *testing.T) {
 		CreatedAt:       now,
 		UpdatedAt:       now,
 	})
-	svc := services.NewSupportReportService(mem, nil, stub, nil, nil, models.TicketBackendPlane, stubSupportUserRepoAdmin{}, nil)
+	svc := services.NewSupportReportService(mem, nil, stub, nil, nil, models.TicketBackendPlane, stubSupportUserRepoAdmin{}, nil, nil)
 	h := NewSupportReportHandler(svc)
 	r := chi.NewRouter()
 	r.Post("/support/reports/{id}/mark-irrelevant", h.MarkIrrelevant)

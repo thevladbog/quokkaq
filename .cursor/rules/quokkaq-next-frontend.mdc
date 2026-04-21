@@ -44,3 +44,10 @@ For **ESLint, Prettier, tests, and dev-server restarts**, use `quokkaq-agent-wor
 ## Deeper context
 
 - [`apps/frontend/AGENTS.md`](apps/frontend/AGENTS.md)
+
+## Permissions and route guards
+
+- Use **`isPlatformAdmin`** / **`isTenantAdmin`** from parsed `User` (`UserModelSchema`) instead of `user.roles?.includes('platform_admin')` where possible; use **`isTenantAdminUser()`** from [`lib/tenant-admin-access.ts`](apps/frontend/lib/tenant-admin-access.ts) for “elevated tenant” checks (platform + global admin + tenant `system_admin`).
+- **Layouts/routes** — [`ConditionalLayout.tsx`](apps/frontend/components/ConditionalLayout.tsx) / [`ProtectedRoute.tsx`](apps/frontend/components/ProtectedRoute.tsx): `requiredPermission`, `requiredAnyPermission`, `requireTenantAdmin`, `requirePlatformOperator` only — **no `allowedRoles`**.
+- **New permission IDs** — add to [`lib/permission-variants.ts`](apps/frontend/lib/permission-variants.ts) and [`lib/unit-permissions.ts`](apps/frontend/lib/unit-permissions.ts); add i18n under `messages/*/permissions_list` when exposing in UI.
+- **Unit-scoped UI** — [`PermissionGuard`](apps/frontend/components/auth/permission-guard.tsx) with `tenantAdminBypass` for tenant `system_admin` bypass of listed perms.

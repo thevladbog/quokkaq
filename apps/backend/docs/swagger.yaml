@@ -992,6 +992,7 @@ components:
         photoUrl:
           type: string
         roles:
+          description: Roles is deprecated; use tenantRoles and unit permissions instead.
           items:
             $ref: '#/components/schemas/handlers.RoleDTO'
           type: array

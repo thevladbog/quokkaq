@@ -9,8 +9,10 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 
 interface ProtectedSidebarLayoutProps {
   children: ReactNode;
-  allowedRoles: string[];
+  requirePlatformOperator?: boolean;
+  requireTenantAdmin?: boolean;
   requiredPermission?: string;
+  requiredAnyPermission?: string[];
   fallbackComponent?: ReactNode;
   loadingComponent?: ReactNode;
   /** Defaults to AppSidebar (tenant). Use PlatformSidebar for /platform routes. */
@@ -19,16 +21,20 @@ interface ProtectedSidebarLayoutProps {
 
 const ProtectedSidebarLayout = ({
   children,
-  allowedRoles,
+  requirePlatformOperator,
+  requireTenantAdmin,
   requiredPermission,
+  requiredAnyPermission,
   fallbackComponent,
   loadingComponent,
   SidebarComponent = AppSidebar
 }: ProtectedSidebarLayoutProps) => {
   return (
     <ProtectedRoute
-      allowedRoles={allowedRoles}
+      requirePlatformOperator={requirePlatformOperator}
+      requireTenantAdmin={requireTenantAdmin}
       requiredPermission={requiredPermission}
+      requiredAnyPermission={requiredAnyPermission}
       fallbackComponent={fallbackComponent}
       loadingComponent={loadingComponent}
     >

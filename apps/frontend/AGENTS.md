@@ -45,3 +45,12 @@
 ## Деплой
 
 - Docker (standalone Next), CI по ветке `prod-release` → Yandex Cloud; детали в `README.md`.
+
+## Права доступа (RBAC) во фронтенде
+
+- **Модель пользователя** — [`UserModelSchema`](../../packages/shared-types/src/index.ts) (`@quokkaq/shared-types`): после парсинга доступны **`isPlatformAdmin`** (глобальная роль `platform_admin`) и **`isTenantAdmin`** (tenant-роль `system_admin` в активной компании). Поле **`roles`** устарело; предпочтительны `tenantRoles` и карта **`permissions`** по `unitId`.
+- **Повышенный доступ в тенанте** — [`lib/tenant-admin-access.ts`](lib/tenant-admin-access.ts): `isTenantAdminUser(user)` = platform_admin **или** глобальный `admin` **или** tenant `system_admin`.
+- **Маршруты** — [`components/ConditionalLayout.tsx`](components/ConditionalLayout.tsx) и [`components/ProtectedRoute.tsx`](components/ProtectedRoute.tsx): только `requiredPermission` / `requiredAnyPermission` / `requireTenantAdmin` / `requirePlatformOperator`; массивов `allowedRoles` нет.
+- **Компонент** [`components/auth/permission-guard.tsx`](components/auth/permission-guard.tsx) — проверка прав на юнит; `tenantAdminBypass` разрешает tenant `system_admin` без перечисления прав; `platform_admin` обходят через `isPlatformAdmin`.
+- **Константы прав** — [`lib/permission-variants.ts`](lib/permission-variants.ts) (канонические строки и алиасы), список для UI — [`lib/unit-permissions.ts`](lib/unit-permissions.ts). Для сопоставления строк использовать `userUnitPermissionMatches` / `flatPermissionsInclude`.
+- **SaaS operator UI** (`/platform`) — только `isPlatformAdmin` / [`lib/platform-access.ts`](lib/platform-access.ts); отдельного env для «tenant admin в platform» нет.

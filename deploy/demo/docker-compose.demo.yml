@@ -193,8 +193,6 @@ services:
       NEXT_PUBLIC_APP_URL: https://${DEMO_APP_HOST}
       NEXT_PUBLIC_API_URL: https://${DEMO_API_HOST}
       NEXT_PUBLIC_WS_URL: wss://${DEMO_API_HOST}
-      # Keep tenant admins off /platform (only platform_admin may open operator UI).
-      NEXT_PUBLIC_PLATFORM_ALLOW_TENANT_ADMIN: 'false'
     depends_on:
       backend:
         condition: service_healthy

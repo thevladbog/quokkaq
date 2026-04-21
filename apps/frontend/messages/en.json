@@ -475,7 +475,14 @@
         "ACCESS_SUPERVISOR_PANEL": "Access Supervisor Panel",
         "ACCESS_SURVEY_RESPONSES": "View guest survey ratings",
         "ACCESS_STATISTICS_SUBDIVISION": "Statistics: whole subdivision",
-        "ACCESS_STATISTICS_ZONE": "Statistics: assigned service zones only"
+        "ACCESS_STATISTICS_ZONE": "Statistics: assigned service zones only",
+        "TICKETS_READ": "View tickets",
+        "TICKETS_WRITE": "Create and update tickets",
+        "COUNTER_OPERATE": "Operate counters",
+        "SURVEY_MANAGE": "Manage surveys",
+        "CALENDAR_MANAGE": "Manage calendar integration",
+        "STATISTICS_READ": "View statistics",
+        "SUPPORT_REPORTS": "Support requests (tenant)"
       },
       "system_admin": "System Administrator",
       "system_admin_desc": "Grant full access to the system",

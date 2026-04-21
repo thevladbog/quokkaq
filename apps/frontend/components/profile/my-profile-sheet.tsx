@@ -22,8 +22,13 @@ import {
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useGetUnits } from '@/lib/api/generated/units';
 import { usePatchAuthMe } from '@/lib/hooks';
+import {
+  permissionListMessageKey,
+  userUnitPermissionMatches
+} from '@/lib/permission-variants';
 import { UNIT_PERMISSIONS } from '@/lib/unit-permissions';
 import { getUnitDisplayName } from '@/lib/unit-display';
+import { isTenantAdminUser } from '@/lib/tenant-admin-access';
 import { toast } from 'sonner';
 
 type UserUnitRow = NonNullable<User['units']>[number];
@@ -56,7 +61,7 @@ export function MyProfileSheet({ open, onOpenChange }: MyProfileSheetProps) {
   );
 
   const getPermissionLabel = (permissionId: string) => {
-    const key = `permissions_list.${permissionId}`;
+    const key = `permissions_list.${permissionListMessageKey(permissionId)}`;
     return tAdminUsers.has(key) ? tAdminUsers(key) : permissionId;
   };
 
@@ -105,7 +110,7 @@ export function MyProfileSheet({ open, onOpenChange }: MyProfileSheetProps) {
   const unitRowCode = (uu: UserUnitRow) =>
     uu.unit?.code ?? unitById.get(uu.unitId)?.code ?? '';
 
-  const isSystemAdmin = user?.roles?.includes('admin');
+  const isSystemAdmin = user ? isTenantAdminUser(user) : false;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -196,7 +201,7 @@ export function MyProfileSheet({ open, onOpenChange }: MyProfileSheetProps) {
                           </p>
                           <ul className='space-y-1.5 text-sm'>
                             {UNIT_PERMISSIONS.filter((p) =>
-                              perms.includes(p.id)
+                              userUnitPermissionMatches(perms, p.id)
                             ).map((p) => (
                               <li key={p.id}>{getPermissionLabel(p.id)}</li>
                             ))}

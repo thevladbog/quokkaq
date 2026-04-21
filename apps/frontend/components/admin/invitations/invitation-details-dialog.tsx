@@ -13,6 +13,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useUnits } from '@/lib/hooks';
 
 import { Unit } from '@/lib/api';
+import { permissionListMessageKey } from '@/lib/permission-variants';
 
 interface Invitation {
   id: string;
@@ -118,7 +119,7 @@ export default function InvitationDetailsDialog({
                                 className='text-muted-foreground flex items-center text-sm'
                               >
                                 <div className='bg-primary mr-2 h-1.5 w-1.5 rounded-full' />
-                                {tPermissions(perm)}
+                                {tPermissions(permissionListMessageKey(perm))}
                               </div>
                             ))}
                           </div>

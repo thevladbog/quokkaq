@@ -68,7 +68,7 @@ bash deploy/demo/demo-reset.sh
 
 Then open `https://<DEMO_APP_HOST>/` and sign in with the **tenant admin** email from your `.env.demo` (`DEMO_ADMIN_EMAIL`, default `demo-admin@demo.quokkaq.local`) and `DEMO_ADMIN_PASSWORD` (default if unset in the container: `demo-admin-change-me` — set `DEMO_ADMIN_PASSWORD` in compose/backend env for production-hardened demos).
 
-- Seeded users have **tenant `admin` / `operator` only** — no `platform_admin`; SaaS operator UI (`/platform`) stays closed unless you misconfigure `NEXT_PUBLIC_PLATFORM_ALLOW_TENANT_ADMIN` on the frontend.
+- Seeded users have **tenant `admin` / `operator` only** — no `platform_admin`; the SaaS operator UI (`/platform`) is available only to **`platform_admin`** accounts.
 - Historical demo data spans **~90 days** (override with `DEMO_HISTORY_DAYS`).
 
 ## Nightly reset (optional)

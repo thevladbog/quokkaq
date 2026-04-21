@@ -1,12 +1,14 @@
 package repository
 
 import (
-	"strings"
-
 	"quokkaq-go-backend/internal/models"
+	"quokkaq-go-backend/internal/rbac"
 )
 
-const permAccessSupervisorPanel = "ACCESS_SUPERVISOR_PANEL"
+// Tenant system_admin coverage (shift journal):
+// No explicit system_admin slug check. Tenant system_admin users get access.supervisor_panel (and the
+// full catalog) on all units via merged user_units from tenant roles. This function therefore grants
+// full journal when UserHasCanonicalUnitPermission(..., PermAccessSupervisorPanel) is true on the unit.
 
 // shiftJournalSeesAllActivityFromLoadedUser reports whether the user may see all shift journal
 // (ticket history) rows in the given unit, as opposed to only rows where they are the actor.
@@ -20,15 +22,5 @@ func shiftJournalSeesAllActivityFromLoadedUser(user *models.User, unitID string)
 			return true
 		}
 	}
-	for _, uu := range user.Units {
-		if uu.UnitID != unitID {
-			continue
-		}
-		for _, p := range uu.Permissions {
-			if strings.TrimSpace(p) == permAccessSupervisorPanel {
-				return true
-			}
-		}
-	}
-	return false
+	return UserHasCanonicalUnitPermission(user, unitID, rbac.PermAccessSupervisorPanel)
 }

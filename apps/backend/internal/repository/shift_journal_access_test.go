@@ -70,7 +70,7 @@ func TestShiftJournalSeesAllActivityFromLoadedUser(t *testing.T) {
 				Roles: []models.UserRole{{Role: models.Role{Name: "operator"}}},
 				Units: []models.UserUnit{{
 					UnitID:      unitA,
-					Permissions: models.StringArray{"ACCESS_STAFF_PANEL", permAccessSupervisorPanel},
+					Permissions: models.StringArray{"ACCESS_STAFF_PANEL", "ACCESS_SUPERVISOR_PANEL"},
 				}},
 			},
 			unitID: unitA,
@@ -82,7 +82,7 @@ func TestShiftJournalSeesAllActivityFromLoadedUser(t *testing.T) {
 				Roles: []models.UserRole{{Role: models.Role{Name: "operator"}}},
 				Units: []models.UserUnit{{
 					UnitID:      otherUnit,
-					Permissions: models.StringArray{permAccessSupervisorPanel},
+					Permissions: models.StringArray{"ACCESS_SUPERVISOR_PANEL"},
 				}},
 			},
 			unitID: unitA,

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"quokkaq-go-backend/internal/pkg/authcookie"
+	"quokkaq-go-backend/internal/repository"
 
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -41,12 +42,58 @@ const TerminalUnitIDKey contextKey = "terminalUnitID"
 // TerminalCounterIDKey is set when typ=terminal and the device is bound to a counter (guest survey screen).
 const TerminalCounterIDKey contextKey = "terminalCounterID"
 
+// ContextFromJWTAccessToken parses an access JWT and returns context with UserIDKey / TokenTypeKey / terminal keys.
+func ContextFromJWTAccessToken(base context.Context, tokenString string) (context.Context, error) {
+	tokenString = strings.TrimSpace(tokenString)
+	if tokenString == "" {
+		return base, jwt.ErrTokenMalformed
+	}
+	secret := os.Getenv("JWT_SECRET")
+	if secret == "" {
+		secret = "default_secret_please_change"
+	}
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, jwt.ErrSignatureInvalid
+		}
+		return []byte(secret), nil
+	})
+	if err != nil || !token.Valid {
+		return base, err
+	}
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return base, jwt.ErrTokenInvalidClaims
+	}
+	if typ, ok := claims["typ"].(string); ok && typ == "refresh" {
+		return base, jwt.ErrTokenInvalidClaims
+	}
+	userID, ok := claims["sub"].(string)
+	if !ok {
+		return base, jwt.ErrTokenInvalidClaims
+	}
+	userID = strings.TrimSpace(userID)
+
+	ctx := base
+	tokenType := "user"
+	if typ, ok := claims["typ"].(string); ok && typ == "terminal" {
+		tokenType = "terminal"
+		userID = strings.ToLower(userID)
+		if uid, ok := jwtStringClaim(claims, "unit_id"); ok {
+			ctx = context.WithValue(ctx, TerminalUnitIDKey, uid)
+		}
+		if cid, ok := jwtStringClaim(claims, "counter_id"); ok {
+			ctx = context.WithValue(ctx, TerminalCounterIDKey, cid)
+		}
+	}
+	ctx = context.WithValue(ctx, TokenTypeKey, tokenType)
+	ctx = context.WithValue(ctx, UserIDKey, userID)
+	return ctx, nil
+}
+
 // JWTAuth is a middleware that validates JWT tokens and extracts user ID
 func JWTAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Prefer Authorization: Bearer when present so explicit credentials win over HttpOnly cookies.
-		// Otherwise a browser with both a staff session (quokkaq_access) and a terminal Bearer token
-		// would use the user JWT and terminal routes return 403 Forbidden.
 		tokenString := ""
 		if authHeader := strings.TrimSpace(r.Header.Get("Authorization")); authHeader != "" {
 			const pfx = "Bearer "
@@ -61,61 +108,64 @@ func JWTAuth(next http.Handler) http.Handler {
 			http.Error(w, "Authentication required", http.StatusUnauthorized)
 			return
 		}
-		secret := os.Getenv("JWT_SECRET")
-		if secret == "" {
-			secret = "default_secret_please_change"
-		}
-
-		// Parse and validate token
-		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, jwt.ErrSignatureInvalid
-			}
-			return []byte(secret), nil
-		})
-
-		if err != nil || !token.Valid {
+		ctx, err := ContextFromJWTAccessToken(r.Context(), tokenString)
+		if err != nil {
 			http.Error(w, "Invalid or expired token", http.StatusUnauthorized)
 			return
 		}
-
-		// Extract user ID from claims
-		claims, ok := token.Claims.(jwt.MapClaims)
-		if !ok {
-			http.Error(w, "Invalid token claims", http.StatusUnauthorized)
-			return
-		}
-
-		// Refresh JWTs must only be used with POST /auth/refresh, not as API access tokens.
-		if typ, ok := claims["typ"].(string); ok && typ == "refresh" {
-			http.Error(w, "Invalid token type", http.StatusUnauthorized)
-			return
-		}
-
-		userID, ok := claims["sub"].(string)
-		if !ok {
-			http.Error(w, "Invalid user ID in token", http.StatusUnauthorized)
-			return
-		}
-		userID = strings.TrimSpace(userID)
-
-		ctx := r.Context()
-		tokenType := "user"
-		if typ, ok := claims["typ"].(string); ok && typ == "terminal" {
-			tokenType = "terminal"
-			// Canonical form for UUID PK lookups (JWT / URL casing may differ).
-			userID = strings.ToLower(userID)
-			if uid, ok := jwtStringClaim(claims, "unit_id"); ok {
-				ctx = context.WithValue(ctx, TerminalUnitIDKey, uid)
-			}
-			if cid, ok := jwtStringClaim(claims, "counter_id"); ok {
-				ctx = context.WithValue(ctx, TerminalCounterIDKey, cid)
-			}
-		}
-		ctx = context.WithValue(ctx, TokenTypeKey, tokenType)
-		ctx = context.WithValue(ctx, UserIDKey, userID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+// RequireHumanUserActive returns 403 for deactivated staff users (typ=user JWT only). Terminal JWTs skip this check.
+func RequireHumanUserActive(userRepo repository.UserRepository) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if typ, _ := r.Context().Value(TokenTypeKey).(string); typ == "terminal" {
+				next.ServeHTTP(w, r)
+				return
+			}
+			userID, ok := GetUserIDFromContext(r.Context())
+			if !ok || userID == "" {
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				return
+			}
+			u, err := userRepo.FindByID(r.Context(), userID)
+			if err != nil {
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				return
+			}
+			if !u.IsActive {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// JWTAuthAndActive chains JWTAuth and RequireHumanUserActive for staff sessions.
+func JWTAuthAndActive(userRepo repository.UserRepository) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return JWTAuth(RequireHumanUserActive(userRepo)(next))
+	}
+}
+
+// accessTokenFromWebSocketRequest reads JWT from query (?access_token=), cookie, or Authorization header.
+func accessTokenFromWebSocketRequest(r *http.Request) string {
+	if q := strings.TrimSpace(r.URL.Query().Get("access_token")); q != "" {
+		return q
+	}
+	if c := authcookie.AccessTokenFromRequest(r); c != "" {
+		return c
+	}
+	if authHeader := strings.TrimSpace(r.Header.Get("Authorization")); authHeader != "" {
+		const pfx = "Bearer "
+		if len(authHeader) > len(pfx) && strings.EqualFold(authHeader[:len(pfx)], pfx) {
+			return strings.TrimSpace(authHeader[len(pfx):])
+		}
+	}
+	return ""
 }
 
 // GetUserIDFromContext extracts user ID from request context

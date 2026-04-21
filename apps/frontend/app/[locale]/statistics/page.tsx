@@ -37,9 +37,17 @@ import { useLocale, useTranslations } from 'next-intl';
 import type { User } from '@quokkaq/shared-types';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { DatePickerSingleOrRange } from '@/components/ui/date-picker-single-or-range';
-import ProtectedRoute from '@/components/ProtectedRoute';
 import { useActiveUnit } from '@/contexts/ActiveUnitContext';
 import { useAuthContext } from '@/contexts/AuthContext';
+import {
+  PermAccessStatsSubdivision,
+  PermAccessStatsZone,
+  PermAccessSurveyResponses,
+  PermStatisticsRead,
+  userHasCanonicalUnitPermissionInAnyUnit,
+  userUnitPermissionMatches
+} from '@/lib/permission-variants';
+import { isTenantAdminUser } from '@/lib/tenant-admin-access';
 import {
   Card,
   CardContent,
@@ -263,27 +271,21 @@ function buildSubdivisionOptions(
   return out;
 }
 
-/** Matches backend UserCanViewSurveyScoreAggregates: survey responses, branch statistics, or admin roles. */
+/** Matches backend UserCanViewSurveyScoreAggregates: survey responses, branch statistics, or elevated access. */
 function userCanViewSurveyScoreStatistics(
   u: User | null,
   subdivisionId: string
 ): boolean {
   if (!u || !subdivisionId) return false;
-  const roles = u.roles ?? [];
-  if (
-    roles.includes('platform_admin') ||
-    roles.includes('admin') ||
-    roles.includes('supervisor')
-  ) {
-    return true;
-  }
+  if (isTenantAdminUser(u)) return true;
   return !!u.units?.some(
     (unit) =>
       unit.unitId === subdivisionId &&
       (unit.permissions ?? []).some(
         (p) =>
-          p === 'ACCESS_SURVEY_RESPONSES' ||
-          p === 'ACCESS_STATISTICS_SUBDIVISION'
+          userUnitPermissionMatches([p], PermAccessSurveyResponses) ||
+          userUnitPermissionMatches([p], PermAccessStatsSubdivision) ||
+          userUnitPermissionMatches([p], PermStatisticsRead)
       )
   );
 }
@@ -474,15 +476,14 @@ export default function StatisticsPage() {
   }, [serviceZoneId, zoneOptions]);
 
   const isExpanded =
-    user?.roles?.includes('admin') ||
-    user?.roles?.includes('supervisor') ||
-    user?.roles?.includes('platform_admin') ||
-    (user?.permissions &&
-      Object.values(user.permissions).some(
-        (perms) =>
-          perms.includes('ACCESS_STATISTICS_SUBDIVISION') ||
-          perms.includes('ACCESS_STATISTICS_ZONE')
-      ));
+    (user && isTenantAdminUser(user)) ||
+    (user &&
+      (userHasCanonicalUnitPermissionInAnyUnit(user, PermStatisticsRead) ||
+        userHasCanonicalUnitPermissionInAnyUnit(
+          user,
+          PermAccessStatsSubdivision
+        ) ||
+        userHasCanonicalUnitPermissionInAnyUnit(user, PermAccessStatsZone)));
 
   const actorsQuery = useGetUnitsUnitIdShiftActivityActors(statsSubdivisionId, {
     query: {
@@ -1121,273 +1122,147 @@ export default function StatisticsPage() {
   const showSubdivisionFilter = subdivisionOptions.length > 0;
 
   return (
-    <ProtectedRoute allowedRoles={['admin', 'supervisor', 'staff', 'operator']}>
-      <div className='container mx-auto flex-1 space-y-6 p-4'>
-        <div>
-          <h1 className='text-3xl font-bold tracking-tight'>{t('title')}</h1>
-          <p className='text-muted-foreground mt-1 text-sm'>{t('subtitle')}</p>
-          {computedAt && (
-            <p className='text-muted-foreground mt-1 text-xs'>
-              {t('as_of', {
-                time: formatStatisticsAsOfLine(computedAt, dateLocale)
-              })}
-            </p>
-          )}
-        </div>
+    <div className='container mx-auto flex-1 space-y-6 p-4'>
+      <div>
+        <h1 className='text-3xl font-bold tracking-tight'>{t('title')}</h1>
+        <p className='text-muted-foreground mt-1 text-sm'>{t('subtitle')}</p>
+        {computedAt && (
+          <p className='text-muted-foreground mt-1 text-xs'>
+            {t('as_of', {
+              time: formatStatisticsAsOfLine(computedAt, dateLocale)
+            })}
+          </p>
+        )}
+      </div>
 
-        {!activeUnitId ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('no_unit_title')}</CardTitle>
-              <CardDescription>{t('no_unit_hint')}</CardDescription>
-            </CardHeader>
-          </Card>
-        ) : unitQuery.isError ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('error')}</CardTitle>
-              <CardDescription>{t('no_unit_hint')}</CardDescription>
-            </CardHeader>
-          </Card>
-        ) : statsResolutionBlocked ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('unit_parent_missing_title')}</CardTitle>
-              <CardDescription>{t('unit_parent_missing_hint')}</CardDescription>
-            </CardHeader>
-          </Card>
-        ) : !statsSubdivisionId ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('loading')}</CardTitle>
-            </CardHeader>
-          </Card>
-        ) : (
-          <>
-            <div className='flex w-full justify-end'>
-              <div className='inline-flex max-w-full flex-wrap items-end gap-4'>
-                <div className='shrink-0 space-y-2'>
-                  <Label>{t('filter_date')}</Label>
-                  <DatePickerSingleOrRange
-                    from={from}
-                    to={to}
-                    onRangeChange={(nextFrom, nextTo) =>
-                      setRange({ from: nextFrom, to: nextTo })
-                    }
-                    labels={{
-                      openCalendar: t('open_calendar'),
-                      rangeAwaitingEnd: t('date_range_awaiting_end')
-                    }}
-                    className='min-w-[min(100%,280px)]'
-                  />
+      {!activeUnitId ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('no_unit_title')}</CardTitle>
+            <CardDescription>{t('no_unit_hint')}</CardDescription>
+          </CardHeader>
+        </Card>
+      ) : unitQuery.isError ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('error')}</CardTitle>
+            <CardDescription>{t('no_unit_hint')}</CardDescription>
+          </CardHeader>
+        </Card>
+      ) : statsResolutionBlocked ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('unit_parent_missing_title')}</CardTitle>
+            <CardDescription>{t('unit_parent_missing_hint')}</CardDescription>
+          </CardHeader>
+        </Card>
+      ) : !statsSubdivisionId ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('loading')}</CardTitle>
+          </CardHeader>
+        </Card>
+      ) : (
+        <>
+          <div className='flex w-full justify-end'>
+            <div className='inline-flex max-w-full flex-wrap items-end gap-4'>
+              <div className='shrink-0 space-y-2'>
+                <Label>{t('filter_date')}</Label>
+                <DatePickerSingleOrRange
+                  from={from}
+                  to={to}
+                  onRangeChange={(nextFrom, nextTo) =>
+                    setRange({ from: nextFrom, to: nextTo })
+                  }
+                  labels={{
+                    openCalendar: t('open_calendar'),
+                    rangeAwaitingEnd: t('date_range_awaiting_end')
+                  }}
+                  className='min-w-[min(100%,280px)]'
+                />
+              </div>
+              {showSubdivisionFilter && (
+                <div className='w-fit max-w-full shrink-0 space-y-2'>
+                  <Label>{t('filter_subdivision')}</Label>
+                  <Select
+                    value={statsSubdivisionId}
+                    onValueChange={(id) => setManualSubdivisionId(id)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={t('subdivision_placeholder')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {subdivisionOptions.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-                {showSubdivisionFilter && (
-                  <div className='w-fit max-w-full shrink-0 space-y-2'>
-                    <Label>{t('filter_subdivision')}</Label>
-                    <Select
-                      value={statsSubdivisionId}
-                      onValueChange={(id) => setManualSubdivisionId(id)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue
-                          placeholder={t('subdivision_placeholder')}
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {subdivisionOptions.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
-                            {s.name}
+              )}
+              {showZoneFilter && (
+                <div className='w-fit max-w-full shrink-0 space-y-2'>
+                  <Label>{t('filter_zone')}</Label>
+                  <Select
+                    value={serviceZoneParam ? serviceZoneParam : '__all__'}
+                    onValueChange={(v) =>
+                      setServiceZoneId(v === '__all__' ? '' : v)
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value='__all__'>{t('zone_all')}</SelectItem>
+                      {zoneOptions
+                        .filter((z): z is typeof z & { id: string } =>
+                          Boolean(z.id?.trim())
+                        )
+                        .map((z) => (
+                          <SelectItem key={z.id} value={z.id}>
+                            {getUnitDisplayName(z, appLocale)}
                           </SelectItem>
                         ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-                {showZoneFilter && (
-                  <div className='w-fit max-w-full shrink-0 space-y-2'>
-                    <Label>{t('filter_zone')}</Label>
-                    <Select
-                      value={serviceZoneParam ? serviceZoneParam : '__all__'}
-                      onValueChange={(v) =>
-                        setServiceZoneId(v === '__all__' ? '' : v)
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value='__all__'>{t('zone_all')}</SelectItem>
-                        {zoneOptions
-                          .filter((z): z is typeof z & { id: string } =>
-                            Boolean(z.id?.trim())
-                          )
-                          .map((z) => (
-                            <SelectItem key={z.id} value={z.id}>
-                              {getUnitDisplayName(z, appLocale)}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-                {isExpanded && (
-                  <div className='w-fit max-w-full shrink-0 space-y-2'>
-                    <Label htmlFor='operator-combobox'>
-                      {t('filter_user')}
-                    </Label>
-                    <Combobox
-                      options={operatorComboboxOptions}
-                      value={filterUserId}
-                      onChange={setFilterUserId}
-                      placeholder={t('filter_user_all')}
-                      searchPlaceholder={t('filter_user_placeholder')}
-                      emptyText={t('filter_operator_empty')}
-                      disabled={actorsQuery.isLoading}
-                      id='operator-combobox'
-                    />
-                  </div>
-                )}
-              </div>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {isExpanded && (
+                <div className='w-fit max-w-full shrink-0 space-y-2'>
+                  <Label htmlFor='operator-combobox'>{t('filter_user')}</Label>
+                  <Combobox
+                    options={operatorComboboxOptions}
+                    value={filterUserId}
+                    onChange={setFilterUserId}
+                    placeholder={t('filter_user_all')}
+                    searchPlaceholder={t('filter_user_placeholder')}
+                    emptyText={t('filter_operator_empty')}
+                    disabled={actorsQuery.isLoading}
+                    id='operator-combobox'
+                  />
+                </div>
+              )}
             </div>
+          </div>
 
-            <div className='grid gap-6 lg:grid-cols-2'>
-              <Card>
-                <CardHeader className='flex flex-row flex-nowrap items-center justify-between gap-4 space-y-0'>
-                  <div className='min-w-0 flex-1 space-y-1 pr-2'>
-                    <CardTitle>{t('chart_tickets_by_service')}</CardTitle>
-                    <CardDescription>
-                      {t('chart_tickets_by_service_hint')}
-                    </CardDescription>
-                  </div>
-                  {ticketsPieSlices.length > 0 ? (
-                    <div className='shrink-0'>
-                      <Combobox
-                        options={donutComboboxOptions}
-                        value={donutSelectionResolved ?? '__all__'}
-                        onChange={(v) =>
-                          setDonutSelectedServiceId(
-                            v === '__all__' || v === '' ? null : v
-                          )
-                        }
-                        placeholder={t('chart_sla_radial_all_services')}
-                        searchPlaceholder={t('chart_service_combobox_search')}
-                        emptyText={t('chart_service_combobox_empty')}
-                        className='w-[min(240px,calc(100vw-2.5rem))]'
-                        allowClear={false}
-                        popoverAlign='end'
-                      />
-                    </div>
-                  ) : null}
-                </CardHeader>
-                <CardContent className='flex flex-col items-center pb-0'>
-                  {ticketsByServiceQuery.isLoading ? (
-                    <p className='text-muted-foreground text-sm'>
-                      {t('loading')}
-                    </p>
-                  ) : ticketsByServiceQuery.isError ? (
-                    <p className='text-destructive text-sm'>{t('error')}</p>
-                  ) : ticketsPieSlices.length === 0 ? (
-                    <p className='text-muted-foreground text-sm'>
-                      {t('chart_tickets_by_service_empty')}
-                    </p>
-                  ) : (
-                    <div className='relative mx-auto aspect-square w-full max-w-[280px]'>
-                      <ChartContainer
-                        config={ticketsPieChartConfig}
-                        className='h-full w-full'
-                      >
-                        <PieChart>
-                          <ChartTooltip
-                            content={(props) => (
-                              <TicketsByServiceChartTooltip
-                                {...props}
-                                locale={appLocale}
-                              />
-                            )}
-                          />
-                          <PieWithSectorShape
-                            data={ticketsPieSlices}
-                            dataKey='value'
-                            nameKey='name'
-                            innerRadius='58%'
-                            outerRadius='78%'
-                            strokeWidth={2}
-                            cursor='default'
-                            shape={(sectorProps: StatisticsPieSectorProps) => {
-                              const highlighted =
-                                donutActiveIndex !== undefined &&
-                                sectorProps.index === donutActiveIndex;
-                              if (highlighted || sectorProps.isActive) {
-                                return (
-                                  <StatisticsDonutActiveShape
-                                    {...sectorProps}
-                                  />
-                                );
-                              }
-                              const {
-                                cx,
-                                cy,
-                                innerRadius,
-                                outerRadius,
-                                startAngle,
-                                endAngle,
-                                fill,
-                                cornerRadius
-                              } = sectorProps;
-                              return (
-                                <Sector
-                                  cx={cx}
-                                  cy={cy}
-                                  innerRadius={innerRadius}
-                                  outerRadius={outerRadius}
-                                  startAngle={startAngle}
-                                  endAngle={endAngle}
-                                  fill={fill}
-                                  cornerRadius={cornerRadius}
-                                  className='stroke-background'
-                                  strokeWidth={2}
-                                />
-                              );
-                            }}
-                          >
-                            {ticketsPieSlices.map((s) => (
-                              <Cell key={s.serviceId} fill={s.fill} />
-                            ))}
-                          </PieWithSectorShape>
-                        </PieChart>
-                      </ChartContainer>
-                      <div className='pointer-events-none absolute inset-0 flex flex-col items-center justify-center'>
-                        <span className='text-3xl font-bold tabular-nums'>
-                          {ticketsDonutCenterValue.toLocaleString(appLocale)}
-                        </span>
-                        <span className='text-muted-foreground mt-1 max-w-[10rem] text-center text-xs'>
-                          {t('chart_tickets_by_service_center')}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className='flex flex-row flex-nowrap items-center justify-between gap-4 space-y-0'>
-                  <div className='min-w-0 flex-1 space-y-1 pr-2'>
-                    <CardTitle>{t('chart_sla_radial')}</CardTitle>
-                    <CardDescription>
-                      {t('chart_sla_radial_hint')}
-                    </CardDescription>
-                  </div>
+          <div className='grid gap-6 lg:grid-cols-2'>
+            <Card>
+              <CardHeader className='flex flex-row flex-nowrap items-center justify-between gap-4 space-y-0'>
+                <div className='min-w-0 flex-1 space-y-1 pr-2'>
+                  <CardTitle>{t('chart_tickets_by_service')}</CardTitle>
+                  <CardDescription>
+                    {t('chart_tickets_by_service_hint')}
+                  </CardDescription>
+                </div>
+                {ticketsPieSlices.length > 0 ? (
                   <div className='shrink-0'>
                     <Combobox
-                      options={slaComboboxOptions}
-                      value={
-                        slaSummaryServiceId.trim()
-                          ? slaSummaryServiceId
-                          : '__all__'
-                      }
+                      options={donutComboboxOptions}
+                      value={donutSelectionResolved ?? '__all__'}
                       onChange={(v) =>
-                        setSlaSummaryServiceId(
-                          v === '__all__' || v === '' ? '' : v
+                        setDonutSelectedServiceId(
+                          v === '__all__' || v === '' ? null : v
                         )
                       }
                       placeholder={t('chart_sla_radial_all_services')}
@@ -1398,281 +1273,276 @@ export default function StatisticsPage() {
                       popoverAlign='end'
                     />
                   </div>
-                </CardHeader>
-                <CardContent className='flex flex-col items-center pb-0'>
-                  {slaSummaryQuery.isLoading ? (
-                    <p className='text-muted-foreground text-sm'>
-                      {t('loading')}
-                    </p>
-                  ) : slaSummaryQuery.isError ? (
-                    <p className='text-destructive text-sm'>{t('error')}</p>
-                  ) : radialSlaRow.tot <= 0 ? (
-                    <p className='text-muted-foreground text-sm'>
-                      {t('chart_sla_radial_empty')}
-                    </p>
-                  ) : (
+                ) : null}
+              </CardHeader>
+              <CardContent className='flex flex-col items-center pb-0'>
+                {ticketsByServiceQuery.isLoading ? (
+                  <p className='text-muted-foreground text-sm'>
+                    {t('loading')}
+                  </p>
+                ) : ticketsByServiceQuery.isError ? (
+                  <p className='text-destructive text-sm'>{t('error')}</p>
+                ) : ticketsPieSlices.length === 0 ? (
+                  <p className='text-muted-foreground text-sm'>
+                    {t('chart_tickets_by_service_empty')}
+                  </p>
+                ) : (
+                  <div className='relative mx-auto aspect-square w-full max-w-[280px]'>
                     <ChartContainer
-                      config={radialSlaChartConfig}
-                      className='mx-auto aspect-square w-full max-w-[320px]'
+                      config={ticketsPieChartConfig}
+                      className='h-full w-full'
                     >
-                      <RadialBarChart
-                        data={slaRadialChartData}
-                        margin={{ top: 20, right: 0, bottom: 12, left: 0 }}
-                        startAngle={180}
-                        endAngle={0}
-                        innerRadius={100}
-                        outerRadius={140}
-                      >
-                        <RadialBar
-                          dataKey='within'
-                          stackId='sla'
-                          fill='var(--color-within)'
-                          cornerRadius={5}
-                          className='stroke-transparent stroke-2'
-                        />
-                        <RadialBar
-                          dataKey='breach'
-                          stackId='sla'
-                          fill='var(--color-breach)'
-                          cornerRadius={5}
-                          className='stroke-transparent stroke-2'
-                        />
+                      <PieChart>
                         <ChartTooltip
-                          cursor={false}
-                          content={
-                            <ChartTooltipContent
-                              hideLabel
-                              formatter={(value, name) => {
-                                const pct =
-                                  typeof value === 'number'
-                                    ? `${value.toLocaleString(appLocale, {
-                                        minimumFractionDigits: 1,
-                                        maximumFractionDigits: 1
-                                      })}%`
-                                    : String(value ?? '');
-                                const label =
-                                  name === 'within'
-                                    ? t('legend_sla_within')
-                                    : name === 'breach'
-                                      ? t('legend_sla_breach')
-                                      : String(name ?? '');
-                                return [pct, label];
-                              }}
+                          content={(props) => (
+                            <TicketsByServiceChartTooltip
+                              {...props}
+                              locale={appLocale}
                             />
-                          }
+                          )}
                         />
-                        <PolarRadiusAxis
-                          tick={false}
-                          tickLine={false}
-                          axisLine={false}
+                        <PieWithSectorShape
+                          data={ticketsPieSlices}
+                          dataKey='value'
+                          nameKey='name'
+                          innerRadius='58%'
+                          outerRadius='78%'
+                          strokeWidth={2}
+                          cursor='default'
+                          shape={(sectorProps: StatisticsPieSectorProps) => {
+                            const highlighted =
+                              donutActiveIndex !== undefined &&
+                              sectorProps.index === donutActiveIndex;
+                            if (highlighted || sectorProps.isActive) {
+                              return (
+                                <StatisticsDonutActiveShape {...sectorProps} />
+                              );
+                            }
+                            const {
+                              cx,
+                              cy,
+                              innerRadius,
+                              outerRadius,
+                              startAngle,
+                              endAngle,
+                              fill,
+                              cornerRadius
+                            } = sectorProps;
+                            return (
+                              <Sector
+                                cx={cx}
+                                cy={cy}
+                                innerRadius={innerRadius}
+                                outerRadius={outerRadius}
+                                startAngle={startAngle}
+                                endAngle={endAngle}
+                                fill={fill}
+                                cornerRadius={cornerRadius}
+                                className='stroke-background'
+                                strokeWidth={2}
+                              />
+                            );
+                          }}
                         >
-                          <RechartsRadialLabel
-                            content={({ viewBox }) => {
-                              if (
-                                viewBox &&
-                                'cx' in viewBox &&
-                                'cy' in viewBox
-                              ) {
-                                const cx = Number(viewBox.cx);
-                                const cy = Number(viewBox.cy);
-                                return (
-                                  <text x={cx} y={cy} textAnchor='middle'>
-                                    <tspan
-                                      x={cx}
-                                      y={cy - 20}
-                                      className='fill-foreground text-3xl font-bold'
-                                    >
-                                      {`${radialSlaRow.withinPct.toLocaleString(
-                                        appLocale,
-                                        {
-                                          minimumFractionDigits: 1,
-                                          maximumFractionDigits: 1
-                                        }
-                                      )}%`}
-                                    </tspan>
-                                    <tspan
-                                      x={cx}
-                                      y={cy + 8}
-                                      className='fill-muted-foreground text-sm'
-                                    >
-                                      {t('chart_sla_radial_center')}
-                                    </tspan>
-                                  </text>
-                                );
-                              }
-                              return null;
+                          {ticketsPieSlices.map((s) => (
+                            <Cell key={s.serviceId} fill={s.fill} />
+                          ))}
+                        </PieWithSectorShape>
+                      </PieChart>
+                    </ChartContainer>
+                    <div className='pointer-events-none absolute inset-0 flex flex-col items-center justify-center'>
+                      <span className='text-3xl font-bold tabular-nums'>
+                        {ticketsDonutCenterValue.toLocaleString(appLocale)}
+                      </span>
+                      <span className='text-muted-foreground mt-1 max-w-[10rem] text-center text-xs'>
+                        {t('chart_tickets_by_service_center')}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className='flex flex-row flex-nowrap items-center justify-between gap-4 space-y-0'>
+                <div className='min-w-0 flex-1 space-y-1 pr-2'>
+                  <CardTitle>{t('chart_sla_radial')}</CardTitle>
+                  <CardDescription>
+                    {t('chart_sla_radial_hint')}
+                  </CardDescription>
+                </div>
+                <div className='shrink-0'>
+                  <Combobox
+                    options={slaComboboxOptions}
+                    value={
+                      slaSummaryServiceId.trim()
+                        ? slaSummaryServiceId
+                        : '__all__'
+                    }
+                    onChange={(v) =>
+                      setSlaSummaryServiceId(
+                        v === '__all__' || v === '' ? '' : v
+                      )
+                    }
+                    placeholder={t('chart_sla_radial_all_services')}
+                    searchPlaceholder={t('chart_service_combobox_search')}
+                    emptyText={t('chart_service_combobox_empty')}
+                    className='w-[min(240px,calc(100vw-2.5rem))]'
+                    allowClear={false}
+                    popoverAlign='end'
+                  />
+                </div>
+              </CardHeader>
+              <CardContent className='flex flex-col items-center pb-0'>
+                {slaSummaryQuery.isLoading ? (
+                  <p className='text-muted-foreground text-sm'>
+                    {t('loading')}
+                  </p>
+                ) : slaSummaryQuery.isError ? (
+                  <p className='text-destructive text-sm'>{t('error')}</p>
+                ) : radialSlaRow.tot <= 0 ? (
+                  <p className='text-muted-foreground text-sm'>
+                    {t('chart_sla_radial_empty')}
+                  </p>
+                ) : (
+                  <ChartContainer
+                    config={radialSlaChartConfig}
+                    className='mx-auto aspect-square w-full max-w-[320px]'
+                  >
+                    <RadialBarChart
+                      data={slaRadialChartData}
+                      margin={{ top: 20, right: 0, bottom: 12, left: 0 }}
+                      startAngle={180}
+                      endAngle={0}
+                      innerRadius={100}
+                      outerRadius={140}
+                    >
+                      <RadialBar
+                        dataKey='within'
+                        stackId='sla'
+                        fill='var(--color-within)'
+                        cornerRadius={5}
+                        className='stroke-transparent stroke-2'
+                      />
+                      <RadialBar
+                        dataKey='breach'
+                        stackId='sla'
+                        fill='var(--color-breach)'
+                        cornerRadius={5}
+                        className='stroke-transparent stroke-2'
+                      />
+                      <ChartTooltip
+                        cursor={false}
+                        content={
+                          <ChartTooltipContent
+                            hideLabel
+                            formatter={(value, name) => {
+                              const pct =
+                                typeof value === 'number'
+                                  ? `${value.toLocaleString(appLocale, {
+                                      minimumFractionDigits: 1,
+                                      maximumFractionDigits: 1
+                                    })}%`
+                                  : String(value ?? '');
+                              const label =
+                                name === 'within'
+                                  ? t('legend_sla_within')
+                                  : name === 'breach'
+                                    ? t('legend_sla_breach')
+                                    : String(name ?? '');
+                              return [pct, label];
                             }}
                           />
-                        </PolarRadiusAxis>
-                      </RadialBarChart>
-                    </ChartContainer>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+                        }
+                      />
+                      <PolarRadiusAxis
+                        tick={false}
+                        tickLine={false}
+                        axisLine={false}
+                      >
+                        <RechartsRadialLabel
+                          content={({ viewBox }) => {
+                            if (viewBox && 'cx' in viewBox && 'cy' in viewBox) {
+                              const cx = Number(viewBox.cx);
+                              const cy = Number(viewBox.cy);
+                              return (
+                                <text x={cx} y={cy} textAnchor='middle'>
+                                  <tspan
+                                    x={cx}
+                                    y={cy - 20}
+                                    className='fill-foreground text-3xl font-bold'
+                                  >
+                                    {`${radialSlaRow.withinPct.toLocaleString(
+                                      appLocale,
+                                      {
+                                        minimumFractionDigits: 1,
+                                        maximumFractionDigits: 1
+                                      }
+                                    )}%`}
+                                  </tspan>
+                                  <tspan
+                                    x={cx}
+                                    y={cy + 8}
+                                    className='fill-muted-foreground text-sm'
+                                  >
+                                    {t('chart_sla_radial_center')}
+                                  </tspan>
+                                </text>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                      </PolarRadiusAxis>
+                    </RadialBarChart>
+                  </ChartContainer>
+                )}
+              </CardContent>
+            </Card>
+          </div>
 
-            <div className='grid gap-6 lg:grid-cols-2'>
-              <Card>
-                <CardHeader>
-                  <CardTitle>{t('chart_wait_service')}</CardTitle>
-                  <CardDescription>
-                    {t('chart_wait_service_hint')}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className='h-[320px]'>
-                  {tsQuery.isLoading ? (
-                    <p className='text-muted-foreground text-sm'>
-                      {t('loading')}
-                    </p>
-                  ) : tsQuery.isError ? (
-                    <p className='text-destructive text-sm'>{t('error')}</p>
-                  ) : (
-                    <ChartContainer
-                      config={waitServiceChartConfig}
-                      className='h-full w-full'
-                    >
-                      {hourlyStatsAxis ? (
-                        <ComposedChart data={waitChartData}>
-                          <defs>
-                            <linearGradient
-                              id='waitFillHourly'
-                              x1='0'
-                              y1='0'
-                              x2='0'
-                              y2='1'
-                            >
-                              <stop
-                                offset='0%'
-                                stopColor='var(--primary)'
-                                stopOpacity={0.4}
-                              />
-                              <stop
-                                offset='100%'
-                                stopColor='var(--primary)'
-                                stopOpacity={0.05}
-                              />
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid
-                            strokeDasharray='3 3'
-                            className='stroke-muted'
-                          />
-                          <XAxis
-                            dataKey='date'
-                            tick={{ fontSize: 11 }}
-                            tickFormatter={formatStatsDateTick}
-                            interval={1}
-                          />
-                          <YAxis tick={{ fontSize: 11 }} />
-                          <ChartTooltip
-                            content={<ChartTooltipContent />}
-                            formatter={formatWaitServiceTooltipValue}
-                            labelFormatter={formatStatsTooltipLabel}
-                          />
-                          <Area
-                            type='monotone'
-                            dataKey='waitDisplay'
-                            name={t('legend_wait_min')}
-                            stroke='var(--primary)'
-                            fill='url(#waitFillHourly)'
-                            strokeWidth={2}
-                            connectNulls={false}
-                            baseValue={0}
-                            isAnimationActive={false}
-                          />
-                          <Line
-                            type='monotone'
-                            dataKey='service'
-                            name={t('legend_service_min')}
-                            stroke='var(--chart-2)'
-                            strokeWidth={2}
-                            dot={false}
-                            connectNulls={false}
-                          />
-                        </ComposedChart>
-                      ) : (
-                        <AreaChart data={waitChartData}>
-                          <defs>
-                            <linearGradient
-                              id='waitFill'
-                              x1='0'
-                              y1='0'
-                              x2='0'
-                              y2='1'
-                            >
-                              <stop
-                                offset='0%'
-                                stopColor='var(--primary)'
-                                stopOpacity={0.35}
-                              />
-                              <stop
-                                offset='100%'
-                                stopColor='var(--primary)'
-                                stopOpacity={0}
-                              />
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid
-                            strokeDasharray='3 3'
-                            className='stroke-muted'
-                          />
-                          <XAxis
-                            dataKey='date'
-                            tick={{ fontSize: 11 }}
-                            tickFormatter={formatStatsDateTick}
-                            interval={0}
-                          />
-                          <YAxis tick={{ fontSize: 11 }} />
-                          <ChartTooltip
-                            content={<ChartTooltipContent />}
-                            formatter={formatWaitServiceTooltipValue}
-                            labelFormatter={formatStatsTooltipLabel}
-                          />
-                          <Area
-                            type='monotone'
-                            dataKey='waitDisplay'
-                            name={t('legend_wait_min')}
-                            stroke='var(--primary)'
-                            fill='url(#waitFill)'
-                            strokeWidth={2}
-                            connectNulls={false}
-                            baseValue={0}
-                          />
-                          <Area
-                            type='monotone'
-                            dataKey='service'
-                            name={t('legend_service_min')}
-                            stroke='var(--chart-2)'
-                            fill='none'
-                            strokeWidth={2}
-                            connectNulls={false}
-                            baseValue={0}
-                          />
-                        </AreaChart>
-                      )}
-                    </ChartContainer>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>{t('chart_volume')}</CardTitle>
-                  <CardDescription>{t('chart_load_hint')}</CardDescription>
-                </CardHeader>
-                <CardContent className='h-[320px]'>
-                  {loadQuery.isLoading ? (
-                    <p className='text-muted-foreground text-sm'>
-                      {t('loading')}
-                    </p>
-                  ) : loadQuery.isError ? (
-                    <p className='text-destructive text-sm'>{t('error')}</p>
-                  ) : (
-                    <ChartContainer
-                      config={loadChartConfig}
-                      className='h-full w-full'
-                    >
-                      <BarChart data={loadData}>
+          <div className='grid gap-6 lg:grid-cols-2'>
+            <Card>
+              <CardHeader>
+                <CardTitle>{t('chart_wait_service')}</CardTitle>
+                <CardDescription>
+                  {t('chart_wait_service_hint')}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className='h-[320px]'>
+                {tsQuery.isLoading ? (
+                  <p className='text-muted-foreground text-sm'>
+                    {t('loading')}
+                  </p>
+                ) : tsQuery.isError ? (
+                  <p className='text-destructive text-sm'>{t('error')}</p>
+                ) : (
+                  <ChartContainer
+                    config={waitServiceChartConfig}
+                    className='h-full w-full'
+                  >
+                    {hourlyStatsAxis ? (
+                      <ComposedChart data={waitChartData}>
+                        <defs>
+                          <linearGradient
+                            id='waitFillHourly'
+                            x1='0'
+                            y1='0'
+                            x2='0'
+                            y2='1'
+                          >
+                            <stop
+                              offset='0%'
+                              stopColor='var(--primary)'
+                              stopOpacity={0.4}
+                            />
+                            <stop
+                              offset='100%'
+                              stopColor='var(--primary)'
+                              stopOpacity={0.05}
+                            />
+                          </linearGradient>
+                        </defs>
                         <CartesianGrid
                           strokeDasharray='3 3'
                           className='stroke-muted'
@@ -1681,225 +1551,57 @@ export default function StatisticsPage() {
                           dataKey='date'
                           tick={{ fontSize: 11 }}
                           tickFormatter={formatStatsDateTick}
-                          interval={hourlyStatsAxis ? 1 : 0}
+                          interval={1}
                         />
                         <YAxis tick={{ fontSize: 11 }} />
                         <ChartTooltip
                           content={<ChartTooltipContent />}
-                          formatter={formatLoadTooltipValue}
+                          formatter={formatWaitServiceTooltipValue}
                           labelFormatter={formatStatsTooltipLabel}
                         />
-                        <Legend />
-                        <Bar
-                          dataKey='created'
-                          name={t('legend_created')}
-                          fill='var(--primary)'
-                          radius={[4, 4, 0, 0]}
+                        <Area
+                          type='monotone'
+                          dataKey='waitDisplay'
+                          name={t('legend_wait_min')}
+                          stroke='var(--primary)'
+                          fill='url(#waitFillHourly)'
+                          strokeWidth={2}
+                          connectNulls={false}
+                          baseValue={0}
+                          isAnimationActive={false}
                         />
-                        <Bar
-                          dataKey='completed'
-                          name={t('legend_completed')}
-                          fill='var(--chart-2)'
-                          radius={[4, 4, 0, 0]}
+                        <Line
+                          type='monotone'
+                          dataKey='service'
+                          name={t('legend_service_min')}
+                          stroke='var(--chart-2)'
+                          strokeWidth={2}
+                          dot={false}
+                          connectNulls={false}
                         />
-                        <Bar
-                          dataKey='noShow'
-                          name={t('legend_no_show')}
-                          fill='var(--chart-4)'
-                          radius={[4, 4, 0, 0]}
-                        />
-                      </BarChart>
-                    </ChartContainer>
-                  )}
-                </CardContent>
-              </Card>
-
-              {canSurveyScores && (
-                <Card className='lg:col-span-2'>
-                  <CardHeader>
-                    <CardTitle>{t('chart_survey')}</CardTitle>
-                    <CardDescription>{t('chart_survey_hint')}</CardDescription>
-                  </CardHeader>
-                  <CardContent className='space-y-4'>
-                    {surveyDefinitions.length > 0 && (
-                      <div className='flex w-full max-w-2xl flex-col gap-4 sm:flex-row sm:items-end'>
-                        <div className='min-w-0 flex-1 space-y-2'>
-                          <Label>{t('filter_survey')}</Label>
-                          <Select
-                            value={surveyDefinitionId || '__all__'}
-                            onValueChange={(v) => {
-                              setSurveyDefinitionId(v === '__all__' ? '' : v);
-                              setSurveyQuestionId('');
-                            }}
+                      </ComposedChart>
+                    ) : (
+                      <AreaChart data={waitChartData}>
+                        <defs>
+                          <linearGradient
+                            id='waitFill'
+                            x1='0'
+                            y1='0'
+                            x2='0'
+                            y2='1'
                           >
-                            <SelectTrigger className='w-full'>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value='__all__'>
-                                {t('survey_filter_all')}
-                              </SelectItem>
-                              {surveyDefinitions
-                                .filter((d) => Boolean(d.id?.trim()))
-                                .map((d) => (
-                                  <SelectItem key={d.id} value={d.id!}>
-                                    {d.title ?? d.id}
-                                  </SelectItem>
-                                ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        {surveyDefinitionId.trim() &&
-                          numericQuestionsForSelectedSurvey.length > 0 && (
-                            <div className='min-w-0 flex-1 space-y-2'>
-                              <Label>{t('filter_survey_question')}</Label>
-                              <Select
-                                value={surveyQuestionId || '__all__'}
-                                onValueChange={(v) =>
-                                  setSurveyQuestionId(v === '__all__' ? '' : v)
-                                }
-                              >
-                                <SelectTrigger className='w-full'>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value='__all__'>
-                                    {t('survey_question_all')}
-                                  </SelectItem>
-                                  {numericQuestionsForSelectedSurvey.map(
-                                    (q) => (
-                                      <SelectItem key={q.id} value={q.id}>
-                                        {q.label}
-                                      </SelectItem>
-                                    )
-                                  )}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          )}
-                      </div>
-                    )}
-                    <div className='h-[280px]'>
-                      {surveyQuery.isLoading ? (
-                        <p className='text-muted-foreground text-sm'>
-                          {t('loading')}
-                        </p>
-                      ) : surveyQuery.isError ? (
-                        <p className='text-destructive text-sm'>{t('error')}</p>
-                      ) : (
-                        <ChartContainer
-                          config={surveyChartConfig}
-                          className='h-full w-full'
-                        >
-                          <LineChart data={surveyChartData}>
-                            <CartesianGrid
-                              strokeDasharray='3 3'
-                              className='stroke-muted'
+                            <stop
+                              offset='0%'
+                              stopColor='var(--primary)'
+                              stopOpacity={0.35}
                             />
-                            <XAxis
-                              dataKey='date'
-                              tick={{ fontSize: 11 }}
-                              tickFormatter={formatStatsDateTick}
-                              interval={hourlyStatsAxis ? 1 : 0}
+                            <stop
+                              offset='100%'
+                              stopColor='var(--primary)'
+                              stopOpacity={0}
                             />
-                            <YAxis
-                              domain={surveyScoreYDomain}
-                              tick={{ fontSize: 11 }}
-                            />
-                            <ChartTooltip
-                              content={<ChartTooltipContent />}
-                              formatter={formatScoreTooltipValue}
-                              labelFormatter={formatStatsTooltipLabel}
-                            />
-                            <Legend />
-                            <Line
-                              type='monotone'
-                              dataKey='score'
-                              name={
-                                surveyStatsBody?.mode === 'questions'
-                                  ? t('legend_score_native')
-                                  : t('legend_score_norm5')
-                              }
-                              stroke='var(--primary)'
-                              strokeWidth={2}
-                              dot={false}
-                              connectNulls={false}
-                            />
-                          </LineChart>
-                        </ChartContainer>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              <Card className='gap-0 overflow-hidden pt-0 pb-6 lg:col-span-2'>
-                <CardHeader className='gap-0 border-b p-0 !pb-0'>
-                  <div className='grid w-full min-w-0 grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-stretch'>
-                    <div className='flex min-w-0 flex-col justify-start gap-1.5 px-6 py-5'>
-                      <CardTitle>{t('chart_sla_deviations')}</CardTitle>
-                      <CardDescription>
-                        {t('chart_sla_deviations_hint')}
-                      </CardDescription>
-                    </div>
-                    {!(slaQuery.isLoading || slaQuery.isError) && (
-                      <div
-                        className={cn(
-                          'border-border flex min-h-0 w-full min-w-0 items-stretch border-t',
-                          'sm:h-full sm:max-w-md sm:shrink-0 sm:border-t-0 sm:border-l'
-                        )}
-                      >
-                        <button
-                          type='button'
-                          onClick={() => setSlaDisplayMode('count')}
-                          className={cn(
-                            'border-border flex min-h-0 flex-1 flex-col justify-center gap-0.5 border-r px-4 py-0 text-left transition-colors sm:h-full sm:min-h-0 sm:px-6 sm:py-0',
-                            slaDisplayMode === 'count'
-                              ? 'bg-muted/60'
-                              : 'hover:bg-muted/40'
-                          )}
-                        >
-                          <span className='text-muted-foreground text-xs font-medium'>
-                            {t('sla_mode_count')}
-                          </span>
-                          <span className='text-2xl leading-none font-bold tabular-nums'>
-                            {slaChart.sumTot.toLocaleString(appLocale)}
-                          </span>
-                        </button>
-                        <button
-                          type='button'
-                          onClick={() => setSlaDisplayMode('percent')}
-                          className={cn(
-                            'flex min-h-0 flex-1 flex-col justify-center gap-0.5 px-4 py-0 text-left transition-colors sm:h-full sm:min-h-0 sm:px-6 sm:py-0',
-                            slaDisplayMode === 'percent'
-                              ? 'bg-muted/60'
-                              : 'hover:bg-muted/40'
-                          )}
-                        >
-                          <span className='text-muted-foreground text-xs font-medium'>
-                            {t('sla_mode_percent')}
-                          </span>
-                          <span className='text-2xl leading-none font-bold tabular-nums'>
-                            {slaChart.overallPct.toFixed(1)}%
-                          </span>
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent className='h-[320px]'>
-                  {slaQuery.isLoading ? (
-                    <p className='text-muted-foreground text-sm'>
-                      {t('loading')}
-                    </p>
-                  ) : slaQuery.isError ? (
-                    <p className='text-destructive text-sm'>{t('error')}</p>
-                  ) : (
-                    <ChartContainer
-                      config={slaChartConfig}
-                      className='h-full w-full'
-                    >
-                      <BarChart data={slaChart.data}>
+                          </linearGradient>
+                        </defs>
                         <CartesianGrid
                           strokeDasharray='3 3'
                           className='stroke-muted'
@@ -1908,90 +1610,176 @@ export default function StatisticsPage() {
                           dataKey='date'
                           tick={{ fontSize: 11 }}
                           tickFormatter={formatStatsDateTick}
-                          interval={hourlyStatsAxis ? 1 : 0}
+                          interval={0}
                         />
-                        <YAxis
-                          domain={slaChart.yDomain}
-                          tick={{ fontSize: 11 }}
-                          allowDecimals={slaDisplayMode === 'percent'}
-                        />
+                        <YAxis tick={{ fontSize: 11 }} />
                         <ChartTooltip
-                          content={
-                            <ChartTooltipContent
-                              footer={
-                                slaDisplayMode === 'count'
-                                  ? ({ payload: tipPayload }) => {
-                                      const row = tipPayload?.[0]?.payload as
-                                        | {
-                                            within?: number;
-                                            breach?: number;
-                                          }
-                                        | undefined;
-                                      if (!row) return null;
-                                      const total = Math.round(
-                                        (Number(row.within) || 0) +
-                                          (Number(row.breach) || 0)
-                                      );
-                                      return (
-                                        <div className='flex w-full justify-between gap-4 leading-none'>
-                                          <span className='text-muted-foreground'>
-                                            {t('tooltip_total')}
-                                          </span>
-                                          <span className='text-foreground font-mono font-medium tabular-nums'>
-                                            {total}
-                                          </span>
-                                        </div>
-                                      );
-                                    }
-                                  : undefined
-                              }
-                            />
-                          }
-                          formatter={formatSlaTooltipValue}
+                          content={<ChartTooltipContent />}
+                          formatter={formatWaitServiceTooltipValue}
                           labelFormatter={formatStatsTooltipLabel}
                         />
-                        <Legend />
-                        <Bar
-                          dataKey='within'
-                          name={t('legend_sla_within')}
-                          stackId='sla'
-                          fill='#94a3b8'
+                        <Area
+                          type='monotone'
+                          dataKey='waitDisplay'
+                          name={t('legend_wait_min')}
+                          stroke='var(--primary)'
+                          fill='url(#waitFill)'
+                          strokeWidth={2}
+                          connectNulls={false}
+                          baseValue={0}
                         />
-                        <Bar
-                          dataKey='breach'
-                          name={t('legend_sla_breach')}
-                          stackId='sla'
-                          fill='var(--destructive)'
+                        <Area
+                          type='monotone'
+                          dataKey='service'
+                          name={t('legend_service_min')}
+                          stroke='var(--chart-2)'
+                          fill='none'
+                          strokeWidth={2}
+                          connectNulls={false}
+                          baseValue={0}
                         />
-                      </BarChart>
-                    </ChartContainer>
-                  )}
-                </CardContent>
-              </Card>
+                      </AreaChart>
+                    )}
+                  </ChartContainer>
+                )}
+              </CardContent>
+            </Card>
 
-              {isExpanded && (
-                <Card className='lg:col-span-2'>
-                  <CardHeader>
-                    <CardTitle>{t('chart_utilization')}</CardTitle>
-                    <CardDescription>
-                      {t('chart_utilization_hint')}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className='h-[300px]'>
-                    {utilizationQuery.isLoading ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>{t('chart_volume')}</CardTitle>
+                <CardDescription>{t('chart_load_hint')}</CardDescription>
+              </CardHeader>
+              <CardContent className='h-[320px]'>
+                {loadQuery.isLoading ? (
+                  <p className='text-muted-foreground text-sm'>
+                    {t('loading')}
+                  </p>
+                ) : loadQuery.isError ? (
+                  <p className='text-destructive text-sm'>{t('error')}</p>
+                ) : (
+                  <ChartContainer
+                    config={loadChartConfig}
+                    className='h-full w-full'
+                  >
+                    <BarChart data={loadData}>
+                      <CartesianGrid
+                        strokeDasharray='3 3'
+                        className='stroke-muted'
+                      />
+                      <XAxis
+                        dataKey='date'
+                        tick={{ fontSize: 11 }}
+                        tickFormatter={formatStatsDateTick}
+                        interval={hourlyStatsAxis ? 1 : 0}
+                      />
+                      <YAxis tick={{ fontSize: 11 }} />
+                      <ChartTooltip
+                        content={<ChartTooltipContent />}
+                        formatter={formatLoadTooltipValue}
+                        labelFormatter={formatStatsTooltipLabel}
+                      />
+                      <Legend />
+                      <Bar
+                        dataKey='created'
+                        name={t('legend_created')}
+                        fill='var(--primary)'
+                        radius={[4, 4, 0, 0]}
+                      />
+                      <Bar
+                        dataKey='completed'
+                        name={t('legend_completed')}
+                        fill='var(--chart-2)'
+                        radius={[4, 4, 0, 0]}
+                      />
+                      <Bar
+                        dataKey='noShow'
+                        name={t('legend_no_show')}
+                        fill='var(--chart-4)'
+                        radius={[4, 4, 0, 0]}
+                      />
+                    </BarChart>
+                  </ChartContainer>
+                )}
+              </CardContent>
+            </Card>
+
+            {canSurveyScores && (
+              <Card className='lg:col-span-2'>
+                <CardHeader>
+                  <CardTitle>{t('chart_survey')}</CardTitle>
+                  <CardDescription>{t('chart_survey_hint')}</CardDescription>
+                </CardHeader>
+                <CardContent className='space-y-4'>
+                  {surveyDefinitions.length > 0 && (
+                    <div className='flex w-full max-w-2xl flex-col gap-4 sm:flex-row sm:items-end'>
+                      <div className='min-w-0 flex-1 space-y-2'>
+                        <Label>{t('filter_survey')}</Label>
+                        <Select
+                          value={surveyDefinitionId || '__all__'}
+                          onValueChange={(v) => {
+                            setSurveyDefinitionId(v === '__all__' ? '' : v);
+                            setSurveyQuestionId('');
+                          }}
+                        >
+                          <SelectTrigger className='w-full'>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value='__all__'>
+                              {t('survey_filter_all')}
+                            </SelectItem>
+                            {surveyDefinitions
+                              .filter((d) => Boolean(d.id?.trim()))
+                              .map((d) => (
+                                <SelectItem key={d.id} value={d.id!}>
+                                  {d.title ?? d.id}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {surveyDefinitionId.trim() &&
+                        numericQuestionsForSelectedSurvey.length > 0 && (
+                          <div className='min-w-0 flex-1 space-y-2'>
+                            <Label>{t('filter_survey_question')}</Label>
+                            <Select
+                              value={surveyQuestionId || '__all__'}
+                              onValueChange={(v) =>
+                                setSurveyQuestionId(v === '__all__' ? '' : v)
+                              }
+                            >
+                              <SelectTrigger className='w-full'>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value='__all__'>
+                                  {t('survey_question_all')}
+                                </SelectItem>
+                                {numericQuestionsForSelectedSurvey.map((q) => (
+                                  <SelectItem key={q.id} value={q.id}>
+                                    {q.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+                    </div>
+                  )}
+                  <div className='h-[280px]'>
+                    {surveyQuery.isLoading ? (
                       <p className='text-muted-foreground text-sm'>
                         {t('loading')}
                       </p>
-                    ) : utilizationQuery.isError ? (
-                      <p className='text-muted-foreground text-sm'>
-                        {t('utilization_unavailable')}
-                      </p>
+                    ) : surveyQuery.isError ? (
+                      <p className='text-destructive text-sm'>{t('error')}</p>
                     ) : (
                       <ChartContainer
-                        config={utilizationChartConfig}
+                        config={surveyChartConfig}
                         className='h-full w-full'
                       >
-                        <LineChart data={utilChartData}>
+                        <LineChart data={surveyChartData}>
                           <CartesianGrid
                             strokeDasharray='3 3'
                             className='stroke-muted'
@@ -1999,67 +1787,28 @@ export default function StatisticsPage() {
                           <XAxis
                             dataKey='date'
                             tick={{ fontSize: 11 }}
-                            tickFormatter={formatUtilizationDateTick}
-                            interval={utilizationAxisHourly ? 1 : 0}
+                            tickFormatter={formatStatsDateTick}
+                            interval={hourlyStatsAxis ? 1 : 0}
                           />
-                          <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
+                          <YAxis
+                            domain={surveyScoreYDomain}
+                            tick={{ fontSize: 11 }}
+                          />
                           <ChartTooltip
-                            content={
-                              <ChartTooltipContent
-                                labelFormatter={(v) =>
-                                  formatUtilizationTooltipLabel(v)
-                                }
-                                formatter={(value) => {
-                                  if (
-                                    typeof value === 'number' &&
-                                    Number.isFinite(value)
-                                  ) {
-                                    return `${value}%`;
-                                  }
-                                  return '—';
-                                }}
-                                footer={({ payload: tipPayload }) => {
-                                  const row = tipPayload?.[0]?.payload as
-                                    | {
-                                        servingMin?: number;
-                                        idleMin?: number;
-                                      }
-                                    | undefined;
-                                  if (!row) return null;
-                                  const fmtMin = (n: number | undefined) =>
-                                    n != null && Number.isFinite(n)
-                                      ? `${n} ${t('minutes_short')}`
-                                      : '—';
-                                  return (
-                                    <div className='grid gap-1.5'>
-                                      <div className='flex w-full justify-between gap-4'>
-                                        <span className='text-muted-foreground'>
-                                          {t('utilization_metric_serving')}
-                                        </span>
-                                        <span className='text-foreground font-mono font-medium tabular-nums'>
-                                          {fmtMin(row.servingMin)}
-                                        </span>
-                                      </div>
-                                      <div className='flex w-full justify-between gap-4'>
-                                        <span className='text-muted-foreground'>
-                                          {t('utilization_metric_idle')}
-                                        </span>
-                                        <span className='text-foreground font-mono font-medium tabular-nums'>
-                                          {fmtMin(row.idleMin)}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  );
-                                }}
-                              />
-                            }
+                            content={<ChartTooltipContent />}
+                            formatter={formatScoreTooltipValue}
+                            labelFormatter={formatStatsTooltipLabel}
                           />
                           <Legend />
                           <Line
                             type='monotone'
-                            dataKey='util'
-                            name={t('legend_utilization_pct')}
-                            stroke='var(--chart-3)'
+                            dataKey='score'
+                            name={
+                              surveyStatsBody?.mode === 'questions'
+                                ? t('legend_score_native')
+                                : t('legend_score_norm5')
+                            }
+                            stroke='var(--primary)'
                             strokeWidth={2}
                             dot={false}
                             connectNulls={false}
@@ -2067,13 +1816,251 @@ export default function StatisticsPage() {
                         </LineChart>
                       </ChartContainer>
                     )}
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          </>
-        )}
-      </div>
-    </ProtectedRoute>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <Card className='gap-0 overflow-hidden pt-0 pb-6 lg:col-span-2'>
+              <CardHeader className='gap-0 border-b p-0 !pb-0'>
+                <div className='grid w-full min-w-0 grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-stretch'>
+                  <div className='flex min-w-0 flex-col justify-start gap-1.5 px-6 py-5'>
+                    <CardTitle>{t('chart_sla_deviations')}</CardTitle>
+                    <CardDescription>
+                      {t('chart_sla_deviations_hint')}
+                    </CardDescription>
+                  </div>
+                  {!(slaQuery.isLoading || slaQuery.isError) && (
+                    <div
+                      className={cn(
+                        'border-border flex min-h-0 w-full min-w-0 items-stretch border-t',
+                        'sm:h-full sm:max-w-md sm:shrink-0 sm:border-t-0 sm:border-l'
+                      )}
+                    >
+                      <button
+                        type='button'
+                        onClick={() => setSlaDisplayMode('count')}
+                        className={cn(
+                          'border-border flex min-h-0 flex-1 flex-col justify-center gap-0.5 border-r px-4 py-0 text-left transition-colors sm:h-full sm:min-h-0 sm:px-6 sm:py-0',
+                          slaDisplayMode === 'count'
+                            ? 'bg-muted/60'
+                            : 'hover:bg-muted/40'
+                        )}
+                      >
+                        <span className='text-muted-foreground text-xs font-medium'>
+                          {t('sla_mode_count')}
+                        </span>
+                        <span className='text-2xl leading-none font-bold tabular-nums'>
+                          {slaChart.sumTot.toLocaleString(appLocale)}
+                        </span>
+                      </button>
+                      <button
+                        type='button'
+                        onClick={() => setSlaDisplayMode('percent')}
+                        className={cn(
+                          'flex min-h-0 flex-1 flex-col justify-center gap-0.5 px-4 py-0 text-left transition-colors sm:h-full sm:min-h-0 sm:px-6 sm:py-0',
+                          slaDisplayMode === 'percent'
+                            ? 'bg-muted/60'
+                            : 'hover:bg-muted/40'
+                        )}
+                      >
+                        <span className='text-muted-foreground text-xs font-medium'>
+                          {t('sla_mode_percent')}
+                        </span>
+                        <span className='text-2xl leading-none font-bold tabular-nums'>
+                          {slaChart.overallPct.toFixed(1)}%
+                        </span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className='h-[320px]'>
+                {slaQuery.isLoading ? (
+                  <p className='text-muted-foreground text-sm'>
+                    {t('loading')}
+                  </p>
+                ) : slaQuery.isError ? (
+                  <p className='text-destructive text-sm'>{t('error')}</p>
+                ) : (
+                  <ChartContainer
+                    config={slaChartConfig}
+                    className='h-full w-full'
+                  >
+                    <BarChart data={slaChart.data}>
+                      <CartesianGrid
+                        strokeDasharray='3 3'
+                        className='stroke-muted'
+                      />
+                      <XAxis
+                        dataKey='date'
+                        tick={{ fontSize: 11 }}
+                        tickFormatter={formatStatsDateTick}
+                        interval={hourlyStatsAxis ? 1 : 0}
+                      />
+                      <YAxis
+                        domain={slaChart.yDomain}
+                        tick={{ fontSize: 11 }}
+                        allowDecimals={slaDisplayMode === 'percent'}
+                      />
+                      <ChartTooltip
+                        content={
+                          <ChartTooltipContent
+                            footer={
+                              slaDisplayMode === 'count'
+                                ? ({ payload: tipPayload }) => {
+                                    const row = tipPayload?.[0]?.payload as
+                                      | {
+                                          within?: number;
+                                          breach?: number;
+                                        }
+                                      | undefined;
+                                    if (!row) return null;
+                                    const total = Math.round(
+                                      (Number(row.within) || 0) +
+                                        (Number(row.breach) || 0)
+                                    );
+                                    return (
+                                      <div className='flex w-full justify-between gap-4 leading-none'>
+                                        <span className='text-muted-foreground'>
+                                          {t('tooltip_total')}
+                                        </span>
+                                        <span className='text-foreground font-mono font-medium tabular-nums'>
+                                          {total}
+                                        </span>
+                                      </div>
+                                    );
+                                  }
+                                : undefined
+                            }
+                          />
+                        }
+                        formatter={formatSlaTooltipValue}
+                        labelFormatter={formatStatsTooltipLabel}
+                      />
+                      <Legend />
+                      <Bar
+                        dataKey='within'
+                        name={t('legend_sla_within')}
+                        stackId='sla'
+                        fill='#94a3b8'
+                      />
+                      <Bar
+                        dataKey='breach'
+                        name={t('legend_sla_breach')}
+                        stackId='sla'
+                        fill='var(--destructive)'
+                      />
+                    </BarChart>
+                  </ChartContainer>
+                )}
+              </CardContent>
+            </Card>
+
+            {isExpanded && (
+              <Card className='lg:col-span-2'>
+                <CardHeader>
+                  <CardTitle>{t('chart_utilization')}</CardTitle>
+                  <CardDescription>
+                    {t('chart_utilization_hint')}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className='h-[300px]'>
+                  {utilizationQuery.isLoading ? (
+                    <p className='text-muted-foreground text-sm'>
+                      {t('loading')}
+                    </p>
+                  ) : utilizationQuery.isError ? (
+                    <p className='text-muted-foreground text-sm'>
+                      {t('utilization_unavailable')}
+                    </p>
+                  ) : (
+                    <ChartContainer
+                      config={utilizationChartConfig}
+                      className='h-full w-full'
+                    >
+                      <LineChart data={utilChartData}>
+                        <CartesianGrid
+                          strokeDasharray='3 3'
+                          className='stroke-muted'
+                        />
+                        <XAxis
+                          dataKey='date'
+                          tick={{ fontSize: 11 }}
+                          tickFormatter={formatUtilizationDateTick}
+                          interval={utilizationAxisHourly ? 1 : 0}
+                        />
+                        <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
+                        <ChartTooltip
+                          content={
+                            <ChartTooltipContent
+                              labelFormatter={(v) =>
+                                formatUtilizationTooltipLabel(v)
+                              }
+                              formatter={(value) => {
+                                if (
+                                  typeof value === 'number' &&
+                                  Number.isFinite(value)
+                                ) {
+                                  return `${value}%`;
+                                }
+                                return '—';
+                              }}
+                              footer={({ payload: tipPayload }) => {
+                                const row = tipPayload?.[0]?.payload as
+                                  | {
+                                      servingMin?: number;
+                                      idleMin?: number;
+                                    }
+                                  | undefined;
+                                if (!row) return null;
+                                const fmtMin = (n: number | undefined) =>
+                                  n != null && Number.isFinite(n)
+                                    ? `${n} ${t('minutes_short')}`
+                                    : '—';
+                                return (
+                                  <div className='grid gap-1.5'>
+                                    <div className='flex w-full justify-between gap-4'>
+                                      <span className='text-muted-foreground'>
+                                        {t('utilization_metric_serving')}
+                                      </span>
+                                      <span className='text-foreground font-mono font-medium tabular-nums'>
+                                        {fmtMin(row.servingMin)}
+                                      </span>
+                                    </div>
+                                    <div className='flex w-full justify-between gap-4'>
+                                      <span className='text-muted-foreground'>
+                                        {t('utilization_metric_idle')}
+                                      </span>
+                                      <span className='text-foreground font-mono font-medium tabular-nums'>
+                                        {fmtMin(row.idleMin)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              }}
+                            />
+                          }
+                        />
+                        <Legend />
+                        <Line
+                          type='monotone'
+                          dataKey='util'
+                          name={t('legend_utilization_pct')}
+                          stroke='var(--chart-3)'
+                          strokeWidth={2}
+                          dot={false}
+                          connectNulls={false}
+                        />
+                      </LineChart>
+                    </ChartContainer>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </>
+      )}
+    </div>
   );
 }

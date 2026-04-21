@@ -51,6 +51,7 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import PermissionGuard from '@/components/auth/permission-guard';
+import { PermUnitSettingsManage } from '@/lib/permission-variants';
 import { buildIanaTimezoneComboboxOptions } from '@/lib/iana-timezone-combobox-options';
 import {
   getCalendarIntegrationListMineQueryKey,
@@ -902,7 +903,7 @@ export function CalendarIntegrationsPanel({
                 </AccordionTrigger>
                 <AccordionContent>
                   <PermissionGuard
-                    permissions={['UNIT_SETTINGS_MANAGE']}
+                    permissions={[PermUnitSettingsManage]}
                     unitId={row.unitId}
                     fallback={
                       <p className='text-muted-foreground text-sm'>

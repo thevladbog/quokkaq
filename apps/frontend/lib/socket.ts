@@ -54,7 +54,19 @@ export class SocketClient {
       return;
     }
 
-    const wsUrl = WS_BASE_URL.replace(/^http/, 'ws') + '/ws';
+    const baseWs = WS_BASE_URL.replace(/^http/, 'ws') + '/ws';
+    let tokenQs = '';
+    if (typeof window !== 'undefined') {
+      try {
+        const t = window.localStorage.getItem('access_token');
+        if (t) {
+          tokenQs = `?access_token=${encodeURIComponent(t)}`;
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    const wsUrl = baseWs + tokenQs;
     logger.log('Connecting to WebSocket:', wsUrl);
 
     this.socket = new WebSocket(wsUrl);

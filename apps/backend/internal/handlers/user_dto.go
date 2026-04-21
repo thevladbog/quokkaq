@@ -15,12 +15,13 @@ type TenantRoleBriefResponse struct {
 
 // UserResponse is the DTO for user API responses
 type UserResponse struct {
-	ID          string                    `json:"id"`
-	Name        string                    `json:"name"`
-	Email       *string                   `json:"email,omitempty"`
-	Type        string                    `json:"type,omitempty"`
-	CreatedAt   string                    `json:"createdAt,omitempty"`
-	PhotoURL    *string                   `json:"photoUrl,omitempty"`
+	ID        string  `json:"id"`
+	Name      string  `json:"name"`
+	Email     *string `json:"email,omitempty"`
+	Type      string  `json:"type,omitempty"`
+	CreatedAt string  `json:"createdAt,omitempty"`
+	PhotoURL  *string `json:"photoUrl,omitempty"`
+	// Roles is deprecated; use tenantRoles and unit permissions instead.
 	Roles       []RoleDTO                 `json:"roles,omitempty"`
 	Units       []UserUnitDTO             `json:"units,omitempty"`
 	Permissions map[string][]string       `json:"permissions,omitempty"`
@@ -65,7 +66,7 @@ func MapUserToResponse(user *models.User) *UserResponse {
 		Permissions: make(map[string][]string),
 	}
 
-	// Map roles
+	// Map legacy global roles (required for /auth/me: frontend derives isPlatformAdmin from role names).
 	for _, userRole := range user.Roles {
 		response.Roles = append(response.Roles, RoleDTO{
 			Role: RoleInfoDTO{

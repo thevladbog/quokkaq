@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { getUnitDisplayName } from '@/lib/unit-display';
-import { isTenantSystemAdminSlug } from '@/lib/tenant-roles';
+import { isTenantAdminUser } from '@/lib/tenant-admin-access';
 
 const MAX_UNIT_TAGS = 4;
 const MAX_ROLE_TAGS = 3;
@@ -84,11 +84,7 @@ export function UsersTable({
       </TableHeader>
       <TableBody>
         {users.map((user) => {
-          const isAdmin =
-            user.roles?.includes('admin') ||
-            (user.tenantRoles ?? []).some((tr) =>
-              isTenantSystemAdminSlug(tr.slug)
-            );
+          const isAdmin = isTenantAdminUser(user);
           const seenUnitIds = new Set<string>();
           const unitRows = (user.units ?? []).filter((uu) => {
             if (seenUnitIds.has(uu.unitId)) return false;

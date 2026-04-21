@@ -8,8 +8,15 @@ import PlatformSidebar from '@/components/PlatformSidebar';
 import SettingsSidebar from '@/components/SettingsSidebar';
 import { usePathname } from 'next/navigation';
 import ProtectedSidebarLayout from '@/components/ProtectedSidebarLayout';
-import { platformRouteAllowsTenantAdmin } from '@/lib/platform-access';
 import { pathWithoutLocale as stripLocaleFromPath } from '@/lib/i18n-path';
+import {
+  PermAccessStaffPanel,
+  PermAccessStatsSubdivision,
+  PermAccessStatsZone,
+  PermAccessSupervisorPanel,
+  PermStatisticsRead,
+  PermSupportReports
+} from '@/lib/permission-variants';
 import Image from 'next/image';
 
 interface ConditionalLayoutProps {
@@ -24,16 +31,12 @@ const ConditionalLayout = ({ children }: ConditionalLayoutProps) => {
     [pathname]
   );
 
-  // Define which paths should use the sidebar layout
   const layoutConfig = useMemo(() => {
     if (pathWithoutLocale.startsWith('/platform')) {
-      const allowTenantAdmin = platformRouteAllowsTenantAdmin();
       return {
         useSidebar: true,
         protected: true,
-        roles: allowTenantAdmin
-          ? ['platform_admin', 'admin']
-          : ['platform_admin'],
+        requirePlatformOperator: true,
         SidebarComponent: PlatformSidebar
       };
     }
@@ -68,7 +71,7 @@ const ConditionalLayout = ({ children }: ConditionalLayoutProps) => {
       return {
         useSidebar: true,
         protected: true,
-        roles: ['admin'],
+        requireTenantAdmin: true,
         SidebarComponent: SettingsSidebar
       };
     }
@@ -77,8 +80,7 @@ const ConditionalLayout = ({ children }: ConditionalLayoutProps) => {
       return {
         useSidebar: true,
         protected: true,
-        roles: ['admin', 'staff'],
-        requiredPermission: 'ACCESS_STAFF_PANEL'
+        requiredPermission: PermAccessStaffPanel
       };
     }
 
@@ -89,16 +91,15 @@ const ConditionalLayout = ({ children }: ConditionalLayoutProps) => {
       return {
         useSidebar: true,
         protected: true,
-        roles: ['admin', 'staff', 'supervisor']
+        requiredPermission: PermAccessStaffPanel
       };
     }
 
-    // Onboarding - admin only
     if (
       pathWithoutLocale === '/onboarding' ||
       pathWithoutLocale.startsWith('/onboarding/')
     ) {
-      return { useSidebar: true, protected: true, roles: ['admin'] };
+      return { useSidebar: true, protected: true, requireTenantAdmin: true };
     }
 
     if (
@@ -108,7 +109,7 @@ const ConditionalLayout = ({ children }: ConditionalLayoutProps) => {
       return {
         useSidebar: true,
         protected: true,
-        roles: ['admin', 'staff', 'supervisor', 'operator']
+        requiredPermission: PermSupportReports
       };
     }
 
@@ -119,8 +120,7 @@ const ConditionalLayout = ({ children }: ConditionalLayoutProps) => {
       return {
         useSidebar: true,
         protected: true,
-        roles: ['admin', 'staff'],
-        requiredPermission: 'ACCESS_STAFF_PANEL'
+        requiredPermission: PermAccessStaffPanel
       };
     }
 
@@ -132,7 +132,7 @@ const ConditionalLayout = ({ children }: ConditionalLayoutProps) => {
       return {
         useSidebar: true,
         protected: true,
-        roles: ['admin', 'staff', 'supervisor', 'operator']
+        requiredAnyPermission: [PermAccessStaffPanel, PermAccessSupervisorPanel]
       };
     }
 
@@ -140,7 +140,7 @@ const ConditionalLayout = ({ children }: ConditionalLayoutProps) => {
       return {
         useSidebar: true,
         protected: true,
-        roles: ['admin', 'staff', 'supervisor', 'operator']
+        requiredAnyPermission: [PermAccessStaffPanel, PermAccessSupervisorPanel]
       };
     }
 
@@ -151,7 +151,11 @@ const ConditionalLayout = ({ children }: ConditionalLayoutProps) => {
       return {
         useSidebar: true,
         protected: true,
-        roles: ['admin', 'staff', 'supervisor', 'operator']
+        requiredAnyPermission: [
+          PermAccessStatsSubdivision,
+          PermAccessStatsZone,
+          PermStatisticsRead
+        ]
       };
     }
 
@@ -162,8 +166,7 @@ const ConditionalLayout = ({ children }: ConditionalLayoutProps) => {
       return {
         useSidebar: true,
         protected: true,
-        roles: ['admin', 'supervisor'],
-        requiredPermission: 'ACCESS_SUPERVISOR_PANEL'
+        requiredPermission: PermAccessSupervisorPanel
       };
     }
 
@@ -193,12 +196,13 @@ const ConditionalLayout = ({ children }: ConditionalLayoutProps) => {
 
   if (layoutConfig.useSidebar) {
     if (layoutConfig.protected) {
-      // Use protected layout with sidebar
       return (
         <>
           <ProtectedSidebarLayout
-            allowedRoles={layoutConfig.roles || []}
+            requirePlatformOperator={layoutConfig.requirePlatformOperator}
+            requireTenantAdmin={layoutConfig.requireTenantAdmin}
             requiredPermission={layoutConfig.requiredPermission}
+            requiredAnyPermission={layoutConfig.requiredAnyPermission}
             SidebarComponent={layoutConfig.SidebarComponent}
             fallbackComponent={
               <div className='flex min-h-screen items-center justify-center p-4'>
@@ -217,7 +221,6 @@ const ConditionalLayout = ({ children }: ConditionalLayoutProps) => {
         </>
       );
     } else {
-      // Use public layout with sidebar
       return (
         <SidebarProvider>
           <AppSidebar />
@@ -228,7 +231,6 @@ const ConditionalLayout = ({ children }: ConditionalLayoutProps) => {
     }
   }
 
-  // For other routes, render children without sidebar
   return (
     <>
       {children}

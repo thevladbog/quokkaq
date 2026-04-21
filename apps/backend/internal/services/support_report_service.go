@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"quokkaq-go-backend/internal/models"
+	"quokkaq-go-backend/internal/rbac"
 	"quokkaq-go-backend/internal/repository"
 
 	"github.com/google/uuid"
@@ -52,6 +53,7 @@ type SupportReportService struct {
 	deploymentSettings repository.DeploymentSaaSSettingsRepository
 	createPlatform     string
 	userRepo           repository.UserRepository
+	tenantPerms        repository.TenantCatalogPermissionChecker
 	companyRepo        repository.CompanyRepository
 	// cancelComment is SUPPORT_REPORT_CANCEL_COMMENT (trimmed) or the default applicant-facing Russian line.
 	cancelComment string
@@ -66,7 +68,7 @@ type supportReportTrackerAccessPatcher interface {
 // createPlatform is models.TicketBackendPlane, models.TicketBackendYandexTracker, or SupportReportPlatformNone.
 // companyRepo may be nil (Yandex Tracker company field on create will be left empty).
 // deploymentSettings may be nil (tests); when set, support ticket queue/type can be read from DB with env fallback.
-func NewSupportReportService(repo repository.SupportReportRepository, shareRepo repository.SupportReportShareRepository, plane, tracker SupportReportTicketClient, deploymentSettings repository.DeploymentSaaSSettingsRepository, createPlatform string, userRepo repository.UserRepository, companyRepo repository.CompanyRepository) *SupportReportService {
+func NewSupportReportService(repo repository.SupportReportRepository, shareRepo repository.SupportReportShareRepository, plane, tracker SupportReportTicketClient, deploymentSettings repository.DeploymentSaaSSettingsRepository, createPlatform string, userRepo repository.UserRepository, tenantPerms repository.TenantCatalogPermissionChecker, companyRepo repository.CompanyRepository) *SupportReportService {
 	cc := strings.TrimSpace(os.Getenv("SUPPORT_REPORT_CANCEL_COMMENT"))
 	if cc == "" {
 		cc = "Спасибо, что написали нам. Это обращение закрыто в QuokkaQ. Если снова понадобится помощь — обращайтесь, мы на связи."
@@ -79,6 +81,7 @@ func NewSupportReportService(repo repository.SupportReportRepository, shareRepo 
 		deploymentSettings: deploymentSettings,
 		createPlatform:     createPlatform,
 		userRepo:           userRepo,
+		tenantPerms:        tenantPerms,
 		companyRepo:        companyRepo,
 		cancelComment:      cc,
 	}
@@ -566,16 +569,16 @@ func (s *SupportReportService) AddSupportReportShare(ctx context.Context, viewer
 	if targetUserID == row.CreatedByUserID {
 		return nil, ErrSupportReportShareSelf
 	}
-	okAccess, err := s.userRepo.HasSupportReportAccess(targetUserID)
+	authorCompany, err := s.userRepo.GetCompanyIDByUserID(row.CreatedByUserID)
+	if err != nil {
+		return nil, err
+	}
+	okAccess, err := repository.TenantPermissionAllowed(s.userRepo, s.tenantPerms, targetUserID, authorCompany, rbac.PermSupportReports)
 	if err != nil {
 		return nil, err
 	}
 	if !okAccess {
 		return nil, ErrSupportReportShareInvalidTarget
-	}
-	authorCompany, err := s.userRepo.GetCompanyIDByUserID(row.CreatedByUserID)
-	if err != nil {
-		return nil, err
 	}
 	okCo, err := s.userRepo.HasCompanyAccess(targetUserID, authorCompany)
 	if err != nil {

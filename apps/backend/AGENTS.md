@@ -54,6 +54,19 @@ auth, users, units, tickets, services, counters, shifts, slots, bookings, pre-re
 
 - Подробно: `README.md` (EN), `README.ru.md` (RU).
 
+## Авторизация и RBAC
+
+- **Каталог прав** — константы в [`internal/rbac/permissions.go`](internal/rbac/permissions.go) (dot-notation: `tickets.read`, `access.staff_panel`, `support.reports`, …). Новые ключи добавлять туда и в OpenAPI/клиент при необходимости.
+- **HTTP middleware** ([`internal/middleware/rbac_middleware.go`](internal/middleware/rbac_middleware.go)):
+  - `RequirePlatformAdmin` — только SaaS-оператор (`platform_admin`); в не-production при `PLATFORM_ALLOW_TENANT_ADMIN` может допускать глобальный `admin` (см. `authorization.go`).
+  - `RequireTenantAdmin` — `platform_admin`, глобальный `admin`, tenant `system_admin`, или каталог `tenant.admin` на юните.
+  - `RequireTenantPermission(perm)` — то же + `TenantPermissionAllowed`: каталог `perm` через tenant roles **или** то же право на `user_units` в компании ([`internal/repository/tenant_permission_allowed.go`](internal/repository/tenant_permission_allowed.go)).
+  - `RequireUnitPermission` — право на конкретном `unitId` из URL (JWT user или terminal).
+- **Tenant roles** — `tenant_roles`, `tenant_role_units`, `user_tenant_roles`; слияние прав в `user_units` — `tenantroleseed.RebuildUserUnitsFromTenantRoles` / синхронизация из хендлеров.
+- **Глобальный `admin`** — `userRepo.IsAdmin` (только имя роли `admin`); **legacy**, но всё ещё используется в части хендлеров и middleware. Для полного контроля внутри тенанта предпочтительны tenant-роль `system_admin` и каталог прав.
+- **Миграции БД** — только новые версии: `RunMigration("v1.x.y_snake_case", …)` в [`pkg/database/postgres.go`](pkg/database/postgres.go); тела уже применённых миграций не менять.
+- **Inline-проверки** (survey, shift journal, statistics scope) опираются на глобальные имена ролей и/или канонические права на `user_units`; tenant `system_admin` обычно покрывается **слитыми** правами на все юниты после TRU, а не отдельной проверкой slug в репозитории.
+
 ## Зависимости и алерты
 
 - **pgx / CVE-2026-33815 (GHSA-xgrm-4fwx-7qm8):** в `go.mod` стоит `github.com/jackc/pgx/v5` **v5.9.1**; по OSV исправление с **v5.9.0**. Локально: `go run golang.org/x/vuln/cmd/govulncheck@latest ./...` в `apps/backend` — без находок. Если GitHub Dependency review всё ещё ругается, в [`.github/workflows/dependency-review.yml`](../../.github/workflows/dependency-review.yml) для этого GHSA задан `allow-ghsas` (см. комментарий в workflow); при обновлении данных GitHub правило можно убрать.

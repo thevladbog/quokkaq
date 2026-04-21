@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useUnits, useCreateUnit } from '@/lib/hooks';
 import { companiesApiExt } from '@/lib/api';
-import PermissionGuard from '@/components/auth/permission-guard';
+import { isTenantAdminUser } from '@/lib/tenant-admin-access';
 import { Plus } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import {
@@ -144,7 +144,7 @@ export default function UnitsIndexPage() {
         <h1 className='min-w-0 text-2xl font-bold tracking-tight md:text-3xl'>
           {t('units.title', { defaultValue: 'Units' })}
         </h1>
-        <PermissionGuard permissions={['UNIT_CREATE']}>
+        {isTenantAdminUser(user) ? (
           <Button
             className='h-auto min-h-9 w-full shrink-0 px-3 py-2.5 text-center leading-snug whitespace-normal md:w-auto md:whitespace-nowrap'
             onClick={() => setCreateDialogOpen(true)}
@@ -153,7 +153,7 @@ export default function UnitsIndexPage() {
             <Plus className='mr-2 h-4 w-4 shrink-0' />
             {t('units.add')}
           </Button>
-        </PermissionGuard>
+        ) : null}
       </div>
 
       <Card>

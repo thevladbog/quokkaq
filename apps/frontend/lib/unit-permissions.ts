@@ -1,25 +1,52 @@
 /**
- * Canonical list of assignable per-unit permission IDs and default English labels.
- * UI copy should come from next-intl (`admin.users.permissions_list.*`); labels here
- * match `messages/en.json` for tooling and non-translated contexts.
+ * Canonical list of assignable per-unit permission IDs (dot notation) and default English labels.
+ * UI copy should come from next-intl (`admin.users.permissions_list.*`); keys in messages use
+ * legacy SCREAMING_CASE — use `permissionListMessageKey(id)` when translating.
  */
+import {
+  PermAccessKiosk,
+  PermAccessStaffPanel,
+  PermAccessStatsSubdivision,
+  PermAccessStatsZone,
+  PermAccessSupervisorPanel,
+  PermAccessSurveyResponses,
+  PermAccessTicketScreen,
+  PermCalendarManage,
+  PermCounterOperate,
+  PermStatisticsRead,
+  PermSurveyManage,
+  PermTicketsRead,
+  PermTicketsWrite,
+  PermUnitGridManage,
+  PermUnitServicesManage,
+  PermUnitSettingsManage,
+  PermUnitTicketScreenManage,
+  PermUnitUsersManage
+} from '@/lib/permission-variants';
+
 export const UNIT_PERMISSIONS = [
-  { id: 'UNIT_SETTINGS_MANAGE', label: 'Manage Unit Settings' },
-  { id: 'UNIT_GRID_MANAGE', label: 'Manage Grid' },
-  { id: 'UNIT_SERVICES_MANAGE', label: 'Manage Services' },
-  { id: 'UNIT_TICKET_SCREEN_MANAGE', label: 'Manage Ticket Screen' },
-  { id: 'UNIT_USERS_MANAGE', label: 'Manage Unit Users' },
-  { id: 'ACCESS_STAFF_PANEL', label: 'Access Staff Panel' },
-  { id: 'ACCESS_KIOSK', label: 'Access Kiosk' },
-  { id: 'ACCESS_TICKET_SCREEN', label: 'Access Ticket Screen' },
-  { id: 'ACCESS_SUPERVISOR_PANEL', label: 'Access Supervisor Panel' },
-  { id: 'ACCESS_SURVEY_RESPONSES', label: 'View guest survey ratings' },
+  { id: PermUnitSettingsManage, label: 'Manage Unit Settings' },
+  { id: PermUnitGridManage, label: 'Manage Grid' },
+  { id: PermUnitServicesManage, label: 'Manage Services' },
+  { id: PermUnitTicketScreenManage, label: 'Manage Ticket Screen' },
+  { id: PermUnitUsersManage, label: 'Manage Unit Users' },
+  { id: PermTicketsRead, label: 'View tickets' },
+  { id: PermTicketsWrite, label: 'Create and update tickets' },
+  { id: PermCounterOperate, label: 'Operate counters' },
+  { id: PermSurveyManage, label: 'Manage surveys' },
+  { id: PermCalendarManage, label: 'Manage calendar integration' },
+  { id: PermStatisticsRead, label: 'View statistics' },
+  { id: PermAccessStaffPanel, label: 'Access Staff Panel' },
+  { id: PermAccessKiosk, label: 'Access Kiosk' },
+  { id: PermAccessTicketScreen, label: 'Access Ticket Screen' },
+  { id: PermAccessSupervisorPanel, label: 'Access Supervisor Panel' },
+  { id: PermAccessSurveyResponses, label: 'View guest survey ratings' },
   {
-    id: 'ACCESS_STATISTICS_SUBDIVISION',
+    id: PermAccessStatsSubdivision,
     label: 'Statistics: whole subdivision'
   },
   {
-    id: 'ACCESS_STATISTICS_ZONE',
+    id: PermAccessStatsZone,
     label: 'Statistics: assigned service zones only'
   }
 ] as const;

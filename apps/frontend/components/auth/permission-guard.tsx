@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { useAuthContext } from '@/contexts/AuthContext';
+import { userUnitPermissionMatches } from '@/lib/permission-variants';
 
 interface PermissionGuardProps {
   children: React.ReactNode;
@@ -9,8 +10,8 @@ interface PermissionGuardProps {
   unitId?: string;
   requireAll?: boolean;
   fallback?: React.ReactNode;
-  /** When false, tenant `admin` does not bypass — they need the listed unit permission(s). */
-  adminBypass?: boolean;
+  /** When false, tenant `system_admin` does not bypass — they need the listed unit permission(s). */
+  tenantAdminBypass?: boolean;
 }
 
 export default function PermissionGuard({
@@ -19,7 +20,7 @@ export default function PermissionGuard({
   unitId,
   requireAll = false,
   fallback = null,
-  adminBypass = true
+  tenantAdminBypass = true
 }: PermissionGuardProps) {
   const { user, isAuthenticated, isLoading } = useAuthContext();
 
@@ -32,10 +33,11 @@ export default function PermissionGuard({
     if (isLoading) return null as boolean | null;
     if (!isAuthenticated || !user) return false;
 
-    if (user.roles?.includes('platform_admin')) {
+    if (user.isPlatformAdmin === true) {
       return true;
     }
-    if (adminBypass && user.roles?.includes('admin')) {
+    const tenantSystemAdmin = user.isTenantAdmin === true;
+    if (tenantAdminBypass && tenantSystemAdmin) {
       return true;
     }
 
@@ -46,9 +48,13 @@ export default function PermissionGuard({
     const userPermissions = user.permissions?.[unitId] || [];
 
     if (requireAll) {
-      return sortedPermissions.every((p) => userPermissions.includes(p));
+      return sortedPermissions.every((p) =>
+        userUnitPermissionMatches(userPermissions, p)
+      );
     }
-    return sortedPermissions.some((p) => userPermissions.includes(p));
+    return sortedPermissions.some((p) =>
+      userUnitPermissionMatches(userPermissions, p)
+    );
   }, [
     isLoading,
     isAuthenticated,
@@ -56,7 +62,7 @@ export default function PermissionGuard({
     unitId,
     requireAll,
     sortedPermissions,
-    adminBypass
+    tenantAdminBypass
   ]);
 
   if (hasAccess === null) {

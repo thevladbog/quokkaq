@@ -83,7 +83,6 @@ func (PanicUserRepo) EnsureRoleExistsTx(*gorm.DB, string) (*models.Role, error) 
 func (PanicUserRepo) IsAdmin(string) (bool, error)                              { panic("unexpected") }
 func (PanicUserRepo) ListUserIDsByRoleNames([]string) ([]string, error)         { panic("unexpected") }
 func (PanicUserRepo) ListUserRoleNamesTx(*gorm.DB, string) ([]string, error)    { panic("unexpected") }
-func (PanicUserRepo) HasSupportReportAccess(string) (bool, error)               { panic("unexpected") }
 func (PanicUserRepo) IsPlatformAdmin(string) (bool, error)                      { panic("unexpected") }
 func (PanicUserRepo) IsAdminOrHasUnitAccess(string, string) (bool, error)       { panic("unexpected") }
 func (PanicUserRepo) HasCompanyAccess(string, string) (bool, error)             { panic("unexpected") }
@@ -125,6 +124,15 @@ func (PanicUserRepo) ListCompanyIDsForSupportReportTenantWideAccess(string) ([]s
 	panic("unexpected")
 }
 func (PanicUserRepo) ListUserIDsWithTenantSystemAdminInCompany(string) ([]string, error) {
+	panic("unexpected")
+}
+func (PanicUserRepo) UserMatchesUnitPermission(string, string, string) (bool, error) {
+	panic("unexpected")
+}
+func (PanicUserRepo) UserMatchesAnyUnitPermission(string, string, []string) (bool, error) {
+	panic("unexpected")
+}
+func (PanicUserRepo) UserHasUnitPermissionInCompany(string, string, string) (bool, error) {
 	panic("unexpected")
 }
 

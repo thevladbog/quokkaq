@@ -320,7 +320,7 @@ func (s *invitationService) RegisterUser(token, name, password string, privacyCo
 		if err != nil {
 			return nil, fmt.Errorf("assign tenant membership: %w", err)
 		}
-		defaultPerms := rbac.LegacyRolePermissions("staff")
+		defaultPerms := rbac.DefaultInvitationUnitPermissions()
 		if err := s.userRepo.AssignUnit(user.ID, rootUnit.ID, defaultPerms); err != nil {
 			return nil, fmt.Errorf("assign tenant membership: %w", err)
 		}

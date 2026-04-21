@@ -177,9 +177,22 @@ func (h *CompanyHandler) PatchMyCompany(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
+	isPlatformAdmin, err := h.userRepo.IsPlatformAdmin(userID)
+	if err != nil {
+		logger.PrintfCtx(r.Context(), "PatchMyCompany IsPlatformAdmin: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	isTenantSystemAdmin, err := h.tenantRBAC.UserHasTenantSystemAdminRole(userID, companyID)
+	if err != nil {
+		logger.PrintfCtx(r.Context(), "PatchMyCompany UserHasTenantSystemAdminRole: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	fullPatch := isGlobalAdmin || isPlatformAdmin || isTenantSystemAdmin
 
 	var body models.CompanyPatch
-	if isGlobalAdmin {
+	if fullPatch {
 		dec := json.NewDecoder(bytes.NewReader(bodyBytes))
 		dec.DisallowUnknownFields()
 		if err := dec.Decode(&body); err != nil {
