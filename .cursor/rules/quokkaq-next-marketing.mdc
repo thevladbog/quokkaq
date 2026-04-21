@@ -14,7 +14,7 @@ Public marketing landing (Next.js). Default dev port: **`3010`** (see [`apps/mar
 
 ## API and Orval
 
-- **Contract source**: [`apps/backend/docs/swagger.json`](apps/backend/docs/swagger.json).
+- **Contract source**: [`apps/backend/docs/openapi.json`](apps/backend/docs/openapi.json).
 - **Config**: [`apps/marketing/orval.config.ts`](apps/marketing/orval.config.ts) — OpenAPI filter tag **`subscriptions`**, output [`apps/marketing/lib/api/generated/subscriptions.ts`](apps/marketing/lib/api/generated/subscriptions.ts), Orval **`client: 'fetch'`** (no TanStack Query).
 - **HTTP mutator**: [`apps/marketing/lib/marketing-orval-mutator.ts`](apps/marketing/lib/marketing-orval-mutator.ts) — base URL from `MARKETING_API_URL` or `NEXT_PUBLIC_API_URL`; server `fetch` uses `next: { revalidate: 300 }`.
 - **Do not hand-edit** anything under `apps/marketing/lib/api/generated/` — regenerate instead.

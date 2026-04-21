@@ -240,6 +240,63 @@
                     }
                 ]
             },
+            "handlers.CreateTicketRequestAnonymous": {
+                "additionalProperties": false,
+                "properties": {
+                    "serviceId": {
+                        "minLength": 1,
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "serviceId"
+                ],
+                "type": "object"
+            },
+            "handlers.CreateTicketRequestKiosk": {
+                "additionalProperties": false,
+                "properties": {
+                    "serviceId": {
+                        "minLength": 1,
+                        "type": "string"
+                    },
+                    "visitorLocale": {
+                        "enum": [
+                            "en",
+                            "ru"
+                        ],
+                        "type": "string"
+                    },
+                    "visitorPhone": {
+                        "minLength": 1,
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "serviceId",
+                    "visitorPhone",
+                    "visitorLocale"
+                ],
+                "type": "object"
+            },
+            "handlers.CreateTicketRequestStaff": {
+                "additionalProperties": false,
+                "properties": {
+                    "clientId": {
+                        "minLength": 1,
+                        "type": "string"
+                    },
+                    "serviceId": {
+                        "minLength": 1,
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "serviceId",
+                    "clientId"
+                ],
+                "type": "object"
+            },
             "handlers.CustomTermsLeadRequestBody": {
                 "properties": {
                     "comment": {
@@ -437,8 +494,8 @@
                     },
                     "paymentTerms": {
                         "description": "PaymentTerms is optional markdown for «Условия оплаты». Omit on PATCH to leave unchanged; send \"\" to clear.",
-                        "type": "string",
-                        "maxLength": 32000
+                        "maxLength": 32000,
+                        "type": "string"
                     },
                     "provisionSubscriptionsOnPayment": {
                         "type": "boolean"
@@ -467,8 +524,8 @@
                     },
                     "lineComment": {
                         "description": "LineComment is optional text shown under the line title in print (parentheses in UI/PDF).",
-                        "type": "string",
-                        "maxLength": 512
+                        "maxLength": 512,
+                        "type": "string"
                     },
                     "quantity": {
                         "type": "number"
@@ -521,8 +578,8 @@
                     },
                     "paymentTerms": {
                         "description": "PaymentTerms is optional markdown for «Условия оплаты». Omit on PATCH to leave unchanged; send \"\" to clear.",
-                        "type": "string",
-                        "maxLength": 32000
+                        "maxLength": 32000,
+                        "type": "string"
                     },
                     "provisionSubscriptionsOnPayment": {
                         "type": "boolean"
@@ -547,6 +604,24 @@
                 "required": [
                     "code",
                     "message"
+                ],
+                "type": "object"
+            },
+            "handlers.LoginLinkResponse": {
+                "properties": {
+                    "exampleUrl": {
+                        "description": "Example full login URL including the token query parameter",
+                        "format": "uri",
+                        "type": "string"
+                    },
+                    "token": {
+                        "description": "Opaque tenant login token for strict-tenant links",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "token",
+                    "exampleUrl"
                 ],
                 "type": "object"
             },
@@ -595,6 +670,7 @@
                 "type": "object"
             },
             "handlers.PatchExternalIdentityJSON": {
+                "minProperties": 1,
                 "properties": {
                     "externalObjectId": {
                         "type": "string"
@@ -606,17 +682,16 @@
                         "type": "string"
                     }
                 },
-                "type": "object",
-                "minProperties": 1
+                "type": "object"
             },
             "handlers.PatchMeRequest": {
+                "minProperties": 1,
                 "properties": {
                     "photoUrl": {
                         "type": "string"
                     }
                 },
-                "type": "object",
-                "minProperties": 1
+                "type": "object"
             },
             "handlers.PatchPlatformCompanyBody": {
                 "properties": {
@@ -722,6 +797,7 @@
                 "type": "object"
             },
             "handlers.PatchTicketVisitorRequest": {
+                "minProperties": 1,
                 "properties": {
                     "clientId": {
                         "type": "string"
@@ -736,8 +812,7 @@
                         "type": "string"
                     }
                 },
-                "type": "object",
-                "minProperties": 1
+                "type": "object"
             },
             "handlers.PatchUnitClientRequest": {
                 "properties": {
@@ -768,18 +843,19 @@
                                 "type": "object"
                             }
                         },
-                        "type": "object",
                         "required": [
                             "kiosk"
-                        ]
+                        ],
+                        "type": "object"
                     }
                 },
-                "type": "object",
                 "required": [
                     "config"
-                ]
+                ],
+                "type": "object"
             },
             "handlers.PatchUserSSOFlagsJSON": {
+                "minProperties": 1,
                 "properties": {
                     "exemptFromSsoSync": {
                         "description": "ExemptFromSSOSync when true, SSO directory reconcile does not change this user's global roles, unit assignments, or tenant role mappings (IdP group sync).",
@@ -790,10 +866,10 @@
                         "type": "boolean"
                     }
                 },
-                "type": "object",
-                "minProperties": 1
+                "type": "object"
             },
             "handlers.PatchUserTenantRolesJSON": {
+                "minProperties": 1,
                 "properties": {
                     "confirmRemoveAllTenantRoles": {
                         "description": "ConfirmRemoveAllTenantRoles must be true when tenantRoleIds is empty after trimming, so ReplaceUserTenantRoles does not\nclear user_tenant_roles and trigger RebuildUserUnitsFromTenantRoles mass-removal of user_units by mistake.",
@@ -806,11 +882,10 @@
                         "type": "array"
                     }
                 },
-                "type": "object",
-                "minProperties": 1,
                 "required": [
                     "tenantRoleIds"
-                ]
+                ],
+                "type": "object"
             },
             "handlers.PatchUserTenantRolesResponse": {
                 "properties": {
@@ -821,10 +896,10 @@
                         "type": "array"
                     }
                 },
-                "type": "object",
                 "required": [
                     "tenantRoles"
-                ]
+                ],
+                "type": "object"
             },
             "handlers.PeriodResponse": {
                 "properties": {
@@ -901,10 +976,10 @@
                         "type": "integer"
                     },
                     "features": {
-                        "type": "object",
                         "additionalProperties": {
                             "type": "boolean"
-                        }
+                        },
+                        "type": "object"
                     },
                     "interval": {
                         "type": "string"
@@ -925,16 +1000,16 @@
                         "type": "boolean"
                     },
                     "limits": {
-                        "type": "object",
                         "additionalProperties": {
                             "type": "integer"
-                        }
+                        },
+                        "type": "object"
                     },
                     "limitsNegotiable": {
-                        "type": "object",
                         "additionalProperties": {
                             "type": "boolean"
-                        }
+                        },
+                        "type": "object"
                     },
                     "name": {
                         "type": "string"
@@ -1002,10 +1077,10 @@
                         "type": "integer"
                     },
                     "features": {
-                        "type": "object",
                         "additionalProperties": {
                             "type": "boolean"
-                        }
+                        },
+                        "type": "object"
                     },
                     "interval": {
                         "type": "string"
@@ -1025,16 +1100,16 @@
                         "type": "boolean"
                     },
                     "limits": {
-                        "type": "object",
                         "additionalProperties": {
                             "type": "integer"
-                        }
+                        },
+                        "type": "object"
                     },
                     "limitsNegotiable": {
-                        "type": "object",
                         "additionalProperties": {
                             "type": "boolean"
-                        }
+                        },
+                        "type": "object"
                     },
                     "name": {
                         "type": "string"
@@ -1078,8 +1153,8 @@
                         "type": "string"
                     },
                     "privacyConsentAccepted": {
-                        "type": "boolean",
-                        "enum": [true]
+                        "enum": [true],
+                        "type": "boolean"
                     },
                     "referrer": {
                         "type": "string"
@@ -1137,17 +1212,17 @@
                         "type": "string"
                     },
                     "privacyConsentAccepted": {
-                        "type": "boolean",
-                        "enum": [true]
+                        "enum": [true],
+                        "type": "boolean"
                     },
                     "token": {
                         "type": "string"
                     }
                 },
                 "required": [
+                    "privacyConsentAccepted",
                     "name",
                     "password",
-                    "privacyConsentAccepted",
                     "token"
                 ],
                 "type": "object"
@@ -1233,8 +1308,8 @@
                         "type": "string"
                     },
                     "privacyConsentAccepted": {
-                        "type": "boolean",
-                        "enum": [true]
+                        "enum": [true],
+                        "type": "boolean"
                     }
                 },
                 "required": [
@@ -1278,8 +1353,8 @@
                 "properties": {
                     "code": {
                         "example": "PAIR12345",
-                        "type": "string",
-                        "minLength": 1
+                        "minLength": 1,
+                        "type": "string"
                     }
                 },
                 "required": [
@@ -1405,10 +1480,10 @@
                         "type": "string"
                     }
                 },
-                "type": "object",
                 "required": [
                     "url"
-                ]
+                ],
+                "type": "object"
             },
             "handlers.UploadSurveyCompletionImageResponse": {
                 "properties": {
@@ -1416,10 +1491,10 @@
                         "type": "string"
                     }
                 },
-                "type": "object",
                 "required": [
                     "url"
-                ]
+                ],
+                "type": "object"
             },
             "handlers.UploadSurveyIdleMediaResponse": {
                 "properties": {
@@ -1427,59 +1502,59 @@
                         "type": "string"
                     }
                 },
-                "type": "object",
                 "required": [
                     "url"
-                ]
+                ],
+                "type": "object"
             },
             "handlers.UpsertGroupMappingJSON": {
+                "description": "Map an IdP group to exactly one target: a tenant role id, or a legacy global role name. Send idpGroupId plus either tenantRoleId or legacyRoleName (not both).",
                 "oneOf": [
                     {
-                        "type": "object",
                         "additionalProperties": false,
+                        "properties": {
+                            "idpGroupId": {
+                                "description": "IdP group identifier (e.g. Azure AD group object id).",
+                                "minLength": 1,
+                                "type": "string"
+                            },
+                            "tenantRoleId": {
+                                "description": "Tenant role UUID in this company. Mutually exclusive with legacyRoleName.",
+                                "minLength": 1,
+                                "type": "string"
+                            }
+                        },
                         "required": [
                             "idpGroupId",
                             "tenantRoleId"
                         ],
-                        "properties": {
-                            "idpGroupId": {
-                                "type": "string",
-                                "minLength": 1,
-                                "description": "IdP group identifier (e.g. Azure AD group object id)."
-                            },
-                            "tenantRoleId": {
-                                "type": "string",
-                                "minLength": 1,
-                                "description": "Tenant role UUID in this company. Mutually exclusive with legacyRoleName."
-                            }
-                        }
+                        "type": "object"
                     },
                     {
-                        "type": "object",
                         "additionalProperties": false,
-                        "required": [
-                            "idpGroupId",
-                            "legacyRoleName"
-                        ],
                         "properties": {
                             "idpGroupId": {
-                                "type": "string",
+                                "description": "IdP group identifier (e.g. Azure AD group object id).",
                                 "minLength": 1,
-                                "description": "IdP group identifier (e.g. Azure AD group object id)."
+                                "type": "string"
                             },
                             "legacyRoleName": {
-                                "type": "string",
                                 "description": "Legacy global role name applied by SSO group sync. Mutually exclusive with tenantRoleId.",
                                 "enum": [
                                     "staff",
                                     "supervisor",
                                     "operator"
-                                ]
+                                ],
+                                "type": "string"
                             }
-                        }
+                        },
+                        "required": [
+                            "idpGroupId",
+                            "legacyRoleName"
+                        ],
+                        "type": "object"
                     }
-                ],
-                "description": "Map an IdP group to exactly one target: a tenant role id, or a legacy global role name. Send idpGroupId plus either tenantRoleId or legacyRoleName (not both)."
+                ]
             },
             "handlers.UsageMetricInfoResponse": {
                 "properties": {
@@ -1655,17 +1730,17 @@
                         "type": "string"
                     }
                 },
-                "type": "object",
                 "required": [
                     "title",
                     "questions"
-                ]
+                ],
+                "type": "object"
             },
             "handlers.createVisitorTagDefinitionRequest": {
                 "properties": {
                     "color": {
-                        "type": "string",
-                        "pattern": "^#[0-9A-Fa-f]{6}$"
+                        "pattern": "^#[0-9A-Fa-f]{6}$",
+                        "type": "string"
                     },
                     "label": {
                         "type": "string"
@@ -1707,12 +1782,12 @@
                         "type": "string"
                     }
                 },
-                "type": "object",
                 "required": [
                     "ticketId",
                     "surveyId",
                     "answers"
-                ]
+                ],
+                "type": "object"
             },
             "handlers.patchCompanySlugRequest": {
                 "properties": {
@@ -1721,12 +1796,13 @@
                         "type": "string"
                     }
                 },
-                "type": "object",
                 "required": [
                     "slug"
-                ]
+                ],
+                "type": "object"
             },
             "handlers.patchSurveyRequest": {
+                "minProperties": 1,
                 "properties": {
                     "completionMessage": {
                         "type": "object"
@@ -1744,14 +1820,14 @@
                         "type": "string"
                     }
                 },
-                "type": "object",
-                "minProperties": 1
+                "type": "object"
             },
             "handlers.patchVisitorTagDefinitionRequest": {
+                "minProperties": 1,
                 "properties": {
                     "color": {
-                        "type": "string",
-                        "pattern": "^#[0-9A-Fa-f]{6}$"
+                        "pattern": "^#[0-9A-Fa-f]{6}$",
+                        "type": "string"
                     },
                     "label": {
                         "type": "string"
@@ -1760,8 +1836,7 @@
                         "type": "integer"
                     }
                 },
-                "type": "object",
-                "minProperties": 1
+                "type": "object"
             },
             "handlers.platformListResponse-models_CatalogItem": {
                 "properties": {
@@ -1904,10 +1979,10 @@
                         "type": "string"
                     }
                 },
-                "type": "object",
                 "required": [
                     "code"
-                ]
+                ],
+                "type": "object"
             },
             "handlers.tenantHintRequest": {
                 "properties": {
@@ -1915,10 +1990,10 @@
                         "type": "string"
                     }
                 },
-                "type": "object",
                 "required": [
                     "email"
-                ]
+                ],
+                "type": "object"
             },
             "models.Booking": {
                 "properties": {
@@ -2147,8 +2222,8 @@
                     },
                     "invoiceDefaultPaymentTerms": {
                         "description": "InvoiceDefaultPaymentTerms is markdown used as default «Условия оплаты» on new platform invoices; only the SaaS operator row (IsSaaSOperator) is intended to hold a template.",
-                        "type": "string",
-                        "maxLength": 32000
+                        "maxLength": 32000,
+                        "type": "string"
                     },
                     "invoices": {
                         "items": {
@@ -2279,9 +2354,9 @@
                     },
                     "httpPassword": {
                         "description": "empty string clears password; omit to leave unchanged",
+                        "format": "password",
                         "type": "string",
-                        "writeOnly": true,
-                        "format": "password"
+                        "writeOnly": true
                     },
                     "sitePaymentSystemName": {
                         "type": "string"
@@ -2546,8 +2621,8 @@
                     },
                     "paymentTerms": {
                         "description": "PaymentTermsMarkdown is per-invoice «Условия оплаты» (markdown in UI; PDF uses a plain-text rendering).",
-                        "type": "string",
-                        "maxLength": 32000
+                        "maxLength": 32000,
+                        "type": "string"
                     },
                     "provisionSubscriptionsOnPayment": {
                         "type": "boolean"
@@ -2617,8 +2692,8 @@
                     },
                     "lineComment": {
                         "description": "LineComment is optional print-only clarification (e.g. period); shown under description in UI/PDF.",
-                        "type": "string",
-                        "maxLength": 512
+                        "maxLength": 512,
+                        "type": "string"
                     },
                     "lineGrossMinor": {
                         "type": "integer"
@@ -2716,12 +2791,12 @@
                     },
                     "invoiceStatus": {
                         "description": "paid | void | uncollectible",
-                        "type": "string",
                         "enum": [
                             "paid",
                             "void",
                             "uncollectible"
-                        ]
+                        ],
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -3204,11 +3279,11 @@
                         "type": "integer"
                     },
                     "features": {
-                        "description": "feature flags",
-                        "type": "object",
                         "additionalProperties": {
                             "type": "boolean"
-                        }
+                        },
+                        "description": "feature flags",
+                        "type": "object"
                     },
                     "id": {
                         "type": "string"
@@ -3232,18 +3307,18 @@
                         "type": "boolean"
                     },
                     "limits": {
-                        "description": "quota limits",
-                        "type": "object",
                         "additionalProperties": {
                             "type": "integer"
-                        }
+                        },
+                        "description": "quota limits",
+                        "type": "object"
                     },
                     "limitsNegotiable": {
-                        "description": "LimitsNegotiable maps limit keys to true when the catalog should show “by agreement” instead of a numeric cap.",
-                        "type": "object",
                         "additionalProperties": {
                             "type": "boolean"
-                        }
+                        },
+                        "description": "LimitsNegotiable maps limit keys to true when the catalog should show “by agreement” instead of a numeric cap.",
+                        "type": "object"
                     },
                     "name": {
                         "description": "Primary display name (e.g. Russian on RU marketing)",
@@ -3768,13 +3843,13 @@
                         "type": "string"
                     },
                     "password": {
+                        "format": "password",
                         "type": "string",
-                        "writeOnly": true,
-                        "format": "password"
+                        "writeOnly": true
                     },
                     "photoUrl": {
-                        "type": "string",
-                        "description": "URL of the user's profile photo. Send an empty string to clear the photo; omit the field to leave the current value unchanged."
+                        "description": "URL of the user's profile photo. Send an empty string to clear the photo; omit the field to leave the current value unchanged.",
+                        "type": "string"
                     },
                     "roles": {
                         "items": {
@@ -4054,11 +4129,11 @@
                         "type": "string"
                     },
                     "ssoProtocol": {
-                        "type": "string",
                         "enum": [
                             "oidc",
                             "saml"
-                        ]
+                        ],
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -4092,11 +4167,11 @@
                     },
                     "ssoProtocol": {
                         "description": "\"oidc\" | \"saml\"",
-                        "type": "string",
                         "enum": [
                             "oidc",
                             "saml"
-                        ]
+                        ],
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -4667,12 +4742,12 @@
                     },
                     "next": {
                         "description": "sso | password | choose_slug",
-                        "type": "string",
                         "enum": [
                             "sso",
                             "password",
                             "choose_slug"
-                        ]
+                        ],
+                        "type": "string"
                     },
                     "ssoAvailable": {
                         "type": "boolean"
@@ -4917,81 +4992,6 @@
                     }
                 },
                 "type": "object"
-            },
-            "handlers.LoginLinkResponse": {
-                "type": "object",
-                "required": [
-                    "token",
-                    "exampleUrl"
-                ],
-                "properties": {
-                    "token": {
-                        "type": "string",
-                        "description": "Opaque tenant login token for strict-tenant links"
-                    },
-                    "exampleUrl": {
-                        "type": "string",
-                        "format": "uri",
-                        "description": "Example full login URL including the token query parameter"
-                    }
-                }
-            },
-            "handlers.CreateTicketRequestAnonymous": {
-                "type": "object",
-                "properties": {
-                    "serviceId": {
-                        "type": "string",
-                        "minLength": 1
-                    }
-                },
-                "required": [
-                    "serviceId"
-                ],
-                "additionalProperties": false
-            },
-            "handlers.CreateTicketRequestStaff": {
-                "type": "object",
-                "properties": {
-                    "serviceId": {
-                        "type": "string",
-                        "minLength": 1
-                    },
-                    "clientId": {
-                        "type": "string",
-                        "minLength": 1
-                    }
-                },
-                "required": [
-                    "serviceId",
-                    "clientId"
-                ],
-                "additionalProperties": false
-            },
-            "handlers.CreateTicketRequestKiosk": {
-                "type": "object",
-                "properties": {
-                    "serviceId": {
-                        "type": "string",
-                        "minLength": 1
-                    },
-                    "visitorPhone": {
-                        "type": "string",
-                        "minLength": 1
-                    },
-                    "visitorLocale": {
-                        "type": "string",
-                        "enum": [
-                            "en",
-                            "ru"
-                        ]
-                    }
-                },
-                "required": [
-                    "serviceId",
-                    "visitorPhone",
-                    "visitorLocale"
-                ],
-                "additionalProperties": false
             }
         },
         "securitySchemes": {
@@ -5001,10 +5001,10 @@
                 "type": "apiKey"
             },
             "SessionCookie": {
-                "type": "apiKey",
+                "description": "HttpOnly refresh JWT cookie (same-origin /api). When present, POST /auth/refresh does not require Authorization. POST /auth/logout clears this cookie (and the access cookie) via Set-Cookie. Legacy clients may still send Bearer refresh.",
                 "in": "cookie",
                 "name": "quokkaq_refresh",
-                "description": "HttpOnly refresh JWT cookie (same-origin /api). When present, POST /auth/refresh does not require Authorization. POST /auth/logout clears this cookie (and the access cookie) via Set-Cookie. Legacy clients may still send Bearer refresh."
+                "type": "apiKey"
             }
         }
     },
@@ -5555,8 +5555,8 @@
                             "Location": {
                                 "description": "Absolute or relative URL the client should follow (RFC 9110).",
                                 "schema": {
-                                    "type": "string",
-                                    "format": "uri-reference"
+                                    "format": "uri-reference",
+                                    "type": "string"
                                 }
                             }
                         }
@@ -5702,11 +5702,11 @@
                         "in": "query",
                         "name": "locale",
                         "schema": {
-                            "type": "string",
                             "enum": [
                                 "en",
                                 "ru"
-                            ]
+                            ],
+                            "type": "string"
                         }
                     }
                 ],
@@ -5717,8 +5717,8 @@
                             "Location": {
                                 "description": "Absolute or relative URL the client should follow (RFC 9110).",
                                 "schema": {
-                                    "type": "string",
-                                    "format": "uri-reference"
+                                    "format": "uri-reference",
+                                    "type": "string"
                                 }
                             }
                         }
@@ -5760,8 +5760,8 @@
                             "Location": {
                                 "description": "Absolute or relative URL the client should follow (RFC 9110).",
                                 "schema": {
-                                    "type": "string",
-                                    "format": "uri-reference"
+                                    "format": "uri-reference",
+                                    "type": "string"
                                 }
                             }
                         }
@@ -7004,9 +7004,9 @@
                     "description": "Logical scopes for company-wide tenant settings (documentation only). Clients send `Authorization: Bearer` JWT; the server enforces these rules in code. For `models.CompanyPatch.ssoAccessSource`, the caller must match scope `company.settings.ssoAccessSource`, satisfied when the principal matches any of `global.role.admin`, `global.role.platform_admin`, or `company.tenant_role.system_admin`. Scope `unit.tenant.admin` (unit-only `tenant.admin` permission) is not sufficient alone.",
                     "scopes": {
                         "company.settings.ssoAccessSource": "Change company SSO access provisioning (`manual` vs `sso_groups`). Equivalent to any of global.role.admin, global.role.platform_admin, company.tenant_role.system_admin (not unit.tenant.admin alone).",
+                        "company.tenant_role.system_admin": "Company tenant role slug `system_admin`.",
                         "global.role.admin": "Global administrator (role name `admin`).",
                         "global.role.platform_admin": "Platform administrator (role `platform_admin`).",
-                        "company.tenant_role.system_admin": "Company tenant role slug `system_admin`.",
                         "unit.tenant.admin": "Unit-scoped `tenant.admin` permission — NOT sufficient for ssoAccessSource alone."
                     }
                 }
@@ -21593,6 +21593,7 @@
                     },
                     {
                         "description": "Question ids (repeat query param or comma-separated); native scale",
+                        "explode": true,
                         "in": "query",
                         "name": "questionIds",
                         "schema": {
@@ -21601,8 +21602,7 @@
                             },
                             "type": "array"
                         },
-                        "style": "form",
-                        "explode": true
+                        "style": "form"
                     }
                 ],
                 "responses": {
@@ -23888,8 +23888,8 @@
     ],
     "tags": [
         {
-            "name": "counter-board",
-            "description": "Above-counter ticket display for paired counter_board terminals (terminal JWT). Session for workplace display; separate from guest-survey survey flows."
+            "description": "Above-counter ticket display for paired counter_board terminals (terminal JWT). Session for workplace display; separate from guest-survey survey flows.",
+            "name": "counter-board"
         }
     ]
 }

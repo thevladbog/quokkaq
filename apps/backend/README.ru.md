@@ -250,13 +250,17 @@ go run ./cmd/api
 
 ### Генерация документации API
 
-Аннотации в коде — в формате swag (Swagger 2). Публикуемая спека — OpenAPI 3:
+Аннотации в коде — в формате swag (Swagger 2). Публикуемая спека — OpenAPI 3. Двухшаговый пайплайн из `apps/backend`:
 
 ```bash
-python3 -m pip install 'PyYAML>=6.0,<7'
 go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g cmd/api/main.go -o ./docs
 go run ./cmd/swagger-to-openapi3
-python3 scripts/post_swagger_openapi_tweaks.py
+```
+
+Или через Nx из корня репозитория:
+
+```bash
+pnpm nx run backend:openapi
 ```
 
 ---

@@ -16,7 +16,7 @@ const marketingPublicFetchOutput = {
 export default defineConfig({
   quokkaqMarketingSubscriptions: {
     input: {
-      target: '../backend/docs/swagger.json',
+      target: '../backend/docs/openapi.json',
       filters: {
         mode: 'include',
         tags: ['subscriptions']
@@ -29,7 +29,7 @@ export default defineConfig({
   },
   quokkaqMarketingLeads: {
     input: {
-      target: '../backend/docs/swagger.json',
+      target: '../backend/docs/openapi.json',
       filters: {
         mode: 'include',
         tags: ['leads']

@@ -49,6 +49,30 @@
         "cwd": "apps/backend"
       }
     },
+    "openapi": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/docs/swagger.json", "{projectRoot}/docs/openapi.json", "{projectRoot}/docs/swagger.yaml", "{projectRoot}/docs/docs.go"],
+      "options": {
+        "commands": [
+          "go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g cmd/api/main.go -o ./docs",
+          "go run ./cmd/swagger-to-openapi3"
+        ],
+        "cwd": "apps/backend",
+        "parallel": false
+      }
+    },
+    "openapi:check": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          "go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g cmd/api/main.go -o ./docs",
+          "go run ./cmd/swagger-to-openapi3",
+          "git diff --exit-code docs/docs.go docs/swagger.json docs/openapi.json docs/swagger.yaml"
+        ],
+        "cwd": "apps/backend",
+        "parallel": false
+      }
+    },
     "docker-build": {
       "executor": "nx:run-commands",
       "options": {

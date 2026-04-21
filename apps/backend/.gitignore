@@ -14,6 +14,7 @@ quokkaq-backend
 quokkaq-backend.exe
 quokkaq-api
 quokkaq-api.exe
+/swagger-to-openapi3
 
 # Test binary, built with `go test -c`
 *.test

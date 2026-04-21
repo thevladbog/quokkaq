@@ -434,9 +434,9 @@ export interface HandlersCreateTicketRequestAnonymous {
 
 export interface HandlersCreateTicketRequestStaff {
   /** @minLength 1 */
-  serviceId: string;
-  /** @minLength 1 */
   clientId: string;
+  /** @minLength 1 */
+  serviceId: string;
 }
 
 export type HandlersCreateTicketRequestKioskVisitorLocale = typeof HandlersCreateTicketRequestKioskVisitorLocale[keyof typeof HandlersCreateTicketRequestKioskVisitorLocale];
@@ -450,9 +450,9 @@ export const HandlersCreateTicketRequestKioskVisitorLocale = {
 export interface HandlersCreateTicketRequestKiosk {
   /** @minLength 1 */
   serviceId: string;
+  visitorLocale: HandlersCreateTicketRequestKioskVisitorLocale;
   /** @minLength 1 */
   visitorPhone: string;
-  visitorLocale: HandlersCreateTicketRequestKioskVisitorLocale;
 }
 
 export type HandlersCreateTicketRequest = HandlersCreateTicketRequestAnonymous | HandlersCreateTicketRequestStaff | HandlersCreateTicketRequestKiosk;
@@ -568,6 +568,13 @@ export interface HandlersInvoiceDraftUpsertBody {
 export interface HandlersInvoicePDFPrerequisiteError {
   code: string;
   message: string;
+}
+
+export interface HandlersLoginLinkResponse {
+  /** Example full login URL including the token query parameter */
+  exampleUrl: string;
+  /** Opaque tenant login token for strict-tenant links */
+  token: string;
 }
 
 export interface HandlersLoginRequest {
@@ -2240,13 +2247,6 @@ export interface ServicesUtilizationResponse {
   computedAt?: string;
   granularity?: string;
   points?: ServicesUtilizationPoint[];
-}
-
-export interface HandlersLoginLinkResponse {
-  /** Opaque tenant login token for strict-tenant links */
-  token: string;
-  /** Example full login URL including the token query parameter */
-  exampleUrl: string;
 }
 
 export type PatchUnitsUnitIdAdSettingsBody = { [key: string]: unknown };
