@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"quokkaq-go-backend/docs"
 	"quokkaq-go-backend/internal/config"
 	"quokkaq-go-backend/internal/handlers"
 	"quokkaq-go-backend/internal/jobs"
@@ -338,37 +339,33 @@ func run() error {
 	r.Get("/ws", authmiddleware.WebSocketHandler(hub, userRepo))
 
 	r.Get("/swagger/*", func(w http.ResponseWriter, r *http.Request) {
-		content, err := os.ReadFile("./docs/openapi.json")
-		if err != nil {
-			http.Error(w, "Failed to read OpenAPI spec", http.StatusInternalServerError)
-			return
-		}
-
 		htmlContent, err := scalar.ApiReferenceHTML(&scalar.Options{
-			SpecContent: string(content),
+			SpecContent: string(docs.OpenAPIJSON),
 			CustomOptions: scalar.CustomOptions{
 				PageTitle: "QuokkaQ API Reference",
 			},
 			DarkMode: true,
 		})
-
 		if err != nil {
 			http.Error(w, "Failed to render API reference", http.StatusInternalServerError)
 			return
 		}
-
 		if _, err := fmt.Fprintln(w, htmlContent); err != nil {
 			slog.ErrorContext(r.Context(), "error writing API reference", "err", err)
 		}
 	})
 
 	// openapi.json is the canonical spec; swagger.json is a backward-compatible alias.
-	r.Get("/docs/openapi.json", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./docs/openapi.json")
-	})
-	r.Get("/docs/swagger.json", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./docs/openapi.json")
-	})
+	// Both are served from the embedded bytes (docs.OpenAPIJSON) so the binary has no
+	// working-directory dependency.
+	serveSpec := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		if _, err := w.Write(docs.OpenAPIJSON); err != nil {
+			slog.ErrorContext(r.Context(), "error writing OpenAPI spec", "err", err)
+		}
+	}
+	r.Get("/docs/openapi.json", serveSpec)
+	r.Get("/docs/swagger.json", serveSpec)
 
 	r.Route("/auth", func(r chi.Router) {
 		r.Post("/login", authHandler.Login)

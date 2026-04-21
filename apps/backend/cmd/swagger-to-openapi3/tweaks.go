@@ -486,9 +486,7 @@ func patchAuthRedirect302Headers(doc *openapi3.T) error {
 			continue
 		}
 		resp := r302.Value
-		if resp.Description != nil {
-			resp.Description = strPtr(p.desc)
-		} else {
+		if resp.Description == nil {
 			resp.Description = strPtr(p.desc)
 		}
 		ensureHeaders(resp)

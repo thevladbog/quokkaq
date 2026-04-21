@@ -78,6 +78,10 @@ func main() {
 		fmt.Fprintf(os.Stderr, "parse swagger 2.0: %v\n", err)
 		os.Exit(1)
 	}
+	if doc2.Swagger != "2.0" {
+		fmt.Fprintf(os.Stderr, "%s: expected Swagger 2.0 (\"swagger\": \"2.0\") but got %q — run swag init first\n", swaggerPath, doc2.Swagger)
+		os.Exit(1)
+	}
 	doc3, err := openapi2conv.ToV3(&doc2)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "convert to OpenAPI 3: %v\n", err)

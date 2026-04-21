@@ -99,7 +99,7 @@ func (h *SSOHandler) LoginContext(w http.ResponseWriter, r *http.Request) {
 // @Tags         auth
 // @Param        tenant query string true "Tenant slug"
 // @Param        locale query string false "UI locale for post-SSO redirects (en|ru)"
-// @Success      302  "Redirect"
+// @Success      302  "Redirect to IdP authorization endpoint"
 // @Router       /auth/sso/authorize [get]
 func (h *SSOHandler) SSOAuthorize(w http.ResponseWriter, r *http.Request) {
 	slug := strings.TrimSpace(r.URL.Query().Get("tenant"))
@@ -153,7 +153,7 @@ func (h *SSOHandler) SAMLACS(w http.ResponseWriter, r *http.Request) {
 // @Tags         auth
 // @Param        code  query  string  true  "Authorization code from IdP"
 // @Param        state query  string  true  "OAuth state"
-// @Success      302  "Redirect to app"
+// @Success      302  "Redirect to app after OIDC callback"
 // @Router       /auth/sso/callback [get]
 func (h *SSOHandler) SSOCallback(w http.ResponseWriter, r *http.Request) {
 	h.sso.HandleCallback(r.Context(), w, r)
