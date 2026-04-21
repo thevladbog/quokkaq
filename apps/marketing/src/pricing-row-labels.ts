@@ -51,8 +51,10 @@ export const pricingRowLabelsRu: Record<string, string> = {
   'features.negotiableServices': 'Объём услуг — по договорённости',
   'features.negotiableCounters': 'Окна обслуживания — по договорённости',
   'features.zonesPerUnit': 'До {count} сервисных зон на подразделение',
-  'features.unlimitedZonesPerUnit': 'Неограниченное количество зон на подразделение',
-  'features.negotiableZonesPerUnit': 'Зоны на подразделение — по договорённости',
+  'features.unlimitedZonesPerUnit':
+    'Неограниченное количество зон на подразделение',
+  'features.negotiableZonesPerUnit':
+    'Зоны на подразделение — по договорённости',
   'features.realtimeUpdates': 'Обновления в реальном времени',
   'features.basicSupport': 'Базовая поддержка',
   'features.basicReports': 'Базовые отчёты',
