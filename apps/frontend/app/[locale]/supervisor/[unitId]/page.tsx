@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useMemo, useState } from 'react';
+import { use, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -26,6 +26,7 @@ import type { ShiftCounterRow } from '@/components/supervisor/SupervisorWorkstat
 import { useSyncActiveUnit } from '@/contexts/ActiveUnitContext';
 import { getUnitDisplayName } from '@/lib/unit-display';
 import { useSlaAlerts } from '@/hooks/use-sla-alerts';
+import { socketClient } from '@/lib/socket';
 
 export default function ShiftDashboardPage({
   params
@@ -39,6 +40,15 @@ export default function ShiftDashboardPage({
   useSyncActiveUnit(unitId);
   const { activeSlaAlerts, dismissAlert, dismissAllAlerts } =
     useSlaAlerts(unitId);
+
+  useEffect(() => {
+    if (!unitId) return;
+    socketClient.connect(unitId);
+    return () => {
+      socketClient.disconnect();
+    };
+  }, [unitId]);
+
   const [showEODDialog, setShowEODDialog] = useState(false);
   const [forceReleaseDialogOpen, setForceReleaseDialogOpen] = useState(false);
   const [selectedCounter, setSelectedCounter] = useState<{

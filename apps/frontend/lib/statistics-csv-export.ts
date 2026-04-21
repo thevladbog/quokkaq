@@ -8,6 +8,7 @@ type TimeseriesPoint = {
   ticketsCompleted?: number;
   noShowCount?: number;
   slaWaitMetPct?: number | null;
+  slaServiceMetPct?: number | null;
 };
 
 type LoadPoint = {
@@ -120,17 +121,20 @@ function buildTimeseriesSection(
   t: TranslateFn
 ): string[] {
   if (!points.length) return [];
+  const hasWaitSla = points.some((p) => p.slaWaitMetPct != null);
+  const hasSvcSla = points.some((p) => p.slaServiceMetPct != null);
   const lines: string[] = ['', row([`[${t('chart_wait_service')}]`])];
-  lines.push(
-    row([
-      t('export_date'),
-      t('legend_wait_min'),
-      t('legend_service_min'),
-      t('legend_created'),
-      t('legend_completed'),
-      t('legend_no_show')
-    ])
-  );
+  const header = [
+    t('export_date'),
+    t('legend_wait_min'),
+    t('legend_service_min'),
+    t('legend_created'),
+    t('legend_completed'),
+    t('legend_no_show'),
+    ...(hasWaitSla ? [t('legend_sla_wait_pct')] : []),
+    ...(hasSvcSla ? [t('legend_sla_service_pct')] : [])
+  ];
+  lines.push(row(header));
   for (const p of points) {
     lines.push(
       row([
@@ -139,7 +143,9 @@ function buildTimeseriesSection(
         fmtNum(p.avgServiceMinutes),
         p.ticketsCreated,
         p.ticketsCompleted,
-        p.noShowCount
+        p.noShowCount,
+        ...(hasWaitSla ? [fmtNum(p.slaWaitMetPct, 1)] : []),
+        ...(hasSvcSla ? [fmtNum(p.slaServiceMetPct, 1)] : [])
       ])
     );
   }

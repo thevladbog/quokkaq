@@ -54,8 +54,16 @@ export function StaffCurrentTicketHero({
   const canEditVisitorTags =
     canChangeVisitor && !!client && !client.isAnonymous;
 
-  const { formatTime: formatServiceTime, elapsed: serviceElapsed } =
-    useTicketTimer(isInService ? ticket.calledAt || undefined : undefined);
+  const {
+    formatTime: formatServiceTime,
+    elapsed: serviceElapsed,
+    color: serviceTimerColor,
+    isOverdue: serviceIsOverdue,
+    isWarning: serviceIsWarning
+  } = useTicketTimer(
+    isInService ? ticket.calledAt || undefined : undefined,
+    isInService ? ticket.maxServiceTime : undefined
+  );
 
   const waitingSeconds = useMemo(() => {
     if (!ticket.createdAt || !ticket.calledAt) return 0;
@@ -207,11 +215,28 @@ export function StaffCurrentTicketHero({
                   </div>
                 )}
                 {isInService && (
-                  <div className='rounded-lg border border-emerald-500/30 bg-emerald-50/90 px-2.5 py-1.5 dark:bg-emerald-950/40'>
+                  <div
+                    className={cn(
+                      'rounded-lg border px-2.5 py-1.5',
+                      serviceIsOverdue
+                        ? 'border-red-500/30 bg-red-50/90 dark:bg-red-950/40'
+                        : serviceIsWarning
+                          ? 'border-yellow-500/30 bg-yellow-50/90 dark:bg-yellow-950/40'
+                          : 'border-emerald-500/30 bg-emerald-50/90 dark:bg-emerald-950/40'
+                    )}
+                  >
                     <div className='text-muted-foreground text-[9px] font-semibold tracking-wide uppercase'>
                       {t('queue.service_time')}
                     </div>
-                    <div className='font-mono text-lg font-bold text-emerald-700 tabular-nums dark:text-emerald-400'>
+                    <div
+                      className='font-mono text-lg font-bold tabular-nums'
+                      style={{
+                        color:
+                          serviceTimerColor !== 'transparent'
+                            ? serviceTimerColor
+                            : undefined
+                      }}
+                    >
                       {formatServiceTime(serviceElapsed)}
                     </div>
                   </div>

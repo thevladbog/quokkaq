@@ -9,6 +9,8 @@ type StatsPDFLabels struct {
 	Generated   string
 
 	SLASummaryTitle string
+	SLAWaitTitle    string
+	SLAServiceTitle string
 	SLAWithin       string
 	SLABreach       string
 	SLAMet          string
@@ -62,7 +64,9 @@ func StatsPDFLabelsEN() StatsPDFLabels {
 		Operator:    "Operator:",
 		Generated:   "Generated:",
 
-		SLASummaryTitle: "WAITING SLA SUMMARY",
+		SLASummaryTitle: "SLA SUMMARY",
+		SLAWaitTitle:    "WAIT SLA",
+		SLAServiceTitle: "SERVICE SLA",
 		SLAWithin:       "Within SLA",
 		SLABreach:       "Breach",
 		SLAMet:          "Met",
@@ -117,7 +121,9 @@ func StatsPDFLabelsRU() StatsPDFLabels {
 		Operator:    "Оператор:",
 		Generated:   "Сформирован:",
 
-		SLASummaryTitle: "СВОДКА SLA ОЖИДАНИЯ",
+		SLASummaryTitle: "СВОДКА SLA",
+		SLAWaitTitle:    "SLA ОЖИДАНИЯ",
+		SLAServiceTitle: "SLA ОБСЛУЖИВАНИЯ",
 		SLAWithin:       "В пределах SLA",
 		SLABreach:       "Нарушение",
 		SLAMet:          "Выполнено",
