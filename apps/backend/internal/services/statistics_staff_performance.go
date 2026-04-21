@@ -212,7 +212,7 @@ SELECT
     ELSE 0 END) AS total_idle_min
 FROM counter_operator_intervals
 WHERE unit_id::text = ?
-  AND user_id::text = ANY(?)
+  AND user_id::text IN (?)
   AND kind IN ('break', 'idle')
   AND started_at < ?::timestamptz
   AND COALESCE(ended_at, NOW()) > ?::timestamptz
@@ -235,7 +235,7 @@ SELECT
   SUM(EXTRACT(EPOCH FROM (completed_at - confirmed_at)) / 60.0) AS total_service_min
 FROM tickets
 WHERE unit_id::text = ?
-  AND served_by_user_id::text = ANY(?)
+  AND served_by_user_id::text IN (?)
   AND confirmed_at IS NOT NULL
   AND completed_at IS NOT NULL
   AND completed_at >= ?::timestamptz
@@ -470,7 +470,7 @@ func (s *StatisticsService) resolveUserDisplayNames(ctx context.Context, userIDs
 	}
 	var rows []nameRow
 	if err := s.db.WithContext(ctx).Raw(
-		`SELECT id::text AS id, COALESCE(name, '') AS name, email FROM users WHERE id::text = ANY(?)`, userIDs,
+		`SELECT id::text AS id, COALESCE(name, '') AS name, email FROM users WHERE id::text IN (?)`, userIDs,
 	).Scan(&rows).Error; err != nil {
 		return nil, err
 	}

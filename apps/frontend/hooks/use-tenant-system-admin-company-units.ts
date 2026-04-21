@@ -9,6 +9,8 @@ export type TenantSystemAdminCompanyUnitsSnapshot = {
   allIds: string[];
   /** Top-level subdivisions for workstation seeds; excludes service_zone roots. */
   rootIds: string[];
+  /** Display label per unit id from the same `getAll` payload (avoids N× GET /units/:id for labels). */
+  labelById: Record<string, string>;
 };
 
 /**
@@ -31,7 +33,14 @@ export function useTenantSystemAdminCompanyUnitSnapshot(
       const allIds = [...new Set(inCo.map((u) => u.id))];
       const roots = inCo.filter((u) => !u.parentId?.trim()).map((u) => u.id);
       const rootIds = roots.length > 0 ? roots : allIds;
-      return { allIds, rootIds };
+      const labelById: Record<string, string> = {};
+      for (const u of inCo) {
+        const id = u.id?.trim();
+        if (!id) continue;
+        const label = u.name?.trim() || u.code?.trim();
+        if (label) labelById[id] = label;
+      }
+      return { allIds, rootIds, labelById };
     },
     enabled: enabled && !!cid,
     staleTime: 60_000

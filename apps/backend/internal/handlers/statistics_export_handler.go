@@ -181,9 +181,9 @@ func (h *StatisticsExportHandler) ExportPDF(w http.ResponseWriter, r *http.Reque
 		input.StaffLeaderboard = leaderboard
 	}
 
-	// Include staffing forecast for the next business day (best-effort).
+	// Include staffing forecast for the next business day (best-effort; silently omitted if plan disallows).
 	forecastParams := services.StaffingForecastParams{}
-	forecast, fErr := h.service.GetStaffingForecast(ctx, unitID, forecastParams)
+	forecast, fErr := h.service.GetStaffingForecast(ctx, unitID, companyID, forecastParams)
 	if fErr == nil {
 		input.StaffForecast = forecast
 	}

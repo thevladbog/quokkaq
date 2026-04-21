@@ -47,6 +47,7 @@ CREATE TABLE tickets (
 	last_called_at datetime,
 	max_waiting_time integer,
 	max_service_time integer,
+	served_by_user_id text,
 	operator_comment text
 );
 CREATE TABLE ticket_histories (
@@ -131,7 +132,9 @@ func buildVisitorSvc(t *testing.T, db *gorm.DB, clientRepo repository.UnitClient
 		nil, nil,
 		intervalRepo,
 		clientRepo,
-		nil, nil, nil, nil,
+		nil, nil, nil,
+		nil, // operatorSkillRepo
+		nil, // calendar
 		hub,
 		noopJobEnqueuer{},
 	)

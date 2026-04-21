@@ -450,12 +450,35 @@ export interface HandlersCreateTenantRoleJSON {
   units?: HandlersTenantRoleUnitJSON[];
 }
 
-export interface HandlersCreateTicketRequest {
-  clientId?: string;
+export interface HandlersCreateTicketRequestAnonymous {
+  /** @minLength 1 */
   serviceId: string;
-  visitorLocale?: string;
-  visitorPhone?: string;
 }
+
+export interface HandlersCreateTicketRequestStaff {
+  /** @minLength 1 */
+  clientId: string;
+  /** @minLength 1 */
+  serviceId: string;
+}
+
+export type HandlersCreateTicketRequestKioskVisitorLocale = typeof HandlersCreateTicketRequestKioskVisitorLocale[keyof typeof HandlersCreateTicketRequestKioskVisitorLocale];
+
+
+export const HandlersCreateTicketRequestKioskVisitorLocale = {
+  en: 'en',
+  ru: 'ru',
+} as const;
+
+export interface HandlersCreateTicketRequestKiosk {
+  /** @minLength 1 */
+  serviceId: string;
+  visitorLocale: HandlersCreateTicketRequestKioskVisitorLocale;
+  /** @minLength 1 */
+  visitorPhone: string;
+}
+
+export type HandlersCreateTicketRequest = HandlersCreateTicketRequestAnonymous | HandlersCreateTicketRequestStaff | HandlersCreateTicketRequestKiosk;
 
 export interface HandlersCustomTermsLeadRequestBody {
   /** @minLength 1 */
@@ -514,7 +537,10 @@ export interface HandlersInvoiceDraftLineInput {
   descriptionPrint?: string;
   discountAmountMinor?: number;
   discountPercent?: number;
-  /** LineComment is optional text shown under the line title in print (parentheses in UI/PDF). */
+  /**
+     * LineComment is optional text shown under the line title in print (parentheses in UI/PDF).
+     * @maxLength 512
+     */
   lineComment?: string;
   quantity?: number;
   subscriptionPeriodStart?: string;
@@ -537,7 +563,10 @@ export interface HandlersInvoiceDraftCreateBody {
   dueDate: string;
   /** @minItems 1 */
   lines: HandlersInvoiceDraftLineInput[];
-  /** PaymentTerms is optional markdown for «Условия оплаты». Omit on PATCH to leave unchanged; send "" to clear. */
+  /**
+     * PaymentTerms is optional markdown for «Условия оплаты». Omit on PATCH to leave unchanged; send "" to clear.
+     * @maxLength 32000
+     */
   paymentTerms?: string;
   provisionSubscriptionsOnPayment?: boolean;
 }
@@ -551,7 +580,10 @@ export interface HandlersInvoiceDraftUpsertBody {
   dueDate: string;
   /** @minItems 1 */
   lines: HandlersInvoiceDraftLineInput[];
-  /** PaymentTerms is optional markdown for «Условия оплаты». Omit on PATCH to leave unchanged; send "" to clear. */
+  /**
+     * PaymentTerms is optional markdown for «Условия оплаты». Omit on PATCH to leave unchanged; send "" to clear.
+     * @maxLength 32000
+     */
   paymentTerms?: string;
   provisionSubscriptionsOnPayment?: boolean;
 }
@@ -559,6 +591,13 @@ export interface HandlersInvoiceDraftUpsertBody {
 export interface HandlersInvoicePDFPrerequisiteError {
   code: string;
   message: string;
+}
+
+export interface HandlersLoginLinkResponse {
+  /** Example full login URL including the token query parameter */
+  exampleUrl: string;
+  /** Opaque tenant login token for strict-tenant links */
+  token: string;
 }
 
 export interface HandlersLoginRequest {
@@ -575,7 +614,8 @@ export interface HandlersLoginSessionResponse {
 }
 
 export interface HandlersOperatorCommentPatchDTO {
-  operatorComment: string;
+  /** @nullable */
+  operatorComment: string | null;
 }
 
 export interface HandlersPatchExternalIdentityJSON {
@@ -649,11 +689,11 @@ export interface HandlersPatchUnitClientRequest {
 export type HandlersPatchUnitKioskConfigRequestConfigKiosk = { [key: string]: unknown };
 
 export type HandlersPatchUnitKioskConfigRequestConfig = {
-  kiosk?: HandlersPatchUnitKioskConfigRequestConfigKiosk;
+  kiosk: HandlersPatchUnitKioskConfigRequestConfigKiosk;
 };
 
 export interface HandlersPatchUnitKioskConfigRequest {
-  config?: HandlersPatchUnitKioskConfigRequestConfig;
+  config: HandlersPatchUnitKioskConfigRequestConfig;
 }
 
 export interface HandlersPatchUserSSOFlagsJSON {
@@ -667,11 +707,11 @@ export interface HandlersPatchUserTenantRolesJSON {
   /** ConfirmRemoveAllTenantRoles must be true when tenantRoleIds is empty after trimming, so ReplaceUserTenantRoles does not
   clear user_tenant_roles and trigger RebuildUserUnitsFromTenantRoles mass-removal of user_units by mistake. */
   confirmRemoveAllTenantRoles?: boolean;
-  tenantRoleIds?: string[];
+  tenantRoleIds: string[];
 }
 
 export interface HandlersPatchUserTenantRolesResponse {
-  tenantRoles?: HandlersTenantRoleBriefResponse[];
+  tenantRoles: HandlersTenantRoleBriefResponse[];
 }
 
 export interface HandlersPeriodResponse {
@@ -697,11 +737,11 @@ export interface HandlersPlatformCreateSubscriptionBody {
   trialEnd?: string;
 }
 
-export type HandlersPlatformCreateSubscriptionPlanBodyFeatures = { [key: string]: unknown };
+export type HandlersPlatformCreateSubscriptionPlanBodyFeatures = {[key: string]: boolean};
 
-export type HandlersPlatformCreateSubscriptionPlanBodyLimits = { [key: string]: unknown };
+export type HandlersPlatformCreateSubscriptionPlanBodyLimits = {[key: string]: number};
 
-export type HandlersPlatformCreateSubscriptionPlanBodyLimitsNegotiable = { [key: string]: unknown };
+export type HandlersPlatformCreateSubscriptionPlanBodyLimitsNegotiable = {[key: string]: boolean};
 
 /**
  * PricingModel: "flat" (fixed price) or "per_unit" (price per subdivision). Defaults to "per_unit".
@@ -756,11 +796,11 @@ export interface HandlersPlatformIntegrationsResponse {
   trackerTypeSupport?: string;
 }
 
-export type HandlersPlatformUpdateSubscriptionPlanBodyFeatures = { [key: string]: unknown };
+export type HandlersPlatformUpdateSubscriptionPlanBodyFeatures = {[key: string]: boolean};
 
-export type HandlersPlatformUpdateSubscriptionPlanBodyLimits = { [key: string]: unknown };
+export type HandlersPlatformUpdateSubscriptionPlanBodyLimits = {[key: string]: number};
 
-export type HandlersPlatformUpdateSubscriptionPlanBodyLimitsNegotiable = { [key: string]: unknown };
+export type HandlersPlatformUpdateSubscriptionPlanBodyLimitsNegotiable = {[key: string]: boolean};
 
 /**
  * PricingModel: "flat" or "per_unit". Omit to leave unchanged.
@@ -804,7 +844,7 @@ export interface HandlersPublicLeadRequestBody {
   message?: string;
   name: string;
   planCode?: string;
-  privacyConsentAccepted?: boolean;
+  privacyConsentAccepted: true;
   referrer?: string;
   source?: string;
 }
@@ -831,10 +871,10 @@ export interface HandlersRefreshResponse {
 }
 
 export interface HandlersRegisterUserRequest {
-  name?: string;
-  password?: string;
-  privacyConsentAccepted?: boolean;
-  token?: string;
+  name: string;
+  password: string;
+  privacyConsentAccepted: true;
+  token: string;
 }
 
 export interface HandlersRemoveUnitRequest {
@@ -877,10 +917,11 @@ export interface HandlersSignupRequest {
   password: string;
   /** optional, defaults to starter with trial */
   planCode?: string;
-  privacyConsentAccepted?: boolean;
+  privacyConsentAccepted: true;
 }
 
 export interface HandlersTerminalBootstrapRequest {
+  /** @minLength 1 */
   code: string;
 }
 
@@ -900,7 +941,8 @@ export interface HandlersTestSMSIntegrationRequest {
 }
 
 export interface HandlersTransferRequest {
-  operatorComment?: string;
+  /** @nullable */
+  operatorComment?: string | null;
   toCounterId?: string;
   toServiceId?: string;
   toServiceZoneId?: string;
@@ -935,24 +977,40 @@ export interface HandlersUpdateStatusRequest {
 }
 
 export interface HandlersUploadLogoResponse {
-  url?: string;
+  url: string;
 }
 
 export interface HandlersUploadSurveyCompletionImageResponse {
-  url?: string;
+  url: string;
 }
 
 export interface HandlersUploadSurveyIdleMediaResponse {
-  url?: string;
+  url: string;
 }
 
-export interface HandlersUpsertGroupMappingJSON {
-  idpGroupId?: string;
-  /** mutually exclusive with tenantRoleId */
-  legacyRoleName?: string;
-  /** mutually exclusive with legacyRoleName */
-  tenantRoleId?: string;
-}
+/**
+ * Map an IdP group to exactly one target: a tenant role id, or a legacy global role name. Send idpGroupId plus either tenantRoleId or legacyRoleName (not both).
+ */
+export type HandlersUpsertGroupMappingJSON = {
+  /**
+     * IdP group identifier (e.g. Azure AD group object id).
+     * @minLength 1
+     */
+  idpGroupId: string;
+  /**
+     * Tenant role UUID in this company. Mutually exclusive with legacyRoleName.
+     * @minLength 1
+     */
+  tenantRoleId: string;
+} | {
+  /**
+     * IdP group identifier (e.g. Azure AD group object id).
+     * @minLength 1
+     */
+  idpGroupId: string;
+  /** Legacy global role name applied by SSO group sync. Mutually exclusive with tenantRoleId. */
+  legacyRoleName: 'staff' | 'supervisor' | 'operator';
+};
 
 export interface HandlersUsageMetricInfoResponse {
   current?: number;
@@ -1039,17 +1097,17 @@ export const ModelsSubscriptionPlanPricingModel = {
 /**
  * feature flags
  */
-export type ModelsSubscriptionPlanFeatures = { [key: string]: unknown };
+export type ModelsSubscriptionPlanFeatures = {[key: string]: boolean};
 
 /**
  * quota limits
  */
-export type ModelsSubscriptionPlanLimits = { [key: string]: unknown };
+export type ModelsSubscriptionPlanLimits = {[key: string]: number};
 
 /**
  * LimitsNegotiable maps limit keys to true when the catalog should show “by agreement” instead of a numeric cap.
  */
-export type ModelsSubscriptionPlanLimitsNegotiable = { [key: string]: unknown };
+export type ModelsSubscriptionPlanLimitsNegotiable = {[key: string]: boolean};
 
 export interface ModelsSubscriptionPlan {
   /** AllowInstantPurchase when false: plan may still be public, but checkout is disabled until a sales-led flow exists. */
@@ -1120,7 +1178,10 @@ export interface ModelsInvoiceLine {
   discountPercent?: number;
   id?: string;
   invoiceId?: string;
-  /** LineComment is optional print-only clarification (e.g. period); shown under description in UI/PDF. */
+  /**
+     * LineComment is optional print-only clarification (e.g. period); shown under description in UI/PDF.
+     * @maxLength 512
+     */
   lineComment?: string;
   lineGrossMinor?: number;
   lineNetMinor?: number;
@@ -1197,7 +1258,10 @@ export interface ModelsInvoice {
   paymentProvider?: string;
   /** external invoice ID */
   paymentProviderInvoiceId?: string;
-  /** PaymentTermsMarkdown is per-invoice «Условия оплаты» (markdown in UI; PDF uses a plain-text rendering). */
+  /**
+     * PaymentTermsMarkdown is per-invoice «Условия оплаты» (markdown in UI; PDF uses a plain-text rendering).
+     * @maxLength 32000
+     */
   paymentTerms?: string;
   provisionSubscriptionsOnPayment?: boolean;
   provisioningDoneAt?: string;
@@ -1270,7 +1334,10 @@ export interface ModelsCompany {
   counterparty?: ModelsCompanyCounterparty;
   createdAt?: string;
   id?: string;
-  /** InvoiceDefaultPaymentTerms is markdown used as default «Условия оплаты» on new platform invoices; only the SaaS operator row (IsSaaSOperator) is intended to hold a template. */
+  /**
+     * InvoiceDefaultPaymentTerms is markdown used as default «Условия оплаты» on new platform invoices; only the SaaS operator row (IsSaaSOperator) is intended to hold a template.
+     * @maxLength 32000
+     */
   invoiceDefaultPaymentTerms?: string;
   invoices?: ModelsInvoice[];
   /** single operator tenant per deployment; quotas bypassed */
@@ -1334,11 +1401,12 @@ export interface HandlersCreateSurveyRequest {
   completionMessage?: HandlersCreateSurveyRequestCompletionMessage;
   displayTheme?: HandlersCreateSurveyRequestDisplayTheme;
   idleScreen?: HandlersCreateSurveyRequestIdleScreen;
-  questions?: HandlersCreateSurveyRequestQuestions;
-  title?: string;
+  questions: HandlersCreateSurveyRequestQuestions;
+  title: string;
 }
 
 export interface HandlersCreateVisitorTagDefinitionRequest {
+  /** @pattern ^#[0-9A-Fa-f]{6}$ */
   color: string;
   label: string;
   sortOrder?: number;
@@ -1358,13 +1426,13 @@ export interface HandlersEmergencyUnlockBody {
 export type HandlersGuestSurveySubmitRequestAnswers = { [key: string]: unknown };
 
 export interface HandlersGuestSurveySubmitRequest {
-  answers?: HandlersGuestSurveySubmitRequestAnswers;
-  surveyId?: string;
-  ticketId?: string;
+  answers: HandlersGuestSurveySubmitRequestAnswers;
+  surveyId: string;
+  ticketId: string;
 }
 
 export interface HandlersPatchCompanySlugRequest {
-  slug?: string;
+  slug: string;
 }
 
 export type HandlersPatchSurveyRequestCompletionMessage = { [key: string]: unknown };
@@ -1384,6 +1452,7 @@ export interface HandlersPatchSurveyRequest {
 }
 
 export interface HandlersPatchVisitorTagDefinitionRequest {
+  /** @pattern ^#[0-9A-Fa-f]{6}$ */
   color?: string;
   label?: string;
   sortOrder?: number;
@@ -1436,11 +1505,11 @@ export interface HandlersSetupFirstAdminRequest {
 }
 
 export interface HandlersSsoExchangeRequest {
-  code?: string;
+  code: string;
 }
 
 export interface HandlersTenantHintRequest {
-  email?: string;
+  email: string;
 }
 
 export interface ModelsCatalogItemCreateRequest {
@@ -1471,11 +1540,23 @@ export interface ModelsCatalogItemPatchRequest {
   vatRatePercent?: number;
 }
 
+/**
+ * paid | void | uncollectible
+ */
+export type ModelsOneCStatusMappingRuleDTOInvoiceStatus = typeof ModelsOneCStatusMappingRuleDTOInvoiceStatus[keyof typeof ModelsOneCStatusMappingRuleDTOInvoiceStatus];
+
+
+export const ModelsOneCStatusMappingRuleDTOInvoiceStatus = {
+  paid: 'paid',
+  void: 'void',
+  uncollectible: 'uncollectible',
+} as const;
+
 export interface ModelsOneCStatusMappingRuleDTO {
   contains?: string;
   equals?: string;
   /** paid | void | uncollectible */
-  invoiceStatus?: string;
+  invoiceStatus?: ModelsOneCStatusMappingRuleDTOInvoiceStatus;
 }
 
 export interface ModelsOneCStatusMappingDTO {
@@ -1501,7 +1582,7 @@ export interface ModelsCompanyOneCSettingsPutRequest {
   /** empty string clears password; omit to leave unchanged */
   httpPassword?: string;
   sitePaymentSystemName?: string;
-  statusMapping?: ModelsOneCStatusMappingDTO;
+  statusMapping?: ModelsOneCStatusMappingDTO | null;
 }
 
 export type ModelsCompanyPatchBillingAddress = { [key: string]: unknown };
@@ -1801,6 +1882,7 @@ export interface ModelsUpdateUserInput {
   email?: string;
   name?: string;
   password?: string;
+  /** URL of the user's profile photo. Send an empty string to clear the photo; omit the field to leave the current value unchanged. */
   photoUrl?: string;
   roles?: string[];
 }
@@ -1853,6 +1935,14 @@ export interface ServicesCalendarIntegrationPublic {
   username?: string;
 }
 
+export type ServicesCompanySSOGetResponseSsoProtocol = typeof ServicesCompanySSOGetResponseSsoProtocol[keyof typeof ServicesCompanySSOGetResponseSsoProtocol];
+
+
+export const ServicesCompanySSOGetResponseSsoProtocol = {
+  oidc: 'oidc',
+  saml: 'saml',
+} as const;
+
 export interface ServicesCompanySSOGetResponse {
   clientId?: string;
   clientSecretSet?: boolean;
@@ -1861,8 +1951,19 @@ export interface ServicesCompanySSOGetResponse {
   issuerUrl?: string;
   samlIdpMetadataUrl?: string;
   scopes?: string;
-  ssoProtocol?: string;
+  ssoProtocol?: ServicesCompanySSOGetResponseSsoProtocol;
 }
+
+/**
+ * "oidc" | "saml"
+ */
+export type ServicesCompanySSOPatchSsoProtocol = typeof ServicesCompanySSOPatchSsoProtocol[keyof typeof ServicesCompanySSOPatchSsoProtocol];
+
+
+export const ServicesCompanySSOPatchSsoProtocol = {
+  oidc: 'oidc',
+  saml: 'saml',
+} as const;
 
 export interface ServicesCompanySSOPatch {
   clientId?: string;
@@ -1874,7 +1975,7 @@ export interface ServicesCompanySSOPatch {
   samlIdpMetadataUrl?: string;
   scopes?: string;
   /** "oidc" | "saml" */
-  ssoProtocol?: string;
+  ssoProtocol?: ServicesCompanySSOPatchSsoProtocol;
 }
 
 export type ServicesCounterBoardSessionUnitConfig = { [key: string]: unknown };
@@ -2218,10 +2319,22 @@ export interface ServicesSurveyScoresResponse {
   points?: ServicesSurveyScorePoint[];
 }
 
+/**
+ * sso | password | choose_slug
+ */
+export type ServicesTenantHintResponseNext = typeof ServicesTenantHintResponseNext[keyof typeof ServicesTenantHintResponseNext];
+
+
+export const ServicesTenantHintResponseNext = {
+  sso: 'sso',
+  password: 'password',
+  choose_slug: 'choose_slug',
+} as const;
+
 export interface ServicesTenantHintResponse {
   displayName?: string;
   /** sso | password | choose_slug */
-  next?: string;
+  next?: ServicesTenantHintResponseNext;
   ssoAvailable?: boolean;
   tenantSlug?: string;
 }
@@ -2582,6 +2695,96 @@ export const usePostUnits = <TError = string | HandlersQuotaExceededError,
     }
 
 /**
+ * Deletes a unit by its ID
+ * @summary Delete a unit
+ */
+export type deleteUnitsIdResponse204 = {
+  data: void
+  status: 204
+}
+
+export type deleteUnitsIdResponse500 = {
+  data: string
+  status: 500
+}
+
+export type deleteUnitsIdResponseSuccess = (deleteUnitsIdResponse204) & {
+  headers: Headers;
+};
+export type deleteUnitsIdResponseError = (deleteUnitsIdResponse500) & {
+  headers: Headers;
+};
+
+export type deleteUnitsIdResponse = (deleteUnitsIdResponseSuccess | deleteUnitsIdResponseError)
+
+export const getDeleteUnitsIdUrl = (id: string,) => {
+
+
+
+
+  return `/units/${id}`
+}
+
+export const deleteUnitsId = async (id: string, options?: RequestInit): Promise<deleteUnitsIdResponse> => {
+
+  return orvalMutator<deleteUnitsIdResponse>(getDeleteUnitsIdUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteUnitsIdMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteUnitsId>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteUnitsId>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['deleteUnitsId'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteUnitsId>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteUnitsId(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteUnitsIdMutationResult = NonNullable<Awaited<ReturnType<typeof deleteUnitsId>>>
+
+    export type DeleteUnitsIdMutationError = string
+
+    /**
+ * @summary Delete a unit
+ */
+export const useDeleteUnitsId = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteUnitsId>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteUnitsId>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getDeleteUnitsIdMutationOptions(options), queryClient);
+    }
+
+/**
  * Retrieves a specific unit by its ID
  * @summary Get a unit by ID
  */
@@ -2701,96 +2904,6 @@ export function useGetUnitByID<TData = Awaited<ReturnType<typeof getUnitByID>>, 
 
 
 
-
-/**
- * Deletes a unit by its ID
- * @summary Delete a unit
- */
-export type deleteUnitsIdResponse204 = {
-  data: void
-  status: 204
-}
-
-export type deleteUnitsIdResponse500 = {
-  data: string
-  status: 500
-}
-
-export type deleteUnitsIdResponseSuccess = (deleteUnitsIdResponse204) & {
-  headers: Headers;
-};
-export type deleteUnitsIdResponseError = (deleteUnitsIdResponse500) & {
-  headers: Headers;
-};
-
-export type deleteUnitsIdResponse = (deleteUnitsIdResponseSuccess | deleteUnitsIdResponseError)
-
-export const getDeleteUnitsIdUrl = (id: string,) => {
-
-
-
-
-  return `/units/${id}`
-}
-
-export const deleteUnitsId = async (id: string, options?: RequestInit): Promise<deleteUnitsIdResponse> => {
-
-  return orvalMutator<deleteUnitsIdResponse>(getDeleteUnitsIdUrl(id),
-  {
-    ...options,
-    method: 'DELETE'
-
-
-  }
-);}
-
-
-
-
-export const getDeleteUnitsIdMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteUnitsId>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof deleteUnitsId>>, TError,{id: string}, TContext> => {
-
-const mutationKey = ['deleteUnitsId'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteUnitsId>>, {id: string}> = (props) => {
-          const {id} = props ?? {};
-
-          return  deleteUnitsId(id,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type DeleteUnitsIdMutationResult = NonNullable<Awaited<ReturnType<typeof deleteUnitsId>>>
-
-    export type DeleteUnitsIdMutationError = string
-
-    /**
- * @summary Delete a unit
- */
-export const useDeleteUnitsId = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteUnitsId>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof deleteUnitsId>>,
-        TError,
-        {id: string},
-        TContext
-      > => {
-      return useMutation(getDeleteUnitsIdMutationOptions(options), queryClient);
-    }
 
 /**
  * Updates an existing unit
@@ -3878,7 +3991,7 @@ export const upsertUnitOperatorSkills = async (unitId: string,
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': '*/*', ...options?.headers },
     body: JSON.stringify(
       handlersBulkUpsertSkillsRequest,)
   }

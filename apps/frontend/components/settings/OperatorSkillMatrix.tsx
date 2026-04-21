@@ -41,12 +41,6 @@ interface OperatorSkillMatrixProps {
   onToggleSkillRouting?: (enabled: boolean) => void;
 }
 
-const PRIORITY_LABELS: Record<number, string> = {
-  1: '1 – Primary',
-  2: '2 – Secondary',
-  3: '3 – Backup'
-};
-
 const PRIORITY_BADGE_VARIANT: Record<
   number,
   'default' | 'secondary' | 'outline'
@@ -244,9 +238,9 @@ export function OperatorSkillMatrix({
               <SelectValue placeholder={t('operator_skills.priority')} />
             </SelectTrigger>
             <SelectContent>
-              {[1, 2, 3].map((p) => (
+              {([1, 2, 3] as const).map((p) => (
                 <SelectItem key={p} value={String(p)}>
-                  {PRIORITY_LABELS[p]}
+                  {t(`operator_skills.priority_${p}`)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -301,10 +295,10 @@ export function OperatorSkillMatrix({
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {[1, 2, 3].map((p) => (
+                          {([1, 2, 3] as const).map((p) => (
                             <SelectItem key={p} value={String(p)}>
                               <Badge variant={PRIORITY_BADGE_VARIANT[p]}>
-                                {PRIORITY_LABELS[p]}
+                                {t(`operator_skills.priority_${p}`)}
                               </Badge>
                             </SelectItem>
                           ))}

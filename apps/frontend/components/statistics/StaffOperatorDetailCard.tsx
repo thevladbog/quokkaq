@@ -1,6 +1,8 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocale, useTranslations } from 'next-intl';
+import { enUS, ru } from 'date-fns/locale';
 import {
   Bar,
   CartesianGrid,
@@ -9,8 +11,7 @@ import {
   XAxis,
   YAxis,
   Tooltip,
-  Legend,
-  ResponsiveContainer
+  Legend
 } from 'recharts';
 import type { ServicesStaffPerformanceResponse } from '@/lib/api/generated/statistics';
 import {
@@ -20,7 +21,28 @@ import {
   CardHeader,
   CardTitle
 } from '@/components/ui/card';
+import {
+  ChartContainer,
+  ChartTooltipContent,
+  type ChartConfig
+} from '@/components/ui/chart';
+import {
+  formatStatisticsChartAxisLabel,
+  formatStatisticsTooltipLabel
+} from '@/lib/statistics-chart-dates';
 import { StaffRadarChart } from './StaffRadarChart';
+import { resolveCssColorToRgb } from '@/lib/resolve-css-color';
+
+const trendChartConfig = {
+  completed: {
+    label: '',
+    color: 'var(--chart-1)'
+  },
+  slaWait: {
+    label: '',
+    color: 'var(--chart-2)'
+  }
+} satisfies ChartConfig;
 
 interface KpiTileProps {
   label: string;
@@ -58,6 +80,38 @@ export function StaffOperatorDetailCard({
   data
 }: StaffOperatorDetailCardProps) {
   const t = useTranslations('statistics');
+  const appLocale = useLocale();
+  const dateLocale = appLocale.toLowerCase().startsWith('ru') ? ru : enUS;
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [completedColor, setCompletedColor] = useState('rgb(218, 160, 42)');
+  const [slaWaitColor, setSlaWaitColor] = useState('rgb(89, 89, 222)');
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const style = getComputedStyle(containerRef.current);
+    const c1 = style.getPropertyValue('--chart-1').trim();
+    const c2 = style.getPropertyValue('--chart-2').trim();
+    if (c1) setCompletedColor(resolveCssColorToRgb(c1));
+    if (c2) setSlaWaitColor(resolveCssColorToRgb(c2));
+  }, []);
+
+  const fmtDateTick = useMemo(
+    () => (value: string | number) =>
+      formatStatisticsChartAxisLabel(value, {
+        hourly: false,
+        locale: dateLocale
+      }),
+    [dateLocale]
+  );
+
+  const fmtTooltipLabel = useMemo(
+    () => (label: string | number) =>
+      formatStatisticsTooltipLabel(label, {
+        hourly: false,
+        locale: dateLocale
+      }),
+    [dateLocale]
+  );
 
   const trendData = (data.dailyTrend ?? []).map((pt) => ({
     date: pt.date ?? '',
@@ -66,7 +120,7 @@ export function StaffOperatorDetailCard({
   }));
 
   return (
-    <div className='space-y-6'>
+    <div ref={containerRef} className='space-y-6'>
       {/* KPI row */}
       <div className='grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4'>
         <KpiTile
@@ -141,7 +195,10 @@ export function StaffOperatorDetailCard({
               </CardDescription>
             </CardHeader>
             <CardContent className='h-[260px]'>
-              <ResponsiveContainer width='100%' height='100%'>
+              <ChartContainer
+                config={trendChartConfig}
+                className='h-full w-full'
+              >
                 <ComposedChart data={trendData}>
                   <CartesianGrid
                     strokeDasharray='3 3'
@@ -151,6 +208,7 @@ export function StaffOperatorDetailCard({
                     dataKey='date'
                     tick={{ fontSize: 11 }}
                     className='text-muted-foreground'
+                    tickFormatter={fmtDateTick}
                   />
                   <YAxis
                     yAxisId='left'
@@ -165,19 +223,16 @@ export function StaffOperatorDetailCard({
                     className='text-muted-foreground'
                   />
                   <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'var(--card)',
-                      borderColor: 'var(--border)',
-                      borderRadius: 6,
-                      fontSize: 12
-                    }}
+                    content={
+                      <ChartTooltipContent labelFormatter={fmtTooltipLabel} />
+                    }
                   />
                   <Legend />
                   <Bar
                     yAxisId='left'
                     dataKey='completed'
                     name={t('legend_completed')}
-                    fill='var(--chart-1)'
+                    fill={completedColor}
                     fillOpacity={0.8}
                   />
                   <Line
@@ -185,12 +240,12 @@ export function StaffOperatorDetailCard({
                     type='monotone'
                     dataKey='slaWait'
                     name={t('radar_sla_wait')}
-                    stroke='var(--chart-2)'
+                    stroke={slaWaitColor}
                     strokeWidth={2}
                     dot={false}
                   />
                 </ComposedChart>
-              </ResponsiveContainer>
+              </ChartContainer>
             </CardContent>
           </Card>
         )}

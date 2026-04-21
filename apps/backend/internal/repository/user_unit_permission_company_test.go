@@ -30,6 +30,7 @@ CREATE TABLE units (
 	name_en TEXT,
 	timezone TEXT NOT NULL DEFAULT 'UTC',
 	config TEXT,
+	skill_based_routing_enabled INTEGER NOT NULL DEFAULT 0,
 	created_at DATETIME,
 	updated_at DATETIME
 );

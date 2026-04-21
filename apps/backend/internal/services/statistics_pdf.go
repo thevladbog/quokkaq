@@ -762,7 +762,7 @@ func drawStatsSectionStaffForecast(
 			fmt.Sprintf("%02d:00", h.Hour),
 			fmt.Sprintf("%.1f", h.ExpectedArrivals),
 			fmt.Sprintf("%d", h.RecommendedStaff),
-			fmt.Sprintf("%.1f%%", h.ExpectedSlaPct*100),
+			fmt.Sprintf("%.1f%%", h.ExpectedSlaPct),
 		})
 	}
 

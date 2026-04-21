@@ -26,7 +26,12 @@ import { cn } from '@/lib/utils';
 
 export function SidebarActiveUnitSelect({ className }: { className?: string }) {
   const tNav = useTranslations('nav');
-  const { activeUnitId, setActiveUnitId, assignableUnitIds } = useActiveUnit();
+  const {
+    activeUnitId,
+    setActiveUnitId,
+    assignableUnitIds,
+    assignableUnitLabelById
+  } = useActiveUnit();
   const pathname = usePathname();
   const router = useRouter();
   const { state, isMobile } = useSidebar();
@@ -43,12 +48,17 @@ export function SidebarActiveUnitSelect({ className }: { className?: string }) {
 
   const labelById = useMemo(() => {
     const map = new Map<string, string>();
+    for (const [id, label] of Object.entries(assignableUnitLabelById)) {
+      if (label?.trim()) map.set(id, label.trim());
+    }
     queries.forEach((q, i) => {
       const id = assignableUnitIds[i];
-      if (id && q.data?.name) map.set(id, q.data.name);
+      if (!id || !q.data) return;
+      const label = q.data.name?.trim() || q.data.code?.trim();
+      if (label) map.set(id, label);
     });
     return map;
-  }, [queries, assignableUnitIds]);
+  }, [queries, assignableUnitIds, assignableUnitLabelById]);
 
   if (assignableUnitIds.length === 0) return null;
 

@@ -21,6 +21,8 @@ type ActiveUnitContextValue = {
   activeUnitId: string | null;
   setActiveUnitId: (id: string) => void;
   assignableUnitIds: string[];
+  /** Known display names from GET /auth/me units and tenant-admin company snapshot (before per-unit GET). */
+  assignableUnitLabelById: Record<string, string>;
 };
 
 const ActiveUnitContext = createContext<ActiveUnitContextValue | undefined>(
@@ -76,6 +78,39 @@ export function ActiveUnitProvider({ children }: { children: ReactNode }) {
     tenantAdminSnapshot?.allIds
   ]);
 
+  const assignableUnitLabelFromProfile = useMemo(() => {
+    const map: Record<string, string> = {};
+    const units = user?.units;
+    if (!units?.length) return map;
+    const cid = activeCompanyId?.trim();
+    const filtered = !cid
+      ? units
+      : units.filter((u: { companyId?: string }) => u.companyId === cid);
+    for (const u of filtered) {
+      if (
+        !isUnitSelectableInSidebar(
+          (u as { unit?: { kind?: string } | null }).unit?.kind
+        )
+      ) {
+        continue;
+      }
+      const row = u as {
+        unitId: string;
+        unit?: { name?: string; code?: string } | null;
+      };
+      const label = row.unit?.name?.trim() || row.unit?.code?.trim();
+      if (label) map[row.unitId] = label;
+    }
+    return map;
+  }, [user?.units, activeCompanyId]);
+
+  const assignableUnitLabelById = useMemo(() => {
+    const merged = { ...assignableUnitLabelFromProfile };
+    const snap = tenantAdminSnapshot?.labelById;
+    if (snap) Object.assign(merged, snap);
+    return merged;
+  }, [assignableUnitLabelFromProfile, tenantAdminSnapshot?.labelById]);
+
   const userId = user?.id;
 
   const activeUnitId = useMemo(() => {
@@ -109,9 +144,10 @@ export function ActiveUnitProvider({ children }: { children: ReactNode }) {
     () => ({
       activeUnitId,
       setActiveUnitId,
-      assignableUnitIds
+      assignableUnitIds,
+      assignableUnitLabelById
     }),
-    [activeUnitId, setActiveUnitId, assignableUnitIds]
+    [activeUnitId, setActiveUnitId, assignableUnitIds, assignableUnitLabelById]
   );
 
   return (

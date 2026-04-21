@@ -2266,10 +2266,10 @@ ALTER TABLE units
 		}
 		return db.Exec(`
 CREATE TABLE IF NOT EXISTS operator_skills (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    unit_id uuid NOT NULL REFERENCES units(id) ON UPDATE CASCADE ON DELETE CASCADE,
-    user_id uuid NOT NULL REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
-    service_id uuid NOT NULL REFERENCES services(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    unit_id text NOT NULL REFERENCES units(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    user_id text NOT NULL REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    service_id text NOT NULL REFERENCES services(id) ON UPDATE CASCADE ON DELETE CASCADE,
     priority int NOT NULL DEFAULT 1,
     CONSTRAINT uniq_op_skill UNIQUE (unit_id, user_id, service_id)
 );

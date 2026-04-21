@@ -1818,12 +1818,12 @@ export default function StatisticsPage() {
                           >
                             <stop
                               offset='0%'
-                              stopColor='var(--primary)'
+                              stopColor='var(--color-waitDisplay)'
                               stopOpacity={0.4}
                             />
                             <stop
                               offset='100%'
-                              stopColor='var(--primary)'
+                              stopColor='var(--color-waitDisplay)'
                               stopOpacity={0.05}
                             />
                           </linearGradient>
@@ -1848,7 +1848,7 @@ export default function StatisticsPage() {
                           type='monotone'
                           dataKey='waitDisplay'
                           name={t('legend_wait_min')}
-                          stroke='var(--primary)'
+                          stroke='var(--color-waitDisplay)'
                           fill='url(#waitFillHourly)'
                           strokeWidth={2}
                           connectNulls={false}
@@ -1859,7 +1859,7 @@ export default function StatisticsPage() {
                           type='monotone'
                           dataKey='service'
                           name={t('legend_service_min')}
-                          stroke='var(--chart-2)'
+                          stroke='var(--color-service)'
                           strokeWidth={2}
                           dot={false}
                           connectNulls={false}
@@ -1877,12 +1877,12 @@ export default function StatisticsPage() {
                           >
                             <stop
                               offset='0%'
-                              stopColor='var(--primary)'
+                              stopColor='var(--color-waitDisplay)'
                               stopOpacity={0.35}
                             />
                             <stop
                               offset='100%'
-                              stopColor='var(--primary)'
+                              stopColor='var(--color-waitDisplay)'
                               stopOpacity={0}
                             />
                           </linearGradient>
@@ -1907,7 +1907,7 @@ export default function StatisticsPage() {
                           type='monotone'
                           dataKey='waitDisplay'
                           name={t('legend_wait_min')}
-                          stroke='var(--primary)'
+                          stroke='var(--color-waitDisplay)'
                           fill='url(#waitFill)'
                           strokeWidth={2}
                           connectNulls={false}
@@ -1917,7 +1917,7 @@ export default function StatisticsPage() {
                           type='monotone'
                           dataKey='service'
                           name={t('legend_service_min')}
-                          stroke='var(--chart-2)'
+                          stroke='var(--color-service)'
                           fill='none'
                           strokeWidth={2}
                           connectNulls={false}
@@ -1968,19 +1968,19 @@ export default function StatisticsPage() {
                       <Bar
                         dataKey='created'
                         name={t('legend_created')}
-                        fill='var(--primary)'
+                        fill='var(--color-created)'
                         radius={[4, 4, 0, 0]}
                       />
                       <Bar
                         dataKey='completed'
                         name={t('legend_completed')}
-                        fill='var(--chart-2)'
+                        fill='var(--color-completed)'
                         radius={[4, 4, 0, 0]}
                       />
                       <Bar
                         dataKey='noShow'
                         name={t('legend_no_show')}
-                        fill='var(--chart-4)'
+                        fill='var(--color-noShow)'
                         radius={[4, 4, 0, 0]}
                       />
                     </BarChart>
@@ -2093,7 +2093,7 @@ export default function StatisticsPage() {
                                 ? t('legend_score_native')
                                 : t('legend_score_norm5')
                             }
-                            stroke='var(--primary)'
+                            stroke='var(--color-score)'
                             strokeWidth={2}
                             dot={false}
                             connectNulls={false}
@@ -2286,7 +2286,7 @@ export default function StatisticsPage() {
                         dataKey='breach'
                         name={t('legend_sla_wait_breach')}
                         stackId='sla'
-                        fill='var(--destructive)'
+                        fill='var(--color-breach)'
                       />
                       {slaDisplayMode === 'percent' &&
                         slaChart.sumSvcTot > 0 && (
@@ -2294,7 +2294,7 @@ export default function StatisticsPage() {
                             dataKey='svcPct'
                             name={t('legend_sla_service_pct')}
                             type='monotone'
-                            stroke='var(--chart-2)'
+                            stroke='var(--color-svcPct)'
                             strokeWidth={2}
                             dot={false}
                             connectNulls={false}
@@ -2396,7 +2396,7 @@ export default function StatisticsPage() {
                           type='monotone'
                           dataKey='util'
                           name={t('legend_utilization_pct')}
-                          stroke='var(--chart-3)'
+                          stroke='var(--color-util)'
                           strokeWidth={2}
                           dot={false}
                           connectNulls={false}
@@ -2424,6 +2424,8 @@ export default function StatisticsPage() {
                     <p className='text-muted-foreground text-sm'>
                       {t('loading')}
                     </p>
+                  ) : staffPerformanceListQuery.isError ? (
+                    <p className='text-destructive text-sm'>{t('error')}</p>
                   ) : (
                     <StaffLeaderboard
                       items={
@@ -2450,6 +2452,8 @@ export default function StatisticsPage() {
                     <p className='text-muted-foreground text-sm'>
                       {t('loading')}
                     </p>
+                  ) : staffDetailQuery.isError ? (
+                    <p className='text-destructive text-sm'>{t('error')}</p>
                   ) : staffDetailQuery.data?.status === 200 ? (
                     <StaffOperatorDetailCard
                       data={staffDetailQuery.data.data}
@@ -2475,6 +2479,8 @@ export default function StatisticsPage() {
                     <p className='text-muted-foreground text-sm'>
                       {t('loading')}
                     </p>
+                  ) : staffingForecastQuery.isError ? (
+                    <p className='text-destructive text-sm'>{t('error')}</p>
                   ) : staffingForecastQuery.data?.status === 200 ? (
                     <StaffingForecastPanel
                       data={staffingForecastQuery.data.data}

@@ -735,7 +735,7 @@ func (h *StatisticsHandler) GetSLAHeatmap(w http.ResponseWriter, r *http.Request
 // GetStaffingForecast godoc
 // @ID           getUnitStatisticsStaffingForecast
 // @Summary      Hourly staffing recommendations based on Erlang C and historical arrival data
-// @Description  Computes recommended agent counts per hour for a target date using Erlang C queuing theory. Historical arrival rates are derived from tickets.created_at for the same weekday over the last N weeks.
+// @Description  Computes recommended agent counts per hour for a target date using Erlang C queuing theory. Historical arrival rates are derived from tickets.created_at for the same weekday over the last N weeks. Requires the advanced_reports plan feature.
 // @Tags         statistics
 // @Security     BearerAuth
 // @Param        unitId            path   string  true  "Subdivision unit ID"
@@ -746,7 +746,7 @@ func (h *StatisticsHandler) GetSLAHeatmap(w http.ResponseWriter, r *http.Request
 // @Success      200 {object} services.StaffingForecastResponse
 // @Failure      400 {string} string "Bad Request"
 // @Failure      401 {string} string "Unauthorized"
-// @Failure      403 {string} string "Forbidden"
+// @Failure      403 {string} string "Forbidden (missing statistics access or plan does not include advanced reports)"
 // @Failure      404 {string} string "Unit not found"
 // @Failure      422 {string} string "Not enough data"
 // @Failure      500 {string} string "Internal server error"
@@ -758,6 +758,11 @@ func (h *StatisticsHandler) GetStaffingForecast(w http.ResponseWriter, r *http.R
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
+	companyID, err := h.subdivisionCompanyID(r.Context(), unitID)
+	if err != nil {
+		http.Error(w, "Unit not found", http.StatusNotFound)
+		return
+	}
 
 	q := r.URL.Query()
 	params := services.StaffingForecastParams{
@@ -767,7 +772,7 @@ func (h *StatisticsHandler) GetStaffingForecast(w http.ResponseWriter, r *http.R
 		LookbackWeeks:    parseIntOrDefault(q.Get("lookbackWeeks"), 4),
 	}
 
-	resp, err := h.service.GetStaffingForecast(r.Context(), unitID, params)
+	resp, err := h.service.GetStaffingForecast(r.Context(), unitID, companyID, params)
 	if err != nil {
 		if respondStatisticsServiceErr(w, err) {
 			return

@@ -1,7 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
+import { format, parse, isValid } from 'date-fns';
+import { enUS, ru } from 'date-fns/locale';
+import { CalendarIcon } from 'lucide-react';
 import {
   BarChart,
   Bar,
@@ -17,9 +20,18 @@ import type {
   ServicesStaffingForecastResponse,
   ServicesHourlyStaffingForecast
 } from '@/lib/api/generated/statistics';
+import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger
+} from '@/components/ui/popover';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import { russianWeekdayGenitive } from '@/lib/russian-weekday-genitive';
 
 interface StaffingForecastPanelProps {
   data: ServicesStaffingForecastResponse;
@@ -93,9 +105,32 @@ export function StaffingForecastPanel({
   targetDate
 }: StaffingForecastPanelProps) {
   const t = useTranslations('statistics');
+  const appLocale = useLocale();
+  const dateLocale = appLocale.toLowerCase().startsWith('ru') ? ru : enUS;
+
   const [localDate, setLocalDate] = useState(targetDate);
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [localSla, setLocalSla] = useState(String(targetSlaPct));
   const [localWait, setLocalWait] = useState(String(targetMaxWaitMin));
+
+  /** Parse the stored `YYYY-MM-DD` string to a Date for the Calendar. */
+  const selectedDate = (() => {
+    if (!localDate) return undefined;
+    const d = parse(localDate, 'yyyy-MM-dd', new Date());
+    return isValid(d) ? d : undefined;
+  })();
+
+  /** Display label: localized short date, e.g. "22 апр. 2026" / "Apr 22, 2026". */
+  const displayDate = selectedDate
+    ? format(selectedDate, 'PP', { locale: dateLocale })
+    : t('sf_pick_date');
+
+  /** Localized weekday for the hint line: Russian needs genitive after «для» (не «среда», а «среды»). */
+  const localizedDayOfWeek = selectedDate
+    ? appLocale.toLowerCase().startsWith('ru')
+      ? russianWeekdayGenitive(selectedDate)
+      : format(selectedDate, 'EEEE', { locale: dateLocale })
+    : (data.dayOfWeek ?? '');
 
   const summary = data.dailySummary;
   const hourlyData = (data.hourlyForecasts ?? []).map((h) => ({
@@ -123,19 +158,41 @@ export function StaffingForecastPanel({
     <div className='space-y-6'>
       {/* Controls */}
       <div className='flex flex-wrap items-end gap-4'>
-        <div className='flex min-w-[140px] flex-col gap-1'>
-          <Label htmlFor='sf-date' className='text-muted-foreground text-xs'>
+        <div className='flex min-w-[160px] flex-col gap-1'>
+          <Label className='text-muted-foreground text-xs'>
             {t('sf_target_date')}
           </Label>
-          <Input
-            id='sf-date'
-            type='date'
-            value={localDate}
-            onChange={(e) => setLocalDate(e.target.value)}
-            onBlur={applyParams}
-            onKeyDown={handleKeyDown}
-            className='h-8 text-sm'
-          />
+          <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant='outline'
+                className={cn(
+                  'h-8 justify-start gap-2 px-3 text-sm font-normal',
+                  !selectedDate && 'text-muted-foreground'
+                )}
+              >
+                <CalendarIcon className='size-3.5 shrink-0' />
+                {displayDate}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className='w-auto p-0' align='start'>
+              <Calendar
+                mode='single'
+                selected={selectedDate}
+                onSelect={(date) => {
+                  const iso = date ? format(date, 'yyyy-MM-dd') : '';
+                  setLocalDate(iso);
+                  setCalendarOpen(false);
+                  onParamsChange?.({
+                    targetDate: iso || undefined,
+                    targetSlaPct: parseFloat(localSla) || undefined,
+                    targetMaxWaitMin: parseFloat(localWait) || undefined
+                  });
+                }}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
         </div>
         <div className='flex w-28 flex-col gap-1'>
           <Label htmlFor='sf-sla' className='text-muted-foreground text-xs'>
@@ -248,7 +305,7 @@ export function StaffingForecastPanel({
 
       <p className='text-muted-foreground text-xs'>
         {t('sf_erlang_hint', {
-          dayOfWeek: data.dayOfWeek ?? '',
+          dayOfWeek: localizedDayOfWeek,
           sla: data.targetSlaPct ?? targetSlaPct,
           wait: data.targetMaxWaitMin ?? targetMaxWaitMin
         })}

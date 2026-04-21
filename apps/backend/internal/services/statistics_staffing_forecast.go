@@ -61,7 +61,15 @@ type hourlyArrivalRow struct {
 
 // GetStaffingForecast computes an hourly staffing recommendation for the given unit and parameters.
 // It uses Variant A from the plan: aggregate arrival rate directly from tickets.created_at.
-func (s *StatisticsService) GetStaffingForecast(ctx context.Context, unitID string, p StaffingForecastParams) (*StaffingForecastResponse, error) {
+// Requires the advanced_reports plan feature — returns an error with "plan does not include" when absent.
+func (s *StatisticsService) GetStaffingForecast(ctx context.Context, unitID, companyID string, p StaffingForecastParams) (*StaffingForecastResponse, error) {
+	ok, err := CompanyAllowsAdvancedReports(ctx, s.db, companyID)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, errors.New("plan does not include advanced reports")
+	}
 	p = applyForecastDefaults(p)
 
 	targetDate, err := time.Parse("2006-01-02", p.TargetDate)
@@ -181,7 +189,7 @@ WITH daily_hourly AS (
         )                                            AS avg_svc_min
     FROM tickets t
     WHERE t.unit_id = ?
-      AND t.created_at::date = ANY(?)
+      AND t.created_at::date IN (?)
     GROUP BY sample_date, hour
 )
 SELECT
