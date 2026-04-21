@@ -5411,7 +5411,7 @@
         },
         "/auth/refresh": {
             "post": {
-                "description": "Exchanges a valid refresh JWT for a new access JWT. The refresh token is read from HttpOnly session cookies when present; otherwise send `Authorization: Bearer \u003crefresh\u003e`. Rotated refresh tokens are returned only via `Set-Cookie`, not in the JSON body.",
+                "description": "Exchanges a valid refresh JWT for a new access JWT. The refresh token is read from HttpOnly session cookies when present; otherwise send `Authorization: Bearer <refresh>`. Rotated refresh tokens are returned only via `Set-Cookie`, not in the JSON body.",
                 "operationId": "authRefresh",
                 "responses": {
                     "200": {
@@ -18355,7 +18355,7 @@
         },
         "/units/{unitId}/guest-survey/completion-images/{fileName}": {
             "get": {
-                "description": "Streams image bytes. Requires Authorization: Bearer (staff user JWT or counter terminal JWT). This URL is not embeddable from unauthenticated contexts: plain \u003cimg src\u003e, Markdown image syntax, or server-side markdown renderers without the token will fail. Clients should fetch with the Bearer token (e.g. browser fetch) and create an object/blob URL, or proxy the bytes with auth.",
+                "description": "Streams image bytes. Requires Authorization: Bearer (staff user JWT or counter terminal JWT). This URL is not embeddable from unauthenticated contexts: plain <img src>, Markdown image syntax, or server-side markdown renderers without the token will fail. Clients should fetch with the Bearer token (e.g. browser fetch) and create an object/blob URL, or proxy the bytes with auth.",
                 "operationId": "GetSurveyCompletionImage",
                 "parameters": [
                     {
@@ -18638,7 +18638,7 @@
                 ]
             },
             "get": {
-                "description": "Streams image/video bytes. Requires Authorization: Bearer. Not a public URL for \u003cimg\u003e/\u003cvideo\u003e src or static markdown—use authenticated fetch and blob/object URLs (or a signed public URL if the product adds one).",
+                "description": "Streams image/video bytes. Requires Authorization: Bearer. Not a public URL for <img>/<video> src or static markdown—use authenticated fetch and blob/object URLs (or a signed public URL if the product adds one).",
                 "operationId": "GetSurveyIdleMedia",
                 "parameters": [
                     {
@@ -22046,7 +22046,7 @@
         },
         "/units/{unitId}/survey-completion-images": {
             "post": {
-                "description": "Multipart file field \"file\". Returns an API-relative URL string. The GET for that path requires BearerAuth; it is not usable as a bare \u003cimg src\u003e or static markdown image URL—clients must fetch with Authorization and use a blob/object URL (or proxy) to display.",
+                "description": "Multipart file field \"file\". Returns an API-relative URL string. The GET for that path requires BearerAuth; it is not usable as a bare <img src> or static markdown image URL—clients must fetch with Authorization and use a blob/object URL (or proxy) to display.",
                 "operationId": "UploadCompletionImage",
                 "parameters": [
                     {

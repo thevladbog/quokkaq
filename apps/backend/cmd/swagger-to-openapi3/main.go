@@ -6,11 +6,13 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 
 	"github.com/getkin/kin-openapi/openapi2"
 	"github.com/getkin/kin-openapi/openapi2conv"
@@ -21,13 +23,30 @@ import (
 // stable git diffs (json.MarshalIndent always expands single-element arrays).
 var enumSingleTrueLine = regexp.MustCompile(`"enum":\s*\[\s+true\s+\]`)
 
+// htmlUnescaper reverses Go's default HTML-safe JSON encoding for the three
+// characters that are safe in JSON string values but not in HTML (<, >, &).
+// kin-openapi's custom MarshalJSON methods call json.Marshal internally with
+// escapeHTML=true, so some descriptions still contain escape sequences even
+// when the outer encoder has SetEscapeHTML(false). Unescaping here keeps the
+// committed OpenAPI artifacts human-readable.
+var htmlUnescaper = strings.NewReplacer(
+	`\u003c`, "<",
+	`\u003e`, ">",
+	`\u0026`, "&",
+)
+
 func writeJSON(path string, v any) error {
-	raw, err := json.MarshalIndent(v, "", "    ")
-	if err != nil {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "    ")
+	if err := enc.Encode(v); err != nil {
 		return fmt.Errorf("marshal json: %w", err)
 	}
-	text := enumSingleTrueLine.ReplaceAllLiteralString(string(raw), `"enum": [true]`)
-	text += "\n"
+	// enc.Encode already appends a trailing newline.
+	text := buf.String()
+	text = htmlUnescaper.Replace(text)
+	text = enumSingleTrueLine.ReplaceAllLiteralString(text, `"enum": [true]`)
 	return os.WriteFile(path, []byte(text), 0o644)
 }
 
@@ -95,7 +114,8 @@ func main() {
 
 	docsGo := filepath.Join(docsDir, "docs.go")
 	const docsGoContent = `// Package docs embeds the OpenAPI 3 API specification generated from Swagger 2.0 (swag) via kin-openapi.
-// Run from apps/backend: swag init -g cmd/api/main.go -o ./docs && go run ./cmd/swagger-to-openapi3
+// Run from apps/backend: go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g cmd/api/main.go -o ./docs && go run ./cmd/swagger-to-openapi3
+// Or via Nx from repo root: pnpm nx run backend:openapi
 package docs
 
 import _ "embed"
