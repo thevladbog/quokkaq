@@ -20,14 +20,27 @@ const (
 	slaThreshold80  = 80
 	slaThreshold100 = 100
 
-	// WS event names.
+	// WS event names — wait SLA (queue).
 	eventSlaWarning = "unit.sla_warning"
 	eventSlaBreach  = "unit.sla_breach"
+
+	// WS event names — service-time SLA (at desk).
+	eventServiceSlaWarning = "unit.service_sla_warning"
+	eventServiceSlaBreach  = "unit.service_sla_breach"
+
+	// AlertType values sent in SlaAlertPayload.
+	alertTypeWait    = "wait"
+	alertTypeService = "service"
+
+	// State key prefixes to keep wait and service SLA entries separate.
+	stateKeyPrefixWait    = "w:"
+	stateKeyPrefixService = "s:"
 
 	defaultSlaMonitorIntervalSec = 10
 )
 
-// SlaAlertPayload is the data envelope sent with unit.sla_warning and unit.sla_breach WS events.
+// SlaAlertPayload is the data envelope sent with unit.sla_warning, unit.sla_breach,
+// unit.service_sla_warning, and unit.service_sla_breach WS events.
 type SlaAlertPayload struct {
 	TicketID       string `json:"ticketId"`
 	QueueNumber    string `json:"queueNumber"`
@@ -36,22 +49,24 @@ type SlaAlertPayload struct {
 	ThresholdPct   int    `json:"thresholdPct"` // 50, 80, or 100
 	ElapsedSec     int    `json:"elapsedSec"`
 	MaxWaitTimeSec int    `json:"maxWaitTimeSec"`
+	// AlertType distinguishes wait-queue SLA ("wait") from service-time SLA ("service").
+	AlertType string `json:"alertType"`
 }
 
-// slaTicketState tracks which threshold was last emitted for a ticket so we
-// only fire each crossing once.
+// slaTicketState tracks which threshold was last emitted for a (ticket, alertType) pair
+// so we only fire each crossing once.
 type slaTicketState struct {
 	lastThreshold int // 0 = nothing emitted yet
 }
 
-// SlaMonitorService checks waiting tickets against their SLA thresholds on a
-// regular tick and broadcasts WS events when a threshold is first crossed.
+// SlaMonitorService checks waiting and in_service tickets against their SLA thresholds
+// on a regular tick and broadcasts WS events when a threshold is first crossed.
 type SlaMonitorService struct {
 	ticketRepo repository.TicketRepository
 	hub        *ws.Hub
 
 	mu    sync.Mutex
-	state map[string]*slaTicketState // keyed by ticket ID
+	state map[string]*slaTicketState // keyed by "w:<ticketID>" or "s:<ticketID>"
 }
 
 // NewSlaMonitorService creates a new SLA monitor.
@@ -97,8 +112,8 @@ func (s *SlaMonitorService) Start(ctx context.Context) {
 	}()
 }
 
-// tick is the core per-interval logic. It fetches waiting SLA tickets for every
-// active WS room and emits events for newly crossed thresholds.
+// tick is the core per-interval logic. It fetches waiting and in_service SLA tickets
+// for every active WS room and emits events for newly crossed thresholds.
 func (s *SlaMonitorService) tick() {
 	rooms := s.hub.ActiveRooms()
 	if len(rooms) == 0 {
@@ -106,35 +121,48 @@ func (s *SlaMonitorService) tick() {
 	}
 
 	now := time.Now()
-	seenTicketIDs := make(map[string]struct{}, 64)
+	seenStateKeys := make(map[string]struct{}, 128)
 
 	for _, unitID := range rooms {
-		tickets, err := s.ticketRepo.GetWaitingTicketsWithSLA(unitID)
+		// --- Wait SLA (waiting tickets) ---
+		waitTickets, err := s.ticketRepo.GetWaitingTicketsWithSLA(unitID)
 		if err != nil {
 			slog.Error("sla monitor: GetWaitingTicketsWithSLA", "unit_id", unitID, "err", err)
-			continue
+		} else {
+			for i := range waitTickets {
+				t := &waitTickets[i]
+				key := stateKeyPrefixWait + t.ID
+				seenStateKeys[key] = struct{}{}
+				s.evaluateWaitSLA(t, now, key)
+			}
 		}
 
-		for i := range tickets {
-			t := &tickets[i]
-			seenTicketIDs[t.ID] = struct{}{}
-			s.evaluateTicket(t, now)
+		// --- Service-time SLA (in_service tickets) ---
+		svcTickets, err := s.ticketRepo.GetInServiceTicketsWithSLA(unitID)
+		if err != nil {
+			slog.Error("sla monitor: GetInServiceTicketsWithSLA", "unit_id", unitID, "err", err)
+		} else {
+			for i := range svcTickets {
+				t := &svcTickets[i]
+				key := stateKeyPrefixService + t.ID
+				seenStateKeys[key] = struct{}{}
+				s.evaluateServiceSLA(t, now, key)
+			}
 		}
 	}
 
-	// Evict state for tickets no longer waiting (completed, called, etc.)
+	// Evict state for tickets no longer tracked.
 	s.mu.Lock()
-	for id := range s.state {
-		if _, active := seenTicketIDs[id]; !active {
-			delete(s.state, id)
+	for key := range s.state {
+		if _, active := seenStateKeys[key]; !active {
+			delete(s.state, key)
 		}
 	}
 	s.mu.Unlock()
 }
 
-// evaluateTicket computes the SLA percent for a single ticket and fires a WS
-// event if a new threshold has been crossed since the last tick.
-func (s *SlaMonitorService) evaluateTicket(t *models.Ticket, now time.Time) {
+// evaluateWaitSLA checks a waiting ticket against its MaxWaitingTime SLA.
+func (s *SlaMonitorService) evaluateWaitSLA(t *models.Ticket, now time.Time, stateKey string) {
 	if t.MaxWaitingTime == nil || *t.MaxWaitingTime <= 0 {
 		return
 	}
@@ -146,41 +174,89 @@ func (s *SlaMonitorService) evaluateTicket(t *models.Ticket, now time.Time) {
 	maxSec := *t.MaxWaitingTime
 
 	pct := (elapsedSec * 100) / maxSec
-
 	threshold := s.currentThreshold(pct)
 	if threshold == 0 {
 		return
 	}
 
-	s.mu.Lock()
-	st, ok := s.state[t.ID]
-	if !ok {
-		st = &slaTicketState{}
-		s.state[t.ID] = st
-	}
-	if st.lastThreshold >= threshold {
-		s.mu.Unlock()
+	if !s.shouldEmit(stateKey, threshold) {
 		return
 	}
-	st.lastThreshold = threshold
-	s.mu.Unlock()
 
 	payload := SlaAlertPayload{
 		TicketID:       t.ID,
 		QueueNumber:    t.QueueNumber,
-		ServiceName:    serviceName(t),
+		ServiceName:    resolveServiceName(t),
 		UnitID:         t.UnitID,
 		ThresholdPct:   threshold,
 		ElapsedSec:     elapsedSec,
 		MaxWaitTimeSec: maxSec,
+		AlertType:      alertTypeWait,
 	}
 
 	eventName := eventSlaWarning
 	if threshold >= slaThreshold100 {
 		eventName = eventSlaBreach
 	}
-
 	s.hub.BroadcastEvent(eventName, payload, t.UnitID)
+}
+
+// evaluateServiceSLA checks an in_service ticket against its MaxServiceTime SLA.
+func (s *SlaMonitorService) evaluateServiceSLA(t *models.Ticket, now time.Time, stateKey string) {
+	if t.MaxServiceTime == nil || *t.MaxServiceTime <= 0 || t.ConfirmedAt == nil {
+		return
+	}
+
+	elapsedSec := int(now.Sub(*t.ConfirmedAt).Seconds())
+	if elapsedSec < 0 {
+		elapsedSec = 0
+	}
+	maxSec := *t.MaxServiceTime
+
+	pct := (elapsedSec * 100) / maxSec
+	threshold := s.currentThreshold(pct)
+	if threshold == 0 {
+		return
+	}
+
+	if !s.shouldEmit(stateKey, threshold) {
+		return
+	}
+
+	payload := SlaAlertPayload{
+		TicketID:       t.ID,
+		QueueNumber:    t.QueueNumber,
+		ServiceName:    resolveServiceName(t),
+		UnitID:         t.UnitID,
+		ThresholdPct:   threshold,
+		ElapsedSec:     elapsedSec,
+		MaxWaitTimeSec: maxSec,
+		AlertType:      alertTypeService,
+	}
+
+	eventName := eventServiceSlaWarning
+	if threshold >= slaThreshold100 {
+		eventName = eventServiceSlaBreach
+	}
+	s.hub.BroadcastEvent(eventName, payload, t.UnitID)
+}
+
+// shouldEmit checks (and updates) the per-ticket state to decide whether to emit
+// an event for the given threshold. Returns true if the threshold is newly crossed.
+func (s *SlaMonitorService) shouldEmit(stateKey string, threshold int) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	st, ok := s.state[stateKey]
+	if !ok {
+		st = &slaTicketState{}
+		s.state[stateKey] = st
+	}
+	if st.lastThreshold >= threshold {
+		return false
+	}
+	st.lastThreshold = threshold
+	return true
 }
 
 // currentThreshold maps a percentage to the highest crossed threshold constant
@@ -198,8 +274,8 @@ func (s *SlaMonitorService) currentThreshold(pct int) int {
 	}
 }
 
-// serviceName resolves the best display name from the preloaded Service.
-func serviceName(t *models.Ticket) string {
+// resolveServiceName picks the best display name from the preloaded Service.
+func resolveServiceName(t *models.Ticket) string {
 	if t.Service.NameRu != nil && strings.TrimSpace(*t.Service.NameRu) != "" {
 		return *t.Service.NameRu
 	}

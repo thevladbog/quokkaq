@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, X, XCircle } from 'lucide-react';
+import { AlertTriangle, Clock, X, XCircle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
 import { Badge } from '@/components/ui/badge';
@@ -9,7 +9,7 @@ import type { SlaAlertPayload } from '@/hooks/use-sla-alerts';
 
 interface SlaAlertBannerProps {
   alerts: SlaAlertPayload[];
-  onDismiss: (ticketId: string) => void;
+  onDismiss: (ticketId: string, alertType?: 'wait' | 'service') => void;
   onDismissAll: () => void;
 }
 
@@ -24,10 +24,12 @@ function SlaAlertRow({
   onDismiss
 }: {
   alert: SlaAlertPayload;
-  onDismiss: (id: string) => void;
+  onDismiss: (id: string, alertType?: 'wait' | 'service') => void;
 }) {
   const t = useTranslations('supervisor.dashboardUi.sla');
   const isBreach = alert.thresholdPct >= 100;
+  const alertType = alert.alertType ?? 'wait';
+  const isServiceAlert = alertType === 'service';
 
   const thresholdLabel = isBreach
     ? t('threshold100')
@@ -38,13 +40,18 @@ function SlaAlertRow({
   return (
     <div className='flex items-center justify-between gap-3 py-1.5'>
       <div className='flex min-w-0 flex-1 items-center gap-2'>
+        {isServiceAlert ? (
+          <Clock className='text-muted-foreground h-3.5 w-3.5 shrink-0' />
+        ) : (
+          <AlertTriangle className='text-muted-foreground h-3.5 w-3.5 shrink-0' />
+        )}
         <Badge
           variant={isBreach ? 'destructive' : 'outline'}
           className='shrink-0'
         >
           {alert.queueNumber}
         </Badge>
-        <span className='text-sm leading-tight font-medium'>
+        <span className='truncate text-sm leading-tight font-medium'>
           {alert.serviceName}
         </span>
         <span className='text-muted-foreground shrink-0 text-xs'>
@@ -57,12 +64,17 @@ function SlaAlertRow({
         >
           {thresholdLabel}
         </Badge>
+        {isServiceAlert && (
+          <Badge variant='outline' className='shrink-0 text-xs'>
+            {t('bannerServiceLabel', { defaultValue: 'service' })}
+          </Badge>
+        )}
       </div>
       <Button
         variant='ghost'
         size='icon'
         className='h-6 w-6 shrink-0'
-        onClick={() => onDismiss(alert.ticketId)}
+        onClick={() => onDismiss(alert.ticketId, alertType)}
         aria-label={t('dismiss')}
       >
         <X className='h-3.5 w-3.5' />
@@ -83,6 +95,15 @@ export function SlaAlertBanner({
   const breaches = alerts.filter((a) => a.thresholdPct >= 100);
   const warnings = alerts.filter((a) => a.thresholdPct < 100);
 
+  const waitBreaches = breaches.filter(
+    (a) => (a.alertType ?? 'wait') === 'wait'
+  );
+  const serviceBreaches = breaches.filter((a) => a.alertType === 'service');
+  const waitWarnings = warnings.filter(
+    (a) => (a.alertType ?? 'wait') === 'wait'
+  );
+  const serviceWarnings = warnings.filter((a) => a.alertType === 'service');
+
   return (
     <div
       className='border-destructive/40 bg-destructive/5 rounded-lg border px-4 py-3'
@@ -92,14 +113,24 @@ export function SlaAlertBanner({
       <div className='mb-2 flex items-center justify-between gap-2'>
         <div className='flex flex-wrap items-center gap-2'>
           <AlertTriangle className='text-destructive h-4 w-4 shrink-0' />
-          {breaches.length > 0 && (
+          {waitBreaches.length > 0 && (
             <span className='text-destructive text-sm font-semibold'>
-              {t('bannerBreach', { count: breaches.length })}
+              {t('bannerBreach', { count: waitBreaches.length })}
             </span>
           )}
-          {warnings.length > 0 && (
+          {serviceBreaches.length > 0 && (
+            <span className='text-destructive text-sm font-semibold'>
+              {t('bannerServiceBreach', { count: serviceBreaches.length })}
+            </span>
+          )}
+          {waitWarnings.length > 0 && (
             <span className='text-sm font-medium text-amber-600 dark:text-amber-400'>
-              {t('bannerWarning', { count: warnings.length })}
+              {t('bannerWarning', { count: waitWarnings.length })}
+            </span>
+          )}
+          {serviceWarnings.length > 0 && (
+            <span className='text-sm font-medium text-amber-600 dark:text-amber-400'>
+              {t('bannerServiceWarning', { count: serviceWarnings.length })}
             </span>
           )}
         </div>
@@ -116,7 +147,7 @@ export function SlaAlertBanner({
       <div className='divide-border divide-y'>
         {alerts.map((alert) => (
           <SlaAlertRow
-            key={`${alert.ticketId}-${alert.thresholdPct}`}
+            key={`${alert.alertType ?? 'wait'}-${alert.ticketId}-${alert.thresholdPct}`}
             alert={alert}
             onDismiss={onDismiss}
           />

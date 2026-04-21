@@ -44,6 +44,7 @@ type Ticket struct {
 	CompletedAt     *time.Time `json:"completedAt,omitempty"`
 	LastCalledAt    *time.Time `json:"lastCalledAt,omitempty"`
 	MaxWaitingTime  *int       `json:"maxWaitingTime,omitempty"` // Snapshot from Service at creation
+	MaxServiceTime  *int       `json:"maxServiceTime,omitempty"` // Snapshot from Service at in_service; cleared on transfer/return
 	OperatorComment *string    `gorm:"type:text" json:"operatorComment,omitempty"`
 	// ServedByName is hydrated for client visit lists from ticket_histories (not stored on tickets).
 	ServedByName *string `json:"servedByName,omitempty" gorm:"-"`

@@ -17,6 +17,8 @@ export interface SlaAlertPayload {
   thresholdPct: number;
   elapsedSec: number;
   maxWaitTimeSec: number;
+  /** "wait" for queue-wait SLA alerts, "service" for service-time SLA alerts */
+  alertType: 'wait' | 'service';
 }
 
 export interface QueueSnapshot {
@@ -253,6 +255,18 @@ export class SocketClient {
 
   onSlaBreach(callback: (data: SlaAlertPayload) => void) {
     this.on('unit.sla_breach', (data) => callback(data as SlaAlertPayload));
+  }
+
+  onServiceSlaWarning(callback: (data: SlaAlertPayload) => void) {
+    this.on('unit.service_sla_warning', (data) =>
+      callback(data as SlaAlertPayload)
+    );
+  }
+
+  onServiceSlaBreach(callback: (data: SlaAlertPayload) => void) {
+    this.on('unit.service_sla_breach', (data) =>
+      callback(data as SlaAlertPayload)
+    );
   }
 
   // Emit events - Backend currently doesn't handle these, but keeping for compatibility

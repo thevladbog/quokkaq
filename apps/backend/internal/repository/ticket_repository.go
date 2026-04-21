@@ -202,6 +202,9 @@ type TicketRepository interface {
 	// GetWaitingTicketsWithSLA returns waiting (non-EOD) tickets for a unit that have a positive
 	// max_waiting_time snapshot. Used by the SLA monitor to detect threshold crossings.
 	GetWaitingTicketsWithSLA(unitID string) ([]models.Ticket, error)
+	// GetInServiceTicketsWithSLA returns in_service (non-EOD) tickets for a unit that have a positive
+	// max_service_time snapshot and a non-null confirmed_at. Used by the SLA monitor.
+	GetInServiceTicketsWithSLA(unitID string) ([]models.Ticket, error)
 }
 
 type ticketRepository struct {
@@ -418,6 +421,16 @@ func (r *ticketRepository) GetWaitingTicketsWithSLA(unitID string) ([]models.Tic
 		Where("unit_id = ? AND status = ? AND is_eod = ? AND max_waiting_time IS NOT NULL AND max_waiting_time > 0",
 			unitID, "waiting", false).
 		Order("created_at asc").
+		Find(&tickets).Error
+	return tickets, err
+}
+
+func (r *ticketRepository) GetInServiceTicketsWithSLA(unitID string) ([]models.Ticket, error) {
+	var tickets []models.Ticket
+	err := r.db.Preload("Service").
+		Where("unit_id = ? AND status = ? AND is_eod = ? AND max_service_time IS NOT NULL AND max_service_time > 0 AND confirmed_at IS NOT NULL",
+			unitID, "in_service", false).
+		Order("confirmed_at asc").
 		Find(&tickets).Error
 	return tickets, err
 }

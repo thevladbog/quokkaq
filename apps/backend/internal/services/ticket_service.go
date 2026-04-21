@@ -735,6 +735,12 @@ func (s *ticketService) UpdateStatus(ticketID, status string, actorUserID *strin
 			ticket.CompletedAt = &now
 		case "in_service":
 			ticket.ConfirmedAt = &now
+			// Snapshot the service-time SLA from the current leaf service.
+			if svc, svcErr := s.serviceRepo.FindByIDTx(tx, ticket.ServiceID); svcErr == nil {
+				if svc.MaxServiceTime != nil && *svc.MaxServiceTime > 0 {
+					ticket.MaxServiceTime = svc.MaxServiceTime
+				}
+			}
 		}
 
 		payload := map[string]interface{}{
@@ -942,6 +948,7 @@ func (s *ticketService) Transfer(ticketID string, in TransferTicketInput, actorU
 			ticket.CalledAt = nil
 			ticket.ConfirmedAt = nil
 			ticket.MaxWaitingTime = newSvc.MaxWaitingTime
+			ticket.MaxServiceTime = nil
 
 			payload := map[string]interface{}{
 				"transfer_kind":        "zone",
@@ -1050,6 +1057,7 @@ func (s *ticketService) Transfer(ticketID string, in TransferTicketInput, actorU
 		ticket.ServiceZoneID = targetCounter.ServiceZoneID
 		ticket.CalledAt = nil
 		ticket.ConfirmedAt = nil
+		ticket.MaxServiceTime = nil
 
 		payload := map[string]interface{}{
 			"transfer_kind":        "counter",
@@ -1198,6 +1206,7 @@ func (s *ticketService) ReturnToQueue(ticketID string, actorUserID *string) (*mo
 		ticket.CounterID = nil
 		ticket.CalledAt = nil
 		ticket.ConfirmedAt = nil
+		ticket.MaxServiceTime = nil
 
 		payload := map[string]interface{}{
 			"unit_id":     ticket.UnitID,

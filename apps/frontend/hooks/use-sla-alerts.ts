@@ -43,8 +43,7 @@ export function useSlaAlerts(unitId: string | null | undefined) {
   const t = useTranslations('supervisor.dashboardUi.sla');
   const [activeSlaAlerts, setActiveSlaAlerts] = useState<SlaAlertPayload[]>([]);
 
-  // Track which (ticketId, thresholdPct) pairs have already been toasted to
-  // prevent duplicate toasts when the component remounts.
+  // Track which (alertType, ticketId, thresholdPct) triples have been toasted.
   const seenRef = useRef<Set<string>>(new Set());
 
   // Request browser notification permission once on mount.
@@ -60,15 +59,32 @@ export function useSlaAlerts(unitId: string | null | undefined) {
 
   const handleAlert = useCallback(
     (payload: SlaAlertPayload, isBreach: boolean) => {
-      const key = `${payload.ticketId}:${payload.thresholdPct}`;
+      const alertType = payload.alertType ?? 'wait';
+      const key = `${alertType}:${payload.ticketId}:${payload.thresholdPct}`;
       if (seenRef.current.has(key)) return;
       seenRef.current.add(key);
 
       const elapsed = formatMinutes(payload.elapsedSec);
       const maxWait = formatMinutes(payload.maxWaitTimeSec);
 
-      const titleKey = isBreach ? 'breachTitle' : 'warningTitle';
-      const bodyKey = isBreach ? 'breachBody' : 'warningBody';
+      const isServiceAlert = alertType === 'service';
+
+      const titleKey = isBreach
+        ? isServiceAlert
+          ? 'serviceBreachTitle'
+          : 'breachTitle'
+        : isServiceAlert
+          ? 'serviceWarningTitle'
+          : 'warningTitle';
+
+      const bodyKey = isBreach
+        ? isServiceAlert
+          ? 'serviceBreachBody'
+          : 'breachBody'
+        : isServiceAlert
+          ? 'serviceWarningBody'
+          : 'warningBody';
+
       const title = t(titleKey, { queueNumber: payload.queueNumber });
       const body = t(bodyKey, {
         serviceName: payload.serviceName,
@@ -80,16 +96,14 @@ export function useSlaAlerts(unitId: string | null | undefined) {
         toast.error(title, {
           description: body,
           duration: Infinity,
-          id: `sla-breach-${payload.ticketId}`
+          id: `sla-breach-${alertType}-${payload.ticketId}`
         });
         playSlaBreachSound();
       } else {
-        const toastFn =
-          payload.thresholdPct >= 80 ? toast.warning : toast.warning;
-        toastFn(title, {
+        toast.warning(title, {
           description: body,
           duration: 10000,
-          id: `sla-warn-${payload.ticketId}-${payload.thresholdPct}`
+          id: `sla-warn-${alertType}-${payload.ticketId}-${payload.thresholdPct}`
         });
       }
 
@@ -100,7 +114,12 @@ export function useSlaAlerts(unitId: string | null | undefined) {
       );
 
       setActiveSlaAlerts((prev) => {
-        const existing = prev.findIndex((a) => a.ticketId === payload.ticketId);
+        // For the same ticket, track wait and service alerts independently.
+        const existing = prev.findIndex(
+          (a) =>
+            a.ticketId === payload.ticketId &&
+            (a.alertType ?? 'wait') === alertType
+        );
         if (existing >= 0) {
           const next = [...prev];
           next[existing] = payload;
@@ -109,15 +128,24 @@ export function useSlaAlerts(unitId: string | null | undefined) {
         return [...prev, payload];
       });
 
-      // Refresh the supervisor queue so the updated ticket wait times are visible.
+      // Refresh the supervisor queue so updated ticket times are visible.
       void queryClient.invalidateQueries({ queryKey: ['shift-queue', unitId] });
     },
     [t, queryClient, unitId]
   );
 
-  const dismissAlert = useCallback((ticketId: string) => {
-    setActiveSlaAlerts((prev) => prev.filter((a) => a.ticketId !== ticketId));
-  }, []);
+  const dismissAlert = useCallback(
+    (ticketId: string, alertType?: 'wait' | 'service') => {
+      setActiveSlaAlerts((prev) =>
+        prev.filter(
+          (a) =>
+            a.ticketId !== ticketId ||
+            (alertType !== undefined && (a.alertType ?? 'wait') !== alertType)
+        )
+      );
+    },
+    []
+  );
 
   const dismissAllAlerts = useCallback(() => {
     setActiveSlaAlerts([]);
@@ -130,13 +158,21 @@ export function useSlaAlerts(unitId: string | null | undefined) {
       handleAlert(data as SlaAlertPayload, false);
     const handleBreach = (data: unknown) =>
       handleAlert(data as SlaAlertPayload, true);
+    const handleServiceWarning = (data: unknown) =>
+      handleAlert(data as SlaAlertPayload, false);
+    const handleServiceBreach = (data: unknown) =>
+      handleAlert(data as SlaAlertPayload, true);
 
     socketClient.on('unit.sla_warning', handleWarning);
     socketClient.on('unit.sla_breach', handleBreach);
+    socketClient.on('unit.service_sla_warning', handleServiceWarning);
+    socketClient.on('unit.service_sla_breach', handleServiceBreach);
 
     return () => {
       socketClient.off('unit.sla_warning', handleWarning);
       socketClient.off('unit.sla_breach', handleBreach);
+      socketClient.off('unit.service_sla_warning', handleServiceWarning);
+      socketClient.off('unit.service_sla_breach', handleServiceBreach);
     };
   }, [unitId, handleAlert]);
 

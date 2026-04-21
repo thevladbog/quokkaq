@@ -122,8 +122,10 @@ export interface ModelsService {
   id?: string;
   imageUrl?: string;
   isLeaf?: boolean;
-  /** In seconds */
+  /** In seconds (queue-wait SLA) */
   maxWaitingTime?: number;
+  /** In seconds (service-time SLA — copied to Ticket.MaxServiceTime on in_service) */
+  maxServiceTime?: number;
   name?: string;
   nameEn?: string;
   nameRu?: string;
@@ -276,6 +278,8 @@ export interface ModelsTicket {
   lastCalledAt?: string;
   /** Snapshot from Service at creation */
   maxWaitingTime?: number;
+  /** Snapshot from Service at in_service; cleared on transfer/return */
+  maxServiceTime?: number;
   operatorComment?: string;
   /** No DB FK: avoids AutoMigrate cycle with pre_registrations.ticket_id → tickets.id */
   preRegistration?: ModelsPreRegistration;
