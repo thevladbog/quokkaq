@@ -841,10 +841,14 @@ export const ticketsApi = {
     return TicketModelSchema.parse(res.data);
   },
 
-  visitorCancel: async (id: string) => {
+  visitorCancel: async (id: string, visitorToken?: string) => {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+    if (visitorToken) headers['X-Visitor-Token'] = visitorToken;
     const res = await fetch(`${API_BASE_URL}/tickets/${id}/cancel`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
+      headers
     });
     if (!res.ok) {
       const body = await res.text();
@@ -854,10 +858,19 @@ export const ticketsApi = {
     return TicketModelSchema.parse(json);
   },
 
-  attachPhone: async (id: string, phone: string, locale?: string) => {
+  attachPhone: async (
+    id: string,
+    phone: string,
+    locale?: string,
+    visitorToken?: string
+  ) => {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+    if (visitorToken) headers['X-Visitor-Token'] = visitorToken;
     const res = await fetch(`${API_BASE_URL}/tickets/${id}/phone`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ phone, locale: locale ?? 'ru' })
     });
     if (!res.ok) {

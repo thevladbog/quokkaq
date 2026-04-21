@@ -7,18 +7,25 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 // SMSAeroProvider sends SMS via SMSAero.ru JSON API v2.
 // Docs: https://smsaero.ru/api/v2/
 type SMSAeroProvider struct {
-	email    string
-	apiKey   string
-	signName string
+	email      string
+	apiKey     string
+	signName   string
+	httpClient *http.Client
 }
 
 func NewSMSAeroProvider(email, apiKey, signName string) *SMSAeroProvider {
-	return &SMSAeroProvider{email: email, apiKey: apiKey, signName: signName}
+	return &SMSAeroProvider{
+		email:      email,
+		apiKey:     apiKey,
+		signName:   signName,
+		httpClient: &http.Client{Timeout: 15 * time.Second},
+	}
 }
 
 func (p *SMSAeroProvider) Name() string { return "smsaero" }
@@ -42,7 +49,7 @@ func (p *SMSAeroProvider) Send(to, body string) error {
 	req.SetBasicAuth(p.email, p.apiKey)
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := p.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("smsaero: request failed: %w", err)
 	}

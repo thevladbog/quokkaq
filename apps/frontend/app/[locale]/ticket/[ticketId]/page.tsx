@@ -159,11 +159,19 @@ export default function TicketPage() {
     };
   }, [ticketId, t, refreshTicket]);
 
+  const getVisitorToken = () =>
+    ticketId
+      ? (sessionStorage.getItem(`visitor_token_${ticketId}`) ?? undefined)
+      : undefined;
+
   const handleCancel = async () => {
     if (!ticketId) return;
     setCancelling(true);
     try {
-      const updated = await ticketsApi.visitorCancel(ticketId);
+      const updated = await ticketsApi.visitorCancel(
+        ticketId,
+        getVisitorToken()
+      );
       ticketRef.current = updated;
       setTicket(updated);
     } catch {
@@ -177,7 +185,12 @@ export default function TicketPage() {
     if (!ticketId || !smsPhone.trim()) return;
     setSmsSubmitting(true);
     try {
-      await ticketsApi.attachPhone(ticketId, smsPhone.trim(), locale);
+      await ticketsApi.attachPhone(
+        ticketId,
+        smsPhone.trim(),
+        locale,
+        getVisitorToken()
+      );
       setSmsSubmitted(true);
       toast.success(t('sms_optin_success'));
     } catch {

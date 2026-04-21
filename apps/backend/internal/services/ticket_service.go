@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +13,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"quokkaq-go-backend/internal/localeutil"
@@ -552,6 +555,7 @@ func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID 
 			PreRegistrationID: preRegID,
 			ClientID:          &resolvedClientID,
 			IsCredit:          isCredit,
+			VisitorToken:      uuid.New().String(),
 		}
 
 		payload := map[string]interface{}{
@@ -744,7 +748,7 @@ func (s *ticketService) CallNext(unitID, counterID string, serviceIDs []string, 
 
 	// Notify the new first-in-queue visitor that they're next (queue position = 1).
 	if s.notifService != nil {
-		go s.notifyNextInLine(ticket.UnitID, serviceIDs)
+		go s.notifyNextInLine(ticket.UnitID, serviceIDs, ticket.ServiceZoneID)
 	}
 
 	return ticket, nil
@@ -752,8 +756,9 @@ func (s *ticketService) CallNext(unitID, counterID string, serviceIDs []string, 
 
 // notifyNextInLine finds the current first-waiting ticket and sends a "you're next" SMS
 // if they have a phone. Called after a ticket is called (position of remaining tickets shifts).
-func (s *ticketService) notifyNextInLine(unitID string, serviceIDs []string) {
-	next, err := s.repo.FindWaiting(unitID, serviceIDs, nil)
+// zoneID scopes the lookup to the same service zone as the called ticket.
+func (s *ticketService) notifyNextInLine(unitID string, serviceIDs []string, zoneID *string) {
+	next, err := s.repo.FindWaiting(unitID, serviceIDs, zoneID)
 	if err != nil || next == nil {
 		return
 	}
@@ -902,7 +907,14 @@ func (s *ticketService) AttachPhoneToTicket(ticketID, phoneE164, locale string) 
 
 		// Link the client to the ticket.
 		ticket.ClientID = &c.ID
-		return s.repo.UpdateTx(tx, ticket)
+		if err := s.repo.UpdateTx(tx, ticket); err != nil {
+			return err
+		}
+		// Audit log: record phone attachment with a hashed phone number (no PII in history).
+		h := sha256.Sum256([]byte(phoneE164))
+		return s.writeTicketHistoryTx(tx, ticket.ID, nil, ticketaudit.ActionTicketPhoneAttached, map[string]interface{}{
+			"phone_sha256": hex.EncodeToString(h[:]),
+		})
 	})
 	if err != nil {
 		return nil, err
@@ -1016,7 +1028,7 @@ func (s *ticketService) Pick(ticketID, counterID string, actorUserID *string) (*
 	if s.notifService != nil {
 		go s.notifService.SendTicketCalledSMS(ticket)
 		// Notify the new first-in-queue visitor (parity with CallNext).
-		go s.notifyNextInLine(ticket.UnitID, nil)
+		go s.notifyNextInLine(ticket.UnitID, nil, ticket.ServiceZoneID)
 	}
 
 	return ticket, nil

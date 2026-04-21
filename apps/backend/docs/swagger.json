@@ -3695,6 +3695,10 @@
                     },
                     "unitId": {
                         "type": "string"
+                    },
+                    "visitorToken": {
+                        "description": "VisitorToken is a secret UUID issued at ticket creation. Visitor endpoints require it in\nthe X-Visitor-Token header to prevent IDOR on cancel and phone opt-in.",
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -16230,13 +16234,22 @@
         },
         "/tickets/{id}/cancel": {
             "post": {
-                "description": "Allows a visitor to cancel their own waiting ticket. Only tickets in 'waiting' status can be cancelled this way. No authentication required — the ticket UUID acts as a bearer token.",
+                "description": "Allows a visitor to cancel their own waiting ticket. Only tickets in 'waiting' status can be cancelled this way. Requires the X-Visitor-Token header matching the token issued at ticket creation.",
                 "operationId": "visitorCancelTicket",
                 "parameters": [
                     {
                         "description": "Ticket ID",
                         "in": "path",
                         "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Visitor ownership token",
+                        "in": "header",
+                        "name": "X-Visitor-Token",
                         "required": true,
                         "schema": {
                             "type": "string"
@@ -16253,6 +16266,16 @@
                             }
                         },
                         "description": "OK"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
                     },
                     "404": {
                         "content": {
@@ -16382,13 +16405,22 @@
         },
         "/tickets/{id}/phone": {
             "post": {
-                "description": "Associates a phone number with the visitor of a waiting ticket so they receive SMS notifications. Only valid while the ticket is in 'waiting' status. Normalizes and validates the phone to E.164 format.",
+                "description": "Associates a phone number with the visitor of a waiting ticket so they receive SMS notifications. Only valid while the ticket is in 'waiting' status. Normalizes and validates the phone to E.164 format. Requires X-Visitor-Token header.",
                 "operationId": "attachTicketPhone",
                 "parameters": [
                     {
                         "description": "Ticket ID",
                         "in": "path",
                         "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Visitor ownership token",
+                        "in": "header",
+                        "name": "X-Visitor-Token",
                         "required": true,
                         "schema": {
                             "type": "string"
@@ -16427,6 +16459,16 @@
                             }
                         },
                         "description": "Bad Request"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
                     },
                     "404": {
                         "content": {

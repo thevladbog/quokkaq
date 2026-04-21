@@ -131,9 +131,9 @@ func TestNewSMSProviderFromSettings_nilSettingsReturnsLog(t *testing.T) {
 	}
 }
 
-func TestNewSMSProviderFromSettings_disabledButProviderSetStillActivates(t *testing.T) {
-	// Per implementation: non-empty SmsProvider in DB activates SMS even when SmsEnabled=false.
-	// SmsEnabled=false is only effective when SmsProvider is also empty.
+func TestNewSMSProviderFromSettings_disabledOverridesProviderInDB(t *testing.T) {
+	// SmsEnabled=false must disable SMS even when a provider is configured in DB.
+	// Only SMS_PROVIDER env can bypass this flag.
 	t.Setenv("SMS_PROVIDER", "")
 	t.Setenv("SMS_API_KEY", "")
 	t.Setenv("SMS_API_SECRET", "")
@@ -143,8 +143,8 @@ func TestNewSMSProviderFromSettings_disabledButProviderSetStillActivates(t *test
 		SmsApiKey:   "key",
 	}
 	p := NewSMSProviderFromSettings(settings)
-	if p.Name() != "smsru" {
-		t.Errorf("non-empty provider in DB should activate SMS, got %q", p.Name())
+	if p.Name() != "log" {
+		t.Errorf("SmsEnabled=false must return log provider regardless of DB provider, got %q", p.Name())
 	}
 }
 

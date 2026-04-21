@@ -38,8 +38,10 @@ func NewSMSProviderFromSettings(s *models.DeploymentSaaSSettings) SMSProvider {
 	}
 	applySMSEnvOverrides(&cfg)
 
-	// Determine whether SMS is effectively enabled.
-	smsEnabled := (s != nil && s.SmsEnabled) || cfg.Provider != ""
+	// SMS_PROVIDER env override bypasses the SmsEnabled DB flag.
+	// Without env override, SmsEnabled=false disables SMS even when a provider is configured in DB.
+	envOverride := strings.TrimSpace(os.Getenv("SMS_PROVIDER")) != ""
+	smsEnabled := envOverride || (s != nil && s.SmsEnabled)
 	if !smsEnabled || cfg.Provider == "" {
 		return &LogSMSProvider{}
 	}
@@ -61,6 +63,15 @@ func applySMSEnvOverrides(cfg *SMSConfig) {
 	if v := strings.TrimSpace(os.Getenv("SMS_FROM_NAME")); v != "" && cfg.FromName == "" {
 		cfg.FromName = v
 	}
+}
+
+// MaskPhone replaces the middle digits of an E.164 number with asterisks, keeping the
+// country code prefix (first 2 chars) and the last 4 digits, e.g. "+7***1234".
+func MaskPhone(phone string) string {
+	if len(phone) <= 6 {
+		return "***"
+	}
+	return phone[:2] + "***" + phone[len(phone)-4:]
 }
 
 // NewSMSProviderFromConfig creates the correct provider from a config struct.

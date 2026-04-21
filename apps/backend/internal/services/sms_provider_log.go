@@ -9,6 +9,6 @@ type LogSMSProvider struct{}
 func (p *LogSMSProvider) Name() string { return "log" }
 
 func (p *LogSMSProvider) Send(to, body string) error {
-	slog.Info("SMS (log provider — not sent)", "to", to, "body", body)
+	slog.Debug("SMS (log provider — not sent)", "to", MaskPhone(to), "body_len", len(body))
 	return nil
 }

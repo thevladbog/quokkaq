@@ -740,20 +740,49 @@ func (h *TicketHandler) SetVisitorTags(w http.ResponseWriter, r *http.Request) {
 	RespondJSON(w, ticket)
 }
 
+// validateVisitorToken reads the X-Visitor-Token header, fetches the ticket by id, and returns
+// false (writing an appropriate HTTP error) if the token is absent or does not match.
+// Returns true when the token is valid and the handler may proceed.
+func (h *TicketHandler) validateVisitorToken(w http.ResponseWriter, r *http.Request, ticketID string) bool {
+	token := strings.TrimSpace(r.Header.Get("X-Visitor-Token"))
+	if token == "" {
+		http.Error(w, "X-Visitor-Token header is required", http.StatusForbidden)
+		return false
+	}
+	ticket, err := h.service.GetTicketByID(ticketID)
+	if err != nil {
+		http.Error(w, "ticket not found", http.StatusNotFound)
+		return false
+	}
+	if ticket.VisitorToken != token {
+		http.Error(w, "invalid visitor token", http.StatusForbidden)
+		return false
+	}
+	return true
+}
+
 // VisitorCancelTicket godoc
 // @ID           visitorCancelTicket
 // @Summary      Cancel a waiting ticket (visitor self-service)
-// @Description  Allows a visitor to cancel their own waiting ticket. Only tickets in 'waiting' status can be cancelled this way. No authentication required — the ticket UUID acts as a bearer token.
+// @Description  Allows a visitor to cancel their own waiting ticket. Only tickets in 'waiting' status can be cancelled this way. Requires the X-Visitor-Token header matching the token issued at ticket creation.
 // @Tags         tickets
 // @Produce      json
-// @Param        id  path      string  true  "Ticket ID"
+// @Param        id                path      string  true  "Ticket ID"
+// @Param        X-Visitor-Token   header    string  true  "Visitor ownership token"
 // @Success      200 {object}  models.Ticket
+// @Failure      403 {string}  string "Forbidden"
 // @Failure      404 {string}  string "Ticket not found"
 // @Failure      409 {string}  string "Ticket cannot be cancelled"
 // @Failure      500 {string}  string "Internal Server Error"
 // @Router       /tickets/{id}/cancel [post]
 func (h *TicketHandler) VisitorCancelTicket(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
+
+	// Validate visitor ownership token before mutating.
+	if !h.validateVisitorToken(w, r, id) {
+		return
+	}
+
 	ticket, err := h.service.VisitorCancelTicket(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -779,19 +808,26 @@ type AttachPhoneRequest struct {
 // AttachPhone godoc
 // @ID           attachTicketPhone
 // @Summary      Attach phone number to a ticket for SMS opt-in
-// @Description  Associates a phone number with the visitor of a waiting ticket so they receive SMS notifications. Only valid while the ticket is in 'waiting' status. Normalizes and validates the phone to E.164 format.
+// @Description  Associates a phone number with the visitor of a waiting ticket so they receive SMS notifications. Only valid while the ticket is in 'waiting' status. Normalizes and validates the phone to E.164 format. Requires X-Visitor-Token header.
 // @Tags         tickets
 // @Accept       json
 // @Produce      json
-// @Param        id      path      string              true  "Ticket ID"
-// @Param        request body      AttachPhoneRequest  true  "Phone opt-in request"
+// @Param        id                path      string              true  "Ticket ID"
+// @Param        X-Visitor-Token   header    string              true  "Visitor ownership token"
+// @Param        request           body      AttachPhoneRequest  true  "Phone opt-in request"
 // @Success      200     {object}  models.Ticket
 // @Failure      400     {string}  string "Bad Request"
+// @Failure      403     {string}  string "Forbidden"
 // @Failure      404     {string}  string "Ticket not found"
 // @Failure      409     {string}  string "Ticket no longer in waiting state"
 // @Router       /tickets/{id}/phone [post]
 func (h *TicketHandler) AttachPhone(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
+
+	// Validate visitor ownership token before accepting PII.
+	if !h.validateVisitorToken(w, r, id) {
+		return
+	}
 
 	var req AttachPhoneRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -824,6 +860,21 @@ func (h *TicketHandler) AttachPhone(w http.ResponseWriter, r *http.Request) {
 	if ticket.Status != "waiting" {
 		http.Error(w, "ticket is not in waiting state", http.StatusConflict)
 		return
+	}
+
+	// Enforce SMS feature gate before accepting PII.
+	if h.settingsSvc != nil && h.unitService != nil {
+		smsSettings, sErr := h.settingsSvc.GetIntegrationSettings()
+		if sErr != nil || services.NewSMSProviderFromSettings(smsSettings).Name() == "log" {
+			http.Error(w, "SMS notifications are not configured", http.StatusForbidden)
+			return
+		}
+		if unit, uErr := h.unitService.GetUnitByID(ticket.UnitID); uErr == nil {
+			if ok, _ := services.CompanyHasPlanFeature(unit.CompanyID, "visitor_notifications"); !ok {
+				http.Error(w, "visitor notifications feature not available on current plan", http.StatusForbidden)
+				return
+			}
+		}
 	}
 
 	updated, aErr := h.service.AttachPhoneToTicket(id, phoneE164, locale)
@@ -899,21 +950,23 @@ func (h *TicketHandler) JoinVirtualQueue(w http.ResponseWriter, r *http.Request)
 	unitID := chi.URLParam(r, "unitId")
 
 	// Check unit exists and has virtual queue enabled.
-	if h.unitService != nil {
-		unit, err := h.unitService.GetUnitByID(unitID)
-		if err != nil {
-			http.Error(w, "unit not found", http.StatusNotFound)
-			return
-		}
-		if !unitVirtualQueueEnabled(unit.Config) {
-			http.Error(w, "virtual queue is not enabled for this unit", http.StatusForbidden)
-			return
-		}
-		// Check plan feature.
-		if ok, fErr := services.CompanyHasPlanFeature(unit.CompanyID, "virtual_queue"); fErr != nil || !ok {
-			http.Error(w, "virtual queue feature not available on current plan", http.StatusForbidden)
-			return
-		}
+	if h.unitService == nil {
+		http.Error(w, "service unavailable", http.StatusInternalServerError)
+		return
+	}
+	unit, err := h.unitService.GetUnitByID(unitID)
+	if err != nil {
+		http.Error(w, "unit not found", http.StatusNotFound)
+		return
+	}
+	if !unitVirtualQueueEnabled(unit.Config) {
+		http.Error(w, "virtual queue is not enabled for this unit", http.StatusForbidden)
+		return
+	}
+	// Check plan feature.
+	if ok, fErr := services.CompanyHasPlanFeature(unit.CompanyID, "virtual_queue"); fErr != nil || !ok {
+		http.Error(w, "virtual queue feature not available on current plan", http.StatusForbidden)
+		return
 	}
 
 	var req VirtualQueueJoinRequest

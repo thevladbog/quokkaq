@@ -29,6 +29,7 @@ CREATE TABLE tickets (
 	id text PRIMARY KEY,
 	queue_number text NOT NULL,
 	unit_id text NOT NULL,
+	visitor_token text NOT NULL DEFAULT (lower(hex(randomblob(16)))),
 	service_zone_id text,
 	service_id text NOT NULL,
 	booking_id text,

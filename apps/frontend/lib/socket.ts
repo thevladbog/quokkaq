@@ -227,15 +227,13 @@ export class SocketClient {
   }
 
   onQueueSnapshot(callback: (data: QueueSnapshot) => void) {
-    this.on('queue.snapshot', (data) => callback(data as QueueSnapshot));
+    this.on('queue.snapshot', callback as Listener);
   }
 
   onSystemAlert(
     callback: (data: { message: string; severity: string }) => void
   ) {
-    this.on('system.alert', (data) =>
-      callback(data as { message: string; severity: string })
-    );
+    this.on('system.alert', callback as Listener);
   }
 
   onUnitEOD(
@@ -245,42 +243,66 @@ export class SocketClient {
       countersReleased: number;
     }) => void
   ) {
-    this.on('unit.eod', (data) =>
-      callback(
-        data as {
-          unitId: string;
-          ticketsMarked: number;
-          countersReleased: number;
-        }
-      )
-    );
+    this.on('unit.eod', callback as Listener);
   }
 
+  // Stores the Zod-parsing wrapper per original callback so offSla* can unsubscribe correctly.
+  private slaWrappers = new Map<(data: SlaAlertPayload) => void, Listener>();
+
   private onSlaEvent(event: string, callback: (data: SlaAlertPayload) => void) {
-    this.on(event, (data) => {
+    const wrapper: Listener = (data) => {
       const parsed = SlaAlertPayloadSchema.safeParse(data);
       if (!parsed.success) {
         logger.error('Invalid SLA WebSocket payload:', parsed.error);
         return;
       }
       callback(parsed.data);
-    });
+    };
+    this.slaWrappers.set(callback, wrapper);
+    this.on(event, wrapper);
+  }
+
+  private offSlaEvent(
+    event: string,
+    callback: (data: SlaAlertPayload) => void
+  ) {
+    const wrapper = this.slaWrappers.get(callback);
+    if (wrapper) {
+      this.off(event, wrapper);
+      this.slaWrappers.delete(callback);
+    }
   }
 
   onSlaWarning(callback: (data: SlaAlertPayload) => void) {
     this.onSlaEvent('unit.sla_warning', callback);
   }
 
+  offSlaWarning(callback: (data: SlaAlertPayload) => void) {
+    this.offSlaEvent('unit.sla_warning', callback);
+  }
+
   onSlaBreach(callback: (data: SlaAlertPayload) => void) {
     this.onSlaEvent('unit.sla_breach', callback);
+  }
+
+  offSlaBreach(callback: (data: SlaAlertPayload) => void) {
+    this.offSlaEvent('unit.sla_breach', callback);
   }
 
   onServiceSlaWarning(callback: (data: SlaAlertPayload) => void) {
     this.onSlaEvent('unit.service_sla_warning', callback);
   }
 
+  offServiceSlaWarning(callback: (data: SlaAlertPayload) => void) {
+    this.offSlaEvent('unit.service_sla_warning', callback);
+  }
+
   onServiceSlaBreach(callback: (data: SlaAlertPayload) => void) {
     this.onSlaEvent('unit.service_sla_breach', callback);
+  }
+
+  offServiceSlaBreach(callback: (data: SlaAlertPayload) => void) {
+    this.offSlaEvent('unit.service_sla_breach', callback);
   }
 
   // Emit events - Backend currently doesn't handle these, but keeping for compatibility

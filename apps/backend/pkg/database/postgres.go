@@ -2244,6 +2244,18 @@ ALTER TABLE unit_clients
 		return fmt.Errorf("failed to run v1.6.3_unit_clients_locale migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.6.4_ticket_visitor_token", func(db *gorm.DB) error {
+		// Add visitor_token to tickets: a secret UUID returned to the visitor at creation time.
+		// Used to authenticate visitor-facing mutating endpoints (cancel, phone opt-in).
+		return db.Exec(`
+ALTER TABLE tickets
+    ADD COLUMN IF NOT EXISTS visitor_token uuid NOT NULL DEFAULT gen_random_uuid();
+`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.6.4_ticket_visitor_token migration: %w", err)
+	}
+
 	fmt.Println("✅ All migrations completed successfully")
 	return nil
 }

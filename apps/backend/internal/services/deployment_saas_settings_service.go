@@ -75,10 +75,10 @@ func (s *DeploymentSaaSSettingsService) PatchIntegrationSettings(patch *Deployme
 	if patch.SmsProvider != nil {
 		merged.SmsProvider = *patch.SmsProvider
 	}
-	if patch.SmsApiKey != nil && *patch.SmsApiKey != "" {
+	if patch.SmsApiKey != nil {
 		merged.SmsApiKey = *patch.SmsApiKey
 	}
-	if patch.SmsApiSecret != nil && *patch.SmsApiSecret != "" {
+	if patch.SmsApiSecret != nil {
 		merged.SmsApiSecret = *patch.SmsApiSecret
 	}
 	if patch.SmsFromName != nil {

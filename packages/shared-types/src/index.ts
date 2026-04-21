@@ -547,6 +547,7 @@ export const TicketModelSchema = z.object({
   queuePosition: z.number().nullable().optional(),
   estimatedWaitSeconds: z.number().nullable().optional(),
   smsOptInAvailable: z.boolean().optional(),
+  visitorToken: z.string().optional(),
   service: z
     .object({
       id: z.string().optional(),

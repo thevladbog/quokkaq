@@ -24,6 +24,9 @@ type Ticket struct {
 	ID          string `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
 	QueueNumber string `gorm:"not null" json:"queueNumber"`
 	UnitID      string `gorm:"not null" json:"unitId"`
+	// VisitorToken is a secret UUID issued at ticket creation. Visitor endpoints require it in
+	// the X-Visitor-Token header to prevent IDOR on cancel and phone opt-in.
+	VisitorToken string `gorm:"not null;default:gen_random_uuid()" json:"visitorToken,omitempty"`
 	// ServiceZoneID: waiting pool within the subdivision; NULL = subdivision-wide pool.
 	ServiceZoneID     *string `json:"serviceZoneId,omitempty" gorm:"column:service_zone_id"`
 	ServiceID         string  `gorm:"not null" json:"serviceId"`

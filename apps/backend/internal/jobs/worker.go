@@ -154,7 +154,7 @@ func (w *jobWorker) handleSMSSend(ctx context.Context, t *asynq.Task) error {
 		return fmt.Errorf("sms:send unmarshal failed: %v: %w", err, asynq.SkipRetry)
 	}
 
-	applogger.InfoContext(ctx, "processing SMS send", "notification_id", p.NotificationID, "to", p.To)
+	applogger.InfoContext(ctx, "processing SMS send", "notification_id", p.NotificationID, "to", services.MaskPhone(p.To))
 
 	// Determine current attempt count from the notification row if repo is available.
 	attempts := 1
@@ -187,7 +187,7 @@ func (w *jobWorker) handleSMSSend(ctx context.Context, t *asynq.Task) error {
 	if sendErr != nil {
 		return fmt.Errorf("SMS send via %s failed: %w", provider.Name(), sendErr)
 	}
-	applogger.InfoContext(ctx, "SMS sent successfully", "provider", provider.Name(), "to", p.To)
+	applogger.InfoContext(ctx, "SMS sent successfully", "provider", provider.Name(), "to", services.MaskPhone(p.To))
 	return nil
 }
 

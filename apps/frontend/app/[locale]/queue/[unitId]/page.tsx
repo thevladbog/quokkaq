@@ -88,6 +88,12 @@ export default function VirtualQueuePage() {
         phone: phone.trim() || undefined,
         locale
       });
+      if (result.ticket.visitorToken) {
+        sessionStorage.setItem(
+          `visitor_token_${result.ticket.id}`,
+          result.ticket.visitorToken
+        );
+      }
       router.push(
         result.ticketPageUrl || `/${locale}/ticket/${result.ticket.id}`
       );

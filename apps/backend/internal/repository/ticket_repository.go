@@ -757,13 +757,13 @@ func (r *ticketRepository) GetRecentCompletedServiceTimes(unitID, serviceID stri
 
 func (r *ticketRepository) GetQueuePosition(ticket *models.Ticket) (int, error) {
 	var count int64
-	err := r.db.Model(&models.Ticket{}).
+	query := r.db.Model(&models.Ticket{}).
 		Where(
 			"unit_id = ? AND status = 'waiting' AND is_eod = false AND (priority > ? OR (priority = ? AND created_at < ?))",
 			ticket.UnitID, ticket.Priority, ticket.Priority, ticket.CreatedAt,
-		).
-		Count(&count).Error
-	if err != nil {
+		)
+	query = applyWaitingPoolFilter(query, ticket.ServiceZoneID)
+	if err := query.Count(&count).Error; err != nil {
 		return 0, err
 	}
 	return int(count) + 1, nil
