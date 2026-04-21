@@ -219,7 +219,7 @@ func run() error {
 	shiftHandler := handlers.NewShiftHandler(shiftService, operationalService)
 	statisticsHandler := handlers.NewStatisticsHandler(statsService, userRepo, unitRepo)
 	statisticsExportHandler := handlers.NewStatisticsExportHandler(statsService, userRepo, unitRepo)
-	operatorSkillHandler := handlers.NewOperatorSkillHandler(operatorSkillRepo, userRepo, unitRepo)
+	operatorSkillHandler := handlers.NewOperatorSkillHandler(operatorSkillRepo, userRepo, serviceRepo)
 	operationsHandler := handlers.NewOperationsHandler(operationalService, userRepo, auditLogRepo)
 	templateHandler := handlers.NewTemplateHandler(templateService, userRepo)
 	invitationHandler := handlers.NewInvitationHandler(invitationService, userRepo)
@@ -591,7 +591,11 @@ func run() error {
 			r.Get("/{unitId}/statistics/staff-performance/{userId}", statisticsHandler.GetStaffPerformanceDetail)
 			r.Get("/{unitId}/statistics/staffing-forecast", statisticsHandler.GetStaffingForecast)
 			r.Get("/{unitId}/statistics/export/pdf", statisticsExportHandler.ExportPDF)
-			// Operator skill management
+		})
+
+		r.Group(func(r chi.Router) {
+			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
+			r.Use(authmiddleware.RequireUnitPermission(userRepo, tenantRBACRepo, unitRepo, "unitId", rbac.PermUnitSettingsManage))
 			r.Get("/{unitId}/operator-skills", operatorSkillHandler.ListOperatorSkills)
 			r.Put("/{unitId}/operator-skills", operatorSkillHandler.UpsertOperatorSkills)
 			r.Delete("/{unitId}/operator-skills/{skillId}", operatorSkillHandler.DeleteOperatorSkill)

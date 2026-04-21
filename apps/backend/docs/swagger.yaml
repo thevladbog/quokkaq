@@ -1167,6 +1167,8 @@ components:
                     items:
                         $ref: '#/components/schemas/handlers.operatorSkillInput'
                     type: array
+            required:
+                - skills
             type: object
         handlers.companyMeResponse:
             properties:
@@ -1249,11 +1251,17 @@ components:
         handlers.operatorSkillInput:
             properties:
                 priority:
+                    maximum: 3
+                    minimum: 1
                     type: integer
                 serviceId:
                     type: string
                 userId:
                     type: string
+            required:
+                - priority
+                - serviceId
+                - userId
             type: object
         handlers.patchCompanySlugRequest:
             properties:
@@ -12651,7 +12659,7 @@ paths:
                     type: string
             requestBody:
                 content:
-                    '*/*':
+                    application/json:
                         schema:
                             $ref: '#/components/schemas/handlers.bulkUpsertSkillsRequest'
                 description: Skills to upsert

@@ -110,6 +110,9 @@ func (PanicUserRepo) ShiftJournalSeesAllActivity(string, string) (bool, error) {
 func (PanicUserRepo) HasUnitBranchAccess(string, string) (bool, error) {
 	panic("unexpected")
 }
+func (PanicUserRepo) CountUsersWithMembershipInUnitBranch(string, []string) (int64, error) {
+	panic("unexpected")
+}
 func (PanicUserRepo) UserHasEffectiveAccess(string) (bool, error)             { panic("unexpected") }
 func (PanicUserRepo) RecomputeUserIsActive(context.Context, string) error     { panic("unexpected") }
 func (PanicUserRepo) Transaction(context.Context, func(*gorm.DB) error) error { panic("unexpected") }

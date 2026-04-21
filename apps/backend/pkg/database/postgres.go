@@ -2285,7 +2285,7 @@ CREATE INDEX IF NOT EXISTS idx_operator_skills_unit_user ON operator_skills (uni
 		// Enables accurate per-operator CSAT aggregation and staff performance analytics.
 		return db.Exec(`
 ALTER TABLE tickets
-    ADD COLUMN IF NOT EXISTS served_by_user_id uuid;
+    ADD COLUMN IF NOT EXISTS served_by_user_id text;
 `).Error
 	})
 	if err != nil {

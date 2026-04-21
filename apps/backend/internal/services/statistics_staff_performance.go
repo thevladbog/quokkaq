@@ -205,10 +205,16 @@ ORDER BY actor_user_id
 SELECT
   user_id::text AS user_id,
   SUM(CASE WHEN kind = 'break' THEN
-    EXTRACT(EPOCH FROM (COALESCE(ended_at, NOW()) - started_at)) / 60.0
+    EXTRACT(EPOCH FROM (
+      LEAST(COALESCE(ended_at, NOW()), ?::timestamptz)
+      - GREATEST(started_at, ?::timestamptz)
+    )) / 60.0
     ELSE 0 END) AS total_break_min,
   SUM(CASE WHEN kind = 'idle' THEN
-    EXTRACT(EPOCH FROM (COALESCE(ended_at, NOW()) - started_at)) / 60.0
+    EXTRACT(EPOCH FROM (
+      LEAST(COALESCE(ended_at, NOW()), ?::timestamptz)
+      - GREATEST(started_at, ?::timestamptz)
+    )) / 60.0
     ELSE 0 END) AS total_idle_min
 FROM counter_operator_intervals
 WHERE unit_id::text = ?
@@ -217,7 +223,7 @@ WHERE unit_id::text = ?
   AND started_at < ?::timestamptz
   AND COALESCE(ended_at, NOW()) > ?::timestamptz
 GROUP BY user_id
-`, subdivisionID, targetIDs, endUTC, startUTC).Scan(&intervalBatch).Error
+`, endUTC, startUTC, endUTC, startUTC, subdivisionID, targetIDs, endUTC, startUTC).Scan(&intervalBatch).Error
 	intervalByUser := make(map[string]intervalBatchRow, len(intervalBatch))
 	for _, r := range intervalBatch {
 		intervalByUser[r.UserID] = r

@@ -1731,6 +1731,9 @@
                         "type": "array"
                     }
                 },
+                "required": [
+                    "skills"
+                ],
                 "type": "object"
             },
             "handlers.companyMeResponse": {
@@ -1852,6 +1855,8 @@
             "handlers.operatorSkillInput": {
                 "properties": {
                     "priority": {
+                        "maximum": 3,
+                        "minimum": 1,
                         "type": "integer"
                     },
                     "serviceId": {
@@ -1861,6 +1866,11 @@
                         "type": "string"
                     }
                 },
+                "required": [
+                    "priority",
+                    "serviceId",
+                    "userId"
+                ],
                 "type": "object"
             },
             "handlers.patchCompanySlugRequest": {
@@ -20164,7 +20174,7 @@
                 ],
                 "requestBody": {
                     "content": {
-                        "*/*": {
+                        "application/json": {
                             "schema": {
                                 "$ref": "#/components/schemas/handlers.bulkUpsertSkillsRequest"
                             }

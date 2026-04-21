@@ -1070,13 +1070,17 @@ export interface HandlersAddSupportReportShareRequest {
 }
 
 export interface HandlersOperatorSkillInput {
-  priority?: number;
-  serviceId?: string;
-  userId?: string;
+  /**
+     * @minimum 1
+     * @maximum 3
+     */
+  priority: number;
+  serviceId: string;
+  userId: string;
 }
 
 export interface HandlersBulkUpsertSkillsRequest {
-  skills?: HandlersOperatorSkillInput[];
+  skills: HandlersOperatorSkillInput[];
 }
 
 /**
@@ -3991,7 +3995,7 @@ export const upsertUnitOperatorSkills = async (unitId: string,
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': '*/*', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(
       handlersBulkUpsertSkillsRequest,)
   }

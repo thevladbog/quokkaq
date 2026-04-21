@@ -5,9 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/models"
-	"quokkaq-go-backend/internal/rbac"
 	"quokkaq-go-backend/internal/repository"
 
 	"github.com/go-chi/chi/v5"
@@ -15,40 +13,17 @@ import (
 
 // OperatorSkillHandler serves CRUD endpoints for operator-service skill mappings.
 type OperatorSkillHandler struct {
-	skillRepo repository.OperatorSkillRepository
-	userRepo  repository.UserRepository
-	unitRepo  repository.UnitRepository
+	skillRepo   repository.OperatorSkillRepository
+	userRepo    repository.UserRepository
+	serviceRepo repository.ServiceRepository
 }
 
 func NewOperatorSkillHandler(
 	skillRepo repository.OperatorSkillRepository,
 	userRepo repository.UserRepository,
-	unitRepo repository.UnitRepository,
+	serviceRepo repository.ServiceRepository,
 ) *OperatorSkillHandler {
-	return &OperatorSkillHandler{skillRepo: skillRepo, userRepo: userRepo, unitRepo: unitRepo}
-}
-
-// requireUnitSkillsManage checks that the caller has PermUnitSettingsManage on the given unit.
-func (h *OperatorSkillHandler) requireUnitSkillsManage(r *http.Request, unitID string) (bool, string) {
-	viewerID, ok := middleware.GetUserIDFromContext(r.Context())
-	if !ok || viewerID == "" {
-		return false, ""
-	}
-	user, err := h.userRepo.FindByID(r.Context(), viewerID)
-	if err != nil {
-		return false, ""
-	}
-	if repository.UserHasCanonicalUnitPermission(user, unitID, rbac.PermUnitSettingsManage) {
-		return true, viewerID
-	}
-	// Tenant admins bypass unit-level checks.
-	for _, ur := range user.Roles {
-		switch ur.Role.Name {
-		case "admin", "platform_admin":
-			return true, viewerID
-		}
-	}
-	return false, viewerID
+	return &OperatorSkillHandler{skillRepo: skillRepo, userRepo: userRepo, serviceRepo: serviceRepo}
 }
 
 // ListOperatorSkills godoc
@@ -67,11 +42,6 @@ func (h *OperatorSkillHandler) requireUnitSkillsManage(r *http.Request, unitID s
 // @Router       /units/{unitId}/operator-skills [get]
 func (h *OperatorSkillHandler) ListOperatorSkills(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
-	allowed, _ := h.requireUnitSkillsManage(r, unitID)
-	if !allowed {
-		http.Error(w, "Forbidden", http.StatusForbidden)
-		return
-	}
 
 	filterUser := strings.TrimSpace(r.URL.Query().Get("userId"))
 	filterService := strings.TrimSpace(r.URL.Query().Get("serviceId"))
@@ -94,14 +64,14 @@ func (h *OperatorSkillHandler) ListOperatorSkills(w http.ResponseWriter, r *http
 
 // bulkUpsertSkillsRequest is the body for bulk upsert.
 type bulkUpsertSkillsRequest struct {
-	Skills []operatorSkillInput `json:"skills"`
+	Skills []operatorSkillInput `json:"skills" binding:"required"`
 }
 
 // operatorSkillInput is a single mapping to insert/update.
 type operatorSkillInput struct {
-	UserID    string `json:"userId"`
-	ServiceID string `json:"serviceId"`
-	Priority  int    `json:"priority"`
+	UserID    string `json:"userId" binding:"required"`
+	ServiceID string `json:"serviceId" binding:"required"`
+	Priority  int    `json:"priority" binding:"required,min=1,max=3"`
 }
 
 // UpsertOperatorSkills godoc
@@ -110,6 +80,7 @@ type operatorSkillInput struct {
 // @Description  Insert or update (on conflict: update priority) multiple operator-service mappings for a unit.
 // @Tags         operator-skills
 // @Security     BearerAuth
+// @Accept       json
 // @Param        unitId path   string              true "Subdivision unit ID"
 // @Param        body   body   bulkUpsertSkillsRequest true "Skills to upsert"
 // @Success      204
@@ -120,11 +91,6 @@ type operatorSkillInput struct {
 // @Router       /units/{unitId}/operator-skills [put]
 func (h *OperatorSkillHandler) UpsertOperatorSkills(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
-	allowed, _ := h.requireUnitSkillsManage(r, unitID)
-	if !allowed {
-		http.Error(w, "Forbidden", http.StatusForbidden)
-		return
-	}
 
 	var req bulkUpsertSkillsRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -136,6 +102,8 @@ func (h *OperatorSkillHandler) UpsertOperatorSkills(w http.ResponseWriter, r *ht
 		return
 	}
 
+	userIDs := make(map[string]struct{})
+	serviceIDs := make(map[string]struct{})
 	skills := make([]models.OperatorSkill, 0, len(req.Skills))
 	for _, s := range req.Skills {
 		uid := strings.TrimSpace(s.UserID)
@@ -148,12 +116,42 @@ func (h *OperatorSkillHandler) UpsertOperatorSkills(w http.ResponseWriter, r *ht
 		if p < 1 || p > 3 {
 			p = 1
 		}
+		userIDs[uid] = struct{}{}
+		serviceIDs[sid] = struct{}{}
 		skills = append(skills, models.OperatorSkill{
 			UnitID:    unitID,
 			UserID:    uid,
 			ServiceID: sid,
 			Priority:  p,
 		})
+	}
+
+	uniqUsers := make([]string, 0, len(userIDs))
+	for u := range userIDs {
+		uniqUsers = append(uniqUsers, u)
+	}
+	uniqServices := make([]string, 0, len(serviceIDs))
+	for sid := range serviceIDs {
+		uniqServices = append(uniqServices, sid)
+	}
+
+	nUsers, err := h.userRepo.CountUsersWithMembershipInUnitBranch(unitID, uniqUsers)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if nUsers != int64(len(uniqUsers)) {
+		http.Error(w, "one or more userIds are not members of this unit", http.StatusBadRequest)
+		return
+	}
+	nSvcs, err := h.serviceRepo.CountByUnitSubtreeAndIDs(unitID, uniqServices)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if nSvcs != int64(len(uniqServices)) {
+		http.Error(w, "one or more serviceIds do not belong to this unit", http.StatusBadRequest)
+		return
 	}
 
 	if err := h.skillRepo.UpsertBulk(skills); err != nil {
@@ -178,11 +176,6 @@ func (h *OperatorSkillHandler) UpsertOperatorSkills(w http.ResponseWriter, r *ht
 func (h *OperatorSkillHandler) DeleteOperatorSkill(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
 	skillID := chi.URLParam(r, "skillId")
-	allowed, _ := h.requireUnitSkillsManage(r, unitID)
-	if !allowed {
-		http.Error(w, "Forbidden", http.StatusForbidden)
-		return
-	}
 	if err := h.skillRepo.DeleteByID(unitID, skillID); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

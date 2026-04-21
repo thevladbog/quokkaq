@@ -211,11 +211,13 @@ export function OperatorSkillMatrix({
               <SelectValue placeholder={t('operator_skills.select_operator')} />
             </SelectTrigger>
             <SelectContent>
-              {actors.map((a) => (
-                <SelectItem key={a.userId} value={a.userId ?? ''}>
-                  {a.name ?? a.userId}
-                </SelectItem>
-              ))}
+              {actors
+                .filter((a) => Boolean(a.userId))
+                .map((a) => (
+                  <SelectItem key={a.userId} value={a.userId!}>
+                    {a.name ?? a.userId}
+                  </SelectItem>
+                ))}
             </SelectContent>
           </Select>
           <Select value={newServiceId} onValueChange={setNewServiceId}>
@@ -223,11 +225,13 @@ export function OperatorSkillMatrix({
               <SelectValue placeholder={t('operator_skills.select_service')} />
             </SelectTrigger>
             <SelectContent>
-              {services.map((s) => (
-                <SelectItem key={s.id} value={s.id ?? ''}>
-                  {s.name ?? s.id}
-                </SelectItem>
-              ))}
+              {services
+                .filter((s) => Boolean(s.id))
+                .map((s) => (
+                  <SelectItem key={s.id} value={s.id!}>
+                    {s.name ?? s.id}
+                  </SelectItem>
+                ))}
             </SelectContent>
           </Select>
           <Select

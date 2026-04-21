@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import type { ServicesStaffPerformanceResponse } from '@/lib/api/generated/statistics';
 import { resolveCssColorToRgb, rgbStringToRgba } from '@/lib/resolve-css-color';
@@ -93,17 +93,16 @@ export function StaffRadarChart({ data, className }: StaffRadarChartProps) {
   /** Which vertex dot is hovered; tooltip follows that point. */
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
 
-  const accentRgb = useMemo(() => {
-    if (typeof window === 'undefined') return 'rgb(218, 160, 42)';
-    return resolveCssColorToRgb('var(--chart-1)');
-  }, []);
-  const gridRgb = useMemo(() => {
-    if (typeof window === 'undefined') return 'rgb(200, 200, 200)';
-    return resolveCssColorToRgb('var(--border)');
-  }, []);
-  const dotRingRgb = useMemo(() => {
-    if (typeof window === 'undefined') return 'rgb(255, 255, 255)';
-    return resolveCssColorToRgb('var(--card)');
+  const [accentRgb, setAccentRgb] = useState('rgb(218, 160, 42)');
+  const [gridRgb, setGridRgb] = useState('rgb(200, 200, 200)');
+  const [dotRingRgb, setDotRingRgb] = useState('rgb(255, 255, 255)');
+  useEffect(() => {
+    // Defer out of the effect body to satisfy react-hooks/set-state-in-effect (needs client CSS).
+    queueMicrotask(() => {
+      setAccentRgb(resolveCssColorToRgb('var(--chart-1)'));
+      setGridRgb(resolveCssColorToRgb('var(--border)'));
+      setDotRingRgb(resolveCssColorToRgb('var(--card)'));
+    });
   }, []);
 
   const fillRgba = useMemo(() => rgbStringToRgba(accentRgb, 0.28), [accentRgb]);

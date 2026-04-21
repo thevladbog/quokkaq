@@ -555,9 +555,15 @@ func (s *counterService) CallNext(counterID string, serviceIDs []string, actorUs
 func (s *counterService) findNextTicketForCounterTx(tx *gorm.DB, unitID string, serviceIDs []string, c *models.Counter) (*models.Ticket, bool, string, []string, error) {
 	if s.operatorSkillRepo != nil && c.AssignedTo != nil {
 		unit, err := s.unitRepo.FindByIDLight(unitID)
-		if err == nil && unit.SkillBasedRoutingEnabled {
+		if err != nil {
+			return nil, false, "", nil, err
+		}
+		if unit.SkillBasedRoutingEnabled {
 			skillIDs, serr := s.operatorSkillRepo.ListSkillServiceIDsForOperator(unitID, *c.AssignedTo)
-			if serr == nil && len(skillIDs) > 0 {
+			if serr != nil {
+				return nil, false, "", nil, serr
+			}
+			if len(skillIDs) > 0 {
 				filtered := filterSkillIDsByServiceFilter(skillIDs, serviceIDs)
 				if len(filtered) > 0 {
 					t, err := s.ticketRepo.FindWaitingWithSkillsTx(tx, unitID, filtered, c.ServiceZoneID)

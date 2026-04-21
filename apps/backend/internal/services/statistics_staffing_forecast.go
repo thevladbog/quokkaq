@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"math"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -70,7 +71,18 @@ func (s *StatisticsService) GetStaffingForecast(ctx context.Context, unitID, com
 	}
 	p = applyForecastDefaults(p)
 
-	targetDate, err := time.Parse("2006-01-02", p.TargetDate)
+	tzName := "UTC"
+	if name, tzErr := s.loadSubdivisionTimezoneName(ctx, unitID); tzErr == nil {
+		name = strings.TrimSpace(name)
+		if name != "" {
+			tzName = name
+		}
+	}
+	loc := time.UTC
+	if l, lErr := time.LoadLocation(tzName); lErr == nil && l != nil {
+		loc = l
+	}
+	targetDate, err := time.ParseInLocation("2006-01-02", p.TargetDate, loc)
 	if err != nil {
 		return nil, errors.New("invalid targetDate: must be YYYY-MM-DD")
 	}
@@ -83,7 +95,7 @@ func (s *StatisticsService) GetStaffingForecast(ctx context.Context, unitID, com
 	}
 
 	// Query hourly arrival counts AND avg service time per hour for those sample dates.
-	rows, err := queryHourlyArrivals(ctx, s.db, unitID, sampleDates)
+	rows, err := queryHourlyArrivals(ctx, s.db, unitID, tzName, sampleDates)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +146,7 @@ func applyForecastDefaults(p StaffingForecastParams) StaffingForecastParams {
 	if p.TargetDate == "" {
 		p.TargetDate = time.Now().AddDate(0, 0, 1).Format("2006-01-02")
 	}
-	if p.TargetSLAPercent <= 0 {
+	if p.TargetSLAPercent <= 0 || p.TargetSLAPercent >= 100 {
 		p.TargetSLAPercent = 90.0
 	}
 	if p.TargetMaxWaitMin <= 0 {
@@ -168,19 +180,16 @@ func historicalSameDayDates(targetDate time.Time, weekday time.Weekday, n int) [
 
 // queryHourlyArrivals aggregates avg ticket arrivals per hour (and avg service time) from
 // historical sample dates for the given unit.
-func queryHourlyArrivals(ctx context.Context, db *gorm.DB, unitID string, sampleDates []string) ([]hourlyArrivalRow, error) {
-	// We cast created_at to the local day by truncating to hour, then group by hour-of-day
-	// and average across the sample dates.
-	//
-	// The CTE partitions by (sample_date, hour) counting arrivals per day per hour,
-	// then we average counts across the sample dates for each hour.
-	//
-	// We LEFT JOIN tickets (completed) to get avg service time from completed_at - called_at.
+func queryHourlyArrivals(ctx context.Context, db *gorm.DB, unitID, tzName string, sampleDates []string) ([]hourlyArrivalRow, error) {
+	if strings.TrimSpace(tzName) == "" {
+		tzName = "UTC"
+	}
+	// Bucket by subdivision-local calendar day and hour (same semantics as statistics_hourly).
 	query := `
 WITH daily_hourly AS (
     SELECT
-        t.created_at::date                          AS sample_date,
-        EXTRACT(HOUR FROM t.created_at)::int        AS hour,
+        (t.created_at AT TIME ZONE ?)::date                          AS sample_date,
+        EXTRACT(HOUR FROM (t.created_at AT TIME ZONE ?))::int        AS hour,
         COUNT(*)                                     AS arrivals,
         AVG(
             CASE
@@ -190,7 +199,7 @@ WITH daily_hourly AS (
         )                                            AS avg_svc_min
     FROM tickets t
     WHERE t.unit_id = ?
-      AND t.created_at::date IN (?)
+      AND (t.created_at AT TIME ZONE ?)::date IN (?)
     GROUP BY sample_date, hour
 )
 SELECT
@@ -202,7 +211,7 @@ GROUP BY hour
 ORDER BY hour
 `
 	var rows []hourlyArrivalRow
-	err := db.WithContext(ctx).Raw(query, unitID, sampleDates).Scan(&rows).Error
+	err := db.WithContext(ctx).Raw(query, tzName, tzName, unitID, tzName, sampleDates).Scan(&rows).Error
 	if err != nil {
 		return nil, err
 	}

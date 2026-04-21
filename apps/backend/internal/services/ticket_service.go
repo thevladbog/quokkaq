@@ -781,9 +781,15 @@ func (s *ticketService) CallNext(unitID, counterID string, serviceIDs []string, 
 func (s *ticketService) findNextTicketTx(tx *gorm.DB, unitID string, serviceIDs []string, c *models.Counter) (*models.Ticket, bool, string, []string, error) {
 	if s.operatorSkillRepo != nil && c.AssignedTo != nil {
 		unit, err := s.unitRepo.FindByIDLight(unitID)
-		if err == nil && unit.SkillBasedRoutingEnabled {
+		if err != nil {
+			return nil, false, "", nil, err
+		}
+		if unit.SkillBasedRoutingEnabled {
 			skillIDs, serr := s.operatorSkillRepo.ListSkillServiceIDsForOperator(unitID, *c.AssignedTo)
-			if serr == nil && len(skillIDs) > 0 {
+			if serr != nil {
+				return nil, false, "", nil, serr
+			}
+			if len(skillIDs) > 0 {
 				// Intersect with caller-supplied serviceIDs filter when non-empty.
 				filtered := filterSkillIDsByServiceFilter(skillIDs, serviceIDs)
 				if len(filtered) > 0 {
