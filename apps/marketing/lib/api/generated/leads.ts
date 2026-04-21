@@ -767,9 +767,20 @@ export interface HandlersPublicLeadRequestBody {
   source?: string;
 }
 
+/**
+ * Error is always "quota_exceeded".
+ */
+export type HandlersQuotaExceededErrorError = typeof HandlersQuotaExceededErrorError[keyof typeof HandlersQuotaExceededErrorError];
+
+
+export const HandlersQuotaExceededErrorError = {
+  quota_exceeded: 'quota_exceeded',
+} as const;
+
 export interface HandlersQuotaExceededError {
-  error?: string;
-  message?: string;
+  /** Error is always "quota_exceeded". */
+  error: HandlersQuotaExceededErrorError;
+  message: string;
   metric?: string;
 }
 
@@ -961,10 +972,10 @@ export interface HandlersAddSupportReportShareRequest {
 }
 
 /**
- * PricingModel determines how the price field is interpreted:
-  "flat"     – fixed price per billing period (legacy default)
+ * PricingModel determines how the price field is interpreted.
+Default: "per_unit".
   "per_unit" – price per subdivision per billing period; total = price * active_subdivisions
-PricingModel: flat = fixed price per billing period; per_unit = price per subdivision per period
+  "flat"     – fixed price per billing period (legacy; use only for grandfathered plans)
 enums: flat,per_unit
  */
 export type ModelsSubscriptionPlanPricingModel = typeof ModelsSubscriptionPlanPricingModel[keyof typeof ModelsSubscriptionPlanPricingModel];
@@ -1021,10 +1032,10 @@ export interface ModelsSubscriptionPlan {
   nameEn?: string;
   /** price in minor units (cents/kopeks) */
   price?: number;
-  /** PricingModel determines how the price field is interpreted:
-    "flat"     – fixed price per billing period (legacy default)
+  /** PricingModel determines how the price field is interpreted.
+  Default: "per_unit".
     "per_unit" – price per subdivision per billing period; total = price * active_subdivisions
-  PricingModel: flat = fixed price per billing period; per_unit = price per subdivision per period
+    "flat"     – fixed price per billing period (legacy; use only for grandfathered plans)
   enums: flat,per_unit */
   pricingModel?: ModelsSubscriptionPlanPricingModel;
   updatedAt?: string;

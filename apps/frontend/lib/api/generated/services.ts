@@ -786,9 +786,20 @@ export interface HandlersPublicLeadRequestBody {
   source?: string;
 }
 
+/**
+ * Error is always "quota_exceeded".
+ */
+export type HandlersQuotaExceededErrorError = typeof HandlersQuotaExceededErrorError[keyof typeof HandlersQuotaExceededErrorError];
+
+
+export const HandlersQuotaExceededErrorError = {
+  quota_exceeded: 'quota_exceeded',
+} as const;
+
 export interface HandlersQuotaExceededError {
-  error?: string;
-  message?: string;
+  /** Error is always "quota_exceeded". */
+  error: HandlersQuotaExceededErrorError;
+  message: string;
   metric?: string;
 }
 
@@ -980,10 +991,10 @@ export interface HandlersAddSupportReportShareRequest {
 }
 
 /**
- * PricingModel determines how the price field is interpreted:
-  "flat"     – fixed price per billing period (legacy default)
+ * PricingModel determines how the price field is interpreted.
+Default: "per_unit".
   "per_unit" – price per subdivision per billing period; total = price * active_subdivisions
-PricingModel: flat = fixed price per billing period; per_unit = price per subdivision per period
+  "flat"     – fixed price per billing period (legacy; use only for grandfathered plans)
 enums: flat,per_unit
  */
 export type ModelsSubscriptionPlanPricingModel = typeof ModelsSubscriptionPlanPricingModel[keyof typeof ModelsSubscriptionPlanPricingModel];
@@ -1040,10 +1051,10 @@ export interface ModelsSubscriptionPlan {
   nameEn?: string;
   /** price in minor units (cents/kopeks) */
   price?: number;
-  /** PricingModel determines how the price field is interpreted:
-    "flat"     – fixed price per billing period (legacy default)
+  /** PricingModel determines how the price field is interpreted.
+  Default: "per_unit".
     "per_unit" – price per subdivision per billing period; total = price * active_subdivisions
-  PricingModel: flat = fixed price per billing period; per_unit = price per subdivision per period
+    "flat"     – fixed price per billing period (legacy; use only for grandfathered plans)
   enums: flat,per_unit */
   pricingModel?: ModelsSubscriptionPlanPricingModel;
   updatedAt?: string;
@@ -2219,51 +2230,51 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
  * Creates a new service for a unit
  * @summary Create a new service
  */
-export type postServicesResponse201 = {
+export type createServiceResponse201 = {
   data: ModelsService
   status: 201
 }
 
-export type postServicesResponse400 = {
+export type createServiceResponse400 = {
   data: string
   status: 400
 }
 
-export type postServicesResponse401 = {
+export type createServiceResponse401 = {
   data: string
   status: 401
 }
 
-export type postServicesResponse402 = {
+export type createServiceResponse402 = {
   data: HandlersQuotaExceededError
   status: 402
 }
 
-export type postServicesResponse403 = {
+export type createServiceResponse403 = {
   data: string
   status: 403
 }
 
-export type postServicesResponse409 = {
+export type createServiceResponse409 = {
   data: string
   status: 409
 }
 
-export type postServicesResponse500 = {
+export type createServiceResponse500 = {
   data: string
   status: 500
 }
 
-export type postServicesResponseSuccess = (postServicesResponse201) & {
+export type createServiceResponseSuccess = (createServiceResponse201) & {
   headers: Headers;
 };
-export type postServicesResponseError = (postServicesResponse400 | postServicesResponse401 | postServicesResponse402 | postServicesResponse403 | postServicesResponse409 | postServicesResponse500) & {
+export type createServiceResponseError = (createServiceResponse400 | createServiceResponse401 | createServiceResponse402 | createServiceResponse403 | createServiceResponse409 | createServiceResponse500) & {
   headers: Headers;
 };
 
-export type postServicesResponse = (postServicesResponseSuccess | postServicesResponseError)
+export type createServiceResponse = (createServiceResponseSuccess | createServiceResponseError)
 
-export const getPostServicesUrl = () => {
+export const getCreateServiceUrl = () => {
 
 
 
@@ -2271,9 +2282,9 @@ export const getPostServicesUrl = () => {
   return `/services`
 }
 
-export const postServices = async (modelsService: ModelsService, options?: RequestInit): Promise<postServicesResponse> => {
+export const createService = async (modelsService: ModelsService, options?: RequestInit): Promise<createServiceResponse> => {
 
-  return orvalMutator<postServicesResponse>(getPostServicesUrl(),
+  return orvalMutator<createServiceResponse>(getCreateServiceUrl(),
   {
     ...options,
     method: 'POST',
@@ -2286,11 +2297,11 @@ export const postServices = async (modelsService: ModelsService, options?: Reque
 
 
 
-export const getPostServicesMutationOptions = <TError = string | HandlersQuotaExceededError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postServices>>, TError,{data: ModelsService}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof postServices>>, TError,{data: ModelsService}, TContext> => {
+export const getCreateServiceMutationOptions = <TError = string | HandlersQuotaExceededError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createService>>, TError,{data: ModelsService}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof createService>>, TError,{data: ModelsService}, TContext> => {
 
-const mutationKey = ['postServices'];
+const mutationKey = ['createService'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -2300,10 +2311,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postServices>>, {data: ModelsService}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createService>>, {data: ModelsService}> = (props) => {
           const {data} = props ?? {};
 
-          return  postServices(data,requestOptions)
+          return  createService(data,requestOptions)
         }
 
 
@@ -2313,22 +2324,22 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PostServicesMutationResult = NonNullable<Awaited<ReturnType<typeof postServices>>>
-    export type PostServicesMutationBody = ModelsService
-    export type PostServicesMutationError = string | HandlersQuotaExceededError
+    export type CreateServiceMutationResult = NonNullable<Awaited<ReturnType<typeof createService>>>
+    export type CreateServiceMutationBody = ModelsService
+    export type CreateServiceMutationError = string | HandlersQuotaExceededError
 
     /**
  * @summary Create a new service
  */
-export const usePostServices = <TError = string | HandlersQuotaExceededError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postServices>>, TError,{data: ModelsService}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const useCreateService = <TError = string | HandlersQuotaExceededError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createService>>, TError,{data: ModelsService}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof postServices>>,
+        Awaited<ReturnType<typeof createService>>,
         TError,
         {data: ModelsService},
         TContext
       > => {
-      return useMutation(getPostServicesMutationOptions(options), queryClient);
+      return useMutation(getCreateServiceMutationOptions(options), queryClient);
     }
 
 /**

@@ -64,7 +64,7 @@ const DEFAULT_LIMITS: Record<PlanLimitKey, number> = {
   tickets_per_month: 100,
   services: 5,
   counters: 2,
-  zones_per_unit: 0
+  zones_per_unit: 2
 };
 
 function defaultFeatureMap(): Record<

@@ -32,10 +32,10 @@ type SubscriptionPlan struct {
 	// IsFree when true: plan is always free (price=0 by contract); UI shows "Free" instead of "Custom pricing".
 	// Distinct from enterprise (also price=0 but not free). Set by platform operator in plan constructor.
 	IsFree bool `gorm:"not null;default:false;column:is_free" json:"isFree"`
-	// PricingModel determines how the price field is interpreted:
-	//   "flat"     – fixed price per billing period (legacy default)
+	// PricingModel determines how the price field is interpreted.
+	// Default: "per_unit".
 	//   "per_unit" – price per subdivision per billing period; total = price * active_subdivisions
-	// PricingModel: flat = fixed price per billing period; per_unit = price per subdivision per period
+	//   "flat"     – fixed price per billing period (legacy; use only for grandfathered plans)
 	// enums: flat,per_unit
 	PricingModel string    `gorm:"not null;default:'per_unit';column:pricing_model" json:"pricingModel" enums:"flat,per_unit"`
 	CreatedAt    time.Time `gorm:"autoCreateTime" json:"createdAt"`

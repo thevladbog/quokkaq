@@ -742,6 +742,9 @@ components:
     handlers.QuotaExceededError:
       properties:
         error:
+          description: Error is always "quota_exceeded".
+          enum:
+          - quota_exceeded
           example: quota_exceeded
           type: string
         message:
@@ -750,6 +753,9 @@ components:
         metric:
           example: units
           type: string
+      required:
+      - error
+      - message
       type: object
     handlers.RefreshResponse:
       properties:
@@ -2195,7 +2201,7 @@ components:
           description: price in minor units (cents/kopeks)
           type: integer
         pricingModel:
-          description: "PricingModel determines how the price field is interpreted:\n  \"flat\"     – fixed price per billing period (legacy default)\n  \"per_unit\" – price per subdivision per billing period; total = price * active_subdivisions\nPricingModel: flat = fixed price per billing period; per_unit = price per subdivision per period\nenums: flat,per_unit"
+          description: "PricingModel determines how the price field is interpreted.\nDefault: \"per_unit\".\n  \"per_unit\" – price per subdivision per billing period; total = price * active_subdivisions\n  \"flat\"     – fixed price per billing period (legacy; use only for grandfathered plans)\nenums: flat,per_unit"
           enum:
           - flat
           - per_unit
@@ -8541,6 +8547,7 @@ paths:
   /services:
     post:
       description: Creates a new service for a unit
+      operationId: CreateService
       requestBody:
         content:
           application/json:
@@ -11459,18 +11466,32 @@ paths:
               schema:
                 type: string
           description: Bad Request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
         '402':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/handlers.QuotaExceededError'
           description: Quota Exceeded
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
         '500':
           content:
             application/json:
               schema:
                 type: string
           description: Internal Server Error
+      security:
+      - BearerAuth: []
       summary: Create a new counter
       tags:
       - counters

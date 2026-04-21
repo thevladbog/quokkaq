@@ -22,6 +22,7 @@ func NewServiceHandler(service services.ServiceService, userRepo repository.User
 }
 
 // CreateService godoc
+// @ID           CreateService
 // @Summary      Create a new service
 // @Description  Creates a new service for a unit
 // @Tags         services
