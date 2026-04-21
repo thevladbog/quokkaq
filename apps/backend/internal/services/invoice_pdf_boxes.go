@@ -105,17 +105,21 @@ func pdfMaxLabelColumnWidth(pdf *gopdf.GoPdf, labels []string, setFontBold func(
 	return maxW + 8
 }
 
-// pdfDrawBoxHeader draws UPPERCASE bold title and a thin full-width rule; returns Y to start body.
-func pdfDrawBoxHeader(pdf *gopdf.GoPdf, innerL, y, innerW float64, title string, setFontBold func(float64)) float64 {
+// pdfDrawBoxHeader draws a section title (callers pass final text, e.g. Russian ALL CAPS) and a thin full-width rule; returns Y to start body.
+// Titles use embedded DejaVu Sans regular with a light faux-bold offset instead of DejaVuSans-Bold, which mis-mapped U+042B (Ы) in some PDF subsets.
+func pdfDrawBoxHeader(pdf *gopdf.GoPdf, innerL, y, innerW float64, title string) float64 {
 	title = strings.TrimSpace(title)
 	if title == "" {
 		return y
 	}
 	titleH := 12.0
-	setFontBold(10)
+	titlePt := 10.25
+	_ = pdf.SetFont("dejavu", "", titlePt)
 	pdf.SetTextColor(0, 0, 0)
-	pdf.SetXY(innerL, y)
-	_ = pdf.Cell(&gopdf.Rect{W: innerW, H: titleH}, strings.ToUpper(title))
+	for _, dx := range []float64{0, 0.28} {
+		pdf.SetXY(innerL+dx, y)
+		_ = pdf.Cell(&gopdf.Rect{W: innerW, H: titleH}, title)
+	}
 	yLine := y + titleH + 1
 	pdf.SetLineWidth(0.3)
 	pdf.SetStrokeColor(190, 190, 190)
@@ -154,11 +158,13 @@ func pdfDrawLabelValueRows(
 			remaining = 0
 		}
 		if labelW <= 0 {
-			valW = min(minValCol, remaining)
+			valW = remaining
 			break
 		}
 		if remaining >= minValCol {
-			valW = min(minValCol, remaining)
+			// Use the full remaining width for values; minValCol is only a floor for
+			// shrinking the label column, not a cap on the value column width.
+			valW = remaining
 			break
 		}
 		short := minValCol - remaining

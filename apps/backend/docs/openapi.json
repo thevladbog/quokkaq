@@ -435,6 +435,11 @@
                         "minItems": 1,
                         "type": "array"
                     },
+                    "paymentTerms": {
+                        "description": "PaymentTerms is optional markdown for «Условия оплаты». Omit on PATCH to leave unchanged; send \"\" to clear.",
+                        "type": "string",
+                        "maxLength": 32000
+                    },
                     "provisionSubscriptionsOnPayment": {
                         "type": "boolean"
                     }
@@ -459,6 +464,11 @@
                     },
                     "discountPercent": {
                         "type": "number"
+                    },
+                    "lineComment": {
+                        "description": "LineComment is optional text shown under the line title in print (parentheses in UI/PDF).",
+                        "type": "string",
+                        "maxLength": 512
                     },
                     "quantity": {
                         "type": "number"
@@ -508,6 +518,11 @@
                         },
                         "minItems": 1,
                         "type": "array"
+                    },
+                    "paymentTerms": {
+                        "description": "PaymentTerms is optional markdown for «Условия оплаты». Omit on PATCH to leave unchanged; send \"\" to clear.",
+                        "type": "string",
+                        "maxLength": 32000
                     },
                     "provisionSubscriptionsOnPayment": {
                         "type": "boolean"
@@ -622,6 +637,10 @@
                     },
                     "counterparty": {
                         "type": "object"
+                    },
+                    "invoiceDefaultPaymentTerms": {
+                        "description": "InvoiceDefaultPaymentTerms is markdown; only allowed when patching the SaaS operator company (isSaasOperator).",
+                        "type": "string"
                     },
                     "isSaasOperator": {
                         "type": "boolean"
@@ -2075,6 +2094,11 @@
                     "id": {
                         "type": "string"
                     },
+                    "invoiceDefaultPaymentTerms": {
+                        "description": "InvoiceDefaultPaymentTerms is markdown used as default «Условия оплаты» on new platform invoices; only the SaaS operator row (IsSaaSOperator) is intended to hold a template.",
+                        "type": "string",
+                        "maxLength": 32000
+                    },
                     "invoices": {
                         "items": {
                             "$ref": "#/components/schemas/models.Invoice"
@@ -2469,6 +2493,11 @@
                         "description": "external invoice ID",
                         "type": "string"
                     },
+                    "paymentTerms": {
+                        "description": "PaymentTermsMarkdown is per-invoice «Условия оплаты» (markdown in UI; PDF uses a plain-text rendering).",
+                        "type": "string",
+                        "maxLength": 32000
+                    },
                     "provisionSubscriptionsOnPayment": {
                         "type": "boolean"
                     },
@@ -2534,6 +2563,11 @@
                     },
                     "invoiceId": {
                         "type": "string"
+                    },
+                    "lineComment": {
+                        "description": "LineComment is optional print-only clarification (e.g. period); shown under description in UI/PDF.",
+                        "type": "string",
+                        "maxLength": 512
                     },
                     "lineGrossMinor": {
                         "type": "integer"

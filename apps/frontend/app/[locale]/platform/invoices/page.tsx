@@ -25,6 +25,8 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
+import { PlatformInvoiceDefaultPaymentTermsModal } from '@/components/platform/PlatformInvoiceDefaultPaymentTermsModal';
+import { InvoiceStatusBadge } from '@/components/billing/invoice-status-badge';
 import { Link } from '@/src/i18n/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useMemo } from 'react';
@@ -57,6 +59,7 @@ export default function PlatformInvoicesPage() {
   const intlLocale = useMemo(() => intlLocaleFromAppLocale(locale), [locale]);
   const qc = useQueryClient();
   const [companyFilter, setCompanyFilter] = useState('');
+  const [paymentTermsOpen, setPaymentTermsOpen] = useState(false);
 
   const invoiceListParams = {
     companyId: companyFilter.trim() || undefined,
@@ -102,12 +105,27 @@ export default function PlatformInvoicesPage() {
         <h1 className='text-3xl font-bold'>
           {t('title', { defaultValue: 'Invoices' })}
         </h1>
-        <Button asChild>
-          <Link href='/platform/invoices/new'>
-            {t('newInvoice', { defaultValue: 'New invoice' })}
-          </Link>
-        </Button>
+        <div className='flex flex-wrap gap-2'>
+          <Button
+            type='button'
+            variant='secondary'
+            onClick={() => setPaymentTermsOpen(true)}
+          >
+            {t('paymentTermsButton', {
+              defaultValue: 'Payment terms (default)'
+            })}
+          </Button>
+          <Button asChild>
+            <Link href='/platform/invoices/new'>
+              {t('newInvoice', { defaultValue: 'New invoice' })}
+            </Link>
+          </Button>
+        </div>
       </div>
+      <PlatformInvoiceDefaultPaymentTermsModal
+        open={paymentTermsOpen}
+        onOpenChange={setPaymentTermsOpen}
+      />
       <div className='mb-4 flex max-w-xl flex-wrap gap-2'>
         <Input
           placeholder={t('companyIdFilter', {
@@ -195,7 +213,10 @@ export default function PlatformInvoicesPage() {
                     )}
                   </TableCell>
                   <TableCell>
-                    {invoiceStatusLabel(tOrgInv, inv.status ?? 'draft')}
+                    <InvoiceStatusBadge
+                      status={inv.status ?? 'draft'}
+                      label={invoiceStatusLabel(tOrgInv, inv.status ?? 'draft')}
+                    />
                   </TableCell>
                   <TableCell className='text-sm'>
                     {formatAppDateTime(inv.dueDate, intlLocale)}

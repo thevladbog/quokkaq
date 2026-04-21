@@ -42,9 +42,11 @@ type Company struct {
 	// SsoAccessSource: "manual" (default) or "sso_groups" — IdP groups are source of truth for access when set.
 	SsoAccessSource string `gorm:"column:sso_access_source;size:32;not null;default:manual" json:"ssoAccessSource" enums:"manual,sso_groups"`
 	// OneCCounterpartyGUID maps this tenant company to Контрагент in 1С (УНФ) for CommerceML orders.
-	OneCCounterpartyGUID *string   `gorm:"column:onec_counterparty_guid" json:"onecCounterpartyGuid,omitempty"`
-	CreatedAt            time.Time `gorm:"autoCreateTime" json:"createdAt"`
-	UpdatedAt            time.Time `gorm:"autoUpdateTime" json:"updatedAt"`
+	OneCCounterpartyGUID *string `gorm:"column:onec_counterparty_guid" json:"onecCounterpartyGuid,omitempty"`
+	// InvoiceDefaultPaymentTerms is markdown used as default «Условия оплаты» on new platform invoices; only the SaaS operator row (IsSaaSOperator) is intended to hold a template.
+	InvoiceDefaultPaymentTerms *string   `gorm:"column:invoice_default_payment_terms" json:"invoiceDefaultPaymentTerms,omitempty"`
+	CreatedAt                  time.Time `gorm:"autoCreateTime" json:"createdAt"`
+	UpdatedAt                  time.Time `gorm:"autoUpdateTime" json:"updatedAt"`
 
 	// Relations
 	Units        []Unit        `gorm:"foreignKey:CompanyID" json:"units,omitempty"`

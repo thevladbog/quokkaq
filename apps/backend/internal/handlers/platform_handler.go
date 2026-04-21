@@ -3,11 +3,13 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"quokkaq-go-backend/internal/logger"
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/models"
@@ -320,6 +322,8 @@ type PatchPlatformCompanyBody struct {
 	SsoJitProvisioning        *bool            `json:"ssoJitProvisioning"`
 	OneCCounterpartyGUID      *string          `json:"onecCounterpartyGuid"`
 	ClearOneCCounterpartyGUID *bool            `json:"clearOnecCounterpartyGuid"`
+	// InvoiceDefaultPaymentTerms is markdown; only allowed when patching the SaaS operator company (isSaasOperator).
+	InvoiceDefaultPaymentTerms *string `json:"invoiceDefaultPaymentTerms"`
 }
 
 // PatchCompany godoc
@@ -360,6 +364,11 @@ func (h *PlatformHandler) PatchCompany(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
+	}
+
+	effectiveIsSaasOperator := company.IsSaaSOperator
+	if body.IsSaasOperator != nil {
+		effectiveIsSaasOperator = *body.IsSaasOperator
 	}
 
 	if body.Name != nil {
@@ -404,6 +413,23 @@ func (h *PlatformHandler) PatchCompany(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		company.PaymentAccounts = out
+	}
+
+	if body.InvoiceDefaultPaymentTerms != nil {
+		if !effectiveIsSaasOperator {
+			http.Error(w, "invoiceDefaultPaymentTerms can only be set on the SaaS operator company", http.StatusBadRequest)
+			return
+		}
+		s := strings.TrimSpace(*body.InvoiceDefaultPaymentTerms)
+		if utf8.RuneCountInString(s) > maxInvoicePaymentTermsRunes {
+			http.Error(w, fmt.Sprintf("invoiceDefaultPaymentTerms exceeds %d characters", maxInvoicePaymentTermsRunes), http.StatusBadRequest)
+			return
+		}
+		if s == "" {
+			company.InvoiceDefaultPaymentTerms = nil
+		} else {
+			company.InvoiceDefaultPaymentTerms = &s
+		}
 	}
 
 	if body.StrictPublicTenantResolve != nil {
@@ -462,6 +488,7 @@ func (h *PlatformHandler) PatchCompany(w http.ResponseWriter, r *http.Request) {
 			}
 		} else {
 			company.IsSaaSOperator = false
+			company.InvoiceDefaultPaymentTerms = nil
 			if err := h.companyRepo.Update(company); err != nil {
 				logger.ErrorfCtx(r.Context(), "Platform PatchCompany Update: %v", err)
 				http.Error(w, "Internal server error", http.StatusInternalServerError)

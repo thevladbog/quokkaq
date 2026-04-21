@@ -7,17 +7,20 @@ import type {
   HandlersInvoiceDraftUpsertBody,
   HandlersPlatformListResponseModelsCatalogItem,
   ModelsCatalogItem,
+  ModelsCompany,
   ModelsInvoice,
   ModelsSubscriptionPlan
 } from '@/lib/api/generated/platform';
 import {
   getGetPlatformCatalogItemsQueryKey,
   getGetCompanyQueryKey,
+  getGetSaaSOperatorCompanyQueryKey,
   getPlatformGetInvoiceQueryKey,
   getListInvoicesQueryKey,
   getListSubscriptionPlansQueryKey,
   getPlatformCatalogItems,
   getCompany,
+  getSaaSOperatorCompany,
   platformGetInvoice,
   listSubscriptionPlans,
   getListCompaniesQueryKey,
@@ -28,6 +31,7 @@ import {
 } from '@/lib/api/generated/platform';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DateTimePicker } from '@/components/ui/datetime-picker';
@@ -40,6 +44,7 @@ import {
 } from '@/components/ui/select';
 import { Combobox } from '@/components/ui/combobox';
 import { Spinner } from '@/components/ui/spinner';
+import { PlatformInvoicePaymentTermsMdx } from '@/components/platform/PlatformInvoicePaymentTermsMdx';
 import { useRouter } from '@/src/i18n/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -59,6 +64,7 @@ import {
 import {
   buildDraftBody,
   invoiceToDraftUpsertBody,
+  maxInvoiceLineCommentRunes,
   newDraftLineRow,
   rowsFromInvoiceLines,
   tryParseDraftRowForTotals,
@@ -113,9 +119,13 @@ export function PlatformInvoiceDraftForm({
       appLocale
     )
   );
+  const [paymentTerms, setPaymentTerms] = useState(
+    () => initialInvoice?.paymentTerms ?? ''
+  );
 
   /** Avoid re-seeding when `initialInvoice` is a new object reference but the same draft (preserves in-progress edits). */
   const syncedInvoiceIdRef = useRef<string | undefined>(undefined);
+  const operatorTermsSeededRef = useRef(false);
 
   useEffect(() => {
     const inv = initialInvoice;
@@ -143,12 +153,14 @@ export function PlatformInvoiceDraftForm({
             appLocale
           )
         );
+        setPaymentTerms(snapshot.paymentTerms ?? '');
       });
       return;
     }
 
     if (syncedInvoiceIdRef.current !== undefined) {
       syncedInvoiceIdRef.current = undefined;
+      operatorTermsSeededRef.current = false;
       const d = defaultCompanyId.trim();
       queueMicrotask(() => {
         setCompanyId(d);
@@ -157,6 +169,7 @@ export function PlatformInvoiceDraftForm({
         setAllowYookassa(false);
         setAllowStripe(false);
         setProvision(false);
+        setPaymentTerms('');
         setRows(rowsFromInvoiceLines(undefined, 'RUB', appLocale));
       });
     }
@@ -228,6 +241,28 @@ export function PlatformInvoiceDraftForm({
     queryFn: async () =>
       (await listSubscriptionPlans()).data as ModelsSubscriptionPlan[]
   });
+
+  const { data: saasOperator } = useQuery({
+    queryKey: getGetSaaSOperatorCompanyQueryKey(),
+    queryFn: async (): Promise<ModelsCompany | null> => {
+      const res = await getSaaSOperatorCompany();
+      if (res.status !== 200) return null;
+      return res.data;
+    },
+    enabled: !isEdit
+  });
+
+  useEffect(() => {
+    if (isEdit) return;
+    if (initialInvoice?.id) return;
+    if (!saasOperator) return;
+    if (operatorTermsSeededRef.current) return;
+    operatorTermsSeededRef.current = true;
+    const def = (saasOperator.invoiceDefaultPaymentTerms ?? '').trim();
+    queueMicrotask(() =>
+      setPaymentTerms((prev) => (prev.trim() !== '' ? prev : def))
+    );
+  }, [isEdit, initialInvoice?.id, saasOperator]);
 
   const referenceDataBlocked =
     (!isEdit && companiesQueryError) ||
@@ -381,6 +416,7 @@ export function PlatformInvoiceDraftForm({
         allowYookassa,
         allowStripe,
         provision,
+        paymentTerms,
         rows,
         intlLocale
       );
@@ -413,6 +449,7 @@ export function PlatformInvoiceDraftForm({
         allowYookassa,
         allowStripe,
         provision,
+        paymentTerms,
         rows,
         intlLocale
       );
@@ -448,6 +485,7 @@ export function PlatformInvoiceDraftForm({
         allowYookassa,
         allowStripe,
         provision,
+        paymentTerms,
         rows,
         intlLocale
       );
@@ -651,6 +689,23 @@ export function PlatformInvoiceDraftForm({
         </div>
       </div>
 
+      <div className='grid min-w-0 gap-2'>
+        <Label>{t('paymentTerms', { defaultValue: 'Payment terms' })}</Label>
+        <p className='text-muted-foreground text-xs'>
+          {t('paymentTermsHint', {
+            defaultValue:
+              'Printed on the invoice PDF as plain text. Markdown formatting is stripped for print.'
+          })}
+        </p>
+        <PlatformInvoicePaymentTermsMdx
+          markdown={paymentTerms}
+          onChange={setPaymentTerms}
+          placeholder={t('paymentTermsPlaceholder', {
+            defaultValue: 'Payment terms (markdown)…'
+          })}
+        />
+      </div>
+
       <div className='grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_17.5rem] lg:items-stretch lg:gap-x-8'>
         <div className='min-w-0 space-y-3'>
           <div className='flex items-center justify-between gap-3 lg:justify-start'>
@@ -746,6 +801,33 @@ export function PlatformInvoiceDraftForm({
                           prev.map((r) =>
                             r.key === row.key
                               ? { ...r, descriptionPrint: e.target.value }
+                              : r
+                          )
+                        )
+                      }
+                    />
+                  </div>
+                  <div className='grid min-w-0 gap-2'>
+                    <Label htmlFor={`lineComment-${row.key}`}>
+                      {t('lineComment', {
+                        defaultValue: 'Line comment'
+                      })}
+                    </Label>
+                    <Textarea
+                      id={`lineComment-${row.key}`}
+                      className='min-h-[2.75rem] resize-y'
+                      rows={2}
+                      maxLength={maxInvoiceLineCommentRunes}
+                      placeholder={t('lineCommentPlaceholder', {
+                        defaultValue:
+                          'e.g. March 2026 (printed in italics in parentheses under the title)'
+                      })}
+                      value={row.lineComment}
+                      onChange={(e) =>
+                        setRows((prev) =>
+                          prev.map((r) =>
+                            r.key === row.key
+                              ? { ...r, lineComment: e.target.value }
                               : r
                           )
                         )

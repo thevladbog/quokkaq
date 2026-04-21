@@ -37,6 +37,7 @@ describe('buildDraftBody', () => {
       false,
       false,
       false,
+      '',
       [line({ catalogItemId: '', descriptionPrint: 'X' })],
       enUS
     );
@@ -47,6 +48,22 @@ describe('buildDraftBody', () => {
     expect(body.lines[0]?.quantity).toBe(2);
     expect(body.lines[0]?.unitPriceInclVatMinor).toBe(10_000);
     expect(body.lines[0]?.vatExempt).toBe(true);
+    expect(body.paymentTerms).toBe('');
+  });
+
+  it('includes paymentTerms in draft body', () => {
+    const body = buildDraftBody(
+      'company-1',
+      '2026-01-15T12:00:00.000Z',
+      'RUB',
+      false,
+      false,
+      false,
+      'Pay **within** 10 days',
+      [line({ catalogItemId: '', descriptionPrint: 'X' })],
+      enUS
+    );
+    expect(body.paymentTerms).toBe('Pay **within** 10 days');
   });
 
   it('allows description from catalog id only', () => {
@@ -57,6 +74,7 @@ describe('buildDraftBody', () => {
       false,
       false,
       false,
+      '',
       [
         line({
           descriptionPrint: '   ',
@@ -78,6 +96,7 @@ describe('buildDraftBody', () => {
         false,
         false,
         false,
+        '',
         [line()],
         enUS
       )
@@ -86,10 +105,10 @@ describe('buildDraftBody', () => {
 
   it('throws dueEmpty when due is blank', () => {
     expect(() =>
-      buildDraftBody('c', '', 'RUB', false, false, false, [line()], enUS)
+      buildDraftBody('c', '', 'RUB', false, false, false, '', [line()], enUS)
     ).toThrowError('dueEmpty');
     expect(() =>
-      buildDraftBody('c', '   ', 'RUB', false, false, false, [line()], enUS)
+      buildDraftBody('c', '   ', 'RUB', false, false, false, '', [line()], enUS)
     ).toThrowError('dueEmpty');
   });
 
@@ -102,6 +121,7 @@ describe('buildDraftBody', () => {
         false,
         false,
         false,
+        '',
         [line({ quantity: '0' })],
         enUS
       )
@@ -117,6 +137,7 @@ describe('buildDraftBody', () => {
         false,
         false,
         false,
+        '',
         [line({ unitPriceInput: 'xx' })],
         enUS
       )
@@ -132,6 +153,7 @@ describe('buildDraftBody', () => {
         false,
         false,
         false,
+        '',
         [line({ descriptionPrint: '', catalogItemId: '' })],
         enUS
       )
@@ -147,6 +169,7 @@ describe('buildDraftBody', () => {
         false,
         false,
         false,
+        '',
         [
           line({
             discountPercent: '5',
@@ -167,6 +190,7 @@ describe('buildDraftBody', () => {
         false,
         false,
         false,
+        '',
         [line({ isLicenseLine: true, subscriptionPlanId: '' })],
         enUS
       )
@@ -189,6 +213,7 @@ describe('buildDraftBody', () => {
         false,
         false,
         true,
+        '',
         [lic('a'), lic('b')],
         enUS
       )
@@ -230,6 +255,33 @@ describe('invoiceToDraftUpsertBody', () => {
     expect(body.lines[0]?.descriptionPrint).toBe('A');
     expect(body.lines[1]?.descriptionPrint).toBe('B');
     expect(body.companyId).toBe('co-1');
+    expect(body.paymentTerms).toBe('');
+  });
+
+  it('maps paymentTerms from invoice', () => {
+    const body = invoiceToDraftUpsertBody({
+      companyId: 'co-1',
+      dueDate: '2026-02-01T00:00:00.000Z',
+      currency: 'RUB',
+      paymentTerms: 'Net 30',
+      lines: [
+        {
+          id: 'ln-1',
+          invoiceId: 'inv-1',
+          position: 1,
+          descriptionPrint: 'A',
+          quantity: 1,
+          unit: '',
+          unitPriceInclVatMinor: 100,
+          vatExempt: false,
+          vatRatePercent: 20,
+          lineNetMinor: 0,
+          vatAmountMinor: 0,
+          lineGrossMinor: 100
+        }
+      ]
+    } as import('@quokkaq/shared-types').Invoice);
+    expect(body.paymentTerms).toBe('Net 30');
   });
 });
 

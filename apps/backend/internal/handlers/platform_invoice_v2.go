@@ -3,11 +3,13 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math"
 	"net/http"
 	"quokkaq-go-backend/internal/logger"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"quokkaq-go-backend/internal/invoicing"
 	"quokkaq-go-backend/internal/middleware"
@@ -27,12 +29,17 @@ var (
 	errInvoiceNoCompanyForIssue = errors.New("invoice has no company")
 )
 
+const maxInvoicePaymentTermsRunes = 32000
+const maxInvoiceLineCommentRunes = 512
+
 // InvoiceDraftLineInput is one line in a platform invoice draft create/patch request.
 type InvoiceDraftLineInput struct {
 	CatalogItemID    *string `json:"catalogItemId"`
 	DescriptionPrint string  `json:"descriptionPrint"`
-	Quantity         float64 `json:"quantity"`
-	Unit             string  `json:"unit"` // UOM; if empty and catalog linked, defaults from catalog
+	// LineComment is optional text shown under the line title in print (parentheses in UI/PDF).
+	LineComment string  `json:"lineComment"`
+	Quantity    float64 `json:"quantity"`
+	Unit        string  `json:"unit"` // UOM; if empty and catalog linked, defaults from catalog
 	// If nil with a catalog line, defaults to catalog default price; if non-nil (including *0), that value is used as-is.
 	UnitPriceInclVatMinor   *int64     `json:"unitPriceInclVatMinor,omitempty"`
 	DiscountPercent         *float64   `json:"discountPercent"`
@@ -49,15 +56,25 @@ type InvoiceDraftUpsertBody struct {
 	Currency                 string `json:"currency"`
 	AllowYookassaPaymentLink bool   `json:"allowYookassaPaymentLink"`
 	// Stripe Checkout for platform invoices is not wired end-to-end yet; the flag is stored for future use and API symmetry with YooKassa.
-	AllowStripePaymentLink          bool                    `json:"allowStripePaymentLink"`
-	ProvisionSubscriptionsOnPayment bool                    `json:"provisionSubscriptionsOnPayment"`
-	Lines                           []InvoiceDraftLineInput `json:"lines" binding:"required,min=1"`
+	AllowStripePaymentLink          bool `json:"allowStripePaymentLink"`
+	ProvisionSubscriptionsOnPayment bool `json:"provisionSubscriptionsOnPayment"`
+	// PaymentTerms is optional markdown for «Условия оплаты». Omit on PATCH to leave unchanged; send "" to clear.
+	PaymentTerms *string                 `json:"paymentTerms"`
+	Lines        []InvoiceDraftLineInput `json:"lines" binding:"required,min=1"`
 }
 
 // InvoiceDraftCreateBody is the JSON body for POST /platform/invoices.
 type InvoiceDraftCreateBody struct {
 	CompanyID string `json:"companyId" binding:"required"`
 	InvoiceDraftUpsertBody
+}
+
+func normalizeInvoiceLineComment(s string) string {
+	s = strings.TrimSpace(s)
+	if len(s) >= 2 && s[0] == '(' && s[len(s)-1] == ')' {
+		return strings.TrimSpace(s[1 : len(s)-1])
+	}
+	return s
 }
 
 func licensePeriodEnd(start time.Time, qty float64, interval string) time.Time {
@@ -137,6 +154,11 @@ func (h *PlatformHandler) buildDraftLines(inputs []InvoiceDraftLineInput) ([]mod
 			return nil, 0, 0, 0, errors.New("descriptionPrint is required when no catalog item")
 		}
 
+		cmt := normalizeInvoiceLineComment(in.LineComment)
+		if utf8.RuneCountInString(cmt) > maxInvoiceLineCommentRunes {
+			return nil, 0, 0, 0, fmt.Errorf("lineComment exceeds %d characters", maxInvoiceLineCommentRunes)
+		}
+
 		var planID *string
 		if in.SubscriptionPlanID != nil {
 			p := strings.TrimSpace(*in.SubscriptionPlanID)
@@ -182,6 +204,7 @@ func (h *PlatformHandler) buildDraftLines(inputs []InvoiceDraftLineInput) ([]mod
 		line := models.InvoiceLine{
 			CatalogItemID:           catID,
 			DescriptionPrint:        desc,
+			LineComment:             cmt,
 			Quantity:                qty,
 			MeasureUnit:             lineUnit,
 			UnitPriceInclVatMinor:   priceMinor,
@@ -240,6 +263,17 @@ func (h *PlatformHandler) upsertDraftInvoiceInTx(tx *gorm.DB, invoiceID string, 
 	inv.DueDate = due.UTC()
 	if strings.TrimSpace(body.Currency) != "" {
 		inv.Currency = strings.TrimSpace(body.Currency)
+	}
+	if body.PaymentTerms != nil {
+		t := strings.TrimSpace(*body.PaymentTerms)
+		if t == "" {
+			inv.PaymentTermsMarkdown = nil
+		} else {
+			if utf8.RuneCountInString(t) > maxInvoicePaymentTermsRunes {
+				return fmt.Errorf("paymentTerms exceeds %d characters", maxInvoicePaymentTermsRunes)
+			}
+			inv.PaymentTermsMarkdown = &t
+		}
 	}
 	return h.invoiceRepo.UpdateHeaderAndLinesInTx(tx, &inv, lines)
 }
@@ -312,6 +346,29 @@ func (h *PlatformHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 		AllowYookassaPaymentLink:        body.AllowYookassaPaymentLink,
 		AllowStripePaymentLink:          body.AllowStripePaymentLink,
 		ProvisionSubscriptionsOnPayment: body.ProvisionSubscriptionsOnPayment,
+	}
+	if body.PaymentTerms != nil {
+		t := strings.TrimSpace(*body.PaymentTerms)
+		if utf8.RuneCountInString(t) > maxInvoicePaymentTermsRunes {
+			http.Error(w, fmt.Sprintf("paymentTerms exceeds %d characters", maxInvoicePaymentTermsRunes), http.StatusBadRequest)
+			return
+		}
+		inv.PaymentTermsMarkdown = &t
+	}
+	if inv.PaymentTermsMarkdown == nil {
+		op, errOp := h.companyRepo.FindSaaSOperatorCompany()
+		if errOp != nil {
+			logger.ErrorfCtx(r.Context(), "CreateInvoice FindSaaSOperatorCompany: %v", errOp)
+		} else if op != nil && op.InvoiceDefaultPaymentTerms != nil {
+			t := strings.TrimSpace(*op.InvoiceDefaultPaymentTerms)
+			if t != "" {
+				if utf8.RuneCountInString(t) > maxInvoicePaymentTermsRunes {
+					http.Error(w, "SaaS operator default payment terms exceed allowed length", http.StatusInternalServerError)
+					return
+				}
+				inv.PaymentTermsMarkdown = &t
+			}
+		}
 	}
 	if err := database.DB.Transaction(func(tx *gorm.DB) error {
 		return h.invoiceRepo.CreateWithLinesInTx(tx, &inv, lines)

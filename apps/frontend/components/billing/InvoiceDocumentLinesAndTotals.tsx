@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/table';
 import { formatPriceMinorUnits } from '@/lib/format-price';
 import { invoiceVatSummaryFromLines } from '@/lib/invoice-vat-summary';
+import { invoiceLineCommentForDisplay } from '@/lib/invoice-line-comment-display';
 import {
   discountMinorForPersistedLine,
   effectiveUnitPriceInclVatMinor
@@ -99,10 +100,20 @@ export function InvoiceDocumentLinesAndTotals({
           {lines.map((line, i) => {
             const disc = discountMinorForPersistedLine(line);
             const unitEff = effectiveUnitPriceInclVatMinor(line);
+            const commentParen = invoiceLineCommentForDisplay(line.lineComment);
             return (
               <TableRow key={line.id}>
                 <TableCell>{i + 1}</TableCell>
-                <TableCell>{line.descriptionPrint}</TableCell>
+                <TableCell>
+                  <div className='space-y-0.5'>
+                    <div>{line.descriptionPrint}</div>
+                    {commentParen ? (
+                      <div className='text-muted-foreground text-sm italic'>
+                        {commentParen}
+                      </div>
+                    ) : null}
+                  </div>
+                </TableCell>
                 <TableCell className='text-right'>{line.quantity}</TableCell>
                 <TableCell className='text-right text-sm'>
                   {(line.unit ?? '').trim() || '—'}

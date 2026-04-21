@@ -7,6 +7,8 @@ import (
 	"math"
 	"sort"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"quokkaq-go-backend/internal/assets"
 	"quokkaq-go-backend/internal/models"
@@ -68,19 +70,65 @@ func parseCounterparty(raw json.RawMessage) counterpartyJSON {
 	return cp
 }
 
+// isPostalIndexPrefixBoundary reports whether u begins with postal as its own component:
+// u equals postal, or the first rune after postal is whitespace or a separator (comma, etc.).
+// ASCII hyphen is not treated as a separator so strings like "123308-й" are not stripped.
+func isPostalIndexPrefixBoundary(u, postal string) bool {
+	if postal == "" || !strings.HasPrefix(u, postal) {
+		return false
+	}
+	rest := u[len(postal):]
+	if rest == "" {
+		return true
+	}
+	r, _ := utf8.DecodeRuneInString(rest)
+	if r == utf8.RuneError {
+		return false
+	}
+	if unicode.IsSpace(r) {
+		return true
+	}
+	switch r {
+	case ',', ';', ':', '.', '—', '–', '·':
+		return true
+	default:
+		return false
+	}
+}
+
 func legalAddressLine(cp counterpartyJSON) string {
 	if cp.Addresses == nil || cp.Addresses.Legal == nil {
 		return ""
 	}
 	l := cp.Addresses.Legal
-	parts := []string{}
-	if l.PostalCode != nil && strings.TrimSpace(*l.PostalCode) != "" {
-		parts = append(parts, strings.TrimSpace(*l.PostalCode))
+	postal := ""
+	if l.PostalCode != nil {
+		postal = strings.TrimSpace(*l.PostalCode)
 	}
-	if l.Unrestricted != nil && strings.TrimSpace(*l.Unrestricted) != "" {
-		parts = append(parts, strings.TrimSpace(*l.Unrestricted))
+	unrest := ""
+	if l.Unrestricted != nil {
+		unrest = strings.TrimSpace(*l.Unrestricted)
 	}
-	return strings.Join(parts, ", ")
+	if unrest == "" {
+		return postal
+	}
+	if postal == "" {
+		return unrest
+	}
+	// Avoid "123308, 123308, …" when unrestricted already starts with the same index.
+	for {
+		u := strings.TrimSpace(unrest)
+		if !isPostalIndexPrefixBoundary(u, postal) {
+			break
+		}
+		u = strings.TrimSpace(u[len(postal):])
+		u = strings.TrimLeft(u, ", ")
+		unrest = u
+	}
+	if unrest == "" {
+		return postal
+	}
+	return postal + ", " + unrest
 }
 
 func payeeLegalName(vendor *models.Company, cp counterpartyJSON) string {
@@ -257,6 +305,12 @@ func BuildInvoicePDF(inv *models.Invoice, vendor *models.Company) ([]byte, error
 		pdf.SetTextColor(0, 0, 0)
 	}
 
+	setFontItalic := func(size float64) {
+		// No embedded oblique/italic TTF; use regular face (comments / muted styling via color).
+		_ = pdf.SetFont("dejavu", "", size)
+		pdf.SetTextColor(55, 55, 55)
+	}
+
 	contentRight := pdfPageW - pdfMargin
 	contentW := contentRight - pdfMargin
 	left := pdfMargin
@@ -319,7 +373,7 @@ func BuildInvoicePDF(inv *models.Invoice, vendor *models.Company) ([]byte, error
 		if err := addInvoicePage(); err != nil {
 			return nil, err
 		}
-		y = pdfMargin + 8
+		y = pdfMargin + 8 + pdfContinuationBodyTopPad(&pdf)
 	}
 
 	qrSize := 100.0
@@ -331,7 +385,7 @@ func BuildInvoicePDF(inv *models.Invoice, vendor *models.Company) ([]byte, error
 	innerPayW := payBoxW - 2*pad
 
 	payLineH := 10.5
-	yBody := pdfDrawBoxHeader(&pdf, innerL, payY0+pad, innerPayW, "Реквизиты для оплаты", setFontBold)
+	yBody := pdfDrawBoxHeader(&pdf, innerL, payY0+pad, innerPayW, "РЕКВИЗИТЫ ДЛЯ ОПЛАТЫ")
 	yText := pdfDrawLabelValueRows(&pdf, innerL, yBody, innerPayW, payLineH, paymentDetailPairs(acct), setFont, setFontBold)
 
 	yText += 4
@@ -355,7 +409,7 @@ func BuildInvoicePDF(inv *models.Invoice, vendor *models.Company) ([]byte, error
 		if err := addInvoicePage(); err != nil {
 			return nil, err
 		}
-		y = pdfMargin + 8
+		y = pdfMargin + 8 + pdfContinuationBodyTopPad(&pdf)
 	}
 
 	colGap := 10.0
@@ -366,11 +420,11 @@ func BuildInvoicePDF(inv *models.Invoice, vendor *models.Company) ([]byte, error
 	ir := left + colW + colGap + 8
 
 	boxLineH := 10.5
-	yPayerBody := pdfDrawBoxHeader(&pdf, il, boxY0+pad, iw, "Плательщик", setFontBold)
+	yPayerBody := pdfDrawBoxHeader(&pdf, il, boxY0+pad, iw, "ПЛАТЕЛЬЩИК")
 	yl := pdfDrawLabelValueRows(&pdf, il, yPayerBody, iw, boxLineH, buyerLabelValuePairs(inv), setFont, setFontBold)
 	leftEnd := yl + pad
 
-	ySuppBody := pdfDrawBoxHeader(&pdf, ir, boxY0+pad, iw, "Поставщик", setFontBold)
+	ySuppBody := pdfDrawBoxHeader(&pdf, ir, boxY0+pad, iw, "ПОСТАВЩИК")
 	supPairs := legalEntityLabelValuePairs(vcp, vendor.Name)
 	if len(supPairs) == 0 {
 		supPairs = []pdfLabelValue{{"Наименование", strings.TrimSpace(vendor.Name)}}
@@ -433,53 +487,169 @@ func BuildInvoicePDF(inv *models.Invoice, vendor *models.Company) ([]byte, error
 	pdf.Line(left, y-2, contentRight, y-2)
 	y += 4
 
-	rowH := 14.0
+	const tableDescFontPt = 8.0
+	const tableDescLineGap = 1.2
+	descLineStep := tableDescFontPt + tableDescLineGap
+	const tableCommentFontPt = 7.0
+	const tableCommentLineGap = 1.0
+	commentLineStep := tableCommentFontPt + tableCommentLineGap
+	const tableCommentGapAfterDesc = 1.5
+	minTableRowH := 14.0
+
+	type lineTableSeg struct {
+		height    float64
+		text      string
+		isGap     bool
+		isComment bool
+	}
+
+	tableTopReserve := pdfMargin + 8 + invoiceContinuationHeaderInset
+	maxTableSegH := pdfPageH - pdfMargin - footerReserve - tableTopReserve
+
 	setFont(8)
-	for i, line := range inv.Lines {
-		if y+rowH+footerReserve > pdfPageH-pdfMargin {
-			if err := addInvoicePage(); err != nil {
-				return nil, err
-			}
-			y = pdfMargin + 8
-			setFont(8)
+	for i, invLine := range inv.Lines {
+		descW := tableWidths[1] - 2
+		setFont(tableDescFontPt)
+		descLines := pdfWordWrapLines(&pdf, strings.TrimSpace(invLine.DescriptionPrint), descW)
+		if len(descLines) == 0 {
+			descLines = []string{strings.TrimSpace(invLine.DescriptionPrint)}
 		}
-		x = left
+		var commentLines []string
+		if c := strings.TrimSpace(invLine.LineComment); c != "" {
+			commentLines = pdfWordWrapLines(&pdf, "("+c+")", descW)
+		}
+
+		segs := make([]lineTableSeg, 0, len(descLines)+1+len(commentLines))
+		for _, ln := range descLines {
+			segs = append(segs, lineTableSeg{height: descLineStep, text: ln})
+		}
+		if len(commentLines) > 0 {
+			segs = append(segs, lineTableSeg{height: tableCommentGapAfterDesc, isGap: true})
+			for _, cl := range commentLines {
+				segs = append(segs, lineTableSeg{height: commentLineStep, text: cl, isComment: true})
+			}
+		}
+		for _, s := range segs {
+			if s.height > maxTableSegH {
+				return nil, fmt.Errorf("invoice PDF: line item description/comment segment exceeds printable page body")
+			}
+		}
+
 		row := []string{
 			fmt.Sprintf("%d", i+1),
-			line.DescriptionPrint,
-			trimQuantity(line.Quantity),
-			strings.TrimSpace(line.MeasureUnit),
-			formatMinorForPDF(inv.Currency, effectiveUnitPriceInclVatMinor(line)),
-			vatRateLinePDF(line),
-			vatAmountLinePDF(line, inv.Currency),
-			discountLinePDF(line, inv.Currency),
-			formatMinorForPDF(inv.Currency, line.LineGrossMinor),
+			"",
+			trimQuantity(invLine.Quantity),
+			strings.TrimSpace(invLine.MeasureUnit),
+			formatMinorForPDF(inv.Currency, effectiveUnitPriceInclVatMinor(invLine)),
+			vatRateLinePDF(invLine),
+			vatAmountLinePDF(invLine, inv.Currency),
+			discountLinePDF(invLine, inv.Currency),
+			formatMinorForPDF(inv.Currency, invLine.LineGrossMinor),
 		}
-		for j, txt := range row {
-			cellW := tableWidths[j]
-			clip := txt
-			if j == 1 && len([]rune(clip)) > 36 {
-				r := []rune(clip)
-				clip = string(r[:34]) + "…"
-			}
-			tw, _ := pdf.MeasureTextWidth(clip)
-			if j >= 2 && j != 3 {
-				xi := x + cellW - tw - 2
-				if xi < x {
-					xi = x
+
+		chunkIsFirst := true
+		segIdx := 0
+		for segIdx < len(segs) {
+			if y+minTableRowH+footerReserve > pdfPageH-pdfMargin {
+				if err := addInvoicePage(); err != nil {
+					return nil, err
 				}
-				pdf.SetXY(xi, y)
-				_ = pdf.Cell(&gopdf.Rect{W: tw + 2, H: rowH}, clip)
-			} else {
-				pdf.SetXY(x, y)
-				_ = pdf.Cell(&gopdf.Rect{W: cellW, H: rowH}, clip)
+				y = pdfMargin + 8 + pdfContinuationBodyTopPad(&pdf)
+				setFont(8)
 			}
-			x += cellW
-			if j < nGaps {
-				x += tableColGutter
+
+			end := segIdx
+			sumH := 0.0
+			for end < len(segs) {
+				nextH := segs[end].height
+				trySum := sumH + nextH
+				tryDraw := trySum
+				if tryDraw < minTableRowH {
+					tryDraw = minTableRowH
+				}
+				if y+tryDraw+footerReserve > pdfPageH-pdfMargin {
+					break
+				}
+				sumH = trySum
+				end++
 			}
+			if end == segIdx {
+				if err := addInvoicePage(); err != nil {
+					return nil, err
+				}
+				y = pdfMargin + 8 + pdfContinuationBodyTopPad(&pdf)
+				setFont(8)
+				continue
+			}
+
+			chunkH := sumH
+			if chunkH < minTableRowH {
+				chunkH = minTableRowH
+			}
+
+			x = left
+			pdf.SetTextColor(0, 0, 0)
+			setFont(tableDescFontPt)
+			lineNo := ""
+			if chunkIsFirst {
+				lineNo = row[0]
+			}
+			pdf.SetXY(x, y)
+			_ = pdf.Cell(&gopdf.Rect{W: tableWidths[0], H: chunkH}, lineNo)
+			x += tableWidths[0] + tableColGutter
+
+			dy := y
+			for si := segIdx; si < end; si++ {
+				s := segs[si]
+				if s.isGap {
+					dy += s.height
+					continue
+				}
+				if s.isComment {
+					setFontItalic(tableCommentFontPt)
+					pdf.SetTextColor(115, 115, 115)
+					pdf.SetXY(x, dy)
+					_ = pdf.Cell(&gopdf.Rect{W: tableWidths[1], H: s.height}, s.text)
+					dy += s.height
+				} else {
+					pdf.SetTextColor(0, 0, 0)
+					setFont(tableDescFontPt)
+					pdf.SetXY(x, dy)
+					_ = pdf.Cell(&gopdf.Rect{W: tableWidths[1], H: s.height}, s.text)
+					dy += s.height
+				}
+			}
+			pdf.SetTextColor(0, 0, 0)
+			setFont(8)
+
+			x += tableWidths[1] + tableColGutter
+			for j := 2; j < len(row); j++ {
+				txt := ""
+				if chunkIsFirst {
+					txt = row[j]
+				}
+				cellW := tableWidths[j]
+				tw, _ := pdf.MeasureTextWidth(txt)
+				if j >= 2 && j != 3 {
+					xi := x + cellW - tw - 2
+					if xi < x {
+						xi = x
+					}
+					pdf.SetXY(xi, y)
+					_ = pdf.Cell(&gopdf.Rect{W: tw + 2, H: chunkH}, txt)
+				} else {
+					pdf.SetXY(x, y)
+					_ = pdf.Cell(&gopdf.Rect{W: cellW, H: chunkH}, txt)
+				}
+				x += cellW
+				if j < nGaps {
+					x += tableColGutter
+				}
+			}
+			y += chunkH + 3
+			chunkIsFirst = false
+			segIdx = end
 		}
-		y += rowH + 3
 	}
 
 	y += 8
@@ -578,23 +748,25 @@ func BuildInvoicePDF(inv *models.Invoice, vendor *models.Company) ([]byte, error
 		if err := addInvoicePage(); err != nil {
 			return nil, err
 		}
-		y = pdfMargin + 8
+		y = pdfMargin + 8 + pdfContinuationBodyTopPad(&pdf)
 	}
 
-	// --- Условия оплаты (пока без текста) ---
-	condH := 52.0
-	condY := y
-	pdfStrokeRectGray(&pdf, left, condY, contentW, condH)
-	setFont(10)
-	pdf.SetXY(left+pad, condY+pad)
-	_ = pdf.Cell(&gopdf.Rect{W: contentW - 2*pad, H: 12}, "Условия оплаты")
-	y = condY + condH + 16
+	// --- Условия оплаты ---
+	termsMD := ""
+	if inv.PaymentTermsMarkdown != nil {
+		termsMD = *inv.PaymentTermsMarkdown
+	}
+	nextY, errTerms := pdfDrawInvoicePaymentTermsSection(&pdf, left, y, contentW, pad, addInvoicePage, setFont, setFontBold, termsMD)
+	if errTerms != nil {
+		return nil, errTerms
+	}
+	y = nextY
 
 	if y+footerReserve > pdfPageH-pdfMargin {
 		if err := addInvoicePage(); err != nil {
 			return nil, err
 		}
-		y = pdfMargin + 8
+		y = pdfMargin + 8 + pdfContinuationBodyTopPad(&pdf)
 	}
 
 	// --- Подпись руководителя и м.п. ---
@@ -637,7 +809,7 @@ func BuildInvoicePDF(inv *models.Invoice, vendor *models.Company) ([]byte, error
 		if err := addInvoicePage(); err != nil {
 			return nil, err
 		}
-		y = pdfMargin + 8
+		y = pdfMargin + 8 + pdfContinuationBodyTopPad(&pdf)
 	}
 
 	// --- Сердце внизу ---
@@ -651,12 +823,32 @@ func BuildInvoicePDF(inv *models.Invoice, vendor *models.Company) ([]byte, error
 
 	barW := 168.0
 	barH := 18.0
-	barCornerX := left + 4
-	barCornerY := pdfPageH - pdfMargin - barH - 6
+	var barHold gopdf.ImageHolder
 	if barPNG, berr := encodeCode128PNG(barPayload, int(math.Max(barW*5, 520)), 40); berr == nil {
-		if barHold, herr := gopdf.ImageHolderByBytes(barPNG); herr == nil {
-			_ = pdf.ImageByHolder(barHold, barCornerX, barCornerY, &gopdf.Rect{W: barW, H: barH})
+		if bh, herr := gopdf.ImageHolderByBytes(barPNG); herr == nil {
+			barHold = bh
 		}
+	}
+
+	nPages := pdf.GetNumberOfPages()
+	if nPages > 1 {
+		if err := pdfStampInvoiceMultipageHeadersFooters(
+			&pdf,
+			nPages,
+			docNo,
+			issueDateStr(inv),
+			left,
+			contentRight,
+			pdfMargin,
+			pdfPageH,
+			setFontItalic,
+			setFont,
+		); err != nil {
+			return nil, err
+		}
+	}
+	if err := pdfStampFooterBarcodeEveryPage(&pdf, nPages, left, pdfMargin, pdfPageH, barHold, barW, barH); err != nil {
+		return nil, err
 	}
 
 	return pdf.GetBytesPdfReturnErr()

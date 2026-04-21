@@ -475,6 +475,11 @@ export interface HandlersInvoiceDraftLineInput {
   descriptionPrint?: string;
   discountAmountMinor?: number;
   discountPercent?: number;
+  /**
+     * LineComment is optional text shown under the line title in print (parentheses in UI/PDF).
+     * @maxLength 512
+     */
+  lineComment?: string;
   quantity?: number;
   subscriptionPeriodStart?: string;
   subscriptionPlanId?: string;
@@ -496,6 +501,11 @@ export interface HandlersInvoiceDraftCreateBody {
   dueDate: string;
   /** @minItems 1 */
   lines: HandlersInvoiceDraftLineInput[];
+  /**
+     * PaymentTerms is optional markdown for «Условия оплаты». Omit on PATCH to leave unchanged; send "" to clear.
+     * @maxLength 32000
+     */
+  paymentTerms?: string;
   provisionSubscriptionsOnPayment?: boolean;
 }
 
@@ -508,6 +518,11 @@ export interface HandlersInvoiceDraftUpsertBody {
   dueDate: string;
   /** @minItems 1 */
   lines: HandlersInvoiceDraftLineInput[];
+  /**
+     * PaymentTerms is optional markdown for «Условия оплаты». Omit on PATCH to leave unchanged; send "" to clear.
+     * @maxLength 32000
+     */
+  paymentTerms?: string;
   provisionSubscriptionsOnPayment?: boolean;
 }
 
@@ -557,6 +572,8 @@ export interface HandlersPatchPlatformCompanyBody {
   clearCounterparty?: boolean;
   clearOnecCounterpartyGuid?: boolean;
   counterparty?: HandlersPatchPlatformCompanyBodyCounterparty;
+  /** InvoiceDefaultPaymentTerms is markdown; only allowed when patching the SaaS operator company (isSaasOperator). */
+  invoiceDefaultPaymentTerms?: string;
   isSaasOperator?: boolean;
   name?: string;
   onecCounterpartyGuid?: string;
@@ -984,6 +1001,11 @@ export interface ModelsInvoiceLine {
   discountPercent?: number;
   id?: string;
   invoiceId?: string;
+  /**
+     * LineComment is optional print-only clarification (e.g. period); shown under description in UI/PDF.
+     * @maxLength 512
+     */
+  lineComment?: string;
   lineGrossMinor?: number;
   lineNetMinor?: number;
   plan?: ModelsSubscriptionPlan;
@@ -1059,6 +1081,11 @@ export interface ModelsInvoice {
   paymentProvider?: string;
   /** external invoice ID */
   paymentProviderInvoiceId?: string;
+  /**
+     * PaymentTermsMarkdown is per-invoice «Условия оплаты» (markdown in UI; PDF uses a plain-text rendering).
+     * @maxLength 32000
+     */
+  paymentTerms?: string;
   provisionSubscriptionsOnPayment?: boolean;
   provisioningDoneAt?: string;
   /** "draft", "open", "paid", "void", "uncollectible" */
@@ -1130,6 +1157,11 @@ export interface ModelsCompany {
   counterparty?: ModelsCompanyCounterparty;
   createdAt?: string;
   id?: string;
+  /**
+     * InvoiceDefaultPaymentTerms is markdown used as default «Условия оплаты» on new platform invoices; only the SaaS operator row (IsSaaSOperator) is intended to hold a template.
+     * @maxLength 32000
+     */
+  invoiceDefaultPaymentTerms?: string;
   invoices?: ModelsInvoice[];
   /** single operator tenant per deployment; quotas bypassed */
   isSaasOperator?: boolean;

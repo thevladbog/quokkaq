@@ -3,7 +3,7 @@
 import { Invoice } from '@quokkaq/shared-types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { InvoiceStatusBadge } from '@/components/billing/invoice-status-badge';
 import { Download, Receipt } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useMemo } from 'react';
@@ -35,26 +35,6 @@ export function InvoiceList({
   const t = useTranslations('organization.invoices');
   const locale = useLocale();
   const intlLocale = useMemo(() => intlLocaleFromAppLocale(locale), [locale]);
-
-  const getStatusBadge = (status: string) => {
-    return (
-      <Badge
-        variant={
-          status === 'draft'
-            ? 'outline'
-            : status === 'open'
-              ? 'secondary'
-              : status === 'paid'
-                ? 'default'
-                : status === 'uncollectible'
-                  ? 'destructive'
-                  : 'outline'
-        }
-      >
-        {t(`statuses.${status}`)}
-      </Badge>
-    );
-  };
 
   const getPaymentProviderLabel = (provider: string) => {
     return t(`providers.${provider}`);
@@ -148,7 +128,10 @@ export function InvoiceList({
                       getPaymentProviderLabel(invoice.paymentProvider)}
                   </td>
                   <td className='px-4 py-3'>
-                    {getStatusBadge(invoice.status)}
+                    <InvoiceStatusBadge
+                      status={invoice.status}
+                      label={t(`statuses.${invoice.status}`)}
+                    />
                   </td>
                   <td className='px-4 py-3 text-right'>
                     {invoiceAllowsPdfDownload(invoice.status) && onDownload && (
