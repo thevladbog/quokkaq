@@ -42,6 +42,7 @@ import { useTranslations, useLocale } from 'next-intl';
 import { toast } from 'sonner';
 import { getUnitDisplayName } from '@/lib/unit-display';
 import { ImageUpload } from '@/components/ui/image-upload';
+import { logger } from '@/lib/logger';
 import { isQuotaExceededError } from '@/lib/quota-error';
 import type { Service } from '@quokkaq/shared-types';
 
@@ -476,7 +477,7 @@ function ServiceForm({
       if (isQuotaExceededError(error)) {
         toast.error(tUnits('quota_exceeded_service'));
       } else {
-        console.error('Error saving service:', error);
+        logger.error('Error saving service:', error);
         toast.error(tServices('save_error'));
       }
     }

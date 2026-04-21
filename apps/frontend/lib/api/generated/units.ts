@@ -713,6 +713,18 @@ export type HandlersPlatformCreateSubscriptionPlanBodyLimits = {[key: string]: n
 
 export type HandlersPlatformCreateSubscriptionPlanBodyLimitsNegotiable = {[key: string]: boolean};
 
+/**
+ * PricingModel: "flat" (fixed price) or "per_unit" (price per subdivision). Defaults to "per_unit".
+enums: flat,per_unit
+ */
+export type HandlersPlatformCreateSubscriptionPlanBodyPricingModel = typeof HandlersPlatformCreateSubscriptionPlanBodyPricingModel[keyof typeof HandlersPlatformCreateSubscriptionPlanBodyPricingModel];
+
+
+export const HandlersPlatformCreateSubscriptionPlanBodyPricingModel = {
+  flat: 'flat',
+  per_unit: 'per_unit',
+} as const;
+
 export interface HandlersPlatformCreateSubscriptionPlanBody {
   /** AllowInstantPurchase omitted or null defaults to true. */
   allowInstantPurchase?: boolean;
@@ -734,8 +746,9 @@ export interface HandlersPlatformCreateSubscriptionPlanBody {
   name?: string;
   nameEn?: string;
   price?: number;
-  /** PricingModel: "flat" (fixed price) or "per_unit" (price per subdivision). Defaults to "per_unit". */
-  pricingModel?: string;
+  /** PricingModel: "flat" (fixed price) or "per_unit" (price per subdivision). Defaults to "per_unit".
+  enums: flat,per_unit */
+  pricingModel?: HandlersPlatformCreateSubscriptionPlanBodyPricingModel;
 }
 
 export interface HandlersPlatformIntegrationsResponse {
@@ -752,6 +765,18 @@ export type HandlersPlatformUpdateSubscriptionPlanBodyFeatures = {[key: string]:
 export type HandlersPlatformUpdateSubscriptionPlanBodyLimits = {[key: string]: number};
 
 export type HandlersPlatformUpdateSubscriptionPlanBodyLimitsNegotiable = {[key: string]: boolean};
+
+/**
+ * PricingModel: "flat" or "per_unit". Omit to leave unchanged.
+enums: flat,per_unit
+ */
+export type HandlersPlatformUpdateSubscriptionPlanBodyPricingModel = typeof HandlersPlatformUpdateSubscriptionPlanBodyPricingModel[keyof typeof HandlersPlatformUpdateSubscriptionPlanBodyPricingModel];
+
+
+export const HandlersPlatformUpdateSubscriptionPlanBodyPricingModel = {
+  flat: 'flat',
+  per_unit: 'per_unit',
+} as const;
 
 export interface HandlersPlatformUpdateSubscriptionPlanBody {
   allowInstantPurchase?: boolean;
@@ -771,8 +796,9 @@ export interface HandlersPlatformUpdateSubscriptionPlanBody {
   name?: string;
   nameEn?: string;
   price?: number;
-  /** PricingModel: "flat" or "per_unit". Omit to leave unchanged. */
-  pricingModel?: string;
+  /** PricingModel: "flat" or "per_unit". Omit to leave unchanged.
+  enums: flat,per_unit */
+  pricingModel?: HandlersPlatformUpdateSubscriptionPlanBodyPricingModel;
 }
 
 export interface HandlersPublicLeadRequestBody {
@@ -785,6 +811,12 @@ export interface HandlersPublicLeadRequestBody {
   privacyConsentAccepted: true;
   referrer?: string;
   source?: string;
+}
+
+export interface HandlersQuotaExceededError {
+  error?: string;
+  message?: string;
+  metric?: string;
 }
 
 export interface HandlersRefreshResponse {
@@ -975,6 +1007,21 @@ export interface HandlersAddSupportReportShareRequest {
 }
 
 /**
+ * PricingModel determines how the price field is interpreted:
+  "flat"     – fixed price per billing period (legacy default)
+  "per_unit" – price per subdivision per billing period; total = price * active_subdivisions
+PricingModel: flat = fixed price per billing period; per_unit = price per subdivision per period
+enums: flat,per_unit
+ */
+export type ModelsSubscriptionPlanPricingModel = typeof ModelsSubscriptionPlanPricingModel[keyof typeof ModelsSubscriptionPlanPricingModel];
+
+
+export const ModelsSubscriptionPlanPricingModel = {
+  flat: 'flat',
+  per_unit: 'per_unit',
+} as const;
+
+/**
  * feature flags
  */
 export type ModelsSubscriptionPlanFeatures = {[key: string]: boolean};
@@ -1022,8 +1069,10 @@ export interface ModelsSubscriptionPlan {
   price?: number;
   /** PricingModel determines how the price field is interpreted:
     "flat"     – fixed price per billing period (legacy default)
-    "per_unit" – price per subdivision per billing period; total = price * active_subdivisions */
-  pricingModel?: string;
+    "per_unit" – price per subdivision per billing period; total = price * active_subdivisions
+  PricingModel: flat = fixed price per billing period; per_unit = price per subdivision per period
+  enums: flat,per_unit */
+  pricingModel?: ModelsSubscriptionPlanPricingModel;
   updatedAt?: string;
 }
 
@@ -2189,8 +2238,6 @@ export interface HandlersLoginLinkResponse {
   exampleUrl: string;
 }
 
-export type PostUnits402 = { [key: string]: unknown };
-
 export type PatchUnitsUnitIdAdSettingsBody = { [key: string]: unknown };
 
 export type PatchUnitsUnitIdAdSettings200 = {[key: string]: boolean};
@@ -2350,7 +2397,7 @@ export type postUnitsResponse400 = {
 }
 
 export type postUnitsResponse402 = {
-  data: PostUnits402
+  data: HandlersQuotaExceededError
   status: 402
 }
 
@@ -2391,7 +2438,7 @@ export const postUnits = async (modelsUnit: NonReadonly<ModelsUnit>, options?: R
 
 
 
-export const getPostUnitsMutationOptions = <TError = string | PostUnits402,
+export const getPostUnitsMutationOptions = <TError = string | HandlersQuotaExceededError,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnits>>, TError,{data: NonReadonly<ModelsUnit>}, TContext>, request?: SecondParameter<typeof orvalMutator>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postUnits>>, TError,{data: NonReadonly<ModelsUnit>}, TContext> => {
 
@@ -2420,12 +2467,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostUnitsMutationResult = NonNullable<Awaited<ReturnType<typeof postUnits>>>
     export type PostUnitsMutationBody = NonReadonly<ModelsUnit>
-    export type PostUnitsMutationError = string | PostUnits402
+    export type PostUnitsMutationError = string | HandlersQuotaExceededError
 
     /**
  * @summary Create a new unit
  */
-export const usePostUnits = <TError = string | PostUnits402,
+export const usePostUnits = <TError = string | HandlersQuotaExceededError,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnits>>, TError,{data: NonReadonly<ModelsUnit>}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postUnits>>,

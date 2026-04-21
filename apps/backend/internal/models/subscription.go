@@ -35,7 +35,9 @@ type SubscriptionPlan struct {
 	// PricingModel determines how the price field is interpreted:
 	//   "flat"     – fixed price per billing period (legacy default)
 	//   "per_unit" – price per subdivision per billing period; total = price * active_subdivisions
-	PricingModel string    `gorm:"not null;default:'per_unit';column:pricing_model" json:"pricingModel"`
+	// PricingModel: flat = fixed price per billing period; per_unit = price per subdivision per period
+	// enums: flat,per_unit
+	PricingModel string    `gorm:"not null;default:'per_unit';column:pricing_model" json:"pricingModel" enums:"flat,per_unit"`
 	CreatedAt    time.Time `gorm:"autoCreateTime" json:"createdAt"`
 	UpdatedAt    time.Time `gorm:"autoUpdateTime" json:"updatedAt"`
 }

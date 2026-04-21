@@ -87,9 +87,7 @@ export function SubscriptionCard({
     return Math.max(0, raw);
   }, [subscription.trialEnd, nowMs]);
 
-  const isFree =
-    (subscription.plan as typeof subscription.plan & { isFree?: boolean })
-      ?.isFree === true;
+  const isFree = subscription.plan?.isFree === true;
 
   const showFooter = useMemo(() => {
     const s = subscription;
@@ -132,11 +130,7 @@ export function SubscriptionCard({
         {/* Price */}
         {subscription.plan &&
           (() => {
-            const planExt = subscription.plan as typeof subscription.plan & {
-              isFree?: boolean;
-              pricingModel?: string;
-            };
-            if (planExt.isFree) {
+            if (subscription.plan.isFree) {
               return (
                 <div className='flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 p-4'>
                   <span className='text-2xl font-bold text-green-700'>
@@ -146,7 +140,7 @@ export function SubscriptionCard({
               );
             }
             if (subscription.plan.price > 0) {
-              const isPerUnit = planExt.pricingModel === 'per_unit';
+              const isPerUnit = subscription.plan.pricingModel === 'per_unit';
               return (
                 <div className='flex items-baseline gap-2'>
                   <span className='text-4xl font-bold'>

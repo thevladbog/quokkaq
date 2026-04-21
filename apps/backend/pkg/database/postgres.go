@@ -2138,7 +2138,7 @@ SET limits = limits || jsonb_build_object('zones_per_unit',
     WHEN 'professional'  THEN 5
     WHEN 'enterprise'    THEN -1
     WHEN 'grandfathered' THEN -1
-    ELSE 0
+    ELSE -1
   END
 )
 WHERE limits IS NOT NULL AND NOT (limits ? 'zones_per_unit')`).Error; err != nil {

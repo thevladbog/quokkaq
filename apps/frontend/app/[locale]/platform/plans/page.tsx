@@ -3,7 +3,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type {
   HandlersPlatformCreateSubscriptionPlanBody,
-  HandlersPlatformUpdateSubscriptionPlanBody,
   ModelsSubscriptionPlan
 } from '@/lib/api/generated/platform';
 import {
@@ -331,7 +330,7 @@ export default function PlatformPlansPage() {
         allowInstantPurchase: form.isFree ? true : form.allowInstantPurchase,
         isFree: form.isFree,
         pricingModel: form.pricingModel
-      } as HandlersPlatformCreateSubscriptionPlanBody);
+      });
     },
     onSuccess: () => {
       qc.invalidateQueries({
@@ -390,7 +389,7 @@ export default function PlatformPlansPage() {
         allowInstantPurchase: form.isFree ? true : form.allowInstantPurchase,
         isFree: form.isFree,
         pricingModel: form.pricingModel
-      } as HandlersPlatformUpdateSubscriptionPlanBody);
+      });
     },
     onSuccess: () => {
       qc.invalidateQueries({

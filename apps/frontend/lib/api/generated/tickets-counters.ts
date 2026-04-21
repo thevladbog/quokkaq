@@ -686,6 +686,18 @@ export type HandlersPlatformCreateSubscriptionPlanBodyLimits = {[key: string]: n
 
 export type HandlersPlatformCreateSubscriptionPlanBodyLimitsNegotiable = {[key: string]: boolean};
 
+/**
+ * PricingModel: "flat" (fixed price) or "per_unit" (price per subdivision). Defaults to "per_unit".
+enums: flat,per_unit
+ */
+export type HandlersPlatformCreateSubscriptionPlanBodyPricingModel = typeof HandlersPlatformCreateSubscriptionPlanBodyPricingModel[keyof typeof HandlersPlatformCreateSubscriptionPlanBodyPricingModel];
+
+
+export const HandlersPlatformCreateSubscriptionPlanBodyPricingModel = {
+  flat: 'flat',
+  per_unit: 'per_unit',
+} as const;
+
 export interface HandlersPlatformCreateSubscriptionPlanBody {
   /** AllowInstantPurchase omitted or null defaults to true. */
   allowInstantPurchase?: boolean;
@@ -707,8 +719,9 @@ export interface HandlersPlatformCreateSubscriptionPlanBody {
   name?: string;
   nameEn?: string;
   price?: number;
-  /** PricingModel: "flat" (fixed price) or "per_unit" (price per subdivision). Defaults to "per_unit". */
-  pricingModel?: string;
+  /** PricingModel: "flat" (fixed price) or "per_unit" (price per subdivision). Defaults to "per_unit".
+  enums: flat,per_unit */
+  pricingModel?: HandlersPlatformCreateSubscriptionPlanBodyPricingModel;
 }
 
 export interface HandlersPlatformIntegrationsResponse {
@@ -725,6 +738,18 @@ export type HandlersPlatformUpdateSubscriptionPlanBodyFeatures = {[key: string]:
 export type HandlersPlatformUpdateSubscriptionPlanBodyLimits = {[key: string]: number};
 
 export type HandlersPlatformUpdateSubscriptionPlanBodyLimitsNegotiable = {[key: string]: boolean};
+
+/**
+ * PricingModel: "flat" or "per_unit". Omit to leave unchanged.
+enums: flat,per_unit
+ */
+export type HandlersPlatformUpdateSubscriptionPlanBodyPricingModel = typeof HandlersPlatformUpdateSubscriptionPlanBodyPricingModel[keyof typeof HandlersPlatformUpdateSubscriptionPlanBodyPricingModel];
+
+
+export const HandlersPlatformUpdateSubscriptionPlanBodyPricingModel = {
+  flat: 'flat',
+  per_unit: 'per_unit',
+} as const;
 
 export interface HandlersPlatformUpdateSubscriptionPlanBody {
   allowInstantPurchase?: boolean;
@@ -744,8 +769,9 @@ export interface HandlersPlatformUpdateSubscriptionPlanBody {
   name?: string;
   nameEn?: string;
   price?: number;
-  /** PricingModel: "flat" or "per_unit". Omit to leave unchanged. */
-  pricingModel?: string;
+  /** PricingModel: "flat" or "per_unit". Omit to leave unchanged.
+  enums: flat,per_unit */
+  pricingModel?: HandlersPlatformUpdateSubscriptionPlanBodyPricingModel;
 }
 
 export interface HandlersPublicLeadRequestBody {
@@ -758,6 +784,12 @@ export interface HandlersPublicLeadRequestBody {
   privacyConsentAccepted: true;
   referrer?: string;
   source?: string;
+}
+
+export interface HandlersQuotaExceededError {
+  error?: string;
+  message?: string;
+  metric?: string;
 }
 
 export interface HandlersRefreshResponse {
@@ -948,6 +980,21 @@ export interface HandlersAddSupportReportShareRequest {
 }
 
 /**
+ * PricingModel determines how the price field is interpreted:
+  "flat"     – fixed price per billing period (legacy default)
+  "per_unit" – price per subdivision per billing period; total = price * active_subdivisions
+PricingModel: flat = fixed price per billing period; per_unit = price per subdivision per period
+enums: flat,per_unit
+ */
+export type ModelsSubscriptionPlanPricingModel = typeof ModelsSubscriptionPlanPricingModel[keyof typeof ModelsSubscriptionPlanPricingModel];
+
+
+export const ModelsSubscriptionPlanPricingModel = {
+  flat: 'flat',
+  per_unit: 'per_unit',
+} as const;
+
+/**
  * feature flags
  */
 export type ModelsSubscriptionPlanFeatures = {[key: string]: boolean};
@@ -995,8 +1042,10 @@ export interface ModelsSubscriptionPlan {
   price?: number;
   /** PricingModel determines how the price field is interpreted:
     "flat"     – fixed price per billing period (legacy default)
-    "per_unit" – price per subdivision per billing period; total = price * active_subdivisions */
-  pricingModel?: string;
+    "per_unit" – price per subdivision per billing period; total = price * active_subdivisions
+  PricingModel: flat = fixed price per billing period; per_unit = price per subdivision per period
+  enums: flat,per_unit */
+  pricingModel?: ModelsSubscriptionPlanPricingModel;
   updatedAt?: string;
 }
 
@@ -2165,10 +2214,6 @@ export interface HandlersLoginLinkResponse {
 export type PostCountersIdCallNext200 = { [key: string]: unknown };
 
 export type PostCountersIdForceRelease200 = { [key: string]: unknown };
-
-export type PostUnitsUnitIdCounters402 = { [key: string]: unknown };
-
-export type CreateUnitTicket402 = { [key: string]: unknown };
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
@@ -4269,36 +4314,36 @@ export function useGetUnitsUnitIdCounters<TData = Awaited<ReturnType<typeof getU
  * Creates a new counter for a unit
  * @summary Create a new counter
  */
-export type postUnitsUnitIdCountersResponse201 = {
+export type createUnitCounterResponse201 = {
   data: ModelsCounter
   status: 201
 }
 
-export type postUnitsUnitIdCountersResponse400 = {
+export type createUnitCounterResponse400 = {
   data: string
   status: 400
 }
 
-export type postUnitsUnitIdCountersResponse402 = {
-  data: PostUnitsUnitIdCounters402
+export type createUnitCounterResponse402 = {
+  data: HandlersQuotaExceededError
   status: 402
 }
 
-export type postUnitsUnitIdCountersResponse500 = {
+export type createUnitCounterResponse500 = {
   data: string
   status: 500
 }
 
-export type postUnitsUnitIdCountersResponseSuccess = (postUnitsUnitIdCountersResponse201) & {
+export type createUnitCounterResponseSuccess = (createUnitCounterResponse201) & {
   headers: Headers;
 };
-export type postUnitsUnitIdCountersResponseError = (postUnitsUnitIdCountersResponse400 | postUnitsUnitIdCountersResponse402 | postUnitsUnitIdCountersResponse500) & {
+export type createUnitCounterResponseError = (createUnitCounterResponse400 | createUnitCounterResponse402 | createUnitCounterResponse500) & {
   headers: Headers;
 };
 
-export type postUnitsUnitIdCountersResponse = (postUnitsUnitIdCountersResponseSuccess | postUnitsUnitIdCountersResponseError)
+export type createUnitCounterResponse = (createUnitCounterResponseSuccess | createUnitCounterResponseError)
 
-export const getPostUnitsUnitIdCountersUrl = (unitId: string,) => {
+export const getCreateUnitCounterUrl = (unitId: string,) => {
 
 
 
@@ -4306,10 +4351,10 @@ export const getPostUnitsUnitIdCountersUrl = (unitId: string,) => {
   return `/units/${unitId}/counters`
 }
 
-export const postUnitsUnitIdCounters = async (unitId: string,
-    modelsCounter: ModelsCounter, options?: RequestInit): Promise<postUnitsUnitIdCountersResponse> => {
+export const createUnitCounter = async (unitId: string,
+    modelsCounter: ModelsCounter, options?: RequestInit): Promise<createUnitCounterResponse> => {
 
-  return orvalMutator<postUnitsUnitIdCountersResponse>(getPostUnitsUnitIdCountersUrl(unitId),
+  return orvalMutator<createUnitCounterResponse>(getCreateUnitCounterUrl(unitId),
   {
     ...options,
     method: 'POST',
@@ -4322,11 +4367,11 @@ export const postUnitsUnitIdCounters = async (unitId: string,
 
 
 
-export const getPostUnitsUnitIdCountersMutationOptions = <TError = string | PostUnitsUnitIdCounters402,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdCounters>>, TError,{unitId: string;data: ModelsCounter}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdCounters>>, TError,{unitId: string;data: ModelsCounter}, TContext> => {
+export const getCreateUnitCounterMutationOptions = <TError = string | HandlersQuotaExceededError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createUnitCounter>>, TError,{unitId: string;data: ModelsCounter}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof createUnitCounter>>, TError,{unitId: string;data: ModelsCounter}, TContext> => {
 
-const mutationKey = ['postUnitsUnitIdCounters'];
+const mutationKey = ['createUnitCounter'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -4336,10 +4381,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postUnitsUnitIdCounters>>, {unitId: string;data: ModelsCounter}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createUnitCounter>>, {unitId: string;data: ModelsCounter}> = (props) => {
           const {unitId,data} = props ?? {};
 
-          return  postUnitsUnitIdCounters(unitId,data,requestOptions)
+          return  createUnitCounter(unitId,data,requestOptions)
         }
 
 
@@ -4349,22 +4394,22 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PostUnitsUnitIdCountersMutationResult = NonNullable<Awaited<ReturnType<typeof postUnitsUnitIdCounters>>>
-    export type PostUnitsUnitIdCountersMutationBody = ModelsCounter
-    export type PostUnitsUnitIdCountersMutationError = string | PostUnitsUnitIdCounters402
+    export type CreateUnitCounterMutationResult = NonNullable<Awaited<ReturnType<typeof createUnitCounter>>>
+    export type CreateUnitCounterMutationBody = ModelsCounter
+    export type CreateUnitCounterMutationError = string | HandlersQuotaExceededError
 
     /**
  * @summary Create a new counter
  */
-export const usePostUnitsUnitIdCounters = <TError = string | PostUnitsUnitIdCounters402,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postUnitsUnitIdCounters>>, TError,{unitId: string;data: ModelsCounter}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const useCreateUnitCounter = <TError = string | HandlersQuotaExceededError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createUnitCounter>>, TError,{unitId: string;data: ModelsCounter}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof postUnitsUnitIdCounters>>,
+        Awaited<ReturnType<typeof createUnitCounter>>,
         TError,
         {unitId: string;data: ModelsCounter},
         TContext
       > => {
-      return useMutation(getPostUnitsUnitIdCountersMutationOptions(options), queryClient);
+      return useMutation(getCreateUnitCounterMutationOptions(options), queryClient);
     }
 
 /**
@@ -4508,7 +4553,7 @@ export type createUnitTicketResponse400 = {
 }
 
 export type createUnitTicketResponse402 = {
-  data: CreateUnitTicket402
+  data: HandlersQuotaExceededError
   status: 402
 }
 
@@ -4550,7 +4595,7 @@ export const createUnitTicket = async (unitId: string,
 
 
 
-export const getCreateUnitTicketMutationOptions = <TError = string | CreateUnitTicket402,
+export const getCreateUnitTicketMutationOptions = <TError = string | HandlersQuotaExceededError,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createUnitTicket>>, TError,{unitId: string;data: HandlersCreateTicketRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
 ): UseMutationOptions<Awaited<ReturnType<typeof createUnitTicket>>, TError,{unitId: string;data: HandlersCreateTicketRequest}, TContext> => {
 
@@ -4579,12 +4624,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type CreateUnitTicketMutationResult = NonNullable<Awaited<ReturnType<typeof createUnitTicket>>>
     export type CreateUnitTicketMutationBody = HandlersCreateTicketRequest
-    export type CreateUnitTicketMutationError = string | CreateUnitTicket402
+    export type CreateUnitTicketMutationError = string | HandlersQuotaExceededError
 
     /**
  * @summary Create a new ticket
  */
-export const useCreateUnitTicket = <TError = string | CreateUnitTicket402,
+export const useCreateUnitTicket = <TError = string | HandlersQuotaExceededError,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createUnitTicket>>, TError,{unitId: string;data: HandlersCreateTicketRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof createUnitTicket>>,

@@ -971,7 +971,7 @@ export const countersApi = {
     unitId: string,
     data: { name: string; serviceZoneId?: string | null }
   ) => {
-    const res = await orvalTc.postUnitsUnitIdCounters(unitId, {
+    const res = await orvalTc.createUnitCounter(unitId, {
       name: data.name,
       serviceZoneId: data.serviceZoneId ?? undefined
     });

@@ -474,7 +474,9 @@ func (h *AuthHandler) Signup(w http.ResponseWriter, r *http.Request) {
 	if req.PlanCode == "" {
 		if h.subscriptionRepo != nil {
 			freePlan, err := h.subscriptionRepo.FindFreePlan()
-			if err == nil && freePlan != nil {
+			if err != nil {
+				logger.PrintfCtx(r.Context(), "Signup: FindFreePlan error (falling back to starter): %v", err)
+			} else if freePlan != nil {
 				req.PlanCode = freePlan.Code
 			}
 		}

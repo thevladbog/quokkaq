@@ -59,7 +59,7 @@ type CreateInvitationRequest struct {
 // @Success      201  {object}  models.Invitation
 // @Failure      400  {string}  string "Bad Request"
 // @Failure      401  {string}  string "Unauthorized"
-// @Failure      402  {object}  object "Quota Exceeded"
+// @Failure      402  {object}  handlers.QuotaExceededError "Quota Exceeded"
 // @Failure      403  {string}  string "Forbidden"
 // @Failure      500  {string}  string "Internal Server Error"
 // @Router       /invitations [post]

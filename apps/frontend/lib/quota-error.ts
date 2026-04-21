@@ -7,9 +7,6 @@ export function isQuotaExceededError(err: unknown): boolean {
   if (err instanceof ApiHttpError) {
     return err.status === 402;
   }
-  if (err instanceof Error) {
-    return err.message.includes('API Error: 402');
-  }
   return false;
 }
 
@@ -18,9 +15,11 @@ export function isQuotaExceededError(err: unknown): boolean {
  * (credit warning scenario — quota exceeded but the response may still carry a ticket).
  */
 export function isTicketCreditWarning(err: unknown): boolean {
-  if (!isQuotaExceededError(err)) return false;
-  if (err instanceof ApiHttpError) {
-    return err.rawBody?.includes('tickets_per_month') ?? false;
+  if (!(err instanceof ApiHttpError) || err.status !== 402) return false;
+  try {
+    const parsed = JSON.parse(err.rawBody ?? '');
+    return parsed?.metric === 'tickets_per_month';
+  } catch {
+    return false;
   }
-  return false;
 }

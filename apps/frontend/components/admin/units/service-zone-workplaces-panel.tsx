@@ -130,12 +130,7 @@ export function ServiceZoneWorkplacesPanel({
       );
     } catch (error) {
       if (isQuotaExceededError(error)) {
-        toast.error(
-          t('quota_exceeded_unit', {
-            defaultValue:
-              'Достигнут лимит тарифного плана. Обновите тариф, чтобы добавить ещё.'
-          })
-        );
+        toast.error(t('quota_exceeded_unit'));
       } else {
         toast.error(
           t('create_error', {

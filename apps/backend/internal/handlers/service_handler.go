@@ -32,7 +32,7 @@ func NewServiceHandler(service services.ServiceService, userRepo repository.User
 // @Success      201  {object}  models.Service
 // @Failure      400  {string}  string "Bad Request"
 // @Failure      401  {string}  string "Unauthorized"
-// @Failure      402  {object}  object "Quota Exceeded"
+// @Failure      402  {object}  handlers.QuotaExceededError "Quota Exceeded"
 // @Failure      403  {string}  string "Forbidden"
 // @Failure      409  {string}  string "Conflict (duplicate calendar slot key for unit)"
 // @Failure      500  {string}  string "Internal Server Error"
@@ -65,7 +65,7 @@ func (h *ServiceHandler) CreateService(w http.ResponseWriter, r *http.Request) {
 	if err := h.service.CreateService(&service); err != nil {
 		switch {
 		case errors.Is(err, services.ErrServiceQuotaExceeded):
-			writeQuotaExceeded(w, "", err)
+			writeQuotaExceeded(w, "services", err)
 		case errors.Is(err, services.ErrDuplicateCalendarSlotKey):
 			http.Error(w, err.Error(), http.StatusConflict)
 		default:

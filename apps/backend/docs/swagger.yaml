@@ -632,7 +632,12 @@ components:
         price:
           type: integer
         pricingModel:
-          description: 'PricingModel: "flat" (fixed price) or "per_unit" (price per subdivision). Defaults to "per_unit".'
+          description: 'PricingModel: "flat" (fixed price) or "per_unit" (price per subdivision). Defaults to "per_unit".
+
+            enums: flat,per_unit'
+          enum:
+          - flat
+          - per_unit
           type: string
       type: object
     handlers.PlatformIntegrationsResponse:
@@ -698,7 +703,12 @@ components:
         price:
           type: integer
         pricingModel:
-          description: 'PricingModel: "flat" or "per_unit". Omit to leave unchanged.'
+          description: 'PricingModel: "flat" or "per_unit". Omit to leave unchanged.
+
+            enums: flat,per_unit'
+          enum:
+          - flat
+          - per_unit
           type: string
       type: object
     handlers.PublicLeadRequestBody:
@@ -728,6 +738,18 @@ components:
       - email
       - name
       - privacyConsentAccepted
+      type: object
+    handlers.QuotaExceededError:
+      properties:
+        error:
+          example: quota_exceeded
+          type: string
+        message:
+          example: unit quota exceeded for current subscription plan
+          type: string
+        metric:
+          example: units
+          type: string
       type: object
     handlers.RefreshResponse:
       properties:
@@ -2173,7 +2195,10 @@ components:
           description: price in minor units (cents/kopeks)
           type: integer
         pricingModel:
-          description: "PricingModel determines how the price field is interpreted:\n  \"flat\"     – fixed price per billing period (legacy default)\n  \"per_unit\" – price per subdivision per billing period; total = price * active_subdivisions"
+          description: "PricingModel determines how the price field is interpreted:\n  \"flat\"     – fixed price per billing period (legacy default)\n  \"per_unit\" – price per subdivision per billing period; total = price * active_subdivisions\nPricingModel: flat = fixed price per billing period; per_unit = price per subdivision per period\nenums: flat,per_unit"
+          enum:
+          - flat
+          - per_unit
           type: string
         updatedAt:
           type: string
@@ -6697,7 +6722,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/handlers.QuotaExceededError'
           description: Quota Exceeded
         '403':
           content:
@@ -8547,7 +8572,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/handlers.QuotaExceededError'
           description: Quota Exceeded
         '403':
           content:
@@ -10468,7 +10493,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/handlers.QuotaExceededError'
           description: Quota Exceeded
         '500':
           content:
@@ -11405,6 +11430,7 @@ paths:
       - counters
     post:
       description: Creates a new counter for a unit
+      operationId: CreateUnitCounter
       parameters:
       - description: Unit ID
         in: path
@@ -11437,7 +11463,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/handlers.QuotaExceededError'
           description: Quota Exceeded
         '500':
           content:
@@ -12342,12 +12368,6 @@ paths:
               schema:
                 type: string
           description: Bad Request
-        '402':
-          content:
-            application/json:
-              schema:
-                type: object
-          description: Quota Exceeded
         '500':
           content:
             application/json:
@@ -13994,7 +14014,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/handlers.QuotaExceededError'
           description: Quota Exceeded
         '500':
           content:

@@ -1217,7 +1217,7 @@ export const SubscriptionPlanSchema = z.object({
    * - "flat"     – fixed price per billing period
    * - "per_unit" – price per active subdivision per billing period
    */
-  pricingModel: z.enum(['flat', 'per_unit']).optional().default('per_unit'),
+  pricingModel: z.enum(['flat', 'per_unit']).optional().default('flat'),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional()
 });

@@ -38,7 +38,7 @@ func planSeedAllowInstantPurchase(code string) bool {
 	return true
 }
 
-func planSeedIsFree(code string) bool {
+func planSeedIsFree(_ string) bool {
 	// grandfathered is a legacy zero-price plan but not semantically "free" (it's a legacy tier).
 	// No seeded plan is currently marked as isFree; that flag is set by platform operators via the constructor.
 	return false

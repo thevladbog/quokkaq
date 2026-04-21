@@ -667,6 +667,18 @@ export type HandlersPlatformCreateSubscriptionPlanBodyLimits = {[key: string]: n
 
 export type HandlersPlatformCreateSubscriptionPlanBodyLimitsNegotiable = {[key: string]: boolean};
 
+/**
+ * PricingModel: "flat" (fixed price) or "per_unit" (price per subdivision). Defaults to "per_unit".
+enums: flat,per_unit
+ */
+export type HandlersPlatformCreateSubscriptionPlanBodyPricingModel = typeof HandlersPlatformCreateSubscriptionPlanBodyPricingModel[keyof typeof HandlersPlatformCreateSubscriptionPlanBodyPricingModel];
+
+
+export const HandlersPlatformCreateSubscriptionPlanBodyPricingModel = {
+  flat: 'flat',
+  per_unit: 'per_unit',
+} as const;
+
 export interface HandlersPlatformCreateSubscriptionPlanBody {
   /** AllowInstantPurchase omitted or null defaults to true. */
   allowInstantPurchase?: boolean;
@@ -688,8 +700,9 @@ export interface HandlersPlatformCreateSubscriptionPlanBody {
   name?: string;
   nameEn?: string;
   price?: number;
-  /** PricingModel: "flat" (fixed price) or "per_unit" (price per subdivision). Defaults to "per_unit". */
-  pricingModel?: string;
+  /** PricingModel: "flat" (fixed price) or "per_unit" (price per subdivision). Defaults to "per_unit".
+  enums: flat,per_unit */
+  pricingModel?: HandlersPlatformCreateSubscriptionPlanBodyPricingModel;
 }
 
 export interface HandlersPlatformIntegrationsResponse {
@@ -706,6 +719,18 @@ export type HandlersPlatformUpdateSubscriptionPlanBodyFeatures = {[key: string]:
 export type HandlersPlatformUpdateSubscriptionPlanBodyLimits = {[key: string]: number};
 
 export type HandlersPlatformUpdateSubscriptionPlanBodyLimitsNegotiable = {[key: string]: boolean};
+
+/**
+ * PricingModel: "flat" or "per_unit". Omit to leave unchanged.
+enums: flat,per_unit
+ */
+export type HandlersPlatformUpdateSubscriptionPlanBodyPricingModel = typeof HandlersPlatformUpdateSubscriptionPlanBodyPricingModel[keyof typeof HandlersPlatformUpdateSubscriptionPlanBodyPricingModel];
+
+
+export const HandlersPlatformUpdateSubscriptionPlanBodyPricingModel = {
+  flat: 'flat',
+  per_unit: 'per_unit',
+} as const;
 
 export interface HandlersPlatformUpdateSubscriptionPlanBody {
   allowInstantPurchase?: boolean;
@@ -725,8 +750,9 @@ export interface HandlersPlatformUpdateSubscriptionPlanBody {
   name?: string;
   nameEn?: string;
   price?: number;
-  /** PricingModel: "flat" or "per_unit". Omit to leave unchanged. */
-  pricingModel?: string;
+  /** PricingModel: "flat" or "per_unit". Omit to leave unchanged.
+  enums: flat,per_unit */
+  pricingModel?: HandlersPlatformUpdateSubscriptionPlanBodyPricingModel;
 }
 
 export interface HandlersPublicLeadRequestBody {
@@ -739,6 +765,12 @@ export interface HandlersPublicLeadRequestBody {
   privacyConsentAccepted: true;
   referrer?: string;
   source?: string;
+}
+
+export interface HandlersQuotaExceededError {
+  error?: string;
+  message?: string;
+  metric?: string;
 }
 
 export interface HandlersRefreshResponse {
@@ -929,6 +961,21 @@ export interface HandlersAddSupportReportShareRequest {
 }
 
 /**
+ * PricingModel determines how the price field is interpreted:
+  "flat"     – fixed price per billing period (legacy default)
+  "per_unit" – price per subdivision per billing period; total = price * active_subdivisions
+PricingModel: flat = fixed price per billing period; per_unit = price per subdivision per period
+enums: flat,per_unit
+ */
+export type ModelsSubscriptionPlanPricingModel = typeof ModelsSubscriptionPlanPricingModel[keyof typeof ModelsSubscriptionPlanPricingModel];
+
+
+export const ModelsSubscriptionPlanPricingModel = {
+  flat: 'flat',
+  per_unit: 'per_unit',
+} as const;
+
+/**
  * feature flags
  */
 export type ModelsSubscriptionPlanFeatures = {[key: string]: boolean};
@@ -976,8 +1023,10 @@ export interface ModelsSubscriptionPlan {
   price?: number;
   /** PricingModel determines how the price field is interpreted:
     "flat"     – fixed price per billing period (legacy default)
-    "per_unit" – price per subdivision per billing period; total = price * active_subdivisions */
-  pricingModel?: string;
+    "per_unit" – price per subdivision per billing period; total = price * active_subdivisions
+  PricingModel: flat = fixed price per billing period; per_unit = price per subdivision per period
+  enums: flat,per_unit */
+  pricingModel?: ModelsSubscriptionPlanPricingModel;
   updatedAt?: string;
 }
 

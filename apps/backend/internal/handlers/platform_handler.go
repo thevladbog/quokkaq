@@ -898,7 +898,8 @@ type PlatformCreateSubscriptionPlanBody struct {
 	// IsFree when true: plan is always free (price must be 0). Shown as "Free" in UI, not "Custom pricing".
 	IsFree *bool `json:"isFree,omitempty"`
 	// PricingModel: "flat" (fixed price) or "per_unit" (price per subdivision). Defaults to "per_unit".
-	PricingModel *string `json:"pricingModel,omitempty"`
+	// enums: flat,per_unit
+	PricingModel *string `json:"pricingModel,omitempty" enums:"flat,per_unit"`
 }
 
 // CreateSubscriptionPlan godoc
@@ -1042,7 +1043,8 @@ type PlatformUpdateSubscriptionPlanBody struct {
 	// IsFree when true: plan is always free (price must be 0). Omit to leave unchanged.
 	IsFree *bool `json:"isFree,omitempty"`
 	// PricingModel: "flat" or "per_unit". Omit to leave unchanged.
-	PricingModel *string `json:"pricingModel,omitempty"`
+	// enums: flat,per_unit
+	PricingModel *string `json:"pricingModel,omitempty" enums:"flat,per_unit"`
 }
 
 // UpdateSubscriptionPlan godoc

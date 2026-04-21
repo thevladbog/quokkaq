@@ -143,11 +143,7 @@ export function PlanSelector({
               </CardTitle>
               <div className='mt-4'>
                 {(() => {
-                  const planExt = plan as SubscriptionPlan & {
-                    isFree?: boolean;
-                    pricingModel?: string;
-                  };
-                  if (planExt.isFree) {
+                  if (plan.isFree) {
                     return (
                       <div className='text-foreground text-2xl font-bold'>
                         {t('freePlan', { defaultValue: 'Бесплатно' })}
@@ -155,7 +151,7 @@ export function PlanSelector({
                     );
                   }
                   if (plan.price > 0) {
-                    const isPerUnit = planExt.pricingModel === 'per_unit';
+                    const isPerUnit = plan.pricingModel === 'per_unit';
                     return (
                       <div className='flex flex-nowrap items-baseline gap-x-2 whitespace-nowrap'>
                         <span className='text-foreground text-4xl font-bold tabular-nums'>

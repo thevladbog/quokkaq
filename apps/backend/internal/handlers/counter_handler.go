@@ -48,6 +48,7 @@ func writeCounterServiceError(w http.ResponseWriter, err error) {
 }
 
 // CreateCounter godoc
+// @ID           CreateUnitCounter
 // @Summary      Create a new counter
 // @Description  Creates a new counter for a unit
 // @Tags         counters
@@ -57,7 +58,7 @@ func writeCounterServiceError(w http.ResponseWriter, err error) {
 // @Param        counter body   models.Counter true  "Counter Data"
 // @Success      201  {object}  models.Counter
 // @Failure      400  {string}  string "Bad Request"
-// @Failure      402  {object}  object "Quota Exceeded"
+// @Failure      402  {object}  handlers.QuotaExceededError "Quota Exceeded"
 // @Failure      500  {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/counters [post]
 func (h *CounterHandler) CreateCounter(w http.ResponseWriter, r *http.Request) {
@@ -73,7 +74,7 @@ func (h *CounterHandler) CreateCounter(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.service.CreateCounter(&counter); err != nil {
 		if errors.Is(err, services.ErrCounterQuotaExceeded) {
-			writeQuotaExceeded(w, "", err)
+			writeQuotaExceeded(w, "counters", err)
 			return
 		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)

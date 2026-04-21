@@ -313,7 +313,6 @@ func (h *PreRegistrationHandler) Validate(w http.ResponseWriter, r *http.Request
 // @Param        body   body      models.PreRegistrationCodeRequest  true  "Six-digit code"
 // @Success      200    {object}  models.PreRegistrationRedeemResponse
 // @Failure      400    {string}  string "Bad Request"
-// @Failure      402    {object}  object "Quota Exceeded"
 // @Failure      500    {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/pre-registrations/redeem [post]
 func (h *PreRegistrationHandler) Redeem(w http.ResponseWriter, r *http.Request) {
@@ -345,7 +344,10 @@ func (h *PreRegistrationHandler) Redeem(w http.ResponseWriter, r *http.Request) 
 	ticket, err := h.ticketService.CreateTicketWithPreRegistration(preReg.UnitID, preReg.ServiceID, preReg.ID, nil)
 	if err != nil {
 		if errors.Is(err, services.ErrTicketQuotaExhausted) {
-			writeQuotaExceeded(w, "tickets_per_month", err)
+			RespondJSON(w, models.PreRegistrationRedeemResponse{
+				Success: false,
+				Message: err.Error(),
+			})
 			return
 		}
 		if errors.Is(err, phoneutil.ErrInvalidPhone) ||
