@@ -21179,6 +21179,148 @@
                 ]
             }
         },
+        "/units/{unitId}/statistics/export/pdf": {
+            "get": {
+                "description": "Generates a branded A4 PDF with all available statistics sections for the chosen date range. Same auth as individual statistics endpoints.",
+                "operationId": "exportStatisticsPDF",
+                "parameters": [
+                    {
+                        "description": "Subdivision unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Start date (YYYY-MM-DD)",
+                        "in": "query",
+                        "name": "dateFrom",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "End date (YYYY-MM-DD)",
+                        "in": "query",
+                        "name": "dateTo",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Filter by operator/user ID (exact match)",
+                        "in": "query",
+                        "name": "userId",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Filter by service zone ID (exact match)",
+                        "in": "query",
+                        "name": "serviceZoneId",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Filter survey scores by survey definition ID",
+                        "in": "query",
+                        "name": "surveyId",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Filter survey scores by question IDs (repeatable)",
+                        "in": "query",
+                        "name": "questionIds",
+                        "schema": {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/pdf": {
+                                "schema": {
+                                    "format": "binary",
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "PDF report"
+                    },
+                    "400": {
+                        "content": {
+                            "text/plain": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "401": {
+                        "content": {
+                            "text/plain": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "text/plain": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "text/plain": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unit not found"
+                    },
+                    "500": {
+                        "content": {
+                            "text/plain": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Export statistics as PDF report",
+                "tags": [
+                    "statistics"
+                ]
+            }
+        },
         "/units/{unitId}/statistics/load": {
             "get": {
                 "description": "Same daily bucket source as timeseries volume; wait/service semantics match timeseries when those metrics are derived from the same warehouse rows.",

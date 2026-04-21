@@ -192,6 +192,8 @@ func applyTweaks(doc *openapi3.T) error {
 	// Soft-fail: endpoint may not be present in all build configurations.
 	_ = patchGetExternalIdentity204NoBody(doc)
 
+	_ = patchStatisticsExportPDFErrorResponses(doc)
+
 	return nil
 }
 
@@ -999,5 +1001,32 @@ func patchGetExternalIdentity204NoBody(doc *openapi3.T) error {
 		return nil
 	}
 	r204.Value.Content = nil
+	return nil
+}
+
+// patchStatisticsExportPDFErrorResponses removes "application/pdf" from error
+// responses on the statistics PDF export endpoint. swag emits all @Produce types
+// for every response; errors are text/plain, not PDF.
+func patchStatisticsExportPDFErrorResponses(doc *openapi3.T) error {
+	item := doc.Paths.Value("/units/{unitId}/statistics/export/pdf")
+	if item == nil {
+		return nil
+	}
+	get := item.Get
+	if get == nil || get.Responses == nil {
+		return nil
+	}
+	for _, code := range []string{"400", "401", "403", "404", "500"} {
+		rRef := get.Responses.Value(code)
+		if rRef == nil || rRef.Value == nil {
+			continue
+		}
+		delete(rRef.Value.Content, "application/pdf")
+	}
+	// Also clean up the 200 response: remove text/plain since success is always PDF.
+	r200 := get.Responses.Value("200")
+	if r200 != nil && r200.Value != nil {
+		delete(r200.Value.Content, "text/plain")
+	}
 	return nil
 }

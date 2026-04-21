@@ -162,7 +162,20 @@
     "tooltip_total": "Total",
     "minutes_short": "min",
     "utilization_metric_serving": "Serving",
-    "utilization_metric_idle": "Idle & break"
+    "utilization_metric_idle": "Idle & break",
+    "export_csv": "Export CSV",
+    "export_pdf": "Export PDF",
+    "export_pdf_error": "Failed to download PDF report",
+    "export_button": "Export",
+    "export_report_title": "QuokkaQ Statistics Report",
+    "export_generated_at": "Generated at",
+    "export_period": "Period",
+    "export_date": "Date",
+    "export_service": "Service",
+    "export_count": "Count",
+    "export_score_norm5": "Avg score (1–5)",
+    "export_score_native": "Avg answer (question scale)",
+    "export_question_id": "Question ID"
   },
   "operations": {
     "title": "Operations",

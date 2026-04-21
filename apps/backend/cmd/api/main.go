@@ -206,6 +206,7 @@ func run() error {
 	bookingHandler := handlers.NewBookingHandler(bookingService, userRepo)
 	shiftHandler := handlers.NewShiftHandler(shiftService, operationalService)
 	statisticsHandler := handlers.NewStatisticsHandler(statsService, userRepo, unitRepo)
+	statisticsExportHandler := handlers.NewStatisticsExportHandler(statsService, userRepo, unitRepo)
 	operationsHandler := handlers.NewOperationsHandler(operationalService, userRepo, auditLogRepo)
 	templateHandler := handlers.NewTemplateHandler(templateService, userRepo)
 	invitationHandler := handlers.NewInvitationHandler(invitationService, userRepo)
@@ -307,7 +308,7 @@ func run() error {
 		AllowedOrigins:   allowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowedHeaders:   []string{"Accept", "Accept-Language", "Authorization", "Content-Type", "X-CSRF-Token", "X-Company-Id", "X-Request-Id", "X-Setup-Token", "traceparent", "tracestate"},
-		ExposedHeaders:   []string{"Link", "X-Request-Id", "traceparent", "tracestate"},
+		ExposedHeaders:   []string{"Link", "X-Request-Id", "Content-Disposition", "traceparent", "tracestate"},
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
@@ -570,6 +571,7 @@ func run() error {
 			r.Get("/{unitId}/statistics/utilization", statisticsHandler.GetUtilization)
 			r.Get("/{unitId}/statistics/survey-scores", statisticsHandler.GetSurveyScores)
 			r.Get("/{unitId}/statistics/employee-radar", statisticsHandler.GetEmployeeRadar)
+			r.Get("/{unitId}/statistics/export/pdf", statisticsExportHandler.ExportPDF)
 		})
 
 		r.Group(func(r chi.Router) {

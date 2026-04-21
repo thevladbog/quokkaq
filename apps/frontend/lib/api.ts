@@ -1526,3 +1526,28 @@ export const dadataApi = {
       z.unknown()
     )
 };
+
+export const statisticsExportApi = {
+  downloadPDF: async (
+    unitId: string,
+    params: {
+      dateFrom: string;
+      dateTo: string;
+      userId?: string;
+      serviceZoneId?: string;
+    }
+  ) => {
+    const qs = new URLSearchParams();
+    qs.set('dateFrom', params.dateFrom);
+    qs.set('dateTo', params.dateTo);
+    if (params.userId) qs.set('userId', params.userId);
+    if (params.serviceZoneId) qs.set('serviceZoneId', params.serviceZoneId);
+    const { blob, headers } = await apiRequestBlob(
+      `/units/${encodeURIComponent(unitId)}/statistics/export/pdf?${qs.toString()}`
+    );
+    return {
+      blob,
+      contentDisposition: headers.get('Content-Disposition')
+    };
+  }
+};

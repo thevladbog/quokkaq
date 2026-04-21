@@ -109,6 +109,26 @@ import {
   ChartTooltipContent,
   type ChartConfig
 } from '@/components/ui/chart';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
+import { toast } from 'sonner';
+import { Download, FileSpreadsheet, FileText } from 'lucide-react';
+import { logger } from '@/lib/logger';
+import {
+  downloadStatisticsCSV,
+  type StatisticsExportData,
+  type StatisticsExportFilters
+} from '@/lib/statistics-csv-export';
+import { statisticsExportApi } from '@/lib/api';
+import {
+  parseFilenameFromContentDisposition,
+  triggerBlobDownload
+} from '@/lib/download-blob';
 
 /** "Today" for statistics date params; must match subdivision calendar (backend buckets). */
 function defaultDateRange(timezone?: string | null) {
@@ -1132,20 +1152,121 @@ export default function StatisticsPage() {
     slaStatsBody?.computedAt ??
     loadStatsBody?.computedAt;
 
+  const handleExportCSV = () => {
+    const exportData: StatisticsExportData = {
+      timeseries: tsStatsBody,
+      load: loadStatsBody,
+      slaDeviations: slaStatsBody,
+      slaSummary: slaSummaryBody,
+      ticketsByService: ticketsByServiceBody,
+      surveyScores: canSurveyScores ? surveyStatsBody : null,
+      utilization:
+        isExpanded && utilizationQuery.data?.status === 200
+          ? utilizationQuery.data.data
+          : null
+    };
+
+    const subdivisionUnit = unitById.get(statsSubdivisionId);
+    const subdivisionLabel = subdivisionUnit
+      ? getUnitDisplayName(subdivisionUnit, appLocale)
+      : undefined;
+
+    const zoneUnit = serviceZoneParam
+      ? zoneOptions.find((z) => z.id === serviceZoneParam)
+      : undefined;
+    const zoneLabel = zoneUnit
+      ? getUnitDisplayName(zoneUnit, appLocale)
+      : undefined;
+
+    const operatorLabel = filterUserId
+      ? operatorComboboxOptions.find((o) => o.value === filterUserId)?.label
+      : undefined;
+
+    const filters: StatisticsExportFilters = {
+      dateFrom: from,
+      dateTo: dateToForApi,
+      subdivisionName: subdivisionLabel,
+      zoneName: zoneLabel,
+      operatorName: operatorLabel
+    };
+
+    downloadStatisticsCSV(exportData, filters, t, subdivisionLabel);
+  };
+
+  const [pdfExporting, setPdfExporting] = useState(false);
+
+  const handleExportPDF = async () => {
+    if (!statsSubdivisionId || pdfExporting) return;
+    setPdfExporting(true);
+    try {
+      const { blob, contentDisposition } =
+        await statisticsExportApi.downloadPDF(statsSubdivisionId, {
+          dateFrom: from,
+          dateTo: dateToForApi,
+          userId: userIdParam,
+          serviceZoneId: serviceZoneParam || undefined
+        });
+      const fromHeader =
+        parseFilenameFromContentDisposition(contentDisposition);
+      const filename = fromHeader ?? `statistics_${from}_${dateToForApi}.pdf`;
+      triggerBlobDownload(blob, filename);
+    } catch (error) {
+      logger.error('Statistics PDF export failed', error);
+      toast.error(t('export_pdf_error'));
+    } finally {
+      setPdfExporting(false);
+    }
+  };
+
+  const hasAnyExportData =
+    Boolean(tsStatsBody?.points?.length) ||
+    Boolean(loadStatsBody?.points?.length) ||
+    Boolean(slaStatsBody?.points?.length) ||
+    Boolean(ticketsByServiceBody?.items?.length) ||
+    Boolean(surveyStatsBody?.points?.length) ||
+    Boolean(slaSummaryBody?.slaWaitTotal) ||
+    (utilizationQuery.data?.status === 200 &&
+      Boolean(utilizationQuery.data.data?.points?.length));
+
   const showZoneFilter = zoneOptions.length > 0;
   const showSubdivisionFilter = subdivisionOptions.length > 0;
 
   return (
     <div className='container mx-auto flex-1 space-y-6 p-4'>
-      <div>
-        <h1 className='text-3xl font-bold tracking-tight'>{t('title')}</h1>
-        <p className='text-muted-foreground mt-1 text-sm'>{t('subtitle')}</p>
-        {computedAt && (
-          <p className='text-muted-foreground mt-1 text-xs'>
-            {t('as_of', {
-              time: formatStatisticsAsOfLine(computedAt, dateLocale)
-            })}
-          </p>
+      <div className='flex items-start justify-between gap-4'>
+        <div>
+          <h1 className='text-3xl font-bold tracking-tight'>{t('title')}</h1>
+          <p className='text-muted-foreground mt-1 text-sm'>{t('subtitle')}</p>
+          {computedAt && (
+            <p className='text-muted-foreground mt-1 text-xs'>
+              {t('as_of', {
+                time: formatStatisticsAsOfLine(computedAt, dateLocale)
+              })}
+            </p>
+          )}
+        </div>
+        {statsSubdivisionId && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant='outline' size='sm' disabled={!hasAnyExportData}>
+                <Download className='mr-2 h-4 w-4' />
+                {t('export_button')}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align='end'>
+              <DropdownMenuItem onClick={handleExportCSV}>
+                <FileSpreadsheet className='mr-2 h-4 w-4' />
+                {t('export_csv')}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={handleExportPDF}
+                disabled={pdfExporting}
+              >
+                <FileText className='mr-2 h-4 w-4' />
+                {t('export_pdf')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
       </div>
 

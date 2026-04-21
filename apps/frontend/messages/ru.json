@@ -162,7 +162,20 @@
     "tooltip_total": "Итого",
     "minutes_short": "мин",
     "utilization_metric_serving": "Обслуживание",
-    "utilization_metric_idle": "Простой и перерыв"
+    "utilization_metric_idle": "Простой и перерыв",
+    "export_csv": "Экспорт CSV",
+    "export_pdf": "Экспорт PDF",
+    "export_pdf_error": "Не удалось скачать PDF-отчёт",
+    "export_button": "Экспорт",
+    "export_report_title": "Отчёт по статистике QuokkaQ",
+    "export_generated_at": "Дата формирования",
+    "export_period": "Период",
+    "export_date": "Дата",
+    "export_service": "Услуга",
+    "export_count": "Количество",
+    "export_score_norm5": "Средний балл (1–5)",
+    "export_score_native": "Средний ответ (шкала вопроса)",
+    "export_question_id": "ID вопроса"
   },
   "operations": {
     "title": "Операции",

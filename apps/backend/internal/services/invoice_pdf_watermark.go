@@ -26,7 +26,6 @@ const (
 var (
 	quokkaOnce     sync.Once
 	quokkaFadedPNG []byte
-	quokkaHolder   gopdf.ImageHolder
 	quokkaInitErr  error
 )
 
@@ -35,10 +34,6 @@ func initQuokkaWatermarkCache() {
 		return
 	}
 	quokkaFadedPNG, quokkaInitErr = watermarkOpacityOnWhite(assets.QuokkaWatermarkPNG)
-	if quokkaInitErr != nil {
-		return
-	}
-	quokkaHolder, quokkaInitErr = gopdf.ImageHolderByBytes(quokkaFadedPNG)
 }
 
 func watermarkOpacityOnWhite(src []byte) ([]byte, error) {
@@ -82,6 +77,10 @@ func watermarkOpacityOnWhite(src []byte) ([]byte, error) {
 }
 
 // drawQuokkaWatermark draws the mascot in the bottom-right (~37% of page width), behind content.
+//
+// gopdf's ImageHolder wraps bytes.Buffer (io.Reader); calling ImageByHolder drains the buffer,
+// so we must create a fresh holder from the cached PNG bytes on every call rather than reusing
+// a package-level singleton.
 func drawQuokkaWatermark(pdf *gopdf.GoPdf) error {
 	if len(assets.QuokkaWatermarkPNG) == 0 {
 		return nil
@@ -90,12 +89,16 @@ func drawQuokkaWatermark(pdf *gopdf.GoPdf) error {
 	if quokkaInitErr != nil {
 		return quokkaInitErr
 	}
-	if quokkaHolder == nil {
+	if len(quokkaFadedPNG) == 0 {
 		return nil
+	}
+	holder, err := gopdf.ImageHolderByBytes(quokkaFadedPNG)
+	if err != nil {
+		return err
 	}
 	wmW := pdfPageW * 0.37
 	wmH := wmW
 	x := pdfPageW - wmW - pdfMargin*0.35
 	y := pdfPageH - pdfMargin*0.35 - wmH
-	return pdf.ImageByHolder(quokkaHolder, x, y, &gopdf.Rect{W: wmW, H: wmH})
+	return pdf.ImageByHolder(holder, x, y, &gopdf.Rect{W: wmW, H: wmH})
 }
