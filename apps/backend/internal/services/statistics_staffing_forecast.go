@@ -6,8 +6,6 @@ import (
 	"math"
 	"time"
 
-	"quokkaq-go-backend/pkg/database"
-
 	"gorm.io/gorm"
 )
 
@@ -85,7 +83,7 @@ func (s *StatisticsService) GetStaffingForecast(ctx context.Context, unitID, com
 	}
 
 	// Query hourly arrival counts AND avg service time per hour for those sample dates.
-	rows, err := queryHourlyArrivals(database.DB, unitID, sampleDates)
+	rows, err := queryHourlyArrivals(ctx, s.db, unitID, sampleDates)
 	if err != nil {
 		return nil, err
 	}
@@ -145,6 +143,9 @@ func applyForecastDefaults(p StaffingForecastParams) StaffingForecastParams {
 	if p.LookbackWeeks <= 0 {
 		p.LookbackWeeks = 4
 	}
+	if p.LookbackWeeks > 52 {
+		p.LookbackWeeks = 52
+	}
 	return p
 }
 
@@ -167,7 +168,7 @@ func historicalSameDayDates(targetDate time.Time, weekday time.Weekday, n int) [
 
 // queryHourlyArrivals aggregates avg ticket arrivals per hour (and avg service time) from
 // historical sample dates for the given unit.
-func queryHourlyArrivals(db *gorm.DB, unitID string, sampleDates []string) ([]hourlyArrivalRow, error) {
+func queryHourlyArrivals(ctx context.Context, db *gorm.DB, unitID string, sampleDates []string) ([]hourlyArrivalRow, error) {
 	// We cast created_at to the local day by truncating to hour, then group by hour-of-day
 	// and average across the sample dates.
 	//
@@ -201,7 +202,7 @@ GROUP BY hour
 ORDER BY hour
 `
 	var rows []hourlyArrivalRow
-	err := db.WithContext(context.Background()).Raw(query, unitID, sampleDates).Scan(&rows).Error
+	err := db.WithContext(ctx).Raw(query, unitID, sampleDates).Scan(&rows).Error
 	if err != nil {
 		return nil, err
 	}
@@ -302,11 +303,15 @@ func logFactorial(n int) float64 {
 	if n <= 1 {
 		return 0
 	}
-	v := 0.0
-	for i := 2; i <= n; i++ {
-		v += math.Log(float64(i))
+	if n <= 20 {
+		v := 0.0
+		for i := 2; i <= n; i++ {
+			v += math.Log(float64(i))
+		}
+		return v
 	}
-	return v
+	nF := float64(n)
+	return nF*math.Log(nF) - nF + 0.5*math.Log(2*math.Pi*nF)
 }
 
 // buildDailySummary aggregates per-hour forecasts into a daily summary.

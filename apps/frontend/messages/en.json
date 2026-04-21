@@ -1262,7 +1262,8 @@
       "routing_saved": "Skill-based routing setting saved.",
       "priority_1": "1 – Primary",
       "priority_2": "2 – Secondary",
-      "priority_3": "3 – Backup"
+      "priority_3": "3 – Backup",
+      "delete_skill": "Delete skill mapping"
     },
     "virtual_queue_settings": {
       "tab": "Online Queue",

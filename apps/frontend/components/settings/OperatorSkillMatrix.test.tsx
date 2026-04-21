@@ -144,10 +144,10 @@ describe('OperatorSkillMatrix', () => {
       <OperatorSkillMatrix unitId='u-1' skillBasedRoutingEnabled={true} />
     );
 
-    const deleteButtons = screen.getAllByRole('button', { name: '' });
-    // There should be one delete button per skill + one "add" button
-    // (skills: 2, add: 1)
-    expect(deleteButtons.length).toBeGreaterThanOrEqual(2);
+    const deleteButtons = screen.getAllByRole('button', {
+      name: 'operator_skills.delete_skill'
+    });
+    expect(deleteButtons).toHaveLength(2);
   });
 
   it('shows empty state when there are no skills', () => {

@@ -49,6 +49,22 @@ function fmtHour(h: number): string {
   return `${String(h).padStart(2, '0')}:00`;
 }
 
+const SF_SLA_MIN = 50;
+const SF_SLA_MAX = 99;
+const SF_WAIT_MIN = 1;
+const SF_WAIT_MAX = 60;
+
+/** Parse and clamp numeric forecast params to match input min/max and backend defaults. */
+function clampForecastParam(
+  raw: string,
+  min: number,
+  max: number
+): number | undefined {
+  const v = parseFloat(raw);
+  if (isNaN(v) || !isFinite(v) || v <= 0) return undefined;
+  return Math.min(Math.max(v, min), max);
+}
+
 interface TooltipPayloadItem {
   name: string;
   value: number | string;
@@ -139,12 +155,10 @@ export function StaffingForecastPanel({
   }));
 
   function applyParams() {
-    const pct = parseFloat(localSla);
-    const wait = parseFloat(localWait);
     onParamsChange?.({
       targetDate: localDate || undefined,
-      targetSlaPct: isNaN(pct) ? undefined : pct,
-      targetMaxWaitMin: isNaN(wait) ? undefined : wait
+      targetSlaPct: clampForecastParam(localSla, SF_SLA_MIN, SF_SLA_MAX),
+      targetMaxWaitMin: clampForecastParam(localWait, SF_WAIT_MIN, SF_WAIT_MAX)
     });
   }
 
@@ -185,8 +199,16 @@ export function StaffingForecastPanel({
                   setCalendarOpen(false);
                   onParamsChange?.({
                     targetDate: iso || undefined,
-                    targetSlaPct: parseFloat(localSla) || undefined,
-                    targetMaxWaitMin: parseFloat(localWait) || undefined
+                    targetSlaPct: clampForecastParam(
+                      localSla,
+                      SF_SLA_MIN,
+                      SF_SLA_MAX
+                    ),
+                    targetMaxWaitMin: clampForecastParam(
+                      localWait,
+                      SF_WAIT_MIN,
+                      SF_WAIT_MAX
+                    )
                   });
                 }}
                 initialFocus

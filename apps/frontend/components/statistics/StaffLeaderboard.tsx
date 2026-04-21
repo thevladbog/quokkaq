@@ -47,14 +47,20 @@ interface SortableThProps {
 function SortableTh({ label, field, active, onSort }: SortableThProps) {
   return (
     <TableHead
-      className={cn(
-        'cursor-pointer whitespace-nowrap select-none',
-        active && 'text-foreground font-semibold'
-      )}
-      onClick={() => onSort(field)}
+      className={cn('whitespace-nowrap', active && 'font-semibold')}
+      aria-sort={active ? 'descending' : 'none'}
     >
-      {label}
-      {active && <span className='ml-1 opacity-60'>↓</span>}
+      <button
+        type='button'
+        className={cn(
+          'text-foreground inline-flex cursor-pointer items-center gap-1 select-none',
+          active && 'font-semibold'
+        )}
+        onClick={() => onSort(field)}
+      >
+        {label}
+        {active && <span className='opacity-60'>↓</span>}
+      </button>
     </TableHead>
   );
 }

@@ -28,7 +28,7 @@ func NewOperatorSkillHandler(
 	return &OperatorSkillHandler{skillRepo: skillRepo, userRepo: userRepo, unitRepo: unitRepo}
 }
 
-// requireUnitSkillsManage checks that the caller has PermUnitUsersManage on the given unit.
+// requireUnitSkillsManage checks that the caller has PermUnitSettingsManage on the given unit.
 func (h *OperatorSkillHandler) requireUnitSkillsManage(r *http.Request, unitID string) (bool, string) {
 	viewerID, ok := middleware.GetUserIDFromContext(r.Context())
 	if !ok || viewerID == "" {
@@ -38,7 +38,7 @@ func (h *OperatorSkillHandler) requireUnitSkillsManage(r *http.Request, unitID s
 	if err != nil {
 		return false, ""
 	}
-	if repository.UserHasCanonicalUnitPermission(user, unitID, rbac.PermUnitUsersManage) {
+	if repository.UserHasCanonicalUnitPermission(user, unitID, rbac.PermUnitSettingsManage) {
 		return true, viewerID
 	}
 	// Tenant admins bypass unit-level checks.

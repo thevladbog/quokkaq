@@ -310,6 +310,7 @@ export function OperatorSkillMatrix({
                         variant='ghost'
                         size='icon'
                         className='h-7 w-7'
+                        aria-label={t('operator_skills.delete_skill')}
                         onClick={() => skill.id && handleDelete(skill.id)}
                         disabled={deleteMutation.isPending}
                       >
