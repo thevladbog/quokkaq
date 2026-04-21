@@ -15,6 +15,9 @@ export const pricingRowLabelsEn: Record<string, string> = {
   'features.negotiableTickets': 'Monthly tickets by agreement',
   'features.negotiableServices': 'Services volume by agreement',
   'features.negotiableCounters': 'Service counters by agreement',
+  'features.zonesPerUnit': 'Up to {count} service zones per unit',
+  'features.unlimitedZonesPerUnit': 'Unlimited service zones per unit',
+  'features.negotiableZonesPerUnit': 'Service zones per unit by agreement',
   'features.realtimeUpdates': 'Real-time updates',
   'features.basicSupport': 'Basic support',
   'features.basicReports': 'Basic reports',
@@ -47,6 +50,11 @@ export const pricingRowLabelsRu: Record<string, string> = {
   'features.negotiableTickets': 'Талоны в месяц — по договорённости',
   'features.negotiableServices': 'Объём услуг — по договорённости',
   'features.negotiableCounters': 'Окна обслуживания — по договорённости',
+  'features.zonesPerUnit': 'До {count} сервисных зон на подразделение',
+  'features.unlimitedZonesPerUnit':
+    'Неограниченное количество зон на подразделение',
+  'features.negotiableZonesPerUnit':
+    'Зоны на подразделение — по договорённости',
   'features.realtimeUpdates': 'Обновления в реальном времени',
   'features.basicSupport': 'Базовая поддержка',
   'features.basicReports': 'Базовые отчёты',

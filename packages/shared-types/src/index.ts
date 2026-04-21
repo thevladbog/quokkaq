@@ -1206,6 +1206,18 @@ export const SubscriptionPlanSchema = z.object({
   allowInstantPurchase: z.boolean().optional().default(true),
   /** Single highlighted tier on marketing and in-app plan pickers. */
   isPromoted: z.boolean().optional().default(false),
+  /**
+   * When true: plan is always free (price=0 by contract).
+   * UI shows "Бесплатно" / "Free" instead of "Custom pricing".
+   * Semantically distinct from enterprise (also price=0 but not free).
+   */
+  isFree: z.boolean().optional().default(false),
+  /**
+   * How the `price` field is interpreted:
+   * - "flat"     – fixed price per billing period
+   * - "per_unit" – price per active subdivision per billing period
+   */
+  pricingModel: z.enum(['flat', 'per_unit']).optional().default('flat'),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional()
 });

@@ -73,6 +73,28 @@ func RespondJSONWithStatus(w http.ResponseWriter, status int, data interface{}) 
 	return true
 }
 
+// QuotaExceededError is the standard error shape returned in HTTP 402 quota-exceeded responses.
+// error and message are always present; metric is optional.
+type QuotaExceededError struct {
+	// Error is always "quota_exceeded".
+	Error   string `json:"error"            example:"quota_exceeded"                              enums:"quota_exceeded" validate:"required"`
+	Message string `json:"message"          example:"unit quota exceeded for current subscription plan" validate:"required"`
+	Metric  string `json:"metric,omitempty" example:"units"`
+}
+
+// writeQuotaExceeded writes a structured HTTP 402 response for quota-exceeded errors.
+// The error message is JSON-marshalled so that special characters cannot cause XSS.
+func writeQuotaExceeded(w http.ResponseWriter, metric string, err error) {
+	body := QuotaExceededError{
+		Error:   "quota_exceeded",
+		Message: err.Error(),
+	}
+	if metric != "" {
+		body.Metric = metric
+	}
+	RespondJSONWithStatus(w, http.StatusPaymentRequired, body)
+}
+
 // getActorFromRequest returns a pointer to the authenticated user ID for audit fields, or nil if absent.
 func getActorFromRequest(r *http.Request) *string {
 	if uid, ok := middleware.GetUserIDFromContext(r.Context()); ok && uid != "" {

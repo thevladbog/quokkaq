@@ -39,6 +39,7 @@ import { useRouter } from '@/src/i18n/navigation';
 import PermissionGuard from '@/components/auth/permission-guard';
 import { PermUnitSettingsManage } from '@/lib/permission-variants';
 import { formatApiToastErrorMessage } from '@/lib/format-api-toast-error';
+import { isQuotaExceededError } from '@/lib/quota-error';
 import {
   childSubdivisionsQueryKey,
   childUnitsQueryKey
@@ -128,11 +129,15 @@ export function ServiceZoneWorkplacesPanel({
           : t('child_subdivision_created')
       );
     } catch (error) {
-      toast.error(
-        t('create_error', {
-          message: formatApiToastErrorMessage(error, tCommon('error'))
-        })
-      );
+      if (isQuotaExceededError(error)) {
+        toast.error(t('quota_exceeded_unit'));
+      } else {
+        toast.error(
+          t('create_error', {
+            message: formatApiToastErrorMessage(error, tCommon('error'))
+          })
+        );
+      }
     }
   };
 

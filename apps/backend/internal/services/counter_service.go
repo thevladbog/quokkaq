@@ -36,6 +36,9 @@ var ErrCounterOccupancyOrBreakViaUpdate = errors.New("assignedTo and onBreak can
 // ErrCounterInvalidServiceZoneIDType is returned when service_zone_id in updates is not a string or null.
 var ErrCounterInvalidServiceZoneIDType = errors.New("invalid service_zone_id type")
 
+// ErrCounterQuotaExceeded is returned when the company's plan does not allow creating another counter.
+var ErrCounterQuotaExceeded = errors.New("counter quota exceeded for current subscription plan")
+
 type CounterService interface {
 	CreateCounter(counter *models.Counter) error
 	GetCountersByUnit(unitID string) ([]models.Counter, error)
@@ -58,6 +61,7 @@ type counterService struct {
 	unitRepo     repository.UnitRepository
 	intervalRepo repository.OperatorIntervalRepository
 	hub          *ws.Hub
+	quota        QuotaService
 }
 
 func NewCounterService(
@@ -77,6 +81,29 @@ func NewCounterService(
 		unitRepo:     unitRepo,
 		intervalRepo: intervalRepo,
 		hub:          hub,
+	}
+}
+
+// NewCounterServiceWithQuota creates a CounterService with quota enforcement enabled.
+func NewCounterServiceWithQuota(
+	repo repository.CounterRepository,
+	ticketRepo repository.TicketRepository,
+	serviceRepo repository.ServiceRepository,
+	userRepo repository.UserRepository,
+	intervalRepo repository.OperatorIntervalRepository,
+	unitRepo repository.UnitRepository,
+	hub *ws.Hub,
+	quota QuotaService,
+) CounterService {
+	return &counterService{
+		repo:         repo,
+		ticketRepo:   ticketRepo,
+		serviceRepo:  serviceRepo,
+		userRepo:     userRepo,
+		unitRepo:     unitRepo,
+		intervalRepo: intervalRepo,
+		hub:          hub,
+		quota:        quota,
 	}
 }
 
@@ -109,6 +136,19 @@ func (s *counterService) CreateCounter(counter *models.Counter) error {
 	}
 	if err := ValidateOptionalChildServiceZone(s.unitRepo, counter.UnitID, &counter.ServiceZoneID); err != nil {
 		return err
+	}
+	if s.quota != nil {
+		unit, err := s.unitRepo.FindByIDLight(counter.UnitID)
+		if err != nil {
+			return err
+		}
+		ok, err := s.quota.CheckQuota(unit.CompanyID, "counters")
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return ErrCounterQuotaExceeded
+		}
 	}
 	return s.repo.Create(counter)
 }

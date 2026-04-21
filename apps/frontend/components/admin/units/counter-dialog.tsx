@@ -25,6 +25,7 @@ import { getGetUnitsUnitIdCountersQueryKey } from '@/lib/api/generated/tickets-c
 import { normalizeChildUnitsQueryData } from '@/lib/child-units-query';
 import { getGetUnitsUnitIdChildUnitsQueryKey } from '@/lib/api/generated/units';
 import { countersApi, Counter, unitsApi } from '@/lib/api';
+import { isQuotaExceededError } from '@/lib/quota-error';
 import type { CounterServiceZoneFilter } from '@/components/admin/units/counter-zone-filter';
 import { getUnitDisplayName } from '@/lib/unit-display';
 
@@ -85,6 +86,7 @@ function CounterForm({
   onOpenChange: (open: boolean) => void;
 }) {
   const t = useTranslations('admin.counters');
+  const tUnits = useTranslations('admin.units');
   const tGeneral = useTranslations('general');
   const locale = useLocale();
   const queryClient = useQueryClient();
@@ -131,7 +133,11 @@ function CounterForm({
       onOpenChange(false);
     },
     onError: (error) => {
-      toast.error(t('created_error', { error: error.message }));
+      if (isQuotaExceededError(error)) {
+        toast.error(tUnits('quota_exceeded_counter'));
+      } else {
+        toast.error(t('created_error', { error: error.message }));
+      }
     }
   });
 

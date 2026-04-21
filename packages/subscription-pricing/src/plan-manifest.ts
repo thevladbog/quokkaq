@@ -1,10 +1,12 @@
-/** Quota limit keys aligned with backend `quotaMetricKeys`. */
+/** Quota limit keys aligned with backend `quotaMetricKeys`.
+ * Note: `zones_per_unit` is per-subdivision (not per-company) but included here for UI display. */
 export const PLAN_LIMIT_KEYS = [
   'units',
   'users',
   'tickets_per_month',
   'services',
-  'counters'
+  'counters',
+  'zones_per_unit'
 ] as const;
 
 export type PlanLimitKey = (typeof PLAN_LIMIT_KEYS)[number];

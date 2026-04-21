@@ -46,6 +46,10 @@ func NewUserService(repo repository.UserRepository, companyRepo repository.Compa
 }
 
 func (s *userService) CreateUser(user *models.User) error {
+	// TODO(quota): Add quota check for "users" metric here (same pattern as invitationService).
+	// POST /users is a platform/admin endpoint and the invitation flow already enforces
+	// this quota for tenant-admin-initiated invitations, so this is lower priority.
+
 	// Check if email exists
 	if user.Email != nil {
 		existing, _ := s.repo.FindByEmail(context.Background(), *user.Email)

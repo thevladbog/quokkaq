@@ -28,9 +28,18 @@ type SubscriptionPlan struct {
 	// LimitsNegotiable maps limit keys to true when the catalog should show “by agreement” instead of a numeric cap.
 	LimitsNegotiable json.RawMessage `gorm:"type:jsonb" json:"limitsNegotiable,omitempty" swaggertype:"object"`
 	// AllowInstantPurchase when false: plan may still be public, but checkout is disabled until a sales-led flow exists.
-	AllowInstantPurchase bool      `gorm:"not null;default:true;column:allow_instant_purchase" json:"allowInstantPurchase"`
-	CreatedAt            time.Time `gorm:"autoCreateTime" json:"createdAt"`
-	UpdatedAt            time.Time `gorm:"autoUpdateTime" json:"updatedAt"`
+	AllowInstantPurchase bool `gorm:"not null;default:true;column:allow_instant_purchase" json:"allowInstantPurchase"`
+	// IsFree when true: plan is always free (price=0 by contract); UI shows "Free" instead of "Custom pricing".
+	// Distinct from enterprise (also price=0 but not free). Set by platform operator in plan constructor.
+	IsFree bool `gorm:"not null;default:false;column:is_free" json:"isFree"`
+	// PricingModel determines how the price field is interpreted.
+	// Default: "per_unit".
+	//   "per_unit" – price per subdivision per billing period; total = price * active_subdivisions
+	//   "flat"     – fixed price per billing period (legacy; use only for grandfathered plans)
+	// enums: flat,per_unit
+	PricingModel string    `gorm:"not null;default:'per_unit';column:pricing_model" json:"pricingModel" enums:"flat,per_unit"`
+	CreatedAt    time.Time `gorm:"autoCreateTime" json:"createdAt"`
+	UpdatedAt    time.Time `gorm:"autoUpdateTime" json:"updatedAt"`
 }
 
 // BeforeCreate assigns a UUID when ID is empty so inserts work without a DB default (Postgres gen_random_uuid is not portable to SQLite tests).

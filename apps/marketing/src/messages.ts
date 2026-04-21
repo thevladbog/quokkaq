@@ -102,10 +102,16 @@ export type HomeMessages = {
   pricingFromApi: {
     perMonth: string;
     perYear: string;
+    /** Label for per-unit pricing model: "/ unit / mo". */
+    perUnitPerMonth?: string;
     popularBadge: string;
     startTrial: string;
+    /** CTA for a free plan (isFree=true). */
+    startFree?: string;
     contactSales: string;
     customPricing: string;
+    /** Label shown when isFree=true. */
+    freePlan?: string;
     /** Strong CTA strip below plan cards (enterprise / custom deal). */
     customTermsEyebrow: string;
     customTermsTitle: string;
@@ -393,10 +399,13 @@ export const messages: Record<
       pricingFromApi: {
         perMonth: '/mo',
         perYear: '/yr',
+        perUnitPerMonth: '/ unit / mo',
         popularBadge: 'Recommended',
         startTrial: 'Start free trial',
+        startFree: 'Start for free',
         contactSales: 'Contact',
         customPricing: 'Custom',
+        freePlan: 'Free',
         customTermsEyebrow: 'Multi-site & custom terms',
         customTermsTitle: 'Need terms that match your rollout?',
         customTermsBody:
@@ -715,10 +724,13 @@ export const messages: Record<
       pricingFromApi: {
         perMonth: '/мес',
         perYear: '/год',
+        perUnitPerMonth: '/ подр. / мес',
         popularBadge: 'Рекомендуем',
         startTrial: 'Начать пробный период',
+        startFree: 'Начать бесплатно',
         contactSales: 'Связаться',
         customPricing: 'По запросу',
+        freePlan: 'Бесплатно',
         customTermsEyebrow: 'Для сетей и особых условий',
         customTermsTitle: 'Нужны условия под ваш масштаб и процессы?',
         customTermsBody:

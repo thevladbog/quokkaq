@@ -38,6 +38,7 @@ import { Link, useRouter } from '@/src/i18n/navigation';
 import PermissionGuard from '@/components/auth/permission-guard';
 import { PermUnitSettingsManage } from '@/lib/permission-variants';
 import { formatApiToastErrorMessage } from '@/lib/format-api-toast-error';
+import { isQuotaExceededError } from '@/lib/quota-error';
 import { UnitCountersSection } from '@/components/admin/units/counters-list';
 import {
   childUnitsQueryKey,
@@ -257,11 +258,15 @@ export function SubdivisionStationsAndZonesPanel({
           : t('child_subdivision_created')
       );
     } catch (error) {
-      toast.error(
-        t('create_error', {
-          message: formatApiToastErrorMessage(error, tCommon('error'))
-        })
-      );
+      if (isQuotaExceededError(error)) {
+        toast.error(t('quota_exceeded_unit'));
+      } else {
+        toast.error(
+          t('create_error', {
+            message: formatApiToastErrorMessage(error, tCommon('error'))
+          })
+        );
+      }
     }
   });
 

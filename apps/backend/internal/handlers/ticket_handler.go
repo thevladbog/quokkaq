@@ -46,6 +46,7 @@ type CreateTicketRequest struct {
 // @Param        request body      CreateTicketRequest true  "Ticket Request"
 // @Success      201  {object}  models.Ticket
 // @Failure      400  {string}  string "Bad Request"
+// @Failure      402  {object}  handlers.QuotaExceededError "Quota Exceeded"
 // @Failure      500  {string}  string "Internal Server Error"
 // @Router       /units/{unitId}/tickets [post]
 func (h *TicketHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
@@ -98,6 +99,9 @@ func (h *TicketHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 	ticket, err := h.service.CreateTicket(unitID, serviceID, staffClientID, visitorPhone, visitorLocale, actor)
 	if err != nil {
 		switch {
+		case errors.Is(err, services.ErrTicketQuotaExhausted):
+			writeQuotaExceeded(w, "tickets_per_month", err)
+			return
 		case errors.Is(err, services.ErrTicketServiceNotInUnit),
 			errors.Is(err, services.ErrVisitorAnonymousNotAllowed),
 			errors.Is(err, services.ErrTicketCreateClientNotInUnit),

@@ -343,6 +343,13 @@ func (h *PreRegistrationHandler) Redeem(w http.ResponseWriter, r *http.Request) 
 	// 2. Create Ticket
 	ticket, err := h.ticketService.CreateTicketWithPreRegistration(preReg.UnitID, preReg.ServiceID, preReg.ID, nil)
 	if err != nil {
+		if errors.Is(err, services.ErrTicketQuotaExhausted) {
+			RespondJSON(w, models.PreRegistrationRedeemResponse{
+				Success: false,
+				Message: err.Error(),
+			})
+			return
+		}
 		if errors.Is(err, phoneutil.ErrInvalidPhone) ||
 			errors.Is(err, services.ErrPreRegistrationPhoneInvalid) ||
 			errors.Is(err, services.ErrDuplicateClientPhone) ||

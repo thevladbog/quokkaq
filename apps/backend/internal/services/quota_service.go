@@ -17,6 +17,9 @@ type QuotaService interface {
 	GetLimit(companyID string, metric string) (int, error)
 	IncrementUsage(companyID string, metric string, delta int) error
 	GetUsageMetrics(companyID string) (*UsageMetrics, error)
+	// CheckZonesPerUnit checks whether a specific subdivision has capacity for an additional service zone.
+	// subdivisionID is the parent subdivision unit ID; companyID is used to load the plan limits.
+	CheckZonesPerUnit(subdivisionID, companyID string) (bool, error)
 }
 
 type quotaService struct{}
@@ -99,11 +102,18 @@ func (s *quotaService) GetCurrentUsage(companyID string, metric string) (int, er
 		nowUTC := time.Now().UTC()
 		billingMonth := time.Date(nowUTC.Year(), nowUTC.Month(), 1, 0, 0, 0, 0, time.UTC)
 
+		// Lazily apply credit carry-over from the previous billing month on the first
+		// quota check of a new period: count credit tickets issued in the prior month
+		// that have not yet been deducted and insert a negative usage_record entry.
+		if err := s.applyCreditCarryOverIfNeeded(companyID, billingMonth); err != nil {
+			return 0, err
+		}
+
 		var sum int
 		query := `
 			SELECT COALESCE(SUM(value), 0) 
 			FROM usage_records 
-			WHERE company_id = ? AND metric_type IN ('tickets_per_month', 'tickets_created') AND billing_month = ?
+			WHERE company_id = ? AND metric_type IN ('tickets_per_month', 'tickets_created', 'tickets_credit_carry_over') AND billing_month = ?
 		`
 		if err := db.Raw(query, companyID, billingMonth).Scan(&sum).Error; err != nil {
 			return 0, err
@@ -180,6 +190,7 @@ func (s *quotaService) GetLimit(companyID string, metric string) (int, error) {
 }
 
 // quotaMetricKeys are the metrics exposed by GetUsageMetrics / GetCurrentUsage.
+// zones_per_unit is not included here because it is per-subdivision, not per-company.
 var quotaMetricKeys = []string{"units", "users", "tickets_per_month", "services", "counters"}
 
 // limitsMapForCompany loads subscription plan limits once and merges defaults for missing keys.
@@ -227,12 +238,81 @@ func (s *quotaService) getDefaultLimit(metric string) int {
 		"tickets_per_month": 100,
 		"services":          5,
 		"counters":          2,
+		"zones_per_unit":    0, // no zones by default without a plan
 	}
 
 	if limit, exists := defaults[metric]; exists {
 		return limit
 	}
 	return 0
+}
+
+// CheckZonesPerUnit checks whether subdivisionID has room for one more service_zone child.
+// It reads the zones_per_unit limit from the company's subscription plan.
+func (s *quotaService) CheckZonesPerUnit(subdivisionID, companyID string) (bool, error) {
+	db := database.DB
+
+	limit, err := s.GetLimit(companyID, "zones_per_unit")
+	if err != nil {
+		return false, err
+	}
+	if limit == -1 {
+		return true, nil // unlimited
+	}
+
+	var count int64
+	if err := db.Model(&models.Unit{}).
+		Where("parent_id = ? AND kind = ?", subdivisionID, models.UnitKindServiceZone).
+		Count(&count).Error; err != nil {
+		return false, err
+	}
+	return int(count) < limit, nil
+}
+
+// applyCreditCarryOverIfNeeded deducts prior-month credit tickets from the current billing period.
+// Called lazily on the first tickets_per_month quota check of each new month.
+// It is idempotent: if a carry-over row for the current billingMonth already exists, it is a no-op.
+func (s *quotaService) applyCreditCarryOverIfNeeded(companyID string, billingMonth time.Time) error {
+	db := database.DB
+
+	// Check if carry-over for this period has already been applied.
+	var existingCount int64
+	if err := db.Raw(
+		`SELECT COUNT(*) FROM usage_records WHERE company_id = ? AND metric_type = 'tickets_credit_carry_over' AND billing_month = ?`,
+		companyID, billingMonth,
+	).Scan(&existingCount).Error; err != nil {
+		return err
+	}
+	if existingCount > 0 {
+		return nil // already applied
+	}
+
+	// Count credit tickets issued in the previous billing month.
+	prevMonth := billingMonth.AddDate(0, -1, 0)
+	prevMonthEnd := billingMonth // exclusive upper bound
+
+	var creditCount int64
+	if err := db.Raw(
+		`SELECT COUNT(*) FROM tickets
+		 WHERE unit_id IN (SELECT id FROM units WHERE company_id = ?)
+		   AND is_credit = true
+		   AND created_at >= ? AND created_at < ?`,
+		companyID, prevMonth, prevMonthEnd,
+	).Scan(&creditCount).Error; err != nil {
+		return err
+	}
+
+	// Always write a carry-over row (even if creditCount == 0) so we don't recheck every time.
+	// A zero-value row acts as a sentinel while a positive value deducts from the current period's quota.
+	nowUTC := time.Now().UTC()
+	carryOver := &models.UsageRecord{
+		CompanyID:    companyID,
+		MetricType:   "tickets_credit_carry_over",
+		Value:        int(creditCount),
+		Timestamp:    nowUTC,
+		BillingMonth: billingMonth,
+	}
+	return db.Create(carryOver).Error
 }
 
 // IncrementUsage records usage for quota tracking

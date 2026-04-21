@@ -55,13 +55,22 @@ export function LandingPricing({
         <div className='grid gap-8 lg:grid-cols-3'>
           {useApi
             ? apiPlans.map((plan, index) => {
+                const planExt = plan as SubscriptionPlan & {
+                  isFree?: boolean;
+                  pricingModel?: string;
+                };
                 const isPopular = plan.isPromoted === true;
-                const isCustom = plan.code === 'enterprise';
+                const isCustom = plan.code === 'enterprise' && !planExt.isFree;
+                const isFree = planExt.isFree === true;
+                const isPerUnit = planExt.pricingModel === 'per_unit';
                 const rows = buildPricingRowsFromApiPlan(plan);
-                const intervalLabel =
-                  plan.interval === 'year'
-                    ? copy.pricingFromApi.perYear
-                    : copy.pricingFromApi.perMonth;
+                const intervalLabel = isFree
+                  ? (copy.pricingFromApi.freePlan ?? 'Бесплатно')
+                  : isPerUnit
+                    ? (copy.pricingFromApi.perUnitPerMonth ?? '/ подр. / мес')
+                    : plan.interval === 'year'
+                      ? copy.pricingFromApi.perYear
+                      : copy.pricingFromApi.perMonth;
                 /** Self-service trial / signup; otherwise contact sales. */
                 const sellable =
                   !isCustom && plan.allowInstantPurchase !== false;
@@ -75,9 +84,11 @@ export function LandingPricing({
                   }
                   return `${localeHomePath(locale)}#book-demo`;
                 })();
-                const ctaLabel = sellable
-                  ? copy.pricingFromApi.startTrial
-                  : copy.pricingFromApi.contactSales;
+                const ctaLabel = isFree
+                  ? (copy.pricingFromApi.startFree ?? 'Начать бесплатно')
+                  : sellable
+                    ? copy.pricingFromApi.startTrial
+                    : copy.pricingFromApi.contactSales;
                 const planTitle = subscriptionPlanDisplayName(plan, locale);
                 /** EN: move ISO currency into the title so the price row fits (e.g. "Optimal, RUB"). */
                 const enSplitCurrency =
@@ -113,7 +124,11 @@ export function LandingPricing({
                         {planHeading}
                       </h3>
                       <div className='mb-2 inline-flex max-w-full min-w-0 flex-nowrap items-baseline gap-x-1.5 leading-tight whitespace-nowrap'>
-                        {isCustom ? (
+                        {isFree ? (
+                          <span className='font-display text-3xl font-bold text-[color:var(--color-text)]'>
+                            {copy.pricingFromApi.freePlan ?? 'Бесплатно'}
+                          </span>
+                        ) : isCustom ? (
                           <span className='font-display text-3xl font-bold text-[color:var(--color-text)]'>
                             {copy.pricingFromApi.customPricing}
                           </span>

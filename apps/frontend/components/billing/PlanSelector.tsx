@@ -142,33 +142,50 @@ export function PlanSelector({
                 })()}
               </CardTitle>
               <div className='mt-4'>
-                {plan.price > 0 ? (
-                  <div className='flex flex-nowrap items-baseline gap-x-2 whitespace-nowrap'>
-                    <span className='text-foreground text-4xl font-bold tabular-nums'>
-                      {locale.startsWith('en') &&
-                      plan.code !== PLAN_CODES.ENTERPRISE
-                        ? formatPriceMinorUnitsAmountOnly(
-                            plan.price,
-                            plan.currency,
-                            intlLocale
-                          )
-                        : formatPriceMinorUnits(
-                            plan.price,
-                            plan.currency ?? 'RUB',
-                            intlLocale
-                          )}
-                    </span>
-                    <span className='text-muted-foreground shrink-0'>
-                      {plan.interval === 'month'
-                        ? tBilling('perMonth')
-                        : tBilling('perYear')}
-                    </span>
-                  </div>
-                ) : (
-                  <div className='text-foreground text-2xl font-bold'>
-                    {t('customPricing')}
-                  </div>
-                )}
+                {(() => {
+                  if (plan.isFree) {
+                    return (
+                      <div className='text-foreground text-2xl font-bold'>
+                        {t('freePlan', { defaultValue: 'Бесплатно' })}
+                      </div>
+                    );
+                  }
+                  if (plan.price > 0) {
+                    const isPerUnit = plan.pricingModel === 'per_unit';
+                    return (
+                      <div className='flex flex-nowrap items-baseline gap-x-2 whitespace-nowrap'>
+                        <span className='text-foreground text-4xl font-bold tabular-nums'>
+                          {locale.startsWith('en') &&
+                          plan.code !== PLAN_CODES.ENTERPRISE
+                            ? formatPriceMinorUnitsAmountOnly(
+                                plan.price,
+                                plan.currency,
+                                intlLocale
+                              )
+                            : formatPriceMinorUnits(
+                                plan.price,
+                                plan.currency ?? 'RUB',
+                                intlLocale
+                              )}
+                        </span>
+                        <span className='text-muted-foreground shrink-0 text-sm'>
+                          {isPerUnit
+                            ? t('perUnitPerMonth', {
+                                defaultValue: '/ подр. / мес'
+                              })
+                            : plan.interval === 'month'
+                              ? tBilling('perMonth')
+                              : tBilling('perYear')}
+                        </span>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className='text-foreground text-2xl font-bold'>
+                      {t('customPricing')}
+                    </div>
+                  );
+                })()}
               </div>
             </CardHeader>
 
@@ -236,11 +253,21 @@ export function PlanSelector({
                   variant={isPromotedPlan(plan) ? 'default' : 'outline'}
                 >
                   {primaryCtaLabel ??
-                    (plan.price > 0
-                      ? plan.allowInstantPurchase === false
-                        ? t('requestPlanAccess')
-                        : t('selectPlan')
-                      : t('contactUs'))}
+                    (() => {
+                      const planExt = plan as SubscriptionPlan & {
+                        isFree?: boolean;
+                      };
+                      if (planExt.isFree)
+                        return t('startFree', {
+                          defaultValue: 'Начать бесплатно'
+                        });
+                      if (plan.price > 0) {
+                        return plan.allowInstantPurchase === false
+                          ? t('requestPlanAccess')
+                          : t('selectPlan');
+                      }
+                      return t('contactUs');
+                    })()}
                 </Button>
               ) : (
                 <Button

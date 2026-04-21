@@ -79,6 +79,7 @@ CREATE TABLE tickets (
 	status text DEFAULT 'waiting',
 	priority integer DEFAULT 0,
 	is_eod integer DEFAULT 0,
+	is_credit integer DEFAULT 0,
 	created_at datetime,
 	FOREIGN KEY (unit_id) REFERENCES units(id),
 	FOREIGN KEY (service_id) REFERENCES services(id)

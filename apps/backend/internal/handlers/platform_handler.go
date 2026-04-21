@@ -895,6 +895,11 @@ type PlatformCreateSubscriptionPlanBody struct {
 	AllowInstantPurchase *bool `json:"allowInstantPurchase,omitempty"`
 	// IsPromoted when true: this plan becomes the only promoted tier (others cleared in the same transaction).
 	IsPromoted *bool `json:"isPromoted,omitempty"`
+	// IsFree when true: plan is always free (price must be 0). Shown as "Free" in UI, not "Custom pricing".
+	IsFree *bool `json:"isFree,omitempty"`
+	// PricingModel: "flat" (fixed price) or "per_unit" (price per subdivision). Defaults to "per_unit".
+	// enums: flat,per_unit
+	PricingModel *string `json:"pricingModel,omitempty" enums:"flat,per_unit"`
 }
 
 // CreateSubscriptionPlan godoc
@@ -935,6 +940,23 @@ func (h *PlatformHandler) CreateSubscriptionPlan(w http.ResponseWriter, r *http.
 		http.Error(w, "price must be non-negative", http.StatusBadRequest)
 		return
 	}
+	isFree := false
+	if body.IsFree != nil {
+		isFree = *body.IsFree
+	}
+	if isFree && body.Price != 0 {
+		http.Error(w, "price must be 0 when isFree is true", http.StatusBadRequest)
+		return
+	}
+	pricingModel := "per_unit"
+	if body.PricingModel != nil && *body.PricingModel != "" {
+		pm := strings.TrimSpace(*body.PricingModel)
+		if pm != "flat" && pm != "per_unit" {
+			http.Error(w, "pricingModel must be 'flat' or 'per_unit'", http.StatusBadRequest)
+			return
+		}
+		pricingModel = pm
+	}
 	isPublic := true
 	if body.IsPublic != nil {
 		isPublic = *body.IsPublic
@@ -946,6 +968,9 @@ func (h *PlatformHandler) CreateSubscriptionPlan(w http.ResponseWriter, r *http.
 	allowInstant := true
 	if body.AllowInstantPurchase != nil {
 		allowInstant = *body.AllowInstantPurchase
+	}
+	if isFree {
+		allowInstant = true // free plans always allow instant signup
 	}
 	isPromoted := false
 	if body.IsPromoted != nil {
@@ -970,6 +995,8 @@ func (h *PlatformHandler) CreateSubscriptionPlan(w http.ResponseWriter, r *http.
 		LimitsNegotiable:     limitsNeg,
 		AllowInstantPurchase: allowInstant,
 		IsPromoted:           isPromoted,
+		IsFree:               isFree,
+		PricingModel:         pricingModel,
 	}
 	if err := database.DB.Transaction(func(tx *gorm.DB) error {
 		if isPromoted {
@@ -1013,6 +1040,11 @@ type PlatformUpdateSubscriptionPlanBody struct {
 	AllowInstantPurchase *bool           `json:"allowInstantPurchase,omitempty"`
 	// IsPromoted omitted: leave unchanged. When true, other plans are demoted in the same transaction.
 	IsPromoted *bool `json:"isPromoted,omitempty"`
+	// IsFree when true: plan is always free (price must be 0). Omit to leave unchanged.
+	IsFree *bool `json:"isFree,omitempty"`
+	// PricingModel: "flat" or "per_unit". Omit to leave unchanged.
+	// enums: flat,per_unit
+	PricingModel *string `json:"pricingModel,omitempty" enums:"flat,per_unit"`
 }
 
 // UpdateSubscriptionPlan godoc
@@ -1065,6 +1097,10 @@ func (h *PlatformHandler) UpdateSubscriptionPlan(w http.ResponseWriter, r *http.
 		http.Error(w, "price must be non-negative", http.StatusBadRequest)
 		return
 	}
+	if body.IsFree != nil && *body.IsFree && body.Price != 0 {
+		http.Error(w, "price must be 0 when isFree is true", http.StatusBadRequest)
+		return
+	}
 	plan.Name = body.Name
 	plan.NameEn = body.NameEn
 	plan.Code = body.Code
@@ -1085,6 +1121,20 @@ func (h *PlatformHandler) UpdateSubscriptionPlan(w http.ResponseWriter, r *http.
 	}
 	if body.IsPromoted != nil {
 		plan.IsPromoted = *body.IsPromoted
+	}
+	if body.IsFree != nil {
+		plan.IsFree = *body.IsFree
+		if plan.IsFree {
+			plan.AllowInstantPurchase = true // free plans always allow instant signup
+		}
+	}
+	if body.PricingModel != nil && *body.PricingModel != "" {
+		pm := strings.TrimSpace(*body.PricingModel)
+		if pm != "flat" && pm != "per_unit" {
+			http.Error(w, "pricingModel must be 'flat' or 'per_unit'", http.StatusBadRequest)
+			return
+		}
+		plan.PricingModel = pm
 	}
 	if body.LimitsNegotiable != nil {
 		neg := body.LimitsNegotiable

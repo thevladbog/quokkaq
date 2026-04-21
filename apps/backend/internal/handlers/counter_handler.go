@@ -48,16 +48,22 @@ func writeCounterServiceError(w http.ResponseWriter, err error) {
 }
 
 // CreateCounter godoc
+// @ID           CreateUnitCounter
 // @Summary      Create a new counter
 // @Description  Creates a new counter for a unit
 // @Tags         counters
 // @Accept       json
 // @Produce      json
-// @Param        counter body models.Counter true "Counter Data"
+// @Security     BearerAuth
+// @Param        unitId  path   string        true  "Unit ID"
+// @Param        counter body   models.Counter true  "Counter Data"
 // @Success      201  {object}  models.Counter
 // @Failure      400  {string}  string "Bad Request"
+// @Failure      401  {string}  string "Unauthorized"
+// @Failure      402  {object}  handlers.QuotaExceededError "Quota Exceeded"
+// @Failure      403  {string}  string "Forbidden"
 // @Failure      500  {string}  string "Internal Server Error"
-// @Router       /counters [post]
+// @Router       /units/{unitId}/counters [post]
 func (h *CounterHandler) CreateCounter(w http.ResponseWriter, r *http.Request) {
 	var counter models.Counter
 	if err := json.NewDecoder(r.Body).Decode(&counter); err != nil {
@@ -70,7 +76,14 @@ func (h *CounterHandler) CreateCounter(w http.ResponseWriter, r *http.Request) {
 	counter.UnitID = unitID
 
 	if err := h.service.CreateCounter(&counter); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		switch {
+		case errors.Is(err, services.ErrCounterQuotaExceeded):
+			writeQuotaExceeded(w, "counters", err)
+		case errors.Is(err, services.ErrInvalidServiceZone):
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		default:
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 		return
 	}
 

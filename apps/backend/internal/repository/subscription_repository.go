@@ -1,11 +1,14 @@
 package repository
 
 import (
+	"errors"
 	"sort"
 	"strings"
 
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/pkg/database"
+
+	"gorm.io/gorm"
 )
 
 type SubscriptionRepository interface {
@@ -21,6 +24,9 @@ type SubscriptionRepository interface {
 	ListAllPlans() ([]models.SubscriptionPlan, error)
 	FindPlanByID(id string) (*models.SubscriptionPlan, error)
 	FindPlanByCode(code string) (*models.SubscriptionPlan, error)
+	// FindFreePlan returns the first active public plan with is_free=true.
+	// Returns nil (no error) when no free plan exists.
+	FindFreePlan() (*models.SubscriptionPlan, error)
 	CreatePlan(plan *models.SubscriptionPlan) error
 	UpdatePlan(plan *models.SubscriptionPlan) error
 }
@@ -114,6 +120,21 @@ func (r *subscriptionRepository) FindPlanByCode(code string) (*models.Subscripti
 		Where("is_active = ? AND is_public = ?", true, true).
 		First(&plan).Error
 	if err != nil {
+		return nil, err
+	}
+	return &plan, nil
+}
+
+func (r *subscriptionRepository) FindFreePlan() (*models.SubscriptionPlan, error) {
+	var plan models.SubscriptionPlan
+	err := database.DB.
+		Where("is_free = ? AND is_active = ? AND is_public = ?", true, true, true).
+		Order("display_order ASC").
+		First(&plan).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	return &plan, nil

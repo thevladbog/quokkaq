@@ -10,6 +10,12 @@ import (
 	"gorm.io/gorm"
 )
 
+// ErrUnitQuotaExceeded is returned when the company's plan does not allow creating another subdivision.
+var ErrUnitQuotaExceeded = errors.New("unit quota exceeded for current subscription plan")
+
+// ErrZoneQuotaExceeded is returned when the parent subdivision has reached its zones_per_unit limit.
+var ErrZoneQuotaExceeded = errors.New("service zone quota per subdivision exceeded for current subscription plan")
+
 // Validation errors from CreateUnit / UpdateUnit (use errors.Is in HTTP handlers).
 var (
 	ErrInvalidUnitKind    = errors.New("invalid unit kind: use subdivision or service_zone")
@@ -46,10 +52,16 @@ type unitService struct {
 	repo       repository.UnitRepository
 	anonymous  UnitAnonymousEnsurer
 	tenantRBAC repository.TenantRBACRepository
+	quota      QuotaService
 }
 
 func NewUnitService(repo repository.UnitRepository, anonymous UnitAnonymousEnsurer, tenantRBAC repository.TenantRBACRepository) UnitService {
 	return &unitService{repo: repo, anonymous: anonymous, tenantRBAC: tenantRBAC}
+}
+
+// NewUnitServiceWithQuota creates UnitService with quota enforcement enabled.
+func NewUnitServiceWithQuota(repo repository.UnitRepository, anonymous UnitAnonymousEnsurer, tenantRBAC repository.TenantRBACRepository, quota QuotaService) UnitService {
+	return &unitService{repo: repo, anonymous: anonymous, tenantRBAC: tenantRBAC, quota: quota}
 }
 
 func normalizeUnitKind(kind string) string {
@@ -151,6 +163,31 @@ func (s *unitService) CreateUnit(unit *models.Unit) error {
 	if err := s.validateHierarchy("", unit.CompanyID, unit.ParentID); err != nil {
 		return err
 	}
+
+	// Enforce quota limits when quota service is available.
+	if s.quota != nil {
+		switch unit.Kind {
+		case models.UnitKindSubdivision:
+			ok, err := s.quota.CheckQuota(unit.CompanyID, "units")
+			if err != nil {
+				return err
+			}
+			if !ok {
+				return ErrUnitQuotaExceeded
+			}
+		case models.UnitKindServiceZone:
+			if unit.ParentID != nil && *unit.ParentID != "" {
+				ok, err := s.quota.CheckZonesPerUnit(*unit.ParentID, unit.CompanyID)
+				if err != nil {
+					return err
+				}
+				if !ok {
+					return ErrZoneQuotaExceeded
+				}
+			}
+		}
+	}
+
 	return s.repo.Transaction(func(tx *gorm.DB) error {
 		if err := s.repo.CreateTx(tx, unit); err != nil {
 			return err

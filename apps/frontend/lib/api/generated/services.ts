@@ -269,6 +269,9 @@ export interface ModelsTicket {
   counterId?: string;
   createdAt?: string;
   id?: string;
+  /** IsCredit marks a ticket issued when the monthly tickets_per_month quota was exhausted but
+  the working day (EOD) was still open. Credit tickets are counted against the next billing period. */
+  isCredit?: boolean;
   isEod?: boolean;
   lastCalledAt?: string;
   /** Snapshot from Service at creation */
@@ -683,6 +686,18 @@ export type HandlersPlatformCreateSubscriptionPlanBodyLimits = {[key: string]: n
 
 export type HandlersPlatformCreateSubscriptionPlanBodyLimitsNegotiable = {[key: string]: boolean};
 
+/**
+ * PricingModel: "flat" (fixed price) or "per_unit" (price per subdivision). Defaults to "per_unit".
+enums: flat,per_unit
+ */
+export type HandlersPlatformCreateSubscriptionPlanBodyPricingModel = typeof HandlersPlatformCreateSubscriptionPlanBodyPricingModel[keyof typeof HandlersPlatformCreateSubscriptionPlanBodyPricingModel];
+
+
+export const HandlersPlatformCreateSubscriptionPlanBodyPricingModel = {
+  flat: 'flat',
+  per_unit: 'per_unit',
+} as const;
+
 export interface HandlersPlatformCreateSubscriptionPlanBody {
   /** AllowInstantPurchase omitted or null defaults to true. */
   allowInstantPurchase?: boolean;
@@ -693,6 +708,8 @@ export interface HandlersPlatformCreateSubscriptionPlanBody {
   features?: HandlersPlatformCreateSubscriptionPlanBodyFeatures;
   interval?: string;
   isActive?: boolean;
+  /** IsFree when true: plan is always free (price must be 0). Shown as "Free" in UI, not "Custom pricing". */
+  isFree?: boolean;
   /** IsPromoted when true: this plan becomes the only promoted tier (others cleared in the same transaction). */
   isPromoted?: boolean;
   /** IsPublic omitted or null defaults to true (backward compatible). */
@@ -702,6 +719,9 @@ export interface HandlersPlatformCreateSubscriptionPlanBody {
   name?: string;
   nameEn?: string;
   price?: number;
+  /** PricingModel: "flat" (fixed price) or "per_unit" (price per subdivision). Defaults to "per_unit".
+  enums: flat,per_unit */
+  pricingModel?: HandlersPlatformCreateSubscriptionPlanBodyPricingModel;
 }
 
 export interface HandlersPlatformIntegrationsResponse {
@@ -719,6 +739,18 @@ export type HandlersPlatformUpdateSubscriptionPlanBodyLimits = {[key: string]: n
 
 export type HandlersPlatformUpdateSubscriptionPlanBodyLimitsNegotiable = {[key: string]: boolean};
 
+/**
+ * PricingModel: "flat" or "per_unit". Omit to leave unchanged.
+enums: flat,per_unit
+ */
+export type HandlersPlatformUpdateSubscriptionPlanBodyPricingModel = typeof HandlersPlatformUpdateSubscriptionPlanBodyPricingModel[keyof typeof HandlersPlatformUpdateSubscriptionPlanBodyPricingModel];
+
+
+export const HandlersPlatformUpdateSubscriptionPlanBodyPricingModel = {
+  flat: 'flat',
+  per_unit: 'per_unit',
+} as const;
+
 export interface HandlersPlatformUpdateSubscriptionPlanBody {
   allowInstantPurchase?: boolean;
   code?: string;
@@ -727,6 +759,8 @@ export interface HandlersPlatformUpdateSubscriptionPlanBody {
   features?: HandlersPlatformUpdateSubscriptionPlanBodyFeatures;
   interval?: string;
   isActive?: boolean;
+  /** IsFree when true: plan is always free (price must be 0). Omit to leave unchanged. */
+  isFree?: boolean;
   /** IsPromoted omitted: leave unchanged. When true, other plans are demoted in the same transaction. */
   isPromoted?: boolean;
   isPublic?: boolean;
@@ -735,6 +769,9 @@ export interface HandlersPlatformUpdateSubscriptionPlanBody {
   name?: string;
   nameEn?: string;
   price?: number;
+  /** PricingModel: "flat" or "per_unit". Omit to leave unchanged.
+  enums: flat,per_unit */
+  pricingModel?: HandlersPlatformUpdateSubscriptionPlanBodyPricingModel;
 }
 
 export interface HandlersPublicLeadRequestBody {
@@ -747,6 +784,23 @@ export interface HandlersPublicLeadRequestBody {
   privacyConsentAccepted: true;
   referrer?: string;
   source?: string;
+}
+
+/**
+ * Error is always "quota_exceeded".
+ */
+export type HandlersQuotaExceededErrorError = typeof HandlersQuotaExceededErrorError[keyof typeof HandlersQuotaExceededErrorError];
+
+
+export const HandlersQuotaExceededErrorError = {
+  quota_exceeded: 'quota_exceeded',
+} as const;
+
+export interface HandlersQuotaExceededError {
+  /** Error is always "quota_exceeded". */
+  error: HandlersQuotaExceededErrorError;
+  message: string;
+  metric?: string;
 }
 
 export interface HandlersRefreshResponse {
@@ -937,6 +991,21 @@ export interface HandlersAddSupportReportShareRequest {
 }
 
 /**
+ * PricingModel determines how the price field is interpreted.
+Default: "per_unit".
+  "per_unit" – price per subdivision per billing period; total = price * active_subdivisions
+  "flat"     – fixed price per billing period (legacy; use only for grandfathered plans)
+enums: flat,per_unit
+ */
+export type ModelsSubscriptionPlanPricingModel = typeof ModelsSubscriptionPlanPricingModel[keyof typeof ModelsSubscriptionPlanPricingModel];
+
+
+export const ModelsSubscriptionPlanPricingModel = {
+  flat: 'flat',
+  per_unit: 'per_unit',
+} as const;
+
+/**
  * feature flags
  */
 export type ModelsSubscriptionPlanFeatures = {[key: string]: boolean};
@@ -967,6 +1036,9 @@ export interface ModelsSubscriptionPlan {
   /** "month", "year" */
   interval?: string;
   isActive?: boolean;
+  /** IsFree when true: plan is always free (price=0 by contract); UI shows "Free" instead of "Custom pricing".
+  Distinct from enterprise (also price=0 but not free). Set by platform operator in plan constructor. */
+  isFree?: boolean;
   /** IsPromoted marks the single catalog recommended plan (marketing + in-app pricing highlight). */
   isPromoted?: boolean;
   isPublic?: boolean;
@@ -979,6 +1051,12 @@ export interface ModelsSubscriptionPlan {
   nameEn?: string;
   /** price in minor units (cents/kopeks) */
   price?: number;
+  /** PricingModel determines how the price field is interpreted.
+  Default: "per_unit".
+    "per_unit" – price per subdivision per billing period; total = price * active_subdivisions
+    "flat"     – fixed price per billing period (legacy; use only for grandfathered plans)
+  enums: flat,per_unit */
+  pricingModel?: ModelsSubscriptionPlanPricingModel;
   updatedAt?: string;
 }
 
@@ -2152,46 +2230,51 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
  * Creates a new service for a unit
  * @summary Create a new service
  */
-export type postServicesResponse201 = {
+export type createServiceResponse201 = {
   data: ModelsService
   status: 201
 }
 
-export type postServicesResponse400 = {
+export type createServiceResponse400 = {
   data: string
   status: 400
 }
 
-export type postServicesResponse401 = {
+export type createServiceResponse401 = {
   data: string
   status: 401
 }
 
-export type postServicesResponse403 = {
+export type createServiceResponse402 = {
+  data: HandlersQuotaExceededError
+  status: 402
+}
+
+export type createServiceResponse403 = {
   data: string
   status: 403
 }
 
-export type postServicesResponse409 = {
+export type createServiceResponse409 = {
   data: string
   status: 409
 }
 
-export type postServicesResponse500 = {
+export type createServiceResponse500 = {
   data: string
   status: 500
 }
 
-export type postServicesResponseSuccess = (postServicesResponse201) & {
+export type createServiceResponseSuccess = (createServiceResponse201) & {
   headers: Headers;
 };
-export type postServicesResponseError = (postServicesResponse400 | postServicesResponse401 | postServicesResponse403 | postServicesResponse409 | postServicesResponse500) & {
+export type createServiceResponseError = (createServiceResponse400 | createServiceResponse401 | createServiceResponse402 | createServiceResponse403 | createServiceResponse409 | createServiceResponse500) & {
   headers: Headers;
 };
 
-export type postServicesResponse = (postServicesResponseSuccess | postServicesResponseError)
+export type createServiceResponse = (createServiceResponseSuccess | createServiceResponseError)
 
-export const getPostServicesUrl = () => {
+export const getCreateServiceUrl = () => {
 
 
 
@@ -2199,9 +2282,9 @@ export const getPostServicesUrl = () => {
   return `/services`
 }
 
-export const postServices = async (modelsService: ModelsService, options?: RequestInit): Promise<postServicesResponse> => {
+export const createService = async (modelsService: ModelsService, options?: RequestInit): Promise<createServiceResponse> => {
 
-  return orvalMutator<postServicesResponse>(getPostServicesUrl(),
+  return orvalMutator<createServiceResponse>(getCreateServiceUrl(),
   {
     ...options,
     method: 'POST',
@@ -2214,11 +2297,11 @@ export const postServices = async (modelsService: ModelsService, options?: Reque
 
 
 
-export const getPostServicesMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postServices>>, TError,{data: ModelsService}, TContext>, request?: SecondParameter<typeof orvalMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof postServices>>, TError,{data: ModelsService}, TContext> => {
+export const getCreateServiceMutationOptions = <TError = string | HandlersQuotaExceededError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createService>>, TError,{data: ModelsService}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof createService>>, TError,{data: ModelsService}, TContext> => {
 
-const mutationKey = ['postServices'];
+const mutationKey = ['createService'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -2228,10 +2311,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postServices>>, {data: ModelsService}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createService>>, {data: ModelsService}> = (props) => {
           const {data} = props ?? {};
 
-          return  postServices(data,requestOptions)
+          return  createService(data,requestOptions)
         }
 
 
@@ -2241,22 +2324,22 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PostServicesMutationResult = NonNullable<Awaited<ReturnType<typeof postServices>>>
-    export type PostServicesMutationBody = ModelsService
-    export type PostServicesMutationError = string
+    export type CreateServiceMutationResult = NonNullable<Awaited<ReturnType<typeof createService>>>
+    export type CreateServiceMutationBody = ModelsService
+    export type CreateServiceMutationError = string | HandlersQuotaExceededError
 
     /**
  * @summary Create a new service
  */
-export const usePostServices = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postServices>>, TError,{data: ModelsService}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+export const useCreateService = <TError = string | HandlersQuotaExceededError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createService>>, TError,{data: ModelsService}, TContext>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof postServices>>,
+        Awaited<ReturnType<typeof createService>>,
         TError,
         {data: ModelsService},
         TContext
       > => {
-      return useMutation(getPostServicesMutationOptions(options), queryClient);
+      return useMutation(getCreateServiceMutationOptions(options), queryClient);
     }
 
 /**

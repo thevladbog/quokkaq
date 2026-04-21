@@ -39,8 +39,11 @@ import { normalizeChildUnitsQueryData } from '@/lib/child-units-query';
 import { getGetUnitsUnitIdChildUnitsQueryKey } from '@/lib/api/generated/units';
 import { unitsApi } from '@/lib/api';
 import { useTranslations, useLocale } from 'next-intl';
+import { toast } from 'sonner';
 import { getUnitDisplayName } from '@/lib/unit-display';
 import { ImageUpload } from '@/components/ui/image-upload';
+import { logger } from '@/lib/logger';
+import { isQuotaExceededError } from '@/lib/quota-error';
 import type { Service } from '@quokkaq/shared-types';
 
 interface UnitServicesManagerProps {
@@ -381,6 +384,7 @@ function ServiceForm({
 }) {
   const tServices = useTranslations('admin.services');
   const tRoot = useTranslations();
+  const tUnits = useTranslations('admin.units');
   const locale = useLocale();
   const createServiceMutation = useCreateService();
   const updateServiceMutation = useUpdateService();
@@ -470,7 +474,12 @@ function ServiceForm({
       }
       onSaved();
     } catch (error) {
-      console.error('Error saving service:', error);
+      if (isQuotaExceededError(error)) {
+        toast.error(tUnits('quota_exceeded_service'));
+      } else {
+        logger.error('Error saving service:', error);
+        toast.error(tServices('save_error'));
+      }
     }
   };
 

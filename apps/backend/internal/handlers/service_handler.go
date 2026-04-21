@@ -22,6 +22,7 @@ func NewServiceHandler(service services.ServiceService, userRepo repository.User
 }
 
 // CreateService godoc
+// @ID           CreateService
 // @Summary      Create a new service
 // @Description  Creates a new service for a unit
 // @Tags         services
@@ -32,6 +33,7 @@ func NewServiceHandler(service services.ServiceService, userRepo repository.User
 // @Success      201  {object}  models.Service
 // @Failure      400  {string}  string "Bad Request"
 // @Failure      401  {string}  string "Unauthorized"
+// @Failure      402  {object}  handlers.QuotaExceededError "Quota Exceeded"
 // @Failure      403  {string}  string "Forbidden"
 // @Failure      409  {string}  string "Conflict (duplicate calendar slot key for unit)"
 // @Failure      500  {string}  string "Internal Server Error"
@@ -62,11 +64,14 @@ func (h *ServiceHandler) CreateService(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.service.CreateService(&service); err != nil {
-		if errors.Is(err, services.ErrDuplicateCalendarSlotKey) {
+		switch {
+		case errors.Is(err, services.ErrServiceQuotaExceeded):
+			writeQuotaExceeded(w, "services", err)
+		case errors.Is(err, services.ErrDuplicateCalendarSlotKey):
 			http.Error(w, err.Error(), http.StatusConflict)
-			return
+		default:
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 

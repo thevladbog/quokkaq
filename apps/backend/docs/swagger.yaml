@@ -608,6 +608,9 @@ components:
           type: string
         isActive:
           type: boolean
+        isFree:
+          description: 'IsFree when true: plan is always free (price must be 0). Shown as "Free" in UI, not "Custom pricing".'
+          type: boolean
         isPromoted:
           description: 'IsPromoted when true: this plan becomes the only promoted tier (others cleared in the same transaction).'
           type: boolean
@@ -628,6 +631,14 @@ components:
           type: string
         price:
           type: integer
+        pricingModel:
+          description: 'PricingModel: "flat" (fixed price) or "per_unit" (price per subdivision). Defaults to "per_unit".
+
+            enums: flat,per_unit'
+          enum:
+          - flat
+          - per_unit
+          type: string
       type: object
     handlers.PlatformIntegrationsResponse:
       properties:
@@ -669,6 +680,9 @@ components:
           type: string
         isActive:
           type: boolean
+        isFree:
+          description: 'IsFree when true: plan is always free (price must be 0). Omit to leave unchanged.'
+          type: boolean
         isPromoted:
           description: 'IsPromoted omitted: leave unchanged. When true, other plans are demoted in the same transaction.'
           type: boolean
@@ -688,6 +702,14 @@ components:
           type: string
         price:
           type: integer
+        pricingModel:
+          description: 'PricingModel: "flat" or "per_unit". Omit to leave unchanged.
+
+            enums: flat,per_unit'
+          enum:
+          - flat
+          - per_unit
+          type: string
       type: object
     handlers.PublicLeadRequestBody:
       properties:
@@ -716,6 +738,24 @@ components:
       - email
       - name
       - privacyConsentAccepted
+      type: object
+    handlers.QuotaExceededError:
+      properties:
+        error:
+          description: Error is always "quota_exceeded".
+          enum:
+          - quota_exceeded
+          example: quota_exceeded
+          type: string
+        message:
+          example: unit quota exceeded for current subscription plan
+          type: string
+        metric:
+          example: units
+          type: string
+      required:
+      - error
+      - message
       type: object
     handlers.RefreshResponse:
       properties:
@@ -2132,6 +2172,11 @@ components:
           type: string
         isActive:
           type: boolean
+        isFree:
+          description: 'IsFree when true: plan is always free (price=0 by contract); UI shows "Free" instead of "Custom pricing".
+
+            Distinct from enterprise (also price=0 but not free). Set by platform operator in plan constructor.'
+          type: boolean
         isPromoted:
           description: IsPromoted marks the single catalog recommended plan (marketing + in-app pricing highlight).
           type: boolean
@@ -2155,6 +2200,12 @@ components:
         price:
           description: price in minor units (cents/kopeks)
           type: integer
+        pricingModel:
+          description: "PricingModel determines how the price field is interpreted.\nDefault: \"per_unit\".\n  \"per_unit\" – price per subdivision per billing period; total = price * active_subdivisions\n  \"flat\"     – fixed price per billing period (legacy; use only for grandfathered plans)\nenums: flat,per_unit"
+          enum:
+          - flat
+          - per_unit
+          type: string
         updatedAt:
           type: string
       type: object
@@ -2307,6 +2358,11 @@ components:
           type: string
         id:
           type: string
+        isCredit:
+          description: 'IsCredit marks a ticket issued when the monthly tickets_per_month quota was exhausted but
+
+            the working day (EOD) was still open. Credit tickets are counted against the next billing period.'
+          type: boolean
         isEod:
           type: boolean
         lastCalledAt:
@@ -5881,39 +5937,6 @@ paths:
       summary: Replace tenant role assignments for a user
       tags:
       - companies
-  /counters:
-    post:
-      description: Creates a new counter for a unit
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/models.Counter'
-        description: Counter Data
-        required: true
-        x-originalParamName: counter
-      responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/models.Counter'
-          description: Created
-        '400':
-          content:
-            application/json:
-              schema:
-                type: string
-          description: Bad Request
-        '500':
-          content:
-            application/json:
-              schema:
-                type: string
-          description: Internal Server Error
-      summary: Create a new counter
-      tags:
-      - counters
   /counters/{id}:
     delete:
       description: Deletes a counter by its ID
@@ -6701,6 +6724,12 @@ paths:
               schema:
                 type: string
           description: Unauthorized
+        '402':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/handlers.QuotaExceededError'
+          description: Quota Exceeded
         '403':
           content:
             application/json:
@@ -8518,6 +8547,7 @@ paths:
   /services:
     post:
       description: Creates a new service for a unit
+      operationId: CreateService
       requestBody:
         content:
           application/json:
@@ -8545,6 +8575,12 @@ paths:
               schema:
                 type: string
           description: Unauthorized
+        '402':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/handlers.QuotaExceededError'
+          description: Quota Exceeded
         '403':
           content:
             application/json:
@@ -10460,6 +10496,12 @@ paths:
               schema:
                 type: string
           description: Bad Request
+        '402':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/handlers.QuotaExceededError'
+          description: Quota Exceeded
         '500':
           content:
             application/json:
@@ -11391,6 +11433,66 @@ paths:
                 type: string
           description: Internal Server Error
       summary: Get counters by unit
+      tags:
+      - counters
+    post:
+      description: Creates a new counter for a unit
+      operationId: CreateUnitCounter
+      parameters:
+      - description: Unit ID
+        in: path
+        name: unitId
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/models.Counter'
+        description: Counter Data
+        required: true
+        x-originalParamName: counter
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/models.Counter'
+          description: Created
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Bad Request
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Unauthorized
+        '402':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/handlers.QuotaExceededError'
+          description: Quota Exceeded
+        '403':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Forbidden
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: Create a new counter
       tags:
       - counters
   /units/{unitId}/guest-survey/completion-images/{fileName}:
@@ -13929,6 +14031,12 @@ paths:
               schema:
                 type: string
           description: Bad Request
+        '402':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/handlers.QuotaExceededError'
+          description: Quota Exceeded
         '500':
           content:
             application/json:

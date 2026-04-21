@@ -17,15 +17,21 @@ import (
 )
 
 type AuthHandler struct {
-	service     services.AuthService
-	userService services.UserService
-	userRepo    repository.UserRepository
-	tenantRBAC  repository.TenantRBACRepository
-	leadIssues  *services.LeadIssueService
+	service          services.AuthService
+	userService      services.UserService
+	userRepo         repository.UserRepository
+	tenantRBAC       repository.TenantRBACRepository
+	leadIssues       *services.LeadIssueService
+	subscriptionRepo repository.SubscriptionRepository
 }
 
 func NewAuthHandler(service services.AuthService, userService services.UserService, userRepo repository.UserRepository, tenantRBAC repository.TenantRBACRepository, leadIssues *services.LeadIssueService) *AuthHandler {
 	return &AuthHandler{service: service, userService: userService, userRepo: userRepo, tenantRBAC: tenantRBAC, leadIssues: leadIssues}
+}
+
+// NewAuthHandlerWithSubscription creates AuthHandler with subscription repository for free plan lookup.
+func NewAuthHandlerWithSubscription(service services.AuthService, userService services.UserService, userRepo repository.UserRepository, tenantRBAC repository.TenantRBACRepository, leadIssues *services.LeadIssueService, subscriptionRepo repository.SubscriptionRepository) *AuthHandler {
+	return &AuthHandler{service: service, userService: userService, userRepo: userRepo, tenantRBAC: tenantRBAC, leadIssues: leadIssues, subscriptionRepo: subscriptionRepo}
 }
 
 // PatchMeRequest is the body for PATCH /auth/me (self-service profile photo only).
@@ -463,9 +469,20 @@ func (h *AuthHandler) Signup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Default to starter plan if not specified
+	// Resolve default plan when not specified: prefer a free plan (isFree=true) if one exists,
+	// otherwise fall back to the "starter" plan.
 	if req.PlanCode == "" {
-		req.PlanCode = "starter"
+		if h.subscriptionRepo != nil {
+			freePlan, err := h.subscriptionRepo.FindFreePlan()
+			if err != nil {
+				logger.PrintfCtx(r.Context(), "Signup: FindFreePlan error (falling back to starter): %v", err)
+			} else if freePlan != nil {
+				req.PlanCode = freePlan.Code
+			}
+		}
+		if req.PlanCode == "" {
+			req.PlanCode = "starter"
+		}
 	}
 
 	var preferredSlug *string
