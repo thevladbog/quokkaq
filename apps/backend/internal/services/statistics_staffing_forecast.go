@@ -14,6 +14,9 @@ import (
 // to compute a meaningful forecast.
 var ErrStaffingForecastNoData = errors.New("not enough historical data for staffing forecast")
 
+// maxStaffingForecastLookbackWeeks caps lookback samples and slice preallocation (CodeQL: go/uncontrolled-allocation-size).
+const maxStaffingForecastLookbackWeeks = 52
+
 // StaffingForecastParams holds query parameters for the staffing forecast endpoint.
 type StaffingForecastParams struct {
 	TargetDate       string  // YYYY-MM-DD; defaults to tomorrow
@@ -155,8 +158,8 @@ func applyForecastDefaults(p StaffingForecastParams) StaffingForecastParams {
 	if p.LookbackWeeks <= 0 {
 		p.LookbackWeeks = 4
 	}
-	if p.LookbackWeeks > 52 {
-		p.LookbackWeeks = 52
+	if p.LookbackWeeks > maxStaffingForecastLookbackWeeks {
+		p.LookbackWeeks = maxStaffingForecastLookbackWeeks
 	}
 	return p
 }
@@ -166,10 +169,10 @@ func historicalSameDayDates(targetDate time.Time, weekday time.Weekday, n int) [
 	if n <= 0 {
 		return []string{}
 	}
-	if n > 52 {
-		n = 52
+	if n > maxStaffingForecastLookbackWeeks {
+		n = maxStaffingForecastLookbackWeeks
 	}
-	out := make([]string, 0, n)
+	out := make([]string, 0, maxStaffingForecastLookbackWeeks)
 	d := targetDate.AddDate(0, 0, -7)
 	for len(out) < n {
 		if d.Weekday() == weekday {
