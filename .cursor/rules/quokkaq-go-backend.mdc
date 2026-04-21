@@ -23,8 +23,8 @@ Use the existing flow: **handlers → services → repository → models**. Exte
 ## New HTTP API surface
 
 1. Wire routes in `main.go`.
-2. Add Swagger annotations on handlers; regenerate docs when contracts change: `swag init -g cmd/api/main.go -o ./docs` (CI checks OpenAPI artifacts — see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
-3. If the frontend uses **Orval** for that area, after updating `docs/swagger.json` run from repo root: `pnpm nx run frontend:orval`, then immediately run `pnpm nx run frontend:orval:check` so generated OpenAPI → React Query output matches committed files. Adjust [`apps/frontend/orval.config.ts`](apps/frontend/orval.config.ts) if the new routes use tags not yet included in `input.filters`; fix any drift reported by the check before committing. Prefer stable **`operationId`** via swag `@ID` (instead of relying on auto-derived names) to reduce noisy diffs when docs are regenerated.
+2. Add Swagger annotations on handlers; regenerate docs when contracts change — run from repo root: `pnpm nx run backend:openapi` (or from `apps/backend`: `swag init -g cmd/api/main.go -o ./docs && go run ./cmd/swagger-to-openapi3`). CI checks OpenAPI artifacts via `backend:openapi:check` — see [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+3. If the frontend uses **Orval** for that area, after updating `docs/openapi.json` run from repo root: `pnpm nx run frontend:orval`, then immediately run `pnpm nx run frontend:orval:check` so generated OpenAPI → React Query output matches committed files. Adjust [`apps/frontend/orval.config.ts`](apps/frontend/orval.config.ts) if the new routes use tags not yet included in `input.filters`; fix any drift reported by the check before committing. Prefer stable **`operationId`** via swag `@ID` (instead of relying on auto-derived names) to reduce noisy diffs when docs are regenerated.
 
 ## Database migrations
 

@@ -338,7 +338,7 @@ func run() error {
 	r.Get("/ws", authmiddleware.WebSocketHandler(hub, userRepo))
 
 	r.Get("/swagger/*", func(w http.ResponseWriter, r *http.Request) {
-		content, err := os.ReadFile("./docs/swagger.json")
+		content, err := os.ReadFile("./docs/openapi.json")
 		if err != nil {
 			http.Error(w, "Failed to read OpenAPI spec", http.StatusInternalServerError)
 			return
@@ -362,11 +362,12 @@ func run() error {
 		}
 	})
 
-	r.Get("/docs/swagger.json", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./docs/swagger.json")
-	})
+	// openapi.json is the canonical spec; swagger.json is a backward-compatible alias.
 	r.Get("/docs/openapi.json", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./docs/swagger.json")
+		http.ServeFile(w, r, "./docs/openapi.json")
+	})
+	r.Get("/docs/swagger.json", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./docs/openapi.json")
 	})
 
 	r.Route("/auth", func(r chi.Router) {

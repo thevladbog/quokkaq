@@ -260,13 +260,17 @@ The published spec is OpenAPI 3.0 (converted from Swagger 2 annotations):
 
 ### Generating API docs
 
-Code annotations use swag (Swagger 2). Run the full pipeline:
+Code annotations use swag (Swagger 2). Run the two-step pipeline from `apps/backend`:
 
 ```bash
-python3 -m pip install 'PyYAML>=6.0,<7'
 go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g cmd/api/main.go -o ./docs
 go run ./cmd/swagger-to-openapi3
-python3 scripts/post_swagger_openapi_tweaks.py
+```
+
+Or via Nx from the repo root:
+
+```bash
+pnpm nx run backend:openapi
 ```
 
 ---
@@ -327,7 +331,7 @@ Async task processing for operations like email sending and TTS generation.
 4. **Create Handler** in `internal/handlers/`
 5. **Register Routes** in `cmd/api/main.go`
 6. **Add Swagger Annotations** to handler methods
-7. **Regenerate API Docs** with `swag init`
+7. **Regenerate API Docs** with `pnpm nx run backend:openapi` (or `swag init -g cmd/api/main.go -o ./docs && go run ./cmd/swagger-to-openapi3` from `apps/backend`)
 
 ---
 

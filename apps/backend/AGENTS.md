@@ -38,9 +38,9 @@ auth, users, units, tickets, services, counters, shifts, slots, bookings, pre-re
 - `docker-compose.yml`: postgres, redis, minio, backend — API **:3001**
 - После старта: Scalar `http://localhost:3001/swagger/`, спека OpenAPI 3: `http://localhost:3001/docs/openapi.json` (и исторический путь `/docs/swagger.json`).
 - Новые эндпоинты: model → repository → service → handler → регистрация в `main.go` → аннотации swag (Swagger 2) → пайплайн доков из `apps/backend`:
-  `swag init -g cmd/api/main.go -o ./docs` → `go run ./cmd/swagger-to-openapi3` (конвертация в OpenAPI 3 через kin-openapi) → `python3 scripts/post_swagger_openapi_tweaks.py` (`minProperties` / паттерн цвета; для YAML нужен PyYAML: `pip install pyyaml`).
-- Pull request: корневой CI — `swag init` + конвертер + post-hook + `git diff` по `docs/*` при затронутом backend; отдельный workflow в `apps/backend/.github/` — тот же порядок; Gosec — [`.github/workflows/gosec.yml`](../../.github/workflows/gosec.yml) и [`.gosec.json`](.gosec.json).
-- Монорепо **quokkaq**: после обновления `docs/swagger.json`, если эндпоинт попадает под Orval на фронте, из корня выполнить `pnpm nx run frontend:orval` и закоммитить изменения в `apps/frontend/lib/api/generated/` (см. `apps/frontend/orval.config.ts`). Для читаемых имён в клиенте можно задать `@ID` в swag-комментариях к handler.
+  `swag init -g cmd/api/main.go -o ./docs` → `go run ./cmd/swagger-to-openapi3` (конвертация в OpenAPI 3 через kin-openapi + структурные патчи). Или через Nx из корня: `pnpm nx run backend:openapi`.
+- Pull request: корневой CI — `pnpm nx run backend:openapi:check` + `git diff` по `docs/*` при затронутом backend; отдельный workflow в `apps/backend/.github/` — тот же порядок; Gosec — [`.github/workflows/gosec.yml`](../../.github/workflows/gosec.yml) и [`.gosec.json`](.gosec.json).
+- Монорепо **quokkaq**: после обновления `docs/openapi.json`, если эндпоинт попадает под Orval на фронте, из корня выполнить `pnpm nx run frontend:orval` и закоммитить изменения в `apps/frontend/lib/api/generated/` (см. `apps/frontend/orval.config.ts`). Для читаемых имён в клиенте можно задать `@ID` в swag-комментариях к handler.
 
 ## Фронтенд (соседний репозиторий)
 

@@ -52,10 +52,8 @@ jobs:
 
       - name: Verify OpenAPI 3 artifacts match doc pipeline
         run: |
-          python3 -m pip install --user 'PyYAML>=6.0,<7'
           go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g cmd/api/main.go -o ./docs
           go run ./cmd/swagger-to-openapi3
-          python3 scripts/post_swagger_openapi_tweaks.py
           git diff --exit-code docs/docs.go docs/swagger.json docs/openapi.json docs/swagger.yaml
 
   lint:

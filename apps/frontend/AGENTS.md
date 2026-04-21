@@ -28,7 +28,7 @@
 
 ## OpenAPI и Orval (генерация клиента)
 
-- Спека: `../backend/docs/swagger.json` (в монорепо — [`apps/backend/docs/swagger.json`](../../apps/backend/docs/swagger.json)).
+- Спека: `../backend/docs/openapi.json` (в монорепо — [`apps/backend/docs/openapi.json`](../../apps/backend/docs/openapi.json)).
 - Конфиг: [`orval.config.ts`](orval.config.ts). Наборы тегов → отдельные файлы в [`lib/api/generated/`](lib/api/generated/) (например **`platform`** → `platform.ts`, **`auth`** → `auth.ts`); файлы **не править вручную**.
 - HTTP для сгенерированных вызовов: [`lib/orval-mutator.ts`](lib/orval-mutator.ts) использует [`lib/authenticated-api-fetch.ts`](lib/authenticated-api-fetch.ts) (JWT и refresh, как в `lib/api.ts`).
 - После изменений swag/OpenAPI: из корня репозитория `pnpm nx run frontend:orval`. Проверка расхождения с коммитом: `pnpm nx run frontend:orval:check`.

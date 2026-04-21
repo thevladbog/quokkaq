@@ -36,7 +36,7 @@ const publicBackendFetchOutput = {
 export default defineConfig({
   quokkaqPlatform: {
     input: {
-      target: '../backend/docs/swagger.json',
+      target: '../backend/docs/openapi.json',
       filters: {
         mode: 'include',
         tags: ['platform']
@@ -49,7 +49,7 @@ export default defineConfig({
   },
   quokkaqTicketsCounters: {
     input: {
-      target: '../backend/docs/swagger.json',
+      target: '../backend/docs/openapi.json',
       filters: {
         mode: 'include',
         tags: ['tickets', 'counters']
@@ -62,7 +62,7 @@ export default defineConfig({
   },
   quokkaqUnits: {
     input: {
-      target: '../backend/docs/swagger.json',
+      target: '../backend/docs/openapi.json',
       filters: {
         mode: 'include',
         tags: ['units']
@@ -75,7 +75,7 @@ export default defineConfig({
   },
   quokkaqTenantBilling: {
     input: {
-      target: '../backend/docs/swagger.json',
+      target: '../backend/docs/openapi.json',
       filters: {
         mode: 'include',
         tags: ['invoices', 'subscriptions']
@@ -88,7 +88,7 @@ export default defineConfig({
   },
   quokkaqPublicSubscriptions: {
     input: {
-      target: '../backend/docs/swagger.json',
+      target: '../backend/docs/openapi.json',
       filters: {
         mode: 'include',
         tags: ['subscriptions']
@@ -101,7 +101,7 @@ export default defineConfig({
   },
   quokkaqUpload: {
     input: {
-      target: '../backend/docs/swagger.json',
+      target: '../backend/docs/openapi.json',
       filters: {
         mode: 'include',
         tags: ['upload']
@@ -114,7 +114,7 @@ export default defineConfig({
   },
   quokkaqSurveys: {
     input: {
-      target: '../backend/docs/swagger.json',
+      target: '../backend/docs/openapi.json',
       filters: {
         mode: 'include',
         tags: ['surveys']
@@ -127,7 +127,7 @@ export default defineConfig({
   },
   quokkaqStatistics: {
     input: {
-      target: '../backend/docs/swagger.json',
+      target: '../backend/docs/openapi.json',
       filters: {
         mode: 'include',
         tags: ['statistics', 'operations']
@@ -140,7 +140,7 @@ export default defineConfig({
   },
   quokkaqGuestSurveyTerminal: {
     input: {
-      target: '../backend/docs/swagger.json',
+      target: '../backend/docs/openapi.json',
       filters: {
         mode: 'include',
         tags: ['guest-survey', 'counter-board']
@@ -161,7 +161,7 @@ export default defineConfig({
   /** Admin terminal CRUD + public bootstrap (same mutator as main app API). */
   quokkaqDesktopTerminal: {
     input: {
-      target: '../backend/docs/swagger.json',
+      target: '../backend/docs/openapi.json',
       filters: {
         mode: 'include',
         tags: ['DesktopTerminal']
@@ -174,7 +174,7 @@ export default defineConfig({
   },
   quokkaqServices: {
     input: {
-      target: '../backend/docs/swagger.json',
+      target: '../backend/docs/openapi.json',
       filters: {
         mode: 'include',
         tags: ['services']
@@ -187,7 +187,7 @@ export default defineConfig({
   },
   quokkaqShift: {
     input: {
-      target: '../backend/docs/swagger.json',
+      target: '../backend/docs/openapi.json',
       filters: {
         mode: 'include',
         tags: ['shift']
@@ -200,7 +200,7 @@ export default defineConfig({
   },
   quokkaqAuth: {
     input: {
-      target: '../backend/docs/swagger.json',
+      target: '../backend/docs/openapi.json',
       filters: {
         mode: 'include',
         tags: ['auth', 'companies']
@@ -213,7 +213,7 @@ export default defineConfig({
   },
   quokkaqCalendarIntegration: {
     input: {
-      target: '../backend/docs/swagger.json',
+      target: '../backend/docs/openapi.json',
       filters: {
         mode: 'include',
         tags: ['calendar-integration']
@@ -226,7 +226,7 @@ export default defineConfig({
   },
   quokkaqPreRegistrations: {
     input: {
-      target: '../backend/docs/swagger.json',
+      target: '../backend/docs/openapi.json',
       filters: {
         mode: 'include',
         tags: ['pre-registrations']
@@ -239,7 +239,7 @@ export default defineConfig({
   },
   quokkaqSupport: {
     input: {
-      target: '../backend/docs/swagger.json',
+      target: '../backend/docs/openapi.json',
       filters: {
         mode: 'include',
         tags: ['support']
@@ -252,7 +252,7 @@ export default defineConfig({
   },
   quokkaqSystem: {
     input: {
-      target: '../backend/docs/swagger.json',
+      target: '../backend/docs/openapi.json',
       filters: {
         mode: 'include',
         tags: ['system']
