@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -91,8 +93,12 @@ func respondStatisticsServiceErr(w http.ResponseWriter, err error) bool {
 		http.Error(w, msg, http.StatusBadRequest)
 		return true
 	}
-	if strings.Contains(msg, "invalid date") || strings.Contains(msg, "dateTo before") {
+	if strings.Contains(msg, "invalid date") || strings.Contains(msg, "dateTo before") || strings.Contains(msg, "invalid targetDate") {
 		http.Error(w, msg, http.StatusBadRequest)
+		return true
+	}
+	if errors.Is(err, services.ErrStaffingForecastNoData) {
+		http.Error(w, msg, http.StatusUnprocessableEntity)
 		return true
 	}
 	return false
@@ -551,6 +557,116 @@ func (h *StatisticsHandler) GetEmployeeRadar(w http.ResponseWriter, r *http.Requ
 	RespondJSON(w, resp)
 }
 
+// GetStaffPerformanceList godoc
+// @ID           getUnitStatisticsStaffPerformanceList
+// @Summary      Staff performance leaderboard — all operators for a date range
+// @Description  Returns aggregated performance metrics per operator from StatisticsDailyBucket, CounterOperatorInterval, and Survey data. Requires advanced_reports plan feature. Expanded scope returns all operators; non-expanded returns only the caller.
+// @Tags         statistics
+// @Security     BearerAuth
+// @Param        unitId    path   string true  "Subdivision unit ID"
+// @Param        dateFrom  query  string true  "YYYY-MM-DD"
+// @Param        dateTo    query  string true  "YYYY-MM-DD"
+// @Param        sort      query  string false "Sort field: ticketsCompleted|avgServiceMs|slaWait|csatAvg|utilizationPct" default(ticketsCompleted)
+// @Param        order     query  string false "Sort order: desc|asc" default(desc)
+// @Success      200 {object} services.StaffPerformanceListResponse
+// @Failure      400 {string} string "Bad Request"
+// @Failure      401 {string} string "Unauthorized"
+// @Failure      403 {string} string "Forbidden (missing statistics access or plan)"
+// @Failure      404 {string} string "Unit not found"
+// @Failure      500 {string} string "Internal server error"
+// @Router       /units/{unitId}/statistics/staff-performance [get]
+func (h *StatisticsHandler) GetStaffPerformanceList(w http.ResponseWriter, r *http.Request) {
+	unitID := chi.URLParam(r, "unitId")
+	viewerID, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok || viewerID == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	user, err := h.userRepo.FindByID(r.Context(), viewerID)
+	if err != nil {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+	companyID, err := h.subdivisionCompanyID(r.Context(), unitID)
+	if err != nil {
+		http.Error(w, "Unit not found", http.StatusNotFound)
+		return
+	}
+	dateFrom := strings.TrimSpace(r.URL.Query().Get("dateFrom"))
+	dateTo := strings.TrimSpace(r.URL.Query().Get("dateTo"))
+	if dateFrom == "" || dateTo == "" {
+		http.Error(w, "dateFrom and dateTo are required (YYYY-MM-DD)", http.StatusBadRequest)
+		return
+	}
+	sortBy := strings.TrimSpace(r.URL.Query().Get("sort"))
+	sortOrder := strings.TrimSpace(r.URL.Query().Get("order"))
+	resp, err := h.service.GetStaffPerformanceList(r.Context(), unitID, companyID, user, viewerID, dateFrom, dateTo, sortBy, sortOrder)
+	if err != nil {
+		if respondStatisticsServiceErr(w, err) {
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	RespondJSON(w, resp)
+}
+
+// GetStaffPerformanceDetail godoc
+// @ID           getUnitStatisticsStaffPerformanceDetail
+// @Summary      Staff performance detail — single operator with daily trend
+// @Description  Returns detailed performance metrics for a single operator including a day-by-day trend. Requires advanced_reports plan feature.
+// @Tags         statistics
+// @Security     BearerAuth
+// @Param        unitId   path   string true "Subdivision unit ID"
+// @Param        userId   path   string true "Target operator user ID"
+// @Param        dateFrom query  string true "YYYY-MM-DD"
+// @Param        dateTo   query  string true "YYYY-MM-DD"
+// @Success      200 {object} services.StaffPerformanceResponse
+// @Failure      400 {string} string "Bad Request"
+// @Failure      401 {string} string "Unauthorized"
+// @Failure      403 {string} string "Forbidden (missing statistics access or plan)"
+// @Failure      404 {string} string "Unit not found"
+// @Failure      500 {string} string "Internal server error"
+// @Router       /units/{unitId}/statistics/staff-performance/{userId} [get]
+func (h *StatisticsHandler) GetStaffPerformanceDetail(w http.ResponseWriter, r *http.Request) {
+	unitID := chi.URLParam(r, "unitId")
+	targetUserID := chi.URLParam(r, "userId")
+	if strings.TrimSpace(targetUserID) == "" {
+		http.Error(w, "userId path param is required", http.StatusBadRequest)
+		return
+	}
+	viewerID, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok || viewerID == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	user, err := h.userRepo.FindByID(r.Context(), viewerID)
+	if err != nil {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+	companyID, err := h.subdivisionCompanyID(r.Context(), unitID)
+	if err != nil {
+		http.Error(w, "Unit not found", http.StatusNotFound)
+		return
+	}
+	dateFrom := strings.TrimSpace(r.URL.Query().Get("dateFrom"))
+	dateTo := strings.TrimSpace(r.URL.Query().Get("dateTo"))
+	if dateFrom == "" || dateTo == "" {
+		http.Error(w, "dateFrom and dateTo are required (YYYY-MM-DD)", http.StatusBadRequest)
+		return
+	}
+	resp, err := h.service.GetStaffPerformanceDetail(r.Context(), unitID, companyID, user, viewerID, targetUserID, dateFrom, dateTo)
+	if err != nil {
+		if respondStatisticsServiceErr(w, err) {
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	RespondJSON(w, resp)
+}
+
 // GetSLAHeatmap godoc
 // @ID           getUnitStatisticsSlaHeatmap
 // @Summary      Per-hour SLA compliance heatmap for a date range
@@ -614,4 +730,72 @@ func (h *StatisticsHandler) GetSLAHeatmap(w http.ResponseWriter, r *http.Request
 		return
 	}
 	RespondJSON(w, resp)
+}
+
+// GetStaffingForecast godoc
+// @ID           getUnitStatisticsStaffingForecast
+// @Summary      Hourly staffing recommendations based on Erlang C and historical arrival data
+// @Description  Computes recommended agent counts per hour for a target date using Erlang C queuing theory. Historical arrival rates are derived from tickets.created_at for the same weekday over the last N weeks.
+// @Tags         statistics
+// @Security     BearerAuth
+// @Param        unitId            path   string  true  "Subdivision unit ID"
+// @Param        targetDate        query  string  false "Target date YYYY-MM-DD (defaults to tomorrow)"
+// @Param        targetSlaPct      query  number  false "Target SLA percent, e.g. 90 (default)" default(90)
+// @Param        targetMaxWaitMin  query  number  false "Target max wait time in minutes (default 5)" default(5)
+// @Param        lookbackWeeks     query  integer false "Number of past same-weekday samples (default 4)" default(4)
+// @Success      200 {object} services.StaffingForecastResponse
+// @Failure      400 {string} string "Bad Request"
+// @Failure      401 {string} string "Unauthorized"
+// @Failure      403 {string} string "Forbidden"
+// @Failure      404 {string} string "Unit not found"
+// @Failure      422 {string} string "Not enough data"
+// @Failure      500 {string} string "Internal server error"
+// @Router       /units/{unitId}/statistics/staffing-forecast [get]
+func (h *StatisticsHandler) GetStaffingForecast(w http.ResponseWriter, r *http.Request) {
+	unitID := chi.URLParam(r, "unitId")
+	_, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	q := r.URL.Query()
+	params := services.StaffingForecastParams{
+		TargetDate:       strings.TrimSpace(q.Get("targetDate")),
+		TargetSLAPercent: parseFloatOrDefault(q.Get("targetSlaPct"), 90.0),
+		TargetMaxWaitMin: parseFloatOrDefault(q.Get("targetMaxWaitMin"), 5.0),
+		LookbackWeeks:    parseIntOrDefault(q.Get("lookbackWeeks"), 4),
+	}
+
+	resp, err := h.service.GetStaffingForecast(r.Context(), unitID, params)
+	if err != nil {
+		if respondStatisticsServiceErr(w, err) {
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	RespondJSON(w, resp)
+}
+
+func parseFloatOrDefault(s string, def float64) float64 {
+	if s == "" {
+		return def
+	}
+	var v float64
+	if _, err := fmt.Sscanf(s, "%f", &v); err != nil || v <= 0 {
+		return def
+	}
+	return v
+}
+
+func parseIntOrDefault(s string, def int) int {
+	if s == "" {
+		return def
+	}
+	var v int
+	if _, err := fmt.Sscanf(s, "%d", &v); err != nil || v <= 0 {
+		return def
+	}
+	return v
 }

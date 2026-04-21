@@ -19,14 +19,16 @@ type StatisticsPDFInput struct {
 	FilterOperator string
 	Labels         StatsPDFLabels
 
-	SlaSummary    *SlaSummaryResponse
-	Timeseries    *TimeseriesResponse
-	Load          *LoadResponse
-	SLADeviations *SLADeviationsResponse
-	TicketsSvc    *TicketsByServiceResponse
-	SurveyScores  *SurveyScoresResponse
-	Utilization   *UtilizationResponse
-	EmployeeRadar *EmployeeRadarResponse
+	SlaSummary       *SlaSummaryResponse
+	Timeseries       *TimeseriesResponse
+	Load             *LoadResponse
+	SLADeviations    *SLADeviationsResponse
+	TicketsSvc       *TicketsByServiceResponse
+	SurveyScores     *SurveyScoresResponse
+	Utilization      *UtilizationResponse
+	EmployeeRadar    *EmployeeRadarResponse
+	StaffLeaderboard *StaffPerformanceListResponse
+	StaffForecast    *StaffingForecastResponse
 }
 
 const (
@@ -143,6 +145,24 @@ func BuildStatisticsPDF(input StatisticsPDFInput) ([]byte, error) {
 	// ── Employee Radar ──────────────────────────────────────────────
 	if input.EmployeeRadar != nil && input.EmployeeRadar.UserID != "" {
 		y, err = drawStatsSectionRadar(&pdf, left, y, innerW, input.EmployeeRadar, tblCfg, addPage, l)
+		if err != nil {
+			return nil, err
+		}
+		y += statsPdfSectionGap
+	}
+
+	// ── Staff Performance Leaderboard ───────────────────────────────
+	if input.StaffLeaderboard != nil && len(input.StaffLeaderboard.Items) > 0 {
+		y, err = drawStatsSectionStaffLeaderboard(&pdf, left, y, innerW, input.StaffLeaderboard, tblCfg, addPage, l)
+		if err != nil {
+			return nil, err
+		}
+		y += statsPdfSectionGap
+	}
+
+	// ── Staffing Forecast ───────────────────────────────────────────
+	if input.StaffForecast != nil && len(input.StaffForecast.HourlyForecasts) > 0 {
+		y, err = drawStatsSectionStaffForecast(&pdf, left, y, innerW, input.StaffForecast, tblCfg, addPage, l)
 		if err != nil {
 			return nil, err
 		}
@@ -647,6 +667,103 @@ func drawStatsSectionRadar(
 		{l.RadarSLAWait, fmt.Sprintf("%.1f", data.SlaWait)},
 		{l.RadarSLAService, fmt.Sprintf("%.1f", data.SlaService)},
 		{l.RadarTicketsPerH, fmt.Sprintf("%.1f", data.TicketsPerHour)},
+	}
+
+	return statsPdfDrawTable(pdf, left, y, innerW, cols, rows, cfg, addPage)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Section: Staff Performance Leaderboard
+// ─────────────────────────────────────────────────────────────────────────────
+
+func drawStatsSectionStaffLeaderboard(
+	pdf *gopdf.GoPdf, left, y, innerW float64,
+	data *StaffPerformanceListResponse,
+	cfg pdfTableConfig,
+	addPage func() (float64, error),
+	l StatsPDFLabels,
+) (float64, error) {
+	y, err := ensureSpaceForSection(pdf, y, 60, addPage)
+	if err != nil {
+		return y, err
+	}
+	y = drawStatsSectionHeader(pdf, left, y, innerW, l.SectionStaffLeader)
+
+	cols := []pdfColumnDef{
+		{l.ColOperator, 2.5, pdfAlignLeft},
+		{l.ColTickets, 0.8, pdfAlignRight},
+		{l.ColSLAWait, 1.1, pdfAlignRight},
+		{l.ColSLAService, 1.1, pdfAlignRight},
+		{l.ColUtil, 1.0, pdfAlignRight},
+		{l.ColCSAT, 0.9, pdfAlignRight},
+	}
+	rows := make([][]string, 0, len(data.Items))
+	for _, op := range data.Items {
+		name := op.UserName
+		if name == "" {
+			name = op.UserID
+		}
+		slaWait := "—"
+		if op.SlaWaitTotal > 0 {
+			slaWait = fmt.Sprintf("%.1f%%", float64(op.SlaWaitMet)/float64(op.SlaWaitTotal)*100)
+		}
+		slaSvc := "—"
+		if op.SlaServiceTotal > 0 {
+			slaSvc = fmt.Sprintf("%.1f%%", float64(op.SlaServiceMet)/float64(op.SlaServiceTotal)*100)
+		}
+		util := fmt.Sprintf("%.1f%%", op.UtilizationPct)
+		csat := "—"
+		if op.CsatAvg != nil {
+			csat = fmt.Sprintf("%.2f", *op.CsatAvg)
+		}
+		rows = append(rows, []string{
+			name,
+			fmt.Sprintf("%d", op.TicketsCompleted),
+			slaWait,
+			slaSvc,
+			util,
+			csat,
+		})
+	}
+
+	return statsPdfDrawTable(pdf, left, y, innerW, cols, rows, cfg, addPage)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Section: Staffing Forecast
+// ─────────────────────────────────────────────────────────────────────────────
+
+func drawStatsSectionStaffForecast(
+	pdf *gopdf.GoPdf, left, y, innerW float64,
+	data *StaffingForecastResponse,
+	cfg pdfTableConfig,
+	addPage func() (float64, error),
+	l StatsPDFLabels,
+) (float64, error) {
+	y, err := ensureSpaceForSection(pdf, y, 60, addPage)
+	if err != nil {
+		return y, err
+	}
+	title := l.SectionStaffForecast
+	if data.TargetDate != "" {
+		title += "  (" + data.TargetDate + ")"
+	}
+	y = drawStatsSectionHeader(pdf, left, y, innerW, title)
+
+	cols := []pdfColumnDef{
+		{l.ColHour, 1.0, pdfAlignLeft},
+		{l.ColArrivalRate, 1.2, pdfAlignRight},
+		{l.ColRecommended, 1.0, pdfAlignRight},
+		{l.ColSLAPct, 1.0, pdfAlignRight},
+	}
+	rows := make([][]string, 0, len(data.HourlyForecasts))
+	for _, h := range data.HourlyForecasts {
+		rows = append(rows, []string{
+			fmt.Sprintf("%02d:00", h.Hour),
+			fmt.Sprintf("%.1f", h.ExpectedArrivals),
+			fmt.Sprintf("%d", h.RecommendedStaff),
+			fmt.Sprintf("%.1f%%", h.ExpectedSlaPct*100),
+		})
 	}
 
 	return statsPdfDrawTable(pdf, left, y, innerW, cols, rows, cfg, addPage)

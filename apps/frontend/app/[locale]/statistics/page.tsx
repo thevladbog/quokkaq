@@ -72,9 +72,18 @@ import {
   useGetUnitStatisticsSurveyScores,
   useGetUnitStatisticsTicketsByService,
   useGetUnitStatisticsSlaSummary,
-  useGetUnitStatisticsSlaHeatmap
+  useGetUnitStatisticsSlaHeatmap,
+  useGetUnitStatisticsStaffPerformanceList,
+  useGetUnitStatisticsStaffPerformanceDetail,
+  useGetUnitStatisticsStaffingForecast
 } from '@/lib/api/generated/statistics';
 import { SLAHeatmapChart } from '@/components/statistics/SLAHeatmapChart';
+import {
+  StaffLeaderboard,
+  type StaffSortField
+} from '@/components/statistics/StaffLeaderboard';
+import { StaffOperatorDetailCard } from '@/components/statistics/StaffOperatorDetailCard';
+import { StaffingForecastPanel } from '@/components/statistics/StaffingForecastPanel';
 import { useGetUnitsUnitIdShiftActivityActors } from '@/lib/api/generated/shift';
 import { useGetUnitsUnitIdServices } from '@/lib/api/generated/services';
 import { normalizeChildUnitsQueryData } from '@/lib/child-units-query';
@@ -333,6 +342,17 @@ export default function StatisticsPage() {
   const [slaDisplayMode, setSlaDisplayMode] = useState<'percent' | 'count'>(
     'percent'
   );
+  const [staffSortBy, setStaffSortBy] =
+    useState<StaffSortField>('ticketsCompleted');
+  const [staffSelectedUserId, setStaffSelectedUserId] = useState('');
+  const tomorrow = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().slice(0, 10);
+  }, []);
+  const [forecastTargetDate, setForecastTargetDate] = useState(tomorrow);
+  const [forecastSlaPct, setForecastSlaPct] = useState(90);
+  const [forecastMaxWait, setForecastMaxWait] = useState(5);
 
   const unitQuery = useGetUnitByID(activeUnitId ?? '', {
     query: { enabled: Boolean(activeUnitId) }
@@ -712,6 +732,54 @@ export default function StatisticsPage() {
         enabled: Boolean(
           statsSubdivisionId && utilizationOperatorId && isExpanded
         )
+      }
+    }
+  );
+
+  const staffPerformanceListQuery = useGetUnitStatisticsStaffPerformanceList(
+    statsSubdivisionId,
+    {
+      dateFrom: from,
+      dateTo: dateToForApi,
+      sort: staffSortBy,
+      order: 'desc'
+    },
+    {
+      query: {
+        enabled: Boolean(
+          statsSubdivisionId && isExpanded && from && dateToForApi
+        )
+      }
+    }
+  );
+
+  const staffDetailQuery = useGetUnitStatisticsStaffPerformanceDetail(
+    statsSubdivisionId,
+    staffSelectedUserId,
+    {
+      dateFrom: from,
+      dateTo: dateToForApi
+    },
+    {
+      query: {
+        enabled: Boolean(
+          statsSubdivisionId && staffSelectedUserId && isExpanded
+        )
+      }
+    }
+  );
+
+  const staffingForecastQuery = useGetUnitStatisticsStaffingForecast(
+    statsSubdivisionId,
+    {
+      targetDate: forecastTargetDate,
+      targetSlaPct: forecastSlaPct,
+      targetMaxWaitMin: forecastMaxWait,
+      lookbackWeeks: 4
+    },
+    {
+      query: {
+        enabled: Boolean(statsSubdivisionId && isExpanded)
       }
     }
   );
@@ -2340,6 +2408,96 @@ export default function StatisticsPage() {
               </Card>
             )}
           </div>
+
+          {/* Staff Performance section (expanded scope only) */}
+          {isExpanded && (
+            <div className='space-y-6 pt-2'>
+              <Card className='lg:col-span-3'>
+                <CardHeader>
+                  <CardTitle>{t('staff_performance_title')}</CardTitle>
+                  <CardDescription>
+                    {t('staff_performance_hint')}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {staffPerformanceListQuery.isLoading ? (
+                    <p className='text-muted-foreground text-sm'>
+                      {t('loading')}
+                    </p>
+                  ) : (
+                    <StaffLeaderboard
+                      items={
+                        staffPerformanceListQuery.data?.status === 200
+                          ? (staffPerformanceListQuery.data.data.items ?? [])
+                          : []
+                      }
+                      selectedUserId={staffSelectedUserId}
+                      onSelectUser={(uid) =>
+                        setStaffSelectedUserId((prev) =>
+                          prev === uid ? '' : uid
+                        )
+                      }
+                      sortBy={staffSortBy}
+                      onSortChange={setStaffSortBy}
+                    />
+                  )}
+                </CardContent>
+              </Card>
+
+              {staffSelectedUserId && (
+                <div>
+                  {staffDetailQuery.isLoading ? (
+                    <p className='text-muted-foreground text-sm'>
+                      {t('loading')}
+                    </p>
+                  ) : staffDetailQuery.data?.status === 200 ? (
+                    <StaffOperatorDetailCard
+                      data={staffDetailQuery.data.data}
+                    />
+                  ) : null}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Staffing Forecast section (expanded scope only) */}
+          {isExpanded && (
+            <div className='pt-2'>
+              <Card className='lg:col-span-3'>
+                <CardHeader>
+                  <CardTitle>{t('staffing_forecast_title')}</CardTitle>
+                  <CardDescription>
+                    {t('staffing_forecast_hint')}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {staffingForecastQuery.isLoading ? (
+                    <p className='text-muted-foreground text-sm'>
+                      {t('loading')}
+                    </p>
+                  ) : staffingForecastQuery.data?.status === 200 ? (
+                    <StaffingForecastPanel
+                      data={staffingForecastQuery.data.data}
+                      targetDate={forecastTargetDate}
+                      targetSlaPct={forecastSlaPct}
+                      targetMaxWaitMin={forecastMaxWait}
+                      onParamsChange={(p) => {
+                        if (p.targetDate) setForecastTargetDate(p.targetDate);
+                        if (p.targetSlaPct != null)
+                          setForecastSlaPct(p.targetSlaPct);
+                        if (p.targetMaxWaitMin != null)
+                          setForecastMaxWait(p.targetMaxWaitMin);
+                      }}
+                    />
+                  ) : (
+                    <p className='text-muted-foreground text-sm'>
+                      {t('sf_no_data')}
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </>
       )}
     </div>

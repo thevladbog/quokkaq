@@ -235,6 +235,7 @@ type ticketService struct {
 	tagDefRepo         repository.VisitorTagDefinitionRepository
 	unitClientHistRepo repository.UnitClientHistoryRepository
 	preRegRepo         *repository.PreRegistrationRepository
+	operatorSkillRepo  repository.OperatorSkillRepository
 	calendar           *CalendarIntegrationService
 	hub                *ws.Hub
 	jobClient          JobEnqueuer
@@ -260,6 +261,7 @@ func NewTicketService(
 	tagDefRepo repository.VisitorTagDefinitionRepository,
 	unitClientHistRepo repository.UnitClientHistoryRepository,
 	preRegRepo *repository.PreRegistrationRepository,
+	operatorSkillRepo repository.OperatorSkillRepository,
 	calendar *CalendarIntegrationService,
 	hub *ws.Hub,
 	jobClient JobEnqueuer,
@@ -274,6 +276,7 @@ func NewTicketService(
 		tagDefRepo:         tagDefRepo,
 		unitClientHistRepo: unitClientHistRepo,
 		preRegRepo:         preRegRepo,
+		operatorSkillRepo:  operatorSkillRepo,
 		calendar:           calendar,
 		hub:                hub,
 		jobClient:          jobClient,
@@ -292,6 +295,7 @@ func NewTicketServiceWithQuota(
 	tagDefRepo repository.VisitorTagDefinitionRepository,
 	unitClientHistRepo repository.UnitClientHistoryRepository,
 	preRegRepo *repository.PreRegistrationRepository,
+	operatorSkillRepo repository.OperatorSkillRepository,
 	calendar *CalendarIntegrationService,
 	hub *ws.Hub,
 	jobClient JobEnqueuer,
@@ -308,6 +312,7 @@ func NewTicketServiceWithQuota(
 		tagDefRepo:         tagDefRepo,
 		unitClientHistRepo: unitClientHistRepo,
 		preRegRepo:         preRegRepo,
+		operatorSkillRepo:  operatorSkillRepo,
 		calendar:           calendar,
 		hub:                hub,
 		jobClient:          jobClient,
@@ -682,6 +687,9 @@ func (s *ticketService) CallNext(unitID, counterID string, serviceIDs []string, 
 	}
 
 	var ticket *models.Ticket
+	var skillRoutingMiss bool
+	var missUserID string
+	var missSkillIDs []string
 	err := s.repo.Transaction(func(tx *gorm.DB) error {
 		c, err := s.counterRepo.FindByIDForUpdateTx(tx, counterID)
 		if err != nil {
@@ -694,19 +702,22 @@ func (s *ticketService) CallNext(unitID, counterID string, serviceIDs []string, 
 			return ErrCounterUnitMismatch
 		}
 
-		t, err := s.repo.FindWaitingForUpdateTx(tx, unitID, serviceIDs, c.ServiceZoneID)
+		t, missed, userID, skillIDs, err := s.findNextTicketTx(tx, unitID, serviceIDs, c)
 		if err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return ErrNoWaitingTickets
-			}
 			return err
 		}
 		ticket = t
+		skillRoutingMiss = missed
+		missUserID = userID
+		missSkillIDs = skillIDs
 		fromStatus := ticket.Status
 		now := time.Now()
 		ticket.Status = "called"
 		ticket.CounterID = &counterID
 		ticket.CalledAt = &now
+		if c.AssignedTo != nil {
+			ticket.ServedByUserID = c.AssignedTo
+		}
 
 		payload := map[string]interface{}{
 			"unit_id":     ticket.UnitID,
@@ -738,6 +749,14 @@ func (s *ticketService) CallNext(unitID, counterID string, serviceIDs []string, 
 		ticket.Counter = c
 	}
 	s.hub.BroadcastEvent("ticket.called", ticket, ticket.UnitID)
+	if skillRoutingMiss && s.hub != nil {
+		s.hub.BroadcastEvent("unit.skill_routing_miss", map[string]interface{}{
+			"unitId":          unitID,
+			"userId":          missUserID,
+			"skillServiceIds": missSkillIDs,
+			"counterId":       counterID,
+		}, unitID)
+	}
 
 	s.enqueueTTS(ticket, counterID)
 
@@ -752,6 +771,69 @@ func (s *ticketService) CallNext(unitID, counterID string, serviceIDs []string, 
 	}
 
 	return ticket, nil
+}
+
+// findNextTicketTx selects the next ticket to call within a transaction.
+// When skill-based routing is enabled for the unit and the counter has an assigned operator with skills,
+// it attempts to find the best skill-matched ticket first; falls back to standard FIFO on no match.
+// Returns: ticket, skillRoutingMiss (true when skill search was attempted but fell back to FIFO),
+// missUserID, missSkillIDs (for the skill_routing_miss WS event).
+func (s *ticketService) findNextTicketTx(tx *gorm.DB, unitID string, serviceIDs []string, c *models.Counter) (*models.Ticket, bool, string, []string, error) {
+	if s.operatorSkillRepo != nil && c.AssignedTo != nil {
+		unit, err := s.unitRepo.FindByIDLight(unitID)
+		if err == nil && unit.SkillBasedRoutingEnabled {
+			skillIDs, serr := s.operatorSkillRepo.ListSkillServiceIDsForOperator(unitID, *c.AssignedTo)
+			if serr == nil && len(skillIDs) > 0 {
+				// Intersect with caller-supplied serviceIDs filter when non-empty.
+				filtered := filterSkillIDsByServiceFilter(skillIDs, serviceIDs)
+				if len(filtered) > 0 {
+					t, err := s.repo.FindWaitingWithSkillsTx(tx, unitID, filtered, c.ServiceZoneID)
+					if err == nil {
+						return t, false, "", nil, nil
+					}
+					if !errors.Is(err, gorm.ErrRecordNotFound) {
+						return nil, false, "", nil, err
+					}
+					// No skill-matched ticket — fall through to FIFO and signal miss.
+					t, ferr := s.repo.FindWaitingForUpdateTx(tx, unitID, serviceIDs, c.ServiceZoneID)
+					if ferr != nil {
+						if errors.Is(ferr, gorm.ErrRecordNotFound) {
+							return nil, false, "", nil, ErrNoWaitingTickets
+						}
+						return nil, false, "", nil, ferr
+					}
+					return t, true, *c.AssignedTo, filtered, nil
+				}
+			}
+		}
+	}
+	t, err := s.repo.FindWaitingForUpdateTx(tx, unitID, serviceIDs, c.ServiceZoneID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, false, "", nil, ErrNoWaitingTickets
+		}
+		return nil, false, "", nil, err
+	}
+	return t, false, "", nil, nil
+}
+
+// filterSkillIDsByServiceFilter intersects skill service IDs with an explicit filter list.
+// When filter is empty all skill IDs are returned (no restriction).
+func filterSkillIDsByServiceFilter(skillIDs, filterIDs []string) []string {
+	if len(filterIDs) == 0 {
+		return skillIDs
+	}
+	set := make(map[string]struct{}, len(filterIDs))
+	for _, id := range filterIDs {
+		set[id] = struct{}{}
+	}
+	out := make([]string, 0, len(skillIDs))
+	for _, id := range skillIDs {
+		if _, ok := set[id]; ok {
+			out = append(out, id)
+		}
+	}
+	return out
 }
 
 // notifyNextInLine finds the current first-waiting ticket and sends a "you're next" SMS
@@ -997,6 +1079,9 @@ func (s *ticketService) Pick(ticketID, counterID string, actorUserID *string) (*
 		ticket.Status = "called"
 		ticket.CounterID = &counterID
 		ticket.CalledAt = &now
+		if c.AssignedTo != nil {
+			ticket.ServedByUserID = c.AssignedTo
+		}
 
 		payload := map[string]interface{}{
 			"unit_id":     ticket.UnitID,
@@ -1118,6 +1203,8 @@ func (s *ticketService) Transfer(ticketID string, in TransferTicketInput, actorU
 			ticket.ConfirmedAt = nil
 			ticket.MaxWaitingTime = newSvc.MaxWaitingTime
 			ticket.MaxServiceTime = nil
+			// Clear served_by so statistics don't attribute the waiting period to the previous operator.
+			ticket.ServedByUserID = nil
 
 			payload := map[string]interface{}{
 				"transfer_kind":        "zone",
@@ -1227,6 +1314,8 @@ func (s *ticketService) Transfer(ticketID string, in TransferTicketInput, actorU
 		ticket.CalledAt = nil
 		ticket.ConfirmedAt = nil
 		ticket.MaxServiceTime = nil
+		// Clear served_by so statistics don't attribute the waiting period to the previous operator.
+		ticket.ServedByUserID = nil
 
 		payload := map[string]interface{}{
 			"transfer_kind":        "counter",

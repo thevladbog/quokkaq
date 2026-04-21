@@ -175,6 +175,19 @@ func (h *StatisticsExportHandler) ExportPDF(w http.ResponseWriter, r *http.Reque
 		input.EmployeeRadar = radar
 	}
 
+	// Include staff performance leaderboard when the viewer has access to advanced reports.
+	leaderboard, lErr := h.service.GetStaffPerformanceList(ctx, unitID, companyID, user, viewerID, dateFrom, dateTo, "ticketsCompleted", "desc")
+	if lErr == nil {
+		input.StaffLeaderboard = leaderboard
+	}
+
+	// Include staffing forecast for the next business day (best-effort).
+	forecastParams := services.StaffingForecastParams{}
+	forecast, fErr := h.service.GetStaffingForecast(ctx, unitID, forecastParams)
+	if fErr == nil {
+		input.StaffForecast = forecast
+	}
+
 	_ = responded
 
 	pdfBytes, err := services.BuildStatisticsPDF(input)

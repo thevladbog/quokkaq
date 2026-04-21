@@ -23,6 +23,8 @@ type StatsPDFLabels struct {
 	SectionSurvey        string
 	SectionUtilization   string
 	SectionRadar         string
+	SectionStaffLeader   string
+	SectionStaffForecast string
 
 	ColDate           string
 	ColAvgWait        string
@@ -53,6 +55,19 @@ type StatsPDFLabels struct {
 	RadarSLAWait     string
 	RadarSLAService  string
 	RadarTicketsPerH string
+
+	ColOperator   string
+	ColTickets    string
+	ColSLAWait    string
+	ColSLAService string
+	ColUtil       string
+	ColCSAT       string
+
+	ColHour         string
+	ColRecommended  string
+	ColExpectedWait string
+	ColSLAPct       string
+	ColArrivalRate  string
 }
 
 // StatsPDFLabelsEN returns English labels for the statistics PDF.
@@ -79,6 +94,8 @@ func StatsPDFLabelsEN() StatsPDFLabels {
 		SectionSurvey:        "SURVEY SCORES",
 		SectionUtilization:   "OPERATOR UTILIZATION",
 		SectionRadar:         "EMPLOYEE RADAR",
+		SectionStaffLeader:   "STAFF PERFORMANCE LEADERBOARD",
+		SectionStaffForecast: "STAFFING RECOMMENDATIONS",
 
 		ColDate:           "Date",
 		ColAvgWait:        "Avg Wait (min)",
@@ -109,6 +126,19 @@ func StatsPDFLabelsEN() StatsPDFLabels {
 		RadarSLAWait:     "SLA Wait",
 		RadarSLAService:  "SLA Service",
 		RadarTicketsPerH: "Tickets / Hour",
+
+		ColOperator:   "Operator",
+		ColTickets:    "Tickets",
+		ColSLAWait:    "SLA Wait %",
+		ColSLAService: "SLA Svc %",
+		ColUtil:       "Util %",
+		ColCSAT:       "CSAT",
+
+		ColHour:         "Hour",
+		ColRecommended:  "Agents",
+		ColExpectedWait: "Exp. Wait (min)",
+		ColSLAPct:       "SLA %",
+		ColArrivalRate:  "Arrivals/h",
 	}
 }
 
@@ -136,6 +166,8 @@ func StatsPDFLabelsRU() StatsPDFLabels {
 		SectionSurvey:        "ГОСТЕВЫЕ ОПРОСЫ",
 		SectionUtilization:   "ЗАГРУЗКА ОПЕРАТОРА",
 		SectionRadar:         "ПРОФИЛЬ СОТРУДНИКА",
+		SectionStaffLeader:   "РЕЙТИНГ ОПЕРАТОРОВ",
+		SectionStaffForecast: "РЕКОМЕНДАЦИИ ПО ШТАТНОМУ РАСПИСАНИЮ",
 
 		ColDate:           "Дата",
 		ColAvgWait:        "Ср. ожидание (мин)",
@@ -166,5 +198,18 @@ func StatsPDFLabelsRU() StatsPDFLabels {
 		RadarSLAWait:     "SLA ожидания",
 		RadarSLAService:  "SLA обслуживания",
 		RadarTicketsPerH: "Талонов / час",
+
+		ColOperator:   "Оператор",
+		ColTickets:    "Талоны",
+		ColSLAWait:    "SLA ожид. %",
+		ColSLAService: "SLA обсл. %",
+		ColUtil:       "Загрузка %",
+		ColCSAT:       "CSAT",
+
+		ColHour:         "Час",
+		ColRecommended:  "Агентов",
+		ColExpectedWait: "Ожид. (мин)",
+		ColSLAPct:       "SLA %",
+		ColArrivalRate:  "Заявок/ч",
 	}
 }
