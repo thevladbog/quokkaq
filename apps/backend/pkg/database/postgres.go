@@ -2292,6 +2292,24 @@ ALTER TABLE tickets
 		return fmt.Errorf("failed to run v1.7.1_ticket_served_by_user_id migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.7.2_anomaly_alerts", func(db *gorm.DB) error {
+		// units.id is text (GORM string PK), not uuid — FK types must match (SQLSTATE 42804).
+		return db.Exec(`
+CREATE TABLE IF NOT EXISTS anomaly_alerts (
+    id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    unit_id text NOT NULL REFERENCES units(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    kind varchar(64) NOT NULL,
+    message text NOT NULL,
+    severity varchar(32) NOT NULL DEFAULT 'warning',
+    created_at timestamptz NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_anomaly_alerts_unit_created ON anomaly_alerts (unit_id, created_at DESC);
+`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.7.2_anomaly_alerts migration: %w", err)
+	}
+
 	fmt.Println("✅ All migrations completed successfully")
 	return nil
 }

@@ -63,6 +63,7 @@ type counterService struct {
 	operatorSkillRepo repository.OperatorSkillRepository
 	hub               *ws.Hub
 	quota             QuotaService
+	etaSched          ETAScheduler
 }
 
 func NewCounterService(
@@ -117,6 +118,9 @@ func (s *counterService) broadcastCounterUpdated(counter *models.Counter) {
 		return
 	}
 	s.hub.BroadcastEvent("counter.updated", counter, counter.UnitID)
+	if s.etaSched != nil && strings.TrimSpace(counter.UnitID) != "" {
+		s.etaSched.Schedule(counter.UnitID)
+	}
 }
 
 func (s *counterService) hydrateBreakStartedAt(c *models.Counter) {

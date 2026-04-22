@@ -32,6 +32,12 @@ handlers → services → repository → models (GORM)
 
 auth, users, units, tickets, services, counters, shifts, slots, bookings, pre-registrations, invitations, templates, mail, storage, TTS, job enqueue.
 
+## Статистика: аномалии и staffing
+
+- **Asynq:** периодическая задача `anomaly:check` ставится из `cmd/api/main.go`, тип и постановка — `internal/jobs/types.go`, `internal/jobs/client.go`, обработчик — `internal/jobs/worker.go` (`handleAnomalyCheck`). Нужен **Redis** (`REDIS_URL` и т.п.), иначе очередь недоступна.
+- **БД:** сохранённые сигналы — таблица `anomaly_alerts` (миграция в [`pkg/database/postgres.go`](pkg/database/postgres.go)), репозиторий [`internal/repository/anomaly_alert_repository.go`](internal/repository/anomaly_alert_repository.go).
+- **API для UI:** `GET /units/{unitId}/statistics/anomaly-alerts` — [`internal/handlers/statistics_handler.go`](internal/handlers/statistics_handler.go); логика детекции/уведомлений — [`internal/services/prediction_service.go`](internal/services/prediction_service.go).
+
 ## Локальная разработка
 
 - Из корня монорепо: `pnpm nx run backend:serve` — `go run ./cmd/api` через [`scripts/run-backend-dev.js`](scripts/run-backend-dev.js) (освобождение порта, корректный код выхода для Nx при Ctrl+C). Hot reload нет: после правок `.go` перезапустите процесс. Без Nx: `node scripts/run-backend-dev.js` или `go run ./cmd/api` из `apps/backend`.

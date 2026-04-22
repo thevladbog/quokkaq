@@ -22,18 +22,21 @@ type StatisticsService struct {
 	statsRepo    repository.StatisticsRepository
 	opRepo       repository.OperationalStateRepository
 	segmentsRepo repository.StatisticsTicketSegmentsRepository
+	anomalyRepo  repository.AnomalyAlertRepository
 }
 
 func NewStatisticsService(
 	statsRepo repository.StatisticsRepository,
 	opRepo repository.OperationalStateRepository,
 	segmentsRepo repository.StatisticsTicketSegmentsRepository,
+	anomalyRepo repository.AnomalyAlertRepository,
 ) *StatisticsService {
 	return &StatisticsService{
 		db:           database.DB,
 		statsRepo:    statsRepo,
 		opRepo:       opRepo,
 		segmentsRepo: segmentsRepo,
+		anomalyRepo:  anomalyRepo,
 	}
 }
 
@@ -880,5 +883,58 @@ func (s *StatisticsService) GetEmployeeRadar(
 		return nil, err
 	}
 	out.ComputedAt = computedAt
+	return out, nil
+}
+
+// AnomalyAlertItem is one persisted operational anomaly for the statistics UI.
+type AnomalyAlertItem struct {
+	ID        string    `json:"id"`
+	UnitID    string    `json:"unitId"`
+	Kind      string    `json:"kind"`
+	Message   string    `json:"message"`
+	Severity  string    `json:"severity"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+// AnomalyAlertsResponse lists recent anomaly_alerts for a subdivision.
+type AnomalyAlertsResponse struct {
+	Items []AnomalyAlertItem `json:"items"`
+}
+
+// GetAnomalyAlerts returns recent persisted anomaly signals for a unit branch (advanced_reports + statistics scope).
+func (s *StatisticsService) GetAnomalyAlerts(ctx context.Context, subdivisionID, companyID string, user *models.User, viewerID string, limit int) (*AnomalyAlertsResponse, error) {
+	if s.anomalyRepo == nil {
+		return nil, errors.New("anomaly alerts unavailable")
+	}
+	ok, err := CompanyAllowsAdvancedReports(ctx, s.db, companyID)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, errors.New("plan does not include advanced reports")
+	}
+	branchIDs, err := s.statisticsBranchUnitIDs(ctx, subdivisionID)
+	if err != nil {
+		return nil, err
+	}
+	sc := statistics.ResolveScope(user, subdivisionID, viewerID, branchIDs)
+	if sc.Denied {
+		return nil, errors.New("forbidden")
+	}
+	rows, err := s.anomalyRepo.ListByUnit(ctx, subdivisionID, limit)
+	if err != nil {
+		return nil, err
+	}
+	out := &AnomalyAlertsResponse{Items: make([]AnomalyAlertItem, 0, len(rows))}
+	for _, r := range rows {
+		out.Items = append(out.Items, AnomalyAlertItem{
+			ID:        r.ID,
+			UnitID:    r.UnitID,
+			Kind:      r.Kind,
+			Message:   r.Message,
+			Severity:  r.Severity,
+			CreatedAt: r.CreatedAt,
+		})
+	}
 	return out, nil
 }

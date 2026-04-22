@@ -130,11 +130,6 @@ func run() error {
 	deploymentSaaSSettingsRepo := repository.NewDeploymentSaaSSettingsRepository()
 	deploymentSaaSSettingsService := services.NewDeploymentSaaSSettingsService(deploymentSaaSSettingsRepo)
 
-	jobWorker := jobs.NewJobWorkerWithSMS(ttsService, ticketRepo, notifRepo, deploymentSaaSSettingsService)
-	if err := jobWorker.Start(); err != nil {
-		return err
-	}
-	defer jobWorker.Stop()
 	trackerClient := services.NewYandexTrackerClientFromEnv()
 	leadIssueService := services.NewLeadIssueService(deploymentSaaSSettingsRepo, trackerClient)
 	authService, err := services.NewAuthService(userRepo, companyRepo, mailService, subscriptionRepo, tenantRBACRepo, leadIssueService)
@@ -162,15 +157,37 @@ func run() error {
 	ticketService := services.NewTicketServiceWithQuota(ticketRepo, counterRepo, serviceRepo, unitRepo, operatorIntervalRepo, unitClientRepo, visitorTagDefRepo, unitClientHistRepo, preRegRepo, operatorSkillRepo, calendarIntegrationService, hub, jobEnqueuerAdapter, quotaService, operationalService)
 	notificationService := services.NewNotificationService(notifRepo, unitRepo, unitClientRepo, jobEnqueuerAdapter, deploymentSaaSSettingsService)
 	ticketService.SetNotificationService(notificationService)
+	anomalyAlertRepo := repository.NewAnomalyAlertRepository()
+	anomalyService := services.NewAnomalyService(database.DB, hub, unitRepo, anomalyAlertRepo)
+	jobWorker := jobs.NewJobWorkerWithSMS(ttsService, ticketRepo, notifRepo, deploymentSaaSSettingsService)
 	// Wire notification service into the Asynq worker so visitor:notify jobs can delegate to it.
 	jobs.WithNotificationService(jobWorker, notificationService)
+	jobs.WithAnomalyService(jobWorker, anomalyService)
+	if err := jobWorker.Start(); err != nil {
+		return err
+	}
+	defer jobWorker.Stop()
 	serviceService := services.NewServiceServiceWithQuota(serviceRepo, unitRepo, quotaService)
 	counterService := services.NewCounterServiceWithQuota(counterRepo, ticketRepo, serviceRepo, userRepo, operatorIntervalRepo, unitRepo, operatorSkillRepo, hub, quotaService)
 	bookingService := services.NewBookingService(bookingRepo)
-	statsService := services.NewStatisticsService(statsRepo, opStateRepo, statsSegmentsRepo)
+	statsService := services.NewStatisticsService(statsRepo, opStateRepo, statsSegmentsRepo, anomalyAlertRepo)
 	refreshCtx, refreshCancel := context.WithCancel(context.Background())
 	defer refreshCancel()
 	statsRefresh.StartPeriodicRefresh(refreshCtx)
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-refreshCtx.Done():
+				return
+			case <-ticker.C:
+				if err := jobClient.EnqueueAnomalyCheck(); err != nil {
+					slog.Error("EnqueueAnomalyCheck", "err", err)
+				}
+			}
+		}
+	}()
 	slaMonitor := services.NewSlaMonitorService(ticketRepo, hub)
 	slaMonitor.Start(refreshCtx)
 	go func() {
@@ -211,7 +228,14 @@ func run() error {
 	companySSOHTTP := handlers.NewCompanySSOHTTP(ssoService, userRepo, companyRepo)
 	tenantRBACHTTP := handlers.NewTenantRBACHTTP(tenantRBACRepo, userRepo, ssoService)
 	unitHandler := handlers.NewUnitHandler(unitService, storageService, operationalService, userRepo)
-	etaService := services.NewETAServiceWithServiceRepo(ticketRepo, counterRepo, serviceRepo)
+	etaService := services.NewETAServiceFull(ticketRepo, counterRepo, serviceRepo, unitRepo, statsRepo)
+	predictionService := services.NewPredictionService(database.DB, hub, etaService, unitRepo, ticketRepo)
+	etaBroadcaster := services.NewETABroadcaster(etaService, hub, 0)
+	etaBroadcaster.SetAfterFlush(func(unitID string) {
+		predictionService.MaybeBroadcastStaffingAlert(context.Background(), unitID)
+	})
+	services.WireTicketServiceETAScheduler(ticketService, etaBroadcaster)
+	services.WireCounterServiceETAScheduler(counterService, etaBroadcaster)
 	ticketHandler := handlers.NewTicketHandlerFull(ticketService, operationalService, etaService, unitService).WithSettingsService(deploymentSaaSSettingsService)
 	serviceHandler := handlers.NewServiceHandler(serviceService, userRepo)
 	counterHandler := handlers.NewCounterHandler(counterService, counterRepo, operationalService, userRepo, unitRepo)
@@ -590,6 +614,7 @@ func run() error {
 			r.Get("/{unitId}/statistics/staff-performance", statisticsHandler.GetStaffPerformanceList)
 			r.Get("/{unitId}/statistics/staff-performance/{userId}", statisticsHandler.GetStaffPerformanceDetail)
 			r.Get("/{unitId}/statistics/staffing-forecast", statisticsHandler.GetStaffingForecast)
+			r.Get("/{unitId}/statistics/anomaly-alerts", statisticsHandler.GetAnomalyAlerts)
 			r.Get("/{unitId}/statistics/export/pdf", statisticsExportHandler.ExportPDF)
 		})
 

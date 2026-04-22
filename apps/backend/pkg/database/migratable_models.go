@@ -55,6 +55,7 @@ func AllMigratableModels() []any {
 		&models.DesktopTerminal{},
 		&models.UnitOperationalState{},
 		&models.StatisticsDailyBucket{},
+		&models.AnomalyAlert{},
 		&models.StatisticsSurveyDaily{},
 		&models.SupportReport{},
 		&models.DeploymentSaaSSettings{},

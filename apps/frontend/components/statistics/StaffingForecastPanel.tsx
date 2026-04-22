@@ -14,7 +14,9 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
-  ReferenceLine
+  ReferenceLine,
+  ComposedChart,
+  Line
 } from 'recharts';
 import type {
   ServicesStaffingForecastResponse,
@@ -149,10 +151,19 @@ export function StaffingForecastPanel({
     : (data.dayOfWeek ?? '');
 
   const summary = data.dailySummary;
-  const hourlyData = (data.hourlyForecasts ?? []).map((h) => ({
-    ...h,
-    label: fmtHour(h.hour ?? 0)
-  }));
+  const uncFrac = Math.min(
+    0.85,
+    Math.max(0, (data.arrivalUncertaintyPct ?? 0) / 100)
+  );
+  const hourlyData = (data.hourlyForecasts ?? []).map((h) => {
+    const exp = h.expectedArrivals ?? 0;
+    return {
+      ...h,
+      label: fmtHour(h.hour ?? 0),
+      arrivalsHigh: exp * (1 + uncFrac),
+      arrivalsLow: Math.max(0, exp * (1 - uncFrac))
+    };
+  });
 
   function applyParams() {
     onParamsChange?.({
@@ -266,6 +277,23 @@ export function StaffingForecastPanel({
               {t('sf_avg_recommended')}:{' '}
               {(summary.avgRecommendedStaff ?? 0).toFixed(1)} {t('sf_agents')}
             </Badge>
+            {(data.arrivalUncertaintyPct ?? 0) > 0 && (
+              <Badge variant='outline' className='h-7 px-3 text-xs'>
+                {t('sf_arrival_uncertainty')}:{' '}
+                {(data.arrivalUncertaintyPct ?? 0).toFixed(1)}%
+              </Badge>
+            )}
+            {(data.loadTrendPct ?? 0) !== 0 && (
+              <Badge
+                variant={
+                  (data.loadTrendPct ?? 0) > 0 ? 'destructive' : 'secondary'
+                }
+                className='h-7 px-3 text-xs'
+              >
+                {t('sf_load_trend')}: {(data.loadTrendPct ?? 0) > 0 ? '+' : ''}
+                {(data.loadTrendPct ?? 0).toFixed(1)}%
+              </Badge>
+            )}
           </div>
         )}
       </div>
@@ -325,6 +353,100 @@ export function StaffingForecastPanel({
         <p className='text-muted-foreground text-sm'>{t('sf_no_data')}</p>
       )}
 
+      {/* Expected arrivals with uncertainty band (coefficient-of-variation proxy) */}
+      {hourlyData.length > 0 && (data.arrivalUncertaintyPct ?? 0) > 0 && (
+        <div className='space-y-2'>
+          <p className='text-muted-foreground text-xs font-medium'>
+            {t('sf_arrivals_band_title')}
+          </p>
+          <div className='h-36'>
+            <ResponsiveContainer width='100%' height='100%'>
+              <ComposedChart
+                data={hourlyData}
+                margin={{ top: 4, right: 8, bottom: 0, left: -10 }}
+              >
+                <CartesianGrid strokeDasharray='3 3' vertical={false} />
+                <XAxis
+                  dataKey='label'
+                  tick={{ fontSize: 10 }}
+                  interval={1}
+                  angle={-30}
+                  textAnchor='end'
+                  height={32}
+                />
+                <YAxis tick={{ fontSize: 10 }} allowDecimals />
+                <Tooltip
+                  formatter={(v: number, name: string) => [
+                    typeof v === 'number' ? v.toFixed(1) : v,
+                    name === 'expectedArrivals'
+                      ? t('sf_expected_arrivals')
+                      : name
+                  ]}
+                  labelFormatter={(label) => String(label)}
+                />
+                <Line
+                  type='monotone'
+                  dataKey='arrivalsHigh'
+                  name='high'
+                  stroke='hsl(var(--muted-foreground))'
+                  strokeWidth={1}
+                  strokeDasharray='4 3'
+                  dot={false}
+                />
+                <Line
+                  type='monotone'
+                  dataKey='arrivalsLow'
+                  name='low'
+                  stroke='hsl(var(--muted-foreground))'
+                  strokeWidth={1}
+                  strokeDasharray='4 3'
+                  dot={false}
+                />
+                <Line
+                  type='monotone'
+                  dataKey='expectedArrivals'
+                  stroke='hsl(var(--primary))'
+                  strokeWidth={2}
+                  dot={false}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      <div className='space-y-2 rounded-lg border border-dashed p-3'>
+        <p className='text-foreground text-sm font-medium'>
+          {t('sf_ai_recommendations_title')}
+        </p>
+        <ul className='text-muted-foreground list-inside list-disc space-y-1 text-xs'>
+          <li>
+            {t('sf_ai_peak_line', {
+              hour: fmtHour(summary?.peakHour ?? 0),
+              n: (summary?.peakArrivals ?? 0).toFixed(0)
+            })}
+          </li>
+          {(data.loadTrendPct ?? 0) !== 0 ? (
+            <li>
+              {(data.loadTrendPct ?? 0) > 0
+                ? t('sf_ai_trend_up_line', {
+                    pct: Math.abs(data.loadTrendPct ?? 0).toFixed(1)
+                  })
+                : t('sf_ai_trend_down_line', {
+                    pct: Math.abs(data.loadTrendPct ?? 0).toFixed(1)
+                  })}
+            </li>
+          ) : null}
+          {(data.arrivalUncertaintyPct ?? 0) > 12 ? (
+            <li>
+              {t('sf_ai_volatile_line', {
+                pct: (data.arrivalUncertaintyPct ?? 0).toFixed(1)
+              })}
+            </li>
+          ) : null}
+        </ul>
+      </div>
+
       <p className='text-muted-foreground text-xs'>
         {t('sf_erlang_hint', {
           dayOfWeek: localizedDayOfWeek,
@@ -332,6 +454,7 @@ export function StaffingForecastPanel({
           wait: data.targetMaxWaitMin ?? targetMaxWaitMin
         })}
       </p>
+      <p className='text-muted-foreground text-xs'>{t('sf_ai_hint')}</p>
     </div>
   );
 }

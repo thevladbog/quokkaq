@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { socketClient } from '@/lib/socket';
+import { socketClient, type UnitETASnapshot } from '@/lib/socket';
 import { toast } from 'sonner';
 import { useTranslations, useLocale } from 'next-intl';
 import { ticketsApi, Ticket } from '@/lib/api';
@@ -25,8 +25,9 @@ import {
   AlertDialogTrigger
 } from '@/components/ui/alert-dialog';
 import Image from 'next/image';
+import { Progress } from '@/components/ui/progress';
 
-const POLLING_INTERVAL_MS = 15_000;
+const POLLING_INTERVAL_MS = 30_000;
 
 const TICKET_STEPS: { status: string; labelKey: string }[] = [
   { status: 'waiting', labelKey: 'step_waiting' },
@@ -55,6 +56,11 @@ export default function TicketPage() {
   const [smsPhone, setSmsPhone] = useState('');
   const [smsSubmitting, setSmsSubmitting] = useState(false);
   const [smsSubmitted, setSmsSubmitted] = useState(false);
+  const [liveEta, setLiveEta] = useState<{
+    position: number;
+    seconds: number;
+  } | null>(null);
+  const etaMaxRef = useRef<number | null>(null);
 
   const locale = useLocale();
   const t = useTranslations('ticket_page');
@@ -70,6 +76,13 @@ export default function TicketPage() {
       const updated = await ticketsApi.getById(ticketId);
       ticketRef.current = updated;
       setTicket(updated);
+      if (
+        updated.estimatedWaitSeconds != null &&
+        updated.estimatedWaitSeconds > 0 &&
+        etaMaxRef.current == null
+      ) {
+        etaMaxRef.current = updated.estimatedWaitSeconds;
+      }
     } catch {
       // Silently ignore refresh errors to not spam errors during polling
     }
@@ -81,6 +94,7 @@ export default function TicketPage() {
     let cancelled = false;
     let onCalledHandler: ((data: unknown) => void) | null = null;
     let onUpdatedHandler: ((data: unknown) => void) | null = null;
+    let onEtaHandler: ((data: UnitETASnapshot) => void) | null = null;
 
     const load = async () => {
       try {
@@ -122,8 +136,21 @@ export default function TicketPage() {
               }
             };
 
+            onEtaHandler = (snap: UnitETASnapshot) => {
+              const row = snap.tickets?.find((x) => x.ticketId === t_data.id);
+              if (row) {
+                setLiveEta({
+                  position: row.queuePosition,
+                  seconds: row.estimatedWaitSeconds
+                });
+                if (row.estimatedWaitSeconds > 0 && etaMaxRef.current == null) {
+                  etaMaxRef.current = row.estimatedWaitSeconds;
+                }
+              }
+            };
             socketClient.on('ticket.called', onCalledHandler);
             socketClient.on('ticket.updated', onUpdatedHandler);
+            socketClient.onEtaUpdate(onEtaHandler);
           } catch (e) {
             console.warn('Socket connect failed', e);
           }
@@ -154,10 +181,16 @@ export default function TicketPage() {
       if (onCalledHandler) socketClient.off('ticket.called', onCalledHandler);
       if (onUpdatedHandler)
         socketClient.off('ticket.updated', onUpdatedHandler);
+      if (onEtaHandler) socketClient.offEtaUpdate(onEtaHandler);
       socketClient.disconnect();
       if (pollingRef.current) clearInterval(pollingRef.current);
     };
   }, [ticketId, t, refreshTicket]);
+
+  useEffect(() => {
+    setLiveEta(null);
+    etaMaxRef.current = null;
+  }, [ticketId]);
 
   const getVisitorToken = () =>
     ticketId
@@ -230,6 +263,19 @@ export default function TicketPage() {
 
   const service = ticket.service;
 
+  const displayPosition = liveEta?.position ?? ticket.queuePosition;
+  const displayEtaSeconds =
+    liveEta?.seconds ?? ticket.estimatedWaitSeconds ?? null;
+  const etaProgressPct =
+    ticket.status === 'waiting' &&
+    displayEtaSeconds != null &&
+    displayEtaSeconds > 0
+      ? (() => {
+          const max = Math.max(etaMaxRef.current ?? 0, displayEtaSeconds, 60);
+          return Math.min(100, Math.round((displayEtaSeconds / max) * 100));
+        })()
+      : 0;
+
   return (
     <div className='bg-background flex min-h-screen items-center justify-center p-4'>
       <Card className='flex w-full max-w-md flex-col items-center pt-6'>
@@ -281,22 +327,28 @@ export default function TicketPage() {
 
           {/* Queue position + ETA (waiting only) */}
           {ticket.status === 'waiting' && (
-            <div className='mb-4 flex flex-col items-center gap-1'>
-              {ticket.queuePosition != null && (
-                <span className='text-muted-foreground text-sm font-medium'>
-                  {ticket.queuePosition === 1
+            <div className='mb-4 flex w-full max-w-xs flex-col items-center gap-2'>
+              {displayPosition != null && (
+                <span className='text-muted-foreground text-sm font-medium transition-all duration-300'>
+                  {displayPosition === 1
                     ? t('queue_position_first')
-                    : t('queue_position', { position: ticket.queuePosition })}
+                    : t('queue_position', { position: displayPosition })}
                 </span>
               )}
-              {ticket.estimatedWaitSeconds != null &&
-                ticket.estimatedWaitSeconds > 0 && (
-                  <span className='text-muted-foreground text-xs'>
+              {displayEtaSeconds != null && displayEtaSeconds > 0 && (
+                <>
+                  <span className='text-muted-foreground text-xs transition-all duration-300'>
                     {t('estimated_wait', {
-                      minutes: formatEstimatedWait(ticket.estimatedWaitSeconds)
+                      minutes: formatEstimatedWait(displayEtaSeconds)
                     })}
                   </span>
-                )}
+                  <Progress
+                    className='h-2 w-full'
+                    value={etaProgressPct}
+                    indicatorClassName='transition-all duration-500 ease-out'
+                  />
+                </>
+              )}
             </div>
           )}
 

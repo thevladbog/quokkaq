@@ -16,7 +16,11 @@ vi.mock('recharts', () => ({
   BarChart: ({ children }: { children: React.ReactNode }) => (
     <div data-testid='bar-chart'>{children}</div>
   ),
+  ComposedChart: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid='composed-chart'>{children}</div>
+  ),
   Bar: () => null,
+  Line: () => null,
   XAxis: () => null,
   YAxis: () => null,
   CartesianGrid: () => null,
@@ -58,7 +62,15 @@ const mockData: ServicesStaffingForecastResponse = {
     peakArrivals: 20,
     maxRecommendedStaff: 4,
     avgRecommendedStaff: 3.5
-  }
+  },
+  arrivalUncertaintyPct: 0,
+  loadTrendPct: 0
+};
+
+const mockDataWithUncertainty: ServicesStaffingForecastResponse = {
+  ...mockData,
+  arrivalUncertaintyPct: 22,
+  loadTrendPct: 12.5
 };
 
 describe('StaffingForecastPanel', () => {
@@ -89,6 +101,21 @@ describe('StaffingForecastPanel', () => {
 
     const charts = screen.getAllByTestId('bar-chart');
     expect(charts.length).toBeGreaterThan(0);
+  });
+
+  it('renders arrivals uncertainty band chart and AI block when arrivalUncertaintyPct is positive', () => {
+    render(
+      <StaffingForecastPanel
+        data={mockDataWithUncertainty}
+        targetDate='2026-05-01'
+        targetSlaPct={90}
+        targetMaxWaitMin={5}
+      />
+    );
+
+    expect(screen.getByTestId('composed-chart')).toBeInTheDocument();
+    expect(screen.getByText('sf_arrivals_band_title')).toBeInTheDocument();
+    expect(screen.getByText('sf_ai_recommendations_title')).toBeInTheDocument();
   });
 
   it('renders daily summary badges', () => {

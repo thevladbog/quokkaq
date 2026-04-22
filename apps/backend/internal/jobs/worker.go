@@ -30,6 +30,7 @@ type jobWorker struct {
 	// settingsSvc is resolved per-job so runtime SMS config changes take effect immediately.
 	settingsSvc  *services.DeploymentSaaSSettingsService
 	notifService *services.NotificationService
+	anomalySvc   *services.AnomalyService
 }
 
 func NewJobWorker(ttsService services.TtsService, ticketRepo repository.TicketRepository) JobWorker {
@@ -97,6 +98,15 @@ func NewJobWorkerWithSMS(
 func WithNotificationService(w JobWorker, ns *services.NotificationService) JobWorker {
 	if jw, ok := w.(*jobWorker); ok {
 		jw.notifService = ns
+	}
+	return w
+}
+
+// WithAnomalyService registers the periodic anomaly scan handler (TypeAnomalyCheck).
+func WithAnomalyService(w JobWorker, a *services.AnomalyService) JobWorker {
+	if jw, ok := w.(*jobWorker); ok && a != nil {
+		jw.anomalySvc = a
+		jw.mux.HandleFunc(TypeAnomalyCheck, jw.handleAnomalyCheck)
 	}
 	return w
 }
@@ -217,5 +227,13 @@ func (w *jobWorker) handleVisitorNotify(ctx context.Context, t *asynq.Task) erro
 	default:
 		applogger.WarnContext(ctx, "visitor:notify: unknown type", "type", p.Type)
 	}
+	return nil
+}
+
+func (w *jobWorker) handleAnomalyCheck(ctx context.Context, _ *asynq.Task) error {
+	if w.anomalySvc == nil {
+		return nil
+	}
+	w.anomalySvc.RunPeriodicCheck(ctx)
 	return nil
 }

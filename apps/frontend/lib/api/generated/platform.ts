@@ -1894,6 +1894,19 @@ export interface RepositorySupportReportShareCandidate {
   userId?: string;
 }
 
+export interface ServicesAnomalyAlertItem {
+  createdAt?: string;
+  id?: string;
+  kind?: string;
+  message?: string;
+  severity?: string;
+  unitId?: string;
+}
+
+export interface ServicesAnomalyAlertsResponse {
+  items?: ServicesAnomalyAlertItem[];
+}
+
 export interface ServicesCalendarIntegrationPublic {
   adminNotifyEmails?: string;
   caldavBaseUrl?: string;
@@ -2255,9 +2268,13 @@ export interface ServicesStaffPerformanceListResponse {
 }
 
 export interface ServicesStaffingForecastResponse {
+  /** ArrivalUncertaintyPct is coefficient of variation of hourly expected arrivals (×100), as a confidence proxy. */
+  arrivalUncertaintyPct?: number;
   dailySummary?: ServicesDailyStaffingSummary;
   dayOfWeek?: string;
   hourlyForecasts?: ServicesHourlyStaffingForecast[];
+  /** LoadTrendPct compares total expected arrivals to a shifted lookback block (prior month window); 0 when unavailable. */
+  loadTrendPct?: number;
   targetDate?: string;
   targetMaxWaitMin?: number;
   targetSlaPct?: number;

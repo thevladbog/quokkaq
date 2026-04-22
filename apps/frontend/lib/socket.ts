@@ -23,6 +23,55 @@ const SlaAlertPayloadSchema = z.object({
 
 export type SlaAlertPayload = z.infer<typeof SlaAlertPayloadSchema>;
 
+/** Payload for unit.eta_update (matches Go services.UnitETASnapshot). */
+export const UnitETASnapshotSchema = z.object({
+  unitId: z.string(),
+  timestamp: z.string(),
+  queueLength: z.number(),
+  estimatedWaitMinutes: z.number(),
+  activeCounters: z.number(),
+  services: z
+    .array(
+      z.object({
+        serviceId: z.string(),
+        serviceName: z.string(),
+        queueLength: z.number(),
+        estimatedWaitMinutes: z.number()
+      })
+    )
+    .optional(),
+  tickets: z
+    .array(
+      z.object({
+        ticketId: z.string(),
+        queuePosition: z.number(),
+        estimatedWaitSeconds: z.number()
+      })
+    )
+    .optional()
+});
+
+export type UnitETASnapshot = z.infer<typeof UnitETASnapshotSchema>;
+
+export const UnitStaffingAlertSchema = z.object({
+  unitId: z.string(),
+  kind: z.string(),
+  message: z.string(),
+  recommendedExtraCounters: z.number().optional(),
+  predictedSlaBreachInMin: z.number().optional()
+});
+
+export type UnitStaffingAlert = z.infer<typeof UnitStaffingAlertSchema>;
+
+export const UnitAnomalyAlertSchema = z.object({
+  unitId: z.string(),
+  kind: z.string(),
+  message: z.string(),
+  severity: z.string().optional()
+});
+
+export type UnitAnomalyAlert = z.infer<typeof UnitAnomalyAlertSchema>;
+
 export interface QueueSnapshot {
   unitId: string;
   now: string;
@@ -246,8 +295,17 @@ export class SocketClient {
     this.on('unit.eod', callback as Listener);
   }
 
-  // Stores the Zod-parsing wrapper per original callback so offSla* can unsubscribe correctly.
+  // Stores the Zod-parsing wrapper per original callback so offSla* / offEtaUpdate can unsubscribe correctly.
   private slaWrappers = new Map<(data: SlaAlertPayload) => void, Listener>();
+  private etaWrappers = new Map<(data: UnitETASnapshot) => void, Listener>();
+  private staffingWrappers = new Map<
+    (data: UnitStaffingAlert) => void,
+    Listener
+  >();
+  private anomalyWrappers = new Map<
+    (data: UnitAnomalyAlert) => void,
+    Listener
+  >();
 
   private onSlaEvent(event: string, callback: (data: SlaAlertPayload) => void) {
     const wrapper: Listener = (data) => {
@@ -303,6 +361,69 @@ export class SocketClient {
 
   offServiceSlaBreach(callback: (data: SlaAlertPayload) => void) {
     this.offSlaEvent('unit.service_sla_breach', callback);
+  }
+
+  onEtaUpdate(callback: (data: UnitETASnapshot) => void) {
+    const wrapper: Listener = (data) => {
+      const parsed = UnitETASnapshotSchema.safeParse(data);
+      if (!parsed.success) {
+        logger.error('Invalid unit.eta_update payload:', parsed.error);
+        return;
+      }
+      callback(parsed.data);
+    };
+    this.etaWrappers.set(callback, wrapper);
+    this.on('unit.eta_update', wrapper);
+  }
+
+  offEtaUpdate(callback: (data: UnitETASnapshot) => void) {
+    const wrapper = this.etaWrappers.get(callback);
+    if (wrapper) {
+      this.off('unit.eta_update', wrapper);
+      this.etaWrappers.delete(callback);
+    }
+  }
+
+  onStaffingAlert(callback: (data: UnitStaffingAlert) => void) {
+    const wrapper: Listener = (data) => {
+      const parsed = UnitStaffingAlertSchema.safeParse(data);
+      if (!parsed.success) {
+        logger.error('Invalid unit.staffing_alert payload:', parsed.error);
+        return;
+      }
+      callback(parsed.data);
+    };
+    this.staffingWrappers.set(callback, wrapper);
+    this.on('unit.staffing_alert', wrapper);
+  }
+
+  offStaffingAlert(callback: (data: UnitStaffingAlert) => void) {
+    const wrapper = this.staffingWrappers.get(callback);
+    if (wrapper) {
+      this.off('unit.staffing_alert', wrapper);
+      this.staffingWrappers.delete(callback);
+    }
+  }
+
+  onAnomalyAlert(callback: (data: UnitAnomalyAlert) => void) {
+    const wrapper: Listener = (data) => {
+      const parsed = UnitAnomalyAlertSchema.safeParse(data);
+      if (!parsed.success) {
+        logger.error('Invalid unit.anomaly_alert payload:', parsed.error);
+        return;
+      }
+      callback(parsed.data);
+    };
+    this.anomalyWrappers.set(callback, wrapper);
+    this.on('unit.anomaly_alert', wrapper);
+  }
+
+  offAnomalyAlert(callback: (data: UnitAnomalyAlert) => void) {
+    const wrapper = this.anomalyWrappers.get(callback);
+    if (wrapper) {
+      this.off('unit.anomaly_alert', wrapper);
+      this.anomalyWrappers.delete(callback);
+    }
   }
 
   // Emit events - Backend currently doesn't handle these, but keeping for compatibility

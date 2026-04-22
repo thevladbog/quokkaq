@@ -4,6 +4,7 @@ const (
 	TypeTTSGenerate   = "tts:generate"
 	TypeSMSSend       = "sms:send"
 	TypeVisitorNotify = "visitor:notify"
+	TypeAnomalyCheck  = "anomaly:check"
 )
 
 type TtsJobPayload struct {
