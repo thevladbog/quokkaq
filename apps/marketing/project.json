@@ -37,7 +37,7 @@
     "test": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "node -e \"process.exit(0)\"",
+        "command": "pnpm exec tsc --noEmit",
         "cwd": "apps/marketing"
       }
     },

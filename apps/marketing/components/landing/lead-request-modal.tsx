@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { Checkbox } from '@/components/ui/checkbox';
+import { pushMarketingEvent } from '@/lib/marketing-analytics';
 import {
   postPublicLeadRequest,
   type HandlersPublicLeadRequestBody
@@ -152,6 +153,10 @@ export function LeadRequestModal({
       const res = await postPublicLeadRequest(body);
       if (res.status === 201) {
         setSuccess(true);
+        pushMarketingEvent('marketing_lead_submit', {
+          source,
+          plan_code: planCode?.trim() ?? ''
+        });
         setName('');
         setEmail('');
         setCompany('');

@@ -1,5 +1,4 @@
-import Link from 'next/link';
-
+import { CheckCircle2 } from 'lucide-react';
 import type { SubscriptionPlan } from '@quokkaq/shared-types';
 import {
   buildPricingRowsFromApiPlan,
@@ -12,6 +11,10 @@ import type { AppLocale, HomeMessages } from '@/src/messages';
 import { localeHomePath } from '@/lib/locale-paths';
 import { formatPricingRowLabel } from '@/lib/format-pricing-row-label';
 import { LeadRequestCta } from '@/components/landing/lead-request-cta';
+import {
+  MarketingTrackedCtaA,
+  MarketingTrackedCtaLink
+} from '@/components/landing/marketing-tracked-cta';
 
 function intlLocaleFromAppLocale(locale: AppLocale): string {
   return locale === 'ru' ? 'ru-RU' : 'en-US';
@@ -60,9 +63,13 @@ export function LandingPricing({
                   pricingModel?: string;
                 };
                 const isPopular = plan.isPromoted === true;
+                const isEnterprise = plan.code === 'enterprise';
                 const isCustom = plan.code === 'enterprise' && !planExt.isFree;
                 const isFree = planExt.isFree === true;
                 const isPerUnit = planExt.pricingModel === 'per_unit';
+                const isEnterpriseListPrice = isCustom && (plan.price ?? 0) > 0;
+                const isEnterpriseOnRequest = isCustom && (plan.price ?? 0) === 0;
+                const hasTopBadge = isPopular || isEnterprise;
                 const rows = buildPricingRowsFromApiPlan(plan);
                 const intervalLabel = isFree
                   ? (copy.pricingFromApi.freePlan ?? 'Бесплатно')
@@ -101,20 +108,43 @@ export function LandingPricing({
                     ? 'text-3xl font-bold tabular-nums tracking-tight sm:text-4xl lg:text-[2.05rem] xl:text-5xl'
                     : 'text-4xl font-bold tabular-nums tracking-tight sm:text-5xl';
 
+                const cardShellClass = isPopular
+                  ? 'isolate border-2 border-[color:var(--color-primary)]/60 bg-gradient-to-br from-[color:var(--color-primary)]/5 to-[color:var(--color-secondary)]/5 pt-10 shadow-md shadow-[color:var(--color-primary)]/10'
+                  : isEnterprise
+                    ? 'landing-pricing-card-enterprise isolate border-2 border-violet-300/55 pt-10 shadow-sm shadow-violet-500/8 dark:border-violet-500/30'
+                    : 'border-[color:var(--color-border)] bg-[color:var(--color-surface-elevated)]';
+                const ctaEmphasisClass = isPopular
+                  ? 'z-[3] min-h-12 border-2 border-[color:var(--color-primary)] bg-[color:var(--color-surface)] text-base font-bold text-[color:var(--color-primary)] shadow-sm transition hover:bg-[color:var(--color-primary)]/10 hover:shadow'
+                  : isEnterprise
+                    ? 'z-[1] min-h-12 border-0 bg-violet-600 text-sm font-semibold text-white shadow-sm shadow-violet-600/25 transition hover:bg-violet-700 hover:shadow-violet-700/30 dark:bg-violet-600 dark:hover:bg-violet-500'
+                    : 'z-[1] min-h-11 border-2 border-[color:var(--color-border)] bg-[color:var(--color-surface)] text-sm text-[color:var(--color-text)] hover:border-[color:var(--color-primary)] hover:text-[color:var(--color-primary)]';
+
                 return (
                   <div
                     key={plan.id}
-                    className={`landing-reveal relative z-[1] flex flex-col overflow-visible rounded-2xl border-2 p-8 ${
-                      isPopular
-                        ? 'isolate border-[color:var(--color-primary)] bg-gradient-to-br from-[color:var(--color-primary)]/5 to-[color:var(--color-secondary)]/5 pt-10 shadow-xl ring-2 shadow-[color:var(--color-primary)]/20 ring-[color:var(--color-primary)]/30 ring-offset-2 ring-offset-[color:var(--color-surface)]'
-                        : 'border-[color:var(--color-border)] bg-[color:var(--color-surface-elevated)]'
-                    }`}
-                    style={{ animationDelay: `${0.1 * index}s` }}
+                    className={`${
+                      isEnterprise
+                        ? 'relative'
+                        : 'landing-reveal relative'
+                    } z-[1] flex flex-col overflow-visible rounded-2xl border-2 p-8 ${cardShellClass}`}
+                    style={
+                      isEnterprise
+                        ? undefined
+                        : { animationDelay: `${0.1 * index}s` }
+                    }
                   >
-                    {isPopular && (
+                    {hasTopBadge && (
                       <div className='absolute -top-4 left-1/2 z-[3] -translate-x-1/2'>
-                        <span className='font-landing-label rounded-full bg-gradient-to-r from-[color:var(--color-primary)] to-[color:var(--color-primary-hover)] px-4 py-1 text-xs font-semibold text-white shadow-lg'>
-                          {copy.pricingFromApi.popularBadge}
+                        <span
+                          className={`font-landing-label rounded-full px-4 py-1 text-xs font-semibold text-white shadow-lg ${
+                            isPopular
+                              ? 'bg-gradient-to-r from-[color:var(--color-primary)] to-[color:var(--color-primary-hover)]'
+                              : 'bg-gradient-to-r from-violet-600 to-violet-800 dark:from-violet-500 dark:to-violet-700'
+                          }`}
+                        >
+                          {isPopular
+                            ? copy.pricingFromApi.popularBadge
+                            : copy.pricingFromApi.enterpriseBadge}
                         </span>
                       </div>
                     )}
@@ -123,17 +153,32 @@ export function LandingPricing({
                       <h3 className='font-display mb-2 text-2xl font-bold text-[color:var(--color-text)]'>
                         {planHeading}
                       </h3>
-                      <div className='mb-2 inline-flex max-w-full min-w-0 flex-nowrap items-baseline gap-x-1.5 leading-tight whitespace-nowrap'>
+                      <div className='mb-2 min-w-0 max-w-full'>
                         {isFree ? (
                           <span className='font-display text-3xl font-bold text-[color:var(--color-text)]'>
                             {copy.pricingFromApi.freePlan ?? 'Бесплатно'}
                           </span>
-                        ) : isCustom ? (
+                        ) : isEnterpriseListPrice ? (
+                          <div className='flex min-w-0 flex-col items-start gap-0.5'>
+                            <span
+                              className={`font-display text-[color:var(--color-text)] ${priceTypography}`}
+                            >
+                              {formatPriceMinorUnits(
+                                plan.price ?? 0,
+                                plan.currency ?? 'RUB',
+                                intlLocale
+                              )}
+                            </span>
+                            <span className='text-sm leading-snug font-medium break-words text-[color:var(--color-text-muted)]'>
+                              {intervalLabel}
+                            </span>
+                          </div>
+                        ) : isEnterpriseOnRequest ? (
                           <span className='font-display text-3xl font-bold text-[color:var(--color-text)]'>
                             {copy.pricingFromApi.customPricing}
                           </span>
                         ) : (
-                          <>
+                          <div className='flex min-w-0 flex-col items-start gap-0.5'>
                             <span
                               className={`font-display text-[color:var(--color-text)] ${priceTypography}`}
                             >
@@ -149,10 +194,10 @@ export function LandingPricing({
                                     intlLocale
                                   )}
                             </span>
-                            <span className='shrink-0 self-baseline text-sm leading-none font-medium whitespace-nowrap text-[color:var(--color-text-muted)]'>
+                            <span className='text-sm leading-snug font-medium break-words text-[color:var(--color-text-muted)]'>
                               {intervalLabel}
                             </span>
-                          </>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -163,19 +208,28 @@ export function LandingPricing({
                           key={row.rowKey}
                           className='flex items-start gap-3 text-sm text-[color:var(--color-text)]'
                         >
-                          <svg
-                            className='mt-0.5 h-5 w-5 shrink-0 text-[color:var(--color-primary)]'
-                            fill='none'
-                            viewBox='0 0 24 24'
-                            stroke='currentColor'
-                          >
-                            <path
-                              strokeLinecap='round'
-                              strokeLinejoin='round'
+                          {isEnterprise ? (
+                            <CheckCircle2
+                              className='mt-0.5 h-5 w-5 shrink-0 text-violet-500 dark:text-violet-400'
                               strokeWidth={2}
-                              d='M5 13l4 4L19 7'
+                              aria-hidden
                             />
-                          </svg>
+                          ) : (
+                            <svg
+                              className='mt-0.5 h-5 w-5 shrink-0 text-[color:var(--color-primary)]'
+                              fill='none'
+                              viewBox='0 0 24 24'
+                              stroke='currentColor'
+                              aria-hidden
+                            >
+                              <path
+                                strokeLinecap='round'
+                                strokeLinejoin='round'
+                                strokeWidth={2}
+                                d='M5 13l4 4L19 7'
+                              />
+                            </svg>
+                          )}
                           {formatPricingRowLabel(
                             locale,
                             row.translationKey,
@@ -188,30 +242,24 @@ export function LandingPricing({
 
                     {sellable ? (
                       appBaseUrl ? (
-                        <a
+                        <MarketingTrackedCtaA
+                          ctaId={`pricing_trial_${plan.code}`}
                           href={href}
                           target='_blank'
                           rel='noopener noreferrer'
-                          className={`focus-ring relative mt-auto inline-flex w-full items-center justify-center rounded-xl px-6 py-3 font-semibold transition ${
-                            isPopular
-                              ? 'z-[3] min-h-12 bg-gradient-to-r from-[color:var(--color-primary)] to-[color:var(--color-primary-hover)] text-base font-bold text-white shadow-lg shadow-[color:var(--color-primary)]/35 hover:from-[color:var(--color-primary-hover)] hover:to-[color:var(--color-primary-hover)] hover:shadow-xl hover:shadow-[color:var(--color-primary)]/45'
-                              : 'z-[1] min-h-11 border-2 border-[color:var(--color-border)] bg-[color:var(--color-surface)] text-sm text-[color:var(--color-text)] hover:border-[color:var(--color-primary)] hover:text-[color:var(--color-primary)]'
-                          }`}
+                          className={`focus-ring relative mt-auto inline-flex w-full items-center justify-center rounded-xl px-6 py-3 font-semibold transition ${ctaEmphasisClass}`}
                         >
                           {ctaLabel}
-                        </a>
+                        </MarketingTrackedCtaA>
                       ) : (
-                        <Link
+                        <MarketingTrackedCtaLink
+                          ctaId={`pricing_trial_local_${plan.code}`}
                           href={href}
                           prefetch={false}
-                          className={`focus-ring relative mt-auto inline-flex w-full items-center justify-center rounded-xl px-6 py-3 font-semibold transition ${
-                            isPopular
-                              ? 'z-[3] min-h-12 bg-gradient-to-r from-[color:var(--color-primary)] to-[color:var(--color-primary-hover)] text-base font-bold text-white shadow-lg shadow-[color:var(--color-primary)]/35 hover:from-[color:var(--color-primary-hover)] hover:to-[color:var(--color-primary-hover)] hover:shadow-xl hover:shadow-[color:var(--color-primary)]/45'
-                              : 'z-[1] min-h-11 border-2 border-[color:var(--color-border)] bg-[color:var(--color-surface)] text-sm text-[color:var(--color-text)] hover:border-[color:var(--color-primary)] hover:text-[color:var(--color-primary)]'
-                          }`}
+                          className={`focus-ring relative mt-auto inline-flex w-full items-center justify-center rounded-xl px-6 py-3 font-semibold transition ${ctaEmphasisClass}`}
                         >
                           {ctaLabel}
-                        </Link>
+                        </MarketingTrackedCtaLink>
                       )
                     ) : (
                       <LeadRequestCta
@@ -220,11 +268,7 @@ export function LandingPricing({
                         lead={copy.leadForm}
                         appBaseUrl={appBaseUrl}
                         planCode={plan.code}
-                        className={`focus-ring relative mt-auto inline-flex w-full items-center justify-center rounded-xl px-6 py-3 font-semibold transition ${
-                          isPopular
-                            ? 'z-[3] min-h-12 bg-gradient-to-r from-[color:var(--color-primary)] to-[color:var(--color-primary-hover)] text-base font-bold text-white shadow-lg shadow-[color:var(--color-primary)]/35 hover:from-[color:var(--color-primary-hover)] hover:to-[color:var(--color-primary-hover)] hover:shadow-xl hover:shadow-[color:var(--color-primary)]/45'
-                            : 'z-[1] min-h-11 border-2 border-[color:var(--color-border)] bg-[color:var(--color-surface)] text-sm text-[color:var(--color-text)] hover:border-[color:var(--color-primary)] hover:text-[color:var(--color-primary)]'
-                        }`}
+                        className={`focus-ring relative mt-auto inline-flex w-full items-center justify-center rounded-xl px-6 py-3 font-semibold transition ${ctaEmphasisClass}`}
                       >
                         {ctaLabel}
                       </LeadRequestCta>
@@ -267,12 +311,12 @@ export function LandingPricing({
                       <h3 className='font-display mb-2 text-2xl font-bold text-[color:var(--color-text)]'>
                         {plan.name}
                       </h3>
-                      <div className='mb-2 flex min-w-0 flex-nowrap items-baseline gap-x-2 gap-y-0'>
+                      <div className='mb-2 flex min-w-0 flex-col items-start gap-0.5'>
                         <span className='font-display text-4xl font-bold tracking-tight text-[color:var(--color-text)] tabular-nums sm:text-5xl'>
                           {plan.price}
                         </span>
                         {!isCustomFallback && (
-                          <span className='shrink-0 text-sm leading-none font-medium whitespace-nowrap text-[color:var(--color-text-muted)]'>
+                          <span className='text-sm leading-snug font-medium break-words text-[color:var(--color-text-muted)]'>
                             /{plan.period}
                           </span>
                         )}
@@ -293,35 +337,45 @@ export function LandingPricing({
                           key={feature}
                           className='flex items-start gap-3 text-sm text-[color:var(--color-text)]'
                         >
-                          <svg
-                            className='mt-0.5 h-5 w-5 shrink-0 text-[color:var(--color-primary)]'
-                            fill='none'
-                            viewBox='0 0 24 24'
-                            stroke='currentColor'
-                          >
-                            <path
-                              strokeLinecap='round'
-                              strokeLinejoin='round'
+                          {isCustomFallback ? (
+                            <CheckCircle2
+                              className='mt-0.5 h-5 w-5 shrink-0 text-violet-500 dark:text-violet-400'
                               strokeWidth={2}
-                              d='M5 13l4 4L19 7'
+                              aria-hidden
                             />
-                          </svg>
+                          ) : (
+                            <svg
+                              className='mt-0.5 h-5 w-5 shrink-0 text-[color:var(--color-primary)]'
+                              fill='none'
+                              viewBox='0 0 24 24'
+                              stroke='currentColor'
+                              aria-hidden
+                            >
+                              <path
+                                strokeLinecap='round'
+                                strokeLinejoin='round'
+                                strokeWidth={2}
+                                d='M5 13l4 4L19 7'
+                              />
+                            </svg>
+                          )}
                           {feature}
                         </li>
                       ))}
                     </ul>
 
-                    <Link
+                    <MarketingTrackedCtaLink
+                      ctaId='pricing_fallback_plan_cta'
                       href={`${localeHomePath(locale)}#book-demo`}
                       prefetch={false}
                       className={`focus-ring mt-auto inline-flex min-h-11 items-center justify-center rounded-xl px-6 py-3 text-sm font-semibold transition ${
                         plan.recommended
-                          ? 'bg-[color:var(--color-primary)] text-white shadow-lg shadow-[color:var(--color-primary)]/30 hover:bg-[color:var(--color-primary-hover)]'
+                          ? 'border-2 border-[color:var(--color-primary)] bg-[color:var(--color-surface)] text-[color:var(--color-primary)] shadow-sm hover:bg-[color:var(--color-primary)]/10'
                           : 'border-2 border-[color:var(--color-border)] bg-[color:var(--color-surface)] text-[color:var(--color-text)] hover:border-[color:var(--color-primary)] hover:text-[color:var(--color-primary)]'
                       }`}
                     >
                       {plan.cta}
-                    </Link>
+                    </MarketingTrackedCtaLink>
                   </div>
                 );
               })}

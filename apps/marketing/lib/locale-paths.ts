@@ -5,6 +5,12 @@ export function localeHomePath(locale: AppLocale): '/en' | '/ru' {
   return locale === 'ru' ? '/ru' : '/en';
 }
 
+export function localePricingPath(
+  locale: AppLocale
+): '/en/pricing' | '/ru/pricing' {
+  return locale === 'ru' ? '/ru/pricing' : '/en/pricing';
+}
+
 export function localePrivacyPath(
   locale: AppLocale
 ): '/en/privacy' | '/ru/privacy' {
