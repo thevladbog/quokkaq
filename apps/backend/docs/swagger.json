@@ -11740,6 +11740,7 @@
         },
         "/integrations/v1/units/{unitId}/queue-summary": {
             "get": {
+                "operationId": "getIntegrationUnitQueueSummary",
                 "parameters": [
                     {
                         "description": "Unit ID",
