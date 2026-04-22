@@ -1434,6 +1434,29 @@ export interface HandlersCompanyMeResponse {
   publicAppUrl?: string;
 }
 
+export interface HandlersCreateIntegrationAPIKeyRequest {
+  name?: string;
+  scopes?: string[];
+  unitId?: string;
+}
+
+export interface HandlersIntegrationAPIKeyRowDTO {
+  companyId?: string;
+  createdAt?: string;
+  createdByUserId?: string;
+  id?: string;
+  lastUsedAt?: string;
+  name?: string;
+  revokedAt?: string;
+  scopes?: string[];
+  unitId?: string;
+}
+
+export interface HandlersCreateIntegrationAPIKeyResponse {
+  key?: HandlersIntegrationAPIKeyRowDTO;
+  token?: string;
+}
+
 export type HandlersCreateSupportReportRequestDiagnostics = { [key: string]: unknown };
 
 export interface HandlersCreateSupportReportRequest {
@@ -1465,6 +1488,30 @@ export interface HandlersCreateVisitorTagDefinitionRequest {
   color: string;
   label: string;
   sortOrder?: number;
+}
+
+export interface HandlersCreateWebhookEndpointRequest {
+  enabled?: boolean;
+  eventTypes?: string[];
+  unitId?: string;
+  url?: string;
+}
+
+export interface HandlersWebhookEndpointDTO {
+  companyId?: string;
+  consecutiveFailures?: number;
+  createdAt?: string;
+  enabled?: boolean;
+  eventTypes?: string[];
+  id?: string;
+  signingSecretMasked?: string;
+  unitId?: string;
+  url?: string;
+}
+
+export interface HandlersCreateWebhookEndpointResponse {
+  endpoint?: HandlersWebhookEndpointDTO;
+  signingSecret?: string;
 }
 
 export type HandlersEmergencyUnlockBodyConfirm = typeof HandlersEmergencyUnlockBodyConfirm[keyof typeof HandlersEmergencyUnlockBodyConfirm];

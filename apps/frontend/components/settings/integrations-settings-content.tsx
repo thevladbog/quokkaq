@@ -36,6 +36,7 @@ import { getUnitDisplayName } from '@/lib/unit-display';
 import { OrganizationSsoSettingsCard } from '@/components/organization/organization-sso-settings-card';
 import { OrganizationSsoAccessSourceCard } from '@/components/organization/organization-sso-access-source-card';
 import { OrganizationTenantRbacSettings } from '@/components/organization/organization-tenant-rbac-settings';
+import { DeveloperApiIntegrations } from '@/components/settings/developer-api-integrations';
 
 export function IntegrationsSettingsContent() {
   const t = useTranslations('admin.integrations');
@@ -46,7 +47,8 @@ export function IntegrationsSettingsContent() {
   const searchParams = useSearchParams();
 
   const tabParam = searchParams.get('tab');
-  const activeTab = tabParam === 'auth' ? 'auth' : 'calendars';
+  const activeTab =
+    tabParam === 'auth' ? 'auth' : tabParam === 'api' ? 'api' : 'calendars';
 
   const setTab = (value: string) => {
     const q = new URLSearchParams(searchParams.toString());
@@ -216,6 +218,7 @@ export function IntegrationsSettingsContent() {
         <TabsList className='mb-6'>
           <TabsTrigger value='calendars'>{t('tab_calendars')}</TabsTrigger>
           <TabsTrigger value='auth'>{t('tab_authentication')}</TabsTrigger>
+          <TabsTrigger value='api'>{t('tab_api')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value='calendars' className='space-y-6'>
@@ -270,6 +273,13 @@ export function IntegrationsSettingsContent() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value='api' className='space-y-6'>
+          <DeveloperApiIntegrations
+            locale={locale}
+            unitOptions={unitOptionsForProps}
+          />
         </TabsContent>
 
         <TabsContent value='auth' className='space-y-6'>

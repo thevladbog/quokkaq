@@ -12,8 +12,9 @@ import (
 
 // CalendarIntegrationKind identifies the provider implementation (extensible).
 const (
-	CalendarIntegrationKindYandexCalDAV = "yandex_caldav"
-	CalendarIntegrationKindGoogleCalDAV = "google_caldav"
+	CalendarIntegrationKindYandexCalDAV   = "yandex_caldav"
+	CalendarIntegrationKindGoogleCalDAV   = "google_caldav"
+	CalendarIntegrationKindMicrosoftGraph = "microsoft_graph"
 )
 
 // GoogleCalDAVAPIHost is the HTTPS host for Google Calendar CalDAV v2.

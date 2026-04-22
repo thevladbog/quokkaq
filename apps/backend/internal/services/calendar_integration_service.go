@@ -74,6 +74,8 @@ func (s *CalendarIntegrationService) clientForIntegration(ctx context.Context, i
 		kind = models.CalendarIntegrationKindYandexCalDAV
 	}
 	switch kind {
+	case models.CalendarIntegrationKindMicrosoftGraph:
+		return nil, ErrCalendarIntegrationKindUnknown
 	case models.CalendarIntegrationKindYandexCalDAV:
 		raw, err := ssocrypto.DecryptAES256GCM(integ.AppPasswordEncrypted)
 		if err != nil {
@@ -599,6 +601,11 @@ func (s *CalendarIntegrationService) SyncIntegration(ctx context.Context, integr
 		return err
 	}
 	if !integ.Enabled {
+		return nil
+	}
+	if strings.TrimSpace(integ.Kind) == models.CalendarIntegrationKindMicrosoftGraph {
+		// OAuth + Graph sync path is not shipped yet; keep row enabled for forward compatibility.
+		_ = s.repo.UpdateSyncMeta(integ.ID, time.Now().UTC(), "")
 		return nil
 	}
 	unitID := integ.UnitID

@@ -19,6 +19,7 @@ type JobClient interface {
 	// EnqueueVisitorNotifyRaw enqueues a visitor:notify job with a pre-formed payload struct.
 	EnqueueVisitorNotifyRaw(payload VisitorNotifyPayload) error
 	EnqueueAnomalyCheck() error
+	EnqueueWebhookFlushOutbox() error
 	Close() error
 }
 
@@ -84,6 +85,16 @@ func (c *jobClient) EnqueueAnomalyCheck() error {
 		asynq.Queue("low"),
 		asynq.MaxRetry(1),
 		asynq.Unique(10*time.Minute),
+	)
+	return err
+}
+
+func (c *jobClient) EnqueueWebhookFlushOutbox() error {
+	task := asynq.NewTask(TypeWebhookFlushOutbox, []byte("{}"))
+	_, err := c.client.Enqueue(task,
+		asynq.Queue("default"),
+		asynq.MaxRetry(2),
+		asynq.Unique(5*time.Second),
 	)
 	return err
 }

@@ -203,7 +203,7 @@ export default defineConfig({
       target: '../backend/docs/openapi.json',
       filters: {
         mode: 'include',
-        tags: ['auth', 'companies']
+        tags: ['auth', 'companies', 'integrations']
       }
     },
     output: {

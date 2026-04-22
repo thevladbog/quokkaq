@@ -335,7 +335,17 @@ func (s *ticketService) writeTicketHistoryTx(tx *gorm.DB, ticketID string, actor
 	if err != nil {
 		return err
 	}
-	return s.repo.CreateTicketHistoryTx(tx, h)
+	if err := s.repo.CreateTicketHistoryTx(tx, h); err != nil {
+		return err
+	}
+	ctx := context.Background()
+	if tx.Statement != nil && tx.Statement.Context != nil {
+		ctx = tx.Statement.Context
+	}
+	if err := repository.InsertWebhookOutboxIfEligibleTx(ctx, tx, h); err != nil {
+		return err
+	}
+	return nil
 }
 
 // ErrTicketQuotaExhausted is returned when the monthly ticket quota is exhausted

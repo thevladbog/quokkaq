@@ -1836,6 +1836,34 @@
                 },
                 "type": "object"
             },
+            "handlers.createIntegrationAPIKeyRequest": {
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    },
+                    "scopes": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "unitId": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "handlers.createIntegrationAPIKeyResponse": {
+                "properties": {
+                    "key": {
+                        "$ref": "#/components/schemas/handlers.integrationAPIKeyRowDTO"
+                    },
+                    "token": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "handlers.createSupportReportRequest": {
                 "properties": {
                     "description": {
@@ -1899,6 +1927,37 @@
                 ],
                 "type": "object"
             },
+            "handlers.createWebhookEndpointRequest": {
+                "properties": {
+                    "enabled": {
+                        "type": "boolean"
+                    },
+                    "eventTypes": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "unitId": {
+                        "type": "string"
+                    },
+                    "url": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "handlers.createWebhookEndpointResponse": {
+                "properties": {
+                    "endpoint": {
+                        "$ref": "#/components/schemas/handlers.webhookEndpointDTO"
+                    },
+                    "signingSecret": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "handlers.emergencyUnlockBody": {
                 "properties": {
                     "confirm": {
@@ -1931,6 +1990,41 @@
                     "surveyId",
                     "answers"
                 ],
+                "type": "object"
+            },
+            "handlers.integrationAPIKeyRowDTO": {
+                "properties": {
+                    "companyId": {
+                        "type": "string"
+                    },
+                    "createdAt": {
+                        "type": "string"
+                    },
+                    "createdByUserId": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "lastUsedAt": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "revokedAt": {
+                        "type": "string"
+                    },
+                    "scopes": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "unitId": {
+                        "type": "string"
+                    }
+                },
                 "type": "object"
             },
             "handlers.operatorSkillInput": {
@@ -2158,6 +2252,41 @@
                 "required": [
                     "email"
                 ],
+                "type": "object"
+            },
+            "handlers.webhookEndpointDTO": {
+                "properties": {
+                    "companyId": {
+                        "type": "string"
+                    },
+                    "consecutiveFailures": {
+                        "type": "integer"
+                    },
+                    "createdAt": {
+                        "type": "string"
+                    },
+                    "enabled": {
+                        "type": "boolean"
+                    },
+                    "eventTypes": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "signingSecretMasked": {
+                        "type": "string"
+                    },
+                    "unitId": {
+                        "type": "string"
+                    },
+                    "url": {
+                        "type": "string"
+                    }
+                },
                 "type": "object"
             },
             "models.Booking": {
@@ -8404,6 +8533,98 @@
                 ]
             }
         },
+        "/companies/me/integration-api-keys": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/handlers.integrationAPIKeyRowDTO"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List integration API keys",
+                "tags": [
+                    "integrations"
+                ]
+            },
+            "post": {
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.createIntegrationAPIKeyRequest"
+                            }
+                        }
+                    },
+                    "description": "request",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.createIntegrationAPIKeyResponse"
+                                }
+                            }
+                        },
+                        "description": "Created"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Create integration API key",
+                "tags": [
+                    "integrations"
+                ]
+            }
+        },
+        "/companies/me/integration-api-keys/{id}": {
+            "delete": {
+                "parameters": [
+                    {
+                        "description": "Key ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Revoke integration API key",
+                "tags": [
+                    "integrations"
+                ]
+            }
+        },
         "/companies/me/login-links": {
             "post": {
                 "operationId": "companiesMeLoginLinkPost",
@@ -9723,6 +9944,98 @@
                 "summary": "Replace tenant role assignments for a user",
                 "tags": [
                     "companies"
+                ]
+            }
+        },
+        "/companies/me/webhook-endpoints": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/handlers.webhookEndpointDTO"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List webhook endpoints",
+                "tags": [
+                    "integrations"
+                ]
+            },
+            "post": {
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.createWebhookEndpointRequest"
+                            }
+                        }
+                    },
+                    "description": "Webhook endpoint",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.createWebhookEndpointResponse"
+                                }
+                            }
+                        },
+                        "description": "Created"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Create webhook endpoint",
+                "tags": [
+                    "integrations"
+                ]
+            }
+        },
+        "/companies/me/webhook-endpoints/{id}": {
+            "delete": {
+                "parameters": [
+                    {
+                        "description": "Endpoint ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Delete webhook endpoint",
+                "tags": [
+                    "integrations"
                 ]
             }
         },

@@ -191,6 +191,23 @@ func run() error {
 			}
 		}
 	}()
+	go func() {
+		if err := jobClient.EnqueueWebhookFlushOutbox(); err != nil {
+			slog.Error("EnqueueWebhookFlushOutbox", "err", err)
+		}
+		ticker := time.NewTicker(12 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-refreshCtx.Done():
+				return
+			case <-ticker.C:
+				if err := jobClient.EnqueueWebhookFlushOutbox(); err != nil {
+					slog.Error("EnqueueWebhookFlushOutbox", "err", err)
+				}
+			}
+		}
+	}()
 	slaMonitor := services.NewSlaMonitorService(ticketRepo, hub)
 	slaMonitor.Start(refreshCtx)
 	go func() {
@@ -258,6 +275,10 @@ func run() error {
 	slotHandler := handlers.NewSlotHandler(slotService, calendarIntegrationService)
 	preRegHandler := handlers.NewPreRegistrationHandler(preRegService, ticketService)
 	calendarIntegrationHandler := handlers.NewCalendarIntegrationHandler(calendarIntegrationService, userRepo)
+	integrationAPIKeyRepo := repository.NewIntegrationAPIKeyRepository(database.DB)
+	webhookEndpointRepo := repository.NewWebhookEndpointRepository(database.DB)
+	integrationAPIKeysHandler := handlers.NewIntegrationAPIKeysHandler(database.DB, integrationAPIKeyRepo, userRepo, unitRepo)
+	webhookEndpointsHandler := handlers.NewWebhookEndpointsHandler(database.DB, webhookEndpointRepo, userRepo, unitRepo)
 	unitClientHandler := handlers.NewUnitClientHandler(unitClientService, ticketService)
 	visitorTagHandler := handlers.NewVisitorTagHandler(visitorTagDefService)
 	uploadHandler := handlers.NewUploadHandler(storageService)
@@ -643,6 +664,13 @@ func run() error {
 		})
 	})
 
+	r.Route("/integrations/v1", func(r chi.Router) {
+		r.Use(authmiddleware.IntegrationAPIKeyAuth(database.DB))
+		r.Use(authmiddleware.RequireIntegrationUnitBelongsToCompany(unitRepo, "unitId"))
+		r.With(authmiddleware.RequireIntegrationAPIScope("tickets:read"), authmiddleware.RequireIntegrationUnitURLMatch("unitId")).Get("/units/{unitId}/tickets", ticketHandler.GetTicketsByUnit)
+		r.With(authmiddleware.RequireIntegrationAPIScope("tickets:write"), authmiddleware.RequireIntegrationUnitURLMatch("unitId")).Post("/units/{unitId}/tickets", ticketHandler.CreateTicket)
+	})
+
 	r.Route("/services", func(r chi.Router) {
 		r.Use(authmiddleware.JWTAuthAndActive(userRepo))
 		r.Post("/", serviceHandler.CreateService)
@@ -742,6 +770,12 @@ func run() error {
 			r.Post("/me/calendar-integrations", calendarIntegrationHandler.CreateMine)
 			r.Put("/me/calendar-integrations/{integrationId}", calendarIntegrationHandler.PutMine)
 			r.Delete("/me/calendar-integrations/{integrationId}", calendarIntegrationHandler.DeleteMine)
+			r.Get("/me/integration-api-keys", integrationAPIKeysHandler.List)
+			r.Post("/me/integration-api-keys", integrationAPIKeysHandler.Create)
+			r.Delete("/me/integration-api-keys/{id}", integrationAPIKeysHandler.Revoke)
+			r.Get("/me/webhook-endpoints", webhookEndpointsHandler.List)
+			r.Post("/me/webhook-endpoints", webhookEndpointsHandler.Create)
+			r.Delete("/me/webhook-endpoints/{id}", webhookEndpointsHandler.Delete)
 			r.Post("/dadata/party/find-by-inn", dadataHandler.FindPartyByInn)
 			r.Post("/dadata/party/suggest", dadataHandler.SuggestParty)
 			r.Post("/dadata/address/suggest", dadataHandler.SuggestAddress)

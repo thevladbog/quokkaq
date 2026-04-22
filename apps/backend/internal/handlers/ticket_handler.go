@@ -16,6 +16,8 @@ import (
 	"quokkaq-go-backend/internal/phoneutil"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
+	"quokkaq-go-backend/internal/subscriptionfeatures"
+	"quokkaq-go-backend/pkg/database"
 
 	"github.com/go-chi/chi/v5"
 	"gorm.io/gorm"
@@ -892,7 +894,7 @@ func (h *TicketHandler) AttachPhone(w http.ResponseWriter, r *http.Request) {
 // GetUnitQueueStatus godoc
 // @ID           getUnitQueueStatus
 // @Summary      Get public queue status for a unit
-// @Description  Returns queue length, estimated wait time (minutes), and active counter count. Public endpoint, no authentication required.
+// @Description  Returns queue length, estimated wait time (minutes), and active counter count. Public endpoint, no authentication required. Requires subscription plan feature public_queue_widget.
 // @Tags         tickets
 // @Produce      json
 // @Param        unitId  path      string  true  "Unit ID"
@@ -901,6 +903,18 @@ func (h *TicketHandler) AttachPhone(w http.ResponseWriter, r *http.Request) {
 // @Router       /units/{unitId}/queue-status [get]
 func (h *TicketHandler) GetUnitQueueStatus(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
+	if h.unitService != nil {
+		unit, uerr := h.unitService.GetUnitByID(unitID)
+		if uerr != nil || unit == nil {
+			http.Error(w, "unit not found", http.StatusNotFound)
+			return
+		}
+		ok, ferr := subscriptionfeatures.CompanyHasPublicQueueWidget(r.Context(), database.DB, unit.CompanyID)
+		if ferr != nil || !ok {
+			http.Error(w, "public queue widget is not enabled for this subscription plan", http.StatusForbidden)
+			return
+		}
+	}
 	if h.eta == nil {
 		RespondJSON(w, map[string]interface{}{
 			"queueLength":          0,

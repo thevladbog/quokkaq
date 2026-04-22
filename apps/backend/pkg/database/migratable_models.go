@@ -60,5 +60,9 @@ func AllMigratableModels() []any {
 		&models.SupportReport{},
 		&models.DeploymentSaaSSettings{},
 		&models.CompanyOneCSettings{},
+		&models.IntegrationAPIKey{},
+		&models.WebhookEndpoint{},
+		&models.WebhookDeliveryLog{},
+		&models.WebhookOutbox{},
 	}
 }

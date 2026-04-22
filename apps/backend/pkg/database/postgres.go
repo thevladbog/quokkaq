@@ -2377,6 +2377,97 @@ END $$;
 		return fmt.Errorf("failed to run v1.7.4_subscription_plan_annual_prepay migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.8.0_integrations_api_keys_webhooks_outbox", func(db *gorm.DB) error {
+		if err := db.Exec(`
+CREATE TABLE IF NOT EXISTS integration_api_keys (
+	id uuid PRIMARY KEY,
+	company_id uuid NOT NULL REFERENCES companies(id) ON UPDATE CASCADE ON DELETE CASCADE,
+	unit_id uuid REFERENCES units(id) ON UPDATE CASCADE ON DELETE SET NULL,
+	name text NOT NULL,
+	secret_hash text NOT NULL,
+	scopes jsonb NOT NULL DEFAULT '[]'::jsonb,
+	created_by_user_id uuid REFERENCES users(id) ON UPDATE CASCADE ON DELETE SET NULL,
+	revoked_at timestamptz,
+	last_used_at timestamptz,
+	created_at timestamptz NOT NULL DEFAULT now(),
+	updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_integration_api_keys_company_id ON integration_api_keys(company_id);
+CREATE INDEX IF NOT EXISTS idx_integration_api_keys_unit_id ON integration_api_keys(unit_id);
+
+CREATE TABLE IF NOT EXISTS webhook_endpoints (
+	id uuid PRIMARY KEY,
+	company_id uuid NOT NULL REFERENCES companies(id) ON UPDATE CASCADE ON DELETE CASCADE,
+	unit_id uuid REFERENCES units(id) ON UPDATE CASCADE ON DELETE SET NULL,
+	url text NOT NULL,
+	signing_secret text NOT NULL,
+	event_types jsonb NOT NULL DEFAULT '[]'::jsonb,
+	enabled boolean NOT NULL DEFAULT true,
+	consecutive_failures integer NOT NULL DEFAULT 0,
+	created_at timestamptz NOT NULL DEFAULT now(),
+	updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_webhook_endpoints_company_id ON webhook_endpoints(company_id);
+
+CREATE TABLE IF NOT EXISTS webhook_delivery_logs (
+	id uuid PRIMARY KEY,
+	webhook_endpoint_id uuid NOT NULL REFERENCES webhook_endpoints(id) ON UPDATE CASCADE ON DELETE CASCADE,
+	ticket_history_id uuid REFERENCES ticket_histories(id) ON UPDATE CASCADE ON DELETE SET NULL,
+	http_status integer,
+	response_snippet text,
+	duration_ms integer NOT NULL DEFAULT 0,
+	error_message text,
+	attempt integer NOT NULL DEFAULT 1,
+	created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_webhook_delivery_logs_endpoint ON webhook_delivery_logs(webhook_endpoint_id);
+
+CREATE TABLE IF NOT EXISTS webhook_outbox (
+	id uuid PRIMARY KEY,
+	company_id uuid NOT NULL REFERENCES companies(id) ON UPDATE CASCADE ON DELETE CASCADE,
+	ticket_history_id uuid NOT NULL REFERENCES ticket_histories(id) ON UPDATE CASCADE ON DELETE CASCADE,
+	created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_webhook_outbox_created_at ON webhook_outbox(created_at);
+`).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.8.0_integrations_api_keys_webhooks_outbox migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.8.1_subscription_plan_integration_features", func(db *gorm.DB) error {
+		// Add outbound_webhooks / public_queue_widget to existing plan JSON when keys are missing.
+		if err := db.Exec(`
+UPDATE subscription_plans
+SET features = COALESCE(features, '{}'::jsonb) || '{"outbound_webhooks": false}'::jsonb
+WHERE features->'outbound_webhooks' IS NULL;
+UPDATE subscription_plans
+SET features = COALESCE(features, '{}'::jsonb) || '{"public_queue_widget": false}'::jsonb
+WHERE features->'public_queue_widget' IS NULL;
+UPDATE subscription_plans
+SET features = jsonb_set(COALESCE(features, '{}'::jsonb), '{outbound_webhooks}', 'true'::jsonb, true)
+WHERE code IN ('professional', 'enterprise', 'grandfathered');
+UPDATE subscription_plans
+SET features = jsonb_set(COALESCE(features, '{}'::jsonb), '{public_queue_widget}', 'true'::jsonb, true)
+WHERE code IN ('professional', 'enterprise', 'grandfathered');
+UPDATE subscription_plans
+SET features = jsonb_set(COALESCE(features, '{}'::jsonb), '{outbound_webhooks}', 'false'::jsonb, true)
+WHERE code = 'starter';
+UPDATE subscription_plans
+SET features = jsonb_set(COALESCE(features, '{}'::jsonb), '{public_queue_widget}', 'false'::jsonb, true)
+WHERE code = 'starter';
+`).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.8.1_subscription_plan_integration_features migration: %w", err)
+	}
+
 	fmt.Println("✅ All migrations completed successfully")
 	return nil
 }

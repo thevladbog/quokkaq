@@ -74,6 +74,7 @@ func NewJobWorker(ttsService services.TtsService, ticketRepo repository.TicketRe
 	mux.HandleFunc(TypeTTSGenerate, w.handleTtsGenerate)
 	mux.HandleFunc(TypeSMSSend, w.handleSMSSend)
 	mux.HandleFunc(TypeVisitorNotify, w.handleVisitorNotify)
+	mux.HandleFunc(TypeWebhookFlushOutbox, w.handleWebhookFlushOutbox)
 
 	return w
 }
