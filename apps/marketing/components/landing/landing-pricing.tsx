@@ -87,16 +87,17 @@ export function LandingPricing({
               role='tablist'
               aria-label={copy.pricingFromApi.billingToggleGroupLabel}
               tabIndex={0}
-              className='border-[color:var(--color-border)] bg-[color:var(--color-surface-elevated)] inline-flex rounded-full border p-1 shadow-sm'
+              className='inline-flex rounded-full border border-[color:var(--color-border)] bg-[color:var(--color-surface-elevated)] p-1 shadow-sm'
               onKeyDown={(e) => {
                 if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') {
                   return;
                 }
                 e.preventDefault();
                 const root = billingTablistRef.current;
-                const tabs = root?.querySelectorAll<HTMLButtonElement>(
-                  'button[role="tab"]'
-                );
+                const tabs =
+                  root?.querySelectorAll<HTMLButtonElement>(
+                    'button[role="tab"]'
+                  );
                 if (!tabs?.length) {
                   return;
                 }
@@ -145,8 +146,8 @@ export function LandingPricing({
                   <span
                     className={
                       billingPeriod === 'annual'
-                        ? 'pointer-events-none absolute -right-1 -top-2 rounded-md bg-white px-1.5 py-0.5 text-[0.65rem] font-black leading-none text-amber-950 shadow-md ring-2 ring-white/80 [transform:rotate(8deg)] dark:bg-neutral-950 dark:text-amber-200 dark:ring-neutral-600/80'
-                        : 'pointer-events-none absolute -right-1 -top-2 rounded-md bg-amber-400/95 px-1.5 py-0.5 text-[0.65rem] font-black leading-none text-amber-950 shadow ring-1 ring-amber-600/25 [transform:rotate(8deg)] dark:bg-amber-300/90 dark:text-amber-950'
+                        ? 'pointer-events-none absolute -top-2 -right-1 [transform:rotate(8deg)] rounded-md bg-white px-1.5 py-0.5 text-[0.65rem] leading-none font-black text-amber-950 shadow-md ring-2 ring-white/80 dark:bg-neutral-950 dark:text-amber-200 dark:ring-neutral-600/80'
+                        : 'pointer-events-none absolute -top-2 -right-1 [transform:rotate(8deg)] rounded-md bg-amber-400/95 px-1.5 py-0.5 text-[0.65rem] leading-none font-black text-amber-950 shadow ring-1 ring-amber-600/25 dark:bg-amber-300/90 dark:text-amber-950'
                     }
                     aria-hidden
                   >
@@ -597,9 +598,7 @@ export function LandingPricing({
               source='pricing_custom_terms'
               lead={copy.leadForm}
               appBaseUrl={appBaseUrl}
-              billingPeriod={
-                showBillingToggle ? billingPeriod : undefined
-              }
+              billingPeriod={showBillingToggle ? billingPeriod : undefined}
               className='focus-ring group inline-flex min-h-12 w-full shrink-0 items-center justify-center gap-2 self-center rounded-xl bg-[color:var(--color-primary)] px-7 py-3.5 text-base font-semibold text-white shadow-lg shadow-[color:var(--color-primary)]/35 transition hover:bg-[color:var(--color-primary-hover)] hover:shadow-xl hover:shadow-[color:var(--color-primary)]/40 sm:w-auto sm:self-stretch sm:px-8 lg:self-center'
             >
               <span>{copy.pricingFromApi.requestQuote}</span>

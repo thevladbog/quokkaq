@@ -76,7 +76,12 @@ export type HomeMessages = {
   interfaceShowcase: {
     heading: string;
     subheading: string;
-    items: Array<{ title: string; description: string; image: string; imageAlt: string }>;
+    items: Array<{
+      title: string;
+      description: string;
+      image: string;
+      imageAlt: string;
+    }>;
   };
   useCases: {
     heading: string;
