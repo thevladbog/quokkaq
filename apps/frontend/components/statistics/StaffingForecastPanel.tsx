@@ -153,10 +153,7 @@ export function StaffingForecastPanel({
     : (data.dayOfWeek ?? '');
 
   const summary = data.dailySummary;
-  const uncFrac = Math.min(
-    0.85,
-    Math.max(0, (data.arrivalUncertaintyPct ?? 0) / 100)
-  );
+  const uncFrac = Math.max(0, (data.arrivalUncertaintyPct ?? 0) / 100);
   const hourlyData = (data.hourlyForecasts ?? []).map((h) => {
     const exp = h.expectedArrivals ?? 0;
     return {

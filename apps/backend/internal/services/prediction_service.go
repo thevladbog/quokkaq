@@ -165,9 +165,6 @@ func (p *PredictionService) MaybeBroadcastStaffingAlert(ctx context.Context, uni
 
 	p.hub.BroadcastEvent("unit.staffing_alert", payload, unitID)
 	broadcasted = true
-	p.mu.Lock()
-	p.lastStaff[unitID] = time.Now()
-	p.mu.Unlock()
 }
 
 func minPositiveMaxWaitingSec(tickets []models.Ticket) *int {
@@ -218,9 +215,6 @@ func (p *PredictionService) maybeHeuristicStaffingAlert(unitID string, summary U
 		"estimatedWaitMinutes":     summary.EstimatedWaitMinutes,
 	}
 	p.hub.BroadcastEvent("unit.staffing_alert", payload, unitID)
-	p.mu.Lock()
-	p.lastStaff[unitID] = time.Now()
-	p.mu.Unlock()
 	return true
 }
 
@@ -245,9 +239,21 @@ func NewAnomalyService(db *gorm.DB, hub *ws.Hub, unitRepo repository.UnitReposit
 		unitRepo:  unitRepo,
 		alertRepo: alertRepo,
 		last:      make(map[string]time.Time),
-		cooldown:  10 * time.Minute,
+		cooldown:  defaultAnomalyUnitCooldown,
 	}
 }
+
+// AnomalyCheckInterval returns the per-unit emit cooldown. Use the same value for the anomaly
+// job enqueue ticker so the worker is not scheduled much more often than the guard allows.
+func (a *AnomalyService) AnomalyCheckInterval() time.Duration {
+	if a == nil {
+		return defaultAnomalyUnitCooldown
+	}
+	return a.cooldown
+}
+
+// defaultAnomalyUnitCooldown must stay in sync with the enqueue ticker in cmd/api.
+const defaultAnomalyUnitCooldown = 10 * time.Minute
 
 // RunPeriodicCheck scans subdivision units for spike / slow-service / mass no-show anomalies.
 func (a *AnomalyService) RunPeriodicCheck(ctx context.Context) error {

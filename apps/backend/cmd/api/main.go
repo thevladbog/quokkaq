@@ -178,7 +178,7 @@ func run() error {
 		if err := jobClient.EnqueueAnomalyCheck(); err != nil {
 			slog.Error("EnqueueAnomalyCheck", "err", err)
 		}
-		ticker := time.NewTicker(5 * time.Minute)
+		ticker := time.NewTicker(anomalyService.AnomalyCheckInterval())
 		defer ticker.Stop()
 		for {
 			select {

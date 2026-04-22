@@ -286,13 +286,16 @@ func ewmaSeconds(samples []int, alpha float64) int {
 	return int(math.Round(e))
 }
 
-func (s *ETAService) timeOfDayMultiplier(unitID string, now time.Time) float64 {
+// todHourlyOverall returns the clamped time-of-day multiplier and, when the query succeeds,
+// raw hourly and overall service-time averages (seconds) for use in fallbacks without a second DB read.
+func (s *ETAService) todHourlyOverall(unitID string, now time.Time) (tod float64, hourly float64, overall float64) {
+	tod = 1
 	if s.unitRepo == nil {
-		return 1
+		return
 	}
 	u, err := s.unitRepo.FindByIDLight(unitID)
 	if err != nil || u == nil {
-		return 1
+		return
 	}
 	tzName := strings.TrimSpace(u.Timezone)
 	if tzName == "" {
@@ -306,18 +309,19 @@ func (s *ETAService) timeOfDayMultiplier(unitID string, now time.Time) float64 {
 	hour := local.Hour()
 	wd := local.Weekday()
 
-	hourly, overall, err := s.ticketRepo.GetServiceTimeHourlyVsOverall(unitID, tzName, hour, wd, etaLookbackDays)
-	if err != nil || overall <= 0 || hourly <= 0 {
-		return 1
+	h, o, err := s.ticketRepo.GetServiceTimeHourlyVsOverall(unitID, tzName, hour, wd, etaLookbackDays)
+	if err != nil || o <= 0 || h <= 0 {
+		return
 	}
-	ratio := hourly / overall
+	hourly, overall = h, o
+	ratio := h / o
 	if ratio < etaTODClampMin {
 		ratio = etaTODClampMin
 	}
 	if ratio > etaTODClampMax {
 		ratio = etaTODClampMax
 	}
-	return ratio
+	return ratio, hourly, overall
 }
 
 // effectiveServiceSec returns service duration estimate (seconds) with EWMA and time-of-day adjustment.
@@ -338,7 +342,7 @@ func (s *ETAService) effectiveServiceSec(unitID, serviceID string, now time.Time
 			sec = ewmaSeconds(cp, etaEWMAAlpha)
 		}
 	}
-	tod := s.timeOfDayMultiplier(unitID, now)
+	tod, hourly, overall := s.todHourlyOverall(unitID, now)
 	if sec > 0 {
 		return int(math.Round(float64(sec) * tod)), tod
 	}
@@ -349,15 +353,19 @@ func (s *ETAService) effectiveServiceSec(unitID, serviceID string, now time.Time
 		}
 	}
 	// Fallback: historical averages from raw tickets when EWMA has insufficient data.
-	tz := s.resolveTZ(unitID)
-	loc, lerr := time.LoadLocation(tz)
-	if lerr != nil || loc == nil {
-		loc = time.UTC
-	}
-	local := now.In(loc)
-	hourly, overall, herr := s.ticketRepo.GetServiceTimeHourlyVsOverall(unitID, tz, local.Hour(), local.Weekday(), etaLookbackDays)
-	if herr != nil {
-		return 0, tod
+	// Reuse hourly/overall from todHourlyOverall when the first query succeeded; otherwise a single read.
+	if hourly <= 0 && overall <= 0 {
+		tz := s.resolveTZ(unitID)
+		loc, lerr := time.LoadLocation(tz)
+		if lerr != nil || loc == nil {
+			loc = time.UTC
+		}
+		local := now.In(loc)
+		var herr error
+		hourly, overall, herr = s.ticketRepo.GetServiceTimeHourlyVsOverall(unitID, tz, local.Hour(), local.Weekday(), etaLookbackDays)
+		if herr != nil {
+			return 0, tod
+		}
 	}
 	if hourly > 0 {
 		return int(math.Round(hourly)), tod
