@@ -544,6 +544,7 @@ func run() error {
 		r.Group(func(r chi.Router) {
 			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
 			r.Use(authmiddleware.RequireUnitAnyPermission(userRepo, tenantRBACRepo, unitRepo, "unitId", []string{rbac.PermUnitTicketScreenManage, rbac.PermUnitSignageManage}))
+			r.Get("/{unitId}/signage-health", signageHandler.SignageHealth)
 			r.Get("/{unitId}/playlists", signageHandler.ListPlaylists)
 			r.Get("/{unitId}/playlists/{playlistId}", signageHandler.GetPlaylist)
 			r.Post("/{unitId}/playlists", signageHandler.CreatePlaylist)

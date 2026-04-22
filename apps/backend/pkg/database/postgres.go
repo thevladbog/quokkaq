@@ -2544,6 +2544,33 @@ UPDATE external_feeds SET consecutive_failures = 0 WHERE consecutive_failures IS
 		return fmt.Errorf("failed to run v1.8.5_external_feed_consecutive_failures migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.8.6_signage_validity", func(db *gorm.DB) error {
+		if err := db.Exec(`
+ALTER TABLE playlist_items
+    ADD COLUMN IF NOT EXISTS valid_from date,
+    ADD COLUMN IF NOT EXISTS valid_to date;
+ALTER TABLE playlist_schedules
+    ADD COLUMN IF NOT EXISTS valid_from date,
+    ADD COLUMN IF NOT EXISTS valid_to date;
+ALTER TABLE screen_announcements
+    ADD COLUMN IF NOT EXISTS display_mode text NOT NULL DEFAULT 'banner';
+UPDATE screen_announcements SET display_mode = 'banner' WHERE display_mode IS NULL OR display_mode = '';
+`).Error; err != nil {
+			return err
+		}
+		if err := db.AutoMigrate(
+			&dbmodels.PlaylistItem{},
+			&dbmodels.PlaylistSchedule{},
+			&dbmodels.ScreenAnnouncement{},
+		); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.8.6_signage_validity migration: %w", err)
+	}
+
 	fmt.Println("✅ All migrations completed successfully")
 	return nil
 }

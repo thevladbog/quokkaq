@@ -63,7 +63,16 @@ export interface HandlersAccessibleCompaniesResponse {
   companies?: HandlersAccessibleCompanyItem[];
 }
 
+export type HandlersAnnouncementRequestDisplayMode = typeof HandlersAnnouncementRequestDisplayMode[keyof typeof HandlersAnnouncementRequestDisplayMode];
+
+
+export const HandlersAnnouncementRequestDisplayMode = {
+  banner: 'banner',
+  fullscreen: 'fullscreen',
+} as const;
+
 export interface HandlersAnnouncementRequest {
+  displayMode?: HandlersAnnouncementRequestDisplayMode;
   expiresAt?: string;
   isActive?: boolean;
   priority?: number;
@@ -474,6 +483,10 @@ export interface HandlersCreateInvitationRequest {
 export interface HandlersPlaylistItemInput {
   duration?: number;
   materialId?: string;
+  /** YYYY-MM-DD, optional; inclusive */
+  validFrom?: string;
+  /** YYYY-MM-DD, optional; inclusive */
+  validTo?: string;
 }
 
 export interface HandlersCreatePlaylistRequest {
@@ -490,6 +503,8 @@ export interface HandlersCreateScheduleRequest {
   playlistId?: string;
   priority?: number;
   startTime?: string;
+  validFrom?: string;
+  validTo?: string;
 }
 
 export interface HandlersTenantRoleUnitJSON {
@@ -1986,6 +2001,8 @@ export interface ModelsPlaylistItem {
   materialId?: string;
   playlistId?: string;
   sortOrder?: number;
+  validFrom?: string;
+  validTo?: string;
 }
 
 export interface ModelsPlaylist {
@@ -2014,6 +2031,9 @@ export interface ModelsPlaylistSchedule {
   startTime?: string;
   unitId?: string;
   updatedAt?: string;
+  /** Optional calendar range (inclusive) when the schedule applies, interpreted with the unit’s timezone. Nil = unbounded. */
+  validFrom?: string;
+  validTo?: string;
 }
 
 export interface ModelsPreRegCalendarSlotItem {
@@ -2077,6 +2097,8 @@ export interface ModelsPreRegistrationUpdateRequest {
 
 export interface ModelsScreenAnnouncement {
   createdAt?: string;
+  /** DisplayMode: "banner" (in-layout list) or "fullscreen" (full-screen alert overlay; highest priority first). */
+  displayMode?: string;
   expiresAt?: string;
   id?: string;
   isActive?: boolean;
@@ -2371,6 +2393,16 @@ export interface ServicesEmployeeRadarResponse {
   userId?: string;
 }
 
+export interface ServicesFeedHealth {
+  consecutiveFailures?: number;
+  healthy?: boolean;
+  id?: string;
+  isActive?: boolean;
+  lastError?: string;
+  lastFetchAt?: string;
+  name?: string;
+}
+
 /**
  * IdleScreen from the active survey for this counter (service zone scope first), regardless of ticket.
  */
@@ -2548,6 +2580,29 @@ export interface ServicesShiftCounterDTO {
   serviceZoneId?: string;
   /** off_duty | idle | serving | break */
   sessionState?: string;
+  unitId?: string;
+}
+
+export interface ServicesSignagePlaylistRef {
+  id?: string;
+  name?: string;
+}
+
+export interface ServicesSignageActive {
+  /** no slides after item-date filtering */
+  empty?: boolean;
+  playlist?: ServicesSignagePlaylistRef;
+  reason?: string;
+  source?: string;
+}
+
+export interface ServicesSignageHealthDTO {
+  active?: ServicesSignageActive;
+  feeds?: ServicesFeedHealth[];
+  hasDefaultPlaylist?: boolean;
+  playlistCount?: number;
+  scheduleCount?: number;
+  timezone?: string;
   unitId?: string;
 }
 
@@ -6471,6 +6526,119 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       > => {
       return useMutation(getUpdateSignageAnnouncementMutationOptions(options), queryClient);
     }
+
+/**
+ * @summary Digital signage health summary (admin)
+ */
+export type getSignageHealthResponse200 = {
+  data: ServicesSignageHealthDTO
+  status: 200
+}
+
+export type getSignageHealthResponseSuccess = (getSignageHealthResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getSignageHealthResponse = (getSignageHealthResponseSuccess)
+
+export const getGetSignageHealthUrl = (unitId: string,) => {
+
+
+
+
+  return `/units/${unitId}/signage-health`
+}
+
+export const getSignageHealth = async (unitId: string, options?: RequestInit): Promise<getSignageHealthResponse> => {
+
+  return orvalMutator<getSignageHealthResponse>(getGetSignageHealthUrl(unitId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSignageHealthQueryKey = (unitId: string,) => {
+    return [
+    `/units/${unitId}/signage-health`
+    ] as const;
+    }
+
+
+export const getGetSignageHealthQueryOptions = <TData = Awaited<ReturnType<typeof getSignageHealth>>, TError = unknown>(unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSignageHealth>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSignageHealthQueryKey(unitId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSignageHealth>>> = ({ signal }) => getSignageHealth(unitId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSignageHealth>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetSignageHealthQueryResult = NonNullable<Awaited<ReturnType<typeof getSignageHealth>>>
+export type GetSignageHealthQueryError = unknown
+
+
+export function useGetSignageHealth<TData = Awaited<ReturnType<typeof getSignageHealth>>, TError = unknown>(
+ unitId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSignageHealth>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getSignageHealth>>,
+          TError,
+          Awaited<ReturnType<typeof getSignageHealth>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetSignageHealth<TData = Awaited<ReturnType<typeof getSignageHealth>>, TError = unknown>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSignageHealth>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getSignageHealth>>,
+          TError,
+          Awaited<ReturnType<typeof getSignageHealth>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetSignageHealth<TData = Awaited<ReturnType<typeof getSignageHealth>>, TError = unknown>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSignageHealth>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Digital signage health summary (admin)
+ */
+
+export function useGetSignageHealth<TData = Awaited<ReturnType<typeof getSignageHealth>>, TError = unknown>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSignageHealth>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetSignageHealthQueryOptions(unitId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 /**
  * Returns label/color tag definitions scoped to the unit, ordered by sortOrder then label.

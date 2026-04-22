@@ -543,7 +543,9 @@ export type SignageConfig = z.infer<typeof SignageConfigSchema>;
 export const PlaylistItemInputSchema = z.object({
   materialId: z.string(),
   sortOrder: z.number().int().optional(),
-  duration: z.number().int().min(0).optional()
+  duration: z.number().int().min(0).optional(),
+  validFrom: z.string().optional(),
+  validTo: z.string().optional()
 });
 
 export const PlaylistSchema = z.object({
@@ -564,6 +566,8 @@ export const PlaylistScheduleSchema = z.object({
   daysOfWeek: z.string(),
   startTime: z.string(),
   endTime: z.string(),
+  validFrom: z.string().optional(),
+  validTo: z.string().optional(),
   priority: z.number().int().optional(),
   isActive: z.boolean().optional()
 });
@@ -588,6 +592,7 @@ export const ScreenAnnouncementSchema = z.object({
   text: z.string(),
   priority: z.number().int().optional(),
   style: z.string().optional(),
+  displayMode: z.enum(['banner', 'fullscreen']).optional(),
   startsAt: z.string().nullable().optional(),
   expiresAt: z.string().nullable().optional(),
   isActive: z.boolean().optional()

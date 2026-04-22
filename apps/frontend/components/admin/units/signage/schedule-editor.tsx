@@ -33,6 +33,8 @@ export function ScheduleEditor({ unitId }: { unitId: string }) {
   const [scDays, setScDays] = useState('1,2,3,4,5');
   const [scStart, setScStart] = useState('09:00');
   const [scEnd, setScEnd] = useState('18:00');
+  const [scValidFrom, setScValidFrom] = useState('');
+  const [scValidTo, setScValidTo] = useState('');
   const [priority, setPriority] = useState(0);
   const createSc = orval.useCreateSignageSchedule();
   const delSc = orval.useDeleteSignageSchedule();
@@ -49,6 +51,8 @@ export function ScheduleEditor({ unitId }: { unitId: string }) {
       daysOfWeek: scDays,
       startTime: scStart,
       endTime: scEnd,
+      validFrom: scValidFrom.trim() || undefined,
+      validTo: scValidTo.trim() || undefined,
       priority,
       isActive: true
     };
@@ -141,6 +145,26 @@ export function ScheduleEditor({ unitId }: { unitId: string }) {
             onChange={(e) => setPriority(parseInt(e.target.value, 10) || 0)}
           />
         </div>
+        <div>
+          <Label>
+            {t('scheduleValidFrom', { default: 'Valid from (date, optional)' })}
+          </Label>
+          <Input
+            type='date'
+            value={scValidFrom}
+            onChange={(e) => setScValidFrom(e.target.value)}
+          />
+        </div>
+        <div>
+          <Label>
+            {t('scheduleValidTo', { default: 'Valid to (date, optional)' })}
+          </Label>
+          <Input
+            type='date'
+            value={scValidTo}
+            onChange={(e) => setScValidTo(e.target.value)}
+          />
+        </div>
       </div>
       <Button
         onClick={() => {
@@ -157,6 +181,9 @@ export function ScheduleEditor({ unitId }: { unitId: string }) {
           >
             <span>
               {s.startTime}–{s.endTime} · {s.daysOfWeek} · pri {s.priority ?? 0}
+              {s.validFrom || s.validTo
+                ? ` · ${(s.validFrom ?? '…').toString().slice(0, 10)}–${(s.validTo ?? '…').toString().slice(0, 10)}`
+                : ''}
             </span>
             <div className='flex items-center gap-1'>
               <Button
@@ -171,6 +198,12 @@ export function ScheduleEditor({ unitId }: { unitId: string }) {
                     daysOfWeek: s.daysOfWeek ?? '',
                     startTime: s.startTime ?? '',
                     endTime: s.endTime ?? '',
+                    validFrom: s.validFrom
+                      ? String(s.validFrom).slice(0, 10)
+                      : undefined,
+                    validTo: s.validTo
+                      ? String(s.validTo).slice(0, 10)
+                      : undefined,
                     priority: nextP,
                     isActive: s.isActive
                   };

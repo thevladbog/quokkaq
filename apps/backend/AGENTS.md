@@ -40,6 +40,11 @@ auth, users, units, tickets, services, counters, shifts, slots, bookings, pre-re
 - **Публичные пути (без сессии, для экрана):** объявления и данные фидов — теги и маршруты в [`internal/handlers/signage_handler.go`](internal/handlers/signage_handler.go) (имена путей и префиксы `public-` / `public-screen-` в OpenAPI).
 - **Очередь `servedToday`:** в обход HTTP и WebSocket `UnitETASnapshot` заполняется в [`internal/services/eta_service.go`](internal/services/eta_service.go) той же логикой дня, что `GetUnitQueueSummary` (функция `servedTodayForUnit` + timezone юнита).
 
+### Позиция продукта и границы (Digital Signage)
+
+- **QuokkaQ** в части табло: **один публичный экран = один `unit` с очередью**, не сеть DSP на тысячи дисплеев. Расширения **vNext** (календарные границы слотов, сроки слайдов, `GET .../signage-health`, режимы объявлений `banner` / `fullscreen`) согласованы с **таймзоной юнита** (`ActivePlaylist` и валидация дат).
+- **Вне near-term roadmap** (только по запросу B2B): группы экранов, теги/smart-плейлисты, proof of play, shuffle, тяжёлый offline (PWA/Tauri) — фиксировать в коммерции, не планировать как обязательный baseline.
+
 ## Статистика: аномалии и staffing
 
 - **Asynq:** периодическая задача `anomaly:check` ставится из `cmd/api/main.go`, тип и постановка — `internal/jobs/types.go`, `internal/jobs/client.go`, обработчик — `internal/jobs/worker.go` (`handleAnomalyCheck`). Нужен **Redis** (`REDIS_URL` и т.п.), иначе очередь недоступна.

@@ -1012,15 +1012,35 @@
       "classicLayout": "Классический макет",
       "presets": "Шаблон экрана",
       "tabs": {
+        "status": "Состояние",
         "playlists": "Плейлисты",
         "schedules": "Расписание",
         "feeds": "Внешние фиды",
         "layout": "Макет",
         "announcements": "Объявления"
       },
+      "healthTitle": "Табло и фиды",
+      "healthRefresh": "Обновить",
+      "healthTimezone": "Часовой пояс",
+      "healthActiveSource": "Активный плейлист",
+      "healthEmpty": "Нет слайдов (проверьте даты слайдов и медиа)",
+      "healthPlaylists": "Плейлистов",
+      "healthSchedules": "Расписаний",
+      "hasDefault": "есть плейлист по умолчанию",
+      "noDefault": "нет плейлиста по умолчанию",
+      "healthFeeds": "Внешние фиды",
+      "feedOk": "OK",
+      "feedFailing": "Ошибки опроса",
+      "annDisplay": "Режим",
+      "annBanner": "В макете (полоса)",
+      "annFullscreen": "Полноэкранно (срочно)",
+      "itemValidFrom": "Слайд — с даты",
+      "itemValidTo": "Слайд — до даты",
+      "scheduleValidFrom": "Действует с (дата, по желанию)",
+      "scheduleValidTo": "Действует по (дата, по желанию)",
       "editOrder": "Порядок",
       "saveOrder": "Сохранить порядок",
-      "reorderSave": "Перетащите, укажите длительность, затем сохраните",
+      "reorderSave": "Перетащите, длительность, при необходимости даты слайда, затем сохраните",
       "pickPlaylist": "Выберите плейлист",
       "daysLabel": "Дни (1=пн … 7=вс)",
       "bumpPriority": "Приоритет +1",
@@ -2026,6 +2046,10 @@
     "templateUnknown": "Неизвестный макет: {id}",
     "feeds": {
       "missing": "Настройте фид в настройках юнита"
+    },
+    "announcements": {
+      "title": "Объявления",
+      "fullscreenLabel": "Важно"
     },
     "stats": {
       "inQueue": "В очереди",

@@ -20,6 +20,11 @@ components:
             type: object
         handlers.AnnouncementRequest:
             properties:
+                displayMode:
+                    enum:
+                        - banner
+                        - fullscreen
+                    type: string
                 expiresAt:
                     type: string
                 isActive:
@@ -203,6 +208,12 @@ components:
                 priority:
                     type: integer
                 startTime:
+                    type: string
+                validFrom:
+                    example: "2025-06-01"
+                    type: string
+                validTo:
+                    example: "2025-08-31"
                     type: string
             type: object
         handlers.CreateTenantRoleJSON:
@@ -884,6 +895,14 @@ components:
                 duration:
                     type: integer
                 materialId:
+                    type: string
+                validFrom:
+                    description: YYYY-MM-DD, optional; inclusive
+                    example: "2025-12-24"
+                    type: string
+                validTo:
+                    description: YYYY-MM-DD, optional; inclusive
+                    example: "2025-12-31"
                     type: string
             type: object
         handlers.PublicLeadRequestBody:
@@ -2329,6 +2348,10 @@ components:
                     type: string
                 sortOrder:
                     type: integer
+                validFrom:
+                    type: string
+                validTo:
+                    type: string
             type: object
         models.PlaylistSchedule:
             properties:
@@ -2356,6 +2379,11 @@ components:
                 unitId:
                     type: string
                 updatedAt:
+                    type: string
+                validFrom:
+                    description: Optional calendar range (inclusive) when the schedule applies, interpreted with the unit’s timezone. Nil = unbounded.
+                    type: string
+                validTo:
                     type: string
             type: object
         models.PreRegCalendarSlotItem:
@@ -2496,6 +2524,9 @@ components:
         models.ScreenAnnouncement:
             properties:
                 createdAt:
+                    type: string
+                displayMode:
+                    description: 'DisplayMode: "banner" (in-layout list) or "fullscreen" (full-screen alert overlay; highest priority first).'
                     type: string
                 expiresAt:
                     type: string
@@ -3504,6 +3535,23 @@ components:
                 userId:
                     type: string
             type: object
+        services.FeedHealth:
+            properties:
+                consecutiveFailures:
+                    type: integer
+                healthy:
+                    type: boolean
+                id:
+                    type: string
+                isActive:
+                    type: boolean
+                lastError:
+                    type: string
+                lastFetchAt:
+                    type: string
+                name:
+                    type: string
+            type: object
         services.GoogleCalendarPickOption:
             properties:
                 id:
@@ -3777,6 +3825,44 @@ components:
                     description: off_duty | idle | serving | break
                     type: string
                 unitId:
+                    type: string
+            type: object
+        services.SignageActive:
+            properties:
+                empty:
+                    description: no slides after item-date filtering
+                    type: boolean
+                playlist:
+                    $ref: '#/components/schemas/services.SignagePlaylistRef'
+                reason:
+                    type: string
+                source:
+                    type: string
+            type: object
+        services.SignageHealthDTO:
+            properties:
+                active:
+                    $ref: '#/components/schemas/services.SignageActive'
+                feeds:
+                    items:
+                        $ref: '#/components/schemas/services.FeedHealth'
+                    type: array
+                hasDefaultPlaylist:
+                    type: boolean
+                playlistCount:
+                    type: integer
+                scheduleCount:
+                    type: integer
+                timezone:
+                    type: string
+                unitId:
+                    type: string
+            type: object
+        services.SignagePlaylistRef:
+            properties:
+                id:
+                    type: string
+                name:
                     type: string
             type: object
         services.SlaSummaryResponse:
@@ -14809,6 +14895,28 @@ paths:
             summary: Get queue tickets
             tags:
                 - shift
+    /units/{unitId}/signage-health:
+        get:
+            operationId: GetSignageHealth
+            parameters:
+                - description: Unit ID
+                  in: path
+                  name: unitId
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/services.SignageHealthDTO'
+                    description: OK
+            security:
+                - BearerAuth: []
+            summary: Digital signage health summary (admin)
+            tags:
+                - signage
     /units/{unitId}/slots/capacities:
         get:
             description: Returns per-day, per-service capacity definitions used when generating slots.

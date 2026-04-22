@@ -27,7 +27,16 @@ export interface HandlersAccessibleCompaniesResponse {
   companies?: HandlersAccessibleCompanyItem[];
 }
 
+export type HandlersAnnouncementRequestDisplayMode = typeof HandlersAnnouncementRequestDisplayMode[keyof typeof HandlersAnnouncementRequestDisplayMode];
+
+
+export const HandlersAnnouncementRequestDisplayMode = {
+  banner: 'banner',
+  fullscreen: 'fullscreen',
+} as const;
+
 export interface HandlersAnnouncementRequest {
+  displayMode?: HandlersAnnouncementRequestDisplayMode;
   expiresAt?: string;
   isActive?: boolean;
   priority?: number;
@@ -438,6 +447,10 @@ export interface HandlersCreateInvitationRequest {
 export interface HandlersPlaylistItemInput {
   duration?: number;
   materialId?: string;
+  /** YYYY-MM-DD, optional; inclusive */
+  validFrom?: string;
+  /** YYYY-MM-DD, optional; inclusive */
+  validTo?: string;
 }
 
 export interface HandlersCreatePlaylistRequest {
@@ -454,6 +467,8 @@ export interface HandlersCreateScheduleRequest {
   playlistId?: string;
   priority?: number;
   startTime?: string;
+  validFrom?: string;
+  validTo?: string;
 }
 
 export interface HandlersTenantRoleUnitJSON {
@@ -1950,6 +1965,8 @@ export interface ModelsPlaylistItem {
   materialId?: string;
   playlistId?: string;
   sortOrder?: number;
+  validFrom?: string;
+  validTo?: string;
 }
 
 export interface ModelsPlaylist {
@@ -1978,6 +1995,9 @@ export interface ModelsPlaylistSchedule {
   startTime?: string;
   unitId?: string;
   updatedAt?: string;
+  /** Optional calendar range (inclusive) when the schedule applies, interpreted with the unit’s timezone. Nil = unbounded. */
+  validFrom?: string;
+  validTo?: string;
 }
 
 export interface ModelsPreRegCalendarSlotItem {
@@ -2041,6 +2061,8 @@ export interface ModelsPreRegistrationUpdateRequest {
 
 export interface ModelsScreenAnnouncement {
   createdAt?: string;
+  /** DisplayMode: "banner" (in-layout list) or "fullscreen" (full-screen alert overlay; highest priority first). */
+  displayMode?: string;
   expiresAt?: string;
   id?: string;
   isActive?: boolean;
@@ -2335,6 +2357,16 @@ export interface ServicesEmployeeRadarResponse {
   userId?: string;
 }
 
+export interface ServicesFeedHealth {
+  consecutiveFailures?: number;
+  healthy?: boolean;
+  id?: string;
+  isActive?: boolean;
+  lastError?: string;
+  lastFetchAt?: string;
+  name?: string;
+}
+
 /**
  * IdleScreen from the active survey for this counter (service zone scope first), regardless of ticket.
  */
@@ -2512,6 +2544,29 @@ export interface ServicesShiftCounterDTO {
   serviceZoneId?: string;
   /** off_duty | idle | serving | break */
   sessionState?: string;
+  unitId?: string;
+}
+
+export interface ServicesSignagePlaylistRef {
+  id?: string;
+  name?: string;
+}
+
+export interface ServicesSignageActive {
+  /** no slides after item-date filtering */
+  empty?: boolean;
+  playlist?: ServicesSignagePlaylistRef;
+  reason?: string;
+  source?: string;
+}
+
+export interface ServicesSignageHealthDTO {
+  active?: ServicesSignageActive;
+  feeds?: ServicesFeedHealth[];
+  hasDefaultPlaylist?: boolean;
+  playlistCount?: number;
+  scheduleCount?: number;
+  timezone?: string;
   unitId?: string;
 }
 

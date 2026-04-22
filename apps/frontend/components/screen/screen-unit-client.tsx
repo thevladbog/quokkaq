@@ -23,6 +23,7 @@ import {
   ContentPlayer,
   type ContentSlide
 } from '@/components/screen/content-player';
+import { ScreenFullscreenAnnouncementOverlay } from '@/components/screen/screen-fullscreen-announcement-overlay';
 import { ScreenRenderer } from '@/components/screen/screen-renderer';
 import { CalledTicketsTable } from '@/components/screen/called-tickets-table';
 import { QueueTicker } from '@/components/screen/queue-ticker';
@@ -390,18 +391,34 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
   const headerColor = isCustomColorsEnabled ? adConfig?.headerColor || '' : '';
   const bodyColor = isCustomColorsEnabled ? adConfig?.bodyColor || '' : '';
 
-  const annForRenderer = publicAnnouncements.map((a) => ({
-    id: a.id,
-    text: a.text,
-    style: a.style,
-    priority: a.priority
-  }));
+  const annForRenderer = publicAnnouncements
+    .filter(
+      (a) =>
+        ((a as { displayMode?: string }).displayMode || 'banner') === 'banner'
+    )
+    .map((a) => ({
+      id: a.id ?? '',
+      text: a.text ?? '',
+      style: a.style ?? 'info',
+      priority: a.priority ?? 0
+    }));
+  const annFullscreen = publicAnnouncements
+    .filter((a) => (a as { displayMode?: string }).displayMode === 'fullscreen')
+    .map((a) => ({
+      id: a.id ?? '',
+      text: a.text ?? '',
+      style: a.style ?? 'info',
+      priority: a.priority ?? 0
+    }));
 
   return (
     <div
       className='bg-background text-foreground flex h-screen w-screen flex-col overflow-hidden'
       style={{ backgroundColor: bodyColor || undefined }}
     >
+      {annFullscreen.length > 0 && (
+        <ScreenFullscreenAnnouncementOverlay items={annFullscreen} />
+      )}
       {/* Top Bar: Unit Name + Date/Time */}
       <div
         className='bg-card z-10 flex h-20 flex-none items-center justify-between border-b px-8 shadow-sm'

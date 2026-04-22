@@ -40,6 +40,11 @@ function SortableItem(props: {
   label: string;
   duration: number;
   onDuration: (v: number) => void;
+  validFrom: string;
+  validTo: string;
+  onValidFrom: (v: string) => void;
+  onValidTo: (v: string) => void;
+  dateLabels: { from: string; to: string };
 }) {
   const {
     attributes,
@@ -58,7 +63,7 @@ function SortableItem(props: {
     <li
       ref={setNodeRef}
       style={style}
-      className='bg-card flex items-center gap-2 rounded-md border px-2 py-1.5'
+      className='bg-card flex flex-wrap items-center gap-2 rounded-md border px-2 py-1.5'
     >
       <button
         type='button'
@@ -81,6 +86,26 @@ function SortableItem(props: {
           props.onDuration(Number.isNaN(n) ? 0 : n);
         }}
       />
+      <div className='ml-auto flex flex-col gap-0.5 sm:flex-row sm:items-center'>
+        <Input
+          className='h-8 w-[9.5rem] text-xs'
+          type='date'
+          value={props.validFrom}
+          title={props.dateLabels.from}
+          onChange={(e) => {
+            props.onValidFrom(e.target.value);
+          }}
+        />
+        <Input
+          className='h-8 w-[9.5rem] text-xs'
+          type='date'
+          value={props.validTo}
+          title={props.dateLabels.to}
+          onChange={(e) => {
+            props.onValidTo(e.target.value);
+          }}
+        />
+      </div>
     </li>
   );
 }
@@ -102,6 +127,20 @@ function buildOrderFromItems(rows: orval.ModelsPlaylistItem[] | undefined): {
     if (it.id) d[it.id] = it.duration ?? 10;
   }
   return { orderIds: o, durations: d };
+}
+
+function buildItemDateBounds(
+  rows: orval.ModelsPlaylistItem[] | undefined
+): Record<string, { from: string; to: string }> {
+  const o: Record<string, { from: string; to: string }> = {};
+  for (const it of rows ?? []) {
+    if (!it.id) continue;
+    o[it.id] = {
+      from: it.validFrom ? it.validFrom.slice(0, 10) : '',
+      to: it.validTo ? it.validTo.slice(0, 10) : ''
+    };
+  }
+  return o;
 }
 
 function PlaylistOrderPanel(props: {
@@ -133,6 +172,9 @@ function PlaylistOrderPanel(props: {
   const [durations, setDurations] = useState(
     () => buildOrderFromItems(itemRows).durations
   );
+  const [itemDates, setItemDates] = useState(() =>
+    buildItemDateBounds(itemRows)
+  );
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
@@ -153,10 +195,13 @@ function PlaylistOrderPanel(props: {
     const its = orderIds.map((id, i) => {
       const it = itemRows.find((x) => x.id === id);
       const matId = it?.materialId ?? it?.material?.id ?? '';
+      const bd = itemDates[id] ?? { from: '', to: '' };
       return {
         materialId: matId,
         sortOrder: i,
-        duration: durations[id] ?? 10
+        duration: durations[id] ?? 10,
+        validFrom: bd.from.trim() || undefined,
+        validTo: bd.to.trim() || undefined
       } as orval.HandlersPlaylistItemInput;
     });
     const data = {
@@ -195,7 +240,8 @@ function PlaylistOrderPanel(props: {
     <div className='space-y-2 rounded-lg border p-3'>
       <Label>
         {t('reorderSave', {
-          default: 'Drag to reorder, adjust duration, then save'
+          default:
+            'Drag to reorder, set duration and optional slide date range, then save'
         })}
       </Label>
       <DndContext
@@ -213,6 +259,7 @@ function PlaylistOrderPanel(props: {
               const matId =
                 it?.materialId ??
                 (it as { material?: { id?: string } })?.material?.id;
+              const b = itemDates[pid] ?? { from: '', to: '' };
               return (
                 <SortableItem
                   key={pid}
@@ -220,6 +267,24 @@ function PlaylistOrderPanel(props: {
                   label={matId ? byMatId(matId) : pid}
                   duration={durations[pid] ?? 10}
                   onDuration={(v) => setDurations((d) => ({ ...d, [pid]: v }))}
+                  validFrom={b.from}
+                  validTo={b.to}
+                  onValidFrom={(v) => {
+                    setItemDates((prev) => {
+                      const cur = prev[pid] ?? { from: '', to: '' };
+                      return { ...prev, [pid]: { ...cur, from: v } };
+                    });
+                  }}
+                  onValidTo={(v) => {
+                    setItemDates((prev) => {
+                      const cur = prev[pid] ?? { from: '', to: '' };
+                      return { ...prev, [pid]: { ...cur, to: v } };
+                    });
+                  }}
+                  dateLabels={{
+                    from: t('itemValidFrom', { default: 'Valid from' }),
+                    to: t('itemValidTo', { default: 'Valid to' })
+                  }}
                 />
               );
             })}
@@ -270,7 +335,10 @@ export function PlaylistManager({
 
   const itemRows = items ?? [];
   const itemFingerprint = itemRows
-    .map((i) => `${i.id ?? ''}-${i.sortOrder ?? 0}-${i.duration ?? 0}`)
+    .map(
+      (i) =>
+        `${i.id ?? ''}-${i.sortOrder ?? 0}-${i.duration ?? 0}-${i.validFrom ?? ''}-${i.validTo ?? ''}`
+    )
     .join(',');
 
   useLegacyPlaylistMigration({

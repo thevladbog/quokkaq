@@ -20,12 +20,15 @@ type Playlist struct {
 }
 
 // PlaylistItem is one slide in a playlist; duration is seconds (0 = video auto / image fallback from unit config).
+// ValidFrom/ValidTo are optional calendar dates (inclusive) in the unit’s locale; public playback skips items outside the range.
 type PlaylistItem struct {
-	ID         string `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
-	PlaylistID string `gorm:"not null;index" json:"playlistId"`
-	MaterialID string `gorm:"not null" json:"materialId"`
-	SortOrder  int    `gorm:"not null;default:0" json:"sortOrder"`
-	Duration   int    `gorm:"not null;default:10" json:"duration"`
+	ID         string     `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
+	PlaylistID string     `gorm:"not null;index" json:"playlistId"`
+	MaterialID string     `gorm:"not null" json:"materialId"`
+	SortOrder  int        `gorm:"not null;default:0" json:"sortOrder"`
+	Duration   int        `gorm:"not null;default:10" json:"duration"`
+	ValidFrom  *time.Time `gorm:"type:date" json:"validFrom,omitempty"`
+	ValidTo    *time.Time `gorm:"type:date" json:"validTo,omitempty"`
 
 	Playlist Playlist     `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-"`
 	Material UnitMaterial `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"material,omitempty"`
@@ -37,13 +40,16 @@ type PlaylistSchedule struct {
 	UnitID     string `gorm:"not null;index" json:"unitId"`
 	PlaylistID string `gorm:"not null;index" json:"playlistId"`
 	// Comma-separated weekday numbers 1=Mon .. 7=Sun (e.g. "1,2,3,4,5").
-	DaysOfWeek string    `gorm:"not null;default:'1,2,3,4,5,6,7'" json:"daysOfWeek"`
-	StartTime  string    `gorm:"not null" json:"startTime"` // "HH:MM"
-	EndTime    string    `gorm:"not null" json:"endTime"`   // "HH:MM"
-	Priority   int       `gorm:"not null;default:0" json:"priority"`
-	IsActive   bool      `gorm:"not null;default:true" json:"isActive"`
-	CreatedAt  time.Time `gorm:"default:now()" json:"createdAt"`
-	UpdatedAt  time.Time `gorm:"default:now()" json:"updatedAt"`
+	DaysOfWeek string `gorm:"not null;default:'1,2,3,4,5,6,7'" json:"daysOfWeek"`
+	StartTime  string `gorm:"not null" json:"startTime"` // "HH:MM"
+	EndTime    string `gorm:"not null" json:"endTime"`   // "HH:MM"
+	// Optional calendar range (inclusive) when the schedule applies, interpreted with the unit’s timezone. Nil = unbounded.
+	ValidFrom *time.Time `gorm:"type:date" json:"validFrom,omitempty"`
+	ValidTo   *time.Time `gorm:"type:date" json:"validTo,omitempty"`
+	Priority  int        `gorm:"not null;default:0" json:"priority"`
+	IsActive  bool       `gorm:"not null;default:true" json:"isActive"`
+	CreatedAt time.Time  `gorm:"default:now()" json:"createdAt"`
+	UpdatedAt time.Time  `gorm:"default:now()" json:"updatedAt"`
 
 	Unit     Unit     `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-"`
 	Playlist Playlist `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"playlist,omitempty"`
@@ -71,16 +77,18 @@ type ExternalFeed struct {
 
 // ScreenAnnouncement is a text banner on the public ticket screen.
 type ScreenAnnouncement struct {
-	ID        string     `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
-	UnitID    string     `gorm:"not null;index" json:"unitId"`
-	Text      string     `gorm:"not null" json:"text"`
-	Priority  int        `gorm:"not null;default:0" json:"priority"`
-	Style     string     `gorm:"not null;default:'info'" json:"style"`
-	StartsAt  *time.Time `json:"startsAt,omitempty"`
-	ExpiresAt *time.Time `json:"expiresAt,omitempty"`
-	IsActive  bool       `gorm:"not null;default:true" json:"isActive"`
-	CreatedAt time.Time  `gorm:"default:now()" json:"createdAt"`
-	UpdatedAt time.Time  `gorm:"default:now()" json:"updatedAt"`
+	ID       string `gorm:"primaryKey;default:gen_random_uuid()" json:"id"`
+	UnitID   string `gorm:"not null;index" json:"unitId"`
+	Text     string `gorm:"not null" json:"text"`
+	Priority int    `gorm:"not null;default:0" json:"priority"`
+	Style    string `gorm:"not null;default:'info'" json:"style"`
+	// DisplayMode: "banner" (in-layout list) or "fullscreen" (full-screen alert overlay; highest priority first).
+	DisplayMode string     `gorm:"not null;default:'banner'" json:"displayMode"`
+	StartsAt    *time.Time `json:"startsAt,omitempty"`
+	ExpiresAt   *time.Time `json:"expiresAt,omitempty"`
+	IsActive    bool       `gorm:"not null;default:true" json:"isActive"`
+	CreatedAt   time.Time  `gorm:"default:now()" json:"createdAt"`
+	UpdatedAt   time.Time  `gorm:"default:now()" json:"updatedAt"`
 
 	Unit Unit `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-"`
 }

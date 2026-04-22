@@ -37,6 +37,8 @@ type SignageService interface {
 	DeleteSchedule(unitID, scheduleID string) error
 	// Public: resolved playlist for the ticket screen
 	ActivePlaylist(ctx context.Context, unitID string) (*ActivePlaylistDTO, error)
+	// Admin: one-glance health for signage (playlist resolution, feeds)
+	SignageHealth(ctx context.Context, unitID string) (*SignageHealthDTO, error)
 	// Feeds
 	ListFeeds(unitID string) ([]models.ExternalFeed, error)
 	GetFeed(feedID string) (*models.ExternalFeed, error)
@@ -60,6 +62,42 @@ type ActivePlaylistDTO struct {
 	Source   string           `json:"source"` // schedule | default | none
 	Playlist *models.Playlist `json:"playlist,omitempty"`
 	UnitID   string           `json:"unitId"`
+}
+
+// SignageHealthDTO is an admin summary for the unit’s digital-signage state.
+type SignageHealthDTO struct {
+	UnitID     string         `json:"unitId"`
+	Timezone   string         `json:"timezone"`
+	Active     *SignageActive `json:"active"`
+	Feeds      []FeedHealth   `json:"feeds"`
+	PlaylistN  int            `json:"playlistCount"`
+	ScheduleN  int            `json:"scheduleCount"`
+	HasDefault bool           `json:"hasDefaultPlaylist"`
+}
+
+// SignagePlaylistRef is a minimal id+name for health payloads.
+type SignagePlaylistRef struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// SignageActive mirrors ActivePlaylist in short form.
+type SignageActive struct {
+	Source   string              `json:"source"`
+	Empty    bool                `json:"empty"` // no slides after item-date filtering
+	Reason   string              `json:"reason,omitempty"`
+	Playlist *SignagePlaylistRef `json:"playlist,omitempty"`
+}
+
+// FeedHealth exposes feed poller / error state.
+type FeedHealth struct {
+	ID                  string     `json:"id"`
+	Name                string     `json:"name"`
+	IsActive            bool       `json:"isActive"`
+	ConsecutiveFailures int        `json:"consecutiveFailures"`
+	Healthy             bool       `json:"healthy"`
+	LastError           string     `json:"lastError,omitempty"`
+	LastFetchAt         *time.Time `json:"lastFetchAt,omitempty"`
 }
 
 type signageService struct {
@@ -372,6 +410,7 @@ func (s *signageService) ActivePlaylist(ctx context.Context, unitID string) (*Ac
 		loc = time.UTC
 	}
 	now := time.Now().In(loc)
+	todayYMD := civilYMDStringNow(loc)
 	curD := weekdayOneToSeven(now)
 	curMin, _ := parseHHMM(now.Format("15:04"))
 
@@ -387,6 +426,9 @@ func (s *signageService) ActivePlaylist(ctx context.Context, unitID string) (*Ac
 	var cands []candidate
 	for _, sc := range schedules {
 		if !sc.IsActive {
+			continue
+		}
+		if !scheduleInCalendarWindow(&sc, todayYMD) {
 			continue
 		}
 		days := parseDaySet(sc.DaysOfWeek)
@@ -416,6 +458,7 @@ func (s *signageService) ActivePlaylist(ctx context.Context, unitID string) (*Ac
 			return nil, err
 		}
 		if pl != nil && pl.UnitID == unitID {
+			pl = filterActivePlaylistItems(pl, todayYMD)
 			return &ActivePlaylistDTO{Source: "schedule", Playlist: pl, UnitID: unitID}, nil
 		}
 	}
@@ -430,6 +473,7 @@ func (s *signageService) ActivePlaylist(ctx context.Context, unitID string) (*Ac
 			if err != nil {
 				return nil, err
 			}
+			full = filterActivePlaylistItems(full, todayYMD)
 			return &ActivePlaylistDTO{Source: "default", Playlist: full, UnitID: unitID}, nil
 		}
 	}
@@ -439,9 +483,58 @@ func (s *signageService) ActivePlaylist(ctx context.Context, unitID string) (*Ac
 		if err != nil {
 			return nil, err
 		}
+		full = filterActivePlaylistItems(full, todayYMD)
 		return &ActivePlaylistDTO{Source: "default", Playlist: full, UnitID: unitID}, nil
 	}
 	return &ActivePlaylistDTO{Source: "none", UnitID: unitID}, nil
+}
+
+func (s *signageService) SignageHealth(ctx context.Context, unitID string) (*SignageHealthDTO, error) {
+	_ = ctx
+	unit, err := s.unitRepo.FindByIDLight(unitID)
+	if err != nil {
+		return nil, err
+	}
+	if unit == nil {
+		return nil, gorm.ErrRecordNotFound
+	}
+	pls, _ := s.signageRepo.ListPlaylistsByUnit(unitID)
+	sch, _ := s.signageRepo.ListSchedulesByUnit(unitID)
+	hasDef := false
+	for _, p := range pls {
+		if p.IsDefault {
+			hasDef = true
+			break
+		}
+	}
+	feeds, _ := s.signageRepo.ListFeedsByUnit(unitID)
+	fh := make([]FeedHealth, 0, len(feeds))
+	for _, f := range feeds {
+		healthy := !f.IsActive || f.ConsecutiveFailures == 0
+		fh = append(fh, FeedHealth{
+			ID: f.ID, Name: f.Name, IsActive: f.IsActive, ConsecutiveFailures: f.ConsecutiveFailures,
+			Healthy: healthy, LastError: f.LastError, LastFetchAt: f.LastFetchAt,
+		})
+	}
+	ap, err := s.ActivePlaylist(ctx, unitID)
+	if err != nil {
+		return nil, err
+	}
+	act := &SignageActive{Source: ap.Source}
+	if ap.Playlist != nil {
+		act.Playlist = &SignagePlaylistRef{ID: ap.Playlist.ID, Name: ap.Playlist.Name}
+		act.Empty = len(ap.Playlist.Items) == 0
+		if act.Empty {
+			act.Reason = "no_slides_after_date_filter"
+		}
+	} else if ap.Source == "none" {
+		act.Empty = true
+		act.Reason = "no_playlist"
+	}
+	return &SignageHealthDTO{
+		UnitID: unitID, Timezone: unit.Timezone, Active: act, Feeds: fh,
+		PlaylistN: len(pls), ScheduleN: len(sch), HasDefault: hasDef,
+	}, nil
 }
 
 // --- Feeds ---
@@ -759,6 +852,9 @@ func (s *signageService) CreateAnnouncement(unitID string, a *models.ScreenAnnou
 	if a.Style == "" {
 		a.Style = "info"
 	}
+	if a.DisplayMode == "" {
+		a.DisplayMode = "banner"
+	}
 	if err := s.signageRepo.CreateAnnouncement(a); err != nil {
 		return err
 	}
@@ -787,6 +883,10 @@ func (s *signageService) UpdateAnnouncement(unitID, annID string, a *models.Scre
 	existing.IsActive = a.IsActive
 	existing.StartsAt = a.StartsAt
 	existing.ExpiresAt = a.ExpiresAt
+	existing.DisplayMode = a.DisplayMode
+	if existing.DisplayMode == "" {
+		existing.DisplayMode = "banner"
+	}
 	if err := s.signageRepo.UpdateAnnouncement(existing); err != nil {
 		return err
 	}

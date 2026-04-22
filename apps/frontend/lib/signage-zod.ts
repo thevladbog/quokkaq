@@ -38,7 +38,8 @@ export const createPlaylistRequestSchema = z.object({
 export const createAnnouncementRequestSchema = z.object({
   text: z.string().min(1),
   style: z.string().min(1),
-  isActive: z.boolean()
+  isActive: z.boolean(),
+  displayMode: z.enum(['banner', 'fullscreen']).optional()
 });
 
 export const updatePlaylistRequestSchema = z.object({

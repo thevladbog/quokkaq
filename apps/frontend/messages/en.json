@@ -1012,12 +1012,32 @@
       "classicLayout": "Use classic layout",
       "presets": "Screen template",
       "tabs": {
+        "status": "Status",
         "playlists": "Playlists",
         "schedules": "Schedules",
         "feeds": "External feeds",
         "layout": "Layout",
         "announcements": "Announcements"
       },
+      "healthTitle": "Signage and feeds",
+      "healthRefresh": "Refresh",
+      "healthTimezone": "Timezone",
+      "healthActiveSource": "Active playlist",
+      "healthEmpty": "No slides (check item date ranges or media)",
+      "healthPlaylists": "Playlists",
+      "healthSchedules": "Schedules",
+      "hasDefault": "has default playlist",
+      "noDefault": "no default playlist",
+      "healthFeeds": "External feeds",
+      "feedOk": "OK",
+      "feedFailing": "Failing",
+      "annDisplay": "Layout",
+      "annBanner": "In layout (banner row)",
+      "annFullscreen": "Full screen (urgent)",
+      "itemValidFrom": "Slide — valid from",
+      "itemValidTo": "Slide — valid to",
+      "scheduleValidFrom": "Valid from (date, optional)",
+      "scheduleValidTo": "Valid to (date, optional)",
       "editOrder": "Order",
       "saveOrder": "Save order",
       "reorderSave": "Drag to reorder, set duration, then save",
@@ -2026,6 +2046,10 @@
     "templateUnknown": "Unknown layout: {id}",
     "feeds": {
       "missing": "Configure a feed in unit settings"
+    },
+    "announcements": {
+      "title": "Announcements",
+      "fullscreenLabel": "Notice"
     },
     "stats": {
       "inQueue": "In queue",

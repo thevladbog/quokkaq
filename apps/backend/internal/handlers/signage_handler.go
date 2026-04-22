@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"quokkaq-go-backend/internal/models"
@@ -33,8 +34,10 @@ type CreatePlaylistRequest struct {
 
 // PlaylistItemInput is one material line in a playlist.
 type PlaylistItemInput struct {
-	MaterialID string `json:"materialId"`
-	Duration   int    `json:"duration"`
+	MaterialID string  `json:"materialId"`
+	Duration   int     `json:"duration"`
+	ValidFrom  *string `json:"validFrom" example:"2025-12-24"` // YYYY-MM-DD, optional; inclusive
+	ValidTo    *string `json:"validTo" example:"2025-12-31"`   // YYYY-MM-DD, optional; inclusive
 }
 
 // UpdatePlaylistRequest is the body for PUT /units/{unitId}/playlists/{playlistId}.
@@ -115,7 +118,12 @@ func (h *SignageHandler) CreatePlaylist(w http.ResponseWriter, r *http.Request) 
 	}
 	items := make([]models.PlaylistItem, len(req.Items))
 	for i := range req.Items {
-		items[i] = models.PlaylistItem{MaterialID: req.Items[i].MaterialID, Duration: req.Items[i].Duration}
+		vf, vt, err := playlistItemDateFields(req.Items[i].ValidFrom, req.Items[i].ValidTo)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		items[i] = models.PlaylistItem{MaterialID: req.Items[i].MaterialID, Duration: req.Items[i].Duration, ValidFrom: vf, ValidTo: vt}
 	}
 	if err := h.svc.CreatePlaylist(unitID, p, items); err != nil {
 		writeSignageError(w, err)
@@ -160,7 +168,12 @@ func (h *SignageHandler) UpdatePlaylist(w http.ResponseWriter, r *http.Request) 
 	}
 	items := make([]models.PlaylistItem, len(req.Items))
 	for i := range req.Items {
-		items[i] = models.PlaylistItem{MaterialID: req.Items[i].MaterialID, Duration: req.Items[i].Duration}
+		vf, vt, err := playlistItemDateFields(req.Items[i].ValidFrom, req.Items[i].ValidTo)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		items[i] = models.PlaylistItem{MaterialID: req.Items[i].MaterialID, Duration: req.Items[i].Duration, ValidFrom: vf, ValidTo: vt}
 	}
 	if err := h.svc.UpdatePlaylist(unitID, playlistID, p, items); err != nil {
 		writeSignageError(w, err)
@@ -237,12 +250,14 @@ func (h *SignageHandler) GetSchedule(w http.ResponseWriter, r *http.Request) {
 
 // CreateScheduleRequest body.
 type CreateScheduleRequest struct {
-	PlaylistID string `json:"playlistId"`
-	DaysOfWeek string `json:"daysOfWeek"`
-	StartTime  string `json:"startTime"`
-	EndTime    string `json:"endTime"`
-	Priority   int    `json:"priority"`
-	IsActive   bool   `json:"isActive"`
+	PlaylistID string  `json:"playlistId"`
+	DaysOfWeek string  `json:"daysOfWeek"`
+	StartTime  string  `json:"startTime"`
+	EndTime    string  `json:"endTime"`
+	ValidFrom  *string `json:"validFrom" example:"2025-06-01"`
+	ValidTo    *string `json:"validTo" example:"2025-08-31"`
+	Priority   int     `json:"priority"`
+	IsActive   bool    `json:"isActive"`
 }
 
 // CreateSchedule godoc
@@ -262,11 +277,18 @@ func (h *SignageHandler) CreateSchedule(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	vf, vt, derr := playlistItemDateFields(req.ValidFrom, req.ValidTo)
+	if derr != nil {
+		http.Error(w, derr.Error(), http.StatusBadRequest)
+		return
+	}
 	s := &models.PlaylistSchedule{
 		PlaylistID: req.PlaylistID,
 		DaysOfWeek: req.DaysOfWeek,
 		StartTime:  req.StartTime,
 		EndTime:    req.EndTime,
+		ValidFrom:  vf,
+		ValidTo:    vt,
 		Priority:   req.Priority,
 		IsActive:   req.IsActive,
 	}
@@ -312,10 +334,17 @@ func (h *SignageHandler) UpdateSchedule(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	vf, vt, derr := playlistItemDateFields(req.ValidFrom, req.ValidTo)
+	if derr != nil {
+		http.Error(w, derr.Error(), http.StatusBadRequest)
+		return
+	}
 	existing.PlaylistID = req.PlaylistID
 	existing.DaysOfWeek = req.DaysOfWeek
 	existing.StartTime = req.StartTime
 	existing.EndTime = req.EndTime
+	existing.ValidFrom = vf
+	existing.ValidTo = vt
 	existing.Priority = req.Priority
 	existing.IsActive = req.IsActive
 	if err := h.svc.UpdateSchedule(unitID, sid, existing); err != nil {
@@ -359,6 +388,28 @@ func (h *SignageHandler) DeleteSchedule(w http.ResponseWriter, r *http.Request) 
 func (h *SignageHandler) ActivePlaylistPublic(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unitId")
 	out, err := h.svc.ActivePlaylist(r.Context(), unitID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "Not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	RespondJSON(w, out)
+}
+
+// SignageHealth godoc
+// @ID           GetSignageHealth
+// @Summary      Digital signage health summary (admin)
+// @Tags         signage
+// @Param        unitId path string true "Unit ID"
+// @Success      200  {object}  services.SignageHealthDTO
+// @Router       /units/{unitId}/signage-health [get]
+// @Security     BearerAuth
+func (h *SignageHandler) SignageHealth(w http.ResponseWriter, r *http.Request) {
+	unitID := chi.URLParam(r, "unitId")
+	out, err := h.svc.SignageHealth(r.Context(), unitID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			http.Error(w, "Not found", http.StatusNotFound)
@@ -571,12 +622,13 @@ func (h *SignageHandler) ListAnnouncementsPublic(w http.ResponseWriter, r *http.
 
 // AnnouncementRequest DTO.
 type AnnouncementRequest struct {
-	Text      string  `json:"text"`
-	Priority  int     `json:"priority"`
-	Style     string  `json:"style"`
-	StartsAt  *string `json:"startsAt"`
-	ExpiresAt *string `json:"expiresAt"`
-	IsActive  bool    `json:"isActive"`
+	Text        string  `json:"text"`
+	Priority    int     `json:"priority"`
+	Style       string  `json:"style"`
+	DisplayMode string  `json:"displayMode" enums:"banner,fullscreen"`
+	StartsAt    *string `json:"startsAt"`
+	ExpiresAt   *string `json:"expiresAt"`
+	IsActive    bool    `json:"isActive"`
 }
 
 // CreateAnnouncement godoc
@@ -604,6 +656,15 @@ func (h *SignageHandler) CreateAnnouncement(w http.ResponseWriter, r *http.Reque
 		Priority: req.Priority,
 		Style:    req.Style,
 		IsActive: req.IsActive,
+	}
+	if req.DisplayMode == "" {
+		a.DisplayMode = "banner"
+	} else {
+		if req.DisplayMode != "banner" && req.DisplayMode != "fullscreen" {
+			http.Error(w, "displayMode must be banner or fullscreen", http.StatusBadRequest)
+			return
+		}
+		a.DisplayMode = req.DisplayMode
 	}
 	if req.Style == "" {
 		a.Style = "info"
@@ -656,6 +717,15 @@ func (h *SignageHandler) UpdateAnnouncement(w http.ResponseWriter, r *http.Reque
 		Priority: req.Priority,
 		Style:    req.Style,
 		IsActive: req.IsActive,
+	}
+	if req.DisplayMode == "" {
+		a.DisplayMode = "banner"
+	} else {
+		if req.DisplayMode != "banner" && req.DisplayMode != "fullscreen" {
+			http.Error(w, "displayMode must be banner or fullscreen", http.StatusBadRequest)
+			return
+		}
+		a.DisplayMode = req.DisplayMode
 	}
 	if a.Style == "" {
 		a.Style = "info"
@@ -719,4 +789,36 @@ func writeSignageError(w http.ResponseWriter, err error) {
 		return
 	}
 	http.Error(w, err.Error(), http.StatusInternalServerError)
+}
+
+func parseOptDateYMD(s *string) (*time.Time, error) {
+	if s == nil {
+		return nil, nil
+	}
+	t := strings.TrimSpace(*s)
+	if t == "" {
+		return nil, nil
+	}
+	parsed, err := time.Parse("2006-01-02", t)
+	if err != nil {
+		return nil, err
+	}
+	u := time.Date(parsed.Year(), parsed.Month(), parsed.Day(), 0, 0, 0, 0, time.UTC)
+	return &u, nil
+}
+
+// playlistItemDateFields parses optional YYYY-MM-DD bounds. Used for both playlist item and schedule.
+func playlistItemDateFields(from, to *string) (vf, vt *time.Time, err error) {
+	vf, err = parseOptDateYMD(from)
+	if err != nil {
+		return nil, nil, errors.New("validFrom: use YYYY-MM-DD")
+	}
+	vt, err = parseOptDateYMD(to)
+	if err != nil {
+		return nil, nil, errors.New("validTo: use YYYY-MM-DD")
+	}
+	if vf != nil && vt != nil && vf.After(*vt) {
+		return nil, nil, errors.New("validFrom must be on or before validTo")
+	}
+	return vf, vt, nil
 }
