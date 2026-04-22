@@ -7867,19 +7867,19 @@ export const usePostCompaniesMeWebhookEndpointsIdTest = <TError = unknown,
 /**
  * @summary Queue summary for integration API (same payload as public queue-status, authenticated by integration key)
  */
-export type getIntegrationsV1UnitsUnitIdQueueSummaryResponse200 = {
+export type getIntegrationUnitQueueSummaryResponse200 = {
   data: ServicesUnitQueueSummary
   status: 200
 }
 
-export type getIntegrationsV1UnitsUnitIdQueueSummaryResponseSuccess = (getIntegrationsV1UnitsUnitIdQueueSummaryResponse200) & {
+export type getIntegrationUnitQueueSummaryResponseSuccess = (getIntegrationUnitQueueSummaryResponse200) & {
   headers: Headers;
 };
 ;
 
-export type getIntegrationsV1UnitsUnitIdQueueSummaryResponse = (getIntegrationsV1UnitsUnitIdQueueSummaryResponseSuccess)
+export type getIntegrationUnitQueueSummaryResponse = (getIntegrationUnitQueueSummaryResponseSuccess)
 
-export const getGetIntegrationsV1UnitsUnitIdQueueSummaryUrl = (unitId: string,) => {
+export const getGetIntegrationUnitQueueSummaryUrl = (unitId: string,) => {
 
 
 
@@ -7887,9 +7887,9 @@ export const getGetIntegrationsV1UnitsUnitIdQueueSummaryUrl = (unitId: string,) 
   return `/integrations/v1/units/${unitId}/queue-summary`
 }
 
-export const getIntegrationsV1UnitsUnitIdQueueSummary = async (unitId: string, options?: RequestInit): Promise<getIntegrationsV1UnitsUnitIdQueueSummaryResponse> => {
+export const getIntegrationUnitQueueSummary = async (unitId: string, options?: RequestInit): Promise<getIntegrationUnitQueueSummaryResponse> => {
 
-  return orvalMutator<getIntegrationsV1UnitsUnitIdQueueSummaryResponse>(getGetIntegrationsV1UnitsUnitIdQueueSummaryUrl(unitId),
+  return orvalMutator<getIntegrationUnitQueueSummaryResponse>(getGetIntegrationUnitQueueSummaryUrl(unitId),
   {
     ...options,
     method: 'GET'
@@ -7902,69 +7902,69 @@ export const getIntegrationsV1UnitsUnitIdQueueSummary = async (unitId: string, o
 
 
 
-export const getGetIntegrationsV1UnitsUnitIdQueueSummaryQueryKey = (unitId: string,) => {
+export const getGetIntegrationUnitQueueSummaryQueryKey = (unitId: string,) => {
     return [
     `/integrations/v1/units/${unitId}/queue-summary`
     ] as const;
     }
 
 
-export const getGetIntegrationsV1UnitsUnitIdQueueSummaryQueryOptions = <TData = Awaited<ReturnType<typeof getIntegrationsV1UnitsUnitIdQueueSummary>>, TError = unknown>(unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getIntegrationsV1UnitsUnitIdQueueSummary>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export const getGetIntegrationUnitQueueSummaryQueryOptions = <TData = Awaited<ReturnType<typeof getIntegrationUnitQueueSummary>>, TError = unknown>(unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getIntegrationUnitQueueSummary>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetIntegrationsV1UnitsUnitIdQueueSummaryQueryKey(unitId);
+  const queryKey =  queryOptions?.queryKey ?? getGetIntegrationUnitQueueSummaryQueryKey(unitId);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getIntegrationsV1UnitsUnitIdQueueSummary>>> = ({ signal }) => getIntegrationsV1UnitsUnitIdQueueSummary(unitId, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getIntegrationUnitQueueSummary>>> = ({ signal }) => getIntegrationUnitQueueSummary(unitId, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getIntegrationsV1UnitsUnitIdQueueSummary>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getIntegrationUnitQueueSummary>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type GetIntegrationsV1UnitsUnitIdQueueSummaryQueryResult = NonNullable<Awaited<ReturnType<typeof getIntegrationsV1UnitsUnitIdQueueSummary>>>
-export type GetIntegrationsV1UnitsUnitIdQueueSummaryQueryError = unknown
+export type GetIntegrationUnitQueueSummaryQueryResult = NonNullable<Awaited<ReturnType<typeof getIntegrationUnitQueueSummary>>>
+export type GetIntegrationUnitQueueSummaryQueryError = unknown
 
 
-export function useGetIntegrationsV1UnitsUnitIdQueueSummary<TData = Awaited<ReturnType<typeof getIntegrationsV1UnitsUnitIdQueueSummary>>, TError = unknown>(
- unitId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getIntegrationsV1UnitsUnitIdQueueSummary>>, TError, TData>> & Pick<
+export function useGetIntegrationUnitQueueSummary<TData = Awaited<ReturnType<typeof getIntegrationUnitQueueSummary>>, TError = unknown>(
+ unitId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getIntegrationUnitQueueSummary>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getIntegrationsV1UnitsUnitIdQueueSummary>>,
+          Awaited<ReturnType<typeof getIntegrationUnitQueueSummary>>,
           TError,
-          Awaited<ReturnType<typeof getIntegrationsV1UnitsUnitIdQueueSummary>>
+          Awaited<ReturnType<typeof getIntegrationUnitQueueSummary>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetIntegrationsV1UnitsUnitIdQueueSummary<TData = Awaited<ReturnType<typeof getIntegrationsV1UnitsUnitIdQueueSummary>>, TError = unknown>(
- unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getIntegrationsV1UnitsUnitIdQueueSummary>>, TError, TData>> & Pick<
+export function useGetIntegrationUnitQueueSummary<TData = Awaited<ReturnType<typeof getIntegrationUnitQueueSummary>>, TError = unknown>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getIntegrationUnitQueueSummary>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getIntegrationsV1UnitsUnitIdQueueSummary>>,
+          Awaited<ReturnType<typeof getIntegrationUnitQueueSummary>>,
           TError,
-          Awaited<ReturnType<typeof getIntegrationsV1UnitsUnitIdQueueSummary>>
+          Awaited<ReturnType<typeof getIntegrationUnitQueueSummary>>
         > , 'initialData'
       >, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetIntegrationsV1UnitsUnitIdQueueSummary<TData = Awaited<ReturnType<typeof getIntegrationsV1UnitsUnitIdQueueSummary>>, TError = unknown>(
- unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getIntegrationsV1UnitsUnitIdQueueSummary>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useGetIntegrationUnitQueueSummary<TData = Awaited<ReturnType<typeof getIntegrationUnitQueueSummary>>, TError = unknown>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getIntegrationUnitQueueSummary>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Queue summary for integration API (same payload as public queue-status, authenticated by integration key)
  */
 
-export function useGetIntegrationsV1UnitsUnitIdQueueSummary<TData = Awaited<ReturnType<typeof getIntegrationsV1UnitsUnitIdQueueSummary>>, TError = unknown>(
- unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getIntegrationsV1UnitsUnitIdQueueSummary>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export function useGetIntegrationUnitQueueSummary<TData = Awaited<ReturnType<typeof getIntegrationUnitQueueSummary>>, TError = unknown>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getIntegrationUnitQueueSummary>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetIntegrationsV1UnitsUnitIdQueueSummaryQueryOptions(unitId,options)
+  const queryOptions = getGetIntegrationUnitQueueSummaryQueryOptions(unitId,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
