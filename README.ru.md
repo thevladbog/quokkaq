@@ -3,7 +3,7 @@
   <h1>QuokkaQ Монорепозиторий</h1>
   <p><strong>Современная система управления очередями - Nx монорепо с Next.js, Go и Tauri</strong></p>
   
-  [![Nx](https://img.shields.io/badge/Nx-22.6.1-143055?style=flat&logo=nx)](https://nx.dev/)
+  [![Nx](https://img.shields.io/badge/Nx-22.6.5-143055?style=flat&logo=nx)](https://nx.dev/)
   [![Node.js](https://img.shields.io/badge/Node.js-22+-339933?style=flat&logo=node.js&logoColor=white)](https://nodejs.org/)
   [![Go](https://img.shields.io/badge/Go-1.26.2+-00ADD8?style=flat&logo=go&logoColor=white)](https://golang.org/)
   [![pnpm](https://img.shields.io/badge/pnpm-10+-F69220?style=flat&logo=pnpm&logoColor=white)](https://pnpm.io/)
@@ -37,9 +37,10 @@
 ### Что включено
 
 - 🌐 **Веб-приложение** - Next.js 16 с React 19, TanStack Query и shadcn/ui
+- 📣 **Маркетинговый сайт** - Next.js 16 публичный сайт с актуальными ценами и описанием возможностей
 - 🔧 **API Backend** - Go 1.26.2 с PostgreSQL, Redis, WebSocket и MinIO
 - 🖥️ **Киоск Desktop** - Tauri 2.1 десктоп-приложение с поддержкой термопринтеров
-- 📦 **Общие пакеты** - TypeScript типы (Zod схемы), React UI компоненты и утилиты для киоска
+- 📦 **Общие пакеты** - TypeScript типы (Zod схемы), React UI компоненты, утилиты для киоска и хелперы тарифных планов
 
 ### Ключевые возможности
 
@@ -47,11 +48,27 @@
 - ✅ **Обновления в реальном времени** - WebSocket-уведомления для мгновенных обновлений очереди
 - ✅ **Киоски самообслуживания** - Десктоп-приложение для выдачи талонов с интеграцией принтера
 - ✅ **Управление персоналом** - Назначение окон, отслеживание смен и мониторинг производительности
-- ✅ **Система бронирования** - Предварительная запись с управлением слотами
-- ✅ **Экраны отображения** - Публичное табло очереди с вызовом талонов в реальном времени
+- ✅ **Система бронирования** - Предварительная запись с управлением слотами и синхронизацией календаря
+- ✅ **Экраны отображения** - Публичное табло очереди, экран у стойки и табло над стойкой в реальном времени
 - ✅ **Панель супервизора** - Комплексный надзор за работой подразделения
 - ✅ **Приглашения пользователей** - Система email-шаблонов для онбординга
 - ✅ **Интернационализация** - Полная поддержка английского и русского языков
+- ✅ **SSO-аутентификация** - OIDC и SAML 2.0 единый вход с маппингом внешних идентификаторов и синхронизацией групп
+- ✅ **Консоль SaaS-платформы** - UI оператора для управления тенантами, планами подписки, каталогом и инвойсами
+- ✅ **Биллинг и подписки** - Stripe checkout/отмена и платёжные ссылки YooKassa с обработкой вебхуков
+- ✅ **Гостевые опросы** - Настраиваемые опросы удовлетворённости на экране у стойки и в киоске
+- ✅ **Интеграции календарей** - Google Calendar OAuth, CalDAV/iCal для записи на приём
+- ✅ **SMS-уведомления** - Мультипровайдерная отправка SMS (Twilio, SMS.ru, SMSAero, SMSC) для оповещения посетителей
+- ✅ **Отчёты поддержки** - Внутреннее отслеживание задач с интеграцией Plane и Яндекс Трекер
+- ✅ **Расширенная статистика** - Мониторинг SLA, тепловые карты, прогноз нагрузки и экспорт в PDF
+- ✅ **Шаблоны сообщений** - Настраиваемые шаблоны уведомлений для email и SMS
+- ✅ **Навыки операторов** - Маршрутизация талонов по навыкам и назначение на окна
+- ✅ **Виртуальная очередь** - Удалённое занятие очереди без физического визита к киоску
+- ✅ **Управление клиентами** - CRM-записи, история посещений и теги посетителей
+- ✅ **Интеграция 1С / CommerceML** - Обмен с системой учёта 1С:Предприятие
+- ✅ **Интеграция DaData** - Обогащение данных по адресам, компаниям и банкам (Россия)
+- ✅ **Наблюдаемость OpenTelemetry** - Распределённая трассировка через OTLP-экспортер
+- ✅ **Встроенная wiki-справка** - Внутренняя MDX-документация, доступная по адресу `/help`
 
 ---
 
@@ -64,35 +81,43 @@ graph TB
     subgraph monorepo [QuokkaQ Монорепо]
         subgraph apps [Приложения]
             frontend[Frontend<br/>Next.js 16 + React 19<br/>Порт 3000]
+            marketing[Маркетинговый сайт<br/>Next.js 16<br/>Порт 3010]
             backend[Backend<br/>Go 1.26.2 + PostgreSQL<br/>Порт 3001]
             kiosk[Kiosk Desktop<br/>Tauri 2.1 + Rust]
         end
-        
+
         subgraph packages [Общие пакеты]
             sharedTypes[shared-types<br/>TypeScript типы + Zod]
             uiKit[ui-kit<br/>React компоненты]
             kioskLib[kiosk-lib<br/>Утилиты киоска]
+            subscriptionPricing[subscription-pricing<br/>Утилиты тарифов]
         end
-        
+
         frontend -->|использует| sharedTypes
-        frontend -->|использует| uiKit
-        
+        frontend -->|использует| kioskLib
+        frontend -->|использует| subscriptionPricing
+
+        marketing -->|использует| sharedTypes
+        marketing -->|использует| subscriptionPricing
+
         kiosk -->|использует| sharedTypes
         kiosk -->|использует| uiKit
         kiosk -->|использует| kioskLib
-        
+
         kioskLib -->|использует| sharedTypes
-        
+        subscriptionPricing -->|использует| sharedTypes
+
         frontend -->|HTTP/WS| backend
+        marketing -->|HTTP| backend
         kiosk -->|HTTP/WS| backend
     end
-    
+
     subgraph infrastructure [Инфраструктура]
         postgres[(PostgreSQL)]
         redis[(Redis)]
         minio[(MinIO/S3)]
     end
-    
+
     backend --> postgres
     backend --> redis
     backend --> minio
@@ -102,7 +127,7 @@ graph TB
 
 | Компонент | Технология | Версия |
 |-----------|-----------|---------|
-| **Монорепо** | Nx | 22.6.1 |
+| **Монорепо** | Nx | 22.6.5 |
 | **Менеджер пакетов** | pnpm | 10+ |
 | **Node.js** | Node.js | 22+ |
 | **Frontend** | Next.js | 16.2.1 |
@@ -151,20 +176,45 @@ graph TB
 
 ---
 
+### Маркетинговый сайт (`apps/marketing/`)
+
+**Next.js маркетинговый сайт** для публичного продвижения продукта и отображения тарифов.
+
+**Возможности:**
+- 📣 **Лендинг** - Обзор продукта с описанием ключевых возможностей
+- 💰 **Страница тарифов** - Актуальные планы подписки, загружаемые из API бэкенда
+- 🌍 **Интернационализация** - Английский и русский языки
+
+**Технологии:**
+- Next.js 16 (App Router)
+- React 19
+- TypeScript 6
+- Tailwind CSS 4
+- Orval-сгенерированный API-клиент для планов подписки
+
+**Порт:** `3010`
+
+---
+
 ### Backend (`apps/backend/`)
 
 **Go API сервер** с интеграцией PostgreSQL, Redis и MinIO.
 
 **Возможности:**
 
-- 🔐 **Аутентификация** - JWT-аутентификация с ролевым контролем доступа
+- 🔐 **Аутентификация** - JWT-аутентификация с ролевым контролем доступа (RBAC) и SSO (OIDC/SAML)
 - 🎫 **Управление очередью** - Создание, вызов, передача и завершение талонов
-- 📡 **WebSocket в реальном времени** - Комнатная трансляция обновлений подразделений
-- 🔄 **Фоновые задачи** - Асинхронная обработка задач с Asynq
+- 📡 **WebSocket в реальном времени** - Комнатная трансляция обновлений подразделений и SLA-алерты
+- 🔄 **Фоновые задачи** - Асинхронная обработка задач с Asynq (SMS, TTS, уведомления посетителей)
 - 📧 **Email-система** - Шаблонные email-уведомления
 - 📦 **Файловое хранилище** - MinIO/S3-совместимое хранилище для логотипов и медиа
 - 🔍 **API документация** - Интерактивная справка Scalar API
 - 📝 **Аудит-логирование** - Комплексное отслеживание активности
+- 💳 **Биллинг** - Stripe checkout/отмена и платёжные ссылки YooKassa с обработкой вебхуков
+- 🧭 **Консоль платформы** - Мультитенантная SaaS-консоль оператора для управления компаниями и планами
+- 📊 **Статистика и SLA** - Тепловые карты, прогноз нагрузки, мониторинг SLA и экспорт в PDF
+- 📅 **Синхронизация календарей** - Google Calendar OAuth, CalDAV/iCal для записи на приём
+- 🔗 **1С / CommerceML** - Интеграция с системой учёта 1С:Предприятие
 
 **Технологии:**
 
@@ -254,14 +304,33 @@ import { Button } from '@quokkaq/ui-kit';
 **Содержимое:**
 
 - Обёртка WebSocket клиента
-- Утилиты термопринтера
+- Утилиты термопринтера (ESC/POS, Tauri IPC)
 - Управление таймерами и таймаутами
 - Хуки и хелперы для киоска
 
 **Использование:**
 
 ```typescript
-import { usePrinter, useKioskTimer } from '@quokkaq/kiosk-lib';
+import { buildKioskTicketEscPos, socketClient, useTicketTimer } from '@quokkaq/kiosk-lib';
+```
+
+---
+
+### `subscription-pricing` (`packages/subscription-pricing/`)
+
+Общие утилиты тарифных планов, используемые фронтендом и маркетинговым сайтом.
+
+**Содержимое:**
+
+- Определения ключей возможностей и лимитов планов подписки
+- `buildPricingRowsFromApiPlan` — преобразует данные API-плана в строки отображения
+- Хелперы форматирования цен (минимальные единицы → строка для отображения)
+- Порядок сортировки и отображаемые названия планов
+
+**Использование:**
+
+```typescript
+import { buildPricingRowsFromApiPlan, sortPublicSubscriptionPlans } from '@quokkaq/subscription-pricing';
 ```
 
 ---
@@ -271,7 +340,12 @@ import { usePrinter, useKioskTimer } from '@quokkaq/kiosk-lib';
 ```text
 frontend
 ├── @quokkaq/shared-types
-└── @quokkaq/ui-kit
+├── @quokkaq/kiosk-lib
+└── @quokkaq/subscription-pricing
+
+marketing
+├── @quokkaq/shared-types
+└── @quokkaq/subscription-pricing
 
 kiosk-desktop
 ├── @quokkaq/shared-types
@@ -279,6 +353,9 @@ kiosk-desktop
 └── @quokkaq/kiosk-lib
 
 kiosk-lib
+└── @quokkaq/shared-types
+
+subscription-pricing
 └── @quokkaq/shared-types
 ```
 
@@ -536,7 +613,17 @@ pnpm nx affected -t lint
 - Разворачивает на Yandex Cloud VM
 - Создает git тег: `vX.Y.Z-backend`
 
-#### 4. **Release Kiosk** (`.github/workflows/release-kiosk.yml`)
+#### 4. **Deploy Marketing** (`.github/workflows/deploy-marketing.yml`)
+
+Запускается при push в **`release`**, если менялись `apps/marketing/` или `packages/`:
+
+- Повышает версию в `apps/marketing/package.json`
+- Собирает Docker-образ с Next.js standalone выводом
+- Отправляет в Yandex Container Registry
+- Разворачивает на Yandex Cloud VM
+- Создает git тег: `vX.Y.Z-marketing`
+
+#### 5. **Release Kiosk** (`.github/workflows/release-kiosk.yml`)
 
 Запускается при push в **`release`**, если менялись `apps/kiosk-desktop/` или `packages/`:
 
@@ -864,6 +951,7 @@ CI автоматически:
 
 - [Документация для операторов](apps/frontend/content/wiki/) — в приложении как `/{locale}/help/...` (см. [`docs/wiki/README.md`](docs/wiki/README.md))
 - [Документация Frontend](apps/frontend/README.md)
+- [Документация Marketing Site](apps/marketing/README.md)
 - [Документация Backend](apps/backend/README.md) | [Русская](apps/backend/README.ru.md)
 - [Документация Kiosk](apps/kiosk-desktop/README.md)
 - [Чеклист миграции](MIGRATION-CHECKLIST.md)

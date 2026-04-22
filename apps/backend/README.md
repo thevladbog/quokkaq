@@ -35,14 +35,25 @@
 
 ### Key Capabilities
 
-- **Multi-tenant Support**: Manage multiple units/branches from a single system
-- **Real-time Updates**: WebSocket-based notifications for instant queue updates
-- **Flexible Service Configuration**: Hierarchical services with customizable workflows
+- **Multi-tenant Support**: Manage multiple units/branches from a single system with full RBAC
+- **Real-time Updates**: WebSocket-based notifications for queue updates and SLA alerts
+- **Flexible Service Configuration**: Hierarchical services with skill-based routing and custom prefixes
 - **Staff Management**: Counter assignment, shift tracking, and performance monitoring
-- **Booking System**: Pre-scheduled appointments integration
-- **Kiosk & Display Integration**: APIs for self-service kiosks and queue display screens
+- **Booking & Pre-registration**: Slot-based appointment system with calendar sync
+- **Kiosk & Display Integration**: APIs for self-service kiosks, queue screens, counter displays, and workplace boards
 - **Email Notifications**: Template-based email system with invitation management
-- **File Storage**: MinIO/S3-compatible storage for logos and media files
+- **File Storage**: MinIO/S3-compatible storage for logos, media, and survey assets
+- **SSO Authentication**: OIDC and SAML 2.0 single sign-on with external identity mapping and group synchronization
+- **Billing & Subscriptions**: Stripe checkout/cancellation and YooKassa payment links with webhook processing
+- **SaaS Platform API**: Multi-tenant operator endpoints for managing companies, plans, catalog items, and platform invoices
+- **Statistics & SLA Monitoring**: Advanced analytics including heatmaps, staffing forecast, SLA tracking, and PDF export
+- **Calendar Integrations**: Google Calendar OAuth flow, CalDAV/iCal sync for per-unit and company-level scheduling
+- **SMS Notifications**: Multi-provider SMS delivery (Twilio, SMS.ru, SMSAero, SMSC) via background jobs
+- **Support Reports**: Internal issue workflow with Plane and Yandex Tracker integration
+- **Guest Surveys**: Configurable satisfaction surveys with response tracking and idle/completion media
+- **1C / CommerceML**: Russian accounting system integration for automated data exchange
+- **DaData Proxy**: Russian address, party, and bank data enrichment endpoints
+- **OpenTelemetry Tracing**: Distributed tracing via OTLP HTTP exporter
 
 ---
 
@@ -50,25 +61,36 @@
 
 ### Core Functionality
 
-- ✅ **Queue Management**: Create, call, transfer, and complete tickets with status tracking
-- ✅ **Service Configuration**: Hierarchical service tree with custom prefixes and workflows
-- ✅ **Counter Control**: Assign staff to counters, track occupancy, and manage availability
+- ✅ **Queue Management**: Create, call, transfer, and complete tickets with full status lifecycle
+- ✅ **Service Configuration**: Hierarchical service tree with custom prefixes, skills, and workflows
+- ✅ **Counter Control**: Assign staff to counters, track occupancy, breaks, and availability
 - ✅ **Real-time Notifications**: WebSocket hub for live updates to displays and staff panels
 - ✅ **Shift Management**: Track shifts, generate statistics, and execute end-of-day operations
+- ✅ **Pre-registration & Slots**: Slot grid management and appointment booking with validation
 - ✅ **User Invitation System**: Token-based user registration with email templates
 - ✅ **Audit Logging**: Comprehensive activity tracking for compliance
-- ✅ **Role-Based Access Control**: Flexible permission system for users
+- ✅ **Role-Based Access Control**: Tenant roles, permission catalog, and unit-scoped access
+- ✅ **SSO & External Identities**: OIDC/SAML with external identity linking and group mapping
+- ✅ **Billing**: Stripe checkout/cancel, YooKassa payment links, subscription and invoice management
+- ✅ **Platform Admin**: SaaS operator API for tenant management, plans, catalog, and invoicing
+- ✅ **Statistics & Analytics**: SLA monitoring, heatmaps, utilization, staffing forecast, PDF reports
+- ✅ **Guest Surveys**: Survey definitions, response collection, and display media management
+- ✅ **Desktop Terminals**: Kiosk and display terminal provisioning and bootstrap management
+- ✅ **Client Management**: CRM-style client records, visit history, and visitor tag definitions
+- ✅ **Virtual Queue**: Public remote queue joining without a physical kiosk visit
+- ✅ **Support Reports**: Internal issue tracking with external tracker integration
 
 ### Technical Features
 
 - 🚀 **High Performance**: Built with Go for speed and efficiency
-- 🔄 **Background Jobs**: Async task processing with Redis-backed queue (Asynq)
-- 🔐 **JWT Authentication**: Secure token-based authentication
-- 📡 **WebSocket Support**: Room-based real-time communication
-- 🗄️ **PostgreSQL Database**: Reliable data persistence with GORM
-- 📦 **S3-Compatible Storage**: MinIO integration for file uploads
-- 📧 **SMTP Email**: Template-based email notifications
-- 📚 **API Documentation**: Interactive Scalar API reference
+- 🔄 **Background Jobs**: Async task processing with Redis-backed queue (Asynq) — SMS, TTS, visitor notify
+- 🔐 **JWT Authentication**: Secure token-based authentication with terminal bootstrap tokens
+- 📡 **WebSocket Support**: Room-based real-time communication with SLA breach alerts
+- 🗄️ **PostgreSQL Database**: Reliable data persistence with GORM and versioned migrations
+- 📦 **S3-Compatible Storage**: MinIO integration for file uploads, logos, and survey media
+- 📧 **SMTP Email**: Template-based email notifications via gomail v2
+- 📚 **API Documentation**: Interactive Scalar API reference (OpenAPI 3)
+- 🔭 **Observability**: OpenTelemetry distributed tracing with OTLP HTTP exporter
 
 ---
 
@@ -99,13 +121,39 @@
 |-----------|-----------|
 | **Language** | Go 1.26.2 |
 | **Web Framework** | Chi Router v5 |
-| **Database** | PostgreSQL (via GORM) |
+| **Database** | PostgreSQL 16+ (via GORM) |
 | **Real-time** | Gorilla WebSocket |
 | **Authentication** | JWT (golang-jwt/jwt) |
+| **SSO** | go-oidc (OIDC), crewjam/saml (SAML 2.0) |
 | **Background Jobs** | Asynq (Redis-backed) |
 | **Storage** | AWS SDK v2 (MinIO/S3) |
 | **Email** | gomail v2 |
-| **API Docs** | Swagger → Scalar API Reference |
+| **Payments** | stripe-go v76, yookassa-sdk-go |
+| **Calendar** | Google API (OAuth), go-webdav (CalDAV), go-ical |
+| **Observability** | OpenTelemetry (OTLP exporter) |
+| **API Docs** | Swagger → Scalar API Reference (OpenAPI 3) |
+
+---
+
+## 🔗 External Integrations
+
+| Integration | Purpose |
+|-------------|---------|
+| **Stripe** | Subscription checkout, customer management, cancellation |
+| **YooKassa** | Russian payment links for invoices; webhook for payment confirmation |
+| **OIDC (go-oidc)** | Single sign-on with any OpenID Connect provider |
+| **SAML 2.0 (crewjam/saml)** | Enterprise SSO with SAML identity providers |
+| **Google Calendar** | OAuth 2.0 flow for per-company and per-unit calendar sync |
+| **CalDAV / iCal** | Generic calendar integration (emersion/go-webdav, go-ical) |
+| **Twilio** | SMS provider for visitor notifications |
+| **SMS.ru / SMSAero / SMSC** | Alternative Russian SMS providers (configurable per deployment) |
+| **DaData** | Russian address, party (INN), and bank data lookup |
+| **Plane** | Support report issue creation and workflow tracking |
+| **Yandex Tracker** | Lead and plan-change issue creation (Yandex Cloud SDK) |
+| **1C / CommerceML** | Automated data exchange with 1C: Enterprise accounting systems |
+| **MinIO / AWS S3** | File uploads, media assets, survey imagery, printer logos |
+| **Redis** | Asynq background job queue |
+| **OpenTelemetry** | Distributed tracing (OTLP HTTP exporter) |
 
 ---
 

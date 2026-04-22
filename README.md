@@ -3,7 +3,7 @@
   <h1>QuokkaQ Monorepo</h1>
   <p><strong>Modern queue management system - Nx monorepo with Next.js, Go, and Tauri</strong></p>
   
-  [![Nx](https://img.shields.io/badge/Nx-22.6.1-143055?style=flat&logo=nx)](https://nx.dev/)
+  [![Nx](https://img.shields.io/badge/Nx-22.6.5-143055?style=flat&logo=nx)](https://nx.dev/)
   [![Node.js](https://img.shields.io/badge/Node.js-22+-339933?style=flat&logo=node.js&logoColor=white)](https://nodejs.org/)
   [![Go](https://img.shields.io/badge/Go-1.26.2+-00ADD8?style=flat&logo=go&logoColor=white)](https://golang.org/)
   [![pnpm](https://img.shields.io/badge/pnpm-10+-F69220?style=flat&logo=pnpm&logoColor=white)](https://pnpm.io/)
@@ -37,9 +37,10 @@
 ### What's Included
 
 - 🌐 **Web Application** - Next.js 16 with React 19, TanStack Query, and shadcn/ui
+- 📣 **Marketing Site** - Next.js 16 public-facing site with live pricing and feature pages
 - 🔧 **API Backend** - Go 1.26.2 with PostgreSQL, Redis, WebSocket, and MinIO
 - 🖥️ **Desktop Kiosk** - Tauri 2.1 desktop application with thermal printer support
-- 📦 **Shared Packages** - TypeScript types (Zod schemas), React UI components, and kiosk utilities
+- 📦 **Shared Packages** - TypeScript types (Zod schemas), React UI components, kiosk utilities, and pricing helpers
 
 ### Key Features
 
@@ -47,11 +48,27 @@
 - ✅ **Real-time Updates** - WebSocket-based notifications for instant queue updates
 - ✅ **Self-service Kiosks** - Desktop application for ticket dispensing with printer integration
 - ✅ **Staff Management** - Counter assignment, shift tracking, and performance monitoring
-- ✅ **Booking System** - Pre-scheduled appointments with slot management
-- ✅ **Display Screens** - Public queue display with real-time ticket calling
+- ✅ **Booking System** - Pre-scheduled appointments with slot management and calendar sync
+- ✅ **Display Screens** - Public queue display, counter display, and workplace board with real-time updates
 - ✅ **Supervisor Dashboard** - Comprehensive oversight of unit operations
 - ✅ **User Invitations** - Template-based email system for user onboarding
 - ✅ **Internationalization** - Full support for English and Russian languages
+- ✅ **SSO Authentication** - OIDC and SAML 2.0 single sign-on with external identity mapping and group sync
+- ✅ **SaaS Platform Console** - Operator UI for managing tenants, subscription plans, catalog, and platform invoices
+- ✅ **Billing & Subscriptions** - Stripe checkout/cancellation and YooKassa payment links with webhook handling
+- ✅ **Guest Surveys** - Configurable satisfaction surveys on counter and kiosk displays
+- ✅ **Calendar Integrations** - Google Calendar OAuth, CalDAV/iCal sync for appointment scheduling
+- ✅ **SMS Notifications** - Multi-provider SMS (Twilio, SMS.ru, SMSAero, SMSC) for visitor alerts
+- ✅ **Support Reports** - Internal issue tracking with Plane and Yandex Tracker integration
+- ✅ **Advanced Statistics** - SLA monitoring, heatmaps, staffing forecast, and PDF export
+- ✅ **Message Templates** - Customizable notification templates for email and SMS
+- ✅ **Operator Skills** - Skill-based ticket routing and counter assignment
+- ✅ **Virtual Queue** - Public remote queue joining without a physical kiosk visit
+- ✅ **Client Management** - CRM-style client records, visit history, and visitor tags
+- ✅ **1C / CommerceML Integration** - Russian accounting system exchange (1C: Enterprise)
+- ✅ **DaData Integration** - Russian address, company, and bank data enrichment
+- ✅ **OpenTelemetry Observability** - Distributed tracing via OTLP exporter
+- ✅ **Built-in Help Wiki** - In-product MDX documentation accessible at `/help`
 
 ---
 
@@ -64,35 +81,43 @@ graph TB
     subgraph monorepo [QuokkaQ Monorepo]
         subgraph apps [Applications]
             frontend[Frontend<br/>Next.js 16 + React 19<br/>Port 3000]
+            marketing[Marketing Site<br/>Next.js 16<br/>Port 3010]
             backend[Backend<br/>Go 1.26.2 + PostgreSQL<br/>Port 3001]
             kiosk[Kiosk Desktop<br/>Tauri 2.1 + Rust]
         end
-        
+
         subgraph packages [Shared Packages]
             sharedTypes[shared-types<br/>TypeScript Types + Zod]
             uiKit[ui-kit<br/>React Components]
             kioskLib[kiosk-lib<br/>Kiosk Utilities]
+            subscriptionPricing[subscription-pricing<br/>Pricing Utilities]
         end
-        
+
         frontend -->|uses| sharedTypes
-        frontend -->|uses| uiKit
-        
+        frontend -->|uses| kioskLib
+        frontend -->|uses| subscriptionPricing
+
+        marketing -->|uses| sharedTypes
+        marketing -->|uses| subscriptionPricing
+
         kiosk -->|uses| sharedTypes
         kiosk -->|uses| uiKit
         kiosk -->|uses| kioskLib
-        
+
         kioskLib -->|uses| sharedTypes
-        
+        subscriptionPricing -->|uses| sharedTypes
+
         frontend -->|HTTP/WS| backend
+        marketing -->|HTTP| backend
         kiosk -->|HTTP/WS| backend
     end
-    
+
     subgraph infrastructure [Infrastructure]
         postgres[(PostgreSQL)]
         redis[(Redis)]
         minio[(MinIO/S3)]
     end
-    
+
     backend --> postgres
     backend --> redis
     backend --> minio
@@ -102,7 +127,7 @@ graph TB
 
 | Component | Technology | Version |
 |-----------|-----------|---------|
-| **Monorepo** | Nx | 22.6.1 |
+| **Monorepo** | Nx | 22.6.5 |
 | **Package Manager** | pnpm | 10+ |
 | **Node.js** | Node.js | 22+ |
 | **Frontend** | Next.js | 16.2.1 |
@@ -149,19 +174,44 @@ graph TB
 
 ---
 
+### Marketing Site (`apps/marketing/`)
+
+**Next.js marketing website** for public-facing product promotion and pricing.
+
+**Features:**
+- 📣 **Landing Page** - Product overview with feature highlights
+- 💰 **Pricing Page** - Live subscription plans fetched from the backend API
+- 🌍 **Internationalization** - English and Russian locales
+
+**Technology:**
+- Next.js 16 (App Router)
+- React 19
+- TypeScript 6
+- Tailwind CSS 4
+- Orval-generated API client for subscription plans
+
+**Port:** `3010`
+
+---
+
 ### Backend (`apps/backend/`)
 
 **Go API server** with PostgreSQL, Redis, and MinIO integration.
 
 **Features:**
-- 🔐 **Authentication** - JWT-based auth with role-based access control
+- 🔐 **Authentication** - JWT-based auth with role-based access control (RBAC) and SSO (OIDC/SAML)
 - 🎫 **Queue Management** - Create, call, transfer, and complete tickets
-- 📡 **Real-time WebSocket** - Room-based broadcasting for unit updates
-- 🔄 **Background Jobs** - Async task processing with Asynq
+- 📡 **Real-time WebSocket** - Room-based broadcasting for unit updates and SLA alerts
+- 🔄 **Background Jobs** - Async task processing with Asynq (SMS, TTS, visitor notifications)
 - 📧 **Email System** - Template-based email notifications
 - 📦 **File Storage** - MinIO/S3-compatible storage for logos and media
 - 🔍 **API Documentation** - Interactive Scalar API reference
 - 📝 **Audit Logging** - Comprehensive activity tracking
+- 💳 **Billing** - Stripe checkout/cancel and YooKassa payment links with webhooks
+- 🧭 **Platform Admin** - Multi-tenant SaaS operator console for managing companies and plans
+- 📊 **Statistics & SLA** - Heatmaps, staffing forecast, SLA monitoring, and PDF export
+- 📅 **Calendar Sync** - Google Calendar OAuth, CalDAV/iCal for appointment booking
+- 🔗 **1C / CommerceML** - Russian accounting system integration
 
 **Technology:**
 - Go 1.26.2
@@ -243,13 +293,30 @@ Kiosk-specific utilities for WebSocket connections, printing, and timers.
 
 **Contents:**
 - WebSocket client wrapper
-- Thermal printer utilities
+- Thermal printer utilities (ESC/POS, Tauri IPC)
 - Timer and timeout management
 - Kiosk-specific hooks and helpers
 
 **Usage:**
 ```typescript
-import { usePrinter, useKioskTimer } from '@quokkaq/kiosk-lib';
+import { buildKioskTicketEscPos, socketClient, useTicketTimer } from '@quokkaq/kiosk-lib';
+```
+
+---
+
+### `subscription-pricing` (`packages/subscription-pricing/`)
+
+Shared pricing and plan utilities used by both the frontend and marketing site.
+
+**Contents:**
+- Feature and limit key definitions for subscription plans
+- `buildPricingRowsFromApiPlan` — converts API plan data into display rows
+- Price formatting helpers (minor unit → display string)
+- Plan sort order and display name helpers
+
+**Usage:**
+```typescript
+import { buildPricingRowsFromApiPlan, sortPublicSubscriptionPlans } from '@quokkaq/subscription-pricing';
 ```
 
 ---
@@ -259,7 +326,12 @@ import { usePrinter, useKioskTimer } from '@quokkaq/kiosk-lib';
 ```text
 frontend
 ├── @quokkaq/shared-types
-└── @quokkaq/ui-kit
+├── @quokkaq/kiosk-lib
+└── @quokkaq/subscription-pricing
+
+marketing
+├── @quokkaq/shared-types
+└── @quokkaq/subscription-pricing
 
 kiosk-desktop
 ├── @quokkaq/shared-types
@@ -267,6 +339,9 @@ kiosk-desktop
 └── @quokkaq/kiosk-lib
 
 kiosk-lib
+└── @quokkaq/shared-types
+
+subscription-pricing
 └── @quokkaq/shared-types
 ```
 
@@ -520,7 +595,16 @@ Runs on push to **`release`** when `apps/backend/` changes:
 - Deploys to Yandex Cloud VM
 - Creates git tag: `vX.Y.Z-backend`
 
-#### 4. **Release Kiosk** (`.github/workflows/release-kiosk.yml`)
+#### 4. **Deploy Marketing** (`.github/workflows/deploy-marketing.yml`)
+
+Runs on push to **`release`** when `apps/marketing/` or `packages/` change:
+- Bumps version in `apps/marketing/package.json`
+- Builds Docker image with Next.js standalone output
+- Pushes to Yandex Container Registry
+- Deploys to Yandex Cloud VM
+- Creates git tag: `vX.Y.Z-marketing`
+
+#### 5. **Release Kiosk** (`.github/workflows/release-kiosk.yml`)
 
 Runs on push to **`release`** when `apps/kiosk-desktop/` or `packages/` change:
 - Bumps version in `package.json`, `Cargo.toml`, and `tauri.conf.json`
@@ -843,6 +927,7 @@ For complete license terms, see:
 
 - [Operator documentation (source)](apps/frontend/content/wiki/) — shown in-product under `/{locale}/help/...` (see [`docs/wiki/README.md`](docs/wiki/README.md))
 - [Frontend Documentation](apps/frontend/README.md)
+- [Marketing Site Documentation](apps/marketing/README.md)
 - [Backend Documentation](apps/backend/README.md) | [Russian](apps/backend/README.ru.md)
 - [Kiosk Documentation](apps/kiosk-desktop/README.md)
 - [Migration Checklist](MIGRATION-CHECKLIST.md)
