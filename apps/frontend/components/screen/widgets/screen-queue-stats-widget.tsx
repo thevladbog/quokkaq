@@ -20,7 +20,7 @@ function fmt(
   if (value == null) {
     return (
       <span className='text-muted-foreground text-2xl' aria-hidden>
-        —
+        {t('stats.noData', { default: '—' })}
       </span>
     );
   }

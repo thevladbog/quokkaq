@@ -1043,7 +1043,11 @@
       "dayS": "Sat",
       "daySn": "Sun",
       "feedStatusOk": "OK",
-      "feedStatusFail": "Failing"
+      "feedStatusFail": "Failing",
+      "scheduleOverlap": "This schedule overlaps another for the same day and time. Change days or the time range.",
+      "scheduleConflictLegend": "Red: overlapping time slots on the same day. Higher priority still wins if both apply.",
+      "scheduleConflictBarTitle": "Overlap",
+      "previewDevHint": "Dev: preview uses this site’s origin. If the API is on another host, the screen data may not match production."
     },
     "kiosk_settings": {
       "title": "Kiosk Settings",
@@ -2028,6 +2032,7 @@
       "openWindows": "Open windows",
       "estWait": "Est. wait",
       "servedToday": "Served today",
+      "noData": "—",
       "aria": "Queue summary"
     }
   },

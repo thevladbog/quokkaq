@@ -3,11 +3,16 @@
 import { useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import * as orval from '@/lib/api/generated/units';
-import { safeParseSignageWithToast, signageZod } from '@/lib/signage-zod';
+import {
+  safeParseSignageWithToast,
+  signageZod,
+  updateSignageScheduleBodySchema
+} from '@/lib/signage-zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import { newScheduleOverlapsAnyExisting } from '@/lib/signage-schedule-overlap';
 import { ScheduleTimeline } from './schedule-timeline';
 
 export function ScheduleEditor({ unitId }: { unitId: string }) {
@@ -32,6 +37,7 @@ export function ScheduleEditor({ unitId }: { unitId: string }) {
   const createSc = orval.useCreateSignageSchedule();
   const delSc = orval.useDeleteSignageSchedule();
   const updSc = orval.useUpdateSignageSchedule();
+  const list = (schedules as orval.ModelsPlaylistSchedule[] | undefined) ?? [];
 
   const onCreate = async () => {
     if (!scPl) {
@@ -49,6 +55,15 @@ export function ScheduleEditor({ unitId }: { unitId: string }) {
     if (
       !safeParseSignageWithToast('Schedule', signageZod.schedule, body).success
     ) {
+      return;
+    }
+    if (newScheduleOverlapsAnyExisting(body, list)) {
+      toast.error(
+        t('scheduleOverlap', {
+          default:
+            'This schedule overlaps another for the same day and time. Change days or the time range.'
+        })
+      );
       return;
     }
     try {
@@ -72,8 +87,6 @@ export function ScheduleEditor({ unitId }: { unitId: string }) {
       toast.error(String(e));
     }
   };
-
-  const list = (schedules as orval.ModelsPlaylistSchedule[] | undefined) ?? [];
 
   return (
     <div className='space-y-4'>
@@ -153,18 +166,28 @@ export function ScheduleEditor({ unitId }: { unitId: string }) {
                 onClick={async () => {
                   if (!s.id) return;
                   const nextP = (s.priority ?? 0) + 1;
+                  const data = {
+                    playlistId: s.playlistId ?? '',
+                    daysOfWeek: s.daysOfWeek ?? '',
+                    startTime: s.startTime ?? '',
+                    endTime: s.endTime ?? '',
+                    priority: nextP,
+                    isActive: s.isActive
+                  };
+                  if (
+                    !safeParseSignageWithToast(
+                      'Schedule update',
+                      updateSignageScheduleBodySchema,
+                      data
+                    ).success
+                  ) {
+                    return;
+                  }
                   try {
                     await updSc.mutateAsync({
                       unitId,
                       scheduleId: s.id,
-                      data: {
-                        playlistId: s.playlistId,
-                        daysOfWeek: s.daysOfWeek,
-                        startTime: s.startTime,
-                        endTime: s.endTime,
-                        priority: nextP,
-                        isActive: s.isActive
-                      } as orval.HandlersCreateScheduleRequest
+                      data: data as orval.HandlersCreateScheduleRequest
                     });
                     void refetchSch();
                   } catch (e) {

@@ -24,7 +24,11 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUpdateUnit } from '@/lib/hooks';
 import { getGetUnitByIDQueryKey } from '@/lib/api/generated/units';
 import { useLegacyPlaylistMigration } from './use-legacy-playlist-migration';
-import { safeParseSignageWithToast, signageZod } from '@/lib/signage-zod';
+import {
+  safeParseSignageWithToast,
+  signageZod,
+  updatePlaylistRequestSchema
+} from '@/lib/signage-zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -155,15 +159,25 @@ function PlaylistOrderPanel(props: {
         duration: durations[id] ?? 10
       } as orval.HandlersPlaylistItemInput;
     });
+    const data = {
+      name: playlist.name ?? '',
+      isDefault: playlist.isDefault,
+      items: its
+    };
+    if (
+      !safeParseSignageWithToast(
+        'Playlist update',
+        updatePlaylistRequestSchema,
+        data
+      ).success
+    ) {
+      return;
+    }
     try {
       await updatePl.mutateAsync({
         unitId,
         playlistId: editId,
-        data: {
-          name: playlist.name,
-          isDefault: playlist.isDefault,
-          items: its
-        }
+        data
       });
       void refetchPl();
       void qc.invalidateQueries({

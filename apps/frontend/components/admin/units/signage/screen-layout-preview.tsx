@@ -47,6 +47,14 @@ export function ScreenLayoutPreview({ unitId, locale, onRefreshKey }: Props) {
           {src}
         </p>
       )}
+      {process.env.NODE_ENV === 'development' ? (
+        <p className='text-muted-foreground text-xs'>
+          {t('previewDevHint', {
+            default:
+              "Dev: preview uses this site's origin. If the API is on another host, the screen data may not match production."
+          })}
+        </p>
+      ) : null}
       <div className='bg-muted/20 overflow-hidden rounded-lg border'>
         <iframe
           title={t('screenPreview', { default: 'Screen preview' })}

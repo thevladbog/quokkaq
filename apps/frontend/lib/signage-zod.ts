@@ -41,10 +41,23 @@ export const createAnnouncementRequestSchema = z.object({
   isActive: z.boolean()
 });
 
+export const updatePlaylistRequestSchema = z.object({
+  name: z.string().min(1, 'name'),
+  isDefault: z.boolean().optional(),
+  items: z.array(PlaylistItemInputSchema).min(1, 'at least one item')
+});
+
+export const updateSignageScheduleBodySchema = PlaylistScheduleSchema.omit({
+  id: true,
+  unitId: true
+});
+
 export const signageZod = {
   playlist: PlaylistSchema,
   createPlaylist: createPlaylistRequestSchema,
+  updatePlaylist: updatePlaylistRequestSchema,
   schedule: PlaylistScheduleSchema,
+  updateSignageSchedule: updateSignageScheduleBodySchema,
   feed: ExternalFeedSchema,
   announcement: ScreenAnnouncementSchema,
   createAnnouncement: createAnnouncementRequestSchema,

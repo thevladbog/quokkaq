@@ -2,6 +2,10 @@
 
 import { useMemo } from 'react';
 import { useTranslations } from 'next-intl';
+import {
+  getOverlappingScheduleIds,
+  type OverlapCheckRow
+} from '@/lib/signage-schedule-overlap';
 
 const DAY_INDEX = [1, 2, 3, 4, 5, 6, 7] as const;
 
@@ -66,11 +70,24 @@ export function ScheduleTimeline({ schedules }: { schedules: ScheduleRow[] }) {
     return m;
   }, [schedules]);
 
+  const overlapIds = useMemo(
+    () => getOverlappingScheduleIds(schedules as OverlapCheckRow),
+    [schedules]
+  );
+  const hasConflicts = overlapIds.size > 0;
+
   return (
     <div className='space-y-2'>
       <h3 className='text-sm font-medium'>
         {t('scheduleTimeline', { default: 'Weekly view' })}
       </h3>
+      {hasConflicts ? (
+        <p className='text-destructive text-xs' role='status'>
+          {t('scheduleConflictLegend', {
+            default: 'Red: overlapping time on the same day.'
+          })}
+        </p>
+      ) : null}
       <div className='grid max-w-4xl grid-cols-7 gap-0.5 text-center'>
         {DAY_INDEX.map((d) => {
           const k =
@@ -111,10 +128,15 @@ export function ScheduleTimeline({ schedules }: { schedules: ScheduleRow[] }) {
                   const w = b > a ? b - a : 0;
                   const left = (a / (24 * 60)) * 100;
                   const width = Math.max(0.5, (w / (24 * 60)) * 100);
+                  const conflict = overlapIds.has(s.id);
                   return (
                     <div
                       key={s.id + s.startTime + d}
-                      className='bg-primary/30 border-primary/40 absolute h-1/2 min-h-[1.5rem] rounded border'
+                      className={
+                        conflict
+                          ? 'ring-destructive/60 border-destructive/50 bg-destructive/20 absolute h-1/2 min-h-[1.5rem] rounded border ring-2'
+                          : 'bg-primary/30 border-primary/40 absolute h-1/2 min-h-[1.5rem] rounded border'
+                      }
                       style={{
                         left: `${left}%`,
                         width: `${width}%`,
@@ -125,7 +147,12 @@ export function ScheduleTimeline({ schedules }: { schedules: ScheduleRow[] }) {
                         s.playlistName,
                         s.id,
                         `${s.startTime}–${s.endTime}`,
-                        `P${s.priority ?? 0}`
+                        `P${s.priority ?? 0}`,
+                        conflict
+                          ? t('scheduleConflictBarTitle', {
+                              default: 'Overlap'
+                            })
+                          : ''
                       ]
                         .filter(Boolean)
                         .join(' · ')}
