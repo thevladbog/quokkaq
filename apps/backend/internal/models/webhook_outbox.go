@@ -19,6 +19,11 @@ type WebhookOutbox struct {
 	CreatedAt       time.Time  `gorm:"autoCreateTime" json:"createdAt"`
 }
 
+// TableName keeps GORM on the singular table name (migration: webhook_outbox; default GORM name would be webhook_outboxes).
+func (WebhookOutbox) TableName() string {
+	return "webhook_outbox"
+}
+
 func (w *WebhookOutbox) BeforeCreate(tx *gorm.DB) error {
 	if w.ID == "" {
 		w.ID = uuid.New().String()

@@ -19,7 +19,7 @@
 ## REST интеграций (`/integrations/v1`)
 
 - Авторизация — **ключ API интеграции**, выпускается в настройках (имя заголовка и формат — в OpenAPI).
-- У ключа есть **scopes**; у каждого маршрута в спецификации указаны нужные scope. Пример read-only: **`GET /integrations/v1/units/{unitId}/queue-summary`** (нужен `tickets.read` на ключе).
+- У ключа есть **scopes**; у каждого маршрута в спецификации указаны нужные scope. Пример read-only: **`GET /integrations/v1/units/{unitId}/queue-summary`** (нужен `tickets:read` на ключе; для создания/изменения данных — `tickets:write`, как в OpenAPI).
 - **Лимиты запросов:** если на сервере задано `INTEGRATION_API_RL_REDIS=true` и доступен Redis, лимитер для `/integrations/v1` считается в Redis (удобно при нескольких инстансах). Иначе используется in-memory лимитер (нормально для одного процесса в dev).
 
 ## Вебхуки

@@ -32,25 +32,33 @@ type TicketHandler struct {
 	eta         *services.ETAService
 	unitService services.UnitService
 	settingsSvc *services.DeploymentSaaSSettingsService
+	db          *gorm.DB
 }
 
-var unitQueueStatusCache sync.Map // key: unitID → queueStatusCacheEntry
+var (
+	unitQueueStatusCacheMu   sync.Mutex
+	unitQueueStatusCacheData = make(map[string]queueStatusCacheEntry)
+)
 
 type queueStatusCacheEntry struct {
 	at   time.Time
 	body []byte
 }
 
-const unitQueueStatusCacheTTL = 10 * time.Second
+const (
+	unitQueueStatusCacheTTL        = 10 * time.Second
+	unitQueueStatusCacheMaxEntries = 2000
+)
 
 func loadQueueStatusFromCache(unitID string) ([]byte, bool) {
-	v, ok := unitQueueStatusCache.Load(unitID)
+	unitQueueStatusCacheMu.Lock()
+	defer unitQueueStatusCacheMu.Unlock()
+	e, ok := unitQueueStatusCacheData[unitID]
 	if !ok {
 		return nil, false
 	}
-	e := v.(queueStatusCacheEntry)
 	if time.Since(e.at) > unitQueueStatusCacheTTL {
-		unitQueueStatusCache.Delete(unitID)
+		delete(unitQueueStatusCacheData, unitID)
 		return nil, false
 	}
 	return e.body, true
@@ -59,7 +67,37 @@ func loadQueueStatusFromCache(unitID string) ([]byte, bool) {
 func storeQueueStatusCache(unitID string, body []byte) {
 	b := make([]byte, len(body))
 	copy(b, body)
-	unitQueueStatusCache.Store(unitID, queueStatusCacheEntry{at: time.Now(), body: b})
+	now := time.Now()
+	unitQueueStatusCacheMu.Lock()
+	defer unitQueueStatusCacheMu.Unlock()
+	for id, ent := range unitQueueStatusCacheData {
+		if now.Sub(ent.at) > unitQueueStatusCacheTTL {
+			delete(unitQueueStatusCacheData, id)
+		}
+	}
+	unitQueueStatusCacheData[unitID] = queueStatusCacheEntry{at: now, body: b}
+	if len(unitQueueStatusCacheData) > unitQueueStatusCacheMaxEntries {
+		var oldestID string
+		var oldestAt time.Time
+		first := true
+		for id, ent := range unitQueueStatusCacheData {
+			if first || ent.at.Before(oldestAt) {
+				first = false
+				oldestAt = ent.at
+				oldestID = id
+			}
+		}
+		if oldestID != "" {
+			delete(unitQueueStatusCacheData, oldestID)
+		}
+	}
+}
+
+func (h *TicketHandler) orm() *gorm.DB {
+	if h.db != nil {
+		return h.db
+	}
+	return database.DB
 }
 
 func NewTicketHandler(service services.TicketService, operational *services.OperationalService) *TicketHandler {
@@ -72,8 +110,9 @@ func NewTicketHandlerWithETA(service services.TicketService, operational *servic
 }
 
 // NewTicketHandlerFull creates a TicketHandler with all optional services wired.
-func NewTicketHandlerFull(service services.TicketService, operational *services.OperationalService, eta *services.ETAService, unitService services.UnitService) *TicketHandler {
-	return &TicketHandler{service: service, operational: operational, eta: eta, unitService: unitService}
+// db is used for subscription/plan checks on public routes (e.g. queue-status); when nil, database.DB is used.
+func NewTicketHandlerFull(service services.TicketService, operational *services.OperationalService, eta *services.ETAService, unitService services.UnitService, db *gorm.DB) *TicketHandler {
+	return &TicketHandler{service: service, operational: operational, eta: eta, unitService: unitService, db: db}
 }
 
 // WithSettingsService attaches the deployment SaaS settings service (needed for smsOptInAvailable check).
@@ -941,7 +980,7 @@ func (h *TicketHandler) GetUnitQueueStatus(w http.ResponseWriter, r *http.Reques
 			http.Error(w, "unit not found", http.StatusNotFound)
 			return
 		}
-		ok, ferr := subscriptionfeatures.CompanyHasPublicQueueWidget(r.Context(), database.DB, unit.CompanyID)
+		ok, ferr := subscriptionfeatures.CompanyHasPublicQueueWidget(r.Context(), h.orm(), unit.CompanyID)
 		if ferr != nil || !ok {
 			http.Error(w, "public queue widget is not enabled for this subscription plan", http.StatusForbidden)
 			return
@@ -954,7 +993,7 @@ func (h *TicketHandler) GetUnitQueueStatus(w http.ResponseWriter, r *http.Reques
 			}
 		}
 		var co models.Company
-		if err := database.DB.WithContext(r.Context()).Where("id = ?", unit.CompanyID).First(&co).Error; err == nil {
+		if err := h.orm().WithContext(r.Context()).Where("id = ?", unit.CompanyID).First(&co).Error; err == nil {
 			origins := publicqueuewidget.AllowedOriginsFromCompanySettings(co.Settings)
 			if o := strings.TrimSpace(r.Header.Get("Origin")); len(origins) > 0 && o != "" {
 				allowed := false
@@ -987,7 +1026,9 @@ func (h *TicketHandler) GetUnitQueueStatus(w http.ResponseWriter, r *http.Reques
 			RespondJSON(w, summary)
 			return
 		}
-		unitQueueStatusCache.Delete(unitID)
+		unitQueueStatusCacheMu.Lock()
+		delete(unitQueueStatusCacheData, unitID)
+		unitQueueStatusCacheMu.Unlock()
 	}
 	summary, err := h.eta.GetUnitQueueSummary(unitID)
 	if err != nil {

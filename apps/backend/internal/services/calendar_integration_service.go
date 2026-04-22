@@ -445,16 +445,16 @@ func (s *CalendarIntegrationService) CreateMicrosoftGraphIntegration(companyID, 
 		return nil, encErr
 	}
 	row := models.UnitCalendarIntegration{
-		UnitID:               unitID,
-		Kind:                 models.CalendarIntegrationKindMicrosoftGraph,
-		DisplayName:          fmt.Sprintf("Microsoft 365 (%s)", upn),
-		Enabled:              true,
-		CaldavBaseURL:        "https://graph.microsoft.com",
-		CalendarPath:         calID,
-		Username:             upn,
-		CredentialCiphertext: encStr,
-		Timezone:             tz,
+		UnitID:        unitID,
+		Kind:          models.CalendarIntegrationKindMicrosoftGraph,
+		DisplayName:   fmt.Sprintf("Microsoft 365 (%s)", upn),
+		Enabled:       true,
+		CaldavBaseURL: "https://graph.microsoft.com",
+		CalendarPath:  calID,
+		Username:      upn,
+		Timezone:      tz,
 	}
+	row.CredentialCiphertext = encStr
 	if err := s.repo.CreateIntegration(&row); err != nil {
 		return nil, err
 	}

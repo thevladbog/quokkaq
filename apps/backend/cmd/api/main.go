@@ -261,7 +261,7 @@ func run() error {
 	})
 	services.WireTicketServiceETAScheduler(ticketService, etaBroadcaster)
 	services.WireCounterServiceETAScheduler(counterService, etaBroadcaster)
-	ticketHandler := handlers.NewTicketHandlerFull(ticketService, operationalService, etaService, unitService).WithSettingsService(deploymentSaaSSettingsService)
+	ticketHandler := handlers.NewTicketHandlerFull(ticketService, operationalService, etaService, unitService, database.DB).WithSettingsService(deploymentSaaSSettingsService)
 	serviceHandler := handlers.NewServiceHandler(serviceService, userRepo)
 	counterHandler := handlers.NewCounterHandler(counterService, counterRepo, operationalService, userRepo, unitRepo)
 	bookingHandler := handlers.NewBookingHandler(bookingService, userRepo)

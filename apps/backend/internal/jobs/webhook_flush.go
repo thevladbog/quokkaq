@@ -71,7 +71,7 @@ func (w *jobWorker) handleWebhookFlushOutbox(ctx context.Context, _ *asynq.Task)
 		endpoints, err := epRepo.ListEnabledForCompanyAndEvent(ctx, ob.CompanyID, unitID, hist.Action)
 		if err != nil {
 			applogger.ErrorfCtx(ctx, "webhook flush: list endpoints: %v", err)
-			_ = repository.WebhookOutboxScheduleRetry(ctx, db, ob.ID, ob.AttemptCount, time.Now().UTC().Add(30*time.Second), false)
+			_ = repository.WebhookOutboxScheduleRetry(ctx, db, ob.ID, ob.AttemptCount+1, time.Now().UTC().Add(30*time.Second), false)
 			return err
 		}
 		if len(endpoints) == 0 {

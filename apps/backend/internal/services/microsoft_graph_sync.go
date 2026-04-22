@@ -56,37 +56,15 @@ func (s *CalendarIntegrationService) syncMicrosoftGraphCalendar(ctx context.Cont
 	q := url.Values{}
 	q.Set("startDateTime", start)
 	q.Set("endDateTime", end)
-	var graphURL string
+	var firstURL string
 	if strings.EqualFold(calPath, "primary") {
-		graphURL = "https://graph.microsoft.com/v1.0/me/calendar/calendarView?" + q.Encode()
+		firstURL = "https://graph.microsoft.com/v1.0/me/calendar/calendarView?" + q.Encode()
 	} else {
-		graphURL = fmt.Sprintf("https://graph.microsoft.com/v1.0/me/calendars/%s/calendarView?%s", url.PathEscape(calPath), q.Encode())
+		firstURL = fmt.Sprintf("https://graph.microsoft.com/v1.0/me/calendars/%s/calendarView?%s", url.PathEscape(calPath), q.Encode())
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, graphURL, nil)
+	events, err := s.fetchAllMicrosoftGraphCalendarViewPages(ctx, integ.ID, firstURL, access)
 	if err != nil {
-		_ = s.markSyncError(integ.ID, err.Error())
-		return err
-	}
-	req.Header.Set("Authorization", "Bearer "+access)
-	resp, err := microsoftOAuthHTTPClient.Do(req)
-	if err != nil {
-		_ = s.markSyncError(integ.ID, err.Error())
-		return err
-	}
-	defer func() { _, _ = io.Copy(io.Discard, resp.Body); _ = resp.Body.Close() }()
-	body, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		msg := fmt.Sprintf("graph calendarView: HTTP %d %s", resp.StatusCode, strings.TrimSpace(string(body)))
-		_ = s.markSyncError(integ.ID, msg)
-		return fmt.Errorf("%s", msg)
-	}
-
-	var envelope struct {
-		Value []map[string]interface{} `json:"value"`
-	}
-	if err := json.Unmarshal(body, &envelope); err != nil {
-		_ = s.markSyncError(integ.ID, err.Error())
 		return err
 	}
 
@@ -109,7 +87,7 @@ func (s *CalendarIntegrationService) syncMicrosoftGraphCalendar(ctx context.Cont
 
 	syncStart := time.Now().UTC()
 	seen := make(map[string]struct{})
-	for _, ev := range envelope.Value {
+	for _, ev := range events {
 		if isCancelledMS(ev) {
 			continue
 		}
@@ -159,6 +137,48 @@ func (s *CalendarIntegrationService) syncMicrosoftGraphCalendar(ctx context.Cont
 	}
 	_ = s.repo.UpdateSyncMeta(integ.ID, time.Now().UTC(), "")
 	return nil
+}
+
+// fetchAllMicrosoftGraphCalendarViewPages follows @odata.nextLink until all pages are collected.
+func (s *CalendarIntegrationService) fetchAllMicrosoftGraphCalendarViewPages(ctx context.Context, integID, startURL, access string) ([]map[string]interface{}, error) {
+	var all []map[string]interface{}
+	next := strings.TrimSpace(startURL)
+	for next != "" {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, next, nil)
+		if err != nil {
+			_ = s.markSyncError(integID, err.Error())
+			return nil, err
+		}
+		req.Header.Set("Authorization", "Bearer "+access)
+		resp, err := microsoftOAuthHTTPClient.Do(req)
+		if err != nil {
+			_ = s.markSyncError(integID, err.Error())
+			return nil, err
+		}
+		body, readErr := io.ReadAll(resp.Body)
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+		if readErr != nil {
+			_ = s.markSyncError(integID, readErr.Error())
+			return nil, readErr
+		}
+		if resp.StatusCode < 200 || resp.StatusCode > 299 {
+			msg := fmt.Sprintf("graph calendarView: HTTP %d %s", resp.StatusCode, strings.TrimSpace(string(body)))
+			_ = s.markSyncError(integID, msg)
+			return nil, fmt.Errorf("%s", msg)
+		}
+		var envelope struct {
+			Value    []map[string]interface{} `json:"value"`
+			NextLink string                   `json:"@odata.nextLink"`
+		}
+		if err := json.Unmarshal(body, &envelope); err != nil {
+			_ = s.markSyncError(integID, err.Error())
+			return nil, err
+		}
+		all = append(all, envelope.Value...)
+		next = strings.TrimSpace(envelope.NextLink)
+	}
+	return all, nil
 }
 
 func isCancelledMS(ev map[string]interface{}) bool {

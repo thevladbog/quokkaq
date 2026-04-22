@@ -19,7 +19,7 @@ If every flag is `false`, the product UI typically hides the Developer API / int
 ## Integration REST (`/integrations/v1`)
 
 - Authenticate with an **integration API key** issued in Settings (see OpenAPI for the header name and format).
-- Keys carry **scopes**; each route documents required scopes. Example read-only route: **`GET /integrations/v1/units/{unitId}/queue-summary`** (requires `tickets.read` on the key).
+- Keys carry **scopes**; each route documents required scopes. Example read-only route: **`GET /integrations/v1/units/{unitId}/queue-summary`** (requires `tickets:read` on the key; routes that create or change data need `tickets:write` where OpenAPI says so).
 - **Rate limiting:** your operator may set `INTEGRATION_API_RL_REDIS=true` on the server so limits are enforced with Redis (shared across instances). If unset or `false`, the API uses an in-memory limiter (fine for single-node dev).
 
 ## Webhooks

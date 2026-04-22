@@ -16,5 +16,5 @@ func SupportedKinds() []string {
 var KindDescriptions = map[string]string{
 	models.CalendarIntegrationKindYandexCalDAV:   "Yandex Calendar (CalDAV app password)",
 	models.CalendarIntegrationKindGoogleCalDAV:   "Google Calendar (OAuth + CalDAV)",
-	models.CalendarIntegrationKindMicrosoftGraph: "Microsoft 365 / Outlook (OAuth; slot sync via Graph API is planned — use Google or Yandex for live CalDAV import today)",
+	models.CalendarIntegrationKindMicrosoftGraph: "Microsoft 365 / Outlook (OAuth + Microsoft Graph calendar sync)",
 }
