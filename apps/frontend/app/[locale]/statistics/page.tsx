@@ -87,6 +87,7 @@ import { StaffOperatorDetailCard } from '@/components/statistics/StaffOperatorDe
 import { StaffingForecastPanel } from '@/components/statistics/StaffingForecastPanel';
 import { useGetUnitsUnitIdShiftActivityActors } from '@/lib/api/generated/shift';
 import { useGetUnitsUnitIdServices } from '@/lib/api/generated/services';
+import { isApiHttpError } from '@/lib/api-errors';
 import { normalizeChildUnitsQueryData } from '@/lib/child-units-query';
 import {
   getUnitByID,
@@ -2491,7 +2492,14 @@ export default function StatisticsPage() {
                       {t('loading')}
                     </p>
                   ) : staffingForecastQuery.isError ? (
-                    <p className='text-destructive text-sm'>{t('error')}</p>
+                    isApiHttpError(staffingForecastQuery.error) &&
+                    staffingForecastQuery.error.status === 422 ? (
+                      <p className='text-muted-foreground text-sm'>
+                        {t('sf_no_data')}
+                      </p>
+                    ) : (
+                      <p className='text-destructive text-sm'>{t('error')}</p>
+                    )
                   ) : staffingForecastQuery.data?.status === 200 ? (
                     <StaffingForecastPanel
                       data={staffingForecastQuery.data.data}
