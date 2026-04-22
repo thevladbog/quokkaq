@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"time"
 
 	"quokkaq-go-backend/internal/services"
 
@@ -17,6 +18,7 @@ type JobClient interface {
 	EnqueueSMSSendRaw(payload SMSSendPayload) error
 	// EnqueueVisitorNotifyRaw enqueues a visitor:notify job with a pre-formed payload struct.
 	EnqueueVisitorNotifyRaw(payload VisitorNotifyPayload) error
+	EnqueueAnomalyCheck() error
 	Close() error
 }
 
@@ -73,6 +75,16 @@ func (c *jobClient) EnqueueVisitorNotifyRaw(payload VisitorNotifyPayload) error 
 	}
 	task := asynq.NewTask(TypeVisitorNotify, data)
 	_, err = c.client.Enqueue(task, asynq.Queue("default"), asynq.MaxRetry(3))
+	return err
+}
+
+func (c *jobClient) EnqueueAnomalyCheck() error {
+	task := asynq.NewTask(TypeAnomalyCheck, []byte("{}"))
+	_, err := c.client.Enqueue(task,
+		asynq.Queue("low"),
+		asynq.MaxRetry(1),
+		asynq.Unique(10*time.Minute),
+	)
 	return err
 }
 

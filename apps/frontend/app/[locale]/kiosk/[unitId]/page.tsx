@@ -41,6 +41,7 @@ import {
 } from '@/lib/kiosk-print';
 import { intlLocaleFromAppLocale } from '@/lib/format-datetime';
 import { logger } from '@/lib/logger';
+import { socketClient, type UnitETASnapshot } from '@/lib/socket';
 import { getUnitDisplayName } from '@/lib/unit-display';
 import { isQuotaExceededError } from '@/lib/quota-error';
 import {
@@ -65,6 +66,9 @@ export default function UnitKioskPage() {
   const [autoCloseTimerId, setAutoCloseTimerId] =
     useState<NodeJS.Timeout | null>(null);
   const [countdown, setCountdown] = useState<number>(5);
+  const [successEtaMinutes, setSuccessEtaMinutes] = useState<number | null>(
+    null
+  );
   const router = useRouter();
   const locale = useLocale();
   const intlLocale = useMemo(() => intlLocaleFromAppLocale(locale), [locale]);
@@ -129,6 +133,26 @@ export default function UnitKioskPage() {
     }
     return unit.id;
   }, [unit]);
+
+  useEffect(() => {
+    if (!isTicketModalOpen || !createdTicket || !kioskApiUnitId) {
+      return;
+    }
+    socketClient.connect(kioskApiUnitId);
+    const h = (snap: UnitETASnapshot) => {
+      const row = snap.tickets?.find((x) => x.ticketId === createdTicket.id);
+      if (row && row.estimatedWaitSeconds > 0) {
+        setSuccessEtaMinutes(
+          Math.max(1, Math.round(row.estimatedWaitSeconds / 60))
+        );
+      }
+    };
+    socketClient.onEtaUpdate(h);
+    return () => {
+      socketClient.offEtaUpdate(h);
+      socketClient.disconnect();
+    };
+  }, [isTicketModalOpen, createdTicket, kioskApiUnitId]);
 
   /** Which grid column (pool) the kiosk shows: subdivision-wide vs this zone. */
   const kioskGridZoneScope = useMemo(() => {
@@ -333,6 +357,7 @@ export default function UnitKioskPage() {
   }, [unitServicesTree, selectedServicePath, kioskGridZoneScope, unit?.kind]);
 
   const openTicketSuccessFlow = (ticket: Ticket, service: Service) => {
+    setSuccessEtaMinutes(null);
     setCreatedTicket(ticket);
     setIsTicketModalOpen(true);
     setSelectedServicePath([]);
@@ -782,6 +807,7 @@ export default function UnitKioskPage() {
           setIsTicketModalOpen(open);
           if (!open) {
             setCreatedTicket(null);
+            setSuccessEtaMinutes(null);
             if (autoCloseTimerId) {
               clearInterval(autoCloseTimerId);
               setAutoCloseTimerId(null);
@@ -827,6 +853,11 @@ export default function UnitKioskPage() {
               <div className='mb-4 text-7xl leading-none font-bold'>
                 {createdTicket.queueNumber}
               </div>
+              {successEtaMinutes != null && (
+                <p className='text-muted-foreground mb-2 text-sm'>
+                  {t('ticket.success_eta', { minutes: successEtaMinutes })}
+                </p>
+              )}
 
               <Separator className='my-4 w-full' />
 

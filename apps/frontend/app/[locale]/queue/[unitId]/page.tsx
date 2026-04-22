@@ -5,6 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { useTranslations, useLocale } from 'next-intl';
 import { toast } from 'sonner';
 import { unitsApi } from '@/lib/api';
+import { socketClient, type UnitETASnapshot } from '@/lib/socket';
+import { useUnit } from '@/lib/hooks';
 import type { Service } from '@/lib/api';
 import { getLocalizedName } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,6 +20,12 @@ interface QueueStatus {
   queueLength: number;
   estimatedWaitMinutes: number;
   activeCounters: number;
+  services?: Array<{
+    serviceId: string;
+    serviceName: string;
+    queueLength: number;
+    estimatedWaitMinutes: number;
+  }>;
 }
 
 export default function VirtualQueuePage() {
@@ -48,6 +56,33 @@ export default function VirtualQueuePage() {
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState('');
 
+  const { data: unitForWs } = useUnit(unitId ?? '', {
+    enabled: Boolean(unitId)
+  });
+  const wsRoomId =
+    unitForWs?.kind === 'service_zone' && unitForWs.parentId
+      ? unitForWs.parentId
+      : unitId;
+
+  useEffect(() => {
+    if (!unitId || !wsRoomId) return;
+    socketClient.connect(wsRoomId);
+    const onEta = (snap: UnitETASnapshot) => {
+      if (snap.unitId !== wsRoomId) return;
+      setQueueStatus({
+        queueLength: snap.queueLength,
+        estimatedWaitMinutes: snap.estimatedWaitMinutes,
+        activeCounters: snap.activeCounters,
+        services: snap.services
+      });
+    };
+    socketClient.onEtaUpdate(onEta);
+    return () => {
+      socketClient.offEtaUpdate(onEta);
+      socketClient.disconnect();
+    };
+  }, [unitId, wsRoomId]);
+
   useEffect(() => {
     if (!unitId) return;
 
@@ -74,7 +109,7 @@ export default function VirtualQueuePage() {
         .getQueueStatus(unitId)
         .then(setQueueStatus)
         .catch(() => null);
-    }, 30_000);
+    }, 60_000);
 
     return () => clearInterval(pollInterval);
   }, [unitId, t]);
@@ -132,20 +167,39 @@ export default function VirtualQueuePage() {
         <CardContent className='space-y-6'>
           {/* Queue status pills */}
           {queueStatus && (
-            <div className='flex flex-wrap justify-center gap-2'>
-              <span className='bg-muted rounded-full px-3 py-1 text-sm'>
-                {t('queue_length', { count: queueStatus.queueLength })}
-              </span>
-              {queueStatus.estimatedWaitMinutes > 0 && (
+            <div className='flex flex-col gap-2'>
+              <div className='flex flex-wrap justify-center gap-2'>
                 <span className='bg-muted rounded-full px-3 py-1 text-sm'>
-                  {t('estimated_wait', {
-                    minutes: Math.round(queueStatus.estimatedWaitMinutes)
-                  })}
+                  {t('queue_length', { count: queueStatus.queueLength })}
                 </span>
+                {queueStatus.estimatedWaitMinutes > 0 && (
+                  <span className='bg-muted rounded-full px-3 py-1 text-sm transition-all duration-300'>
+                    {t('estimated_wait', {
+                      minutes: Math.round(queueStatus.estimatedWaitMinutes)
+                    })}
+                  </span>
+                )}
+                <span className='bg-muted rounded-full px-3 py-1 text-sm'>
+                  {t('active_counters', { count: queueStatus.activeCounters })}
+                </span>
+              </div>
+              {queueStatus.services && queueStatus.services.length > 0 && (
+                <div className='text-muted-foreground flex flex-wrap justify-center gap-1.5 text-xs'>
+                  {queueStatus.services.map((svc) => (
+                    <span
+                      key={svc.serviceId}
+                      className='bg-muted/60 max-w-[200px] truncate rounded-full px-2 py-0.5'
+                    >
+                      {svc.serviceName}: {svc.queueLength}
+                      {svc.estimatedWaitMinutes > 0
+                        ? ` · ${t('estimated_wait_short', {
+                            minutes: Math.round(svc.estimatedWaitMinutes)
+                          })}`
+                        : ''}
+                    </span>
+                  ))}
+                </div>
               )}
-              <span className='bg-muted rounded-full px-3 py-1 text-sm'>
-                {t('active_counters', { count: queueStatus.activeCounters })}
-              </span>
             </div>
           )}
 

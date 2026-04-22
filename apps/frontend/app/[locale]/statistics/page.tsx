@@ -75,7 +75,8 @@ import {
   useGetUnitStatisticsSlaHeatmap,
   useGetUnitStatisticsStaffPerformanceList,
   useGetUnitStatisticsStaffPerformanceDetail,
-  useGetUnitStatisticsStaffingForecast
+  useGetUnitStatisticsStaffingForecast,
+  useGetUnitStatisticsAnomalyAlerts
 } from '@/lib/api/generated/statistics';
 import { SLAHeatmapChart } from '@/components/statistics/SLAHeatmapChart';
 import {
@@ -86,6 +87,7 @@ import { StaffOperatorDetailCard } from '@/components/statistics/StaffOperatorDe
 import { StaffingForecastPanel } from '@/components/statistics/StaffingForecastPanel';
 import { useGetUnitsUnitIdShiftActivityActors } from '@/lib/api/generated/shift';
 import { useGetUnitsUnitIdServices } from '@/lib/api/generated/services';
+import { isApiHttpError } from '@/lib/api-errors';
 import { normalizeChildUnitsQueryData } from '@/lib/child-units-query';
 import {
   getUnitByID,
@@ -777,6 +779,16 @@ export default function StatisticsPage() {
       targetMaxWaitMin: forecastMaxWait,
       lookbackWeeks: 4
     },
+    {
+      query: {
+        enabled: Boolean(statsSubdivisionId && isExpanded)
+      }
+    }
+  );
+
+  const anomalyAlertsQuery = useGetUnitStatisticsAnomalyAlerts(
+    statsSubdivisionId,
+    { limit: 50 },
     {
       query: {
         enabled: Boolean(statsSubdivisionId && isExpanded)
@@ -2480,7 +2492,14 @@ export default function StatisticsPage() {
                       {t('loading')}
                     </p>
                   ) : staffingForecastQuery.isError ? (
-                    <p className='text-destructive text-sm'>{t('error')}</p>
+                    isApiHttpError(staffingForecastQuery.error) &&
+                    staffingForecastQuery.error.status === 422 ? (
+                      <p className='text-muted-foreground text-sm'>
+                        {t('sf_no_data')}
+                      </p>
+                    ) : (
+                      <p className='text-destructive text-sm'>{t('error')}</p>
+                    )
                   ) : staffingForecastQuery.data?.status === 200 ? (
                     <StaffingForecastPanel
                       data={staffingForecastQuery.data.data}
@@ -2498,6 +2517,60 @@ export default function StatisticsPage() {
                   ) : (
                     <p className='text-muted-foreground text-sm'>
                       {t('sf_no_data')}
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className='mt-4 lg:col-span-3'>
+                <CardHeader>
+                  <CardTitle>{t('anomaly_signals_title')}</CardTitle>
+                  <CardDescription>{t('anomaly_signals_body')}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {anomalyAlertsQuery.isLoading ? (
+                    <p className='text-muted-foreground text-sm'>
+                      {t('loading')}
+                    </p>
+                  ) : anomalyAlertsQuery.isError ? (
+                    <p className='text-destructive text-sm'>{t('error')}</p>
+                  ) : anomalyAlertsQuery.data?.status === 200 ? (
+                    <ul className='max-h-64 space-y-3 overflow-y-auto text-sm'>
+                      {(anomalyAlertsQuery.data.data.items ?? []).length ===
+                      0 ? (
+                        <li className='text-muted-foreground'>
+                          {t('anomaly_signals_empty')}
+                        </li>
+                      ) : (
+                        (anomalyAlertsQuery.data.data.items ?? []).map(
+                          (row) => (
+                            <li
+                              key={row.id ?? `${row.kind}-${row.createdAt}`}
+                              className='border-border border-b pb-2 last:border-0'
+                            >
+                              <p className='text-muted-foreground text-xs'>
+                                {row.createdAt
+                                  ? formatStatisticsTooltipLabel(
+                                      row.createdAt,
+                                      {
+                                        hourly: true,
+                                        locale: dateLocale
+                                      }
+                                    )
+                                  : '—'}
+                                {row.kind ? ` · ${row.kind}` : ''}
+                              </p>
+                              <p className='text-foreground mt-0.5'>
+                                {row.message}
+                              </p>
+                            </li>
+                          )
+                        )
+                      )}
+                    </ul>
+                  ) : (
+                    <p className='text-muted-foreground text-sm'>
+                      {t('anomaly_signals_unavailable')}
                     </p>
                   )}
                 </CardContent>

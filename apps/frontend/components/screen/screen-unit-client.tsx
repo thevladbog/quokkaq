@@ -14,7 +14,7 @@ import { getGetUnitsUnitIdTicketsQueryKey } from '@/lib/api/generated/tickets-co
 import { Ticket, unitsApi, Material, UnitConfig } from '@/lib/api';
 import { logger } from '@/lib/logger';
 import { useTickets, useUnit } from '@/lib/hooks';
-import { socketClient } from '@/lib/socket';
+import { socketClient, type UnitETASnapshot } from '@/lib/socket';
 import { AdPlayer } from '@/components/screen/ad-player';
 import { CalledTicketsTable } from '@/components/screen/called-tickets-table';
 import { QueueTicker } from '@/components/screen/queue-ticker';
@@ -98,6 +98,32 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
     refetchInterval: 120000
   });
 
+  // Queue status for ETA display (state must be declared before WebSocket handlers use setQueueStatus)
+  const [queueStatus, setQueueStatus] = useState<{
+    queueLength: number;
+    estimatedWaitMinutes: number;
+    activeCounters: number;
+    services?: Array<{
+      serviceId: string;
+      serviceName: string;
+      queueLength: number;
+      estimatedWaitMinutes: number;
+    }>;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!unitId) return;
+    const fetch = () => {
+      unitsApi
+        .getQueueStatus(unitId)
+        .then(setQueueStatus)
+        .catch(() => null);
+    };
+    fetch();
+    const iv = setInterval(fetch, 60_000);
+    return () => clearInterval(iv);
+  }, [unitId]);
+
   // Clock
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -138,10 +164,20 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
       scheduleWsRefetch();
     };
 
+    const handleEta = (snap: UnitETASnapshot) => {
+      setQueueStatus({
+        queueLength: snap.queueLength,
+        estimatedWaitMinutes: snap.estimatedWaitMinutes,
+        activeCounters: snap.activeCounters,
+        services: snap.services
+      });
+    };
+
     socketClient.onTicketCreated(handleTicketUpdate);
     socketClient.onTicketUpdated(handleTicketUpdate);
     socketClient.onTicketCalled(handleTicketUpdate);
     socketClient.onUnitEOD(handleEOD);
+    socketClient.onEtaUpdate(handleEta);
 
     return () => {
       if (wsDebounceRef.t) {
@@ -152,6 +188,7 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
       socketClient.off('ticket.updated', handleTicketUpdate);
       socketClient.off('ticket.called', handleTicketUpdate);
       socketClient.off('unit.eod', handleEOD);
+      socketClient.offEtaUpdate(handleEta);
       socketClient.disconnect();
     };
   }, [unitId, unitKind, unitParentId, queryClient]);
@@ -188,32 +225,6 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
       clearInterval(interval);
     };
   }, [unitId, unit]);
-
-  // Queue status for ETA display
-  const [queueStatus, setQueueStatus] = useState<{
-    queueLength: number;
-    estimatedWaitMinutes: number;
-    activeCounters: number;
-    services?: Array<{
-      serviceId: string;
-      serviceName: string;
-      queueLength: number;
-      estimatedWaitMinutes: number;
-    }>;
-  } | null>(null);
-
-  useEffect(() => {
-    if (!unitId) return;
-    const fetch = () => {
-      unitsApi
-        .getQueueStatus(unitId)
-        .then(setQueueStatus)
-        .catch(() => null);
-    };
-    fetch();
-    const iv = setInterval(fetch, 30_000);
-    return () => clearInterval(iv);
-  }, [unitId]);
 
   if (isUnitLoading) {
     return (
@@ -364,8 +375,8 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
           {/* Queue stats */}
           {queueStatus && (
             <div className='flex flex-wrap items-center gap-4 text-sm'>
-              {/* Per-service breakdown (when multiple services have waiting tickets) */}
-              {queueStatus.services && queueStatus.services.length > 1 ? (
+              {/* Per-service breakdown (live WS + snapshot; hidden when API omits single-service legacy shape) */}
+              {queueStatus.services && queueStatus.services.length > 0 ? (
                 queueStatus.services.map((svc) => (
                   <span
                     key={svc.serviceId}
@@ -386,12 +397,14 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
                 <>
                   <span>
                     {t('queueLength')}:{' '}
-                    <strong>{queueStatus.queueLength}</strong>
+                    <strong className='tabular-nums transition-all duration-300'>
+                      {queueStatus.queueLength}
+                    </strong>
                   </span>
                   {queueStatus.estimatedWaitMinutes > 0 && (
                     <span>
                       {t('estimatedWait')}:{' '}
-                      <strong>
+                      <strong className='tabular-nums transition-all duration-300'>
                         ~{Math.round(queueStatus.estimatedWaitMinutes)}{' '}
                         {t('minutes')}
                       </strong>

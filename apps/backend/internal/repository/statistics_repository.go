@@ -24,6 +24,9 @@ type StatisticsRepository interface {
 	UpsertDailyBucket(bucket *models.StatisticsDailyBucket) error
 	ListDailyBuckets(unitID, dateFrom, dateTo string, actorUserID *string, zoneQ StatisticsZoneQuery) ([]models.StatisticsDailyBucket, error)
 	DeleteDailyBucketsForUnitDay(unitID, bucketDate string) error
+	// AvgServiceSecSubdivisionRollup returns weighted average service duration (seconds) from daily buckets
+	// for the whole-subdivision aggregate actor (used when live ticket samples are sparse for ETA).
+	AvgServiceSecSubdivisionRollup(unitID string, lookbackDays int) (avgSec float64, ok bool, err error)
 
 	UpsertSurveyDaily(row *models.StatisticsSurveyDaily) error
 	DeleteSurveyDailyForUnitDay(unitID, bucketDate string) error
@@ -167,6 +170,37 @@ func (r *statisticsRepository) ListDailyBuckets(unitID, dateFrom, dateTo string,
 
 func (r *statisticsRepository) DeleteDailyBucketsForUnitDay(unitID, bucketDate string) error {
 	return r.db.Where("unit_id = ? AND bucket_date = ?", unitID, bucketDate).Delete(&models.StatisticsDailyBucket{}).Error
+}
+
+func (r *statisticsRepository) AvgServiceSecSubdivisionRollup(unitID string, lookbackDays int) (float64, bool, error) {
+	if lookbackDays <= 0 {
+		lookbackDays = 28
+	}
+	if lookbackDays > 366 {
+		lookbackDays = 366
+	}
+	cutoff := time.Now().UTC().AddDate(0, 0, -lookbackDays).Format("2006-01-02")
+	type agg struct {
+		SumMs int64 `gorm:"column:sum_ms"`
+		Cnt   int64 `gorm:"column:cnt"`
+	}
+	var row agg
+	err := r.db.Model(&models.StatisticsDailyBucket{}).
+		Select("COALESCE(SUM(service_sum_ms),0) AS sum_ms, COALESCE(SUM(service_count),0) AS cnt").
+		Where("unit_id::text = ? AND bucket_date >= ? AND actor_user_id::text = ? AND service_zone_id::text = ?",
+			unitID, cutoff, statisticsUnitAggregateActor, statisticsWholeSubdivisionServiceZone).
+		Scan(&row).Error
+	if err != nil {
+		return 0, false, err
+	}
+	if row.Cnt <= 0 || row.SumMs <= 0 {
+		return 0, false, nil
+	}
+	avgSec := float64(row.SumMs) / float64(row.Cnt) / 1000.0
+	if avgSec <= 0 {
+		return 0, false, nil
+	}
+	return avgSec, true, nil
 }
 
 // StatisticsSurveyAggregateSurveyID is stored as survey_definition_id for the combined “all surveys” norm-5 row.

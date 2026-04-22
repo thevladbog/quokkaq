@@ -52,6 +52,10 @@ type StaffingForecastResponse struct {
 	TargetMaxWaitMin float64                  `json:"targetMaxWaitMin"`
 	HourlyForecasts  []HourlyStaffingForecast `json:"hourlyForecasts"`
 	DailySummary     DailyStaffingSummary     `json:"dailySummary"`
+	// ArrivalUncertaintyPct is coefficient of variation of hourly expected arrivals (×100), as a confidence proxy.
+	ArrivalUncertaintyPct float64 `json:"arrivalUncertaintyPct"`
+	// LoadTrendPct compares total expected arrivals to a shifted lookback block (prior month window); 0 when unavailable.
+	LoadTrendPct float64 `json:"loadTrendPct"`
 }
 
 // hourlyArrivalRow holds the raw SQL aggregation result.
@@ -132,16 +136,59 @@ func (s *StatisticsService) GetStaffingForecast(ctx context.Context, unitID, com
 	}
 
 	summary := buildDailySummary(hourlyForecasts)
+	uncPct := hourlyArrivalUncertaintyPct(hourlyForecasts)
+	trendPct := 0.0
+	shifted := targetDate.AddDate(0, 0, -28)
+	shiftedWeekday := shifted.Weekday()
+	prevDates := historicalSameDayDates(shifted, shiftedWeekday, p.LookbackWeeks)
+	if len(prevDates) > 0 {
+		prevRows, perr := queryHourlyArrivals(ctx, s.db, unitID, tzName, prevDates)
+		if perr == nil && len(prevRows) > 0 {
+			var curTotal, prevTotal float64
+			for _, r := range hourlyForecasts {
+				curTotal += r.ExpectedArrivals
+			}
+			for _, r := range prevRows {
+				prevTotal += r.AvgArrivals
+			}
+			if prevTotal > 0 {
+				trendPct = math.Round((curTotal/prevTotal-1)*1000) / 10
+			}
+		}
+	}
 
 	return &StaffingForecastResponse{
-		UnitID:           unitID,
-		TargetDate:       p.TargetDate,
-		DayOfWeek:        targetWeekday.String(),
-		TargetSLAPct:     p.TargetSLAPercent,
-		TargetMaxWaitMin: p.TargetMaxWaitMin,
-		HourlyForecasts:  hourlyForecasts,
-		DailySummary:     summary,
+		UnitID:                unitID,
+		TargetDate:            p.TargetDate,
+		DayOfWeek:             targetWeekday.String(),
+		TargetSLAPct:          p.TargetSLAPercent,
+		TargetMaxWaitMin:      p.TargetMaxWaitMin,
+		HourlyForecasts:       hourlyForecasts,
+		DailySummary:          summary,
+		ArrivalUncertaintyPct: uncPct,
+		LoadTrendPct:          trendPct,
 	}, nil
+}
+
+func hourlyArrivalUncertaintyPct(hourly []HourlyStaffingForecast) float64 {
+	if len(hourly) == 0 {
+		return 0
+	}
+	var sum float64
+	for _, h := range hourly {
+		sum += h.ExpectedArrivals
+	}
+	mean := sum / float64(len(hourly))
+	if mean <= 0 {
+		return 0
+	}
+	var varSum float64
+	for _, h := range hourly {
+		d := h.ExpectedArrivals - mean
+		varSum += d * d
+	}
+	std := math.Sqrt(varSum / float64(len(hourly)))
+	return math.Round(std/mean*1000) / 10
 }
 
 // applyForecastDefaults fills in zero-value params with sensible defaults.

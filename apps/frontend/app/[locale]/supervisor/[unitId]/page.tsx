@@ -26,7 +26,11 @@ import type { ShiftCounterRow } from '@/components/supervisor/SupervisorWorkstat
 import { useSyncActiveUnit } from '@/contexts/ActiveUnitContext';
 import { getUnitDisplayName } from '@/lib/unit-display';
 import { useSlaAlerts } from '@/hooks/use-sla-alerts';
-import { socketClient } from '@/lib/socket';
+import {
+  socketClient,
+  type UnitAnomalyAlert,
+  type UnitStaffingAlert
+} from '@/lib/socket';
 
 export default function ShiftDashboardPage({
   params
@@ -48,6 +52,31 @@ export default function ShiftDashboardPage({
       socketClient.disconnect();
     };
   }, [unitId]);
+
+  useEffect(() => {
+    if (!unitId) return;
+    const onStaff = (a: UnitStaffingAlert) => {
+      if (a.unitId !== unitId) return;
+      toast.warning(a.message, {
+        description:
+          a.recommendedExtraCounters != null
+            ? t('staffing_alert_extra_counters', {
+                count: a.recommendedExtraCounters
+              })
+            : undefined
+      });
+    };
+    const onAnom = (a: UnitAnomalyAlert) => {
+      if (a.unitId !== unitId) return;
+      toast.error(a.message);
+    };
+    socketClient.onStaffingAlert(onStaff);
+    socketClient.onAnomalyAlert(onAnom);
+    return () => {
+      socketClient.offStaffingAlert(onStaff);
+      socketClient.offAnomalyAlert(onAnom);
+    };
+  }, [unitId, t]);
 
   const [showEODDialog, setShowEODDialog] = useState(false);
   const [forceReleaseDialogOpen, setForceReleaseDialogOpen] = useState(false);

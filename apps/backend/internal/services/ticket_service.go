@@ -243,12 +243,20 @@ type ticketService struct {
 	quota              QuotaService
 	operational        *OperationalService
 	notifService       *NotificationService
+	etaSched           ETAScheduler
 }
 
 // SetNotificationService wires in the SMS notification service after construction
 // (avoids a circular initialisation dependency).
 func (s *ticketService) SetNotificationService(ns *NotificationService) {
 	s.notifService = ns
+}
+
+func (s *ticketService) scheduleETA(unitID string) {
+	if s == nil || s.etaSched == nil || strings.TrimSpace(unitID) == "" {
+		return
+	}
+	s.etaSched.Schedule(unitID)
 }
 
 func NewTicketService(
@@ -608,6 +616,7 @@ func (s *ticketService) createTicketInternal(unitID, serviceID string, preRegID 
 	}
 
 	s.hub.BroadcastEvent("ticket.created", ticket, ticket.UnitID)
+	s.scheduleETA(ticket.UnitID)
 	return ticket, nil
 }
 
@@ -749,6 +758,7 @@ func (s *ticketService) CallNext(unitID, counterID string, serviceIDs []string, 
 		ticket.Counter = c
 	}
 	s.hub.BroadcastEvent("ticket.called", ticket, ticket.UnitID)
+	s.scheduleETA(ticket.UnitID)
 	if skillRoutingMiss && s.hub != nil {
 		s.hub.BroadcastEvent("unit.skill_routing_miss", map[string]interface{}{
 			"unitId":          unitID,
@@ -916,6 +926,7 @@ func (s *ticketService) UpdateStatus(ticketID, status string, actorUserID *strin
 	}
 
 	s.hub.BroadcastEvent("ticket.updated", ticket, ticket.UnitID)
+	s.scheduleETA(ticket.UnitID)
 	return ticket, nil
 }
 
@@ -948,6 +959,7 @@ func (s *ticketService) VisitorCancelTicket(ticketID string) (*models.Ticket, er
 		return nil, err
 	}
 	s.hub.BroadcastEvent("ticket.updated", ticket, ticket.UnitID)
+	s.scheduleETA(ticket.UnitID)
 	return ticket, nil
 }
 
@@ -1045,6 +1057,7 @@ func (s *ticketService) Recall(ticketID string, actorUserID *string) (*models.Ti
 		}
 	}
 	s.hub.BroadcastEvent("ticket.called", ticket, ticket.UnitID)
+	s.scheduleETA(ticket.UnitID)
 
 	if ticket.CounterID != nil {
 		s.enqueueTTS(ticket, *ticket.CounterID)
@@ -1113,6 +1126,7 @@ func (s *ticketService) Pick(ticketID, counterID string, actorUserID *string) (*
 		ticket.Counter = c
 	}
 	s.hub.BroadcastEvent("ticket.called", ticket, ticket.UnitID)
+	s.scheduleETA(ticket.UnitID)
 	s.enqueueTTS(ticket, counterID)
 
 	// Fire-and-forget SMS notification to visitor (parity with CallNext).
@@ -1382,6 +1396,7 @@ func (s *ticketService) Transfer(ticketID string, in TransferTicketInput, actorU
 	}
 
 	s.hub.BroadcastEvent("ticket.updated", ticket, ticket.UnitID)
+	s.scheduleETA(ticket.UnitID)
 	return ticket, nil
 }
 
@@ -1497,6 +1512,7 @@ func (s *ticketService) ReturnToQueue(ticketID string, actorUserID *string) (*mo
 	}
 
 	s.hub.BroadcastEvent("ticket.updated", ticket, ticket.UnitID)
+	s.scheduleETA(ticket.UnitID)
 	return ticket, nil
 }
 
@@ -1515,6 +1531,7 @@ func (s *ticketService) UpdateOperatorComment(ticketID string, comment *string, 
 	}
 
 	s.hub.BroadcastEvent("ticket.updated", ticket, ticket.UnitID)
+	s.scheduleETA(ticket.UnitID)
 	return ticket, nil
 }
 
@@ -1659,6 +1676,7 @@ func (s *ticketService) UpdateTicketVisitor(ticketID string, in PatchTicketVisit
 		return nil, err
 	}
 	s.hub.BroadcastEvent("ticket.updated", ticket, ticket.UnitID)
+	s.scheduleETA(ticket.UnitID)
 	return ticket, nil
 }
 
@@ -1783,6 +1801,7 @@ func (s *ticketService) SetVisitorTagsForTicket(ticketID string, tagDefinitionID
 		return nil, err
 	}
 	s.hub.BroadcastEvent("ticket.updated", ticket, ticket.UnitID)
+	s.scheduleETA(ticket.UnitID)
 	return ticket, nil
 }
 

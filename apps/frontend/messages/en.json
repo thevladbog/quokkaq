@@ -196,6 +196,21 @@
     "sf_avg_recommended": "Avg recommended",
     "sf_no_data": "Not enough historical data to compute a forecast.",
     "sf_erlang_hint": "Forecast for {dayOfWeek}. Target: ≥{sla}% of visitors wait ≤{wait} min. Based on same-weekday historical data.",
+    "sf_arrival_uncertainty": "Hourly variance (CV %)",
+    "sf_load_trend": "Load vs prior window",
+    "sf_ai_hint": "Variance shows how stable arrivals are across hours. Trend compares total expected load to a similar window four weeks earlier.",
+    "anomaly_signals_title": "Operational signals",
+    "anomaly_signals_body": "Recent anomalies are stored here; supervisors also get live toasts via WebSocket.",
+    "anomaly_signals_empty": "No anomaly records yet for this branch.",
+    "anomaly_signals_unavailable": "Could not load anomaly history.",
+    "sf_arrivals_band_title": "Expected arrivals (central line) with upper/lower band from hourly variance",
+    "sf_arrivals_high": "Upper band",
+    "sf_arrivals_low": "Lower band",
+    "sf_ai_recommendations_title": "AI-style recommendations (from forecast metrics)",
+    "sf_ai_peak_line": "Peak load is around {hour} (~{n} expected arrivals).",
+    "sf_ai_trend_up_line": "Total expected load is about {pct}% higher than the comparison window four weeks earlier — plan extra capacity.",
+    "sf_ai_trend_down_line": "Total expected load is about {pct}% lower than the comparison window — possible slack.",
+    "sf_ai_volatile_line": "Arrival variance across hours is high (CV ~{pct}%) — staffing needs may swing more than usual.",
     "radar_sla_wait": "Wait SLA",
     "radar_sla_service": "Service SLA",
     "radar_utilization": "Utilization",
@@ -1677,7 +1692,8 @@
       "listen": "Listen for announcements",
       "proceed": "Proceed to the counter when called",
       "newTicket": "Get Another Ticket",
-      "scanQrCode": "Scan the QR code to open the ticket on your phone"
+      "scanQrCode": "Scan the QR code to open the ticket on your phone",
+      "success_eta": "Approx. wait: ~{minutes} min"
     },
     "checkIn": "Check-in with Booking Code",
     "bookingCodePlaceholder": "Enter booking code",
@@ -2052,6 +2068,8 @@
     "processing": "Processing...",
     "cancel": "Cancel",
     "confirm": "Confirm",
+    "staffing_toast_extra_counters": "+{count, plural, one {# extra counter} other {# extra counters}}",
+    "staffing_alert_extra_counters": "+{count, plural, one {# extra counter} other {# extra counters}}",
     "pre_registration": {
       "badge": "PRE",
       "show_details_aria": "Show pre-registration details"
@@ -2376,6 +2394,7 @@
     "joining": "Joining...",
     "queue_length": "{count} in queue",
     "estimated_wait": "Wait ~{minutes} min.",
+    "estimated_wait_short": "~{minutes} min",
     "active_counters": "Operators: {count}",
     "join_error": "Failed to join the queue",
     "not_enabled": "Online queue joining is currently unavailable"

@@ -2,7 +2,9 @@ package services
 
 import (
 	"errors"
+	"fmt"
 	"testing"
+	"time"
 
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
@@ -42,6 +44,47 @@ func (s *etaTicketRepo) CountWaitingByUnit(_ string) (int64, error) {
 
 func (s *etaTicketRepo) CountWaitingByService(_ string) ([]repository.ServiceWaitingCount, error) {
 	return s.waitingByService, s.waitingByServiceErr
+}
+
+func (s *etaTicketRepo) GetWaitingTickets(_ string) ([]models.Ticket, error) {
+	return nil, nil
+}
+
+func (s *etaTicketRepo) GetServiceTimeHourlyVsOverall(_ string, _ string, _ int, _ time.Weekday, _ int) (float64, float64, error) {
+	return 0, 0, nil
+}
+
+func (s *etaTicketRepo) GetAvgServiceSecPerOccupiedCounter(_ string, _ int) (map[string]float64, error) {
+	return nil, nil
+}
+
+func (s *etaTicketRepo) GetWaitingTicketsWithSLA(_ string) ([]models.Ticket, error) {
+	return nil, nil
+}
+
+func (s *etaTicketRepo) CountTicketsCreatedSince(_ string, _ time.Time) (int64, error) {
+	return 0, nil
+}
+
+// etaStatsRepoStub implements StatisticsRepository for ETA bucket fallback tests.
+type etaStatsRepoStub struct {
+	avgSec float64
+	ok     bool
+	err    error
+}
+
+func (e *etaStatsRepoStub) UpsertDailyBucket(*models.StatisticsDailyBucket) error { return nil }
+func (e *etaStatsRepoStub) ListDailyBuckets(string, string, string, *string, repository.StatisticsZoneQuery) ([]models.StatisticsDailyBucket, error) {
+	return nil, nil
+}
+func (e *etaStatsRepoStub) DeleteDailyBucketsForUnitDay(string, string) error { return nil }
+func (e *etaStatsRepoStub) AvgServiceSecSubdivisionRollup(_ string, _ int) (float64, bool, error) {
+	return e.avgSec, e.ok, e.err
+}
+func (e *etaStatsRepoStub) UpsertSurveyDaily(*models.StatisticsSurveyDaily) error { return nil }
+func (e *etaStatsRepoStub) DeleteSurveyDailyForUnitDay(string, string) error      { return nil }
+func (e *etaStatsRepoStub) ListSurveyDaily(string, string, string) ([]models.StatisticsSurveyDaily, error) {
+	return nil, nil
 }
 
 // etaCounterRepo embeds the interface and only overrides CountActive.
@@ -258,11 +301,80 @@ func TestGetUnitQueueSummary_zeroQueueNoETA(t *testing.T) {
 	}
 }
 
+// countingTicketRepo counts GetAvgServiceSecPerOccupiedCounter calls and can return a fixed waiting list.
+type countingTicketRepo struct {
+	etaTicketRepo
+	getAvgCalls    int
+	waitingTickets []models.Ticket
+}
+
+func (r *countingTicketRepo) GetWaitingTickets(unitID string) ([]models.Ticket, error) {
+	if r.waitingTickets != nil {
+		return r.waitingTickets, nil
+	}
+	return r.etaTicketRepo.GetWaitingTickets(unitID)
+}
+
+func (r *countingTicketRepo) GetAvgServiceSecPerOccupiedCounter(unitID string, n int) (map[string]float64, error) {
+	r.getAvgCalls++
+	return r.etaTicketRepo.GetAvgServiceSecPerOccupiedCounter(unitID, n)
+}
+
+func TestComputeUnitETASnapshot_fetchesOccupiedCounterSamplesOnce(t *testing.T) {
+	t.Parallel()
+	unitID := "u1"
+	svcID := "s1"
+	samples := []int{60, 60, 60, 60, 60}
+	waiting := make([]models.Ticket, 20)
+	for i := range waiting {
+		waiting[i] = models.Ticket{
+			ID:        fmt.Sprintf("t%d", i),
+			Status:    "waiting",
+			UnitID:    unitID,
+			ServiceID: svcID,
+		}
+	}
+	repo := &countingTicketRepo{
+		etaTicketRepo: etaTicketRepo{
+			recentTimes:   map[string][]int{unitID + "|" + svcID: samples},
+			waitingByUnit: 20,
+		},
+		waitingTickets: waiting,
+	}
+	svc := NewETAService(repo, &etaCounterRepo{activeCount: 2})
+	snap, err := svc.ComputeUnitETASnapshot(unitID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if repo.getAvgCalls != 1 {
+		t.Errorf("GetAvgServiceSecPerOccupiedCounter: want 1 call, got %d", repo.getAvgCalls)
+	}
+	if len(snap.Tickets) != 20 {
+		t.Errorf("tickets in snapshot: want 20, got %d", len(snap.Tickets))
+	}
+}
+
+func TestEffectiveServiceMinutesForUnit_usesStatisticsDailyBucketsWhenFewLiveSamples(t *testing.T) {
+	t.Parallel()
+	unitID := "u1"
+	// No EWMA samples; unitRepo nil → time-of-day multiplier 1; bucket rollup used before raw-ticket hourly fallback.
+	ticketRepo := &etaTicketRepo{
+		recentTimes: map[string][]int{},
+	}
+	statsRepo := &etaStatsRepoStub{avgSec: 120, ok: true}
+	eta := NewETAServiceFull(ticketRepo, &etaCounterRepo{activeCount: 1}, &etaServiceRepo{}, nil, statsRepo)
+	min := eta.EffectiveServiceMinutesForUnit(unitID)
+	if min < 1.99 || min > 2.01 {
+		t.Fatalf("want ~2.0 minutes from 120s bucket rollup, got %v", min)
+	}
+}
+
 // compile-time check: ensure embedded nil interfaces are correctly set up
 var (
-	_ repository.TicketRepository  = (*etaTicketRepo)(nil)
-	_ repository.CounterRepository = (*etaCounterRepo)(nil)
-	_ repository.ServiceRepository = (*etaServiceRepo)(nil)
+	_ repository.TicketRepository     = (*etaTicketRepo)(nil)
+	_ repository.CounterRepository    = (*etaCounterRepo)(nil)
+	_ repository.ServiceRepository    = (*etaServiceRepo)(nil)
+	_ repository.StatisticsRepository = (*etaStatsRepoStub)(nil)
 )
 
 // suppress unused import for gorm needed by embedded interface

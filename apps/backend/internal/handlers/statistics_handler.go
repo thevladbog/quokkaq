@@ -783,6 +783,52 @@ func (h *StatisticsHandler) GetStaffingForecast(w http.ResponseWriter, r *http.R
 	RespondJSON(w, resp)
 }
 
+// GetAnomalyAlerts godoc
+// @ID           getUnitStatisticsAnomalyAlerts
+// @Summary      Recent persisted operational anomaly signals for the unit
+// @Description  Returns rows from anomaly_alerts for the subdivision. Requires statistics scope and advanced_reports plan feature.
+// @Tags         statistics
+// @Security     BearerAuth
+// @Param        unitId path   string true  "Subdivision unit ID"
+// @Param        limit  query  int    false "Max rows" default(50) minimum(1) maximum(200)
+// @Success      200 {object} services.AnomalyAlertsResponse
+// @Failure      401 {string} string "Unauthorized"
+// @Failure      403 {string} string "Forbidden"
+// @Failure      404 {string} string "Unit not found"
+// @Failure      500 {string} string "Internal server error"
+// @Router       /units/{unitId}/statistics/anomaly-alerts [get]
+func (h *StatisticsHandler) GetAnomalyAlerts(w http.ResponseWriter, r *http.Request) {
+	unitID := chi.URLParam(r, "unitId")
+	viewerID, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok || viewerID == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	user, err := h.userRepo.FindByID(r.Context(), viewerID)
+	if err != nil {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+	companyID, err := h.subdivisionCompanyID(r.Context(), unitID)
+	if err != nil {
+		http.Error(w, "Unit not found", http.StatusNotFound)
+		return
+	}
+	limit := parseIntOrDefault(r.URL.Query().Get("limit"), 50)
+	if limit > 200 {
+		limit = 200
+	}
+	resp, err := h.service.GetAnomalyAlerts(r.Context(), unitID, companyID, user, viewerID, limit)
+	if err != nil {
+		if respondStatisticsServiceErr(w, err) {
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	RespondJSON(w, resp)
+}
+
 func parseFloatOrDefault(s string, def float64) float64 {
 	if s == "" {
 		return def

@@ -219,6 +219,15 @@ type TicketRepository interface {
 	CountWaitingByUnit(unitID string) (int64, error)
 	// CountWaitingByService returns the waiting non-EOD ticket count grouped by service_id for a unit.
 	CountWaitingByService(unitID string) ([]ServiceWaitingCount, error)
+
+	// GetServiceTimeHourlyVsOverall returns average service duration (seconds) for tickets created in the same
+	// local hour and weekday vs overall average over lookbackDays, for ETA time-of-day adjustment.
+	GetServiceTimeHourlyVsOverall(unitID, tzName string, hour int, weekday time.Weekday, lookbackDays int) (hourlyAvgSec float64, overallAvgSec float64, err error)
+	// GetAvgServiceSecPerOccupiedCounter returns average service seconds from the last up to samplePerCounter
+	// completed tickets per counter that is currently occupied (assigned_to set) in the unit.
+	GetAvgServiceSecPerOccupiedCounter(unitID string, samplePerCounter int) (map[string]float64, error)
+	// CountTicketsCreatedSince counts non-EOD tickets created at or after `since` (UTC) for arrival-rate (Erlang λ).
+	CountTicketsCreatedSince(unitID string, since time.Time) (int64, error)
 }
 
 // ServiceWaitingCount holds the waiting queue length for a single service.
@@ -812,6 +821,14 @@ func (r *ticketRepository) CountWaitingByUnit(unitID string) (int64, error) {
 	return count, err
 }
 
+func (r *ticketRepository) CountTicketsCreatedSince(unitID string, since time.Time) (int64, error) {
+	var count int64
+	err := r.db.Model(&models.Ticket{}).
+		Where("unit_id = ? AND is_eod = false AND created_at >= ?", unitID, since.UTC()).
+		Count(&count).Error
+	return count, err
+}
+
 func (r *ticketRepository) CountWaitingByService(unitID string) ([]ServiceWaitingCount, error) {
 	type row struct {
 		ServiceID string `gorm:"column:service_id"`
@@ -829,6 +846,94 @@ func (r *ticketRepository) CountWaitingByService(unitID string) ([]ServiceWaitin
 	out := make([]ServiceWaitingCount, len(rows))
 	for i, r := range rows {
 		out[i] = ServiceWaitingCount(r)
+	}
+	return out, nil
+}
+
+func (r *ticketRepository) GetServiceTimeHourlyVsOverall(unitID, tzName string, hour int, weekday time.Weekday, lookbackDays int) (hourlyAvgSec float64, overallAvgSec float64, err error) {
+	if lookbackDays <= 0 {
+		lookbackDays = 28
+	}
+	if lookbackDays > 366 {
+		lookbackDays = 366
+	}
+	tz := strings.TrimSpace(tzName)
+	if tz == "" {
+		tz = "UTC"
+	}
+	dow := int(weekday)
+	if dow < 0 || dow > 6 {
+		dow = 0
+	}
+	if hour < 0 || hour > 23 {
+		hour = 0
+	}
+
+	err = r.db.Raw(`
+SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (t.completed_at - t.confirmed_at))), 0)::float AS v
+FROM tickets t
+WHERE t.unit_id = ?
+  AND t.status = 'served' AND t.is_eod = false
+  AND t.confirmed_at IS NOT NULL AND t.completed_at IS NOT NULL
+  AND t.created_at >= NOW() - (?::int * INTERVAL '1 day')
+`, unitID, lookbackDays).Scan(&overallAvgSec).Error
+	if err != nil {
+		return 0, 0, err
+	}
+
+	err = r.db.Raw(`
+SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (t.completed_at - t.confirmed_at))), 0)::float AS v
+FROM tickets t
+WHERE t.unit_id = ?
+  AND t.status = 'served' AND t.is_eod = false
+  AND t.confirmed_at IS NOT NULL AND t.completed_at IS NOT NULL
+  AND t.created_at >= NOW() - (?::int * INTERVAL '1 day')
+  AND EXTRACT(HOUR FROM (t.created_at AT TIME ZONE ?))::int = ?
+  AND EXTRACT(DOW FROM (t.created_at AT TIME ZONE ?))::int = ?
+`, unitID, lookbackDays, tz, hour, tz, dow).Scan(&hourlyAvgSec).Error
+	if err != nil {
+		return 0, overallAvgSec, err
+	}
+	return hourlyAvgSec, overallAvgSec, nil
+}
+
+func (r *ticketRepository) GetAvgServiceSecPerOccupiedCounter(unitID string, samplePerCounter int) (map[string]float64, error) {
+	if samplePerCounter <= 0 {
+		samplePerCounter = 5
+	}
+	if samplePerCounter > 50 {
+		samplePerCounter = 50
+	}
+	type row struct {
+		CounterID string  `gorm:"column:counter_id"`
+		AvgSec    float64 `gorm:"column:avg_sec"`
+	}
+	var rows []row
+	q := `
+SELECT sub.counter_id, AVG(sub.dur)::float AS avg_sec
+FROM (
+  SELECT t.counter_id::text AS counter_id,
+         EXTRACT(EPOCH FROM (t.completed_at - t.confirmed_at))::float AS dur,
+         ROW_NUMBER() OVER (PARTITION BY t.counter_id ORDER BY t.completed_at DESC) AS rn
+  FROM tickets t
+  INNER JOIN counters c ON c.id = t.counter_id AND c.unit_id = ? AND c.assigned_to IS NOT NULL
+  WHERE t.unit_id = ? AND t.status = 'served' AND t.is_eod = false
+    AND t.counter_id IS NOT NULL
+    AND t.confirmed_at IS NOT NULL AND t.completed_at IS NOT NULL
+    AND EXTRACT(EPOCH FROM (t.completed_at - t.confirmed_at)) > 0
+) sub
+WHERE sub.rn <= ?
+GROUP BY sub.counter_id
+`
+	err := r.db.Raw(q, unitID, unitID, samplePerCounter).Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]float64, len(rows))
+	for _, rw := range rows {
+		if rw.CounterID != "" && rw.AvgSec > 0 {
+			out[rw.CounterID] = rw.AvgSec
+		}
 	}
 	return out, nil
 }

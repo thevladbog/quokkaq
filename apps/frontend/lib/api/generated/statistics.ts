@@ -1894,6 +1894,19 @@ export interface RepositorySupportReportShareCandidate {
   userId?: string;
 }
 
+export interface ServicesAnomalyAlertItem {
+  createdAt?: string;
+  id?: string;
+  kind?: string;
+  message?: string;
+  severity?: string;
+  unitId?: string;
+}
+
+export interface ServicesAnomalyAlertsResponse {
+  items?: ServicesAnomalyAlertItem[];
+}
+
 export interface ServicesCalendarIntegrationPublic {
   adminNotifyEmails?: string;
   caldavBaseUrl?: string;
@@ -2255,9 +2268,13 @@ export interface ServicesStaffPerformanceListResponse {
 }
 
 export interface ServicesStaffingForecastResponse {
+  /** ArrivalUncertaintyPct is coefficient of variation of hourly expected arrivals (×100), as a confidence proxy. */
+  arrivalUncertaintyPct?: number;
   dailySummary?: ServicesDailyStaffingSummary;
   dayOfWeek?: string;
   hourlyForecasts?: ServicesHourlyStaffingForecast[];
+  /** LoadTrendPct compares total expected arrivals to a shifted lookback block (prior month window); 0 when unavailable. */
+  loadTrendPct?: number;
   targetDate?: string;
   targetMaxWaitMin?: number;
   targetSlaPct?: number;
@@ -2414,6 +2431,15 @@ export interface ServicesUtilizationResponse {
   granularity?: string;
   points?: ServicesUtilizationPoint[];
 }
+
+export type GetUnitStatisticsAnomalyAlertsParams = {
+/**
+ * Max rows
+ * @minimum 1
+ * @maximum 200
+ */
+limit?: number;
+};
 
 export type GetUnitStatisticsEmployeeRadarParams = {
 /**
@@ -3010,6 +3036,157 @@ export function useGetUnitOperationsStatus<TData = Awaited<ReturnType<typeof get
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetUnitOperationsStatusQueryOptions(unitId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * Returns rows from anomaly_alerts for the subdivision. Requires statistics scope and advanced_reports plan feature.
+ * @summary Recent persisted operational anomaly signals for the unit
+ */
+export type getUnitStatisticsAnomalyAlertsResponse200 = {
+  data: ServicesAnomalyAlertsResponse
+  status: 200
+}
+
+export type getUnitStatisticsAnomalyAlertsResponse401 = {
+  data: string
+  status: 401
+}
+
+export type getUnitStatisticsAnomalyAlertsResponse403 = {
+  data: string
+  status: 403
+}
+
+export type getUnitStatisticsAnomalyAlertsResponse404 = {
+  data: string
+  status: 404
+}
+
+export type getUnitStatisticsAnomalyAlertsResponse500 = {
+  data: string
+  status: 500
+}
+
+export type getUnitStatisticsAnomalyAlertsResponseSuccess = (getUnitStatisticsAnomalyAlertsResponse200) & {
+  headers: Headers;
+};
+export type getUnitStatisticsAnomalyAlertsResponseError = (getUnitStatisticsAnomalyAlertsResponse401 | getUnitStatisticsAnomalyAlertsResponse403 | getUnitStatisticsAnomalyAlertsResponse404 | getUnitStatisticsAnomalyAlertsResponse500) & {
+  headers: Headers;
+};
+
+export type getUnitStatisticsAnomalyAlertsResponse = (getUnitStatisticsAnomalyAlertsResponseSuccess | getUnitStatisticsAnomalyAlertsResponseError)
+
+export const getGetUnitStatisticsAnomalyAlertsUrl = (unitId: string,
+    params?: GetUnitStatisticsAnomalyAlertsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/units/${unitId}/statistics/anomaly-alerts?${stringifiedParams}` : `/units/${unitId}/statistics/anomaly-alerts`
+}
+
+export const getUnitStatisticsAnomalyAlerts = async (unitId: string,
+    params?: GetUnitStatisticsAnomalyAlertsParams, options?: RequestInit): Promise<getUnitStatisticsAnomalyAlertsResponse> => {
+
+  return orvalMutator<getUnitStatisticsAnomalyAlertsResponse>(getGetUnitStatisticsAnomalyAlertsUrl(unitId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetUnitStatisticsAnomalyAlertsQueryKey = (unitId: string,
+    params?: GetUnitStatisticsAnomalyAlertsParams,) => {
+    return [
+    `/units/${unitId}/statistics/anomaly-alerts`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetUnitStatisticsAnomalyAlertsQueryOptions = <TData = Awaited<ReturnType<typeof getUnitStatisticsAnomalyAlerts>>, TError = string>(unitId: string,
+    params?: GetUnitStatisticsAnomalyAlertsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsAnomalyAlerts>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetUnitStatisticsAnomalyAlertsQueryKey(unitId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUnitStatisticsAnomalyAlerts>>> = ({ signal }) => getUnitStatisticsAnomalyAlerts(unitId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsAnomalyAlerts>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetUnitStatisticsAnomalyAlertsQueryResult = NonNullable<Awaited<ReturnType<typeof getUnitStatisticsAnomalyAlerts>>>
+export type GetUnitStatisticsAnomalyAlertsQueryError = string
+
+
+export function useGetUnitStatisticsAnomalyAlerts<TData = Awaited<ReturnType<typeof getUnitStatisticsAnomalyAlerts>>, TError = string>(
+ unitId: string,
+    params: undefined |  GetUnitStatisticsAnomalyAlertsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsAnomalyAlerts>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getUnitStatisticsAnomalyAlerts>>,
+          TError,
+          Awaited<ReturnType<typeof getUnitStatisticsAnomalyAlerts>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetUnitStatisticsAnomalyAlerts<TData = Awaited<ReturnType<typeof getUnitStatisticsAnomalyAlerts>>, TError = string>(
+ unitId: string,
+    params?: GetUnitStatisticsAnomalyAlertsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsAnomalyAlerts>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getUnitStatisticsAnomalyAlerts>>,
+          TError,
+          Awaited<ReturnType<typeof getUnitStatisticsAnomalyAlerts>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetUnitStatisticsAnomalyAlerts<TData = Awaited<ReturnType<typeof getUnitStatisticsAnomalyAlerts>>, TError = string>(
+ unitId: string,
+    params?: GetUnitStatisticsAnomalyAlertsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsAnomalyAlerts>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Recent persisted operational anomaly signals for the unit
+ */
+
+export function useGetUnitStatisticsAnomalyAlerts<TData = Awaited<ReturnType<typeof getUnitStatisticsAnomalyAlerts>>, TError = string>(
+ unitId: string,
+    params?: GetUnitStatisticsAnomalyAlertsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsAnomalyAlerts>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetUnitStatisticsAnomalyAlertsQueryOptions(unitId,params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
