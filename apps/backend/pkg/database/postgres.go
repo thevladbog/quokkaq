@@ -2340,6 +2340,37 @@ ALTER TABLE subscription_plans
 `).Error; err != nil {
 			return err
 		}
+		if err := db.Exec(`
+DO $$
+BEGIN
+	ALTER TABLE subscription_plans
+		ADD CONSTRAINT subscription_plans_annual_prepay_discount_pct_chk
+		CHECK (annual_prepay_discount_percent IS NULL OR (annual_prepay_discount_percent BETWEEN 1 AND 100));
+EXCEPTION
+	WHEN duplicate_object THEN NULL;
+END $$;
+DO $$
+BEGIN
+	ALTER TABLE subscription_plans
+		ADD CONSTRAINT subscription_plans_annual_prepay_price_per_mo_chk
+		CHECK (annual_prepay_price_per_month IS NULL OR annual_prepay_price_per_month > 0);
+EXCEPTION
+	WHEN duplicate_object THEN NULL;
+END $$;
+DO $$
+BEGIN
+	ALTER TABLE subscription_plans
+		ADD CONSTRAINT subscription_plans_annual_prepay_exclusive_chk
+		CHECK (
+			(annual_prepay_discount_percent IS NULL)
+			OR (annual_prepay_price_per_month IS NULL)
+		);
+EXCEPTION
+	WHEN duplicate_object THEN NULL;
+END $$;
+`).Error; err != nil {
+			return err
+		}
 		return nil
 	})
 	if err != nil {

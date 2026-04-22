@@ -33,6 +33,13 @@ func applyTweaks(doc *openapi3.T) error {
 		return err
 	}
 
+	if err := patchBillingPeriodEnums(comp); err != nil {
+		return err
+	}
+	if err := patchAnnualPrepaySchemaConstraints(comp); err != nil {
+		return err
+	}
+
 	if err := patchSecuritySchemesSessionCookie(doc); err != nil {
 		return err
 	}
@@ -405,6 +412,80 @@ func patchPlanJSONObjectMaps(comp *openapi3.Components) error {
 		return fmt.Errorf("applyTweaks: no plan map object properties patched "+
 			"(expected inline type:object props [features limits limitsNegotiable] on at least one of %v; swag/OpenAPI drift?)",
 			schemaKeys)
+	}
+	return nil
+}
+
+func patchBillingPeriodEnums(comp *openapi3.Components) error {
+	type bpPatch struct {
+		schema      string
+		withDefault bool
+	}
+	for _, p := range []bpPatch{
+		{"handlers.CreateCheckoutRequest", true},
+		{"handlers.SignupRequest", true},
+		{"handlers.PlanChangeRequestBody", true},
+		{"handlers.CustomTermsLeadRequestBody", false},
+		{"handlers.PublicLeadRequestBody", false},
+	} {
+		s, err := getSchema(comp, p.schema)
+		if err != nil {
+			return err
+		}
+		pRef, ok := s.Properties["billingPeriod"]
+		if !ok || pRef == nil || pRef.Value == nil {
+			return fmt.Errorf("patchBillingPeriodEnums: %q missing billingPeriod property", p.schema)
+		}
+		v := pRef.Value
+		v.Type = &openapi3.Types{"string"}
+		v.Enum = []interface{}{"month", "annual"}
+		if p.withDefault {
+			v.Default = "month"
+		} else {
+			v.Default = nil
+		}
+	}
+	return nil
+}
+
+func patchAnnualPrepaySchemaConstraints(comp *openapi3.Components) error {
+	one := float64(1)
+	hundred := float64(100)
+	schemaNames := []string{
+		"handlers.PlatformCreateSubscriptionPlanBody",
+		"handlers.PlatformUpdateSubscriptionPlanBody",
+		"models.SubscriptionPlan",
+	}
+	for _, name := range schemaNames {
+		s, err := getSchema(comp, name)
+		if err != nil {
+			return err
+		}
+		if pRef, ok := s.Properties["annualPrepayDiscountPercent"]; ok && pRef != nil && pRef.Value != nil {
+			p := pRef.Value
+			p.Type = &openapi3.Types{"integer"}
+			p.Min = &one
+			p.Max = &hundred
+		} else {
+			return fmt.Errorf("patchAnnualPrepaySchemaConstraints: %q missing annualPrepayDiscountPercent", name)
+		}
+		if pRef, ok := s.Properties["annualPrepayPricePerMonth"]; ok && pRef != nil && pRef.Value != nil {
+			p := pRef.Value
+			p.Type = &openapi3.Types{"integer"}
+			p.Min = &one
+		} else {
+			return fmt.Errorf("patchAnnualPrepaySchemaConstraints: %q missing annualPrepayPricePerMonth", name)
+		}
+		ex := &openapi3.SchemaRef{
+			Value: &openapi3.Schema{
+				Not: &openapi3.SchemaRef{
+					Value: &openapi3.Schema{
+						Required: []string{"annualPrepayDiscountPercent", "annualPrepayPricePerMonth"},
+					},
+				},
+			},
+		}
+		s.AllOf = append(s.AllOf, ex)
 	}
 	return nil
 }

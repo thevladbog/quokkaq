@@ -44,7 +44,9 @@ export function LeadRequestCta({
         className={className}
         onClick={() => {
           pushMarketingEvent('marketing_lead_open', {
-            source: `${source}_mailto`
+            source: `${source}_mailto`,
+            plan_code: planCode?.trim() ?? '',
+            billing_period: billingPeriod?.trim() || 'month'
           });
         }}
       >

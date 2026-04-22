@@ -19,8 +19,8 @@ export function planSupportsAnnualPrepay(plan: SubscriptionPlan): boolean {
   return false;
 }
 
-/** Effective monthly price in minor units when paying for 12 months (display). */
-export function annualPrepayEffectiveMonthlyMinor(
+/** Total minor units charged once per year in Stripe for annual prepay checkout. */
+export function annualPrepayStripeYearlyUnitAmountMinor(
   plan: SubscriptionPlan
 ): number | null {
   if (!planSupportsAnnualPrepay(plan)) {
@@ -28,38 +28,35 @@ export function annualPrepayEffectiveMonthlyMinor(
   }
   const ppm = plan.annualPrepayPricePerMonth;
   if (ppm != null) {
-    return Math.trunc(ppm);
+    return Math.trunc(ppm * 12);
   }
   const pct = plan.annualPrepayDiscountPercent;
   if (pct == null) {
     return null;
   }
-  return Math.trunc((plan.price * (100 - pct)) / 100);
+  return Math.trunc((plan.price * 12 * (100 - pct)) / 100);
 }
 
-/** Total minor units charged once per year in Stripe for annual prepay checkout. */
-export function annualPrepayStripeYearlyUnitAmountMinor(
+/** Effective monthly price in minor units when paying for 12 months (display). */
+export function annualPrepayEffectiveMonthlyMinor(
   plan: SubscriptionPlan
 ): number | null {
-  const monthly = annualPrepayEffectiveMonthlyMinor(plan);
-  if (monthly == null) {
+  const yearly = annualPrepayStripeYearlyUnitAmountMinor(plan);
+  if (yearly == null) {
     return null;
   }
-  return monthly * 12;
+  return Math.trunc(yearly / 12);
 }
 
 /** Approximate savings vs 12× list monthly (minor units); null if not applicable. */
 export function annualPrepaySavingsMinorUnits(
   plan: SubscriptionPlan
 ): number | null {
-  if (!planSupportsAnnualPrepay(plan)) {
+  const yearly = annualPrepayStripeYearlyUnitAmountMinor(plan);
+  if (yearly == null) {
     return null;
   }
-  const eff = annualPrepayEffectiveMonthlyMinor(plan);
-  if (eff == null) {
-    return null;
-  }
-  return Math.max(0, plan.price * 12 - eff * 12);
+  return Math.max(0, plan.price * 12 - yearly);
 }
 
 /**

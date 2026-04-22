@@ -723,6 +723,7 @@ export const useCreateService = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
+      queryClient.invalidateQueries({ queryKey: ['units'] });
     }
   });
 };
@@ -772,6 +773,7 @@ export const useUpdateService = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
+      queryClient.invalidateQueries({ queryKey: ['units'] });
     }
   });
 };
@@ -783,6 +785,7 @@ export const useDeleteService = () => {
     mutationFn: ({ id }: { id: string }) => servicesApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
+      queryClient.invalidateQueries({ queryKey: ['units'] });
     }
   });
 };

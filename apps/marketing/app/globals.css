@@ -307,6 +307,7 @@ body.doc-scroll-active::-webkit-scrollbar-thumb:hover {
   position: relative;
   padding: 0.38rem 0.58rem 0.32rem;
   border-radius: 999px;
+  color: var(--color-text);
   background: linear-gradient(
     145deg,
     rgb(253 230 138 / 0.96),
@@ -323,7 +324,7 @@ body.doc-scroll-active::-webkit-scrollbar-thumb:hover {
     rgb(245 158 11 / 0.22)
   );
   border-color: rgb(251 191 36 / 0.48);
-  color: rgb(254 249 195) !important;
+  color: rgb(254 249 195);
 }
 
 @media (prefers-reduced-motion: reduce) {

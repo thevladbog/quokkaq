@@ -277,7 +277,7 @@ func (h *SubscriptionHandler) GetPlans(w http.ResponseWriter, r *http.Request) {
 type CreateCheckoutRequest struct {
 	PlanCode string `json:"planCode"`
 	// BillingPeriod is "month" (default) or "annual" (12-month prepay when configured on the plan).
-	BillingPeriod string `json:"billingPeriod"`
+	BillingPeriod string `json:"billingPeriod" enums:"month,annual" default:"month"`
 }
 
 // CreateCheckoutResponse represents checkout session response
@@ -381,7 +381,7 @@ func (h *SubscriptionHandler) CreateCheckout(w http.ResponseWriter, r *http.Requ
 				return
 			}
 			logger.PrintfCtx(r.Context(), "CreateCheckout CheckoutLineForBilling: %v", errLine)
-			http.Error(w, "invalid annual billing configuration", http.StatusBadRequest)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 		stripeLine = line
@@ -525,7 +525,7 @@ const maxPlanChangeRequestBodyBytes = 4096
 type PlanChangeRequestBody struct {
 	RequestedPlanCode string `json:"requestedPlanCode" binding:"required" minLength:"1"`
 	// BillingPeriod is optional: "month" (default) or "annual" when the target plan supports annual prepay.
-	BillingPeriod string `json:"billingPeriod"`
+	BillingPeriod string `json:"billingPeriod" enums:"month,annual" default:"month"`
 }
 
 // PostPlanChangeRequest creates a Yandex Tracker issue for a requested subscription plan change (same queue as marketing leads).
@@ -598,7 +598,7 @@ const maxCustomTermsCommentRunes = 8000
 type CustomTermsLeadRequestBody struct {
 	Comment string `json:"comment" binding:"required" minLength:"1"`
 	// BillingPeriod optional context for sales: "month" or "annual".
-	BillingPeriod string `json:"billingPeriod"`
+	BillingPeriod string `json:"billingPeriod" enums:"month,annual"`
 }
 
 // PostCustomTermsLeadRequest creates a [REQ] Yandex Tracker issue (individual pricing / custom terms).

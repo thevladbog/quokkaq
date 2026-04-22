@@ -902,8 +902,8 @@ type PlatformCreateSubscriptionPlanBody struct {
 	// enums: flat,per_unit
 	PricingModel *string `json:"pricingModel,omitempty" enums:"flat,per_unit"`
 	// Annual prepay (monthly plans only): set at most one of discount percent (1–100) or fixed effective monthly price (minor units).
-	AnnualPrepayDiscountPercent *int   `json:"annualPrepayDiscountPercent,omitempty"`
-	AnnualPrepayPricePerMonth   *int64 `json:"annualPrepayPricePerMonth,omitempty"`
+	AnnualPrepayDiscountPercent *int   `json:"annualPrepayDiscountPercent,omitempty" minimum:"1" maximum:"100"`
+	AnnualPrepayPricePerMonth   *int64 `json:"annualPrepayPricePerMonth,omitempty" minimum:"1"`
 }
 
 // CreateSubscriptionPlan godoc
@@ -1055,8 +1055,8 @@ type PlatformUpdateSubscriptionPlanBody struct {
 	// PricingModel: "flat" or "per_unit". Omit to leave unchanged.
 	// enums: flat,per_unit
 	PricingModel                *string `json:"pricingModel,omitempty" enums:"flat,per_unit"`
-	AnnualPrepayDiscountPercent *int    `json:"annualPrepayDiscountPercent,omitempty"`
-	AnnualPrepayPricePerMonth   *int64  `json:"annualPrepayPricePerMonth,omitempty"`
+	AnnualPrepayDiscountPercent *int    `json:"annualPrepayDiscountPercent,omitempty" minimum:"1" maximum:"100"`
+	AnnualPrepayPricePerMonth   *int64  `json:"annualPrepayPricePerMonth,omitempty" minimum:"1"`
 }
 
 // UpdateSubscriptionPlan godoc
@@ -1163,8 +1163,12 @@ func (h *PlatformHandler) UpdateSubscriptionPlan(w http.ResponseWriter, r *http.
 		}
 		plan.LimitsNegotiable = neg
 	}
-	plan.AnnualPrepayDiscountPercent = body.AnnualPrepayDiscountPercent
-	plan.AnnualPrepayPricePerMonth = body.AnnualPrepayPricePerMonth
+	if body.AnnualPrepayDiscountPercent != nil {
+		plan.AnnualPrepayDiscountPercent = body.AnnualPrepayDiscountPercent
+	}
+	if body.AnnualPrepayPricePerMonth != nil {
+		plan.AnnualPrepayPricePerMonth = body.AnnualPrepayPricePerMonth
+	}
 	if err := database.DB.Transaction(func(tx *gorm.DB) error {
 		if body.IsPromoted != nil && *body.IsPromoted {
 			if err := tx.Model(&models.SubscriptionPlan{}).Where("id <> ?", id).Update("is_promoted", false).Error; err != nil {

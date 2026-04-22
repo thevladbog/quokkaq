@@ -729,6 +729,7 @@ export default function PlatformPlansPage() {
               {t('annualPrepayHint')}
             </p>
           </div>
+          {/* TODO: migrate to shadcn/Radix RadioGroup for shared keyboard + roving tabindex semantics. */}
           <div
             className='flex flex-wrap gap-2'
             role='radiogroup'

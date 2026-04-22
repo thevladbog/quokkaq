@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import type { SubscriptionPlan } from '@quokkaq/shared-types';
 import {
@@ -49,6 +49,7 @@ export function LandingPricing({
   const [billingPeriod, setBillingPeriod] = useState<'month' | 'annual'>(
     'month'
   );
+  const billingTablistRef = useRef<HTMLDivElement>(null);
   const showBillingToggle = useMemo(
     () => apiPlans.some((p) => planSupportsAnnualPrepay(p)),
     [apiPlans]
@@ -82,20 +83,45 @@ export function LandingPricing({
         {useApi && showBillingToggle ? (
           <div className='mb-10 flex justify-center'>
             <div
+              ref={billingTablistRef}
               role='tablist'
-              aria-label={copy.pricingFromApi.billingToggleMonth}
+              aria-label={copy.pricingFromApi.billingToggleGroupLabel}
+              tabIndex={0}
               className='border-[color:var(--color-border)] bg-[color:var(--color-surface-elevated)] inline-flex rounded-full border p-1 shadow-sm'
+              onKeyDown={(e) => {
+                if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') {
+                  return;
+                }
+                e.preventDefault();
+                const root = billingTablistRef.current;
+                const tabs = root?.querySelectorAll<HTMLButtonElement>(
+                  'button[role="tab"]'
+                );
+                if (!tabs?.length) {
+                  return;
+                }
+                const cur = billingPeriod === 'month' ? 0 : 1;
+                const dir = e.key === 'ArrowRight' ? 1 : -1;
+                const next = (cur + dir + tabs.length) % tabs.length;
+                const nextPeriod = next === 0 ? 'month' : 'annual';
+                setBillingPeriod(nextPeriod);
+                tabs[next]?.focus();
+              }}
             >
               <button
                 type='button'
                 role='tab'
                 aria-selected={billingPeriod === 'month'}
+                tabIndex={-1}
                 className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
                   billingPeriod === 'month'
                     ? 'bg-[color:var(--color-primary)] text-white shadow'
                     : 'text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)]'
                 }`}
-                onClick={() => setBillingPeriod('month')}
+                onClick={() => {
+                  setBillingPeriod('month');
+                  billingTablistRef.current?.focus();
+                }}
               >
                 {copy.pricingFromApi.billingToggleMonth}
               </button>
@@ -103,12 +129,16 @@ export function LandingPricing({
                 type='button'
                 role='tab'
                 aria-selected={billingPeriod === 'annual'}
+                tabIndex={-1}
                 className={`relative rounded-full px-4 py-2 text-sm font-semibold transition ${
                   billingPeriod === 'annual'
                     ? 'bg-[color:var(--color-primary)] text-white shadow'
                     : 'text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)]'
                 }`}
-                onClick={() => setBillingPeriod('annual')}
+                onClick={() => {
+                  setBillingPeriod('annual');
+                  billingTablistRef.current?.focus();
+                }}
               >
                 {copy.pricingFromApi.billingToggleAnnual}
                 {maxAnnualDisplayPct > 0 ? (
@@ -177,8 +207,9 @@ export function LandingPricing({
                     const billingQs =
                       planSupportsAnnualPrepay(plan) &&
                       plan.interval === 'month' &&
-                      !isFree
-                        ? `&billing=${billingPeriod === 'annual' ? 'annual' : 'month'}`
+                      !isFree &&
+                      billingPeriod === 'annual'
+                        ? '&billing=annual'
                         : '';
                     return `${base}/${locale}/signup?plan=${encodeURIComponent(plan.code)}${billingQs}`;
                   }

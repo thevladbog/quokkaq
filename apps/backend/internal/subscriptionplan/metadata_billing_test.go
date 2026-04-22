@@ -29,8 +29,8 @@ func TestMergePreferredBillingFromCheckout_nonAnnualNoOp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(out) != string(existing) {
-		t.Fatalf("expected unchanged, got %s", string(out))
+	if MetadataPrefersAnnual(out) {
+		t.Fatalf("expected annual preference cleared, metadata %s", string(out))
 	}
 }
 

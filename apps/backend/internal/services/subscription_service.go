@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"quokkaq-go-backend/internal/billingperiod"
 	"quokkaq-go-backend/internal/logger"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
@@ -173,11 +174,8 @@ func (s *SubscriptionService) SubmitPlanChangeRequest(ctx context.Context, userI
 			Message: "Plan is inactive or unavailable",
 		}
 	}
-	bp := strings.TrimSpace(strings.ToLower(billingPeriod))
-	if bp == "" {
-		bp = "month"
-	}
-	if bp != "month" && bp != "annual" {
+	bp, errBP := billingperiod.ParseWithMonthDefault(billingPeriod)
+	if errBP != nil {
 		return &SubscriptionRequestError{Status: http.StatusBadRequest, Message: "billingPeriod must be month or annual"}
 	}
 	if bp == "annual" && !subscriptionplan.HasAnnualPrepayConfig(requestedPlan) {
@@ -261,6 +259,10 @@ func (s *SubscriptionService) SubmitCustomTermsRequest(ctx context.Context, user
 			Message: "Lead requests are not configured",
 		}
 	}
+	ctbp, errBP := billingperiod.ParseWithMonthDefault(billingPeriod)
+	if errBP != nil {
+		return &SubscriptionRequestError{Status: http.StatusBadRequest, Message: "billingPeriod must be month or annual"}
+	}
 	companyID, err := s.resolveCompanyOrHTTPError(ctx, userID, xCompanyID)
 	if err != nil {
 		return err
@@ -307,13 +309,6 @@ func (s *SubscriptionService) SubmitCustomTermsRequest(ctx context.Context, user
 			Status:  http.StatusServiceUnavailable,
 			Message: "Lead requests are not available (Tracker or leads queue not configured)",
 		}
-	}
-	ctbp := strings.TrimSpace(strings.ToLower(billingPeriod))
-	if ctbp == "" {
-		ctbp = "month"
-	}
-	if ctbp != "month" && ctbp != "annual" {
-		return &SubscriptionRequestError{Status: http.StatusBadRequest, Message: "billingPeriod must be month or annual"}
 	}
 	err = s.leadIssues.CreateTenantCustomTermsLeadRequest(ctx,
 		companyID,

@@ -92,7 +92,7 @@ function OrganizationUpgradePlanSelector({
         plans={plans}
         currentPlanId={subscription.planId}
         onSelect={handlePlanSelect}
-        isLoading={plansLoading}
+        isLoading={plansLoading || checkoutMutation.isPending}
         checkoutBillingPeriod={checkoutBilling}
         onCheckoutBillingPeriodChange={(v) => setBillingOverride(v)}
       />

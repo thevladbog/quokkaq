@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"quokkaq-go-backend/internal/billingperiod"
 	"quokkaq-go-backend/internal/logger"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
@@ -128,8 +129,8 @@ func (s *LeadIssueService) notifyTrialRegistrationSync(ctx context.Context, comp
 	fmt.Fprintf(&b, "- **User**: %s\n", userName)
 	fmt.Fprintf(&b, "- **Email**: %s\n", userEmail)
 	fmt.Fprintf(&b, "- **Plan code**: %s\n", planCode)
-	if strings.TrimSpace(billingPeriod) != "" && strings.TrimSpace(billingPeriod) != "month" {
-		fmt.Fprintf(&b, "- **Billing period**: %s\n", strings.TrimSpace(billingPeriod))
+	if bp, err := billingperiod.ParseWithMonthDefault(billingPeriod); err == nil && bp == "annual" {
+		fmt.Fprintf(&b, "- **Billing period**: %s\n", bp)
 	}
 	traceID := uuid.New().String()
 	diag, _ := json.Marshal(map[string]string{"kind": "trial_registration"})
@@ -236,7 +237,9 @@ func (s *LeadIssueService) CreateLeadRequest(ctx context.Context, name, email, c
 		fmt.Fprintf(&b, "- **Plan code (context)**: %s\n", planCode)
 	}
 	if strings.TrimSpace(billingPeriod) != "" {
-		fmt.Fprintf(&b, "- **Billing period**: %s\n", strings.TrimSpace(billingPeriod))
+		if bp, err := billingperiod.ParseOptional(billingPeriod); err == nil && bp != "" {
+			fmt.Fprintf(&b, "- **Billing period**: %s\n", bp)
+		}
 	}
 	fmt.Fprintf(&b, "- **Source**: %s\n", source)
 	fmt.Fprintf(&b, "- **Locale**: %s\n", locale)
@@ -301,10 +304,7 @@ func (s *LeadIssueService) CreatePlanChangeRequest(ctx context.Context,
 	fmt.Fprintf(&b, "- **Email**: %s\n", strings.TrimSpace(userEmail))
 	fmt.Fprintf(&b, "- **Current plan code**: %s\n", cur)
 	fmt.Fprintf(&b, "- **Requested plan code**: %s\n", req)
-	bp := strings.TrimSpace(strings.ToLower(billingPeriod))
-	if bp == "" {
-		bp = "month"
-	}
+	bp, _ := billingperiod.ParseWithMonthDefault(billingPeriod)
 	fmt.Fprintf(&b, "- **Billing period (requested)**: %s\n", bp)
 	traceID := uuid.New().String()
 	diag, _ := json.Marshal(map[string]string{"kind": "plan_change_request"})
@@ -362,10 +362,7 @@ func (s *LeadIssueService) CreateTenantCustomTermsLeadRequest(ctx context.Contex
 	fmt.Fprintf(&b, "- **Requested by**: %s\n", strings.TrimSpace(userDisplayName))
 	fmt.Fprintf(&b, "- **Email**: %s\n", strings.TrimSpace(userEmail))
 	fmt.Fprintf(&b, "- **Source**: %s\n", "tenant_settings_pricing")
-	bp := strings.TrimSpace(strings.ToLower(billingPeriod))
-	if bp == "" {
-		bp = "month"
-	}
+	bp, _ := billingperiod.ParseWithMonthDefault(billingPeriod)
 	fmt.Fprintf(&b, "- **Billing period (context)**: %s\n", bp)
 	traceID := uuid.New().String()
 	diag, _ := json.Marshal(map[string]string{"kind": "tenant_custom_terms", "source": "tenant_settings_pricing"})

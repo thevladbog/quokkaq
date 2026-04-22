@@ -11,7 +11,20 @@ import (
 func MergePreferredBillingFromCheckout(existing json.RawMessage, checkoutBillingPeriod string) (json.RawMessage, error) {
 	bp := strings.TrimSpace(strings.ToLower(checkoutBillingPeriod))
 	if bp != "annual" {
-		return existing, nil
+		m := map[string]interface{}{}
+		if len(existing) > 0 {
+			if err := json.Unmarshal(existing, &m); err != nil {
+				return nil, err
+			}
+		}
+		if m == nil {
+			m = map[string]interface{}{}
+		}
+		delete(m, "preferredBillingPeriod")
+		if len(m) == 0 {
+			return json.RawMessage("{}"), nil
+		}
+		return json.Marshal(m)
 	}
 	m := map[string]interface{}{}
 	if len(existing) > 0 {

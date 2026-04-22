@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"quokkaq-go-backend/internal/billingperiod"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/pkg/tenantslug"
 	"quokkaq-go-backend/internal/repository"
@@ -313,11 +314,8 @@ func (s *authService) Signup(name, email, password, companyName, planCode, billi
 		return nil, fmt.Errorf("invalid plan code: %w", err)
 	}
 
-	bill := strings.TrimSpace(strings.ToLower(billingPeriod))
-	if bill == "" {
-		bill = "month"
-	}
-	if bill != "month" && bill != "annual" {
+	bill, err := billingperiod.ParseWithMonthDefault(billingPeriod)
+	if err != nil {
 		return nil, ErrInvalidSignupBillingPeriod
 	}
 	if bill == "annual" && !subscriptionplan.HasAnnualPrepayConfig(plan) {

@@ -95,7 +95,7 @@ type SignupRequest struct {
 	CompanyName string `json:"companyName" binding:"required"`
 	PlanCode    string `json:"planCode"` // optional, defaults to starter with trial
 	// BillingPeriod: "month" (default) or "annual" when the selected plan supports annual prepay.
-	BillingPeriod          string `json:"billingPeriod"`
+	BillingPeriod          string `json:"billingPeriod" enums:"month,annual" default:"month"`
 	CompanySlug            string `json:"companySlug"` // optional; if empty, generated from company name
 	PrivacyConsentAccepted *bool  `json:"privacyConsentAccepted"`
 }

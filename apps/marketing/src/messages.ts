@@ -112,6 +112,8 @@ export type HomeMessages = {
     /** Billing period toggle (shown when at least one plan has annual prepay). */
     billingToggleMonth: string;
     billingToggleAnnual: string;
+    /** Accessible name for the billing period tablist (not the same as the "Monthly" tab label). */
+    billingToggleGroupLabel: string;
     /** Secondary line under price when annual toggle is on (12-month prepay). */
     billedAnnuallyFootnote: string;
     /**
@@ -424,6 +426,7 @@ export const messages: Record<
         perUnitPerMonth: '/ unit / mo',
         billingToggleMonth: 'Monthly',
         billingToggleAnnual: '12 months',
+        billingToggleGroupLabel: 'Billing period',
         billedAnnuallyFootnote: 'Billed annually (12 months)',
         annualPrepayBubbleLabel: '−{percent}% annual',
         popularBadge: 'Recommended',
@@ -759,6 +762,7 @@ export const messages: Record<
         perUnitPerMonth: '/ подр. / мес',
         billingToggleMonth: 'Месяц',
         billingToggleAnnual: '12 месяцев',
+        billingToggleGroupLabel: 'Период оплаты',
         billedAnnuallyFootnote: 'Оплата за 12 месяцев',
         annualPrepayBubbleLabel: '−{percent}% за год',
         popularBadge: 'Рекомендуем',

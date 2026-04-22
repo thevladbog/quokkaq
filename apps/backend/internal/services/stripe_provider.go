@@ -156,7 +156,10 @@ func (p *StripeProvider) CreateInvoice(ctx context.Context, subscription *models
 		currency = "usd"
 	}
 
-	subQty := subdivisionBillableQuantity(db, subscription.CompanyID)
+	subQty, errQty := subdivisionBillableQuantity(db, subscription.CompanyID)
+	if errQty != nil {
+		return nil, fmt.Errorf("count subdivisions: %w", errQty)
+	}
 	invAmount, err := subscriptionplan.ManualInvoiceLineAmountMinor(&subscription.Plan, subscription.Metadata, subQty)
 	if err != nil {
 		return nil, fmt.Errorf("manual invoice amount: %w", err)
@@ -367,15 +370,17 @@ func (p *StripeProvider) CreateCustomer(ctx context.Context, companyID, email, n
 }
 
 // subdivisionBillableQuantity returns active subdivision count for per_unit billing, lower-bounded at 1 when none exist.
-func subdivisionBillableQuantity(db *gorm.DB, companyID string) int64 {
+func subdivisionBillableQuantity(db *gorm.DB, companyID string) (int64, error) {
 	var n int64
-	_ = db.Model(&models.Unit{}).
+	if err := db.Model(&models.Unit{}).
 		Where("company_id = ? AND kind = ?", companyID, models.UnitKindSubdivision).
-		Count(&n).Error
-	if n < 1 {
-		return 1
+		Count(&n).Error; err != nil {
+		return 0, err
 	}
-	return n
+	if n < 1 {
+		return 1, nil
+	}
+	return n, nil
 }
 
 // Helper methods for webhook handlers

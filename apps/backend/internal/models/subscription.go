@@ -41,9 +41,9 @@ type SubscriptionPlan struct {
 	// enums: flat,per_unit
 	PricingModel string `gorm:"not null;default:'per_unit';column:pricing_model" json:"pricingModel" enums:"flat,per_unit"`
 	// AnnualPrepayDiscountPercent when set (1–100, interval must be month): yearly checkout uses price*12*(100-pct)/100.
-	AnnualPrepayDiscountPercent *int `gorm:"column:annual_prepay_discount_percent" json:"annualPrepayDiscountPercent,omitempty"`
+	AnnualPrepayDiscountPercent *int `gorm:"column:annual_prepay_discount_percent" json:"annualPrepayDiscountPercent,omitempty" minimum:"1" maximum:"100"`
 	// AnnualPrepayPricePerMonth when set (minor units, interval month): yearly checkout uses this * 12 per year.
-	AnnualPrepayPricePerMonth *int64    `gorm:"column:annual_prepay_price_per_month" json:"annualPrepayPricePerMonth,omitempty"`
+	AnnualPrepayPricePerMonth *int64    `gorm:"column:annual_prepay_price_per_month" json:"annualPrepayPricePerMonth,omitempty" minimum:"1"`
 	CreatedAt                 time.Time `gorm:"autoCreateTime" json:"createdAt"`
 	UpdatedAt                 time.Time `gorm:"autoUpdateTime" json:"updatedAt"`
 }

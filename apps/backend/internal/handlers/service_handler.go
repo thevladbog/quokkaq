@@ -124,7 +124,7 @@ func (h *ServiceHandler) GetServiceByID(w http.ResponseWriter, r *http.Request) 
 // @Accept       json
 // @Produce      json
 // @Param        id      path      string          true  "Service ID"
-// @Param        service body      models.Service  true  "Service Data"
+// @Param        service body      models.Service  true  "Sparse or full service JSON; only sent fields are applied (grid-only updates no longer clear name/prefix)."
 // @Success      200     {object}  models.Service
 // @Failure      400     {string}  string "Bad Request"
 // @Failure      409     {string}  string "Conflict (e.g. unit change not allowed)"
@@ -133,14 +133,27 @@ func (h *ServiceHandler) GetServiceByID(w http.ResponseWriter, r *http.Request) 
 // @Router       /services/{id} [put]
 func (h *ServiceHandler) UpdateService(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	var service models.Service
-	if err := json.NewDecoder(r.Body).Decode(&service); err != nil {
+	var raw map[string]json.RawMessage
+	if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	service.ID = id
 
-	if err := h.service.UpdateService(&service); err != nil {
+	existing, err := h.service.GetServiceByID(id)
+	if err != nil {
+		http.Error(w, "Service not found", http.StatusNotFound)
+		return
+	}
+	merged := *existing
+	merged.Children = nil
+	merged.Parent = nil
+	if err := services.MergeServiceJSONPatch(&merged, raw); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	merged.ID = id
+
+	if err := h.service.UpdateService(&merged); err != nil {
 		if errors.Is(err, services.ErrServiceUnitImmutable) {
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
@@ -157,7 +170,7 @@ func (h *ServiceHandler) UpdateService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	RespondJSON(w, service)
+	RespondJSON(w, merged)
 }
 
 // DeleteService godoc

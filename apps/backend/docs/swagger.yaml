@@ -89,7 +89,11 @@ components:
         handlers.CreateCheckoutRequest:
             properties:
                 billingPeriod:
+                    default: month
                     description: BillingPeriod is "month" (default) or "annual" (12-month prepay when configured on the plan).
+                    enum:
+                        - month
+                        - annual
                     type: string
                 planCode:
                     type: string
@@ -208,6 +212,9 @@ components:
             properties:
                 billingPeriod:
                     description: 'BillingPeriod optional context for sales: "month" or "annual".'
+                    enum:
+                        - month
+                        - annual
                     type: string
                 comment:
                     minLength: 1
@@ -632,7 +639,11 @@ components:
         handlers.PlanChangeRequestBody:
             properties:
                 billingPeriod:
+                    default: month
                     description: 'BillingPeriod is optional: "month" (default) or "annual" when the target plan supports annual prepay.'
+                    enum:
+                        - month
+                        - annual
                     type: string
                 requestedPlanCode:
                     minLength: 1
@@ -659,14 +670,22 @@ components:
                 - planId
             type: object
         handlers.PlatformCreateSubscriptionPlanBody:
+            allOf:
+                - not:
+                    required:
+                        - annualPrepayDiscountPercent
+                        - annualPrepayPricePerMonth
             properties:
                 allowInstantPurchase:
                     description: AllowInstantPurchase omitted or null defaults to true.
                     type: boolean
                 annualPrepayDiscountPercent:
                     description: 'Annual prepay (monthly plans only): set at most one of discount percent (1–100) or fixed effective monthly price (minor units).'
+                    maximum: 100
+                    minimum: 1
                     type: integer
                 annualPrepayPricePerMonth:
+                    minimum: 1
                     type: integer
                 code:
                     type: string
@@ -741,12 +760,20 @@ components:
                     type: string
             type: object
         handlers.PlatformUpdateSubscriptionPlanBody:
+            allOf:
+                - not:
+                    required:
+                        - annualPrepayDiscountPercent
+                        - annualPrepayPricePerMonth
             properties:
                 allowInstantPurchase:
                     type: boolean
                 annualPrepayDiscountPercent:
+                    maximum: 100
+                    minimum: 1
                     type: integer
                 annualPrepayPricePerMonth:
+                    minimum: 1
                     type: integer
                 code:
                     type: string
@@ -796,6 +823,9 @@ components:
         handlers.PublicLeadRequestBody:
             properties:
                 billingPeriod:
+                    enum:
+                        - month
+                        - annual
                     type: string
                 company:
                     type: string
@@ -904,7 +934,11 @@ components:
         handlers.SignupRequest:
             properties:
                 billingPeriod:
+                    default: month
                     description: 'BillingPeriod: "month" (default) or "annual" when the selected plan supports annual prepay.'
+                    enum:
+                        - month
+                        - annual
                     type: string
                 companyName:
                     type: string
@@ -2298,15 +2332,23 @@ components:
                     type: string
             type: object
         models.SubscriptionPlan:
+            allOf:
+                - not:
+                    required:
+                        - annualPrepayDiscountPercent
+                        - annualPrepayPricePerMonth
             properties:
                 allowInstantPurchase:
                     description: 'AllowInstantPurchase when false: plan may still be public, but checkout is disabled until a sales-led flow exists.'
                     type: boolean
                 annualPrepayDiscountPercent:
                     description: 'AnnualPrepayDiscountPercent when set (1–100, interval must be month): yearly checkout uses price*12*(100-pct)/100.'
+                    maximum: 100
+                    minimum: 1
                     type: integer
                 annualPrepayPricePerMonth:
                     description: 'AnnualPrepayPricePerMonth when set (minor units, interval month): yearly checkout uses this * 12 per year.'
+                    minimum: 1
                     type: integer
                 code:
                     description: unique plan code like "starter", "professional"
@@ -9078,7 +9120,7 @@ paths:
                     application/json:
                         schema:
                             $ref: '#/components/schemas/models.Service'
-                description: Service Data
+                description: Sparse or full service JSON; only sent fields are applied (grid-only updates no longer clear name/prefix).
                 required: true
                 x-originalParamName: service
             responses:

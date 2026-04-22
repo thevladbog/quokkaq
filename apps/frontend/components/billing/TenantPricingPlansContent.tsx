@@ -193,7 +193,7 @@ export function TenantPricingPlansContent() {
         ) : (
           <TenantPricingPlansCatalog
             key={subscription?.id ?? 'no-subscription'}
-            subscription={subscription}
+            subscription={subscription ?? null}
             plans={plans ?? []}
             plansLoading={plansLoading}
           />
