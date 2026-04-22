@@ -7,8 +7,7 @@ type Props = {
 type IndustryIcon = HomeMessages['stats']['industries'][number]['icon'];
 
 function TrustIcon({ icon }: { icon: IndustryIcon }) {
-  const common =
-    'h-8 w-8 shrink-0 text-[color:var(--color-text-muted)] sm:h-9 sm:w-9';
+  const common = 'h-full w-full text-[color:var(--color-text-muted)]';
 
   switch (icon) {
     case 'healthcare':
@@ -98,12 +97,12 @@ export function LandingStats({ copy }: Props) {
   return (
     <section
       className='relative z-10 border-y border-[color:var(--color-border)] bg-[color:var(--color-surface-elevated)] py-6 sm:py-8'
-      aria-labelledby='trust-strip-heading'
+      aria-labelledby='stats-scenarios-heading'
     >
       <div className='mx-auto max-w-7xl px-4 sm:px-6 lg:px-8'>
         <div className='mx-auto max-w-3xl sm:max-w-4xl'>
           <h2
-            id='trust-strip-heading'
+            id='stats-scenarios-heading'
             className='font-landing-label mb-8 text-center text-xs leading-snug font-bold tracking-[0.16em] text-[color:var(--color-text-muted)] uppercase sm:mb-10 sm:text-[13px] sm:leading-relaxed sm:tracking-[0.18em] md:text-sm'
           >
             {heading}
@@ -112,10 +111,15 @@ export function LandingStats({ copy }: Props) {
             {industries.map((item) => (
               <li
                 key={item.label}
-                className='flex items-center justify-center gap-2.5 text-[color:var(--color-text-muted)] sm:gap-3'
+                className='inline-flex h-8 items-center justify-center gap-2.5 text-[color:var(--color-text-muted)] sm:h-9 sm:gap-3'
               >
-                <TrustIcon icon={item.icon} />
-                <span className='font-display text-base font-medium tracking-tight text-[color:var(--color-text-muted)] sm:text-lg'>
+                <span
+                  className='inline-flex h-8 w-8 shrink-0 items-center justify-center sm:h-9 sm:w-9'
+                  aria-hidden
+                >
+                  <TrustIcon icon={item.icon} />
+                </span>
+                <span className='font-display text-base leading-8 font-medium tracking-tight text-[color:var(--color-text-muted)] sm:text-lg sm:leading-9'>
                   {item.label}
                 </span>
               </li>

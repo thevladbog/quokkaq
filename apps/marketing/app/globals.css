@@ -177,6 +177,34 @@
   }
 }
 
+/**
+ * Enterprise: light — same “5% wash” idea as the popular (orange) card, violet tints
+ * on top of the warm surface (color-mix keeps it clean, not gray).
+ */
+.landing-pricing-card-enterprise {
+  background: linear-gradient(
+    to bottom right,
+    color-mix(
+      in srgb,
+      rgb(139 92 246) 5.5%,
+      var(--color-surface-elevated) 94.5%
+    ),
+    color-mix(
+      in srgb,
+      rgb(167 139 250) 4.5%,
+      var(--color-surface-elevated) 95.5%
+    )
+  );
+}
+
+.dark .landing-pricing-card-enterprise {
+  background: linear-gradient(
+    to bottom right,
+    rgb(139 92 246 / 0.12),
+    rgb(15 23 42 / 0.4)
+  );
+}
+
 .dark .landing-pricing-popular-glass-edge {
   box-shadow:
     inset 0 1px 0 0 rgb(255 255 255 / 0.1),

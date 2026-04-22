@@ -6,7 +6,10 @@ type Props = {
 
 export function LandingInterfaceShowcase({ copy }: Props) {
   return (
-    <section className='relative z-10 border-t border-[color:var(--color-border)] bg-white py-20 sm:py-28 dark:bg-[color:var(--color-surface)]'>
+    <section
+      id='interface-showcase'
+      className='relative z-10 border-t border-[color:var(--color-border)] bg-white py-20 sm:py-28 dark:bg-[color:var(--color-surface)]'
+    >
       <div className='mx-auto max-w-6xl px-4 sm:px-6 lg:px-8'>
         <div className='mb-16 text-center'>
           <h2 className='font-display mb-4 text-3xl font-bold tracking-tight text-[color:var(--color-text)] sm:text-4xl lg:text-5xl'>

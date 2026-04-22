@@ -1,3 +1,5 @@
+'use client';
+
 import Image from 'next/image';
 import Link from 'next/link';
 
@@ -5,6 +7,7 @@ import { localeHomePath } from '@/lib/locale-paths';
 import type { AppLocale, HomeMessages } from '@/src/messages';
 
 import { LeadRequestCta } from '@/components/landing/lead-request-cta';
+import { pushMarketingEvent } from '@/lib/marketing-analytics';
 import { FriendlySmileIcon } from './friendly-smile-icon';
 import { LandingTicketsAnimation } from './landing-tickets-animation';
 
@@ -80,6 +83,12 @@ export function LandingHero({ locale, copy, appBaseUrl }: Props) {
                 target='_blank'
                 rel='noopener noreferrer'
                 className={heroPrimaryClass}
+                onClick={() =>
+                  pushMarketingEvent('marketing_cta_click', {
+                    cta_id: 'hero_trial',
+                    cta_href: signupHref
+                  })
+                }
               >
                 {copy.docsCta}
               </a>
@@ -88,6 +97,11 @@ export function LandingHero({ locale, copy, appBaseUrl }: Props) {
                 href={`${localeHomePath(locale)}#book-demo`}
                 prefetch={false}
                 className={heroPrimaryClass}
+                onClick={() =>
+                  pushMarketingEvent('marketing_cta_click', {
+                    cta_id: 'hero_trial_fallback'
+                  })
+                }
               >
                 {copy.docsCta}
               </Link>
@@ -103,7 +117,15 @@ export function LandingHero({ locale, copy, appBaseUrl }: Props) {
                 {copy.secondaryCta}
               </LeadRequestCta>
             ) : (
-              <a href='#book-demo' className={heroSecondaryClass}>
+              <a
+                href='#book-demo'
+                className={heroSecondaryClass}
+                onClick={() =>
+                  pushMarketingEvent('marketing_cta_click', {
+                    cta_id: 'hero_demo'
+                  })
+                }
+              >
                 {copy.secondaryCta}
               </a>
             )}

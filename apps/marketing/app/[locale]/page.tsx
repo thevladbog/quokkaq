@@ -16,6 +16,7 @@ import { LandingFooterCta } from '@/components/landing/landing-footer-cta';
 import { LandingHero } from '@/components/landing/landing-hero';
 import { LandingHowItWorks } from '@/components/landing/landing-how-it-works';
 import { LandingInterfaceShowcase } from '@/components/landing/landing-interface-showcase';
+import { LandingPillars } from '@/components/landing/landing-pillars';
 import { LandingPricing } from '@/components/landing/landing-pricing';
 import { LandingStats } from '@/components/landing/landing-stats';
 import { LandingTopBar } from '@/components/landing/landing-top-bar';
@@ -81,6 +82,7 @@ export default async function HomePage({ params }: PageProps) {
       <main className='relative z-10 flex min-w-0 flex-1 flex-col overflow-x-clip'>
         <LandingHero copy={t.home} locale={raw} appBaseUrl={appBaseUrl} />
         <LandingStats copy={t.home} />
+        <LandingPillars copy={t.home} />
         <LandingHowItWorks copy={t.home} />
         <LandingFeatures copy={t.home} />
         <LandingInterfaceShowcase copy={t.home} />

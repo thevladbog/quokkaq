@@ -42,8 +42,13 @@ export type HomeMessages = {
     features: string;
     howItWorks: string;
     benefits: string;
+    interfaceShowcase: string;
+    useCases: string;
+    pricing: string;
     faq: string;
     primaryCta: string;
+    openMenu: string;
+    closeMenu: string;
   };
   pillarsHeading: string;
   pillars: {
@@ -105,6 +110,8 @@ export type HomeMessages = {
     /** Label for per-unit pricing model: "/ unit / mo". */
     perUnitPerMonth?: string;
     popularBadge: string;
+    /** Top pill on enterprise (sales-led) when not the promoted plan. */
+    enterpriseBadge: string;
     startTrial: string;
     /** CTA for a free plan (isFree=true). */
     startFree?: string;
@@ -196,26 +203,31 @@ export const messages: Record<
         features: 'Features',
         howItWorks: 'How it works',
         benefits: 'Benefits',
+        pricing: 'Pricing',
+        interfaceShowcase: 'Interface',
+        useCases: 'Use cases',
         faq: 'FAQ',
-        primaryCta: 'Start free trial'
+        primaryCta: 'Start free trial',
+        openMenu: 'Open menu',
+        closeMenu: 'Close menu'
       },
-      pillarsHeading: 'Why teams pick QuokkaQ',
+      pillarsHeading: 'Why QuokkaQ for daily operations',
       pillars: {
         one: {
-          title: 'Structured by design',
-          body: 'Enterprise spacing, typography, and states so every screen feels intentional — not improvised.'
+          title: 'Built for busy service floors',
+          body: 'Consistent layouts and clear states so frontline staff and supervisors spend less time guessing—so guests spend less time waiting.'
         },
         two: {
-          title: 'Accessible by default',
-          body: 'Keyboard-first flows, visible focus, and contrast that still holds in dark mode.'
+          title: 'Accessible on every device',
+          body: 'Keyboard-first flows, visible focus, and strong contrast in light and dark mode—on counters, kiosks, and public displays.'
         },
         three: {
-          title: 'Ready to scale',
-          body: 'Same stack as your product web app: Next.js, strict TypeScript, and CI that catches regressions early.'
+          title: 'Ready to grow with you',
+          body: 'Add locations, queues, and staff roles with one admin model: shared rules and reports across sites, and releases you can plan for.'
         }
       },
       stats: {
-        heading: 'Trusted by teams who cannot afford a chaotic waiting room',
+        heading: 'Common deployment scenarios',
         industries: [
           { label: 'Healthcare', icon: 'healthcare' },
           { label: 'Public Sector', icon: 'publicSector' },
@@ -401,6 +413,8 @@ export const messages: Record<
         perYear: '/yr',
         perUnitPerMonth: '/ unit / mo',
         popularBadge: 'Recommended',
+        /** Shown on enterprise plan pill (product term, same in all locales). */
+        enterpriseBadge: 'Enterprise',
         startTrial: 'Start free trial',
         startFree: 'Start for free',
         contactSales: 'Contact',
@@ -520,27 +534,31 @@ export const messages: Record<
         features: 'Возможности',
         howItWorks: 'Как это работает',
         benefits: 'Преимущества',
+        pricing: 'Тарифы',
+        interfaceShowcase: 'Интерфейс',
+        useCases: 'Сценарии',
         faq: 'FAQ',
-        primaryCta: 'Начать пробный период'
+        primaryCta: 'Начать пробный период',
+        openMenu: 'Открыть меню',
+        closeMenu: 'Закрыть меню'
       },
-      pillarsHeading: 'Почему команды выбирают КвоккаКю',
+      pillarsHeading: 'Почему QuokkaQ в ежедневной работе',
       pillars: {
         one: {
-          title: 'Структура важнее украшений',
-          body: 'Корпоративная сетка, типографика и состояния интерфейса — чтобы каждый экран выглядел собранно.'
+          title: 'Интерфейс для плотного потока',
+          body: 'Понятные экраны и согласованные состояния, чтобы сотрудники на линии и супервайзеры тратили меньше сил — а гостю было проще дождаться своей очереди.'
         },
         two: {
-          title: 'Доступность с первого дня',
-          body: 'Клавиатура, focus-visible и контраст, который держится и в тёмной теме.'
+          title: 'Доступно на разных устройствах',
+          body: 'Клавиатура, focus-visible и стабильный контраст в светлой и тёмной теме: на стойке, киоске и публичном табло.'
         },
         three: {
-          title: 'Готово к росту',
-          body: 'Тот же стек, что и у веб-приложения: Next.js, строгий TypeScript и CI, который ловит регрессии рано.'
+          title: 'Растёте вместе с сетью',
+          body: 'Новые точки, очереди и роли в одной модели администрирования: общие правила и отчёты, предсказуемые релизы, к которым можно готовиться.'
         }
       },
       stats: {
-        heading:
-          'Нам доверяют команды, которым нельзя терпеть хаос в зале ожидания',
+        heading: 'Типовые сценарии, где продукт полезен',
         industries: [
           { label: 'Здравоохранение', icon: 'healthcare' },
           { label: 'Госсектор', icon: 'publicSector' },
@@ -726,6 +744,7 @@ export const messages: Record<
         perYear: '/год',
         perUnitPerMonth: '/ подр. / мес',
         popularBadge: 'Рекомендуем',
+        enterpriseBadge: 'Enterprise',
         startTrial: 'Начать пробный период',
         startFree: 'Начать бесплатно',
         contactSales: 'Связаться',

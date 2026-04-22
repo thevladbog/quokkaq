@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 
+import { pushMarketingEvent } from '@/lib/marketing-analytics';
 import { LeadRequestModal } from '@/components/landing/lead-request-modal';
 import type { AppLocale, HomeMessages } from '@/src/messages';
 
@@ -15,6 +16,7 @@ type Props = {
   planCode?: string;
   className?: string;
   children: React.ReactNode;
+  onOpen?: () => void;
 };
 
 /**
@@ -27,13 +29,22 @@ export function LeadRequestCta({
   appBaseUrl,
   planCode,
   className,
+  onOpen,
   children
 }: Props) {
   const [open, setOpen] = useState(false);
 
   if (!appBaseUrl) {
     return (
-      <a href='mailto:sales@quokkaq.com' className={className}>
+      <a
+        href='mailto:sales@quokkaq.com'
+        className={className}
+        onClick={() => {
+          pushMarketingEvent('marketing_lead_open', {
+            source: `${source}_mailto`
+          });
+        }}
+      >
         {children}
       </a>
     );
@@ -41,7 +52,18 @@ export function LeadRequestCta({
 
   return (
     <>
-      <button type='button' className={className} onClick={() => setOpen(true)}>
+      <button
+        type='button'
+        className={className}
+        onClick={() => {
+          setOpen(true);
+          pushMarketingEvent('marketing_lead_open', {
+            source,
+            plan_code: planCode?.trim() ?? ''
+          });
+          onOpen?.();
+        }}
+      >
         {children}
       </button>
       <LeadRequestModal
