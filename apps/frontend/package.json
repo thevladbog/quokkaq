@@ -16,6 +16,9 @@
     "orval:check": "orval --config orval.config.ts && untracked=$(git ls-files --others --exclude-standard -- lib/api/generated/) && if [ -n \"$untracked\" ]; then echo 'Untracked files under lib/api/generated/ (run from repo root or commit generated output):' && echo \"$untracked\" && exit 1; fi && git diff --exit-code lib/api/generated/"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@formatjs/intl-localematcher": "^0.8.3",
     "@hookform/resolvers": "^5.2.2",
     "@lexical/rich-text": "^0.35.0",

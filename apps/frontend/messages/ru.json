@@ -572,6 +572,7 @@
         "UNIT_GRID_MANAGE": "Управление сеткой",
         "UNIT_SERVICES_MANAGE": "Управление услугами",
         "UNIT_TICKET_SCREEN_MANAGE": "Управление экраном талонов",
+        "UNIT_SIGNAGE_MANAGE": "Управление цифровыми табло",
         "UNIT_USERS_MANAGE": "Управление пользователями подразделения",
         "ACCESS_STAFF_PANEL": "Доступ к панели сотрудника",
         "ACCESS_KIOSK": "Доступ к киоску",
@@ -998,6 +999,36 @@
       "use_custom_colors": "Использовать кастомные цвета",
       "recent_calls_history_limit": "Размер списка «Последние вызовы» (строк)",
       "recent_calls_history_limit_help": "Сколько последних вызовов показывать на экране талонов. 0 — без ограничения."
+    },
+    "signage": {
+      "tab": "Цифровое табло",
+      "title": "Цифровое табло",
+      "create": "Создать",
+      "saved": "Сохранено",
+      "newPlaylist": "Новый плейлист",
+      "playlistNameRequired": "Введите название",
+      "selectMaterials": "Выберите хотя бы один материал",
+      "applyLayout": "Применить макет",
+      "classicLayout": "Классический макет",
+      "presets": "Шаблон экрана",
+      "tabs": {
+        "playlists": "Плейлисты",
+        "schedules": "Расписание",
+        "feeds": "Внешние фиды",
+        "layout": "Макет",
+        "announcements": "Объявления"
+      },
+      "editOrder": "Порядок",
+      "saveOrder": "Сохранить порядок",
+      "reorderSave": "Перетащите, укажите длительность, затем сохраните",
+      "pickPlaylist": "Выберите плейлист",
+      "daysLabel": "Дни (1=пн … 7=вс)",
+      "bumpPriority": "Приоритет +1",
+      "preview": "Просмотр",
+      "cleared": "Готово",
+      "rssWidgetFeed": "Нижняя зона — RSS-фид",
+      "noFeed": "—",
+      "layoutInfoHeavy": "В этом шаблоне нет полосы RSS. Используйте «split-3» для ленты или погоды."
     },
     "kiosk_settings": {
       "title": "Киоск",
@@ -1972,7 +2003,17 @@
     "minutes": "мин.",
     "activeCounters": "Операторов",
     "scanToJoinQueue": "Отсканируйте QR,\nчтобы занять место",
-    "serviceQueue": "{count} чел."
+    "serviceQueue": "{count} чел.",
+    "templateUnknown": "Неизвестный макет: {id}",
+    "feeds": {
+      "missing": "Настройте фид в настройках юнита"
+    },
+    "stats": {
+      "inQueue": "В очереди",
+      "openWindows": "Открыто окон",
+      "estWait": "Прим. ожид.",
+      "servedToday": "Обслужено сегодня"
+    }
   },
   "common": {
     "loading": "Загрузка...",

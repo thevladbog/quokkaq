@@ -1,10 +1,11 @@
 package jobs
 
 const (
-	TypeTTSGenerate   = "tts:generate"
-	TypeSMSSend       = "sms:send"
-	TypeVisitorNotify = "visitor:notify"
-	TypeAnomalyCheck  = "anomaly:check"
+	TypeTTSGenerate     = "tts:generate"
+	TypeSMSSend         = "sms:send"
+	TypeVisitorNotify   = "visitor:notify"
+	TypeAnomalyCheck    = "anomaly:check"
+	TypeSignageFeedPoll = "signage:feed_poll"
 )
 
 type TtsJobPayload struct {
@@ -30,3 +31,6 @@ type VisitorNotifyPayload struct {
 	// Type identifies the notification event: "ticket_called" | "queue_position_alert".
 	Type string `json:"type"`
 }
+
+// SignageFeedPollPayload is the Asynq task for TypeSignageFeedPoll (empty body; worker calls SignageService.PollDueFeeds).
+type SignageFeedPollPayload struct{}

@@ -572,6 +572,7 @@
         "UNIT_GRID_MANAGE": "Manage Grid",
         "UNIT_SERVICES_MANAGE": "Manage Services",
         "UNIT_TICKET_SCREEN_MANAGE": "Manage Ticket Screen",
+        "UNIT_SIGNAGE_MANAGE": "Manage digital signage",
         "UNIT_USERS_MANAGE": "Manage Unit Users",
         "ACCESS_STAFF_PANEL": "Access Staff Panel",
         "ACCESS_KIOSK": "Access Kiosk",
@@ -998,6 +999,36 @@
       "use_custom_colors": "Use custom colors",
       "recent_calls_history_limit": "Last called list size (rows)",
       "recent_calls_history_limit_help": "How many rows to show in “Last called” on the ticket screen. Use 0 for no limit."
+    },
+    "signage": {
+      "tab": "Digital Signage",
+      "title": "Digital Signage",
+      "create": "Create",
+      "saved": "Saved",
+      "newPlaylist": "New playlist",
+      "playlistNameRequired": "Name is required",
+      "selectMaterials": "Select at least one material",
+      "applyLayout": "Apply layout",
+      "classicLayout": "Use classic layout",
+      "presets": "Screen template",
+      "tabs": {
+        "playlists": "Playlists",
+        "schedules": "Schedules",
+        "feeds": "External feeds",
+        "layout": "Layout",
+        "announcements": "Announcements"
+      },
+      "editOrder": "Order",
+      "saveOrder": "Save order",
+      "reorderSave": "Drag to reorder, set duration, then save",
+      "pickPlaylist": "Select a playlist",
+      "daysLabel": "Days (1=Mon … 7=Sun)",
+      "bumpPriority": "Priority +1",
+      "preview": "Preview",
+      "cleared": "Cleared",
+      "rssWidgetFeed": "Bottom row — RSS feed",
+      "noFeed": "—",
+      "layoutInfoHeavy": "This template has no RSS row. Use “split-3” to show an RSS or weather feed."
     },
     "kiosk_settings": {
       "title": "Kiosk Settings",
@@ -1972,7 +2003,17 @@
     "minutes": "min.",
     "activeCounters": "Operators",
     "scanToJoinQueue": "Scan QR to\njoin queue",
-    "serviceQueue": "{count} waiting"
+    "serviceQueue": "{count} waiting",
+    "templateUnknown": "Unknown layout: {id}",
+    "feeds": {
+      "missing": "Configure a feed in unit settings"
+    },
+    "stats": {
+      "inQueue": "In queue",
+      "openWindows": "Open windows",
+      "estWait": "Est. wait",
+      "servedToday": "Served today"
+    }
   },
   "common": {
     "loading": "Loading...",

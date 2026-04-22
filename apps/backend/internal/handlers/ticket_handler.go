@@ -1019,6 +1019,7 @@ func (h *TicketHandler) GetUnitQueueStatus(w http.ResponseWriter, r *http.Reques
 			"queueLength":          0,
 			"estimatedWaitMinutes": 0.0,
 			"activeCounters":       0,
+			"servedToday":          0,
 		})
 		return
 	}
@@ -1066,6 +1067,7 @@ func (h *TicketHandler) GetIntegrationUnitQueueSummary(w http.ResponseWriter, r 
 			"queueLength":          0,
 			"estimatedWaitMinutes": 0.0,
 			"activeCounters":       0,
+			"servedToday":          0,
 		})
 		return
 	}

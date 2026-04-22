@@ -27,6 +27,8 @@ const (
 	PermUnitGridManage         = "unit.grid.manage"
 	PermUnitServicesManage     = "unit.services.manage"
 	PermUnitTicketScreenManage = "unit.ticket_screen.manage"
+	// PermUnitSignageManage controls extended digital signage (playlists, schedules, feeds, screen templates).
+	PermUnitSignageManage      = "unit.signage.manage"
 	PermUnitUsersManage        = "unit.users.manage"
 	PermAccessStaffPanel       = "access.staff_panel"
 	PermAccessSupervisorPanel  = "access.supervisor_panel"
@@ -68,6 +70,7 @@ func All() []string {
 		PermUnitGridManage,
 		PermUnitServicesManage,
 		PermUnitTicketScreenManage,
+		PermUnitSignageManage,
 		PermUnitUsersManage,
 		PermAccessStaffPanel,
 		PermAccessSupervisorPanel,

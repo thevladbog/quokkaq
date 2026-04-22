@@ -478,10 +478,117 @@ export const KioskConfigSchema = z
   })
   .passthrough();
 
+export const ScreenWidgetTypeSchema = z.enum([
+  'called-tickets',
+  'content-player',
+  'queue-stats',
+  'eta-display',
+  'progress-bar',
+  'announcements',
+  'rss-feed',
+  'weather',
+  'clock',
+  'queue-ticker',
+  'custom-html'
+]);
+
+export const ScreenLayoutRegionSchema = z.object({
+  id: z.string(),
+  area: z.string(),
+  size: z.string()
+});
+
+export const ScreenLayoutSchema = z.object({
+  type: z.enum(['split-h', 'split-v', 'grid', 'fullscreen']),
+  regions: z.array(ScreenLayoutRegionSchema)
+});
+
+export const ScreenWidgetConfigSchema = z.object({
+  id: z.string(),
+  type: ScreenWidgetTypeSchema,
+  regionId: z.string(),
+  config: z.record(z.string(), z.any()).optional()
+});
+
+export const ScreenTemplateSchema = z.object({
+  id: z.string(),
+  layout: ScreenLayoutSchema,
+  widgets: z.array(ScreenWidgetConfigSchema)
+});
+
+/** Runtime shape for `UnitConfig.screenTemplate` (dynamic ticket screen layout). */
+export type ScreenWidgetType = z.infer<typeof ScreenWidgetTypeSchema>;
+export type ScreenTemplate = z.infer<typeof ScreenTemplateSchema>;
+
+/** Set after legacy `adScreen.activeMaterialIds` is imported as a default playlist in admin. */
+export const SignageConfigSchema = z
+  .object({
+    /** ISO timestamp when a default playlist was created from `adScreen.activeMaterialIds`. */
+    legacyActiveMaterialsImportedAt: z.string().optional()
+  })
+  .passthrough();
+
+export type SignageConfig = z.infer<typeof SignageConfigSchema>;
+
+export const PlaylistItemInputSchema = z.object({
+  materialId: z.string(),
+  sortOrder: z.number().int().optional(),
+  duration: z.number().int().min(0).optional()
+});
+
+export const PlaylistSchema = z.object({
+  id: z.string().optional(),
+  unitId: z.string().optional(),
+  name: z.string(),
+  description: z.string().optional(),
+  isDefault: z.boolean().optional(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+  items: z.array(PlaylistItemInputSchema).optional()
+});
+
+export const PlaylistScheduleSchema = z.object({
+  id: z.string().optional(),
+  unitId: z.string().optional(),
+  playlistId: z.string(),
+  daysOfWeek: z.string(),
+  startTime: z.string(),
+  endTime: z.string(),
+  priority: z.number().int().optional(),
+  isActive: z.boolean().optional()
+});
+
+export const ExternalFeedTypeSchema = z.enum(['rss', 'weather', 'custom_url']);
+export const ExternalFeedSchema = z.object({
+  id: z.string().optional(),
+  unitId: z.string().optional(),
+  name: z.string(),
+  type: z.union([ExternalFeedTypeSchema, z.string()]),
+  url: z.string(),
+  pollInterval: z.number().int().min(1).optional(),
+  isActive: z.boolean().optional(),
+  config: z.record(z.string(), z.unknown()).optional()
+});
+
+export const ScreenAnnouncementSchema = z.object({
+  id: z.string().optional(),
+  unitId: z.string().optional(),
+  text: z.string(),
+  priority: z.number().int().optional(),
+  style: z.string().optional(),
+  startsAt: z.string().nullable().optional(),
+  expiresAt: z.string().nullable().optional(),
+  isActive: z.boolean().optional()
+});
+
+export type PlaylistItemInput = z.infer<typeof PlaylistItemInputSchema>;
+
 /** Runtime shape for unit `config` JSON (matches {@link UnitConfig}). */
 export const UnitConfigSchema = z
   .object({
     adScreen: AdScreenConfigSchema.optional(),
+    screenTemplate: ScreenTemplateSchema.optional(),
+    signage: SignageConfigSchema.optional(),
     kiosk: KioskConfigSchema.optional(),
     logoUrl: z.string().optional()
   })
@@ -776,6 +883,10 @@ export interface KioskConfig {
 
 export interface UnitConfig {
   adScreen?: AdScreenConfig;
+  /** When set, `/screen/[unitId]` uses {@link ScreenRenderer} instead of the legacy fixed layout. */
+  screenTemplate?: ScreenTemplate;
+  /** Digital signage: migration markers and future keys. */
+  signage?: SignageConfig;
   kiosk?: KioskConfig;
   logoUrl?: string;
   [key: string]: unknown;

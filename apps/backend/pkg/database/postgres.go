@@ -2514,6 +2514,22 @@ WHERE code IN ('enterprise', 'grandfathered') AND limits->'webhook_endpoints_max
 		return fmt.Errorf("failed to run v1.8.3_subscription_plan_integration_limits migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.8.4_digital_signage", func(db *gorm.DB) error {
+		if err := db.AutoMigrate(
+			&dbmodels.Playlist{},
+			&dbmodels.PlaylistItem{},
+			&dbmodels.PlaylistSchedule{},
+			&dbmodels.ExternalFeed{},
+			&dbmodels.ScreenAnnouncement{},
+		); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.8.4_digital_signage migration: %w", err)
+	}
+
 	fmt.Println("✅ All migrations completed successfully")
 	return nil
 }

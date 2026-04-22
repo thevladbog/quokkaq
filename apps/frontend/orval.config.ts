@@ -65,7 +65,7 @@ export default defineConfig({
       target: '../backend/docs/openapi.json',
       filters: {
         mode: 'include',
-        tags: ['units', 'operator-skills']
+        tags: ['units', 'operator-skills', 'signage']
       }
     },
     output: {

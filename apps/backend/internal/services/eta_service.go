@@ -125,9 +125,27 @@ type UnitQueueSummary struct {
 	QueueLength          int64   `json:"queueLength"`
 	EstimatedWaitMinutes float64 `json:"estimatedWaitMinutes"`
 	ActiveCounters       int64   `json:"activeCounters"`
+	// ServedToday is tickets with status served/completed that finished today in the unit timezone.
+	ServedToday int64 `json:"servedToday"`
 	// Services contains per-service breakdown when multiple services have waiting tickets.
 	// Omitted when only one service is active (redundant with the top-level fields).
 	Services []ServiceQueueInfo `json:"services,omitempty"`
+}
+
+// dayRangeInTimezone returns [start, end) in UTC for the current calendar day in `tz` (IANA) or UTC on error.
+func dayRangeInTimezone(nowUTC time.Time, tzName string) (time.Time, time.Time) {
+	tz := strings.TrimSpace(tzName)
+	if tz == "" {
+		tz = "UTC"
+	}
+	loc, err := time.LoadLocation(tz)
+	if err != nil {
+		loc = time.UTC
+	}
+	nowIn := nowUTC.In(loc)
+	start := time.Date(nowIn.Year(), nowIn.Month(), nowIn.Day(), 0, 0, 0, 0, loc)
+	end := start.Add(24 * time.Hour)
+	return start.UTC(), end.UTC()
 }
 
 // GetUnitQueueSummary returns queue length, estimated wait (minutes), and active counter count
@@ -142,10 +160,21 @@ func (s *ETAService) GetUnitQueueSummary(unitID string) (UnitQueueSummary, error
 	if len(services) == 1 {
 		services = nil
 	}
+	var servedToday int64
+	if s.unitRepo != nil {
+		u, uerr := s.unitRepo.FindByIDLight(unitID)
+		if uerr == nil && u != nil {
+			start, end := dayRangeInTimezone(time.Now().UTC(), u.Timezone)
+			if n, cerr := s.ticketRepo.CountServedInUnitInRange(unitID, start, end); cerr == nil {
+				servedToday = n
+			}
+		}
+	}
 	out := UnitQueueSummary{
 		QueueLength:          snap.QueueLength,
 		EstimatedWaitMinutes: snap.EstimatedWaitMinutes,
 		ActiveCounters:       snap.ActiveCounters,
+		ServedToday:          servedToday,
 		Services:             services,
 	}
 	return out, nil

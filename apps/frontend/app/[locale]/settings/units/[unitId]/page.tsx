@@ -25,6 +25,7 @@ import { ServiceZoneWorkplacesPanel } from '@/components/admin/units/service-zon
 import { SubdivisionStationsAndZonesPanel } from '@/components/admin/units/subdivision-stations-and-zones-panel';
 import { WorkplaceParentBanner } from '@/components/admin/units/workplace-parent-banner';
 import { AdScreenSettings } from '@/components/admin/units/ad-screen-settings';
+import { SignageSettings } from '@/components/admin/units/signage-settings';
 import { UnitServicesManager } from '@/components/admin/units/unit-services-manager';
 import { KioskSettings } from '@/components/admin/units/kiosk-settings';
 import { Link } from '@/src/i18n/navigation';
@@ -42,6 +43,7 @@ import {
   PermUnitGridManage,
   PermUnitServicesManage,
   PermUnitSettingsManage,
+  PermUnitSignageManage,
   PermUnitTicketScreenManage
 } from '@/lib/permission-variants';
 import { toast } from 'sonner';
@@ -298,6 +300,12 @@ export default function UnitPage({ params }: UnitPageProps) {
                 {t('ad_screen.title')}
               </TabsTrigger>
             </PermissionGuard>
+            <PermissionGuard
+              permissions={[PermUnitTicketScreenManage, PermUnitSignageManage]}
+              unitId={unitId}
+            >
+              <TabsTrigger value='signage'>{t('signage.tab')}</TabsTrigger>
+            </PermissionGuard>
           </TabsList>
 
           <TabsContent value='general' className='mt-6'>
@@ -445,6 +453,15 @@ export default function UnitPage({ params }: UnitPageProps) {
               />
             </PermissionGuard>
           </TabsContent>
+          <TabsContent value='signage' className='mt-6'>
+            <PermissionGuard
+              permissions={[PermUnitTicketScreenManage, PermUnitSignageManage]}
+              unitId={unitId}
+              fallback={<div>{t('access_denied')}</div>}
+            >
+              <SignageSettings unit={unit} unitId={unitId} />
+            </PermissionGuard>
+          </TabsContent>
 
           <TabsContent value='operator-skills' className='mt-6'>
             <PermissionGuard
@@ -556,6 +573,12 @@ export default function UnitPage({ params }: UnitPageProps) {
             unitId={unitId}
           >
             <TabsTrigger value='ad-screen'>{t('ad_screen.title')}</TabsTrigger>
+          </PermissionGuard>
+          <PermissionGuard
+            permissions={[PermUnitTicketScreenManage, PermUnitSignageManage]}
+            unitId={unitId}
+          >
+            <TabsTrigger value='signage'>{t('signage.tab')}</TabsTrigger>
           </PermissionGuard>
           <PermissionGuard
             permissions={[PermUnitSettingsManage]}
@@ -735,6 +758,15 @@ export default function UnitPage({ params }: UnitPageProps) {
               unitId={unitId}
               currentConfig={unit.config || {}}
             />
+          </PermissionGuard>
+        </TabsContent>
+        <TabsContent value='signage' className='mt-6'>
+          <PermissionGuard
+            permissions={[PermUnitTicketScreenManage, PermUnitSignageManage]}
+            unitId={unitId}
+            fallback={<div>{t('access_denied')}</div>}
+          >
+            <SignageSettings unit={unit} unitId={unitId} />
           </PermissionGuard>
         </TabsContent>
         <TabsContent value='kiosk' className='mt-6'>

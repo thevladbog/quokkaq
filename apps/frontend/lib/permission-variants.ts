@@ -9,6 +9,7 @@ export const PermUnitSettingsManage = 'unit.settings.manage';
 export const PermUnitGridManage = 'unit.grid.manage';
 export const PermUnitServicesManage = 'unit.services.manage';
 export const PermUnitTicketScreenManage = 'unit.ticket_screen.manage';
+export const PermUnitSignageManage = 'unit.signage.manage';
 export const PermUnitUsersManage = 'unit.users.manage';
 export const PermAccessStaffPanel = 'access.staff_panel';
 export const PermAccessSupervisorPanel = 'access.supervisor_panel';
@@ -32,6 +33,7 @@ const LEGACY_TO_CANONICAL: Record<string, string> = {
   UNIT_GRID_MANAGE: PermUnitGridManage,
   UNIT_SERVICES_MANAGE: PermUnitServicesManage,
   UNIT_TICKET_SCREEN_MANAGE: PermUnitTicketScreenManage,
+  UNIT_SIGNAGE_MANAGE: PermUnitSignageManage,
   UNIT_USERS_MANAGE: PermUnitUsersManage,
   ACCESS_STAFF_PANEL: PermAccessStaffPanel,
   ACCESS_SUPERVISOR_PANEL: PermAccessSupervisorPanel,

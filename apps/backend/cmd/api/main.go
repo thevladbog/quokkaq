@@ -102,6 +102,8 @@ func run() error {
 
 	userRepo := repository.NewUserRepository()
 	unitRepo := repository.NewUnitRepository()
+	signageRepo := repository.NewSignageRepository()
+	signageService := services.NewSignageService(signageRepo, unitRepo, hub)
 	ticketRepo := repository.NewTicketRepository()
 	serviceRepo := repository.NewServiceRepository()
 	counterRepo := repository.NewCounterRepository()
@@ -163,6 +165,7 @@ func run() error {
 	// Wire notification service into the Asynq worker so visitor:notify jobs can delegate to it.
 	jobs.WithNotificationService(jobWorker, notificationService)
 	jobs.WithAnomalyService(jobWorker, anomalyService)
+	jobs.WithSignageService(jobWorker, signageService)
 	if err := jobWorker.Start(); err != nil {
 		return err
 	}
@@ -208,6 +211,23 @@ func run() error {
 			}
 		}
 	}()
+	go func() {
+		if err := jobClient.EnqueueSignageFeedPoll(); err != nil {
+			slog.Error("EnqueueSignageFeedPoll", "err", err)
+		}
+		feedTick := time.NewTicker(60 * time.Second)
+		defer feedTick.Stop()
+		for {
+			select {
+			case <-refreshCtx.Done():
+				return
+			case <-feedTick.C:
+				if err := jobClient.EnqueueSignageFeedPoll(); err != nil {
+					slog.Error("EnqueueSignageFeedPoll", "err", err)
+				}
+			}
+		}
+	}()
 	slaMonitor := services.NewSlaMonitorService(ticketRepo, hub)
 	slaMonitor.Start(refreshCtx)
 	go func() {
@@ -248,6 +268,7 @@ func run() error {
 	companySSOHTTP := handlers.NewCompanySSOHTTP(ssoService, userRepo, companyRepo)
 	tenantRBACHTTP := handlers.NewTenantRBACHTTP(tenantRBACRepo, userRepo, ssoService)
 	unitHandler := handlers.NewUnitHandler(unitService, storageService, operationalService, userRepo)
+	signageHandler := handlers.NewSignageHandler(signageService)
 	etaService := services.NewETAServiceFull(ticketRepo, counterRepo, serviceRepo, unitRepo, statsRepo)
 	predictionService := services.NewPredictionService(database.DB, hub, etaService, unitRepo, ticketRepo)
 	etaBroadcaster := services.NewETABroadcaster(etaService, hub, 0)
@@ -514,8 +535,34 @@ func run() error {
 		})
 
 		r.With(authmiddleware.PublicAPIRateLimit).Get("/{unitId}/materials", unitHandler.GetMaterials)
+		r.With(authmiddleware.PublicAPIRateLimit).Get("/{unitId}/active-playlist", signageHandler.ActivePlaylistPublic)
+		r.With(authmiddleware.PublicAPIRateLimit).Get("/{unitId}/public-screen-announcements", signageHandler.ListAnnouncementsPublic)
+		r.With(authmiddleware.PublicAPIRateLimit).Get("/{unitId}/feeds/{feedId}/data", signageHandler.PublicFeedData)
 		r.With(authmiddleware.PublicAPIRateLimit).Get("/{unitId}/queue-status", ticketHandler.GetUnitQueueStatus)
 		r.With(authmiddleware.PublicAPIRateLimit).Post("/{unitId}/virtual-queue", ticketHandler.JoinVirtualQueue)
+
+		r.Group(func(r chi.Router) {
+			r.Use(authmiddleware.JWTAuthAndActive(userRepo))
+			r.Use(authmiddleware.RequireUnitAnyPermission(userRepo, tenantRBACRepo, unitRepo, "unitId", []string{rbac.PermUnitTicketScreenManage, rbac.PermUnitSignageManage}))
+			r.Get("/{unitId}/playlists", signageHandler.ListPlaylists)
+			r.Get("/{unitId}/playlists/{playlistId}", signageHandler.GetPlaylist)
+			r.Post("/{unitId}/playlists", signageHandler.CreatePlaylist)
+			r.Put("/{unitId}/playlists/{playlistId}", signageHandler.UpdatePlaylist)
+			r.Delete("/{unitId}/playlists/{playlistId}", signageHandler.DeletePlaylist)
+			r.Get("/{unitId}/playlist-schedules", signageHandler.ListSchedules)
+			r.Get("/{unitId}/playlist-schedules/{scheduleId}", signageHandler.GetSchedule)
+			r.Post("/{unitId}/playlist-schedules", signageHandler.CreateSchedule)
+			r.Put("/{unitId}/playlist-schedules/{scheduleId}", signageHandler.UpdateSchedule)
+			r.Delete("/{unitId}/playlist-schedules/{scheduleId}", signageHandler.DeleteSchedule)
+			r.Get("/{unitId}/feeds", signageHandler.ListFeeds)
+			r.Post("/{unitId}/feeds", signageHandler.CreateFeed)
+			r.Put("/{unitId}/feeds/{feedId}", signageHandler.UpdateFeed)
+			r.Delete("/{unitId}/feeds/{feedId}", signageHandler.DeleteFeed)
+			r.Get("/{unitId}/screen-announcements", signageHandler.ListAnnouncements)
+			r.Post("/{unitId}/screen-announcements", signageHandler.CreateAnnouncement)
+			r.Put("/{unitId}/screen-announcements/{annId}", signageHandler.UpdateAnnouncement)
+			r.Delete("/{unitId}/screen-announcements/{annId}", signageHandler.DeleteAnnouncement)
+		})
 
 		r.Group(func(r chi.Router) {
 			r.Use(authmiddleware.JWTAuthAndActive(userRepo))

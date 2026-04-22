@@ -63,6 +63,15 @@ export interface HandlersAccessibleCompaniesResponse {
   companies?: HandlersAccessibleCompanyItem[];
 }
 
+export interface HandlersAnnouncementRequest {
+  expiresAt?: string;
+  isActive?: boolean;
+  priority?: number;
+  startsAt?: string;
+  style?: string;
+  text?: string;
+}
+
 export interface HandlersAssignUnitRequest {
   permissions?: string[];
   unitId?: string;
@@ -440,6 +449,17 @@ export interface HandlersCreateDesktopTerminalResponse {
   terminal?: HandlersDesktopTerminalJSON;
 }
 
+export type HandlersCreateFeedRequestConfig = { [key: string]: unknown };
+
+export interface HandlersCreateFeedRequest {
+  config?: HandlersCreateFeedRequestConfig;
+  isActive?: boolean;
+  name?: string;
+  pollInterval?: number;
+  type?: string;
+  url?: string;
+}
+
 export type HandlersCreateInvitationRequestTargetRoles = { [key: string]: unknown };
 
 export type HandlersCreateInvitationRequestTargetUnits = { [key: string]: unknown };
@@ -449,6 +469,27 @@ export interface HandlersCreateInvitationRequest {
   targetRoles?: HandlersCreateInvitationRequestTargetRoles;
   targetUnits?: HandlersCreateInvitationRequestTargetUnits;
   templateId?: string;
+}
+
+export interface HandlersPlaylistItemInput {
+  duration?: number;
+  materialId?: string;
+}
+
+export interface HandlersCreatePlaylistRequest {
+  description?: string;
+  isDefault?: boolean;
+  items?: HandlersPlaylistItemInput[];
+  name?: string;
+}
+
+export interface HandlersCreateScheduleRequest {
+  daysOfWeek?: string;
+  endTime?: string;
+  isActive?: boolean;
+  playlistId?: string;
+  priority?: number;
+  startTime?: string;
 }
 
 export interface HandlersTenantRoleUnitJSON {
@@ -1046,6 +1087,13 @@ export interface HandlersUpdateDesktopTerminalRequest {
   kioskFullscreen?: boolean;
   name?: string;
   unitId?: string;
+}
+
+export interface HandlersUpdatePlaylistRequest {
+  description?: string;
+  isDefault?: boolean;
+  items?: HandlersPlaylistItemInput[];
+  name?: string;
 }
 
 export interface HandlersUpdateStatusRequest {
@@ -1850,6 +1898,27 @@ export interface ModelsDayScheduleWithBookings {
   updatedAt?: string;
 }
 
+export type ModelsExternalFeedCachedData = { [key: string]: unknown };
+
+export type ModelsExternalFeedConfig = { [key: string]: unknown };
+
+export interface ModelsExternalFeed {
+  cachedData?: ModelsExternalFeedCachedData;
+  config?: ModelsExternalFeedConfig;
+  createdAt?: string;
+  id?: string;
+  isActive?: boolean;
+  lastError?: string;
+  lastFetchAt?: string;
+  name?: string;
+  pollInterval?: number;
+  /** rss | weather | custom_url */
+  type?: string;
+  unitId?: string;
+  updatedAt?: string;
+  url?: string;
+}
+
 export interface ModelsGenerateSlotsRequest {
   /** inclusive start date (YYYY-MM-DD) */
   from?: string;
@@ -1898,6 +1967,52 @@ export interface ModelsOperatorSkill {
   serviceId?: string;
   unitId?: string;
   userId?: string;
+}
+
+export interface ModelsUnitMaterial {
+  createdAt?: string;
+  filename?: string;
+  id?: string;
+  type?: string;
+  unitId?: string;
+  url?: string;
+}
+
+export interface ModelsPlaylistItem {
+  duration?: number;
+  id?: string;
+  material?: ModelsUnitMaterial;
+  materialId?: string;
+  playlistId?: string;
+  sortOrder?: number;
+}
+
+export interface ModelsPlaylist {
+  createdAt?: string;
+  description?: string;
+  id?: string;
+  isDefault?: boolean;
+  items?: ModelsPlaylistItem[];
+  name?: string;
+  unitId?: string;
+  updatedAt?: string;
+}
+
+export interface ModelsPlaylistSchedule {
+  createdAt?: string;
+  /** Comma-separated weekday numbers 1=Mon .. 7=Sun (e.g. "1,2,3,4,5"). */
+  daysOfWeek?: string;
+  /** "HH:MM" */
+  endTime?: string;
+  id?: string;
+  isActive?: boolean;
+  playlist?: ModelsPlaylist;
+  playlistId?: string;
+  priority?: number;
+  /** "HH:MM" */
+  startTime?: string;
+  unitId?: string;
+  updatedAt?: string;
 }
 
 export interface ModelsPreRegCalendarSlotItem {
@@ -1957,6 +2072,19 @@ export interface ModelsPreRegistrationUpdateRequest {
   /** Status optional; only "canceled" is accepted to cancel an active pre-registration. */
   status?: ModelsPreRegistrationUpdateRequestStatus;
   time?: string;
+}
+
+export interface ModelsScreenAnnouncement {
+  createdAt?: string;
+  expiresAt?: string;
+  id?: string;
+  isActive?: boolean;
+  priority?: number;
+  startsAt?: string;
+  style?: string;
+  text?: string;
+  unitId?: string;
+  updatedAt?: string;
 }
 
 export interface ModelsSlotSuccessResponse {
@@ -2052,15 +2180,6 @@ export interface ModelsTenantRole {
   updatedAt?: string;
 }
 
-export interface ModelsUnitMaterial {
-  createdAt?: string;
-  filename?: string;
-  id?: string;
-  type?: string;
-  unitId?: string;
-  url?: string;
-}
-
 export interface ModelsUpdateDayScheduleRequest {
   isDayOff?: boolean;
   slots?: ModelsServiceSlot[];
@@ -2103,6 +2222,13 @@ export interface RepositorySupportReportShareCandidate {
   email?: string;
   name?: string;
   userId?: string;
+}
+
+export interface ServicesActivePlaylistDTO {
+  playlist?: ModelsPlaylist;
+  /** schedule | default | none */
+  source?: string;
+  unitId?: string;
 }
 
 export interface ServicesAnomalyAlertItem {
@@ -2604,6 +2730,8 @@ export interface ServicesUnitQueueSummary {
   activeCounters?: number;
   estimatedWaitMinutes?: number;
   queueLength?: number;
+  /** ServedToday is tickets with status served/completed that finished today in the unit timezone. */
+  servedToday?: number;
   /** Services contains per-service breakdown when multiple services have waiting tickets.
   Omitted when only one service is active (redundant with the top-level fields). */
   services?: ServicesServiceQueueInfo[];
@@ -3223,6 +3351,119 @@ export const usePatchUnitsId = <TError = string,
     }
 
 /**
+ * @summary Get the currently active playlist (public, for TV screen)
+ */
+export type getActiveSignagePlaylistResponse200 = {
+  data: ServicesActivePlaylistDTO
+  status: 200
+}
+
+export type getActiveSignagePlaylistResponseSuccess = (getActiveSignagePlaylistResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getActiveSignagePlaylistResponse = (getActiveSignagePlaylistResponseSuccess)
+
+export const getGetActiveSignagePlaylistUrl = (unitId: string,) => {
+
+
+
+
+  return `/units/${unitId}/active-playlist`
+}
+
+export const getActiveSignagePlaylist = async (unitId: string, options?: RequestInit): Promise<getActiveSignagePlaylistResponse> => {
+
+  return orvalMutator<getActiveSignagePlaylistResponse>(getGetActiveSignagePlaylistUrl(unitId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetActiveSignagePlaylistQueryKey = (unitId: string,) => {
+    return [
+    `/units/${unitId}/active-playlist`
+    ] as const;
+    }
+
+
+export const getGetActiveSignagePlaylistQueryOptions = <TData = Awaited<ReturnType<typeof getActiveSignagePlaylist>>, TError = unknown>(unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getActiveSignagePlaylist>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetActiveSignagePlaylistQueryKey(unitId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getActiveSignagePlaylist>>> = ({ signal }) => getActiveSignagePlaylist(unitId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getActiveSignagePlaylist>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetActiveSignagePlaylistQueryResult = NonNullable<Awaited<ReturnType<typeof getActiveSignagePlaylist>>>
+export type GetActiveSignagePlaylistQueryError = unknown
+
+
+export function useGetActiveSignagePlaylist<TData = Awaited<ReturnType<typeof getActiveSignagePlaylist>>, TError = unknown>(
+ unitId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getActiveSignagePlaylist>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getActiveSignagePlaylist>>,
+          TError,
+          Awaited<ReturnType<typeof getActiveSignagePlaylist>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetActiveSignagePlaylist<TData = Awaited<ReturnType<typeof getActiveSignagePlaylist>>, TError = unknown>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getActiveSignagePlaylist>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getActiveSignagePlaylist>>,
+          TError,
+          Awaited<ReturnType<typeof getActiveSignagePlaylist>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetActiveSignagePlaylist<TData = Awaited<ReturnType<typeof getActiveSignagePlaylist>>, TError = unknown>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getActiveSignagePlaylist>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get the currently active playlist (public, for TV screen)
+ */
+
+export function useGetActiveSignagePlaylist<TData = Awaited<ReturnType<typeof getActiveSignagePlaylist>>, TError = unknown>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getActiveSignagePlaylist>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetActiveSignagePlaylistQueryOptions(unitId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
  * Updates ad settings for a unit
  * @summary Update ad settings
  */
@@ -3559,6 +3800,464 @@ export function useGetUnitsUnitIdChildWorkplaces<TData = Awaited<ReturnType<type
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetUnitsUnitIdChildWorkplacesQueryOptions(unitId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export type listSignageFeedsResponse200 = {
+  data: ModelsExternalFeed[]
+  status: 200
+}
+
+export type listSignageFeedsResponseSuccess = (listSignageFeedsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type listSignageFeedsResponse = (listSignageFeedsResponseSuccess)
+
+export const getListSignageFeedsUrl = (unitId: string,) => {
+
+
+
+
+  return `/units/${unitId}/feeds`
+}
+
+export const listSignageFeeds = async (unitId: string, options?: RequestInit): Promise<listSignageFeedsResponse> => {
+
+  return orvalMutator<listSignageFeedsResponse>(getListSignageFeedsUrl(unitId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListSignageFeedsQueryKey = (unitId: string,) => {
+    return [
+    `/units/${unitId}/feeds`
+    ] as const;
+    }
+
+
+export const getListSignageFeedsQueryOptions = <TData = Awaited<ReturnType<typeof listSignageFeeds>>, TError = unknown>(unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSignageFeeds>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListSignageFeedsQueryKey(unitId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSignageFeeds>>> = ({ signal }) => listSignageFeeds(unitId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSignageFeeds>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListSignageFeedsQueryResult = NonNullable<Awaited<ReturnType<typeof listSignageFeeds>>>
+export type ListSignageFeedsQueryError = unknown
+
+
+export function useListSignageFeeds<TData = Awaited<ReturnType<typeof listSignageFeeds>>, TError = unknown>(
+ unitId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSignageFeeds>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listSignageFeeds>>,
+          TError,
+          Awaited<ReturnType<typeof listSignageFeeds>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListSignageFeeds<TData = Awaited<ReturnType<typeof listSignageFeeds>>, TError = unknown>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSignageFeeds>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listSignageFeeds>>,
+          TError,
+          Awaited<ReturnType<typeof listSignageFeeds>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListSignageFeeds<TData = Awaited<ReturnType<typeof listSignageFeeds>>, TError = unknown>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSignageFeeds>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useListSignageFeeds<TData = Awaited<ReturnType<typeof listSignageFeeds>>, TError = unknown>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSignageFeeds>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListSignageFeedsQueryOptions(unitId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export type createSignageFeedResponse201 = {
+  data: ModelsExternalFeed
+  status: 201
+}
+
+export type createSignageFeedResponseSuccess = (createSignageFeedResponse201) & {
+  headers: Headers;
+};
+;
+
+export type createSignageFeedResponse = (createSignageFeedResponseSuccess)
+
+export const getCreateSignageFeedUrl = (unitId: string,) => {
+
+
+
+
+  return `/units/${unitId}/feeds`
+}
+
+export const createSignageFeed = async (unitId: string,
+    handlersCreateFeedRequest: HandlersCreateFeedRequest, options?: RequestInit): Promise<createSignageFeedResponse> => {
+
+  return orvalMutator<createSignageFeedResponse>(getCreateSignageFeedUrl(unitId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersCreateFeedRequest,)
+  }
+);}
+
+
+
+
+export const getCreateSignageFeedMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSignageFeed>>, TError,{unitId: string;data: HandlersCreateFeedRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof createSignageFeed>>, TError,{unitId: string;data: HandlersCreateFeedRequest}, TContext> => {
+
+const mutationKey = ['createSignageFeed'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createSignageFeed>>, {unitId: string;data: HandlersCreateFeedRequest}> = (props) => {
+          const {unitId,data} = props ?? {};
+
+          return  createSignageFeed(unitId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateSignageFeedMutationResult = NonNullable<Awaited<ReturnType<typeof createSignageFeed>>>
+    export type CreateSignageFeedMutationBody = HandlersCreateFeedRequest
+    export type CreateSignageFeedMutationError = unknown
+
+    export const useCreateSignageFeed = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSignageFeed>>, TError,{unitId: string;data: HandlersCreateFeedRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createSignageFeed>>,
+        TError,
+        {unitId: string;data: HandlersCreateFeedRequest},
+        TContext
+      > => {
+      return useMutation(getCreateSignageFeedMutationOptions(options), queryClient);
+    }
+
+export type deleteSignageFeedResponse204 = {
+  data: void
+  status: 204
+}
+
+export type deleteSignageFeedResponseSuccess = (deleteSignageFeedResponse204) & {
+  headers: Headers;
+};
+;
+
+export type deleteSignageFeedResponse = (deleteSignageFeedResponseSuccess)
+
+export const getDeleteSignageFeedUrl = (unitId: string,
+    feedId: string,) => {
+
+
+
+
+  return `/units/${unitId}/feeds/${feedId}`
+}
+
+export const deleteSignageFeed = async (unitId: string,
+    feedId: string, options?: RequestInit): Promise<deleteSignageFeedResponse> => {
+
+  return orvalMutator<deleteSignageFeedResponse>(getDeleteSignageFeedUrl(unitId,feedId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteSignageFeedMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSignageFeed>>, TError,{unitId: string;feedId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteSignageFeed>>, TError,{unitId: string;feedId: string}, TContext> => {
+
+const mutationKey = ['deleteSignageFeed'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteSignageFeed>>, {unitId: string;feedId: string}> = (props) => {
+          const {unitId,feedId} = props ?? {};
+
+          return  deleteSignageFeed(unitId,feedId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteSignageFeedMutationResult = NonNullable<Awaited<ReturnType<typeof deleteSignageFeed>>>
+
+    export type DeleteSignageFeedMutationError = unknown
+
+    export const useDeleteSignageFeed = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSignageFeed>>, TError,{unitId: string;feedId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteSignageFeed>>,
+        TError,
+        {unitId: string;feedId: string},
+        TContext
+      > => {
+      return useMutation(getDeleteSignageFeedMutationOptions(options), queryClient);
+    }
+
+export type updateSignageFeedResponse200 = {
+  data: ModelsExternalFeed
+  status: 200
+}
+
+export type updateSignageFeedResponseSuccess = (updateSignageFeedResponse200) & {
+  headers: Headers;
+};
+;
+
+export type updateSignageFeedResponse = (updateSignageFeedResponseSuccess)
+
+export const getUpdateSignageFeedUrl = (unitId: string,
+    feedId: string,) => {
+
+
+
+
+  return `/units/${unitId}/feeds/${feedId}`
+}
+
+export const updateSignageFeed = async (unitId: string,
+    feedId: string,
+    handlersCreateFeedRequest: HandlersCreateFeedRequest, options?: RequestInit): Promise<updateSignageFeedResponse> => {
+
+  return orvalMutator<updateSignageFeedResponse>(getUpdateSignageFeedUrl(unitId,feedId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersCreateFeedRequest,)
+  }
+);}
+
+
+
+
+export const getUpdateSignageFeedMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSignageFeed>>, TError,{unitId: string;feedId: string;data: HandlersCreateFeedRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateSignageFeed>>, TError,{unitId: string;feedId: string;data: HandlersCreateFeedRequest}, TContext> => {
+
+const mutationKey = ['updateSignageFeed'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateSignageFeed>>, {unitId: string;feedId: string;data: HandlersCreateFeedRequest}> = (props) => {
+          const {unitId,feedId,data} = props ?? {};
+
+          return  updateSignageFeed(unitId,feedId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateSignageFeedMutationResult = NonNullable<Awaited<ReturnType<typeof updateSignageFeed>>>
+    export type UpdateSignageFeedMutationBody = HandlersCreateFeedRequest
+    export type UpdateSignageFeedMutationError = unknown
+
+    export const useUpdateSignageFeed = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSignageFeed>>, TError,{unitId: string;feedId: string;data: HandlersCreateFeedRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateSignageFeed>>,
+        TError,
+        {unitId: string;feedId: string;data: HandlersCreateFeedRequest},
+        TContext
+      > => {
+      return useMutation(getUpdateSignageFeedMutationOptions(options), queryClient);
+    }
+
+export type getSignageFeedDataPublicResponse200 = {
+  data: void
+  status: 200
+}
+
+export type getSignageFeedDataPublicResponseSuccess = (getSignageFeedDataPublicResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getSignageFeedDataPublicResponse = (getSignageFeedDataPublicResponseSuccess)
+
+export const getGetSignageFeedDataPublicUrl = (unitId: string,
+    feedId: string,) => {
+
+
+
+
+  return `/units/${unitId}/feeds/${feedId}/data`
+}
+
+export const getSignageFeedDataPublic = async (unitId: string,
+    feedId: string, options?: RequestInit): Promise<getSignageFeedDataPublicResponse> => {
+
+  return orvalMutator<getSignageFeedDataPublicResponse>(getGetSignageFeedDataPublicUrl(unitId,feedId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSignageFeedDataPublicQueryKey = (unitId: string,
+    feedId: string,) => {
+    return [
+    `/units/${unitId}/feeds/${feedId}/data`
+    ] as const;
+    }
+
+
+export const getGetSignageFeedDataPublicQueryOptions = <TData = Awaited<ReturnType<typeof getSignageFeedDataPublic>>, TError = unknown>(unitId: string,
+    feedId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSignageFeedDataPublic>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSignageFeedDataPublicQueryKey(unitId,feedId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSignageFeedDataPublic>>> = ({ signal }) => getSignageFeedDataPublic(unitId,feedId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(unitId && feedId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSignageFeedDataPublic>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetSignageFeedDataPublicQueryResult = NonNullable<Awaited<ReturnType<typeof getSignageFeedDataPublic>>>
+export type GetSignageFeedDataPublicQueryError = unknown
+
+
+export function useGetSignageFeedDataPublic<TData = Awaited<ReturnType<typeof getSignageFeedDataPublic>>, TError = unknown>(
+ unitId: string,
+    feedId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSignageFeedDataPublic>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getSignageFeedDataPublic>>,
+          TError,
+          Awaited<ReturnType<typeof getSignageFeedDataPublic>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetSignageFeedDataPublic<TData = Awaited<ReturnType<typeof getSignageFeedDataPublic>>, TError = unknown>(
+ unitId: string,
+    feedId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSignageFeedDataPublic>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getSignageFeedDataPublic>>,
+          TError,
+          Awaited<ReturnType<typeof getSignageFeedDataPublic>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetSignageFeedDataPublic<TData = Awaited<ReturnType<typeof getSignageFeedDataPublic>>, TError = unknown>(
+ unitId: string,
+    feedId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSignageFeedDataPublic>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useGetSignageFeedDataPublic<TData = Awaited<ReturnType<typeof getSignageFeedDataPublic>>, TError = unknown>(
+ unitId: string,
+    feedId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSignageFeedDataPublic>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetSignageFeedDataPublicQueryOptions(unitId,feedId,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -4349,6 +5048,1427 @@ export const useDeleteUnitOperatorSkill = <TError = string,
         TContext
       > => {
       return useMutation(getDeleteUnitOperatorSkillMutationOptions(options), queryClient);
+    }
+
+/**
+ * @summary List playlist schedules
+ */
+export type listSignageSchedulesResponse200 = {
+  data: ModelsPlaylistSchedule[]
+  status: 200
+}
+
+export type listSignageSchedulesResponseSuccess = (listSignageSchedulesResponse200) & {
+  headers: Headers;
+};
+;
+
+export type listSignageSchedulesResponse = (listSignageSchedulesResponseSuccess)
+
+export const getListSignageSchedulesUrl = (unitId: string,) => {
+
+
+
+
+  return `/units/${unitId}/playlist-schedules`
+}
+
+export const listSignageSchedules = async (unitId: string, options?: RequestInit): Promise<listSignageSchedulesResponse> => {
+
+  return orvalMutator<listSignageSchedulesResponse>(getListSignageSchedulesUrl(unitId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListSignageSchedulesQueryKey = (unitId: string,) => {
+    return [
+    `/units/${unitId}/playlist-schedules`
+    ] as const;
+    }
+
+
+export const getListSignageSchedulesQueryOptions = <TData = Awaited<ReturnType<typeof listSignageSchedules>>, TError = unknown>(unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSignageSchedules>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListSignageSchedulesQueryKey(unitId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSignageSchedules>>> = ({ signal }) => listSignageSchedules(unitId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSignageSchedules>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListSignageSchedulesQueryResult = NonNullable<Awaited<ReturnType<typeof listSignageSchedules>>>
+export type ListSignageSchedulesQueryError = unknown
+
+
+export function useListSignageSchedules<TData = Awaited<ReturnType<typeof listSignageSchedules>>, TError = unknown>(
+ unitId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSignageSchedules>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listSignageSchedules>>,
+          TError,
+          Awaited<ReturnType<typeof listSignageSchedules>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListSignageSchedules<TData = Awaited<ReturnType<typeof listSignageSchedules>>, TError = unknown>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSignageSchedules>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listSignageSchedules>>,
+          TError,
+          Awaited<ReturnType<typeof listSignageSchedules>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListSignageSchedules<TData = Awaited<ReturnType<typeof listSignageSchedules>>, TError = unknown>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSignageSchedules>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List playlist schedules
+ */
+
+export function useListSignageSchedules<TData = Awaited<ReturnType<typeof listSignageSchedules>>, TError = unknown>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSignageSchedules>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListSignageSchedulesQueryOptions(unitId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export type createSignageScheduleResponse201 = {
+  data: ModelsPlaylistSchedule
+  status: 201
+}
+
+export type createSignageScheduleResponseSuccess = (createSignageScheduleResponse201) & {
+  headers: Headers;
+};
+;
+
+export type createSignageScheduleResponse = (createSignageScheduleResponseSuccess)
+
+export const getCreateSignageScheduleUrl = (unitId: string,) => {
+
+
+
+
+  return `/units/${unitId}/playlist-schedules`
+}
+
+export const createSignageSchedule = async (unitId: string,
+    handlersCreateScheduleRequest: HandlersCreateScheduleRequest, options?: RequestInit): Promise<createSignageScheduleResponse> => {
+
+  return orvalMutator<createSignageScheduleResponse>(getCreateSignageScheduleUrl(unitId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersCreateScheduleRequest,)
+  }
+);}
+
+
+
+
+export const getCreateSignageScheduleMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSignageSchedule>>, TError,{unitId: string;data: HandlersCreateScheduleRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof createSignageSchedule>>, TError,{unitId: string;data: HandlersCreateScheduleRequest}, TContext> => {
+
+const mutationKey = ['createSignageSchedule'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createSignageSchedule>>, {unitId: string;data: HandlersCreateScheduleRequest}> = (props) => {
+          const {unitId,data} = props ?? {};
+
+          return  createSignageSchedule(unitId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateSignageScheduleMutationResult = NonNullable<Awaited<ReturnType<typeof createSignageSchedule>>>
+    export type CreateSignageScheduleMutationBody = HandlersCreateScheduleRequest
+    export type CreateSignageScheduleMutationError = unknown
+
+    export const useCreateSignageSchedule = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSignageSchedule>>, TError,{unitId: string;data: HandlersCreateScheduleRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createSignageSchedule>>,
+        TError,
+        {unitId: string;data: HandlersCreateScheduleRequest},
+        TContext
+      > => {
+      return useMutation(getCreateSignageScheduleMutationOptions(options), queryClient);
+    }
+
+export type deleteSignageScheduleResponse204 = {
+  data: void
+  status: 204
+}
+
+export type deleteSignageScheduleResponseSuccess = (deleteSignageScheduleResponse204) & {
+  headers: Headers;
+};
+;
+
+export type deleteSignageScheduleResponse = (deleteSignageScheduleResponseSuccess)
+
+export const getDeleteSignageScheduleUrl = (unitId: string,
+    scheduleId: string,) => {
+
+
+
+
+  return `/units/${unitId}/playlist-schedules/${scheduleId}`
+}
+
+export const deleteSignageSchedule = async (unitId: string,
+    scheduleId: string, options?: RequestInit): Promise<deleteSignageScheduleResponse> => {
+
+  return orvalMutator<deleteSignageScheduleResponse>(getDeleteSignageScheduleUrl(unitId,scheduleId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteSignageScheduleMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSignageSchedule>>, TError,{unitId: string;scheduleId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteSignageSchedule>>, TError,{unitId: string;scheduleId: string}, TContext> => {
+
+const mutationKey = ['deleteSignageSchedule'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteSignageSchedule>>, {unitId: string;scheduleId: string}> = (props) => {
+          const {unitId,scheduleId} = props ?? {};
+
+          return  deleteSignageSchedule(unitId,scheduleId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteSignageScheduleMutationResult = NonNullable<Awaited<ReturnType<typeof deleteSignageSchedule>>>
+
+    export type DeleteSignageScheduleMutationError = unknown
+
+    export const useDeleteSignageSchedule = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSignageSchedule>>, TError,{unitId: string;scheduleId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteSignageSchedule>>,
+        TError,
+        {unitId: string;scheduleId: string},
+        TContext
+      > => {
+      return useMutation(getDeleteSignageScheduleMutationOptions(options), queryClient);
+    }
+
+export type getSignageScheduleResponse200 = {
+  data: ModelsPlaylistSchedule
+  status: 200
+}
+
+export type getSignageScheduleResponseSuccess = (getSignageScheduleResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getSignageScheduleResponse = (getSignageScheduleResponseSuccess)
+
+export const getGetSignageScheduleUrl = (unitId: string,
+    scheduleId: string,) => {
+
+
+
+
+  return `/units/${unitId}/playlist-schedules/${scheduleId}`
+}
+
+export const getSignageSchedule = async (unitId: string,
+    scheduleId: string, options?: RequestInit): Promise<getSignageScheduleResponse> => {
+
+  return orvalMutator<getSignageScheduleResponse>(getGetSignageScheduleUrl(unitId,scheduleId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSignageScheduleQueryKey = (unitId: string,
+    scheduleId: string,) => {
+    return [
+    `/units/${unitId}/playlist-schedules/${scheduleId}`
+    ] as const;
+    }
+
+
+export const getGetSignageScheduleQueryOptions = <TData = Awaited<ReturnType<typeof getSignageSchedule>>, TError = unknown>(unitId: string,
+    scheduleId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSignageSchedule>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSignageScheduleQueryKey(unitId,scheduleId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSignageSchedule>>> = ({ signal }) => getSignageSchedule(unitId,scheduleId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(unitId && scheduleId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSignageSchedule>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetSignageScheduleQueryResult = NonNullable<Awaited<ReturnType<typeof getSignageSchedule>>>
+export type GetSignageScheduleQueryError = unknown
+
+
+export function useGetSignageSchedule<TData = Awaited<ReturnType<typeof getSignageSchedule>>, TError = unknown>(
+ unitId: string,
+    scheduleId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSignageSchedule>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getSignageSchedule>>,
+          TError,
+          Awaited<ReturnType<typeof getSignageSchedule>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetSignageSchedule<TData = Awaited<ReturnType<typeof getSignageSchedule>>, TError = unknown>(
+ unitId: string,
+    scheduleId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSignageSchedule>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getSignageSchedule>>,
+          TError,
+          Awaited<ReturnType<typeof getSignageSchedule>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetSignageSchedule<TData = Awaited<ReturnType<typeof getSignageSchedule>>, TError = unknown>(
+ unitId: string,
+    scheduleId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSignageSchedule>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useGetSignageSchedule<TData = Awaited<ReturnType<typeof getSignageSchedule>>, TError = unknown>(
+ unitId: string,
+    scheduleId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSignageSchedule>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetSignageScheduleQueryOptions(unitId,scheduleId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export type updateSignageScheduleResponse200 = {
+  data: ModelsPlaylistSchedule
+  status: 200
+}
+
+export type updateSignageScheduleResponseSuccess = (updateSignageScheduleResponse200) & {
+  headers: Headers;
+};
+;
+
+export type updateSignageScheduleResponse = (updateSignageScheduleResponseSuccess)
+
+export const getUpdateSignageScheduleUrl = (unitId: string,
+    scheduleId: string,) => {
+
+
+
+
+  return `/units/${unitId}/playlist-schedules/${scheduleId}`
+}
+
+export const updateSignageSchedule = async (unitId: string,
+    scheduleId: string,
+    handlersCreateScheduleRequest: HandlersCreateScheduleRequest, options?: RequestInit): Promise<updateSignageScheduleResponse> => {
+
+  return orvalMutator<updateSignageScheduleResponse>(getUpdateSignageScheduleUrl(unitId,scheduleId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersCreateScheduleRequest,)
+  }
+);}
+
+
+
+
+export const getUpdateSignageScheduleMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSignageSchedule>>, TError,{unitId: string;scheduleId: string;data: HandlersCreateScheduleRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateSignageSchedule>>, TError,{unitId: string;scheduleId: string;data: HandlersCreateScheduleRequest}, TContext> => {
+
+const mutationKey = ['updateSignageSchedule'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateSignageSchedule>>, {unitId: string;scheduleId: string;data: HandlersCreateScheduleRequest}> = (props) => {
+          const {unitId,scheduleId,data} = props ?? {};
+
+          return  updateSignageSchedule(unitId,scheduleId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateSignageScheduleMutationResult = NonNullable<Awaited<ReturnType<typeof updateSignageSchedule>>>
+    export type UpdateSignageScheduleMutationBody = HandlersCreateScheduleRequest
+    export type UpdateSignageScheduleMutationError = unknown
+
+    export const useUpdateSignageSchedule = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSignageSchedule>>, TError,{unitId: string;scheduleId: string;data: HandlersCreateScheduleRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateSignageSchedule>>,
+        TError,
+        {unitId: string;scheduleId: string;data: HandlersCreateScheduleRequest},
+        TContext
+      > => {
+      return useMutation(getUpdateSignageScheduleMutationOptions(options), queryClient);
+    }
+
+/**
+ * @summary List playlists for a unit
+ */
+export type listSignagePlaylistsResponse200 = {
+  data: ModelsPlaylist[]
+  status: 200
+}
+
+export type listSignagePlaylistsResponse401 = {
+  data: string
+  status: 401
+}
+
+export type listSignagePlaylistsResponse403 = {
+  data: string
+  status: 403
+}
+
+export type listSignagePlaylistsResponseSuccess = (listSignagePlaylistsResponse200) & {
+  headers: Headers;
+};
+export type listSignagePlaylistsResponseError = (listSignagePlaylistsResponse401 | listSignagePlaylistsResponse403) & {
+  headers: Headers;
+};
+
+export type listSignagePlaylistsResponse = (listSignagePlaylistsResponseSuccess | listSignagePlaylistsResponseError)
+
+export const getListSignagePlaylistsUrl = (unitId: string,) => {
+
+
+
+
+  return `/units/${unitId}/playlists`
+}
+
+export const listSignagePlaylists = async (unitId: string, options?: RequestInit): Promise<listSignagePlaylistsResponse> => {
+
+  return orvalMutator<listSignagePlaylistsResponse>(getListSignagePlaylistsUrl(unitId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListSignagePlaylistsQueryKey = (unitId: string,) => {
+    return [
+    `/units/${unitId}/playlists`
+    ] as const;
+    }
+
+
+export const getListSignagePlaylistsQueryOptions = <TData = Awaited<ReturnType<typeof listSignagePlaylists>>, TError = string>(unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSignagePlaylists>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListSignagePlaylistsQueryKey(unitId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSignagePlaylists>>> = ({ signal }) => listSignagePlaylists(unitId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSignagePlaylists>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListSignagePlaylistsQueryResult = NonNullable<Awaited<ReturnType<typeof listSignagePlaylists>>>
+export type ListSignagePlaylistsQueryError = string
+
+
+export function useListSignagePlaylists<TData = Awaited<ReturnType<typeof listSignagePlaylists>>, TError = string>(
+ unitId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSignagePlaylists>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listSignagePlaylists>>,
+          TError,
+          Awaited<ReturnType<typeof listSignagePlaylists>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListSignagePlaylists<TData = Awaited<ReturnType<typeof listSignagePlaylists>>, TError = string>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSignagePlaylists>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listSignagePlaylists>>,
+          TError,
+          Awaited<ReturnType<typeof listSignagePlaylists>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListSignagePlaylists<TData = Awaited<ReturnType<typeof listSignagePlaylists>>, TError = string>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSignagePlaylists>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List playlists for a unit
+ */
+
+export function useListSignagePlaylists<TData = Awaited<ReturnType<typeof listSignagePlaylists>>, TError = string>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSignagePlaylists>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListSignagePlaylistsQueryOptions(unitId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * @summary Create a playlist
+ */
+export type createSignagePlaylistResponse201 = {
+  data: ModelsPlaylist
+  status: 201
+}
+
+export type createSignagePlaylistResponseSuccess = (createSignagePlaylistResponse201) & {
+  headers: Headers;
+};
+;
+
+export type createSignagePlaylistResponse = (createSignagePlaylistResponseSuccess)
+
+export const getCreateSignagePlaylistUrl = (unitId: string,) => {
+
+
+
+
+  return `/units/${unitId}/playlists`
+}
+
+export const createSignagePlaylist = async (unitId: string,
+    handlersCreatePlaylistRequest: HandlersCreatePlaylistRequest, options?: RequestInit): Promise<createSignagePlaylistResponse> => {
+
+  return orvalMutator<createSignagePlaylistResponse>(getCreateSignagePlaylistUrl(unitId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersCreatePlaylistRequest,)
+  }
+);}
+
+
+
+
+export const getCreateSignagePlaylistMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSignagePlaylist>>, TError,{unitId: string;data: HandlersCreatePlaylistRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof createSignagePlaylist>>, TError,{unitId: string;data: HandlersCreatePlaylistRequest}, TContext> => {
+
+const mutationKey = ['createSignagePlaylist'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createSignagePlaylist>>, {unitId: string;data: HandlersCreatePlaylistRequest}> = (props) => {
+          const {unitId,data} = props ?? {};
+
+          return  createSignagePlaylist(unitId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateSignagePlaylistMutationResult = NonNullable<Awaited<ReturnType<typeof createSignagePlaylist>>>
+    export type CreateSignagePlaylistMutationBody = HandlersCreatePlaylistRequest
+    export type CreateSignagePlaylistMutationError = unknown
+
+    /**
+ * @summary Create a playlist
+ */
+export const useCreateSignagePlaylist = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSignagePlaylist>>, TError,{unitId: string;data: HandlersCreatePlaylistRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createSignagePlaylist>>,
+        TError,
+        {unitId: string;data: HandlersCreatePlaylistRequest},
+        TContext
+      > => {
+      return useMutation(getCreateSignagePlaylistMutationOptions(options), queryClient);
+    }
+
+/**
+ * @summary Delete a playlist
+ */
+export type deleteSignagePlaylistResponse204 = {
+  data: void
+  status: 204
+}
+
+export type deleteSignagePlaylistResponseSuccess = (deleteSignagePlaylistResponse204) & {
+  headers: Headers;
+};
+;
+
+export type deleteSignagePlaylistResponse = (deleteSignagePlaylistResponseSuccess)
+
+export const getDeleteSignagePlaylistUrl = (unitId: string,
+    playlistId: string,) => {
+
+
+
+
+  return `/units/${unitId}/playlists/${playlistId}`
+}
+
+export const deleteSignagePlaylist = async (unitId: string,
+    playlistId: string, options?: RequestInit): Promise<deleteSignagePlaylistResponse> => {
+
+  return orvalMutator<deleteSignagePlaylistResponse>(getDeleteSignagePlaylistUrl(unitId,playlistId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteSignagePlaylistMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSignagePlaylist>>, TError,{unitId: string;playlistId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteSignagePlaylist>>, TError,{unitId: string;playlistId: string}, TContext> => {
+
+const mutationKey = ['deleteSignagePlaylist'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteSignagePlaylist>>, {unitId: string;playlistId: string}> = (props) => {
+          const {unitId,playlistId} = props ?? {};
+
+          return  deleteSignagePlaylist(unitId,playlistId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteSignagePlaylistMutationResult = NonNullable<Awaited<ReturnType<typeof deleteSignagePlaylist>>>
+
+    export type DeleteSignagePlaylistMutationError = unknown
+
+    /**
+ * @summary Delete a playlist
+ */
+export const useDeleteSignagePlaylist = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSignagePlaylist>>, TError,{unitId: string;playlistId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteSignagePlaylist>>,
+        TError,
+        {unitId: string;playlistId: string},
+        TContext
+      > => {
+      return useMutation(getDeleteSignagePlaylistMutationOptions(options), queryClient);
+    }
+
+/**
+ * @summary Get a playlist with items and material
+ */
+export type getSignagePlaylistResponse200 = {
+  data: ModelsPlaylist
+  status: 200
+}
+
+export type getSignagePlaylistResponse404 = {
+  data: string
+  status: 404
+}
+
+export type getSignagePlaylistResponseSuccess = (getSignagePlaylistResponse200) & {
+  headers: Headers;
+};
+export type getSignagePlaylistResponseError = (getSignagePlaylistResponse404) & {
+  headers: Headers;
+};
+
+export type getSignagePlaylistResponse = (getSignagePlaylistResponseSuccess | getSignagePlaylistResponseError)
+
+export const getGetSignagePlaylistUrl = (unitId: string,
+    playlistId: string,) => {
+
+
+
+
+  return `/units/${unitId}/playlists/${playlistId}`
+}
+
+export const getSignagePlaylist = async (unitId: string,
+    playlistId: string, options?: RequestInit): Promise<getSignagePlaylistResponse> => {
+
+  return orvalMutator<getSignagePlaylistResponse>(getGetSignagePlaylistUrl(unitId,playlistId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSignagePlaylistQueryKey = (unitId: string,
+    playlistId: string,) => {
+    return [
+    `/units/${unitId}/playlists/${playlistId}`
+    ] as const;
+    }
+
+
+export const getGetSignagePlaylistQueryOptions = <TData = Awaited<ReturnType<typeof getSignagePlaylist>>, TError = string>(unitId: string,
+    playlistId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSignagePlaylist>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSignagePlaylistQueryKey(unitId,playlistId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSignagePlaylist>>> = ({ signal }) => getSignagePlaylist(unitId,playlistId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(unitId && playlistId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSignagePlaylist>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetSignagePlaylistQueryResult = NonNullable<Awaited<ReturnType<typeof getSignagePlaylist>>>
+export type GetSignagePlaylistQueryError = string
+
+
+export function useGetSignagePlaylist<TData = Awaited<ReturnType<typeof getSignagePlaylist>>, TError = string>(
+ unitId: string,
+    playlistId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSignagePlaylist>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getSignagePlaylist>>,
+          TError,
+          Awaited<ReturnType<typeof getSignagePlaylist>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetSignagePlaylist<TData = Awaited<ReturnType<typeof getSignagePlaylist>>, TError = string>(
+ unitId: string,
+    playlistId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSignagePlaylist>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getSignagePlaylist>>,
+          TError,
+          Awaited<ReturnType<typeof getSignagePlaylist>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetSignagePlaylist<TData = Awaited<ReturnType<typeof getSignagePlaylist>>, TError = string>(
+ unitId: string,
+    playlistId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSignagePlaylist>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get a playlist with items and material
+ */
+
+export function useGetSignagePlaylist<TData = Awaited<ReturnType<typeof getSignagePlaylist>>, TError = string>(
+ unitId: string,
+    playlistId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSignagePlaylist>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetSignagePlaylistQueryOptions(unitId,playlistId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * @summary Replace a playlist and its items
+ */
+export type updateSignagePlaylistResponse200 = {
+  data: ModelsPlaylist
+  status: 200
+}
+
+export type updateSignagePlaylistResponseSuccess = (updateSignagePlaylistResponse200) & {
+  headers: Headers;
+};
+;
+
+export type updateSignagePlaylistResponse = (updateSignagePlaylistResponseSuccess)
+
+export const getUpdateSignagePlaylistUrl = (unitId: string,
+    playlistId: string,) => {
+
+
+
+
+  return `/units/${unitId}/playlists/${playlistId}`
+}
+
+export const updateSignagePlaylist = async (unitId: string,
+    playlistId: string,
+    handlersUpdatePlaylistRequest: HandlersUpdatePlaylistRequest, options?: RequestInit): Promise<updateSignagePlaylistResponse> => {
+
+  return orvalMutator<updateSignagePlaylistResponse>(getUpdateSignagePlaylistUrl(unitId,playlistId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersUpdatePlaylistRequest,)
+  }
+);}
+
+
+
+
+export const getUpdateSignagePlaylistMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSignagePlaylist>>, TError,{unitId: string;playlistId: string;data: HandlersUpdatePlaylistRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateSignagePlaylist>>, TError,{unitId: string;playlistId: string;data: HandlersUpdatePlaylistRequest}, TContext> => {
+
+const mutationKey = ['updateSignagePlaylist'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateSignagePlaylist>>, {unitId: string;playlistId: string;data: HandlersUpdatePlaylistRequest}> = (props) => {
+          const {unitId,playlistId,data} = props ?? {};
+
+          return  updateSignagePlaylist(unitId,playlistId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateSignagePlaylistMutationResult = NonNullable<Awaited<ReturnType<typeof updateSignagePlaylist>>>
+    export type UpdateSignagePlaylistMutationBody = HandlersUpdatePlaylistRequest
+    export type UpdateSignagePlaylistMutationError = unknown
+
+    /**
+ * @summary Replace a playlist and its items
+ */
+export const useUpdateSignagePlaylist = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSignagePlaylist>>, TError,{unitId: string;playlistId: string;data: HandlersUpdatePlaylistRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateSignagePlaylist>>,
+        TError,
+        {unitId: string;playlistId: string;data: HandlersUpdatePlaylistRequest},
+        TContext
+      > => {
+      return useMutation(getUpdateSignagePlaylistMutationOptions(options), queryClient);
+    }
+
+export type listSignageAnnouncementsPublicResponse200 = {
+  data: ModelsScreenAnnouncement[]
+  status: 200
+}
+
+export type listSignageAnnouncementsPublicResponseSuccess = (listSignageAnnouncementsPublicResponse200) & {
+  headers: Headers;
+};
+;
+
+export type listSignageAnnouncementsPublicResponse = (listSignageAnnouncementsPublicResponseSuccess)
+
+export const getListSignageAnnouncementsPublicUrl = (unitId: string,) => {
+
+
+
+
+  return `/units/${unitId}/public-screen-announcements`
+}
+
+export const listSignageAnnouncementsPublic = async (unitId: string, options?: RequestInit): Promise<listSignageAnnouncementsPublicResponse> => {
+
+  return orvalMutator<listSignageAnnouncementsPublicResponse>(getListSignageAnnouncementsPublicUrl(unitId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListSignageAnnouncementsPublicQueryKey = (unitId: string,) => {
+    return [
+    `/units/${unitId}/public-screen-announcements`
+    ] as const;
+    }
+
+
+export const getListSignageAnnouncementsPublicQueryOptions = <TData = Awaited<ReturnType<typeof listSignageAnnouncementsPublic>>, TError = unknown>(unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSignageAnnouncementsPublic>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListSignageAnnouncementsPublicQueryKey(unitId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSignageAnnouncementsPublic>>> = ({ signal }) => listSignageAnnouncementsPublic(unitId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSignageAnnouncementsPublic>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListSignageAnnouncementsPublicQueryResult = NonNullable<Awaited<ReturnType<typeof listSignageAnnouncementsPublic>>>
+export type ListSignageAnnouncementsPublicQueryError = unknown
+
+
+export function useListSignageAnnouncementsPublic<TData = Awaited<ReturnType<typeof listSignageAnnouncementsPublic>>, TError = unknown>(
+ unitId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSignageAnnouncementsPublic>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listSignageAnnouncementsPublic>>,
+          TError,
+          Awaited<ReturnType<typeof listSignageAnnouncementsPublic>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListSignageAnnouncementsPublic<TData = Awaited<ReturnType<typeof listSignageAnnouncementsPublic>>, TError = unknown>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSignageAnnouncementsPublic>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listSignageAnnouncementsPublic>>,
+          TError,
+          Awaited<ReturnType<typeof listSignageAnnouncementsPublic>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListSignageAnnouncementsPublic<TData = Awaited<ReturnType<typeof listSignageAnnouncementsPublic>>, TError = unknown>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSignageAnnouncementsPublic>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useListSignageAnnouncementsPublic<TData = Awaited<ReturnType<typeof listSignageAnnouncementsPublic>>, TError = unknown>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSignageAnnouncementsPublic>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListSignageAnnouncementsPublicQueryOptions(unitId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export type listSignageAnnouncementsResponse200 = {
+  data: ModelsScreenAnnouncement[]
+  status: 200
+}
+
+export type listSignageAnnouncementsResponseSuccess = (listSignageAnnouncementsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type listSignageAnnouncementsResponse = (listSignageAnnouncementsResponseSuccess)
+
+export const getListSignageAnnouncementsUrl = (unitId: string,) => {
+
+
+
+
+  return `/units/${unitId}/screen-announcements`
+}
+
+export const listSignageAnnouncements = async (unitId: string, options?: RequestInit): Promise<listSignageAnnouncementsResponse> => {
+
+  return orvalMutator<listSignageAnnouncementsResponse>(getListSignageAnnouncementsUrl(unitId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListSignageAnnouncementsQueryKey = (unitId: string,) => {
+    return [
+    `/units/${unitId}/screen-announcements`
+    ] as const;
+    }
+
+
+export const getListSignageAnnouncementsQueryOptions = <TData = Awaited<ReturnType<typeof listSignageAnnouncements>>, TError = unknown>(unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSignageAnnouncements>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListSignageAnnouncementsQueryKey(unitId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSignageAnnouncements>>> = ({ signal }) => listSignageAnnouncements(unitId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSignageAnnouncements>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListSignageAnnouncementsQueryResult = NonNullable<Awaited<ReturnType<typeof listSignageAnnouncements>>>
+export type ListSignageAnnouncementsQueryError = unknown
+
+
+export function useListSignageAnnouncements<TData = Awaited<ReturnType<typeof listSignageAnnouncements>>, TError = unknown>(
+ unitId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSignageAnnouncements>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listSignageAnnouncements>>,
+          TError,
+          Awaited<ReturnType<typeof listSignageAnnouncements>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListSignageAnnouncements<TData = Awaited<ReturnType<typeof listSignageAnnouncements>>, TError = unknown>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSignageAnnouncements>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listSignageAnnouncements>>,
+          TError,
+          Awaited<ReturnType<typeof listSignageAnnouncements>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListSignageAnnouncements<TData = Awaited<ReturnType<typeof listSignageAnnouncements>>, TError = unknown>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSignageAnnouncements>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useListSignageAnnouncements<TData = Awaited<ReturnType<typeof listSignageAnnouncements>>, TError = unknown>(
+ unitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSignageAnnouncements>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListSignageAnnouncementsQueryOptions(unitId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export type createSignageAnnouncementResponse201 = {
+  data: ModelsScreenAnnouncement
+  status: 201
+}
+
+export type createSignageAnnouncementResponseSuccess = (createSignageAnnouncementResponse201) & {
+  headers: Headers;
+};
+;
+
+export type createSignageAnnouncementResponse = (createSignageAnnouncementResponseSuccess)
+
+export const getCreateSignageAnnouncementUrl = (unitId: string,) => {
+
+
+
+
+  return `/units/${unitId}/screen-announcements`
+}
+
+export const createSignageAnnouncement = async (unitId: string,
+    handlersAnnouncementRequest: HandlersAnnouncementRequest, options?: RequestInit): Promise<createSignageAnnouncementResponse> => {
+
+  return orvalMutator<createSignageAnnouncementResponse>(getCreateSignageAnnouncementUrl(unitId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersAnnouncementRequest,)
+  }
+);}
+
+
+
+
+export const getCreateSignageAnnouncementMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSignageAnnouncement>>, TError,{unitId: string;data: HandlersAnnouncementRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof createSignageAnnouncement>>, TError,{unitId: string;data: HandlersAnnouncementRequest}, TContext> => {
+
+const mutationKey = ['createSignageAnnouncement'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createSignageAnnouncement>>, {unitId: string;data: HandlersAnnouncementRequest}> = (props) => {
+          const {unitId,data} = props ?? {};
+
+          return  createSignageAnnouncement(unitId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateSignageAnnouncementMutationResult = NonNullable<Awaited<ReturnType<typeof createSignageAnnouncement>>>
+    export type CreateSignageAnnouncementMutationBody = HandlersAnnouncementRequest
+    export type CreateSignageAnnouncementMutationError = unknown
+
+    export const useCreateSignageAnnouncement = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSignageAnnouncement>>, TError,{unitId: string;data: HandlersAnnouncementRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createSignageAnnouncement>>,
+        TError,
+        {unitId: string;data: HandlersAnnouncementRequest},
+        TContext
+      > => {
+      return useMutation(getCreateSignageAnnouncementMutationOptions(options), queryClient);
+    }
+
+export type deleteSignageAnnouncementResponse204 = {
+  data: void
+  status: 204
+}
+
+export type deleteSignageAnnouncementResponseSuccess = (deleteSignageAnnouncementResponse204) & {
+  headers: Headers;
+};
+;
+
+export type deleteSignageAnnouncementResponse = (deleteSignageAnnouncementResponseSuccess)
+
+export const getDeleteSignageAnnouncementUrl = (unitId: string,
+    annId: string,) => {
+
+
+
+
+  return `/units/${unitId}/screen-announcements/${annId}`
+}
+
+export const deleteSignageAnnouncement = async (unitId: string,
+    annId: string, options?: RequestInit): Promise<deleteSignageAnnouncementResponse> => {
+
+  return orvalMutator<deleteSignageAnnouncementResponse>(getDeleteSignageAnnouncementUrl(unitId,annId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteSignageAnnouncementMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSignageAnnouncement>>, TError,{unitId: string;annId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteSignageAnnouncement>>, TError,{unitId: string;annId: string}, TContext> => {
+
+const mutationKey = ['deleteSignageAnnouncement'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteSignageAnnouncement>>, {unitId: string;annId: string}> = (props) => {
+          const {unitId,annId} = props ?? {};
+
+          return  deleteSignageAnnouncement(unitId,annId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteSignageAnnouncementMutationResult = NonNullable<Awaited<ReturnType<typeof deleteSignageAnnouncement>>>
+
+    export type DeleteSignageAnnouncementMutationError = unknown
+
+    export const useDeleteSignageAnnouncement = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSignageAnnouncement>>, TError,{unitId: string;annId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteSignageAnnouncement>>,
+        TError,
+        {unitId: string;annId: string},
+        TContext
+      > => {
+      return useMutation(getDeleteSignageAnnouncementMutationOptions(options), queryClient);
+    }
+
+export type updateSignageAnnouncementResponse200 = {
+  data: ModelsScreenAnnouncement
+  status: 200
+}
+
+export type updateSignageAnnouncementResponseSuccess = (updateSignageAnnouncementResponse200) & {
+  headers: Headers;
+};
+;
+
+export type updateSignageAnnouncementResponse = (updateSignageAnnouncementResponseSuccess)
+
+export const getUpdateSignageAnnouncementUrl = (unitId: string,
+    annId: string,) => {
+
+
+
+
+  return `/units/${unitId}/screen-announcements/${annId}`
+}
+
+export const updateSignageAnnouncement = async (unitId: string,
+    annId: string,
+    handlersAnnouncementRequest: HandlersAnnouncementRequest, options?: RequestInit): Promise<updateSignageAnnouncementResponse> => {
+
+  return orvalMutator<updateSignageAnnouncementResponse>(getUpdateSignageAnnouncementUrl(unitId,annId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersAnnouncementRequest,)
+  }
+);}
+
+
+
+
+export const getUpdateSignageAnnouncementMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSignageAnnouncement>>, TError,{unitId: string;annId: string;data: HandlersAnnouncementRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateSignageAnnouncement>>, TError,{unitId: string;annId: string;data: HandlersAnnouncementRequest}, TContext> => {
+
+const mutationKey = ['updateSignageAnnouncement'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateSignageAnnouncement>>, {unitId: string;annId: string;data: HandlersAnnouncementRequest}> = (props) => {
+          const {unitId,annId,data} = props ?? {};
+
+          return  updateSignageAnnouncement(unitId,annId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateSignageAnnouncementMutationResult = NonNullable<Awaited<ReturnType<typeof updateSignageAnnouncement>>>
+    export type UpdateSignageAnnouncementMutationBody = HandlersAnnouncementRequest
+    export type UpdateSignageAnnouncementMutationError = unknown
+
+    export const useUpdateSignageAnnouncement = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSignageAnnouncement>>, TError,{unitId: string;annId: string;data: HandlersAnnouncementRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateSignageAnnouncement>>,
+        TError,
+        {unitId: string;annId: string;data: HandlersAnnouncementRequest},
+        TContext
+      > => {
+      return useMutation(getUpdateSignageAnnouncementMutationOptions(options), queryClient);
     }
 
 /**

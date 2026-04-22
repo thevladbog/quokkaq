@@ -229,6 +229,8 @@ type TicketRepository interface {
 	GetAvgServiceSecPerOccupiedCounter(unitID string, samplePerCounter int) (map[string]float64, error)
 	// CountTicketsCreatedSince counts non-EOD tickets created at or after `since` (UTC) for arrival-rate (Erlang λ).
 	CountTicketsCreatedSince(unitID string, since time.Time) (int64, error)
+	// CountServedInUnitInRange counts non-EOD tickets with status served or completed and completed_at in [start, end) (UTC).
+	CountServedInUnitInRange(unitID string, start, end time.Time) (int64, error)
 }
 
 // ServiceWaitingCount holds the waiting queue length for a single service.
@@ -826,6 +828,17 @@ func (r *ticketRepository) CountTicketsCreatedSince(unitID string, since time.Ti
 	var count int64
 	err := r.db.Model(&models.Ticket{}).
 		Where("unit_id = ? AND is_eod = false AND created_at >= ?", unitID, since.UTC()).
+		Count(&count).Error
+	return count, err
+}
+
+func (r *ticketRepository) CountServedInUnitInRange(unitID string, start, end time.Time) (int64, error) {
+	var count int64
+	err := r.db.Model(&models.Ticket{}).
+		Where(
+			"unit_id = ? AND is_eod = false AND status IN (?, ?) AND completed_at IS NOT NULL AND completed_at >= ? AND completed_at < ?",
+			unitID, "served", "completed", start.UTC(), end.UTC(),
+		).
 		Count(&count).Error
 	return count, err
 }

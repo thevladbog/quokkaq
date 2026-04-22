@@ -1,21 +1,29 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import { useMemo } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import QRCode from 'react-qr-code';
+import {
+  ScreenTemplateSchema,
+  type ScreenTemplate
+} from '@quokkaq/shared-types';
 import {
   formatAppDate,
   formatAppTime,
   intlLocaleFromAppLocale
 } from '@/lib/format-datetime';
 import { getGetUnitsUnitIdTicketsQueryKey } from '@/lib/api/generated/tickets-counters';
+import { getGetUnitByIDQueryKey } from '@/lib/api/generated/units';
 import { Ticket, unitsApi, Material, UnitConfig } from '@/lib/api';
 import { logger } from '@/lib/logger';
 import { useTickets, useUnit } from '@/lib/hooks';
 import { socketClient, type UnitETASnapshot } from '@/lib/socket';
-import { AdPlayer } from '@/components/screen/ad-player';
+import {
+  ContentPlayer,
+  type ContentSlide
+} from '@/components/screen/content-player';
+import { ScreenRenderer } from '@/components/screen/screen-renderer';
 import { CalledTicketsTable } from '@/components/screen/called-tickets-table';
 import { QueueTicker } from '@/components/screen/queue-ticker';
 import { Spinner } from '@/components/ui/spinner';
@@ -98,11 +106,71 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
     refetchInterval: 120000
   });
 
+  const { data: activePlData } = useQuery({
+    queryKey: ['signage', 'active-playlist', unitId],
+    queryFn: () => unitsApi.getActivePlaylist(unitId),
+    enabled: Boolean(unitId),
+    refetchInterval: 60_000
+  });
+
+  const { data: publicAnnouncements = [] } = useQuery({
+    queryKey: ['signage', 'public-ann', unitId],
+    queryFn: () => unitsApi.getPublicScreenAnnouncements(unitId),
+    enabled: Boolean(unitId),
+    refetchInterval: 120_000
+  });
+
+  const screenTmpl: ScreenTemplate | null = useMemo(() => {
+    if (!unit?.config) return null;
+    const r = ScreenTemplateSchema.safeParse(
+      (unit.config as { screenTemplate?: unknown })?.screenTemplate
+    );
+    return r.success ? r.data : null;
+  }, [unit]);
+
+  const useScreenTemplate = useMemo((): ScreenTemplate | null => {
+    if (!screenTmpl) return null;
+    const v = ScreenTemplateSchema.safeParse(screenTmpl);
+    return v.success ? v.data : null;
+  }, [screenTmpl]);
+
+  const contentSlides: ContentSlide[] = useMemo(() => {
+    const pl = activePlData as
+      | {
+          source?: string;
+          playlist?: {
+            items?: Array<{
+              id: string;
+              duration?: number;
+              material?: { type?: string; url?: string };
+            }>;
+          };
+        }
+      | undefined;
+    if (pl?.source && pl.source !== 'none' && pl.playlist?.items?.length) {
+      return pl.playlist.items
+        .filter((it) => it.material?.url)
+        .map((it) => ({
+          id: it.id,
+          type: it.material?.type || 'image',
+          url: it.material!.url!,
+          durationSec: it.duration ?? 0
+        }));
+    }
+    return materials.map((m) => ({
+      id: m.id,
+      type: m.type,
+      url: m.url,
+      durationSec: 0
+    }));
+  }, [activePlData, materials]);
+
   // Queue status for ETA display (state must be declared before WebSocket handlers use setQueueStatus)
   const [queueStatus, setQueueStatus] = useState<{
     queueLength: number;
     estimatedWaitMinutes: number;
     activeCounters: number;
+    servedToday?: number;
     services?: Array<{
       serviceId: string;
       serviceName: string;
@@ -173,11 +241,27 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
       });
     };
 
+    const handleSignage = () => {
+      void queryClient.invalidateQueries({
+        queryKey: ['signage', 'active-playlist', unitId]
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['signage', 'public-ann', unitId]
+      });
+      void queryClient.invalidateQueries({
+        queryKey: getGetUnitByIDQueryKey(unitId)
+      });
+      scheduleWsRefetch();
+    };
+
     socketClient.onTicketCreated(handleTicketUpdate);
     socketClient.onTicketUpdated(handleTicketUpdate);
     socketClient.onTicketCalled(handleTicketUpdate);
     socketClient.onUnitEOD(handleEOD);
     socketClient.onEtaUpdate(handleEta);
+    socketClient.on('screen.content_updated', handleSignage);
+    socketClient.on('feed.updated', handleSignage);
+    socketClient.on('screen.announcement', handleSignage);
 
     return () => {
       if (wsDebounceRef.t) {
@@ -189,6 +273,9 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
       socketClient.off('ticket.called', handleTicketUpdate);
       socketClient.off('unit.eod', handleEOD);
       socketClient.offEtaUpdate(handleEta);
+      socketClient.off('screen.content_updated', handleSignage);
+      socketClient.off('feed.updated', handleSignage);
+      socketClient.off('screen.announcement', handleSignage);
       socketClient.disconnect();
     };
   }, [unitId, unitKind, unitParentId, queryClient]);
@@ -285,7 +372,8 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
 
   const config = unit.config as UnitConfig;
   const adConfig = config?.adScreen;
-  const showAds = adConfig && adConfig.width > 0 && materials.length > 0;
+  const showContent =
+    Boolean(adConfig && adConfig.width > 0) && contentSlides.length > 0;
   const adWidth = adConfig?.width || 0;
 
   const virtualQueueEnabled =
@@ -300,6 +388,13 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
   const isCustomColorsEnabled = adConfig?.isCustomColorsEnabled || false;
   const headerColor = isCustomColorsEnabled ? adConfig?.headerColor || '' : '';
   const bodyColor = isCustomColorsEnabled ? adConfig?.bodyColor || '' : '';
+
+  const annForRenderer = publicAnnouncements.map((a) => ({
+    id: a.id,
+    text: a.text,
+    style: a.style,
+    priority: a.priority
+  }));
 
   return (
     <div
@@ -336,41 +431,58 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
         </div>
       </div>
 
-      {/* Main Content: Dynamic Layout */}
-      <div
-        className='flex flex-1 flex-col overflow-hidden landscape:flex-row'
-        style={
-          {
-            '--ad-size': `${adWidth}%`
-          } as React.CSSProperties
-        }
-      >
-        {/* Ad Container */}
-        {showAds && (
-          <div className='bg-muted/10 order-2 h-[var(--ad-size)] w-full border-t p-4 landscape:order-1 landscape:h-full landscape:w-[var(--ad-size)] landscape:border-t-0 landscape:border-r'>
-            <div className='relative h-full w-full'>
-              <AdPlayer
-                materials={materials}
-                duration={adConfig.duration || 5}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Tickets Container */}
-        <div
-          className={`bg-background order-1 p-0 landscape:order-2 ${showAds ? 'h-[calc(100%-var(--ad-size))] w-full landscape:h-full landscape:w-[calc(100%-var(--ad-size))]' : 'h-full w-full'}`}
-        >
-          <CalledTicketsTable
-            tickets={calledTickets}
-            backgroundColor={bodyColor}
+      {/* Main body: custom screen template or classic split */}
+      {useScreenTemplate ? (
+        <div className='min-h-0 flex-1 overflow-hidden'>
+          <ScreenRenderer
+            unitId={unitId}
+            locale={locale}
+            template={useScreenTemplate}
+            unit={unit}
+            calledTickets={calledTickets}
+            waitingTickets={waitingTickets}
+            queueStatus={queueStatus}
+            contentSlides={contentSlides}
+            defaultImageSeconds={adConfig?.duration || 5}
+            announcements={annForRenderer}
+            adBodyColor={bodyColor}
             historyLimit={adConfig?.recentCallsHistoryLimit ?? 0}
           />
         </div>
-      </div>
+      ) : (
+        <div
+          className='flex flex-1 flex-col overflow-hidden landscape:flex-row'
+          style={
+            {
+              '--ad-size': `${adWidth}%`
+            } as React.CSSProperties
+          }
+        >
+          {showContent && (
+            <div className='bg-muted/10 order-2 h-[var(--ad-size)] w-full border-t p-4 landscape:order-1 landscape:h-full landscape:w-[var(--ad-size)] landscape:border-t-0 landscape:border-r'>
+              <div className='relative h-full w-full'>
+                <ContentPlayer
+                  slides={contentSlides}
+                  defaultImageSeconds={adConfig?.duration || 5}
+                />
+              </div>
+            </div>
+          )}
 
-      {/* Bottom: ETA stats + QR */}
-      {(queueStatus || virtualQueueEnabled) && (
+          <div
+            className={`bg-background order-1 p-0 landscape:order-2 ${showContent ? 'h-[calc(100%-var(--ad-size))] w-full landscape:h-full landscape:w-[calc(100%-var(--ad-size))]' : 'h-full w-full'}`}
+          >
+            <CalledTicketsTable
+              tickets={calledTickets}
+              backgroundColor={bodyColor}
+              historyLimit={adConfig?.recentCallsHistoryLimit ?? 0}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Bottom: ETA stats + QR (classic layout only — templates embed their own stats/ticker) */}
+      {!useScreenTemplate && (queueStatus || virtualQueueEnabled) && (
         <div className='bg-card/90 z-20 flex flex-none items-center justify-between gap-6 border-t px-8 py-2'>
           {/* Queue stats */}
           {queueStatus && (
@@ -434,10 +546,25 @@ export function ScreenUnitClient({ unitId }: ScreenUnitClientProps) {
         </div>
       )}
 
-      {/* Bottom: Ticker */}
-      <div className='z-20 flex-none'>
-        <QueueTicker tickets={waitingTickets} />
-      </div>
+      {useScreenTemplate && virtualQueueEnabled && (
+        <div className='bg-card/90 z-20 flex flex-none items-center justify-end gap-6 border-t px-8 py-2'>
+          <div className='flex items-center gap-3'>
+            <p className='text-muted-foreground max-w-[120px] text-right text-xs leading-tight'>
+              {t('scanToJoinQueue')}
+            </p>
+            <div className='rounded bg-white p-1'>
+              <QRCode value={queueUrl} size={64} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bottom: Ticker (classic) */}
+      {!useScreenTemplate && (
+        <div className='z-20 flex-none'>
+          <QueueTicker tickets={waitingTickets} />
+        </div>
+      )}
     </div>
   );
 }

@@ -29,6 +29,29 @@
                 },
                 "type": "object"
             },
+            "handlers.AnnouncementRequest": {
+                "properties": {
+                    "expiresAt": {
+                        "type": "string"
+                    },
+                    "isActive": {
+                        "type": "boolean"
+                    },
+                    "priority": {
+                        "type": "integer"
+                    },
+                    "startsAt": {
+                        "type": "string"
+                    },
+                    "style": {
+                        "type": "string"
+                    },
+                    "text": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "handlers.AssignUnitRequest": {
                 "properties": {
                     "permissions": {
@@ -206,6 +229,30 @@
                 },
                 "type": "object"
             },
+            "handlers.CreateFeedRequest": {
+                "properties": {
+                    "config": {
+                        "additionalProperties": true,
+                        "type": "object"
+                    },
+                    "isActive": {
+                        "type": "boolean"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "pollInterval": {
+                        "type": "integer"
+                    },
+                    "type": {
+                        "type": "string"
+                    },
+                    "url": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "handlers.CreateInvitationRequest": {
                 "properties": {
                     "email": {
@@ -218,6 +265,49 @@
                         "type": "object"
                     },
                     "templateId": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "handlers.CreatePlaylistRequest": {
+                "properties": {
+                    "description": {
+                        "type": "string"
+                    },
+                    "isDefault": {
+                        "type": "boolean"
+                    },
+                    "items": {
+                        "items": {
+                            "$ref": "#/components/schemas/handlers.PlaylistItemInput"
+                        },
+                        "type": "array"
+                    },
+                    "name": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "handlers.CreateScheduleRequest": {
+                "properties": {
+                    "daysOfWeek": {
+                        "type": "string"
+                    },
+                    "endTime": {
+                        "type": "string"
+                    },
+                    "isActive": {
+                        "type": "boolean"
+                    },
+                    "playlistId": {
+                        "type": "string"
+                    },
+                    "priority": {
+                        "type": "integer"
+                    },
+                    "startTime": {
                         "type": "string"
                     }
                 },
@@ -1213,6 +1303,17 @@
                 },
                 "type": "object"
             },
+            "handlers.PlaylistItemInput": {
+                "properties": {
+                    "duration": {
+                        "type": "integer"
+                    },
+                    "materialId": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "handlers.PublicLeadRequestBody": {
                 "properties": {
                     "billingPeriod": {
@@ -1568,6 +1669,26 @@
                         "type": "string"
                     },
                     "unitId": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "handlers.UpdatePlaylistRequest": {
+                "properties": {
+                    "description": {
+                        "type": "string"
+                    },
+                    "isDefault": {
+                        "type": "boolean"
+                    },
+                    "items": {
+                        "items": {
+                            "$ref": "#/components/schemas/handlers.PlaylistItemInput"
+                        },
+                        "type": "array"
+                    },
+                    "name": {
                         "type": "string"
                     }
                 },
@@ -2921,6 +3042,51 @@
                 },
                 "type": "object"
             },
+            "models.ExternalFeed": {
+                "properties": {
+                    "cachedData": {
+                        "type": "object"
+                    },
+                    "config": {
+                        "type": "object"
+                    },
+                    "createdAt": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "isActive": {
+                        "type": "boolean"
+                    },
+                    "lastError": {
+                        "type": "string"
+                    },
+                    "lastFetchAt": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "pollInterval": {
+                        "type": "integer"
+                    },
+                    "type": {
+                        "description": "rss | weather | custom_url",
+                        "type": "string"
+                    },
+                    "unitId": {
+                        "type": "string"
+                    },
+                    "updatedAt": {
+                        "type": "string"
+                    },
+                    "url": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "models.GenerateSlotsRequest": {
                 "properties": {
                     "from": {
@@ -3240,6 +3406,102 @@
                 },
                 "type": "object"
             },
+            "models.Playlist": {
+                "properties": {
+                    "createdAt": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "isDefault": {
+                        "type": "boolean"
+                    },
+                    "items": {
+                        "items": {
+                            "$ref": "#/components/schemas/models.PlaylistItem"
+                        },
+                        "type": "array"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "unitId": {
+                        "type": "string"
+                    },
+                    "updatedAt": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "models.PlaylistItem": {
+                "properties": {
+                    "duration": {
+                        "type": "integer"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "material": {
+                        "$ref": "#/components/schemas/models.UnitMaterial"
+                    },
+                    "materialId": {
+                        "type": "string"
+                    },
+                    "playlistId": {
+                        "type": "string"
+                    },
+                    "sortOrder": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "models.PlaylistSchedule": {
+                "properties": {
+                    "createdAt": {
+                        "type": "string"
+                    },
+                    "daysOfWeek": {
+                        "description": "Comma-separated weekday numbers 1=Mon .. 7=Sun (e.g. \"1,2,3,4,5\").",
+                        "type": "string"
+                    },
+                    "endTime": {
+                        "description": "\"HH:MM\"",
+                        "type": "string"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "isActive": {
+                        "type": "boolean"
+                    },
+                    "playlist": {
+                        "$ref": "#/components/schemas/models.Playlist"
+                    },
+                    "playlistId": {
+                        "type": "string"
+                    },
+                    "priority": {
+                        "type": "integer"
+                    },
+                    "startTime": {
+                        "description": "\"HH:MM\"",
+                        "type": "string"
+                    },
+                    "unitId": {
+                        "type": "string"
+                    },
+                    "updatedAt": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "models.PreRegCalendarSlotItem": {
                 "properties": {
                     "calendarIntegrationId": {
@@ -3436,6 +3698,41 @@
                         "type": "string"
                     },
                     "name": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "models.ScreenAnnouncement": {
+                "properties": {
+                    "createdAt": {
+                        "type": "string"
+                    },
+                    "expiresAt": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "isActive": {
+                        "type": "boolean"
+                    },
+                    "priority": {
+                        "type": "integer"
+                    },
+                    "startsAt": {
+                        "type": "string"
+                    },
+                    "style": {
+                        "type": "string"
+                    },
+                    "text": {
+                        "type": "string"
+                    },
+                    "unitId": {
+                        "type": "string"
+                    },
+                    "updatedAt": {
                         "type": "string"
                     }
                 },
@@ -4539,6 +4836,21 @@
                         "type": "string"
                     },
                     "userId": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "services.ActivePlaylistDTO": {
+                "properties": {
+                    "playlist": {
+                        "$ref": "#/components/schemas/models.Playlist"
+                    },
+                    "source": {
+                        "description": "schedule | default | none",
+                        "type": "string"
+                    },
+                    "unitId": {
                         "type": "string"
                     }
                 },
@@ -5725,6 +6037,10 @@
                         "type": "number"
                     },
                     "queueLength": {
+                        "type": "integer"
+                    },
+                    "servedToday": {
+                        "description": "ServedToday is tickets with status served/completed that finished today in the unit timezone.",
                         "type": "integer"
                     },
                     "services": {
@@ -18562,6 +18878,38 @@
                 ]
             }
         },
+        "/units/{unitId}/active-playlist": {
+            "get": {
+                "operationId": "GetActiveSignagePlaylist",
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/services.ActivePlaylistDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "summary": "Get the currently active playlist (public, for TV screen)",
+                "tags": [
+                    "signage"
+                ]
+            }
+        },
         "/units/{unitId}/ad-settings": {
             "patch": {
                 "description": "Updates ad settings for a unit",
@@ -19993,6 +20341,217 @@
                 ]
             }
         },
+        "/units/{unitId}/feeds": {
+            "get": {
+                "operationId": "ListSignageFeeds",
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/models.ExternalFeed"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "signage"
+                ]
+            },
+            "post": {
+                "operationId": "CreateSignageFeed",
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.CreateFeedRequest"
+                            }
+                        }
+                    },
+                    "description": "Feed",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/models.ExternalFeed"
+                                }
+                            }
+                        },
+                        "description": "Created"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "signage"
+                ]
+            }
+        },
+        "/units/{unitId}/feeds/{feedId}": {
+            "delete": {
+                "operationId": "DeleteSignageFeed",
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Feed ID",
+                        "in": "path",
+                        "name": "feedId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "signage"
+                ]
+            },
+            "put": {
+                "operationId": "UpdateSignageFeed",
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Feed ID",
+                        "in": "path",
+                        "name": "feedId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.CreateFeedRequest"
+                            }
+                        }
+                    },
+                    "description": "Feed",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/models.ExternalFeed"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "signage"
+                ]
+            }
+        },
+        "/units/{unitId}/feeds/{feedId}/data": {
+            "get": {
+                "operationId": "GetSignageFeedDataPublic",
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Feed ID",
+                        "in": "path",
+                        "name": "feedId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                },
+                "tags": [
+                    "signage"
+                ]
+            }
+        },
         "/units/{unitId}/guest-survey/completion-images/{fileName}": {
             "get": {
                 "description": "Streams image bytes. Requires Authorization: Bearer (staff user JWT or counter terminal JWT). This URL is not embeddable from unauthenticated contexts: plain <img src>, Markdown image syntax, or server-side markdown renderers without the token will fail. Clients should fetch with the Bearer token (e.g. browser fetch) and create an object/blob URL, or proxy the bytes with auth.",
@@ -21266,6 +21825,484 @@
                 ]
             }
         },
+        "/units/{unitId}/playlist-schedules": {
+            "get": {
+                "operationId": "ListSignageSchedules",
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/models.PlaylistSchedule"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List playlist schedules",
+                "tags": [
+                    "signage"
+                ]
+            },
+            "post": {
+                "operationId": "CreateSignageSchedule",
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.CreateScheduleRequest"
+                            }
+                        }
+                    },
+                    "description": "Schedule",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/models.PlaylistSchedule"
+                                }
+                            }
+                        },
+                        "description": "Created"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "signage"
+                ]
+            }
+        },
+        "/units/{unitId}/playlist-schedules/{scheduleId}": {
+            "delete": {
+                "operationId": "DeleteSignageSchedule",
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Schedule ID",
+                        "in": "path",
+                        "name": "scheduleId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "signage"
+                ]
+            },
+            "get": {
+                "operationId": "GetSignageSchedule",
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Schedule ID",
+                        "in": "path",
+                        "name": "scheduleId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/models.PlaylistSchedule"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "signage"
+                ]
+            },
+            "put": {
+                "operationId": "UpdateSignageSchedule",
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Schedule ID",
+                        "in": "path",
+                        "name": "scheduleId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.CreateScheduleRequest"
+                            }
+                        }
+                    },
+                    "description": "Schedule",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/models.PlaylistSchedule"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "signage"
+                ]
+            }
+        },
+        "/units/{unitId}/playlists": {
+            "get": {
+                "operationId": "ListSignagePlaylists",
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/models.Playlist"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List playlists for a unit",
+                "tags": [
+                    "signage"
+                ]
+            },
+            "post": {
+                "operationId": "CreateSignagePlaylist",
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.CreatePlaylistRequest"
+                            }
+                        }
+                    },
+                    "description": "Playlist",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/models.Playlist"
+                                }
+                            }
+                        },
+                        "description": "Created"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Create a playlist",
+                "tags": [
+                    "signage"
+                ]
+            }
+        },
+        "/units/{unitId}/playlists/{playlistId}": {
+            "delete": {
+                "operationId": "DeleteSignagePlaylist",
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Playlist ID",
+                        "in": "path",
+                        "name": "playlistId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Delete a playlist",
+                "tags": [
+                    "signage"
+                ]
+            },
+            "get": {
+                "operationId": "GetSignagePlaylist",
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Playlist ID",
+                        "in": "path",
+                        "name": "playlistId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/models.Playlist"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Not found"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get a playlist with items and material",
+                "tags": [
+                    "signage"
+                ]
+            },
+            "put": {
+                "operationId": "UpdateSignagePlaylist",
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Playlist ID",
+                        "in": "path",
+                        "name": "playlistId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.UpdatePlaylistRequest"
+                            }
+                        }
+                    },
+                    "description": "Playlist",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/models.Playlist"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Replace a playlist and its items",
+                "tags": [
+                    "signage"
+                ]
+            }
+        },
         "/units/{unitId}/pre-registrations": {
             "get": {
                 "description": "Returns all pre-registrations associated with the unit (authenticated unit member).",
@@ -21861,6 +22898,40 @@
                 ]
             }
         },
+        "/units/{unitId}/public-screen-announcements": {
+            "get": {
+                "operationId": "ListSignageAnnouncementsPublic",
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/models.ScreenAnnouncement"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "tags": [
+                    "signage"
+                ]
+            }
+        },
         "/units/{unitId}/queue-status": {
             "get": {
                 "description": "Returns queue length, estimated wait time (minutes), and active counter count. Public endpoint, no authentication required. Requires subscription plan feature public_queue_widget.",
@@ -21909,6 +22980,184 @@
                 "summary": "Get public queue status for a unit",
                 "tags": [
                     "tickets"
+                ]
+            }
+        },
+        "/units/{unitId}/screen-announcements": {
+            "get": {
+                "operationId": "ListSignageAnnouncements",
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/models.ScreenAnnouncement"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "signage"
+                ]
+            },
+            "post": {
+                "operationId": "CreateSignageAnnouncement",
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.AnnouncementRequest"
+                            }
+                        }
+                    },
+                    "description": "Announcement",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/models.ScreenAnnouncement"
+                                }
+                            }
+                        },
+                        "description": "Created"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "signage"
+                ]
+            }
+        },
+        "/units/{unitId}/screen-announcements/{annId}": {
+            "delete": {
+                "operationId": "DeleteSignageAnnouncement",
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Announcement ID",
+                        "in": "path",
+                        "name": "annId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "signage"
+                ]
+            },
+            "put": {
+                "operationId": "UpdateSignageAnnouncement",
+                "parameters": [
+                    {
+                        "description": "Unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Announcement ID",
+                        "in": "path",
+                        "name": "annId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.AnnouncementRequest"
+                            }
+                        }
+                    },
+                    "description": "Announcement",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/models.ScreenAnnouncement"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "signage"
                 ]
             }
         },
