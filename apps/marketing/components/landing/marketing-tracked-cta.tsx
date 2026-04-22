@@ -54,7 +54,9 @@ export function MarketingTrackedCtaLink({
       className={className}
       onClick={(e) => {
         const ctaPath =
-          typeof href === 'string' ? href : (href as { pathname?: string }).pathname;
+          typeof href === 'string'
+            ? href
+            : (href as { pathname?: string }).pathname;
         pushMarketingEvent('marketing_cta_click', {
           cta_id: ctaId,
           cta_href: ctaPath != null ? String(ctaPath) : ''

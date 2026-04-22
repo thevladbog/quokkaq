@@ -184,8 +184,16 @@
 .landing-pricing-card-enterprise {
   background: linear-gradient(
     to bottom right,
-    color-mix(in srgb, rgb(139 92 246) 5.5%, var(--color-surface-elevated) 94.5%),
-    color-mix(in srgb, rgb(167 139 250) 4.5%, var(--color-surface-elevated) 95.5%)
+    color-mix(
+      in srgb,
+      rgb(139 92 246) 5.5%,
+      var(--color-surface-elevated) 94.5%
+    ),
+    color-mix(
+      in srgb,
+      rgb(167 139 250) 4.5%,
+      var(--color-surface-elevated) 95.5%
+    )
   );
 }
 

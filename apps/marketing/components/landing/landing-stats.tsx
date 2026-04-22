@@ -7,8 +7,7 @@ type Props = {
 type IndustryIcon = HomeMessages['stats']['industries'][number]['icon'];
 
 function TrustIcon({ icon }: { icon: IndustryIcon }) {
-  const common =
-    'h-full w-full text-[color:var(--color-text-muted)]';
+  const common = 'h-full w-full text-[color:var(--color-text-muted)]';
 
   switch (icon) {
     case 'healthcare':
@@ -120,7 +119,7 @@ export function LandingStats({ copy }: Props) {
                 >
                   <TrustIcon icon={item.icon} />
                 </span>
-                <span className='font-display text-base font-medium leading-8 tracking-tight text-[color:var(--color-text-muted)] sm:text-lg sm:leading-9'>
+                <span className='font-display text-base leading-8 font-medium tracking-tight text-[color:var(--color-text-muted)] sm:text-lg sm:leading-9'>
                   {item.label}
                 </span>
               </li>

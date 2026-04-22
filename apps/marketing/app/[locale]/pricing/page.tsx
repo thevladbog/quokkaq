@@ -5,7 +5,10 @@ import { LandingFooterCta } from '@/components/landing/landing-footer-cta';
 import { LandingPricing } from '@/components/landing/landing-pricing';
 import { LandingTopBar } from '@/components/landing/landing-top-bar';
 import { PricingPageJsonLd } from '@/components/seo/pricing-page-json-ld';
-import { fetchMarketingSubscriptionPlans, marketingAppBaseUrl } from '@/lib/fetch-marketing-subscription-plans';
+import {
+  fetchMarketingSubscriptionPlans,
+  marketingAppBaseUrl
+} from '@/lib/fetch-marketing-subscription-plans';
 import {
   buildLocaleAlternates,
   marketingCanonicalUrl,

@@ -112,7 +112,9 @@ export function LandingTopBar({ locale, copy, appBaseUrl }: Props) {
                 i === 3 || i === 4 ? 'hidden lg:inline' : ''
               }`}
               onClick={() => {
-                pushMarketingEvent('marketing_nav_click', { nav_href: item.href });
+                pushMarketingEvent('marketing_nav_click', {
+                  nav_href: item.href
+                });
               }}
             >
               {item.label}

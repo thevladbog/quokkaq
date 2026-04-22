@@ -68,7 +68,8 @@ export function LandingPricing({
                 const isFree = planExt.isFree === true;
                 const isPerUnit = planExt.pricingModel === 'per_unit';
                 const isEnterpriseListPrice = isCustom && (plan.price ?? 0) > 0;
-                const isEnterpriseOnRequest = isCustom && (plan.price ?? 0) === 0;
+                const isEnterpriseOnRequest =
+                  isCustom && (plan.price ?? 0) === 0;
                 const hasTopBadge = isPopular || isEnterprise;
                 const rows = buildPricingRowsFromApiPlan(plan);
                 const intervalLabel = isFree
@@ -123,9 +124,7 @@ export function LandingPricing({
                   <div
                     key={plan.id}
                     className={`${
-                      isEnterprise
-                        ? 'relative'
-                        : 'landing-reveal relative'
+                      isEnterprise ? 'relative' : 'landing-reveal relative'
                     } z-[1] flex flex-col overflow-visible rounded-2xl border-2 p-8 ${cardShellClass}`}
                     style={
                       isEnterprise
@@ -153,7 +152,7 @@ export function LandingPricing({
                       <h3 className='font-display mb-2 text-2xl font-bold text-[color:var(--color-text)]'>
                         {planHeading}
                       </h3>
-                      <div className='mb-2 min-w-0 max-w-full'>
+                      <div className='mb-2 max-w-full min-w-0'>
                         {isFree ? (
                           <span className='font-display text-3xl font-bold text-[color:var(--color-text)]'>
                             {copy.pricingFromApi.freePlan ?? 'Бесплатно'}

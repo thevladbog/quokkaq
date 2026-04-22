@@ -121,7 +121,9 @@ export function LandingHero({ locale, copy, appBaseUrl }: Props) {
                 href='#book-demo'
                 className={heroSecondaryClass}
                 onClick={() =>
-                  pushMarketingEvent('marketing_cta_click', { cta_id: 'hero_demo' })
+                  pushMarketingEvent('marketing_cta_click', {
+                    cta_id: 'hero_demo'
+                  })
                 }
               >
                 {copy.secondaryCta}

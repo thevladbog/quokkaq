@@ -37,11 +37,11 @@ Public-facing Next.js website for QuokkaQ — the modern queue management system
 
 ## Routes (locales: `en`, `ru`)
 
-| Path | Description |
-| ---- | ----------- |
-| `/{locale}` | Home (full landing) |
-| `/{locale}/pricing` | Pricing-only page (shared pricing component + footer CTA) |
-| `/{locale}/privacy`, `/{locale}/terms` | Legal |
+| Path                                   | Description                                               |
+| -------------------------------------- | --------------------------------------------------------- |
+| `/{locale}`                            | Home (full landing)                                       |
+| `/{locale}/pricing`                    | Pricing-only page (shared pricing component + footer CTA) |
+| `/{locale}/privacy`, `/{locale}/terms` | Legal                                                     |
 
 Main on-page anchors used by the header: `#features`, `#how-it-works`, `#pillars`, `#interface-showcase`, `#use-cases`, `#pricing`, `#faq`, `#book-demo`.
 
@@ -51,13 +51,13 @@ Main on-page anchors used by the header: `#features`, `#how-it-works`, `#pillars
 
 When `NEXT_PUBLIC_GTM_ID` is set, the site loads GTM (see `components/consent/cookie-consent-and-gtm.tsx`). Client code pushes events via [`lib/marketing-analytics.ts`](lib/marketing-analytics.ts): each push includes `event: 'marketing'`, `event_name: <name>`, and optional fields (e.g. `cta_id`, `nav_href`, `source`).
 
-| `event_name` | Typical use |
-| ------------ | ----------- |
-| `marketing_cta_click` | Trial / tracked CTAs (header, hero, pricing) |
-| `marketing_nav_click` | Header / mobile nav anchor links |
-| `marketing_mobile_menu_toggle` | Mobile menu open/close (`open` in payload) |
-| `marketing_lead_open` | Lead modal or mailto from contact buttons |
-| `marketing_lead_submit` | Successful lead form POST (`source`, `plan_code`) |
+| `event_name`                   | Typical use                                       |
+| ------------------------------ | ------------------------------------------------- |
+| `marketing_cta_click`          | Trial / tracked CTAs (header, hero, pricing)      |
+| `marketing_nav_click`          | Header / mobile nav anchor links                  |
+| `marketing_mobile_menu_toggle` | Mobile menu open/close (`open` in payload)        |
+| `marketing_lead_open`          | Lead modal or mailto from contact buttons         |
+| `marketing_lead_submit`        | Successful lead form POST (`source`, `plan_code`) |
 
 In **Google Tag Manager**, create a Custom Event trigger for `marketing` and branch on the **Data Layer Variable** for `event_name` (or use a single tag with lookup tables).
 
@@ -132,13 +132,13 @@ Generated files live under `lib/api/generated/` and must not be edited manually.
 
 See [`.env.example`](.env.example) for full comments. Summary:
 
-| Variable | Required | Description |
-| -------- | -------- | ----------- |
-| `NEXT_PUBLIC_API_URL` | No (default `http://localhost:3001`) | Public API base; also used for Orval fetches if `MARKETING_API_URL` is unset |
-| `MARKETING_API_URL` | No | Server-only API base for `fetch` (avoids exposing API URL in the client bundle in production) |
-| `NEXT_PUBLIC_MARKETING_SITE_URL` | Yes for non-Vercel production builds | Canonical origin of this site (metadata, sitemap, OG). Dev fallback: `http://localhost:3010` |
-| `NEXT_PUBLIC_APP_URL` or `PUBLIC_APP_URL` | No | Product app base for signup links on pricing / hero; if unset, CTAs may fall back to mailto or anchors |
-| `NEXT_PUBLIC_GTM_ID` | No | Google Tag Manager container id (e.g. `GTM-XXXXXXX`); if unset, optional analytics consent flow is limited |
+| Variable                                  | Required                             | Description                                                                                                |
+| ----------------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_API_URL`                     | No (default `http://localhost:3001`) | Public API base; also used for Orval fetches if `MARKETING_API_URL` is unset                               |
+| `MARKETING_API_URL`                       | No                                   | Server-only API base for `fetch` (avoids exposing API URL in the client bundle in production)              |
+| `NEXT_PUBLIC_MARKETING_SITE_URL`          | Yes for non-Vercel production builds | Canonical origin of this site (metadata, sitemap, OG). Dev fallback: `http://localhost:3010`               |
+| `NEXT_PUBLIC_APP_URL` or `PUBLIC_APP_URL` | No                                   | Product app base for signup links on pricing / hero; if unset, CTAs may fall back to mailto or anchors     |
+| `NEXT_PUBLIC_GTM_ID`                      | No                                   | Google Tag Manager container id (e.g. `GTM-XXXXXXX`); if unset, optional analytics consent flow is limited |
 
 ---
 
