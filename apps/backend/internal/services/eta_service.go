@@ -172,16 +172,9 @@ func (s *ETAService) ComputeUnitETASnapshot(unitID string) (UnitETASnapshot, err
 	if queueLength > 0 {
 		baseSec, _ := s.effectiveServiceSec(unitID, "", now)
 		if baseSec > 0 {
-			divisor := activeCounters
-			if divisor <= 0 {
-				divisor = 1
-			}
 			throughput := harmonicThroughputFromOccupiedSamples(perCounter, baseSec, activeCounters)
 			if throughput > 0 {
 				estimatedWaitMinutes = (float64(queueLength) / throughput) / 60.0
-			} else {
-				totalSec := float64(queueLength) * float64(baseSec) / float64(divisor)
-				estimatedWaitMinutes = totalSec / 60.0
 			}
 		}
 	}
@@ -261,10 +254,6 @@ func (s *ETAService) ComputeUnitETASnapshot(unitID string) (UnitETASnapshot, err
 					baseSecCache[sc.ServiceID] = baseSec
 				}
 				if baseSec > 0 {
-					divisor := activeCounters
-					if divisor <= 0 {
-						divisor = 1
-					}
 					thr, haveThr := throughputByBase[baseSec]
 					if !haveThr {
 						thr = harmonicThroughputFromOccupiedSamples(perCounter, baseSec, activeCounters)
@@ -272,8 +261,6 @@ func (s *ETAService) ComputeUnitETASnapshot(unitID string) (UnitETASnapshot, err
 					}
 					if thr > 0 {
 						info.EstimatedWaitMinutes = float64(sc.Count) / thr / 60.0
-					} else {
-						info.EstimatedWaitMinutes = float64(sc.Count) * float64(baseSec) / float64(divisor) / 60.0
 					}
 				}
 				snap.Services = append(snap.Services, info)
@@ -421,14 +408,6 @@ func harmonicThroughputFromOccupiedSamples(perCounter map[string]float64, fallba
 		return float64(activeCounters) / float64(fallbackBaseSec)
 	}
 	return sumInverse
-}
-
-func (s *ETAService) harmonicThroughputPerSec(unitID string, fallbackBaseSec int, activeCounters int64) float64 {
-	perCounter, err := s.ticketRepo.GetAvgServiceSecPerOccupiedCounter(unitID, etaCounterSamples)
-	if err != nil {
-		perCounter = nil
-	}
-	return harmonicThroughputFromOccupiedSamples(perCounter, fallbackBaseSec, activeCounters)
 }
 
 func estimateWaitSecondsFromInputs(ticket *models.Ticket, position int, baseSec int, activeCounters int64, throughput float64) int {

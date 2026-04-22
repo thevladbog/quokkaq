@@ -135,6 +135,9 @@ func (h *Hub) Run() {
 }
 
 func (h *Hub) BroadcastEvent(event string, data interface{}, roomID string) {
+	if h == nil {
+		return
+	}
 	if h.BroadcastHook != nil {
 		h.BroadcastHook(event, roomID)
 	}
@@ -147,9 +150,13 @@ func (h *Hub) BroadcastEvent(event string, data interface{}, roomID string) {
 		logger.Println("Error marshaling broadcast message:", err)
 		return
 	}
-	h.broadcast <- BroadcastMessage{
+	select {
+	case <-h.quit:
+		return
+	case h.broadcast <- BroadcastMessage{
 		RoomID:  roomID,
 		Message: bytes,
+	}:
 	}
 }
 

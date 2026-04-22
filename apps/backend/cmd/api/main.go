@@ -175,6 +175,9 @@ func run() error {
 	defer refreshCancel()
 	statsRefresh.StartPeriodicRefresh(refreshCtx)
 	go func() {
+		if err := jobClient.EnqueueAnomalyCheck(); err != nil {
+			slog.Error("EnqueueAnomalyCheck", "err", err)
+		}
 		ticker := time.NewTicker(5 * time.Minute)
 		defer ticker.Stop()
 		for {

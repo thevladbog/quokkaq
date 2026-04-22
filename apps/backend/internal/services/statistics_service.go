@@ -921,6 +921,9 @@ func (s *StatisticsService) GetAnomalyAlerts(ctx context.Context, subdivisionID,
 	if sc.Denied {
 		return nil, errors.New("forbidden")
 	}
+	// AnomalyService.RunPeriodicCheck only runs for subdivision (kind) units, so rows are stored per
+	// that subdivision id; child branch units have no separate anomaly_alert records. We still use
+	// branchIDs for ResolveScope, but ListByUnit reads alerts for the subdivision only by design.
 	rows, err := s.anomalyRepo.ListByUnit(ctx, subdivisionID, limit)
 	if err != nil {
 		return nil, err

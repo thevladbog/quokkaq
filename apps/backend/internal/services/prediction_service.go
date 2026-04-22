@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math"
@@ -61,12 +62,23 @@ func (p *PredictionService) MaybeBroadcastStaffingAlert(ctx context.Context, uni
 		return
 	}
 
+	// Reserve cooldown slot so concurrent callers do not all pass the guard; release if we exit without broadcasting.
 	p.mu.Lock()
-	if last, ok := p.lastStaff[unitID]; ok && time.Since(last) < p.cooldown {
+	if last, okc := p.lastStaff[unitID]; okc && time.Since(last) < p.cooldown {
 		p.mu.Unlock()
 		return
 	}
+	p.lastStaff[unitID] = time.Now()
 	p.mu.Unlock()
+
+	broadcasted := false
+	defer func() {
+		if !broadcasted {
+			p.mu.Lock()
+			delete(p.lastStaff, unitID)
+			p.mu.Unlock()
+		}
+	}()
 
 	summary, err := p.eta.GetUnitQueueSummary(unitID)
 	if err != nil {
@@ -78,19 +90,24 @@ func (p *PredictionService) MaybeBroadcastStaffingAlert(ctx context.Context, uni
 
 	slaMinSec := p.strictestWaitSLASec(unitID)
 	if slaMinSec == nil {
-		p.maybeHeuristicStaffingAlert(unitID, summary)
+		if p.maybeHeuristicStaffingAlert(unitID, summary) {
+			broadcasted = true
+		}
 		return
 	}
 
 	slaMin := float64(*slaMinSec) / 60.0
 	if slaMin <= 0 {
-		p.maybeHeuristicStaffingAlert(unitID, summary)
+		if p.maybeHeuristicStaffingAlert(unitID, summary) {
+			broadcasted = true
+		}
 		return
 	}
 
 	since1h := time.Now().UTC().Add(-time.Hour)
 	arrivals1h, err := p.ticketRepo.CountTicketsCreatedSince(unitID, since1h)
 	if err != nil {
+		slog.Debug("CountTicketsCreatedSince failed, using 0 for arrivals rate", "unit", unitID, "err", err)
 		arrivals1h = 0
 	}
 	lambdaPerMin := float64(arrivals1h) / 60.0
@@ -147,7 +164,7 @@ func (p *PredictionService) MaybeBroadcastStaffingAlert(ctx context.Context, uni
 	}
 
 	p.hub.BroadcastEvent("unit.staffing_alert", payload, unitID)
-
+	broadcasted = true
 	p.mu.Lock()
 	p.lastStaff[unitID] = time.Now()
 	p.mu.Unlock()
@@ -182,12 +199,12 @@ func (p *PredictionService) strictestWaitSLASec(unitID string) *int {
 	return minPositiveMaxWaitingSec(waiting)
 }
 
-func (p *PredictionService) maybeHeuristicStaffingAlert(unitID string, summary UnitQueueSummary) {
+func (p *PredictionService) maybeHeuristicStaffingAlert(unitID string, summary UnitQueueSummary) bool {
 	if summary.EstimatedWaitMinutes < 12 {
-		return
+		return false
 	}
 	if summary.ActiveCounters >= 4 {
-		return
+		return false
 	}
 	extra := int64(1)
 	if summary.EstimatedWaitMinutes > 25 {
@@ -204,6 +221,7 @@ func (p *PredictionService) maybeHeuristicStaffingAlert(unitID string, summary U
 	p.mu.Lock()
 	p.lastStaff[unitID] = time.Now()
 	p.mu.Unlock()
+	return true
 }
 
 // --- Anomaly detection (called from periodic job) ---
@@ -242,10 +260,15 @@ func (a *AnomalyService) RunPeriodicCheck(ctx context.Context) error {
 		Pluck("id", &ids).Error; err != nil {
 		return fmt.Errorf("anomaly periodic: list subdivisions: %w", err)
 	}
+	var unitErrs []error
 	for _, id := range ids {
 		if err := a.checkUnit(ctx, id); err != nil {
-			return err
+			slog.Error("anomaly check unit failed", "unit", id, "err", err)
+			unitErrs = append(unitErrs, fmt.Errorf("unit %s: %w", id, err))
 		}
+	}
+	if len(unitErrs) > 0 {
+		return errors.Join(unitErrs...)
 	}
 	return nil
 }
@@ -315,7 +338,7 @@ WITH last_hour AS (
   SELECT AVG(EXTRACT(EPOCH FROM (completed_at - confirmed_at))) AS v
   FROM tickets
   WHERE unit_id = ? AND status = 'served' AND confirmed_at IS NOT NULL AND completed_at IS NOT NULL
-    AND completed_at >= NOW() - INTERVAL '24 hours'
+    AND completed_at >= NOW() - INTERVAL '24 hours' AND completed_at < NOW() - INTERVAL '1 hour'
 )
 SELECT CASE WHEN day.v > 0 AND last_hour.v > 0 THEN last_hour.v / day.v ELSE 0 END
 FROM last_hour, day
@@ -383,6 +406,10 @@ func (a *AnomalyService) emit(ctx context.Context, unitID, kind, msg string) {
 	if a.alertRepo != nil {
 		if err := a.alertRepo.Create(ctx, row); err != nil {
 			slog.Error("anomaly alert persist failed", "unit", unitID, "kind", kind, "err", err)
+			// Still advance last-seen: otherwise the next check retries immediately and spams logs when storage is down.
+			a.mu.Lock()
+			a.last[unitID] = time.Now()
+			a.mu.Unlock()
 			return
 		}
 	}

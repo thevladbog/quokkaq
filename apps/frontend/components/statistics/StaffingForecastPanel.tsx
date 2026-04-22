@@ -55,6 +55,8 @@ const SF_SLA_MIN = 50;
 const SF_SLA_MAX = 99;
 const SF_WAIT_MIN = 1;
 const SF_WAIT_MAX = 60;
+/** When |load trend| is below this (percent), badge stays non-alarming (avoids red for minor jitter). */
+const SF_LOAD_TREND_BADGE_PCT = 5;
 
 /** Parse and clamp numeric forecast params to match input min/max and backend defaults. */
 function clampForecastParam(
@@ -286,7 +288,9 @@ export function StaffingForecastPanel({
             {(data.loadTrendPct ?? 0) !== 0 && (
               <Badge
                 variant={
-                  (data.loadTrendPct ?? 0) > 0 ? 'destructive' : 'secondary'
+                  Math.abs(data.loadTrendPct ?? 0) >= SF_LOAD_TREND_BADGE_PCT
+                    ? 'destructive'
+                    : 'outline'
                 }
                 className='h-7 px-3 text-xs'
               >
@@ -413,6 +417,7 @@ export function StaffingForecastPanel({
                 <Line
                   type='monotone'
                   dataKey='expectedArrivals'
+                  name='expectedArrivals'
                   stroke='hsl(var(--primary))'
                   strokeWidth={2}
                   dot={false}
