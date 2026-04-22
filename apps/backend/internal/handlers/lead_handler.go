@@ -34,6 +34,7 @@ type PublicLeadRequestBody struct {
 	Locale                 string `json:"locale"`
 	Referrer               string `json:"referrer"`
 	PlanCode               string `json:"planCode"`
+	BillingPeriod          string `json:"billingPeriod"`
 	PrivacyConsentAccepted *bool  `json:"privacyConsentAccepted"`
 }
 
@@ -89,6 +90,7 @@ func (h *LeadHandler) PostPublicLeadRequest(w http.ResponseWriter, r *http.Reque
 	}
 	err = h.leadIssues.CreateLeadRequest(r.Context(), name, email, strings.TrimSpace(req.Company), strings.TrimSpace(req.Message),
 		strings.TrimSpace(req.Source), strings.TrimSpace(req.Locale), strings.TrimSpace(req.Referrer), strings.TrimSpace(req.PlanCode),
+		strings.TrimSpace(req.BillingPeriod),
 		true)
 	if err != nil {
 		logger.PrintfCtx(r.Context(), "PostPublicLeadRequest: CreateLeadRequest: %v", err)

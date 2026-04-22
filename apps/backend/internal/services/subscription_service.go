@@ -9,6 +9,7 @@ import (
 	"quokkaq-go-backend/internal/logger"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
+	"quokkaq-go-backend/internal/subscriptionplan"
 
 	"gorm.io/gorm"
 )
@@ -123,8 +124,8 @@ func (s *SubscriptionService) currentPlanCodeForLead(sub *models.Subscription) s
 }
 
 // SubmitPlanChangeRequest validates subscription/plan state and creates a Tracker plan-change ticket.
-// requestedPlanCode must be non-empty (trimmed by caller).
-func (s *SubscriptionService) SubmitPlanChangeRequest(ctx context.Context, userID, xCompanyID, requestedPlanCode string) error {
+// requestedPlanCode must be non-empty (trimmed by caller). billingPeriod is "month" or "annual" (default month).
+func (s *SubscriptionService) SubmitPlanChangeRequest(ctx context.Context, userID, xCompanyID, requestedPlanCode, billingPeriod string) error {
 	if s == nil || s.leadIssues == nil {
 		return &SubscriptionRequestError{
 			Status:  http.StatusServiceUnavailable,
@@ -170,6 +171,19 @@ func (s *SubscriptionService) SubmitPlanChangeRequest(ctx context.Context, userI
 		return &SubscriptionRequestError{
 			Status:  http.StatusBadRequest,
 			Message: "Plan is inactive or unavailable",
+		}
+	}
+	bp := strings.TrimSpace(strings.ToLower(billingPeriod))
+	if bp == "" {
+		bp = "month"
+	}
+	if bp != "month" && bp != "annual" {
+		return &SubscriptionRequestError{Status: http.StatusBadRequest, Message: "billingPeriod must be month or annual"}
+	}
+	if bp == "annual" && !subscriptionplan.HasAnnualPrepayConfig(requestedPlan) {
+		return &SubscriptionRequestError{
+			Status:  http.StatusBadRequest,
+			Message: "annual billing is not available for the requested plan",
 		}
 	}
 	currentPlanID := strings.TrimSpace(subscription.PlanID)
@@ -225,6 +239,7 @@ func (s *SubscriptionService) SubmitPlanChangeRequest(ctx context.Context, userI
 		userEmail,
 		currentCode,
 		requested,
+		bp,
 	)
 	if err != nil {
 		logger.PrintfCtx(ctx, "SubmitPlanChangeRequest CreatePlanChangeRequest: %v", err)
@@ -238,8 +253,8 @@ func (s *SubscriptionService) SubmitPlanChangeRequest(ctx context.Context, userI
 }
 
 // SubmitCustomTermsRequest creates a Tracker [REQ] ticket for individual pricing / custom terms.
-// comment must be non-empty and within length limits (validated by caller).
-func (s *SubscriptionService) SubmitCustomTermsRequest(ctx context.Context, userID, xCompanyID, comment string) error {
+// comment must be non-empty and within length limits (validated by caller). billingPeriod is "month" or "annual" (default month).
+func (s *SubscriptionService) SubmitCustomTermsRequest(ctx context.Context, userID, xCompanyID, comment, billingPeriod string) error {
 	if s == nil || s.leadIssues == nil {
 		return &SubscriptionRequestError{
 			Status:  http.StatusServiceUnavailable,
@@ -293,6 +308,13 @@ func (s *SubscriptionService) SubmitCustomTermsRequest(ctx context.Context, user
 			Message: "Lead requests are not available (Tracker or leads queue not configured)",
 		}
 	}
+	ctbp := strings.TrimSpace(strings.ToLower(billingPeriod))
+	if ctbp == "" {
+		ctbp = "month"
+	}
+	if ctbp != "month" && ctbp != "annual" {
+		return &SubscriptionRequestError{Status: http.StatusBadRequest, Message: "billingPeriod must be month or annual"}
+	}
 	err = s.leadIssues.CreateTenantCustomTermsLeadRequest(ctx,
 		companyID,
 		strings.TrimSpace(company.Name),
@@ -300,6 +322,7 @@ func (s *SubscriptionService) SubmitCustomTermsRequest(ctx context.Context, user
 		strings.TrimSpace(user.Name),
 		userEmail,
 		comment,
+		ctbp,
 	)
 	if err != nil {
 		logger.PrintfCtx(ctx, "SubmitCustomTermsRequest CreateTenantCustomTermsLeadRequest: %v", err)

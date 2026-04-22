@@ -1,13 +1,20 @@
+'use client';
+
+import { useMemo, useState } from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import type { SubscriptionPlan } from '@quokkaq/shared-types';
 import {
+  annualPrepayDisplayDiscountPercent,
+  annualPrepayEffectiveMonthlyMinor,
   buildPricingRowsFromApiPlan,
   formatPriceMinorUnits,
   formatPriceMinorUnitsAmountOnly,
+  planSupportsAnnualPrepay,
   subscriptionPlanDisplayName
 } from '@quokkaq/subscription-pricing';
 
 import type { AppLocale, HomeMessages } from '@/src/messages';
+import { AnnualPrepayDiscountBubble } from '@/components/landing/annual-prepay-promo';
 import { localeHomePath } from '@/lib/locale-paths';
 import { formatPricingRowLabel } from '@/lib/format-pricing-row-label';
 import { LeadRequestCta } from '@/components/landing/lead-request-cta';
@@ -39,6 +46,23 @@ export function LandingPricing({
     (p) => p.isPublic !== false && p.isActive !== false
   );
   const useApi = apiPlans.length > 0;
+  const [billingPeriod, setBillingPeriod] = useState<'month' | 'annual'>(
+    'month'
+  );
+  const showBillingToggle = useMemo(
+    () => apiPlans.some((p) => planSupportsAnnualPrepay(p)),
+    [apiPlans]
+  );
+  const maxAnnualDisplayPct = useMemo(() => {
+    let m = 0;
+    for (const p of apiPlans) {
+      const v = annualPrepayDisplayDiscountPercent(p);
+      if (v != null && v > m) {
+        m = v;
+      }
+    }
+    return m;
+  }, [apiPlans]);
 
   return (
     <section
@@ -54,6 +78,55 @@ export function LandingPricing({
             {copy.pricing.subheading}
           </p>
         </div>
+
+        {useApi && showBillingToggle ? (
+          <div className='mb-10 flex justify-center'>
+            <div
+              role='tablist'
+              aria-label={copy.pricingFromApi.billingToggleMonth}
+              className='border-[color:var(--color-border)] bg-[color:var(--color-surface-elevated)] inline-flex rounded-full border p-1 shadow-sm'
+            >
+              <button
+                type='button'
+                role='tab'
+                aria-selected={billingPeriod === 'month'}
+                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                  billingPeriod === 'month'
+                    ? 'bg-[color:var(--color-primary)] text-white shadow'
+                    : 'text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)]'
+                }`}
+                onClick={() => setBillingPeriod('month')}
+              >
+                {copy.pricingFromApi.billingToggleMonth}
+              </button>
+              <button
+                type='button'
+                role='tab'
+                aria-selected={billingPeriod === 'annual'}
+                className={`relative rounded-full px-4 py-2 text-sm font-semibold transition ${
+                  billingPeriod === 'annual'
+                    ? 'bg-[color:var(--color-primary)] text-white shadow'
+                    : 'text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)]'
+                }`}
+                onClick={() => setBillingPeriod('annual')}
+              >
+                {copy.pricingFromApi.billingToggleAnnual}
+                {maxAnnualDisplayPct > 0 ? (
+                  <span
+                    className={
+                      billingPeriod === 'annual'
+                        ? 'pointer-events-none absolute -right-1 -top-2 rounded-md bg-white px-1.5 py-0.5 text-[0.65rem] font-black leading-none text-amber-950 shadow-md ring-2 ring-white/80 [transform:rotate(8deg)] dark:bg-neutral-950 dark:text-amber-200 dark:ring-neutral-600/80'
+                        : 'pointer-events-none absolute -right-1 -top-2 rounded-md bg-amber-400/95 px-1.5 py-0.5 text-[0.65rem] font-black leading-none text-amber-950 shadow ring-1 ring-amber-600/25 [transform:rotate(8deg)] dark:bg-amber-300/90 dark:text-amber-950'
+                    }
+                    aria-hidden
+                  >
+                    −{maxAnnualDisplayPct}%
+                  </span>
+                ) : null}
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         <div className='grid gap-8 lg:grid-cols-3'>
           {useApi
@@ -72,20 +145,42 @@ export function LandingPricing({
                   isCustom && (plan.price ?? 0) === 0;
                 const hasTopBadge = isPopular || isEnterprise;
                 const rows = buildPricingRowsFromApiPlan(plan);
-                const intervalLabel = isFree
+                const annualMode =
+                  billingPeriod === 'annual' &&
+                  planSupportsAnnualPrepay(plan) &&
+                  !isFree;
+                const annualDiscountPct =
+                  annualPrepayDisplayDiscountPercent(plan);
+                const displayPriceMinor =
+                  annualMode && !isEnterpriseListPrice
+                    ? (annualPrepayEffectiveMonthlyMinor(plan) ?? plan.price)
+                    : plan.price;
+                const baseIntervalLabel = isFree
                   ? (copy.pricingFromApi.freePlan ?? 'Бесплатно')
                   : isPerUnit
                     ? (copy.pricingFromApi.perUnitPerMonth ?? '/ подр. / мес')
                     : plan.interval === 'year'
                       ? copy.pricingFromApi.perYear
                       : copy.pricingFromApi.perMonth;
+                const intervalLabel =
+                  annualMode && !isEnterpriseListPrice && !isPerUnit
+                    ? `${copy.pricingFromApi.perMonth} — ${copy.pricingFromApi.billedAnnuallyFootnote}`
+                    : annualMode && !isEnterpriseListPrice && isPerUnit
+                      ? `${copy.pricingFromApi.perUnitPerMonth ?? '/ подр. / мес'} — ${copy.pricingFromApi.billedAnnuallyFootnote}`
+                      : baseIntervalLabel;
                 /** Self-service trial / signup; otherwise contact sales. */
                 const sellable =
                   !isCustom && plan.allowInstantPurchase !== false;
                 const href = (() => {
                   if (appBaseUrl && sellable) {
                     const base = String(appBaseUrl).replace(/\/$/, '');
-                    return `${base}/${locale}/signup?plan=${encodeURIComponent(plan.code)}`;
+                    const billingQs =
+                      planSupportsAnnualPrepay(plan) &&
+                      plan.interval === 'month' &&
+                      !isFree
+                        ? `&billing=${billingPeriod === 'annual' ? 'annual' : 'month'}`
+                        : '';
+                    return `${base}/${locale}/signup?plan=${encodeURIComponent(plan.code)}${billingQs}`;
                   }
                   if (!sellable) {
                     return '';
@@ -100,7 +195,7 @@ export function LandingPricing({
                 const planTitle = subscriptionPlanDisplayName(plan, locale);
                 /** EN: move ISO currency into the title so the price row fits (e.g. "Optimal, RUB"). */
                 const enSplitCurrency =
-                  locale === 'en' && !isCustom && plan.price > 0;
+                  locale === 'en' && !isCustom && displayPriceMinor > 0;
                 const planHeading = enSplitCurrency
                   ? `${planTitle}, ${(plan.currency ?? 'RUB').toUpperCase()}`
                   : planTitle;
@@ -179,18 +274,51 @@ export function LandingPricing({
                             {copy.pricingFromApi.customPricing}
                           </span>
                         ) : (
-                          <div className='flex min-w-0 flex-col items-start gap-0.5'>
+                          <div
+                            className={`relative flex min-w-0 flex-col items-start gap-0.5 ${
+                              annualMode && annualDiscountPct != null
+                                ? 'pr-14 sm:pr-[4.25rem]'
+                                : ''
+                            }`}
+                          >
+                            {annualMode &&
+                            annualDiscountPct != null &&
+                            !isEnterpriseListPrice ? (
+                              <AnnualPrepayDiscountBubble
+                                percent={annualDiscountPct}
+                                labelTemplate={
+                                  copy.pricingFromApi.annualPrepayBubbleLabel
+                                }
+                              />
+                            ) : null}
+                            {annualMode &&
+                            !isEnterpriseListPrice &&
+                            plan.price > displayPriceMinor ? (
+                              <span className='text-sm font-medium break-words text-[color:var(--color-text-muted)] line-through opacity-70'>
+                                {enSplitCurrency
+                                  ? formatPriceMinorUnitsAmountOnly(
+                                      plan.price,
+                                      plan.currency,
+                                      intlLocale
+                                    )
+                                  : formatPriceMinorUnits(
+                                      plan.price,
+                                      plan.currency,
+                                      intlLocale
+                                    )}
+                              </span>
+                            ) : null}
                             <span
                               className={`font-display text-[color:var(--color-text)] ${priceTypography}`}
                             >
                               {enSplitCurrency
                                 ? formatPriceMinorUnitsAmountOnly(
-                                    plan.price,
+                                    displayPriceMinor,
                                     plan.currency,
                                     intlLocale
                                   )
                                 : formatPriceMinorUnits(
-                                    plan.price,
+                                    displayPriceMinor,
                                     plan.currency,
                                     intlLocale
                                   )}
@@ -269,6 +397,13 @@ export function LandingPricing({
                         lead={copy.leadForm}
                         appBaseUrl={appBaseUrl}
                         planCode={plan.code}
+                        billingPeriod={
+                          planSupportsAnnualPrepay(plan) &&
+                          plan.interval === 'month' &&
+                          !isFree
+                            ? billingPeriod
+                            : undefined
+                        }
                         className={`focus-ring relative mt-auto inline-flex w-full items-center justify-center rounded-xl px-6 py-3 font-semibold transition ${ctaEmphasisClass}`}
                       >
                         {ctaLabel}
@@ -431,6 +566,9 @@ export function LandingPricing({
               source='pricing_custom_terms'
               lead={copy.leadForm}
               appBaseUrl={appBaseUrl}
+              billingPeriod={
+                showBillingToggle ? billingPeriod : undefined
+              }
               className='focus-ring group inline-flex min-h-12 w-full shrink-0 items-center justify-center gap-2 self-center rounded-xl bg-[color:var(--color-primary)] px-7 py-3.5 text-base font-semibold text-white shadow-lg shadow-[color:var(--color-primary)]/35 transition hover:bg-[color:var(--color-primary-hover)] hover:shadow-xl hover:shadow-[color:var(--color-primary)]/40 sm:w-auto sm:self-stretch sm:px-8 lg:self-center'
             >
               <span>{copy.pricingFromApi.requestQuote}</span>

@@ -89,11 +89,13 @@ type ResetPasswordRequest struct {
 }
 
 type SignupRequest struct {
-	Name                   string `json:"name" binding:"required"`
-	Email                  string `json:"email" binding:"required"`
-	Password               string `json:"password" binding:"required"`
-	CompanyName            string `json:"companyName" binding:"required"`
-	PlanCode               string `json:"planCode"`    // optional, defaults to starter with trial
+	Name        string `json:"name" binding:"required"`
+	Email       string `json:"email" binding:"required"`
+	Password    string `json:"password" binding:"required"`
+	CompanyName string `json:"companyName" binding:"required"`
+	PlanCode    string `json:"planCode"` // optional, defaults to starter with trial
+	// BillingPeriod: "month" (default) or "annual" when the selected plan supports annual prepay.
+	BillingPeriod          string `json:"billingPeriod"`
 	CompanySlug            string `json:"companySlug"` // optional; if empty, generated from company name
 	PrivacyConsentAccepted *bool  `json:"privacyConsentAccepted"`
 }
@@ -489,9 +491,13 @@ func (h *AuthHandler) Signup(w http.ResponseWriter, r *http.Request) {
 	if s := strings.TrimSpace(req.CompanySlug); s != "" {
 		preferredSlug = &s
 	}
-	pair, err := h.service.Signup(req.Name, req.Email, req.Password, req.CompanyName, req.PlanCode, preferredSlug, true)
+	pair, err := h.service.Signup(req.Name, req.Email, req.Password, req.CompanyName, req.PlanCode, req.BillingPeriod, preferredSlug, true)
 	if err != nil {
 		if errors.Is(err, services.ErrPrivacyConsentRequired) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if errors.Is(err, services.ErrInvalidSignupBillingPeriod) || errors.Is(err, services.ErrAnnualBillingNotAvailableForPlan) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}

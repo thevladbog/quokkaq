@@ -13,6 +13,7 @@ import (
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
 	"quokkaq-go-backend/internal/services/subscriptions"
+	"quokkaq-go-backend/internal/subscriptionplan"
 	"quokkaq-go-backend/pkg/database"
 	"strings"
 	"time"
@@ -26,6 +27,7 @@ type SubscriptionHandler struct {
 	subscriptionRepo repository.SubscriptionRepository
 	userRepo         repository.UserRepository
 	companyRepo      repository.CompanyRepository
+	unitRepo         repository.UnitRepository
 	paymentProvider  services.PaymentProvider
 	subscriptionSvc  *services.SubscriptionService
 }
@@ -34,6 +36,7 @@ func NewSubscriptionHandler(
 	subscriptionRepo repository.SubscriptionRepository,
 	userRepo repository.UserRepository,
 	companyRepo repository.CompanyRepository,
+	unitRepo repository.UnitRepository,
 	paymentProvider services.PaymentProvider,
 	subscriptionSvc *services.SubscriptionService,
 ) *SubscriptionHandler {
@@ -41,6 +44,7 @@ func NewSubscriptionHandler(
 		subscriptionRepo: subscriptionRepo,
 		userRepo:         userRepo,
 		companyRepo:      companyRepo,
+		unitRepo:         unitRepo,
 		paymentProvider:  paymentProvider,
 		subscriptionSvc:  subscriptionSvc,
 	}
@@ -272,6 +276,8 @@ func (h *SubscriptionHandler) GetPlans(w http.ResponseWriter, r *http.Request) {
 // CreateCheckoutRequest represents checkout session request
 type CreateCheckoutRequest struct {
 	PlanCode string `json:"planCode"`
+	// BillingPeriod is "month" (default) or "annual" (12-month prepay when configured on the plan).
+	BillingPeriod string `json:"billingPeriod"`
 }
 
 // CreateCheckoutResponse represents checkout session response
@@ -359,6 +365,31 @@ func (h *SubscriptionHandler) CreateCheckout(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	billing := strings.TrimSpace(strings.ToLower(req.BillingPeriod))
+	if billing == "" {
+		billing = "month"
+	}
+	var stripeLine *subscriptionplan.CheckoutSubscriptionLine
+	switch billing {
+	case "month":
+		stripeLine = nil
+	case "annual":
+		line, errLine := subscriptionplan.CheckoutLineForBilling(plan, "annual")
+		if errLine != nil {
+			if errors.Is(errLine, subscriptionplan.ErrAnnualPrepayNotConfigured) {
+				http.Error(w, "annual billing is not available for this plan", http.StatusBadRequest)
+				return
+			}
+			logger.PrintfCtx(r.Context(), "CreateCheckout CheckoutLineForBilling: %v", errLine)
+			http.Error(w, "invalid annual billing configuration", http.StatusBadRequest)
+			return
+		}
+		stripeLine = line
+	default:
+		http.Error(w, "billingPeriod must be month or annual", http.StatusBadRequest)
+		return
+	}
+
 	subscription, err := h.subscriptionRepo.FindByCompanyID(companyID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -370,6 +401,19 @@ func (h *SubscriptionHandler) CreateCheckout(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	lineQty := int64(1)
+	if plan.PricingModel == "" || plan.PricingModel == "per_unit" {
+		n, qerr := h.unitRepo.CountSubdivisionsByCompanyID(companyID)
+		if qerr != nil {
+			logger.PrintfCtx(r.Context(), "CreateCheckout CountSubdivisionsByCompanyID(%q): %v", companyID, qerr)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		if n > 0 {
+			lineQty = n
+		}
+	}
+
 	if h.paymentProvider != nil {
 		base, valid := checkoutBaseURLValidForPaymentProvider()
 		if !valid {
@@ -378,7 +422,7 @@ func (h *SubscriptionHandler) CreateCheckout(w http.ResponseWriter, r *http.Requ
 		}
 		successURL := base + "/settings/organization/billing?checkout=success"
 		cancelURL := base + "/settings/organization/billing?checkout=cancel"
-		checkoutURL, sessionID, cerr := h.paymentProvider.CreateCheckoutSession(r.Context(), subscription, plan, successURL, cancelURL)
+		checkoutURL, sessionID, cerr := h.paymentProvider.CreateCheckoutSession(r.Context(), subscription, plan, stripeLine, lineQty, successURL, cancelURL)
 		if cerr != nil {
 			http.Error(w, "Failed to create checkout session", http.StatusInternalServerError)
 			return
@@ -480,6 +524,8 @@ const maxPlanChangeRequestBodyBytes = 4096
 // PlanChangeRequestBody is JSON for POST /subscriptions/plan-change-request.
 type PlanChangeRequestBody struct {
 	RequestedPlanCode string `json:"requestedPlanCode" binding:"required" minLength:"1"`
+	// BillingPeriod is optional: "month" (default) or "annual" when the target plan supports annual prepay.
+	BillingPeriod string `json:"billingPeriod"`
 }
 
 // PostPlanChangeRequest creates a Yandex Tracker issue for a requested subscription plan change (same queue as marketing leads).
@@ -522,7 +568,11 @@ func (h *SubscriptionHandler) PostPlanChangeRequest(w http.ResponseWriter, r *ht
 		http.Error(w, "requestedPlanCode is required", http.StatusBadRequest)
 		return
 	}
-	err = h.subscriptionSvc.SubmitPlanChangeRequest(r.Context(), userID, r.Header.Get("X-Company-Id"), requested)
+	billingPeriod := strings.TrimSpace(strings.ToLower(req.BillingPeriod))
+	if billingPeriod == "" {
+		billingPeriod = "month"
+	}
+	err = h.subscriptionSvc.SubmitPlanChangeRequest(r.Context(), userID, r.Header.Get("X-Company-Id"), requested, billingPeriod)
 	if err != nil {
 		var reqErr *services.SubscriptionRequestError
 		if errors.As(err, &reqErr) {
@@ -547,6 +597,8 @@ const maxCustomTermsCommentRunes = 8000
 // CustomTermsLeadRequestBody is JSON for POST /subscriptions/custom-terms-lead-request.
 type CustomTermsLeadRequestBody struct {
 	Comment string `json:"comment" binding:"required" minLength:"1"`
+	// BillingPeriod optional context for sales: "month" or "annual".
+	BillingPeriod string `json:"billingPeriod"`
 }
 
 // PostCustomTermsLeadRequest creates a [REQ] Yandex Tracker issue (individual pricing / custom terms).
@@ -593,7 +645,11 @@ func (h *SubscriptionHandler) PostCustomTermsLeadRequest(w http.ResponseWriter, 
 		http.Error(w, "comment is too long", http.StatusBadRequest)
 		return
 	}
-	err = h.subscriptionSvc.SubmitCustomTermsRequest(r.Context(), userID, r.Header.Get("X-Company-Id"), comment)
+	ctBilling := strings.TrimSpace(strings.ToLower(req.BillingPeriod))
+	if ctBilling == "" {
+		ctBilling = "month"
+	}
+	err = h.subscriptionSvc.SubmitCustomTermsRequest(r.Context(), userID, r.Header.Get("X-Company-Id"), comment, ctBilling)
 	if err != nil {
 		var reqErr *services.SubscriptionRequestError
 		if errors.As(err, &reqErr) {

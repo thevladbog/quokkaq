@@ -93,22 +93,22 @@ func logSignupFailureInternal(traceID, errText string) {
 }
 
 // NotifyTrialRegistration best-effort after successful signup. Non-blocking; uses a short timeout for the Tracker call.
-func (s *LeadIssueService) NotifyTrialRegistration(ctx context.Context, companyName, companySlug, userName, userEmail, planCode string) {
+func (s *LeadIssueService) NotifyTrialRegistration(ctx context.Context, companyName, companySlug, userName, userEmail, planCode, billingPeriod string) {
 	if s == nil || s.settingsRepo == nil || s.tracker == nil {
 		return
 	}
 	li := s
-	cn, cs, un, ue, pc := companyName, companySlug, userName, userEmail, planCode
+	cn, cs, un, ue, pc, bp := companyName, companySlug, userName, userEmail, planCode, billingPeriod
 	parentCtx := ctx
 	go func() {
 		// WithoutCancel: outbound Tracker call must not be cut off when the HTTP handler returns.
 		runCtx, cancel := context.WithTimeout(context.WithoutCancel(parentCtx), leadIssueTrackerHTTPTimeout)
 		defer cancel()
-		li.notifyTrialRegistrationSync(runCtx, cn, cs, un, ue, pc)
+		li.notifyTrialRegistrationSync(runCtx, cn, cs, un, ue, pc, bp)
 	}()
 }
 
-func (s *LeadIssueService) notifyTrialRegistrationSync(ctx context.Context, companyName, companySlug, userName, userEmail, planCode string) {
+func (s *LeadIssueService) notifyTrialRegistrationSync(ctx context.Context, companyName, companySlug, userName, userEmail, planCode, billingPeriod string) {
 	st, err := s.settingsRepo.Get()
 	if err != nil {
 		return
@@ -128,6 +128,9 @@ func (s *LeadIssueService) notifyTrialRegistrationSync(ctx context.Context, comp
 	fmt.Fprintf(&b, "- **User**: %s\n", userName)
 	fmt.Fprintf(&b, "- **Email**: %s\n", userEmail)
 	fmt.Fprintf(&b, "- **Plan code**: %s\n", planCode)
+	if strings.TrimSpace(billingPeriod) != "" && strings.TrimSpace(billingPeriod) != "month" {
+		fmt.Fprintf(&b, "- **Billing period**: %s\n", strings.TrimSpace(billingPeriod))
+	}
 	traceID := uuid.New().String()
 	diag, _ := json.Marshal(map[string]string{"kind": "trial_registration"})
 	desc := BuildSupportDescriptionMarkdown(b.String(), diag, traceID)
@@ -196,7 +199,7 @@ func (s *LeadIssueService) notifySignupFailureSync(ctx context.Context, companyN
 }
 
 // CreateLeadRequest creates a Tracker issue from the public marketing form ([REQ]).
-func (s *LeadIssueService) CreateLeadRequest(ctx context.Context, name, email, company, message, source, locale, referrer, planCode string, privacyConsentRecorded bool) error {
+func (s *LeadIssueService) CreateLeadRequest(ctx context.Context, name, email, company, message, source, locale, referrer, planCode, billingPeriod string, privacyConsentRecorded bool) error {
 	if s == nil || s.settingsRepo == nil || s.tracker == nil {
 		return fmt.Errorf("lead issue service not configured")
 	}
@@ -232,6 +235,9 @@ func (s *LeadIssueService) CreateLeadRequest(ctx context.Context, name, email, c
 	if strings.TrimSpace(planCode) != "" {
 		fmt.Fprintf(&b, "- **Plan code (context)**: %s\n", planCode)
 	}
+	if strings.TrimSpace(billingPeriod) != "" {
+		fmt.Fprintf(&b, "- **Billing period**: %s\n", strings.TrimSpace(billingPeriod))
+	}
 	fmt.Fprintf(&b, "- **Source**: %s\n", source)
 	fmt.Fprintf(&b, "- **Locale**: %s\n", locale)
 	if strings.TrimSpace(referrer) != "" {
@@ -257,7 +263,7 @@ func (s *LeadIssueService) CreateLeadRequest(ctx context.Context, name, email, c
 func (s *LeadIssueService) CreatePlanChangeRequest(ctx context.Context,
 	companyID, companyName, companySlug string,
 	userDisplayName, userEmail string,
-	currentPlanCode, requestedPlanCode string,
+	currentPlanCode, requestedPlanCode, billingPeriod string,
 ) error {
 	if s == nil || s.settingsRepo == nil || s.tracker == nil {
 		return fmt.Errorf("lead issue service not configured")
@@ -295,6 +301,11 @@ func (s *LeadIssueService) CreatePlanChangeRequest(ctx context.Context,
 	fmt.Fprintf(&b, "- **Email**: %s\n", strings.TrimSpace(userEmail))
 	fmt.Fprintf(&b, "- **Current plan code**: %s\n", cur)
 	fmt.Fprintf(&b, "- **Requested plan code**: %s\n", req)
+	bp := strings.TrimSpace(strings.ToLower(billingPeriod))
+	if bp == "" {
+		bp = "month"
+	}
+	fmt.Fprintf(&b, "- **Billing period (requested)**: %s\n", bp)
 	traceID := uuid.New().String()
 	diag, _ := json.Marshal(map[string]string{"kind": "plan_change_request"})
 	desc := BuildSupportDescriptionMarkdown(b.String(), diag, traceID)
@@ -313,7 +324,7 @@ func (s *LeadIssueService) CreatePlanChangeRequest(ctx context.Context,
 // CreateTenantCustomTermsLeadRequest creates a [REQ] Tracker issue when an authenticated tenant user asks for individual pricing / custom terms (Settings → Pricing).
 func (s *LeadIssueService) CreateTenantCustomTermsLeadRequest(ctx context.Context,
 	companyID, companyName, companySlug string,
-	userDisplayName, userEmail, comment string,
+	userDisplayName, userEmail, comment, billingPeriod string,
 ) error {
 	if s == nil || s.settingsRepo == nil || s.tracker == nil {
 		return fmt.Errorf("lead issue service not configured")
@@ -351,6 +362,11 @@ func (s *LeadIssueService) CreateTenantCustomTermsLeadRequest(ctx context.Contex
 	fmt.Fprintf(&b, "- **Requested by**: %s\n", strings.TrimSpace(userDisplayName))
 	fmt.Fprintf(&b, "- **Email**: %s\n", strings.TrimSpace(userEmail))
 	fmt.Fprintf(&b, "- **Source**: %s\n", "tenant_settings_pricing")
+	bp := strings.TrimSpace(strings.ToLower(billingPeriod))
+	if bp == "" {
+		bp = "month"
+	}
+	fmt.Fprintf(&b, "- **Billing period (context)**: %s\n", bp)
 	traceID := uuid.New().String()
 	diag, _ := json.Marshal(map[string]string{"kind": "tenant_custom_terms", "source": "tenant_settings_pricing"})
 	desc := BuildSupportDescriptionMarkdown(b.String(), diag, traceID)

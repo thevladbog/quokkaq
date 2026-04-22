@@ -88,6 +88,9 @@ components:
             type: object
         handlers.CreateCheckoutRequest:
             properties:
+                billingPeriod:
+                    description: BillingPeriod is "month" (default) or "annual" (12-month prepay when configured on the plan).
+                    type: string
                 planCode:
                     type: string
             type: object
@@ -203,6 +206,9 @@ components:
             type: object
         handlers.CustomTermsLeadRequestBody:
             properties:
+                billingPeriod:
+                    description: 'BillingPeriod optional context for sales: "month" or "annual".'
+                    type: string
                 comment:
                     minLength: 1
                     type: string
@@ -625,6 +631,9 @@ components:
             type: object
         handlers.PlanChangeRequestBody:
             properties:
+                billingPeriod:
+                    description: 'BillingPeriod is optional: "month" (default) or "annual" when the target plan supports annual prepay.'
+                    type: string
                 requestedPlanCode:
                     minLength: 1
                     type: string
@@ -654,6 +663,11 @@ components:
                 allowInstantPurchase:
                     description: AllowInstantPurchase omitted or null defaults to true.
                     type: boolean
+                annualPrepayDiscountPercent:
+                    description: 'Annual prepay (monthly plans only): set at most one of discount percent (1–100) or fixed effective monthly price (minor units).'
+                    type: integer
+                annualPrepayPricePerMonth:
+                    type: integer
                 code:
                     type: string
                 currency:
@@ -730,6 +744,10 @@ components:
             properties:
                 allowInstantPurchase:
                     type: boolean
+                annualPrepayDiscountPercent:
+                    type: integer
+                annualPrepayPricePerMonth:
+                    type: integer
                 code:
                     type: string
                 currency:
@@ -777,6 +795,8 @@ components:
             type: object
         handlers.PublicLeadRequestBody:
             properties:
+                billingPeriod:
+                    type: string
                 company:
                     type: string
                 email:
@@ -883,6 +903,9 @@ components:
             type: object
         handlers.SignupRequest:
             properties:
+                billingPeriod:
+                    description: 'BillingPeriod: "month" (default) or "annual" when the selected plan supports annual prepay.'
+                    type: string
                 companyName:
                     type: string
                 companySlug:
@@ -2279,6 +2302,12 @@ components:
                 allowInstantPurchase:
                     description: 'AllowInstantPurchase when false: plan may still be public, but checkout is disabled until a sales-led flow exists.'
                     type: boolean
+                annualPrepayDiscountPercent:
+                    description: 'AnnualPrepayDiscountPercent when set (1–100, interval must be month): yearly checkout uses price*12*(100-pct)/100.'
+                    type: integer
+                annualPrepayPricePerMonth:
+                    description: 'AnnualPrepayPricePerMonth when set (minor units, interval month): yearly checkout uses this * 12 per year.'
+                    type: integer
                 code:
                     description: unique plan code like "starter", "professional"
                     type: string

@@ -21,9 +21,12 @@ import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 
 export function PricingCustomTermsBanner({
-  className
+  className,
+  billingPeriod = 'month'
 }: {
   className?: string;
+  /** Billing context for the Tracker ticket (month vs annual prepay). */
+  billingPeriod?: 'month' | 'annual';
 }) {
   const t = useTranslations('organization.pricing');
   const tCommon = useTranslations('common');
@@ -32,7 +35,8 @@ export function PricingCustomTermsBanner({
   const [comment, setComment] = useState('');
 
   const mutation = useMutation({
-    mutationFn: (c: string) => subscriptionsApi.requestCustomTermsLead(c),
+    mutationFn: (c: string) =>
+      subscriptionsApi.requestCustomTermsLead(c, billingPeriod),
     onSuccess: () => {
       toast.success(t('customTermsToastSuccess'));
       setComment('');

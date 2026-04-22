@@ -124,5 +124,6 @@ func (p *predUnitRepo) FindFirstByCompanyID(string) (*models.Unit, error) {
 func (p *predUnitRepo) FindFirstByCompanyIDTx(*gorm.DB, string) (*models.Unit, error) {
 	return p.u, nil
 }
+func (p *predUnitRepo) CountSubdivisionsByCompanyID(string) (int64, error) { return 0, nil }
 
 var _ repository.UnitRepository = (*predUnitRepo)(nil)

@@ -63,6 +63,8 @@ func (r *stubUnitRepo) FindByIDLight(_ string) (*models.Unit, error) {
 	}, nil
 }
 
+func (r *stubUnitRepo) CountSubdivisionsByCompanyID(string) (int64, error) { return 0, nil }
+
 // stubOperatorSkillRepo returns a fixed list of service IDs.
 type stubOperatorSkillRepo struct {
 	repository.OperatorSkillRepository          // embed interface for unimplemented methods

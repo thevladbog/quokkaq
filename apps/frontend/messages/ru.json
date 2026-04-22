@@ -2657,7 +2657,16 @@
       "pricingModel": "Модель тарификации",
       "pricingModelFlat": "Фиксированная",
       "pricingModelPerUnit": "За подразделение",
-      "pricingModelHint": "Фиксированная: одна цена в месяц. За подразделение: цена × количество активных подразделений."
+      "pricingModelHint": "Фиксированная: одна цена в месяц. За подразделение: цена × количество активных подразделений.",
+      "annualPrepaySection": "Годовая предоплата (переключатель на маркетинге)",
+      "annualPrepayHint": "Только для помесячного интервала. На маркетинге и в оплате клиент сможет выбрать «12 месяцев». Задайте либо скидку от суммы 12× месячная цена, либо фиксированную цену за месяц при годовой оплате.",
+      "annualPrepayNone": "Нет",
+      "annualPrepayDiscount": "Скидка %",
+      "annualPrepayDiscountLabel": "Скидка на 12 месяцев (%)",
+      "annualPrepayFixed": "Фикс. цена за месяц (год)",
+      "annualPrepayFixedLabel": "Эффективная цена за месяц при оплате за 12 месяцев",
+      "annualPrepayDiscountInvalid": "Введите целое число от 1 до 100 для скидки.",
+      "annualPrepayFixedInvalid": "Введите корректную положительную сумму за месяц."
     },
     "invoices": {
       "title": "Счета",
@@ -3221,6 +3230,9 @@
       "addPaymentMethod": "Добавить способ оплаты",
       "perMonth": "/мес",
       "perYear": "/год",
+      "billingToggleMonth": "Месяц",
+      "billingToggleAnnual": "12 месяцев",
+      "billedAnnuallyFootnote": "Оплата за 12 месяцев",
       "perUnitPerMonth": "/ подр. / мес",
       "freePlan": "Бесплатно",
       "startFree": "Начать бесплатно",

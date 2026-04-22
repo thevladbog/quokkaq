@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"quokkaq-go-backend/internal/models"
+	"quokkaq-go-backend/internal/subscriptionplan"
 	"quokkaq-go-backend/pkg/database"
 	"strings"
 	"time"
@@ -37,7 +38,7 @@ func NewStripeProvider(secretKey, webhookSecret string) PaymentProvider {
 	}
 }
 
-func (p *StripeProvider) CreateCheckoutSession(ctx context.Context, subscription *models.Subscription, checkoutPlan *models.SubscriptionPlan, successURL, cancelURL string) (string, string, error) {
+func (p *StripeProvider) CreateCheckoutSession(ctx context.Context, subscription *models.Subscription, checkoutPlan *models.SubscriptionPlan, stripeLine *subscriptionplan.CheckoutSubscriptionLine, lineQuantity int64, successURL, cancelURL string) (string, string, error) {
 	db := database.DB.WithContext(ctx)
 
 	// Load the subscription with plan and company
@@ -48,6 +49,22 @@ func (p *StripeProvider) CreateCheckoutSession(ctx context.Context, subscription
 	pricePlan := checkoutPlan
 	if pricePlan == nil {
 		pricePlan = &subscription.Plan
+	}
+
+	unitAmount := pricePlan.Price
+	recurringInterval := pricePlan.Interval
+	productName := pricePlan.Name
+	if stripeLine != nil {
+		unitAmount = stripeLine.UnitAmount
+		recurringInterval = stripeLine.Interval
+		if strings.TrimSpace(stripeLine.ProductName) != "" {
+			productName = stripeLine.ProductName
+		}
+	}
+
+	qty := lineQuantity
+	if qty < 1 {
+		qty = 1
 	}
 
 	customerID, err := p.GetCustomerID(ctx, subscription.CompanyID)
@@ -74,14 +91,14 @@ func (p *StripeProvider) CreateCheckoutSession(ctx context.Context, subscription
 				PriceData: &stripe.CheckoutSessionLineItemPriceDataParams{
 					Currency: stripe.String(pricePlan.Currency),
 					ProductData: &stripe.CheckoutSessionLineItemPriceDataProductDataParams{
-						Name: stripe.String(pricePlan.Name),
+						Name: stripe.String(productName),
 					},
-					UnitAmount: stripe.Int64(pricePlan.Price),
+					UnitAmount: stripe.Int64(unitAmount),
 					Recurring: &stripe.CheckoutSessionLineItemPriceDataRecurringParams{
-						Interval: stripe.String(pricePlan.Interval),
+						Interval: stripe.String(recurringInterval),
 					},
 				},
-				Quantity: stripe.Int64(1),
+				Quantity: stripe.Int64(qty),
 			},
 		},
 		SuccessURL: stripe.String(successURL),
@@ -102,6 +119,10 @@ func (p *StripeProvider) CreateCheckoutSession(ctx context.Context, subscription
 		params.Metadata["checkout_plan_code"] = checkoutPlan.Code
 		params.SubscriptionData.Metadata["checkout_plan_id"] = checkoutPlan.ID
 		params.SubscriptionData.Metadata["checkout_plan_code"] = checkoutPlan.Code
+	}
+	if stripeLine != nil {
+		params.Metadata["checkout_billing_period"] = "annual"
+		params.SubscriptionData.Metadata["checkout_billing_period"] = "annual"
 	}
 
 	sess, err := session.New(params)
@@ -135,12 +156,18 @@ func (p *StripeProvider) CreateInvoice(ctx context.Context, subscription *models
 		currency = "usd"
 	}
 
+	subQty := subdivisionBillableQuantity(db, subscription.CompanyID)
+	invAmount, err := subscriptionplan.ManualInvoiceLineAmountMinor(&subscription.Plan, subscription.Metadata, subQty)
+	if err != nil {
+		return nil, fmt.Errorf("manual invoice amount: %w", err)
+	}
+
 	_, err = invoiceitem.New(&stripe.InvoiceItemParams{
 		Params: stripe.Params{
 			Context: ctx,
 		},
 		Customer:    stripe.String(customerID),
-		Amount:      stripe.Int64(subscription.Plan.Price),
+		Amount:      stripe.Int64(invAmount),
 		Currency:    stripe.String(currency),
 		Description: stripe.String(subscription.Plan.Name),
 	})
@@ -181,7 +208,7 @@ func (p *StripeProvider) CreateInvoice(ctx context.Context, subscription *models
 	local := &models.Invoice{
 		CompanyID:                &cid,
 		SubscriptionID:           &sid,
-		Amount:                   subscription.Plan.Price,
+		Amount:                   invAmount,
 		Currency:                 subscription.Plan.Currency,
 		Status:                   status,
 		PaymentProvider:          "stripe",
@@ -339,6 +366,18 @@ func (p *StripeProvider) CreateCustomer(ctx context.Context, companyID, email, n
 	return createdID, err
 }
 
+// subdivisionBillableQuantity returns active subdivision count for per_unit billing, lower-bounded at 1 when none exist.
+func subdivisionBillableQuantity(db *gorm.DB, companyID string) int64 {
+	var n int64
+	_ = db.Model(&models.Unit{}).
+		Where("company_id = ? AND kind = ?", companyID, models.UnitKindSubdivision).
+		Count(&n).Error
+	if n < 1 {
+		return 1
+	}
+	return n
+}
+
 // Helper methods for webhook handlers
 
 func (p *StripeProvider) handleCheckoutCompleted(ctx context.Context, session *stripe.CheckoutSession) error {
@@ -348,7 +387,25 @@ func (p *StripeProvider) handleCheckoutCompleted(ctx context.Context, session *s
 	}
 
 	db := database.DB.WithContext(ctx)
-	updates := map[string]interface{}{"status": "active"}
+	var sub models.Subscription
+	if err := db.First(&sub, "id = ?", subscriptionID).Error; err != nil {
+		return fmt.Errorf("load subscription: %w", err)
+	}
+
+	checkoutBP := strings.TrimSpace(session.Metadata["checkout_billing_period"])
+	meta := sub.Metadata
+	if checkoutBP != "" {
+		var err error
+		meta, err = subscriptionplan.MergePreferredBillingFromCheckout(sub.Metadata, checkoutBP)
+		if err != nil {
+			return fmt.Errorf("merge subscription metadata: %w", err)
+		}
+	}
+
+	updates := map[string]interface{}{
+		"status":   "active",
+		"metadata": meta,
+	}
 	if session.Subscription != nil && session.Subscription.ID != "" {
 		updates["stripe_subscription_id"] = session.Subscription.ID
 	}

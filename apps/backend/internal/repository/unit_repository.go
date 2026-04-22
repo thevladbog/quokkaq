@@ -36,6 +36,8 @@ type UnitRepository interface {
 	FindFirstByCompanyID(companyID string) (*models.Unit, error)
 	// FindFirstByCompanyIDTx returns the oldest unit for a company (used for SSO JIT provisioning).
 	FindFirstByCompanyIDTx(tx *gorm.DB, companyID string) (*models.Unit, error)
+	// CountSubdivisionsByCompanyID counts units with kind subdivision for billing (per_unit quantity).
+	CountSubdivisionsByCompanyID(companyID string) (int64, error)
 }
 
 type unitRepository struct {
@@ -182,4 +184,12 @@ func (r *unitRepository) FindFirstByCompanyIDTx(tx *gorm.DB, companyID string) (
 		return nil, err
 	}
 	return &unit, nil
+}
+
+func (r *unitRepository) CountSubdivisionsByCompanyID(companyID string) (int64, error) {
+	var n int64
+	err := r.db.Model(&models.Unit{}).
+		Where("company_id = ? AND kind = ?", companyID, models.UnitKindSubdivision).
+		Count(&n).Error
+	return n, err
 }

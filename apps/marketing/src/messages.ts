@@ -109,6 +109,16 @@ export type HomeMessages = {
     perYear: string;
     /** Label for per-unit pricing model: "/ unit / mo". */
     perUnitPerMonth?: string;
+    /** Billing period toggle (shown when at least one plan has annual prepay). */
+    billingToggleMonth: string;
+    billingToggleAnnual: string;
+    /** Secondary line under price when annual toggle is on (12-month prepay). */
+    billedAnnuallyFootnote: string;
+    /**
+     * Pill on a plan card in annual mode; `{percent}` is the plan’s discount %
+     * (explicit or equivalent from fixed effective monthly).
+     */
+    annualPrepayBubbleLabel: string;
     popularBadge: string;
     /** Top pill on enterprise (sales-led) when not the promoted plan. */
     enterpriseBadge: string;
@@ -412,6 +422,10 @@ export const messages: Record<
         perMonth: '/mo',
         perYear: '/yr',
         perUnitPerMonth: '/ unit / mo',
+        billingToggleMonth: 'Monthly',
+        billingToggleAnnual: '12 months',
+        billedAnnuallyFootnote: 'Billed annually (12 months)',
+        annualPrepayBubbleLabel: '−{percent}% annual',
         popularBadge: 'Recommended',
         /** Shown on enterprise plan pill (product term, same in all locales). */
         enterpriseBadge: 'Enterprise',
@@ -743,6 +757,10 @@ export const messages: Record<
         perMonth: '/мес',
         perYear: '/год',
         perUnitPerMonth: '/ подр. / мес',
+        billingToggleMonth: 'Месяц',
+        billingToggleAnnual: '12 месяцев',
+        billedAnnuallyFootnote: 'Оплата за 12 месяцев',
+        annualPrepayBubbleLabel: '−{percent}% за год',
         popularBadge: 'Рекомендуем',
         enterpriseBadge: 'Enterprise',
         startTrial: 'Начать пробный период',

@@ -28,6 +28,7 @@ export type LeadRequestModalProps = {
   locale: AppLocale;
   source: string;
   planCode?: string;
+  billingPeriod?: string;
   lead: HomeMessages['leadForm'];
 };
 
@@ -37,6 +38,7 @@ export function LeadRequestModal({
   locale,
   source,
   planCode,
+  billingPeriod,
   lead
 }: LeadRequestModalProps) {
   const [name, setName] = useState('');
@@ -148,6 +150,7 @@ export function LeadRequestModal({
             ? `${window.location.pathname}${window.location.search}`
             : '',
         planCode: planCode?.trim() ?? '',
+        billingPeriod: billingPeriod?.trim() ?? '',
         privacyConsentAccepted: true
       };
       const res = await postPublicLeadRequest(body);
@@ -155,7 +158,8 @@ export function LeadRequestModal({
         setSuccess(true);
         pushMarketingEvent('marketing_lead_submit', {
           source,
-          plan_code: planCode?.trim() ?? ''
+          plan_code: planCode?.trim() ?? '',
+          billing_period: billingPeriod?.trim() || 'month'
         });
         setName('');
         setEmail('');

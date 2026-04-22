@@ -2657,7 +2657,16 @@
       "pricingModel": "Pricing model",
       "pricingModelFlat": "Fixed (flat)",
       "pricingModelPerUnit": "Per subdivision",
-      "pricingModelHint": "Flat: one monthly price. Per subdivision: price × number of active subdivisions."
+      "pricingModelHint": "Flat: one monthly price. Per subdivision: price × number of active subdivisions.",
+      "annualPrepaySection": "12-month prepay (marketing toggle)",
+      "annualPrepayHint": "Only for monthly plans. Customers can choose annual checkout on marketing and billing. Set either a discount on 12× list monthly or a fixed effective monthly price.",
+      "annualPrepayNone": "None",
+      "annualPrepayDiscount": "Discount %",
+      "annualPrepayDiscountLabel": "Discount on 12 months (%)",
+      "annualPrepayFixed": "Fixed monthly (annual)",
+      "annualPrepayFixedLabel": "Effective monthly price when paying for 12 months",
+      "annualPrepayDiscountInvalid": "Enter a whole number from 1 to 100 for the discount.",
+      "annualPrepayFixedInvalid": "Enter a valid positive price for the effective monthly amount."
     },
     "invoices": {
       "title": "Invoices",
@@ -3221,6 +3230,9 @@
       "addPaymentMethod": "Add Payment Method",
       "perMonth": "/mo",
       "perYear": "/yr",
+      "billingToggleMonth": "Monthly",
+      "billingToggleAnnual": "12 months",
+      "billedAnnuallyFootnote": "Billed annually (12 months)",
       "perUnitPerMonth": "/ unit / mo",
       "freePlan": "Free",
       "startFree": "Start for free",

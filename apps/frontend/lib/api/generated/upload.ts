@@ -338,6 +338,8 @@ export interface HandlersCounterCallNextRequest {
 }
 
 export interface HandlersCreateCheckoutRequest {
+  /** BillingPeriod is "month" (default) or "annual" (12-month prepay when configured on the plan). */
+  billingPeriod?: string;
   planCode?: string;
 }
 
@@ -445,6 +447,8 @@ export interface HandlersCreateTicketRequestKiosk {
 export type HandlersCreateTicketRequest = HandlersCreateTicketRequestAnonymous | HandlersCreateTicketRequestStaff | HandlersCreateTicketRequestKiosk;
 
 export interface HandlersCustomTermsLeadRequestBody {
+  /** BillingPeriod optional context for sales: "month" or "annual". */
+  billingPeriod?: string;
   /** @minLength 1 */
   comment: string;
 }
@@ -688,6 +692,8 @@ export interface HandlersPickRequest {
 }
 
 export interface HandlersPlanChangeRequestBody {
+  /** BillingPeriod is optional: "month" (default) or "annual" when the target plan supports annual prepay. */
+  billingPeriod?: string;
   /** @minLength 1 */
   requestedPlanCode: string;
 }
@@ -722,6 +728,9 @@ export const HandlersPlatformCreateSubscriptionPlanBodyPricingModel = {
 export interface HandlersPlatformCreateSubscriptionPlanBody {
   /** AllowInstantPurchase omitted or null defaults to true. */
   allowInstantPurchase?: boolean;
+  /** Annual prepay (monthly plans only): set at most one of discount percent (1–100) or fixed effective monthly price (minor units). */
+  annualPrepayDiscountPercent?: number;
+  annualPrepayPricePerMonth?: number;
   code?: string;
   currency?: string;
   /** DisplayOrder omitted or null defaults to 1000 (sort last among unnamed ordering). */
@@ -780,6 +789,8 @@ export const HandlersPlatformUpdateSubscriptionPlanBodyPricingModel = {
 
 export interface HandlersPlatformUpdateSubscriptionPlanBody {
   allowInstantPurchase?: boolean;
+  annualPrepayDiscountPercent?: number;
+  annualPrepayPricePerMonth?: number;
   code?: string;
   currency?: string;
   displayOrder?: number;
@@ -802,6 +813,7 @@ export interface HandlersPlatformUpdateSubscriptionPlanBody {
 }
 
 export interface HandlersPublicLeadRequestBody {
+  billingPeriod?: string;
   company?: string;
   email: string;
   locale?: string;
@@ -873,6 +885,8 @@ export interface HandlersSaasVendorResponse {
 }
 
 export interface HandlersSignupRequest {
+  /** BillingPeriod: "month" (default) or "annual" when the selected plan supports annual prepay. */
+  billingPeriod?: string;
   companyName: string;
   /** optional; if empty, generated from company name */
   companySlug?: string;
@@ -1080,6 +1094,10 @@ export type ModelsSubscriptionPlanLimitsNegotiable = {[key: string]: boolean};
 export interface ModelsSubscriptionPlan {
   /** AllowInstantPurchase when false: plan may still be public, but checkout is disabled until a sales-led flow exists. */
   allowInstantPurchase?: boolean;
+  /** AnnualPrepayDiscountPercent when set (1–100, interval must be month): yearly checkout uses price*12*(100-pct)/100. */
+  annualPrepayDiscountPercent?: number;
+  /** AnnualPrepayPricePerMonth when set (minor units, interval month): yearly checkout uses this * 12 per year. */
+  annualPrepayPricePerMonth?: number;
   /** unique plan code like "starter", "professional" */
   code?: string;
   createdAt?: string;

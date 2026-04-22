@@ -16,6 +16,7 @@ import (
 	"quokkaq-go-backend/internal/pkg/tenantslug"
 	"quokkaq-go-backend/internal/repository"
 	"quokkaq-go-backend/internal/services"
+	"quokkaq-go-backend/internal/subscriptionplan"
 	"quokkaq-go-backend/pkg/database"
 
 	"github.com/go-chi/chi/v5"
@@ -900,6 +901,9 @@ type PlatformCreateSubscriptionPlanBody struct {
 	// PricingModel: "flat" (fixed price) or "per_unit" (price per subdivision). Defaults to "per_unit".
 	// enums: flat,per_unit
 	PricingModel *string `json:"pricingModel,omitempty" enums:"flat,per_unit"`
+	// Annual prepay (monthly plans only): set at most one of discount percent (1–100) or fixed effective monthly price (minor units).
+	AnnualPrepayDiscountPercent *int   `json:"annualPrepayDiscountPercent,omitempty"`
+	AnnualPrepayPricePerMonth   *int64 `json:"annualPrepayPricePerMonth,omitempty"`
 }
 
 // CreateSubscriptionPlan godoc
@@ -948,6 +952,10 @@ func (h *PlatformHandler) CreateSubscriptionPlan(w http.ResponseWriter, r *http.
 		http.Error(w, "price must be 0 when isFree is true", http.StatusBadRequest)
 		return
 	}
+	if err := subscriptionplan.ValidateAnnualPrepayFields(body.Interval, isFree, body.Price, body.AnnualPrepayDiscountPercent, body.AnnualPrepayPricePerMonth); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	pricingModel := "per_unit"
 	if body.PricingModel != nil && *body.PricingModel != "" {
 		pm := strings.TrimSpace(*body.PricingModel)
@@ -981,22 +989,24 @@ func (h *PlatformHandler) CreateSubscriptionPlan(w http.ResponseWriter, r *http.
 		limitsNeg = json.RawMessage("{}")
 	}
 	plan := models.SubscriptionPlan{
-		Name:                 body.Name,
-		NameEn:               body.NameEn,
-		Code:                 body.Code,
-		Price:                body.Price,
-		Currency:             body.Currency,
-		Interval:             body.Interval,
-		Features:             body.Features,
-		Limits:               body.Limits,
-		IsActive:             body.IsActive,
-		IsPublic:             isPublic,
-		DisplayOrder:         displayOrder,
-		LimitsNegotiable:     limitsNeg,
-		AllowInstantPurchase: allowInstant,
-		IsPromoted:           isPromoted,
-		IsFree:               isFree,
-		PricingModel:         pricingModel,
+		Name:                        body.Name,
+		NameEn:                      body.NameEn,
+		Code:                        body.Code,
+		Price:                       body.Price,
+		Currency:                    body.Currency,
+		Interval:                    body.Interval,
+		Features:                    body.Features,
+		Limits:                      body.Limits,
+		IsActive:                    body.IsActive,
+		IsPublic:                    isPublic,
+		DisplayOrder:                displayOrder,
+		LimitsNegotiable:            limitsNeg,
+		AllowInstantPurchase:        allowInstant,
+		IsPromoted:                  isPromoted,
+		IsFree:                      isFree,
+		PricingModel:                pricingModel,
+		AnnualPrepayDiscountPercent: body.AnnualPrepayDiscountPercent,
+		AnnualPrepayPricePerMonth:   body.AnnualPrepayPricePerMonth,
 	}
 	if err := database.DB.Transaction(func(tx *gorm.DB) error {
 		if isPromoted {
@@ -1044,7 +1054,9 @@ type PlatformUpdateSubscriptionPlanBody struct {
 	IsFree *bool `json:"isFree,omitempty"`
 	// PricingModel: "flat" or "per_unit". Omit to leave unchanged.
 	// enums: flat,per_unit
-	PricingModel *string `json:"pricingModel,omitempty" enums:"flat,per_unit"`
+	PricingModel                *string `json:"pricingModel,omitempty" enums:"flat,per_unit"`
+	AnnualPrepayDiscountPercent *int    `json:"annualPrepayDiscountPercent,omitempty"`
+	AnnualPrepayPricePerMonth   *int64  `json:"annualPrepayPricePerMonth,omitempty"`
 }
 
 // UpdateSubscriptionPlan godoc
@@ -1101,6 +1113,14 @@ func (h *PlatformHandler) UpdateSubscriptionPlan(w http.ResponseWriter, r *http.
 		http.Error(w, "price must be 0 when isFree is true", http.StatusBadRequest)
 		return
 	}
+	isFreeForAnnual := plan.IsFree
+	if body.IsFree != nil {
+		isFreeForAnnual = *body.IsFree
+	}
+	if err := subscriptionplan.ValidateAnnualPrepayFields(body.Interval, isFreeForAnnual, body.Price, body.AnnualPrepayDiscountPercent, body.AnnualPrepayPricePerMonth); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	plan.Name = body.Name
 	plan.NameEn = body.NameEn
 	plan.Code = body.Code
@@ -1143,6 +1163,8 @@ func (h *PlatformHandler) UpdateSubscriptionPlan(w http.ResponseWriter, r *http.
 		}
 		plan.LimitsNegotiable = neg
 	}
+	plan.AnnualPrepayDiscountPercent = body.AnnualPrepayDiscountPercent
+	plan.AnnualPrepayPricePerMonth = body.AnnualPrepayPricePerMonth
 	if err := database.DB.Transaction(func(tx *gorm.DB) error {
 		if body.IsPromoted != nil && *body.IsPromoted {
 			if err := tx.Model(&models.SubscriptionPlan{}).Where("id <> ?", id).Update("is_promoted", false).Error; err != nil {

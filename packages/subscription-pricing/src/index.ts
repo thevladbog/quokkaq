@@ -16,3 +16,10 @@ export {
 } from './format-price-minor';
 export { sortPublicSubscriptionPlans } from './plan-order';
 export { subscriptionPlanDisplayName } from './subscription-plan-display-name';
+export {
+  annualPrepayDisplayDiscountPercent,
+  annualPrepayEffectiveMonthlyMinor,
+  annualPrepaySavingsMinorUnits,
+  annualPrepayStripeYearlyUnitAmountMinor,
+  planSupportsAnnualPrepay
+} from './annual-prepay';

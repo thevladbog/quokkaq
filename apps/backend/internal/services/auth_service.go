@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/pkg/tenantslug"
 	"quokkaq-go-backend/internal/repository"
+	"quokkaq-go-backend/internal/subscriptionplan"
 	"quokkaq-go-backend/pkg/database"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -38,6 +40,12 @@ var ErrUserInactive = errors.New("user account is inactive")
 // ErrTenantRBACNotConfigured is returned when TenantRBACRepository was not wired (signup requires it).
 var ErrTenantRBACNotConfigured = errors.New("tenant rbac not configured")
 
+// ErrInvalidSignupBillingPeriod is returned when billingPeriod is not month or annual.
+var ErrInvalidSignupBillingPeriod = errors.New("billingPeriod must be month or annual")
+
+// ErrAnnualBillingNotAvailableForPlan is returned when the client requests annual prepay but the plan has no annual option.
+var ErrAnnualBillingNotAvailableForPlan = errors.New("annual billing is not available for selected plan")
+
 // IsUniqueConstraintViolation reports Postgres unique violations (23505) and similar driver errors.
 func IsUniqueConstraintViolation(err error) bool {
 	if err == nil {
@@ -64,7 +72,7 @@ type AuthService interface {
 	GetMe(userID string) (*models.User, error)
 	RequestPasswordReset(email string) error
 	ResetPassword(token, newPassword string) error
-	Signup(name, email, password, companyName, planCode string, preferredSlug *string, privacyConsentAccepted bool) (*TokenPair, error)
+	Signup(name, email, password, companyName, planCode, billingPeriod string, preferredSlug *string, privacyConsentAccepted bool) (*TokenPair, error)
 	Refresh(refreshToken string) (*TokenPair, error)
 	// IssueTokenPairForUserID issues JWT access+refresh for an existing user (e.g. after SSO).
 	IssueTokenPairForUserID(userID string) (*TokenPair, error)
@@ -282,7 +290,7 @@ func (s *authService) ResetPassword(token, newPassword string) error {
 	return s.userRepo.DeletePasswordResetToken(resetToken.ID)
 }
 
-func (s *authService) Signup(name, email, password, companyName, planCode string, preferredSlug *string, privacyConsentAccepted bool) (*TokenPair, error) {
+func (s *authService) Signup(name, email, password, companyName, planCode, billingPeriod string, preferredSlug *string, privacyConsentAccepted bool) (*TokenPair, error) {
 	if !privacyConsentAccepted {
 		return nil, ErrPrivacyConsentRequired
 	}
@@ -305,6 +313,17 @@ func (s *authService) Signup(name, email, password, companyName, planCode string
 		return nil, fmt.Errorf("invalid plan code: %w", err)
 	}
 
+	bill := strings.TrimSpace(strings.ToLower(billingPeriod))
+	if bill == "" {
+		bill = "month"
+	}
+	if bill != "month" && bill != "annual" {
+		return nil, ErrInvalidSignupBillingPeriod
+	}
+	if bill == "annual" && !subscriptionplan.HasAnnualPrepayConfig(plan) {
+		return nil, ErrAnnualBillingNotAvailableForPlan
+	}
+
 	company := &models.Company{
 		Name:         companyName,
 		BillingEmail: email,
@@ -317,6 +336,13 @@ func (s *authService) Signup(name, email, password, companyName, planCode string
 		CurrentPeriodStart: time.Now(),
 		CurrentPeriodEnd:   trialEnd,
 		TrialEnd:           &trialEnd,
+	}
+	if bill == "annual" {
+		meta, jerr := json.Marshal(map[string]string{"preferredBillingPeriod": "annual"})
+		if jerr != nil {
+			return nil, fmt.Errorf("subscription metadata: %w", jerr)
+		}
+		subscription.Metadata = meta
 	}
 
 	user := &models.User{
@@ -414,7 +440,7 @@ func (s *authService) Signup(name, email, password, companyName, planCode string
 		return nil, err
 	}
 	if s.leadIssues != nil {
-		s.leadIssues.NotifyTrialRegistration(context.Background(), company.Name, company.Slug, name, email, plan.Code)
+		s.leadIssues.NotifyTrialRegistration(context.Background(), company.Name, company.Slug, name, email, plan.Code, bill)
 	}
 	return pair, nil
 }

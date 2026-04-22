@@ -56,8 +56,8 @@ When `NEXT_PUBLIC_GTM_ID` is set, the site loads GTM (see `components/consent/co
 | `marketing_cta_click`          | Trial / tracked CTAs (header, hero, pricing)      |
 | `marketing_nav_click`          | Header / mobile nav anchor links                  |
 | `marketing_mobile_menu_toggle` | Mobile menu open/close (`open` in payload)        |
-| `marketing_lead_open`          | Lead modal or mailto from contact buttons         |
-| `marketing_lead_submit`        | Successful lead form POST (`source`, `plan_code`) |
+| `marketing_lead_open`          | Lead modal or mailto (`source`, `plan_code`, `billing_period`)   |
+| `marketing_lead_submit`        | Successful lead form POST (`source`, `plan_code`, `billing_period`) |
 
 In **Google Tag Manager**, create a Custom Event trigger for `marketing` and branch on the **Data Layer Variable** for `event_name` (or use a single tag with lookup tables).
 

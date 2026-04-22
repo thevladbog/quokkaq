@@ -1226,6 +1226,10 @@ export const SubscriptionPlanSchema = z.object({
    * - "per_unit" – price per active subdivision per billing period
    */
   pricingModel: z.enum(['flat', 'per_unit']).optional().default('flat'),
+  /** 1–100: yearly checkout uses list monthly × 12 × (100 − pct) / 100. Mutually exclusive with annualPrepayPricePerMonth. */
+  annualPrepayDiscountPercent: z.number().int().min(1).max(100).optional(),
+  /** Minor units: effective monthly when billed annually; yearly charge = this × 12. Mutually exclusive with annualPrepayDiscountPercent. */
+  annualPrepayPricePerMonth: z.number().optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional()
 });
