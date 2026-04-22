@@ -13,6 +13,7 @@ import {
   Tooltip,
   Legend
 } from 'recharts';
+import { formatDurationMs } from '@/lib/format-duration-ms';
 import type { ServicesStaffPerformanceResponse } from '@/lib/api/generated/statistics';
 import {
   Card,
@@ -69,17 +70,6 @@ export function StaffOperatorDetailCard({
   const t = useTranslations('statistics');
   const appLocale = useLocale();
   const dateLocale = appLocale.toLowerCase().startsWith('ru') ? ru : enUS;
-
-  const fmtDuration = (ms?: number): string => {
-    if (!ms) return '—';
-    const totalSec = Math.round(ms / 1000);
-    const min = Math.floor(totalSec / 60);
-    const sec = totalSec % 60;
-    return t('duration_format_min_sec', {
-      minutes: min,
-      seconds: sec.toString().padStart(2, '0')
-    });
-  };
 
   const fmtPct = (v?: number): string => {
     if (v === undefined || v === null) return '—';
@@ -138,11 +128,11 @@ export function StaffOperatorDetailCard({
         />
         <KpiTile
           label={t('staff_detail_avg_wait')}
-          value={fmtDuration(data.avgWaitMs)}
+          value={formatDurationMs(data.avgWaitMs, t)}
         />
         <KpiTile
           label={t('staff_detail_avg_service')}
-          value={fmtDuration(data.avgServiceMs)}
+          value={formatDurationMs(data.avgServiceMs, t)}
         />
         <KpiTile
           label={t('staff_detail_sla_wait')}
@@ -270,7 +260,7 @@ export function StaffOperatorDetailCard({
                     yAxisId='right'
                     type='monotone'
                     dataKey='slaWait'
-                    name={`${t('radar_sla_wait')}, %`}
+                    name={t('radar_sla_wait')}
                     stroke={slaWaitColor}
                     strokeWidth={2}
                     dot={false}

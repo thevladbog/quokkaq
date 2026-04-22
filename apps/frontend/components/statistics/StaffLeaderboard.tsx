@@ -1,6 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import { formatDurationMs } from '@/lib/format-duration-ms';
 import type { ServicesStaffPerformanceResponse } from '@/lib/api/generated/statistics';
 import {
   Table,
@@ -73,17 +74,6 @@ export function StaffLeaderboard({
   onSortChange
 }: StaffLeaderboardProps) {
   const t = useTranslations('statistics');
-
-  const fmtDuration = (ms?: number): string => {
-    if (!ms) return '—';
-    const totalSec = Math.round(ms / 1000);
-    const min = Math.floor(totalSec / 60);
-    const sec = totalSec % 60;
-    return t('duration_format_min_sec', {
-      minutes: min,
-      seconds: sec.toString().padStart(2, '0')
-    });
-  };
 
   if (items.length === 0) {
     return (
@@ -158,7 +148,7 @@ export function StaffLeaderboard({
                   {row.userName ?? row.userId ?? '—'}
                 </TableCell>
                 <TableCell>{row.ticketsCompleted ?? 0}</TableCell>
-                <TableCell>{fmtDuration(row.avgServiceMs)}</TableCell>
+                <TableCell>{formatDurationMs(row.avgServiceMs, t)}</TableCell>
                 <TableCell>
                   <span
                     className={cn(

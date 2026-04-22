@@ -27,16 +27,12 @@ func ParseOptional(raw string) (string, error) {
 
 // ParseWithMonthDefault returns "month" for empty input, otherwise the same rules as ParseOptional.
 func ParseWithMonthDefault(raw string) (string, error) {
-	s := strings.ToLower(strings.TrimSpace(raw))
-	if s == "" {
+	result, err := ParseOptional(raw)
+	if err != nil {
+		return "", err
+	}
+	if result == "" {
 		return "month", nil
 	}
-	switch s {
-	case "month", "monthly":
-		return "month", nil
-	case "annual", "yearly", "year":
-		return "annual", nil
-	default:
-		return "", ErrInvalidBillingPeriod
-	}
+	return result, nil
 }

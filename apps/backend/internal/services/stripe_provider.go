@@ -123,6 +123,9 @@ func (p *StripeProvider) CreateCheckoutSession(ctx context.Context, subscription
 	if stripeLine != nil {
 		params.Metadata["checkout_billing_period"] = "annual"
 		params.SubscriptionData.Metadata["checkout_billing_period"] = "annual"
+	} else {
+		params.Metadata["checkout_billing_period"] = "monthly"
+		params.SubscriptionData.Metadata["checkout_billing_period"] = "monthly"
 	}
 
 	sess, err := session.New(params)

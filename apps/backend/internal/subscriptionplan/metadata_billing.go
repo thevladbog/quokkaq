@@ -7,7 +7,8 @@ import (
 
 // MergePreferredBillingFromCheckout merges Stripe checkout billing intent into subscription metadata JSON.
 // When checkoutBillingPeriod is "annual", sets preferredBillingPeriod to "annual" (same key as signup).
-// Other values leave metadata unchanged. Preserves unrelated keys in the JSON object.
+// For any other value, removes/clears the preferredBillingPeriod key from the subscription metadata JSON
+// while preserving unrelated keys in the JSON object.
 func MergePreferredBillingFromCheckout(existing json.RawMessage, checkoutBillingPeriod string) (json.RawMessage, error) {
 	bp := strings.TrimSpace(strings.ToLower(checkoutBillingPeriod))
 	if bp != "annual" {

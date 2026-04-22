@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"quokkaq-go-backend/internal/logger"
 	"quokkaq-go-backend/internal/middleware"
 	"quokkaq-go-backend/internal/models"
 	"quokkaq-go-backend/internal/repository"
@@ -141,7 +142,12 @@ func (h *ServiceHandler) UpdateService(w http.ResponseWriter, r *http.Request) {
 
 	existing, err := h.service.GetServiceByID(id)
 	if err != nil {
-		http.Error(w, "Service not found", http.StatusNotFound)
+		if repository.IsNotFound(err) {
+			http.Error(w, "Service not found", http.StatusNotFound)
+			return
+		}
+		logger.ErrorfCtx(r.Context(), "UpdateService GetServiceByID: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 	merged := *existing

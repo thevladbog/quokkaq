@@ -726,6 +726,20 @@ function ServiceForm({
     }));
   }, []);
 
+  // Helper to check if a service is a descendant of the editing service
+  const isDescendant = useCallback(
+    (candidateId: string, ancestorId: string | undefined): boolean => {
+      if (!ancestorId) return false;
+      let current = services.find((s) => s.id === candidateId);
+      while (current?.parentId) {
+        if (current.parentId === ancestorId) return true;
+        current = services.find((s) => s.id === current?.parentId);
+      }
+      return false;
+    },
+    [services]
+  );
+
   const isDirty = useMemo(
     () => !areServiceFormValuesEqual(formValues, baselineValues),
     [formValues, baselineValues]
@@ -891,13 +905,13 @@ function ServiceForm({
               />
             </div>
             <div className='space-y-2'>
-              <Label htmlFor='description'>
+              <Label htmlFor='descriptionEn'>
                 {tRoot('forms.fields.desc_en')}
               </Label>
               <Input
-                id='description'
-                name='description'
-                value={formValues.description || ''}
+                id='descriptionEn'
+                name='descriptionEn'
+                value={formValues.descriptionEn || ''}
                 onChange={handleInputChange}
               />
             </div>
@@ -1004,7 +1018,12 @@ function ServiceForm({
               {tRoot('forms.fields.no_parent')}
             </SelectItem>
             {services
-              .filter((s) => s.id !== editingService?.id && !s.isLeaf) // Don't show current service as option
+              .filter(
+                (s) =>
+                  s.id !== editingService?.id &&
+                  !s.isLeaf &&
+                  !isDescendant(s.id, editingService?.id)
+              )
               .map((service) => {
                 const parentSvc = service.parentId
                   ? services.find((p) => p.id === service.parentId)

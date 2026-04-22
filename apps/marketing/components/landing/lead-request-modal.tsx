@@ -8,7 +8,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { pushMarketingEvent } from '@/lib/marketing-analytics';
 import {
   postPublicLeadRequest,
-  type HandlersPublicLeadRequestBody
+  type HandlersPublicLeadRequestBody,
+  HandlersPublicLeadRequestBodyBillingPeriod
 } from '@/lib/api/generated/leads';
 import { localePrivacyPath } from '@/lib/locale-paths';
 import type { AppLocale, HomeMessages } from '@/src/messages';
@@ -138,6 +139,12 @@ export function LeadRequestModal({
     }
     setSubmitting(true);
     try {
+      const trimmedBillingPeriod = billingPeriod?.trim();
+      const validBillingPeriod = 
+        trimmedBillingPeriod === 'month' || trimmedBillingPeriod === 'annual'
+          ? (trimmedBillingPeriod as HandlersPublicLeadRequestBodyBillingPeriod)
+          : undefined;
+      
       const body: HandlersPublicLeadRequestBody = {
         name: n,
         email: em,
@@ -150,7 +157,7 @@ export function LeadRequestModal({
             ? `${window.location.pathname}${window.location.search}`
             : '',
         planCode: planCode?.trim() ?? '',
-        billingPeriod: billingPeriod?.trim() ?? '',
+        billingPeriod: validBillingPeriod,
         privacyConsentAccepted: true
       };
       const res = await postPublicLeadRequest(body);

@@ -101,7 +101,7 @@ export function filterServiceTree(
       }
       continue;
     }
-    if (filteredChildren.length > 0 || queryOk) {
+    if (filteredChildren.length > 0 || (queryOk && q)) {
       out.push({ ...node, children: filteredChildren });
     }
   }

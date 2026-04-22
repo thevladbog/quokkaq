@@ -1113,13 +1113,36 @@ func (h *PlatformHandler) UpdateSubscriptionPlan(w http.ResponseWriter, r *http.
 		http.Error(w, "price must be 0 when isFree is true", http.StatusBadRequest)
 		return
 	}
-	isFreeForAnnual := plan.IsFree
+	// Compute the effective plan by applying request onto existing plan
+	effectiveInterval := body.Interval
+	effectiveIsFree := plan.IsFree
+	effectivePrice := plan.Price
 	if body.IsFree != nil {
-		isFreeForAnnual = *body.IsFree
+		effectiveIsFree = *body.IsFree
 	}
-	if err := subscriptionplan.ValidateAnnualPrepayFields(body.Interval, isFreeForAnnual, body.Price, body.AnnualPrepayDiscountPercent, body.AnnualPrepayPricePerMonth); err != nil {
+	if effectiveInterval == "" {
+		effectiveInterval = plan.Interval
+	}
+	if body.Price >= 0 {
+		effectivePrice = body.Price
+	}
+	effectiveAnnualDisc := plan.AnnualPrepayDiscountPercent
+	effectiveAnnualPPM := plan.AnnualPrepayPricePerMonth
+	if body.AnnualPrepayDiscountPercent != nil {
+		effectiveAnnualDisc = body.AnnualPrepayDiscountPercent
+	}
+	if body.AnnualPrepayPricePerMonth != nil {
+		effectiveAnnualPPM = body.AnnualPrepayPricePerMonth
+	}
+	// Validate the effective plan
+	if err := subscriptionplan.ValidateAnnualPrepayFields(effectiveInterval, effectiveIsFree, effectivePrice, effectiveAnnualDisc, effectiveAnnualPPM); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
+	}
+	// Clear incompatible annual-prepay fields when conditions change
+	if effectiveInterval != "month" || effectiveIsFree || effectivePrice <= 0 {
+		effectiveAnnualDisc = nil
+		effectiveAnnualPPM = nil
 	}
 	plan.Name = body.Name
 	plan.NameEn = body.NameEn
@@ -1163,12 +1186,9 @@ func (h *PlatformHandler) UpdateSubscriptionPlan(w http.ResponseWriter, r *http.
 		}
 		plan.LimitsNegotiable = neg
 	}
-	if body.AnnualPrepayDiscountPercent != nil {
-		plan.AnnualPrepayDiscountPercent = body.AnnualPrepayDiscountPercent
-	}
-	if body.AnnualPrepayPricePerMonth != nil {
-		plan.AnnualPrepayPricePerMonth = body.AnnualPrepayPricePerMonth
-	}
+	// Persist the cleaned effective annual prepay fields
+	plan.AnnualPrepayDiscountPercent = effectiveAnnualDisc
+	plan.AnnualPrepayPricePerMonth = effectiveAnnualPPM
 	if err := database.DB.Transaction(func(tx *gorm.DB) error {
 		if body.IsPromoted != nil && *body.IsPromoted {
 			if err := tx.Model(&models.SubscriptionPlan{}).Where("id <> ?", id).Update("is_promoted", false).Error; err != nil {

@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import type { SlaAlertPayload } from '@/hooks/use-sla-alerts';
+import { formatSlaDuration } from '@/lib/format-sla-duration';
 
 interface SlaAlertBannerProps {
   alerts: SlaAlertPayload[];
@@ -22,17 +23,6 @@ function SlaAlertRow({
 }) {
   const t = useTranslations('supervisor.dashboardUi.sla');
   const tStats = useTranslations('statistics');
-
-  const formatMinutes = (seconds: number): string => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return s === 0
-      ? `${m}${tStats('minutes_short')}`
-      : tStats('duration_format_min_sec', {
-          minutes: m,
-          seconds: s.toString().padStart(2, '0')
-        });
-  };
 
   const isBreach = alert.thresholdPct >= 100;
   const alertType = alert.alertType ?? 'wait';
@@ -62,8 +52,8 @@ function SlaAlertRow({
           {alert.serviceName}
         </span>
         <span className='text-muted-foreground shrink-0 text-xs'>
-          {formatMinutes(alert.elapsedSec)} /{' '}
-          {formatMinutes(alert.maxWaitTimeSec)}
+          {formatSlaDuration(alert.elapsedSec, tStats)} /{' '}
+          {formatSlaDuration(alert.maxWaitTimeSec, tStats)}
         </span>
         <Badge
           variant={isBreach ? 'destructive' : 'secondary'}

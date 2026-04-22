@@ -678,7 +678,8 @@ export const useAuth = () => {
   };
 };
 
-// Helper function to remove empty values (undefined, null, or empty strings)
+// Helper function to remove empty values (undefined or empty strings)
+// Preserves explicit null values to support clearing fields via PATCH semantics
 const filterEmptyValues = <T extends Record<string, unknown>>(
   obj: T
 ): Partial<T> => {
@@ -687,8 +688,8 @@ const filterEmptyValues = <T extends Record<string, unknown>>(
   Object.keys(obj).forEach((key) => {
     const k = key as keyof T;
     const value = obj[k];
-    // Only include values that are not null, undefined, or empty strings
-    if (value !== null && value !== undefined && value !== '') {
+    // Include null values (to clear fields), exclude undefined and empty strings
+    if (value !== undefined && value !== '') {
       filtered[k] = value;
     }
   });
@@ -705,25 +706,11 @@ export const useCreateService = () => {
       const filteredData = filterEmptyValues(
         serviceData as Record<string, unknown>
       ) as Omit<Service, 'id'>;
-      if (
-        Object.prototype.hasOwnProperty.call(
-          serviceData,
-          'restrictedServiceZoneId'
-        )
-      ) {
-        const z = serviceData.restrictedServiceZoneId;
-        filteredData.restrictedServiceZoneId =
-          z === undefined ||
-          z === null ||
-          (typeof z === 'string' && z.trim() === '')
-            ? null
-            : z;
-      }
       return servicesApi.create(filteredData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
-      queryClient.invalidateQueries({ queryKey: ['units'] });
+      queryClient.invalidateQueries({ queryKey: getGetUnitsQueryKey() });
     }
   });
 };
@@ -755,25 +742,11 @@ export const useUpdateService = () => {
       const filteredData = filterEmptyValues(
         serviceData as Record<string, unknown>
       ) as Partial<Omit<Service, 'id'>>;
-      if (
-        Object.prototype.hasOwnProperty.call(
-          serviceData,
-          'restrictedServiceZoneId'
-        )
-      ) {
-        const z = serviceData.restrictedServiceZoneId;
-        filteredData.restrictedServiceZoneId =
-          z === undefined ||
-          z === null ||
-          (typeof z === 'string' && z.trim() === '')
-            ? null
-            : z;
-      }
       return servicesApi.update(id, filteredData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
-      queryClient.invalidateQueries({ queryKey: ['units'] });
+      queryClient.invalidateQueries({ queryKey: getGetUnitsQueryKey() });
     }
   });
 };
@@ -785,7 +758,7 @@ export const useDeleteService = () => {
     mutationFn: ({ id }: { id: string }) => servicesApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
-      queryClient.invalidateQueries({ queryKey: ['units'] });
+      queryClient.invalidateQueries({ queryKey: getGetUnitsQueryKey() });
     }
   });
 };

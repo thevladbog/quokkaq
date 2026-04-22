@@ -14,7 +14,7 @@ export function planSupportsAnnualPrepay(plan: SubscriptionPlan): boolean {
     return Number.isInteger(d) && d >= 1 && d <= 100;
   }
   if (m != null) {
-    return Number.isFinite(m) && m > 0;
+    return Number.isInteger(m) && m > 0;
   }
   return false;
 }
@@ -28,7 +28,7 @@ export function annualPrepayStripeYearlyUnitAmountMinor(
   }
   const ppm = plan.annualPrepayPricePerMonth;
   if (ppm != null) {
-    return Math.trunc(ppm * 12);
+    return ppm * 12;
   }
   const pct = plan.annualPrepayDiscountPercent;
   if (pct == null) {

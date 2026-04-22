@@ -88,13 +88,13 @@ export function SupervisorShiftDashboard({
             <p className='text-muted-foreground'>{unitName ?? '…'}</p>
           </div>
           <div className='flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-end'>
-            <Button variant='outline' asChild className='h-8 shrink-0'>
+            <Button variant='outline' asChild className='h-9 shrink-0'>
               <Link href='/staff/support'>
                 <Bug className='mr-2 h-4 w-4' aria-hidden />
                 {tStaffSupport('sidebarSupport')}
               </Link>
             </Button>
-            <TabsList className='grid h-8 w-full grid-cols-3 sm:inline-flex sm:w-auto'>
+            <TabsList className='grid h-9 w-full grid-cols-3 sm:inline-flex sm:w-auto'>
               <TabsTrigger value='live' className='h-full'>
                 {t('viewLive')}
               </TabsTrigger>
@@ -107,7 +107,7 @@ export function SupervisorShiftDashboard({
             </TabsList>
             <Button
               variant='destructive'
-              className='h-8 shrink-0'
+              className='h-9 shrink-0'
               onClick={onEod}
               disabled={eodPending}
             >
