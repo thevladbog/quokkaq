@@ -637,6 +637,15 @@ func (h *UnitHandler) UpdateUnit(w http.ResponseWriter, r *http.Request) {
 		existingUnit.SortOrder = so
 	}
 
+	if v, ok := raw["skillBasedRoutingEnabled"]; ok {
+		var enabled bool
+		if err := json.Unmarshal(v, &enabled); err != nil {
+			http.Error(w, "invalid skillBasedRoutingEnabled", http.StatusBadRequest)
+			return
+		}
+		existingUnit.SkillBasedRoutingEnabled = enabled
+	}
+
 	if err := h.service.UpdateUnit(existingUnit); err != nil {
 		switch {
 		case errors.Is(err, services.ErrInvalidUnitKind), errors.Is(err, services.ErrInvalidParentKind):

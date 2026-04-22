@@ -2256,6 +2256,42 @@ ALTER TABLE tickets
 		return fmt.Errorf("failed to run v1.6.4_ticket_visitor_token migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.7.0_skill_based_routing", func(db *gorm.DB) error {
+		// Add skill_based_routing_enabled to units and create operator_skills table.
+		if err := db.Exec(`
+ALTER TABLE units
+    ADD COLUMN IF NOT EXISTS skill_based_routing_enabled boolean NOT NULL DEFAULT false;
+`).Error; err != nil {
+			return err
+		}
+		return db.Exec(`
+CREATE TABLE IF NOT EXISTS operator_skills (
+    id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    unit_id text NOT NULL REFERENCES units(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    user_id text NOT NULL REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    service_id text NOT NULL REFERENCES services(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    priority int NOT NULL DEFAULT 1,
+    CONSTRAINT uniq_op_skill UNIQUE (unit_id, user_id, service_id)
+);
+CREATE INDEX IF NOT EXISTS idx_operator_skills_unit_user ON operator_skills (unit_id, user_id);
+`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.7.0_skill_based_routing migration: %w", err)
+	}
+
+	err = manager.RunMigration("v1.7.1_ticket_served_by_user_id", func(db *gorm.DB) error {
+		// Add served_by_user_id to tickets: records the operator (counter.assigned_to at call time).
+		// Enables accurate per-operator CSAT aggregation and staff performance analytics.
+		return db.Exec(`
+ALTER TABLE tickets
+    ADD COLUMN IF NOT EXISTS served_by_user_id text;
+`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.7.1_ticket_served_by_user_id migration: %w", err)
+	}
+
 	fmt.Println("✅ All migrations completed successfully")
 	return nil
 }

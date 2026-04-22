@@ -79,6 +79,8 @@ type UserRepository interface {
 	ShiftJournalSeesAllActivity(userID, unitID string) (bool, error)
 	// HasUnitBranchAccess is true for tenant admin, or if the user has any user_units row for the subdivision or a descendant unit in the org tree.
 	HasUnitBranchAccess(userID, subdivisionID string) (bool, error)
+	// CountUsersWithMembershipInUnitBranch returns how many distinct userIDs have a user_units row for unitID or any descendant unit.
+	CountUsersWithMembershipInUnitBranch(unitID string, userIDs []string) (int64, error)
 	// UserHasEffectiveAccess is true if the user can log in / act: global admin or platform_admin, tenant roles, company owner, or any unit with non-empty permissions.
 	UserHasEffectiveAccess(userID string) (bool, error)
 	// RecomputeUserIsActive sets users.is_active from UserHasEffectiveAccess (call after access-changing operations).
@@ -642,6 +644,23 @@ WHERE uu.user_id = ? AND uu.unit_id IN (SELECT id FROM branch)
 		return false, err
 	}
 	return n > 0, nil
+}
+
+func (r *userRepository) CountUsersWithMembershipInUnitBranch(unitID string, userIDs []string) (int64, error) {
+	if unitID == "" || len(userIDs) == 0 {
+		return 0, nil
+	}
+	var n int64
+	err := r.db.Raw(`
+WITH RECURSIVE branch AS (
+  SELECT id FROM units WHERE id = ?
+  UNION ALL
+  SELECT u.id FROM units u INNER JOIN branch b ON u.parent_id = b.id
+)
+SELECT COUNT(DISTINCT uu.user_id) FROM user_units uu
+WHERE uu.user_id IN ? AND uu.unit_id IN (SELECT id FROM branch)
+`, unitID, userIDs).Scan(&n).Error
+	return n, err
 }
 
 func escapeSQLLikePattern(s string) string {

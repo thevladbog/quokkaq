@@ -54,14 +54,15 @@ type CounterService interface {
 }
 
 type counterService struct {
-	repo         repository.CounterRepository
-	ticketRepo   repository.TicketRepository
-	serviceRepo  repository.ServiceRepository
-	userRepo     repository.UserRepository
-	unitRepo     repository.UnitRepository
-	intervalRepo repository.OperatorIntervalRepository
-	hub          *ws.Hub
-	quota        QuotaService
+	repo              repository.CounterRepository
+	ticketRepo        repository.TicketRepository
+	serviceRepo       repository.ServiceRepository
+	userRepo          repository.UserRepository
+	unitRepo          repository.UnitRepository
+	intervalRepo      repository.OperatorIntervalRepository
+	operatorSkillRepo repository.OperatorSkillRepository
+	hub               *ws.Hub
+	quota             QuotaService
 }
 
 func NewCounterService(
@@ -71,16 +72,18 @@ func NewCounterService(
 	userRepo repository.UserRepository,
 	intervalRepo repository.OperatorIntervalRepository,
 	unitRepo repository.UnitRepository,
+	operatorSkillRepo repository.OperatorSkillRepository,
 	hub *ws.Hub,
 ) CounterService {
 	return &counterService{
-		repo:         repo,
-		ticketRepo:   ticketRepo,
-		serviceRepo:  serviceRepo,
-		userRepo:     userRepo,
-		unitRepo:     unitRepo,
-		intervalRepo: intervalRepo,
-		hub:          hub,
+		repo:              repo,
+		ticketRepo:        ticketRepo,
+		serviceRepo:       serviceRepo,
+		userRepo:          userRepo,
+		unitRepo:          unitRepo,
+		intervalRepo:      intervalRepo,
+		operatorSkillRepo: operatorSkillRepo,
+		hub:               hub,
 	}
 }
 
@@ -92,18 +95,20 @@ func NewCounterServiceWithQuota(
 	userRepo repository.UserRepository,
 	intervalRepo repository.OperatorIntervalRepository,
 	unitRepo repository.UnitRepository,
+	operatorSkillRepo repository.OperatorSkillRepository,
 	hub *ws.Hub,
 	quota QuotaService,
 ) CounterService {
 	return &counterService{
-		repo:         repo,
-		ticketRepo:   ticketRepo,
-		serviceRepo:  serviceRepo,
-		userRepo:     userRepo,
-		unitRepo:     unitRepo,
-		intervalRepo: intervalRepo,
-		hub:          hub,
-		quota:        quota,
+		repo:              repo,
+		ticketRepo:        ticketRepo,
+		serviceRepo:       serviceRepo,
+		userRepo:          userRepo,
+		unitRepo:          unitRepo,
+		intervalRepo:      intervalRepo,
+		operatorSkillRepo: operatorSkillRepo,
+		hub:               hub,
+		quota:             quota,
 	}
 }
 
@@ -463,16 +468,12 @@ func (s *counterService) CallNext(counterID string, serviceIDs []string, actorUs
 		}
 	}
 
-	ticket, err := s.ticketRepo.FindWaiting(counter.UnitID, serviceIDs, counter.ServiceZoneID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrNoWaitingTickets
-		}
-		return nil, err
-	}
-
-	fromStatus := ticket.Status
+	var ticket *models.Ticket
 	now := time.Now()
+	var fromStatus string
+	var skillRoutingMiss bool
+	var missUserID string
+	var missSkillIDs []string
 
 	err = s.ticketRepo.Transaction(func(tx *gorm.DB) error {
 		c, err := s.repo.FindByIDForUpdateTx(tx, counterID)
@@ -482,16 +483,20 @@ func (s *counterService) CallNext(counterID string, serviceIDs []string, actorUs
 		if c.OnBreak {
 			return ErrCounterOnBreak
 		}
-		t, err := s.ticketRepo.FindByIDForUpdateTx(tx, ticket.ID)
+		t, missed, userID, skillIDs, err := s.findNextTicketForCounterTx(tx, counter.UnitID, serviceIDs, c)
 		if err != nil {
 			return err
 		}
-		if t.Status != "waiting" {
-			return ErrNoWaitingTickets
-		}
+		skillRoutingMiss = missed
+		missUserID = userID
+		missSkillIDs = skillIDs
+		fromStatus = t.Status
 		t.Status = "called"
 		t.CounterID = &counterID
 		t.CalledAt = &now
+		if c.AssignedTo != nil {
+			t.ServedByUserID = c.AssignedTo
+		}
 		if err := s.ticketRepo.UpdateTx(tx, t); err != nil {
 			return err
 		}
@@ -532,5 +537,61 @@ func (s *counterService) CallNext(counterID string, serviceIDs []string, actorUs
 	}
 	s.hydrateBreakStartedAt(updatedCounter)
 	s.broadcastCounterUpdated(updatedCounter)
+	if skillRoutingMiss && s.hub != nil {
+		s.hub.BroadcastEvent("unit.skill_routing_miss", map[string]interface{}{
+			"unitId":          counter.UnitID,
+			"userId":          missUserID,
+			"skillServiceIds": missSkillIDs,
+			"counterId":       counterID,
+		}, counter.UnitID)
+	}
 	return ticket, nil
+}
+
+// findNextTicketForCounterTx selects the best waiting ticket for a counter operator within a transaction.
+// When skill-based routing is active for the unit and the counter has an assigned operator with skills,
+// it tries to pick the best skill-matched ticket first; falls back to FIFO when no match is found.
+// Returns: ticket, skillRoutingMiss, missUserID, missSkillIDs, error.
+func (s *counterService) findNextTicketForCounterTx(tx *gorm.DB, unitID string, serviceIDs []string, c *models.Counter) (*models.Ticket, bool, string, []string, error) {
+	if s.operatorSkillRepo != nil && c.AssignedTo != nil {
+		unit, err := s.unitRepo.FindByIDLight(unitID)
+		if err != nil {
+			return nil, false, "", nil, err
+		}
+		if unit.SkillBasedRoutingEnabled {
+			skillIDs, serr := s.operatorSkillRepo.ListSkillServiceIDsForOperator(unitID, *c.AssignedTo)
+			if serr != nil {
+				return nil, false, "", nil, serr
+			}
+			if len(skillIDs) > 0 {
+				filtered := filterSkillIDsByServiceFilter(skillIDs, serviceIDs)
+				if len(filtered) > 0 {
+					t, err := s.ticketRepo.FindWaitingWithSkillsTx(tx, unitID, filtered, c.ServiceZoneID)
+					if err == nil {
+						return t, false, "", nil, nil
+					}
+					if !errors.Is(err, gorm.ErrRecordNotFound) {
+						return nil, false, "", nil, err
+					}
+					// No skill-matched ticket — fall through to FIFO and signal miss.
+					t, ferr := s.ticketRepo.FindWaitingForUpdateTx(tx, unitID, serviceIDs, c.ServiceZoneID)
+					if ferr != nil {
+						if errors.Is(ferr, gorm.ErrRecordNotFound) {
+							return nil, false, "", nil, ErrNoWaitingTickets
+						}
+						return nil, false, "", nil, ferr
+					}
+					return t, true, *c.AssignedTo, filtered, nil
+				}
+			}
+		}
+	}
+	t, err := s.ticketRepo.FindWaitingForUpdateTx(tx, unitID, serviceIDs, c.ServiceZoneID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, false, "", nil, ErrNoWaitingTickets
+		}
+		return nil, false, "", nil, err
+	}
+	return t, false, "", nil, nil
 }

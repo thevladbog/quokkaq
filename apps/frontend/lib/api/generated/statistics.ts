@@ -207,6 +207,9 @@ export interface ModelsUnit {
   parentId?: string;
   preRegistrations?: ModelsPreRegistration[];
   services?: ModelsService[];
+  /** SkillBasedRoutingEnabled activates operator-service skill matching when calling the next ticket.
+  When false (default) the system uses standard FIFO priority routing. */
+  skillBasedRoutingEnabled?: boolean;
   slotConfig?: ModelsSlotConfig;
   sortOrder?: number;
   tickets?: ModelsTicket[];
@@ -299,6 +302,8 @@ export interface ModelsTicket {
   queuePosition?: number;
   /** ServedByName is hydrated for client visit lists from ticket_histories (not stored on tickets). */
   servedByName?: string;
+  /** ServedByUserID is set when a ticket is called/picked; records the operator (counter.AssignedTo at call time). */
+  servedByUserId?: string;
   service?: ModelsService;
   serviceId?: string;
   /** ServiceZoneID: waiting pool within the subdivision; NULL = subdivision-wide pool. */
@@ -1037,6 +1042,20 @@ export interface HandlersAddSupportReportShareRequest {
   userId?: string;
 }
 
+export interface HandlersOperatorSkillInput {
+  /**
+     * @minimum 1
+     * @maximum 3
+     */
+  priority: number;
+  serviceId: string;
+  userId: string;
+}
+
+export interface HandlersBulkUpsertSkillsRequest {
+  skills: HandlersOperatorSkillInput[];
+}
+
 /**
  * PricingModel determines how the price field is interpreted.
 Default: "per_unit".
@@ -1660,6 +1679,16 @@ export interface ModelsMessageTemplate {
   updatedAt?: string;
 }
 
+export interface ModelsOperatorSkill {
+  id?: string;
+  /** Priority: 1 = primary, 2 = secondary, 3 = backup.
+  Lower value = higher precedence when selecting the next ticket for this operator. */
+  priority?: number;
+  serviceId?: string;
+  unitId?: string;
+  userId?: string;
+}
+
 export interface ModelsPreRegCalendarSlotItem {
   calendarIntegrationId?: string;
   externalEventEtag?: string;
@@ -1957,6 +1986,14 @@ export interface ServicesCreateCalendarIntegrationRequest {
   username: string;
 }
 
+export interface ServicesDailyStaffingSummary {
+  avgRecommendedStaff?: number;
+  maxRecommendedStaff?: number;
+  peakArrivals?: number;
+  peakHour?: number;
+  totalExpectedArrivals?: number;
+}
+
 export interface ServicesDeploymentSaaSSettingsPatch {
   leadsTrackerQueue?: string;
   /** full credential (write-only; never returned in GET) */
@@ -2019,6 +2056,19 @@ export interface ServicesGuestSurveySession {
   idleScreen?: ServicesGuestSurveySessionIdleScreen;
   survey?: ServicesGuestSurveySessionSurvey;
   unitConfig?: ServicesGuestSurveySessionUnitConfig;
+}
+
+export interface ServicesHourlyStaffingForecast {
+  /** avg handle time in minutes */
+  avgServiceTimeMin?: number;
+  /** avg tickets expected this hour */
+  expectedArrivals?: number;
+  /** Erlang C P(wait≤target) with recommended agents */
+  expectedSlaPct?: number;
+  /** 0–23 */
+  hour?: number;
+  /** minimum agents to meet SLA */
+  recommendedStaff?: number;
 }
 
 export interface ServicesLoadPoint {
@@ -2159,6 +2209,59 @@ export interface ServicesSlaSummaryResponse {
   slaWaitMet?: number;
   slaWaitTotal?: number;
   withinPct?: number;
+}
+
+export interface ServicesStaffDailyTrendPoint {
+  avgServiceMs?: number;
+  date?: string;
+  slaServicePct?: number;
+  slaWaitPct?: number;
+  ticketsCompleted?: number;
+}
+
+export interface ServicesStaffPerformanceResponse {
+  avgServiceMs?: number;
+  avgWaitMs?: number;
+  computedAt?: string;
+  /** CSAT */
+  csatAvg?: number;
+  csatCount?: number;
+  /** 0–100, derived from csatAvg */
+  csatNorm?: number;
+  /** Daily trend (only populated in detail mode) */
+  dailyTrend?: ServicesStaffDailyTrendPoint[];
+  noShowCount?: number;
+  slaService?: number;
+  slaServiceMet?: number;
+  slaServiceTotal?: number;
+  /** Normalized radar axes (0–100) */
+  slaWait?: number;
+  slaWaitMet?: number;
+  slaWaitTotal?: number;
+  /** Absolute metrics */
+  ticketsCompleted?: number;
+  ticketsCreated?: number;
+  ticketsPerHour?: number;
+  totalBreakMin?: number;
+  totalIdleMin?: number;
+  totalServiceMin?: number;
+  userId?: string;
+  userName?: string;
+  utilizationPct?: number;
+}
+
+export interface ServicesStaffPerformanceListResponse {
+  items?: ServicesStaffPerformanceResponse[];
+}
+
+export interface ServicesStaffingForecastResponse {
+  dailySummary?: ServicesDailyStaffingSummary;
+  dayOfWeek?: string;
+  hourlyForecasts?: ServicesHourlyStaffingForecast[];
+  targetDate?: string;
+  targetMaxWaitMin?: number;
+  targetSlaPct?: number;
+  unitId?: string;
 }
 
 export interface ServicesSupportReportCommentItem {
@@ -2436,6 +2539,55 @@ serviceZoneId?: string;
  * Business service id; omit for all services in scope
  */
 serviceId?: string;
+};
+
+export type GetUnitStatisticsStaffPerformanceListParams = {
+/**
+ * YYYY-MM-DD
+ */
+dateFrom: string;
+/**
+ * YYYY-MM-DD
+ */
+dateTo: string;
+/**
+ * Sort field: ticketsCompleted|avgServiceMs|slaWait|csatAvg|utilizationPct
+ */
+sort?: string;
+/**
+ * Sort order: desc|asc
+ */
+order?: string;
+};
+
+export type GetUnitStatisticsStaffPerformanceDetailParams = {
+/**
+ * YYYY-MM-DD
+ */
+dateFrom: string;
+/**
+ * YYYY-MM-DD
+ */
+dateTo: string;
+};
+
+export type GetUnitStatisticsStaffingForecastParams = {
+/**
+ * Target date YYYY-MM-DD (defaults to tomorrow)
+ */
+targetDate?: string;
+/**
+ * Target SLA percent, e.g. 90 (default)
+ */
+targetSlaPct?: number;
+/**
+ * Target max wait time in minutes (default 5)
+ */
+targetMaxWaitMin?: number;
+/**
+ * Number of past same-weekday samples (default 4)
+ */
+lookbackWeeks?: number;
 };
 
 export type GetUnitStatisticsSurveyScoresParams = {
@@ -3791,6 +3943,487 @@ export function useGetUnitStatisticsSlaSummary<TData = Awaited<ReturnType<typeof
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetUnitStatisticsSlaSummaryQueryOptions(unitId,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * Returns aggregated performance metrics per operator from StatisticsDailyBucket, CounterOperatorInterval, and Survey data. Requires advanced_reports plan feature. Expanded scope returns all operators; non-expanded returns only the caller.
+ * @summary Staff performance leaderboard — all operators for a date range
+ */
+export type getUnitStatisticsStaffPerformanceListResponse200 = {
+  data: ServicesStaffPerformanceListResponse
+  status: 200
+}
+
+export type getUnitStatisticsStaffPerformanceListResponse400 = {
+  data: string
+  status: 400
+}
+
+export type getUnitStatisticsStaffPerformanceListResponse401 = {
+  data: string
+  status: 401
+}
+
+export type getUnitStatisticsStaffPerformanceListResponse403 = {
+  data: string
+  status: 403
+}
+
+export type getUnitStatisticsStaffPerformanceListResponse404 = {
+  data: string
+  status: 404
+}
+
+export type getUnitStatisticsStaffPerformanceListResponse500 = {
+  data: string
+  status: 500
+}
+
+export type getUnitStatisticsStaffPerformanceListResponseSuccess = (getUnitStatisticsStaffPerformanceListResponse200) & {
+  headers: Headers;
+};
+export type getUnitStatisticsStaffPerformanceListResponseError = (getUnitStatisticsStaffPerformanceListResponse400 | getUnitStatisticsStaffPerformanceListResponse401 | getUnitStatisticsStaffPerformanceListResponse403 | getUnitStatisticsStaffPerformanceListResponse404 | getUnitStatisticsStaffPerformanceListResponse500) & {
+  headers: Headers;
+};
+
+export type getUnitStatisticsStaffPerformanceListResponse = (getUnitStatisticsStaffPerformanceListResponseSuccess | getUnitStatisticsStaffPerformanceListResponseError)
+
+export const getGetUnitStatisticsStaffPerformanceListUrl = (unitId: string,
+    params: GetUnitStatisticsStaffPerformanceListParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/units/${unitId}/statistics/staff-performance?${stringifiedParams}` : `/units/${unitId}/statistics/staff-performance`
+}
+
+export const getUnitStatisticsStaffPerformanceList = async (unitId: string,
+    params: GetUnitStatisticsStaffPerformanceListParams, options?: RequestInit): Promise<getUnitStatisticsStaffPerformanceListResponse> => {
+
+  return orvalMutator<getUnitStatisticsStaffPerformanceListResponse>(getGetUnitStatisticsStaffPerformanceListUrl(unitId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetUnitStatisticsStaffPerformanceListQueryKey = (unitId: string,
+    params?: GetUnitStatisticsStaffPerformanceListParams,) => {
+    return [
+    `/units/${unitId}/statistics/staff-performance`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetUnitStatisticsStaffPerformanceListQueryOptions = <TData = Awaited<ReturnType<typeof getUnitStatisticsStaffPerformanceList>>, TError = string>(unitId: string,
+    params: GetUnitStatisticsStaffPerformanceListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsStaffPerformanceList>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetUnitStatisticsStaffPerformanceListQueryKey(unitId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUnitStatisticsStaffPerformanceList>>> = ({ signal }) => getUnitStatisticsStaffPerformanceList(unitId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsStaffPerformanceList>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetUnitStatisticsStaffPerformanceListQueryResult = NonNullable<Awaited<ReturnType<typeof getUnitStatisticsStaffPerformanceList>>>
+export type GetUnitStatisticsStaffPerformanceListQueryError = string
+
+
+export function useGetUnitStatisticsStaffPerformanceList<TData = Awaited<ReturnType<typeof getUnitStatisticsStaffPerformanceList>>, TError = string>(
+ unitId: string,
+    params: GetUnitStatisticsStaffPerformanceListParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsStaffPerformanceList>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getUnitStatisticsStaffPerformanceList>>,
+          TError,
+          Awaited<ReturnType<typeof getUnitStatisticsStaffPerformanceList>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetUnitStatisticsStaffPerformanceList<TData = Awaited<ReturnType<typeof getUnitStatisticsStaffPerformanceList>>, TError = string>(
+ unitId: string,
+    params: GetUnitStatisticsStaffPerformanceListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsStaffPerformanceList>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getUnitStatisticsStaffPerformanceList>>,
+          TError,
+          Awaited<ReturnType<typeof getUnitStatisticsStaffPerformanceList>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetUnitStatisticsStaffPerformanceList<TData = Awaited<ReturnType<typeof getUnitStatisticsStaffPerformanceList>>, TError = string>(
+ unitId: string,
+    params: GetUnitStatisticsStaffPerformanceListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsStaffPerformanceList>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Staff performance leaderboard — all operators for a date range
+ */
+
+export function useGetUnitStatisticsStaffPerformanceList<TData = Awaited<ReturnType<typeof getUnitStatisticsStaffPerformanceList>>, TError = string>(
+ unitId: string,
+    params: GetUnitStatisticsStaffPerformanceListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsStaffPerformanceList>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetUnitStatisticsStaffPerformanceListQueryOptions(unitId,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * Returns detailed performance metrics for a single operator including a day-by-day trend. Requires advanced_reports plan feature.
+ * @summary Staff performance detail — single operator with daily trend
+ */
+export type getUnitStatisticsStaffPerformanceDetailResponse200 = {
+  data: ServicesStaffPerformanceResponse
+  status: 200
+}
+
+export type getUnitStatisticsStaffPerformanceDetailResponse400 = {
+  data: string
+  status: 400
+}
+
+export type getUnitStatisticsStaffPerformanceDetailResponse401 = {
+  data: string
+  status: 401
+}
+
+export type getUnitStatisticsStaffPerformanceDetailResponse403 = {
+  data: string
+  status: 403
+}
+
+export type getUnitStatisticsStaffPerformanceDetailResponse404 = {
+  data: string
+  status: 404
+}
+
+export type getUnitStatisticsStaffPerformanceDetailResponse500 = {
+  data: string
+  status: 500
+}
+
+export type getUnitStatisticsStaffPerformanceDetailResponseSuccess = (getUnitStatisticsStaffPerformanceDetailResponse200) & {
+  headers: Headers;
+};
+export type getUnitStatisticsStaffPerformanceDetailResponseError = (getUnitStatisticsStaffPerformanceDetailResponse400 | getUnitStatisticsStaffPerformanceDetailResponse401 | getUnitStatisticsStaffPerformanceDetailResponse403 | getUnitStatisticsStaffPerformanceDetailResponse404 | getUnitStatisticsStaffPerformanceDetailResponse500) & {
+  headers: Headers;
+};
+
+export type getUnitStatisticsStaffPerformanceDetailResponse = (getUnitStatisticsStaffPerformanceDetailResponseSuccess | getUnitStatisticsStaffPerformanceDetailResponseError)
+
+export const getGetUnitStatisticsStaffPerformanceDetailUrl = (unitId: string,
+    userId: string,
+    params: GetUnitStatisticsStaffPerformanceDetailParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/units/${unitId}/statistics/staff-performance/${userId}?${stringifiedParams}` : `/units/${unitId}/statistics/staff-performance/${userId}`
+}
+
+export const getUnitStatisticsStaffPerformanceDetail = async (unitId: string,
+    userId: string,
+    params: GetUnitStatisticsStaffPerformanceDetailParams, options?: RequestInit): Promise<getUnitStatisticsStaffPerformanceDetailResponse> => {
+
+  return orvalMutator<getUnitStatisticsStaffPerformanceDetailResponse>(getGetUnitStatisticsStaffPerformanceDetailUrl(unitId,userId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetUnitStatisticsStaffPerformanceDetailQueryKey = (unitId: string,
+    userId: string,
+    params?: GetUnitStatisticsStaffPerformanceDetailParams,) => {
+    return [
+    `/units/${unitId}/statistics/staff-performance/${userId}`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetUnitStatisticsStaffPerformanceDetailQueryOptions = <TData = Awaited<ReturnType<typeof getUnitStatisticsStaffPerformanceDetail>>, TError = string>(unitId: string,
+    userId: string,
+    params: GetUnitStatisticsStaffPerformanceDetailParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsStaffPerformanceDetail>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetUnitStatisticsStaffPerformanceDetailQueryKey(unitId,userId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUnitStatisticsStaffPerformanceDetail>>> = ({ signal }) => getUnitStatisticsStaffPerformanceDetail(unitId,userId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(unitId && userId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsStaffPerformanceDetail>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetUnitStatisticsStaffPerformanceDetailQueryResult = NonNullable<Awaited<ReturnType<typeof getUnitStatisticsStaffPerformanceDetail>>>
+export type GetUnitStatisticsStaffPerformanceDetailQueryError = string
+
+
+export function useGetUnitStatisticsStaffPerformanceDetail<TData = Awaited<ReturnType<typeof getUnitStatisticsStaffPerformanceDetail>>, TError = string>(
+ unitId: string,
+    userId: string,
+    params: GetUnitStatisticsStaffPerformanceDetailParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsStaffPerformanceDetail>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getUnitStatisticsStaffPerformanceDetail>>,
+          TError,
+          Awaited<ReturnType<typeof getUnitStatisticsStaffPerformanceDetail>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetUnitStatisticsStaffPerformanceDetail<TData = Awaited<ReturnType<typeof getUnitStatisticsStaffPerformanceDetail>>, TError = string>(
+ unitId: string,
+    userId: string,
+    params: GetUnitStatisticsStaffPerformanceDetailParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsStaffPerformanceDetail>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getUnitStatisticsStaffPerformanceDetail>>,
+          TError,
+          Awaited<ReturnType<typeof getUnitStatisticsStaffPerformanceDetail>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetUnitStatisticsStaffPerformanceDetail<TData = Awaited<ReturnType<typeof getUnitStatisticsStaffPerformanceDetail>>, TError = string>(
+ unitId: string,
+    userId: string,
+    params: GetUnitStatisticsStaffPerformanceDetailParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsStaffPerformanceDetail>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Staff performance detail — single operator with daily trend
+ */
+
+export function useGetUnitStatisticsStaffPerformanceDetail<TData = Awaited<ReturnType<typeof getUnitStatisticsStaffPerformanceDetail>>, TError = string>(
+ unitId: string,
+    userId: string,
+    params: GetUnitStatisticsStaffPerformanceDetailParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsStaffPerformanceDetail>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetUnitStatisticsStaffPerformanceDetailQueryOptions(unitId,userId,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * Computes recommended agent counts per hour for a target date using Erlang C queuing theory. Historical arrival rates are derived from tickets.created_at for the same weekday over the last N weeks. Requires the advanced_reports plan feature.
+ * @summary Hourly staffing recommendations based on Erlang C and historical arrival data
+ */
+export type getUnitStatisticsStaffingForecastResponse200 = {
+  data: ServicesStaffingForecastResponse
+  status: 200
+}
+
+export type getUnitStatisticsStaffingForecastResponse400 = {
+  data: string
+  status: 400
+}
+
+export type getUnitStatisticsStaffingForecastResponse401 = {
+  data: string
+  status: 401
+}
+
+export type getUnitStatisticsStaffingForecastResponse403 = {
+  data: string
+  status: 403
+}
+
+export type getUnitStatisticsStaffingForecastResponse404 = {
+  data: string
+  status: 404
+}
+
+export type getUnitStatisticsStaffingForecastResponse422 = {
+  data: string
+  status: 422
+}
+
+export type getUnitStatisticsStaffingForecastResponse500 = {
+  data: string
+  status: 500
+}
+
+export type getUnitStatisticsStaffingForecastResponseSuccess = (getUnitStatisticsStaffingForecastResponse200) & {
+  headers: Headers;
+};
+export type getUnitStatisticsStaffingForecastResponseError = (getUnitStatisticsStaffingForecastResponse400 | getUnitStatisticsStaffingForecastResponse401 | getUnitStatisticsStaffingForecastResponse403 | getUnitStatisticsStaffingForecastResponse404 | getUnitStatisticsStaffingForecastResponse422 | getUnitStatisticsStaffingForecastResponse500) & {
+  headers: Headers;
+};
+
+export type getUnitStatisticsStaffingForecastResponse = (getUnitStatisticsStaffingForecastResponseSuccess | getUnitStatisticsStaffingForecastResponseError)
+
+export const getGetUnitStatisticsStaffingForecastUrl = (unitId: string,
+    params?: GetUnitStatisticsStaffingForecastParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/units/${unitId}/statistics/staffing-forecast?${stringifiedParams}` : `/units/${unitId}/statistics/staffing-forecast`
+}
+
+export const getUnitStatisticsStaffingForecast = async (unitId: string,
+    params?: GetUnitStatisticsStaffingForecastParams, options?: RequestInit): Promise<getUnitStatisticsStaffingForecastResponse> => {
+
+  return orvalMutator<getUnitStatisticsStaffingForecastResponse>(getGetUnitStatisticsStaffingForecastUrl(unitId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetUnitStatisticsStaffingForecastQueryKey = (unitId: string,
+    params?: GetUnitStatisticsStaffingForecastParams,) => {
+    return [
+    `/units/${unitId}/statistics/staffing-forecast`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetUnitStatisticsStaffingForecastQueryOptions = <TData = Awaited<ReturnType<typeof getUnitStatisticsStaffingForecast>>, TError = string>(unitId: string,
+    params?: GetUnitStatisticsStaffingForecastParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsStaffingForecast>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetUnitStatisticsStaffingForecastQueryKey(unitId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUnitStatisticsStaffingForecast>>> = ({ signal }) => getUnitStatisticsStaffingForecast(unitId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsStaffingForecast>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetUnitStatisticsStaffingForecastQueryResult = NonNullable<Awaited<ReturnType<typeof getUnitStatisticsStaffingForecast>>>
+export type GetUnitStatisticsStaffingForecastQueryError = string
+
+
+export function useGetUnitStatisticsStaffingForecast<TData = Awaited<ReturnType<typeof getUnitStatisticsStaffingForecast>>, TError = string>(
+ unitId: string,
+    params: undefined |  GetUnitStatisticsStaffingForecastParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsStaffingForecast>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getUnitStatisticsStaffingForecast>>,
+          TError,
+          Awaited<ReturnType<typeof getUnitStatisticsStaffingForecast>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetUnitStatisticsStaffingForecast<TData = Awaited<ReturnType<typeof getUnitStatisticsStaffingForecast>>, TError = string>(
+ unitId: string,
+    params?: GetUnitStatisticsStaffingForecastParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsStaffingForecast>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getUnitStatisticsStaffingForecast>>,
+          TError,
+          Awaited<ReturnType<typeof getUnitStatisticsStaffingForecast>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetUnitStatisticsStaffingForecast<TData = Awaited<ReturnType<typeof getUnitStatisticsStaffingForecast>>, TError = string>(
+ unitId: string,
+    params?: GetUnitStatisticsStaffingForecastParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsStaffingForecast>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Hourly staffing recommendations based on Erlang C and historical arrival data
+ */
+
+export function useGetUnitStatisticsStaffingForecast<TData = Awaited<ReturnType<typeof getUnitStatisticsStaffingForecast>>, TError = string>(
+ unitId: string,
+    params?: GetUnitStatisticsStaffingForecastParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUnitStatisticsStaffingForecast>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetUnitStatisticsStaffingForecastQueryOptions(unitId,params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

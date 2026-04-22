@@ -158,6 +158,10 @@ type TicketRepository interface {
 	// FindWaiting returns the next waiting ticket; counterPool nil = subdivision-wide pool (service_zone_id IS NULL).
 	FindWaiting(unitID string, serviceIDs []string, counterPool *string) (*models.Ticket, error)
 	FindWaitingForUpdateTx(tx *gorm.DB, unitID string, serviceIDs []string, counterPool *string) (*models.Ticket, error)
+	// FindWaitingWithSkillsTx selects the highest-priority waiting ticket whose service_id matches one of the
+	// operator's skills, ordered by skill priority ASC, ticket priority DESC, created_at ASC.
+	// Returns gorm.ErrRecordNotFound when no match exists (callers should then fall back to regular FIFO).
+	FindWaitingWithSkillsTx(tx *gorm.DB, unitID string, skillServiceIDs []string, counterPool *string) (*models.Ticket, error)
 	Update(ticket *models.Ticket) error
 	UpdateTx(tx *gorm.DB, ticket *models.Ticket) error
 	Delete(id string) error
@@ -353,6 +357,37 @@ func (r *ticketRepository) FindWaitingForUpdateTx(tx *gorm.DB, unitID string, se
 	}
 	var ticket models.Ticket
 	err := query.Order("priority desc, created_at asc").First(&ticket).Error
+	if err != nil {
+		return nil, err
+	}
+	return &ticket, nil
+}
+
+// FindWaitingWithSkillsTx selects the best waiting ticket that matches one of the skill service IDs.
+// Tickets are ordered by the position of their service_id in skillServiceIDs (primary skill first),
+// then by ticket.priority DESC and created_at ASC within the same skill level.
+// FindWaitingWithSkillsTx selects the highest-priority waiting ticket matching the operator's skill service IDs.
+// Ordering: skill priority (position in skillServiceIDs) ASC, ticket priority DESC, created_at ASC.
+func (r *ticketRepository) FindWaitingWithSkillsTx(tx *gorm.DB, unitID string, skillServiceIDs []string, counterPool *string) (*models.Ticket, error) {
+	if len(skillServiceIDs) == 0 {
+		return nil, gorm.ErrRecordNotFound
+	}
+	// Build CASE … END expression and bind args: each service ID maps to its position (1-based).
+	caseExpr := "CASE service_id::text"
+	caseArgs := make([]interface{}, 0, len(skillServiceIDs)*2)
+	for i, sid := range skillServiceIDs {
+		caseExpr += " WHEN ? THEN ?"
+		caseArgs = append(caseArgs, sid, i+1)
+	}
+	caseExpr += " ELSE 999 END"
+
+	query := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Model(&models.Ticket{}).
+		Where("unit_id = ? AND status = ? AND is_eod = ? AND service_id::text IN ?",
+			unitID, "waiting", false, skillServiceIDs)
+	query = applyWaitingPoolFilter(query, counterPool)
+	var ticket models.Ticket
+	err := query.Order(gorm.Expr("("+caseExpr+") ASC, priority DESC, created_at ASC", caseArgs...)).First(&ticket).Error
 	if err != nil {
 		return nil, err
 	}

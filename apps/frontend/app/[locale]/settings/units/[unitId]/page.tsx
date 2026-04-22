@@ -32,6 +32,7 @@ import { SlotConfiguration } from '@/components/admin/units/slot-configuration';
 import { UnitVisitorTagsSettings } from '@/components/admin/units/unit-visitor-tags-settings';
 import { UnitGuestSurveySettings } from '@/components/admin/units/unit-guest-survey-settings';
 import { VirtualQueueSettings } from '@/components/admin/units/virtual-queue-settings';
+import { OperatorSkillMatrix } from '@/components/settings/OperatorSkillMatrix';
 
 import ServiceGridEditor from '@/components/ServiceGridEditor';
 
@@ -82,6 +83,20 @@ export default function UnitPage({ params }: UnitPageProps) {
   }, [unit]);
 
   const updateUnitMutation = useUpdateUnit();
+
+  const handleToggleSkillRouting = (enabled: boolean) => {
+    updateUnitMutation.mutate(
+      { id: unitId, skillBasedRoutingEnabled: enabled },
+      {
+        onSuccess: () => {
+          toast.success(t('operator_skills.routing_saved'));
+        },
+        onError: () => {
+          toast.error(t('units.update_error'));
+        }
+      }
+    );
+  };
 
   const timezoneOptions = useMemo(
     () => buildIanaTimezoneComboboxOptions(unitTimezone),
@@ -268,6 +283,14 @@ export default function UnitPage({ params }: UnitPageProps) {
               </TabsTrigger>
             </PermissionGuard>
             <PermissionGuard
+              permissions={[PermUnitSettingsManage]}
+              unitId={unitId}
+            >
+              <TabsTrigger value='operator-skills'>
+                {t('operator_skills.tab')}
+              </TabsTrigger>
+            </PermissionGuard>
+            <PermissionGuard
               permissions={[PermUnitTicketScreenManage]}
               unitId={unitId}
             >
@@ -422,6 +445,32 @@ export default function UnitPage({ params }: UnitPageProps) {
               />
             </PermissionGuard>
           </TabsContent>
+
+          <TabsContent value='operator-skills' className='mt-6'>
+            <PermissionGuard
+              permissions={[PermUnitSettingsManage]}
+              unitId={unitId}
+              fallback={<div>{t('access_denied')}</div>}
+            >
+              <Card>
+                <CardHeader>
+                  <CardTitle>{t('operator_skills.title')}</CardTitle>
+                  <CardDescription>
+                    {t('operator_skills.description')}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <OperatorSkillMatrix
+                    unitId={unitId}
+                    skillBasedRoutingEnabled={
+                      unit.skillBasedRoutingEnabled ?? false
+                    }
+                    onToggleSkillRouting={handleToggleSkillRouting}
+                  />
+                </CardContent>
+              </Card>
+            </PermissionGuard>
+          </TabsContent>
         </Tabs>
       </div>
     );
@@ -536,6 +585,14 @@ export default function UnitPage({ params }: UnitPageProps) {
           >
             <TabsTrigger value='virtual-queue'>
               {t('virtual_queue_settings.tab')}
+            </TabsTrigger>
+          </PermissionGuard>
+          <PermissionGuard
+            permissions={[PermUnitSettingsManage]}
+            unitId={unitId}
+          >
+            <TabsTrigger value='operator-skills'>
+              {t('operator_skills.tab')}
             </TabsTrigger>
           </PermissionGuard>
         </TabsList>
@@ -719,6 +776,32 @@ export default function UnitPage({ params }: UnitPageProps) {
             fallback={<div>{t('access_denied')}</div>}
           >
             <VirtualQueueSettings unitId={unitId} currentConfig={unit.config} />
+          </PermissionGuard>
+        </TabsContent>
+
+        <TabsContent value='operator-skills' className='mt-6'>
+          <PermissionGuard
+            permissions={[PermUnitSettingsManage]}
+            unitId={unitId}
+            fallback={<div>{t('access_denied')}</div>}
+          >
+            <Card>
+              <CardHeader>
+                <CardTitle>{t('operator_skills.title')}</CardTitle>
+                <CardDescription>
+                  {t('operator_skills.description')}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <OperatorSkillMatrix
+                  unitId={unitId}
+                  skillBasedRoutingEnabled={
+                    unit.skillBasedRoutingEnabled ?? false
+                  }
+                  onToggleSkillRouting={handleToggleSkillRouting}
+                />
+              </CardContent>
+            </Card>
           </PermissionGuard>
         </TabsContent>
       </Tabs>

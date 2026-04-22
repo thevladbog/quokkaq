@@ -1722,6 +1722,20 @@
                 },
                 "type": "object"
             },
+            "handlers.bulkUpsertSkillsRequest": {
+                "properties": {
+                    "skills": {
+                        "items": {
+                            "$ref": "#/components/schemas/handlers.operatorSkillInput"
+                        },
+                        "type": "array"
+                    }
+                },
+                "required": [
+                    "skills"
+                ],
+                "type": "object"
+            },
             "handlers.companyMeResponse": {
                 "properties": {
                     "company": {
@@ -1835,6 +1849,27 @@
                     "ticketId",
                     "surveyId",
                     "answers"
+                ],
+                "type": "object"
+            },
+            "handlers.operatorSkillInput": {
+                "properties": {
+                    "priority": {
+                        "maximum": 3,
+                        "minimum": 1,
+                        "type": "integer"
+                    },
+                    "serviceId": {
+                        "type": "string"
+                    },
+                    "userId": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "priority",
+                    "serviceId",
+                    "userId"
                 ],
                 "type": "object"
             },
@@ -2850,6 +2885,27 @@
                 },
                 "type": "object"
             },
+            "models.OperatorSkill": {
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "priority": {
+                        "description": "Priority: 1 = primary, 2 = secondary, 3 = backup.\nLower value = higher precedence when selecting the next ticket for this operator.",
+                        "type": "integer"
+                    },
+                    "serviceId": {
+                        "type": "string"
+                    },
+                    "unitId": {
+                        "type": "string"
+                    },
+                    "userId": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "models.PreRegCalendarSlotItem": {
                 "properties": {
                     "calendarIntegrationId": {
@@ -3669,6 +3725,10 @@
                         "description": "ServedByName is hydrated for client visit lists from ticket_histories (not stored on tickets).",
                         "type": "string"
                     },
+                    "servedByUserId": {
+                        "description": "ServedByUserID is set when a ticket is called/picked; records the operator (counter.AssignedTo at call time).",
+                        "type": "string"
+                    },
                     "service": {
                         "$ref": "#/components/schemas/models.Service"
                     },
@@ -3764,6 +3824,10 @@
                             "$ref": "#/components/schemas/models.Service"
                         },
                         "type": "array"
+                    },
+                    "skillBasedRoutingEnabled": {
+                        "description": "SkillBasedRoutingEnabled activates operator-service skill matching when calling the next ticket.\nWhen false (default) the system uses standard FIFO priority routing.",
+                        "type": "boolean"
                     },
                     "slotConfig": {
                         "$ref": "#/components/schemas/models.SlotConfig"
@@ -4329,6 +4393,26 @@
                 ],
                 "type": "object"
             },
+            "services.DailyStaffingSummary": {
+                "properties": {
+                    "avgRecommendedStaff": {
+                        "type": "number"
+                    },
+                    "maxRecommendedStaff": {
+                        "type": "integer"
+                    },
+                    "peakArrivals": {
+                        "type": "number"
+                    },
+                    "peakHour": {
+                        "type": "integer"
+                    },
+                    "totalExpectedArrivals": {
+                        "type": "number"
+                    }
+                },
+                "type": "object"
+            },
             "services.DeploymentSaaSSettingsPatch": {
                 "properties": {
                     "leadsTrackerQueue": {
@@ -4464,6 +4548,31 @@
                     },
                     "status": {
                         "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "services.HourlyStaffingForecast": {
+                "properties": {
+                    "avgServiceTimeMin": {
+                        "description": "avg handle time in minutes",
+                        "type": "number"
+                    },
+                    "expectedArrivals": {
+                        "description": "avg tickets expected this hour",
+                        "type": "number"
+                    },
+                    "expectedSlaPct": {
+                        "description": "Erlang C P(wait≤target) with recommended agents",
+                        "type": "number"
+                    },
+                    "hour": {
+                        "description": "0–23",
+                        "type": "integer"
+                    },
+                    "recommendedStaff": {
+                        "description": "minimum agents to meet SLA",
+                        "type": "integer"
                     }
                 },
                 "type": "object"
@@ -4810,6 +4919,148 @@
                     },
                     "withinPct": {
                         "type": "number"
+                    }
+                },
+                "type": "object"
+            },
+            "services.StaffDailyTrendPoint": {
+                "properties": {
+                    "avgServiceMs": {
+                        "type": "integer"
+                    },
+                    "date": {
+                        "type": "string"
+                    },
+                    "slaServicePct": {
+                        "type": "number"
+                    },
+                    "slaWaitPct": {
+                        "type": "number"
+                    },
+                    "ticketsCompleted": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "services.StaffPerformanceListResponse": {
+                "properties": {
+                    "items": {
+                        "items": {
+                            "$ref": "#/components/schemas/services.StaffPerformanceResponse"
+                        },
+                        "type": "array"
+                    }
+                },
+                "type": "object"
+            },
+            "services.StaffPerformanceResponse": {
+                "properties": {
+                    "avgServiceMs": {
+                        "type": "integer"
+                    },
+                    "avgWaitMs": {
+                        "type": "integer"
+                    },
+                    "computedAt": {
+                        "type": "string"
+                    },
+                    "csatAvg": {
+                        "description": "CSAT",
+                        "type": "number"
+                    },
+                    "csatCount": {
+                        "type": "integer"
+                    },
+                    "csatNorm": {
+                        "description": "0–100, derived from csatAvg",
+                        "type": "number"
+                    },
+                    "dailyTrend": {
+                        "description": "Daily trend (only populated in detail mode)",
+                        "items": {
+                            "$ref": "#/components/schemas/services.StaffDailyTrendPoint"
+                        },
+                        "type": "array"
+                    },
+                    "noShowCount": {
+                        "type": "integer"
+                    },
+                    "slaService": {
+                        "type": "number"
+                    },
+                    "slaServiceMet": {
+                        "type": "integer"
+                    },
+                    "slaServiceTotal": {
+                        "type": "integer"
+                    },
+                    "slaWait": {
+                        "description": "Normalized radar axes (0–100)",
+                        "type": "number"
+                    },
+                    "slaWaitMet": {
+                        "type": "integer"
+                    },
+                    "slaWaitTotal": {
+                        "type": "integer"
+                    },
+                    "ticketsCompleted": {
+                        "description": "Absolute metrics",
+                        "type": "integer"
+                    },
+                    "ticketsCreated": {
+                        "type": "integer"
+                    },
+                    "ticketsPerHour": {
+                        "type": "number"
+                    },
+                    "totalBreakMin": {
+                        "type": "number"
+                    },
+                    "totalIdleMin": {
+                        "type": "number"
+                    },
+                    "totalServiceMin": {
+                        "type": "number"
+                    },
+                    "userId": {
+                        "type": "string"
+                    },
+                    "userName": {
+                        "type": "string"
+                    },
+                    "utilizationPct": {
+                        "type": "number"
+                    }
+                },
+                "type": "object"
+            },
+            "services.StaffingForecastResponse": {
+                "properties": {
+                    "dailySummary": {
+                        "$ref": "#/components/schemas/services.DailyStaffingSummary"
+                    },
+                    "dayOfWeek": {
+                        "type": "string"
+                    },
+                    "hourlyForecasts": {
+                        "items": {
+                            "$ref": "#/components/schemas/services.HourlyStaffingForecast"
+                        },
+                        "type": "array"
+                    },
+                    "targetDate": {
+                        "type": "string"
+                    },
+                    "targetMaxWaitMin": {
+                        "type": "number"
+                    },
+                    "targetSlaPct": {
+                        "type": "number"
+                    },
+                    "unitId": {
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -19812,6 +20063,252 @@
                 ]
             }
         },
+        "/units/{unitId}/operator-skills": {
+            "get": {
+                "operationId": "listUnitOperatorSkills",
+                "parameters": [
+                    {
+                        "description": "Subdivision unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Filter by operator user ID",
+                        "in": "query",
+                        "name": "userId",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Filter by service ID",
+                        "in": "query",
+                        "name": "serviceId",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/models.OperatorSkill"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unit not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List all operator-skill mappings for a unit",
+                "tags": [
+                    "operator-skills"
+                ]
+            },
+            "put": {
+                "description": "Insert or update (on conflict: update priority) multiple operator-service mappings for a unit.",
+                "operationId": "upsertUnitOperatorSkills",
+                "parameters": [
+                    {
+                        "description": "Subdivision unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.bulkUpsertSkillsRequest"
+                            }
+                        }
+                    },
+                    "description": "Skills to upsert",
+                    "required": true,
+                    "x-originalParamName": "body"
+                },
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Bulk upsert operator-skill mappings",
+                "tags": [
+                    "operator-skills"
+                ]
+            }
+        },
+        "/units/{unitId}/operator-skills/{skillId}": {
+            "delete": {
+                "operationId": "deleteUnitOperatorSkill",
+                "parameters": [
+                    {
+                        "description": "Subdivision unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "OperatorSkill ID",
+                        "in": "path",
+                        "name": "skillId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Delete a single operator-skill mapping by ID",
+                "tags": [
+                    "operator-skills"
+                ]
+            }
+        },
         "/units/{unitId}/pre-registrations": {
             "get": {
                 "description": "Returns all pre-registrations associated with the unit (authenticated unit member).",
@@ -22298,6 +22795,378 @@
                     }
                 ],
                 "summary": "Aggregate waiting SLA percent for date range (optional service filter)",
+                "tags": [
+                    "statistics"
+                ]
+            }
+        },
+        "/units/{unitId}/statistics/staff-performance": {
+            "get": {
+                "description": "Returns aggregated performance metrics per operator from StatisticsDailyBucket, CounterOperatorInterval, and Survey data. Requires advanced_reports plan feature. Expanded scope returns all operators; non-expanded returns only the caller.",
+                "operationId": "getUnitStatisticsStaffPerformanceList",
+                "parameters": [
+                    {
+                        "description": "Subdivision unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "YYYY-MM-DD",
+                        "in": "query",
+                        "name": "dateFrom",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "YYYY-MM-DD",
+                        "in": "query",
+                        "name": "dateTo",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Sort field: ticketsCompleted|avgServiceMs|slaWait|csatAvg|utilizationPct",
+                        "in": "query",
+                        "name": "sort",
+                        "schema": {
+                            "default": "ticketsCompleted",
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Sort order: desc|asc",
+                        "in": "query",
+                        "name": "order",
+                        "schema": {
+                            "default": "desc",
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/services.StaffPerformanceListResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden (missing statistics access or plan)"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unit not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Staff performance leaderboard — all operators for a date range",
+                "tags": [
+                    "statistics"
+                ]
+            }
+        },
+        "/units/{unitId}/statistics/staff-performance/{userId}": {
+            "get": {
+                "description": "Returns detailed performance metrics for a single operator including a day-by-day trend. Requires advanced_reports plan feature.",
+                "operationId": "getUnitStatisticsStaffPerformanceDetail",
+                "parameters": [
+                    {
+                        "description": "Subdivision unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Target operator user ID",
+                        "in": "path",
+                        "name": "userId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "YYYY-MM-DD",
+                        "in": "query",
+                        "name": "dateFrom",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "YYYY-MM-DD",
+                        "in": "query",
+                        "name": "dateTo",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/services.StaffPerformanceResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden (missing statistics access or plan)"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unit not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Staff performance detail — single operator with daily trend",
+                "tags": [
+                    "statistics"
+                ]
+            }
+        },
+        "/units/{unitId}/statistics/staffing-forecast": {
+            "get": {
+                "description": "Computes recommended agent counts per hour for a target date using Erlang C queuing theory. Historical arrival rates are derived from tickets.created_at for the same weekday over the last N weeks. Requires the advanced_reports plan feature.",
+                "operationId": "getUnitStatisticsStaffingForecast",
+                "parameters": [
+                    {
+                        "description": "Subdivision unit ID",
+                        "in": "path",
+                        "name": "unitId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Target date YYYY-MM-DD (defaults to tomorrow)",
+                        "in": "query",
+                        "name": "targetDate",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Target SLA percent, e.g. 90 (default)",
+                        "in": "query",
+                        "name": "targetSlaPct",
+                        "schema": {
+                            "default": 90,
+                            "type": "number"
+                        }
+                    },
+                    {
+                        "description": "Target max wait time in minutes (default 5)",
+                        "in": "query",
+                        "name": "targetMaxWaitMin",
+                        "schema": {
+                            "default": 5,
+                            "type": "number"
+                        }
+                    },
+                    {
+                        "description": "Number of past same-weekday samples (default 4)",
+                        "in": "query",
+                        "name": "lookbackWeeks",
+                        "schema": {
+                            "default": 4,
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/services.StaffingForecastResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Forbidden (missing statistics access or plan does not include advanced reports)"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Unit not found"
+                    },
+                    "422": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Not enough data"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Hourly staffing recommendations based on Erlang C and historical arrival data",
                 "tags": [
                     "statistics"
                 ]

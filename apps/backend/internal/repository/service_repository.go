@@ -34,6 +34,8 @@ type ServiceRepository interface {
 	FindMapByIDs(ids []string) (map[string]*models.Service, error)
 	// CountByUnitAndIDs returns how many of the given service IDs belong to the unit (distinct rows).
 	CountByUnitAndIDs(unitID string, ids []string) (int64, error)
+	// CountByUnitSubtreeAndIDs returns how many of the given service IDs have services.unit_id in rootUnitID's subtree (root + descendants).
+	CountByUnitSubtreeAndIDs(rootUnitID string, ids []string) (int64, error)
 	// CountByUnitAndCalendarSlotKey counts services with the same non-empty calendar_slot_key in the unit, optionally excluding one id.
 	CountByUnitAndCalendarSlotKey(unitID, calendarSlotKey string, excludeServiceID string) (int64, error)
 	Update(service *models.Service) error
@@ -140,6 +142,25 @@ func (r *serviceRepository) CountByUnitAndIDs(unitID string, ids []string) (int6
 	err := r.db.Model(&models.Service{}).
 		Where("unit_id = ? AND id IN ?", unitID, ids).
 		Count(&n).Error
+	return n, err
+}
+
+func (r *serviceRepository) CountByUnitSubtreeAndIDs(rootUnitID string, ids []string) (int64, error) {
+	rootUnitID = strings.TrimSpace(rootUnitID)
+	if rootUnitID == "" || len(ids) == 0 {
+		return 0, nil
+	}
+	var n int64
+	const q = `
+WITH RECURSIVE subtree AS (
+	SELECT ? AS id
+	UNION ALL
+	SELECT u.id FROM units u
+	INNER JOIN subtree s ON u.parent_id = s.id
+)
+SELECT COUNT(*) FROM services
+WHERE id IN ? AND unit_id IN (SELECT id FROM subtree)`
+	err := r.db.Raw(q, rootUnitID, ids).Scan(&n).Error
 	return n, err
 }
 

@@ -89,8 +89,11 @@ type Unit struct {
 	NameEn    *string         `gorm:"column:name_en" json:"nameEn,omitempty"`
 	Timezone  string          `gorm:"not null" json:"timezone"`
 	Config    json.RawMessage `gorm:"type:jsonb" json:"config,omitempty" swaggertype:"object"`
-	CreatedAt time.Time       `gorm:"default:now()" json:"createdAt"`
-	UpdatedAt time.Time       `gorm:"autoUpdateTime" json:"updatedAt"`
+	// SkillBasedRoutingEnabled activates operator-service skill matching when calling the next ticket.
+	// When false (default) the system uses standard FIFO priority routing.
+	SkillBasedRoutingEnabled bool      `gorm:"column:skill_based_routing_enabled;not null;default:false" json:"skillBasedRoutingEnabled"`
+	CreatedAt                time.Time `gorm:"default:now()" json:"createdAt"`
+	UpdatedAt                time.Time `gorm:"autoUpdateTime" json:"updatedAt"`
 
 	// Relations
 	Company          Company           `gorm:"constraint:OnUpdate:CASCADE,OnDelete:SET NULL;" json:"-" swaggerignore:"true"`

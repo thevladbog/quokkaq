@@ -234,6 +234,9 @@ export interface ModelsUnit {
   parentId?: string;
   preRegistrations?: ModelsPreRegistration[];
   services?: ModelsService[];
+  /** SkillBasedRoutingEnabled activates operator-service skill matching when calling the next ticket.
+  When false (default) the system uses standard FIFO priority routing. */
+  skillBasedRoutingEnabled?: boolean;
   slotConfig?: ModelsSlotConfig;
   sortOrder?: number;
   tickets?: ModelsTicket[];
@@ -326,6 +329,8 @@ export interface ModelsTicket {
   queuePosition?: number;
   /** ServedByName is hydrated for client visit lists from ticket_histories (not stored on tickets). */
   servedByName?: string;
+  /** ServedByUserID is set when a ticket is called/picked; records the operator (counter.AssignedTo at call time). */
+  servedByUserId?: string;
   service?: ModelsService;
   serviceId?: string;
   /** ServiceZoneID: waiting pool within the subdivision; NULL = subdivision-wide pool. */
@@ -1064,6 +1069,20 @@ export interface HandlersAddSupportReportShareRequest {
   userId?: string;
 }
 
+export interface HandlersOperatorSkillInput {
+  /**
+     * @minimum 1
+     * @maximum 3
+     */
+  priority: number;
+  serviceId: string;
+  userId: string;
+}
+
+export interface HandlersBulkUpsertSkillsRequest {
+  skills: HandlersOperatorSkillInput[];
+}
+
 /**
  * PricingModel determines how the price field is interpreted.
 Default: "per_unit".
@@ -1687,6 +1706,16 @@ export interface ModelsMessageTemplate {
   updatedAt?: string;
 }
 
+export interface ModelsOperatorSkill {
+  id?: string;
+  /** Priority: 1 = primary, 2 = secondary, 3 = backup.
+  Lower value = higher precedence when selecting the next ticket for this operator. */
+  priority?: number;
+  serviceId?: string;
+  unitId?: string;
+  userId?: string;
+}
+
 export interface ModelsPreRegCalendarSlotItem {
   calendarIntegrationId?: string;
   externalEventEtag?: string;
@@ -1984,6 +2013,14 @@ export interface ServicesCreateCalendarIntegrationRequest {
   username: string;
 }
 
+export interface ServicesDailyStaffingSummary {
+  avgRecommendedStaff?: number;
+  maxRecommendedStaff?: number;
+  peakArrivals?: number;
+  peakHour?: number;
+  totalExpectedArrivals?: number;
+}
+
 export interface ServicesDeploymentSaaSSettingsPatch {
   leadsTrackerQueue?: string;
   /** full credential (write-only; never returned in GET) */
@@ -2046,6 +2083,19 @@ export interface ServicesGuestSurveySession {
   idleScreen?: ServicesGuestSurveySessionIdleScreen;
   survey?: ServicesGuestSurveySessionSurvey;
   unitConfig?: ServicesGuestSurveySessionUnitConfig;
+}
+
+export interface ServicesHourlyStaffingForecast {
+  /** avg handle time in minutes */
+  avgServiceTimeMin?: number;
+  /** avg tickets expected this hour */
+  expectedArrivals?: number;
+  /** Erlang C P(wait≤target) with recommended agents */
+  expectedSlaPct?: number;
+  /** 0–23 */
+  hour?: number;
+  /** minimum agents to meet SLA */
+  recommendedStaff?: number;
 }
 
 export interface ServicesLoadPoint {
@@ -2186,6 +2236,59 @@ export interface ServicesSlaSummaryResponse {
   slaWaitMet?: number;
   slaWaitTotal?: number;
   withinPct?: number;
+}
+
+export interface ServicesStaffDailyTrendPoint {
+  avgServiceMs?: number;
+  date?: string;
+  slaServicePct?: number;
+  slaWaitPct?: number;
+  ticketsCompleted?: number;
+}
+
+export interface ServicesStaffPerformanceResponse {
+  avgServiceMs?: number;
+  avgWaitMs?: number;
+  computedAt?: string;
+  /** CSAT */
+  csatAvg?: number;
+  csatCount?: number;
+  /** 0–100, derived from csatAvg */
+  csatNorm?: number;
+  /** Daily trend (only populated in detail mode) */
+  dailyTrend?: ServicesStaffDailyTrendPoint[];
+  noShowCount?: number;
+  slaService?: number;
+  slaServiceMet?: number;
+  slaServiceTotal?: number;
+  /** Normalized radar axes (0–100) */
+  slaWait?: number;
+  slaWaitMet?: number;
+  slaWaitTotal?: number;
+  /** Absolute metrics */
+  ticketsCompleted?: number;
+  ticketsCreated?: number;
+  ticketsPerHour?: number;
+  totalBreakMin?: number;
+  totalIdleMin?: number;
+  totalServiceMin?: number;
+  userId?: string;
+  userName?: string;
+  utilizationPct?: number;
+}
+
+export interface ServicesStaffPerformanceListResponse {
+  items?: ServicesStaffPerformanceResponse[];
+}
+
+export interface ServicesStaffingForecastResponse {
+  dailySummary?: ServicesDailyStaffingSummary;
+  dayOfWeek?: string;
+  hourlyForecasts?: ServicesHourlyStaffingForecast[];
+  targetDate?: string;
+  targetMaxWaitMin?: number;
+  targetSlaPct?: number;
+  unitId?: string;
 }
 
 export interface ServicesSupportReportCommentItem {
@@ -2342,6 +2445,17 @@ export interface ServicesUtilizationResponse {
 export type PatchUnitsUnitIdAdSettingsBody = { [key: string]: unknown };
 
 export type PatchUnitsUnitIdAdSettings200 = {[key: string]: boolean};
+
+export type ListUnitOperatorSkillsParams = {
+/**
+ * Filter by operator user ID
+ */
+userId?: string;
+/**
+ * Filter by service ID
+ */
+serviceId?: string;
+};
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
@@ -3676,6 +3790,364 @@ export const useDeleteUnitsUnitIdMaterialsMaterialId = <TError = string,
         TContext
       > => {
       return useMutation(getDeleteUnitsUnitIdMaterialsMaterialIdMutationOptions(options), queryClient);
+    }
+
+/**
+ * @summary List all operator-skill mappings for a unit
+ */
+export type listUnitOperatorSkillsResponse200 = {
+  data: ModelsOperatorSkill[]
+  status: 200
+}
+
+export type listUnitOperatorSkillsResponse401 = {
+  data: string
+  status: 401
+}
+
+export type listUnitOperatorSkillsResponse403 = {
+  data: string
+  status: 403
+}
+
+export type listUnitOperatorSkillsResponse404 = {
+  data: string
+  status: 404
+}
+
+export type listUnitOperatorSkillsResponse500 = {
+  data: string
+  status: 500
+}
+
+export type listUnitOperatorSkillsResponseSuccess = (listUnitOperatorSkillsResponse200) & {
+  headers: Headers;
+};
+export type listUnitOperatorSkillsResponseError = (listUnitOperatorSkillsResponse401 | listUnitOperatorSkillsResponse403 | listUnitOperatorSkillsResponse404 | listUnitOperatorSkillsResponse500) & {
+  headers: Headers;
+};
+
+export type listUnitOperatorSkillsResponse = (listUnitOperatorSkillsResponseSuccess | listUnitOperatorSkillsResponseError)
+
+export const getListUnitOperatorSkillsUrl = (unitId: string,
+    params?: ListUnitOperatorSkillsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/units/${unitId}/operator-skills?${stringifiedParams}` : `/units/${unitId}/operator-skills`
+}
+
+export const listUnitOperatorSkills = async (unitId: string,
+    params?: ListUnitOperatorSkillsParams, options?: RequestInit): Promise<listUnitOperatorSkillsResponse> => {
+
+  return orvalMutator<listUnitOperatorSkillsResponse>(getListUnitOperatorSkillsUrl(unitId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListUnitOperatorSkillsQueryKey = (unitId: string,
+    params?: ListUnitOperatorSkillsParams,) => {
+    return [
+    `/units/${unitId}/operator-skills`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListUnitOperatorSkillsQueryOptions = <TData = Awaited<ReturnType<typeof listUnitOperatorSkills>>, TError = string>(unitId: string,
+    params?: ListUnitOperatorSkillsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listUnitOperatorSkills>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListUnitOperatorSkillsQueryKey(unitId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listUnitOperatorSkills>>> = ({ signal }) => listUnitOperatorSkills(unitId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(unitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listUnitOperatorSkills>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListUnitOperatorSkillsQueryResult = NonNullable<Awaited<ReturnType<typeof listUnitOperatorSkills>>>
+export type ListUnitOperatorSkillsQueryError = string
+
+
+export function useListUnitOperatorSkills<TData = Awaited<ReturnType<typeof listUnitOperatorSkills>>, TError = string>(
+ unitId: string,
+    params: undefined |  ListUnitOperatorSkillsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listUnitOperatorSkills>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listUnitOperatorSkills>>,
+          TError,
+          Awaited<ReturnType<typeof listUnitOperatorSkills>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListUnitOperatorSkills<TData = Awaited<ReturnType<typeof listUnitOperatorSkills>>, TError = string>(
+ unitId: string,
+    params?: ListUnitOperatorSkillsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listUnitOperatorSkills>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listUnitOperatorSkills>>,
+          TError,
+          Awaited<ReturnType<typeof listUnitOperatorSkills>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListUnitOperatorSkills<TData = Awaited<ReturnType<typeof listUnitOperatorSkills>>, TError = string>(
+ unitId: string,
+    params?: ListUnitOperatorSkillsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listUnitOperatorSkills>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List all operator-skill mappings for a unit
+ */
+
+export function useListUnitOperatorSkills<TData = Awaited<ReturnType<typeof listUnitOperatorSkills>>, TError = string>(
+ unitId: string,
+    params?: ListUnitOperatorSkillsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listUnitOperatorSkills>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListUnitOperatorSkillsQueryOptions(unitId,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+/**
+ * Insert or update (on conflict: update priority) multiple operator-service mappings for a unit.
+ * @summary Bulk upsert operator-skill mappings
+ */
+export type upsertUnitOperatorSkillsResponse204 = {
+  data: void
+  status: 204
+}
+
+export type upsertUnitOperatorSkillsResponse400 = {
+  data: string
+  status: 400
+}
+
+export type upsertUnitOperatorSkillsResponse401 = {
+  data: string
+  status: 401
+}
+
+export type upsertUnitOperatorSkillsResponse403 = {
+  data: string
+  status: 403
+}
+
+export type upsertUnitOperatorSkillsResponse500 = {
+  data: string
+  status: 500
+}
+
+export type upsertUnitOperatorSkillsResponseSuccess = (upsertUnitOperatorSkillsResponse204) & {
+  headers: Headers;
+};
+export type upsertUnitOperatorSkillsResponseError = (upsertUnitOperatorSkillsResponse400 | upsertUnitOperatorSkillsResponse401 | upsertUnitOperatorSkillsResponse403 | upsertUnitOperatorSkillsResponse500) & {
+  headers: Headers;
+};
+
+export type upsertUnitOperatorSkillsResponse = (upsertUnitOperatorSkillsResponseSuccess | upsertUnitOperatorSkillsResponseError)
+
+export const getUpsertUnitOperatorSkillsUrl = (unitId: string,) => {
+
+
+
+
+  return `/units/${unitId}/operator-skills`
+}
+
+export const upsertUnitOperatorSkills = async (unitId: string,
+    handlersBulkUpsertSkillsRequest: HandlersBulkUpsertSkillsRequest, options?: RequestInit): Promise<upsertUnitOperatorSkillsResponse> => {
+
+  return orvalMutator<upsertUnitOperatorSkillsResponse>(getUpsertUnitOperatorSkillsUrl(unitId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      handlersBulkUpsertSkillsRequest,)
+  }
+);}
+
+
+
+
+export const getUpsertUnitOperatorSkillsMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertUnitOperatorSkills>>, TError,{unitId: string;data: HandlersBulkUpsertSkillsRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof upsertUnitOperatorSkills>>, TError,{unitId: string;data: HandlersBulkUpsertSkillsRequest}, TContext> => {
+
+const mutationKey = ['upsertUnitOperatorSkills'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof upsertUnitOperatorSkills>>, {unitId: string;data: HandlersBulkUpsertSkillsRequest}> = (props) => {
+          const {unitId,data} = props ?? {};
+
+          return  upsertUnitOperatorSkills(unitId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpsertUnitOperatorSkillsMutationResult = NonNullable<Awaited<ReturnType<typeof upsertUnitOperatorSkills>>>
+    export type UpsertUnitOperatorSkillsMutationBody = HandlersBulkUpsertSkillsRequest
+    export type UpsertUnitOperatorSkillsMutationError = string
+
+    /**
+ * @summary Bulk upsert operator-skill mappings
+ */
+export const useUpsertUnitOperatorSkills = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertUnitOperatorSkills>>, TError,{unitId: string;data: HandlersBulkUpsertSkillsRequest}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof upsertUnitOperatorSkills>>,
+        TError,
+        {unitId: string;data: HandlersBulkUpsertSkillsRequest},
+        TContext
+      > => {
+      return useMutation(getUpsertUnitOperatorSkillsMutationOptions(options), queryClient);
+    }
+
+/**
+ * @summary Delete a single operator-skill mapping by ID
+ */
+export type deleteUnitOperatorSkillResponse204 = {
+  data: void
+  status: 204
+}
+
+export type deleteUnitOperatorSkillResponse401 = {
+  data: string
+  status: 401
+}
+
+export type deleteUnitOperatorSkillResponse403 = {
+  data: string
+  status: 403
+}
+
+export type deleteUnitOperatorSkillResponse500 = {
+  data: string
+  status: 500
+}
+
+export type deleteUnitOperatorSkillResponseSuccess = (deleteUnitOperatorSkillResponse204) & {
+  headers: Headers;
+};
+export type deleteUnitOperatorSkillResponseError = (deleteUnitOperatorSkillResponse401 | deleteUnitOperatorSkillResponse403 | deleteUnitOperatorSkillResponse500) & {
+  headers: Headers;
+};
+
+export type deleteUnitOperatorSkillResponse = (deleteUnitOperatorSkillResponseSuccess | deleteUnitOperatorSkillResponseError)
+
+export const getDeleteUnitOperatorSkillUrl = (unitId: string,
+    skillId: string,) => {
+
+
+
+
+  return `/units/${unitId}/operator-skills/${skillId}`
+}
+
+export const deleteUnitOperatorSkill = async (unitId: string,
+    skillId: string, options?: RequestInit): Promise<deleteUnitOperatorSkillResponse> => {
+
+  return orvalMutator<deleteUnitOperatorSkillResponse>(getDeleteUnitOperatorSkillUrl(unitId,skillId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteUnitOperatorSkillMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteUnitOperatorSkill>>, TError,{unitId: string;skillId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteUnitOperatorSkill>>, TError,{unitId: string;skillId: string}, TContext> => {
+
+const mutationKey = ['deleteUnitOperatorSkill'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteUnitOperatorSkill>>, {unitId: string;skillId: string}> = (props) => {
+          const {unitId,skillId} = props ?? {};
+
+          return  deleteUnitOperatorSkill(unitId,skillId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteUnitOperatorSkillMutationResult = NonNullable<Awaited<ReturnType<typeof deleteUnitOperatorSkill>>>
+
+    export type DeleteUnitOperatorSkillMutationError = string
+
+    /**
+ * @summary Delete a single operator-skill mapping by ID
+ */
+export const useDeleteUnitOperatorSkill = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteUnitOperatorSkill>>, TError,{unitId: string;skillId: string}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteUnitOperatorSkill>>,
+        TError,
+        {unitId: string;skillId: string},
+        TContext
+      > => {
+      return useMutation(getDeleteUnitOperatorSkillMutationOptions(options), queryClient);
     }
 
 /**

@@ -72,9 +72,18 @@ import {
   useGetUnitStatisticsSurveyScores,
   useGetUnitStatisticsTicketsByService,
   useGetUnitStatisticsSlaSummary,
-  useGetUnitStatisticsSlaHeatmap
+  useGetUnitStatisticsSlaHeatmap,
+  useGetUnitStatisticsStaffPerformanceList,
+  useGetUnitStatisticsStaffPerformanceDetail,
+  useGetUnitStatisticsStaffingForecast
 } from '@/lib/api/generated/statistics';
 import { SLAHeatmapChart } from '@/components/statistics/SLAHeatmapChart';
+import {
+  StaffLeaderboard,
+  type StaffSortField
+} from '@/components/statistics/StaffLeaderboard';
+import { StaffOperatorDetailCard } from '@/components/statistics/StaffOperatorDetailCard';
+import { StaffingForecastPanel } from '@/components/statistics/StaffingForecastPanel';
 import { useGetUnitsUnitIdShiftActivityActors } from '@/lib/api/generated/shift';
 import { useGetUnitsUnitIdServices } from '@/lib/api/generated/services';
 import { normalizeChildUnitsQueryData } from '@/lib/child-units-query';
@@ -333,6 +342,17 @@ export default function StatisticsPage() {
   const [slaDisplayMode, setSlaDisplayMode] = useState<'percent' | 'count'>(
     'percent'
   );
+  const [staffSortBy, setStaffSortBy] =
+    useState<StaffSortField>('ticketsCompleted');
+  const [staffSelectedUserId, setStaffSelectedUserId] = useState('');
+  const tomorrow = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().slice(0, 10);
+  }, []);
+  const [forecastTargetDate, setForecastTargetDate] = useState(tomorrow);
+  const [forecastSlaPct, setForecastSlaPct] = useState(90);
+  const [forecastMaxWait, setForecastMaxWait] = useState(5);
 
   const unitQuery = useGetUnitByID(activeUnitId ?? '', {
     query: { enabled: Boolean(activeUnitId) }
@@ -712,6 +732,54 @@ export default function StatisticsPage() {
         enabled: Boolean(
           statsSubdivisionId && utilizationOperatorId && isExpanded
         )
+      }
+    }
+  );
+
+  const staffPerformanceListQuery = useGetUnitStatisticsStaffPerformanceList(
+    statsSubdivisionId,
+    {
+      dateFrom: from,
+      dateTo: dateToForApi,
+      sort: staffSortBy,
+      order: 'desc'
+    },
+    {
+      query: {
+        enabled: Boolean(
+          statsSubdivisionId && isExpanded && from && dateToForApi
+        )
+      }
+    }
+  );
+
+  const staffDetailQuery = useGetUnitStatisticsStaffPerformanceDetail(
+    statsSubdivisionId,
+    staffSelectedUserId,
+    {
+      dateFrom: from,
+      dateTo: dateToForApi
+    },
+    {
+      query: {
+        enabled: Boolean(
+          statsSubdivisionId && staffSelectedUserId && isExpanded
+        )
+      }
+    }
+  );
+
+  const staffingForecastQuery = useGetUnitStatisticsStaffingForecast(
+    statsSubdivisionId,
+    {
+      targetDate: forecastTargetDate,
+      targetSlaPct: forecastSlaPct,
+      targetMaxWaitMin: forecastMaxWait,
+      lookbackWeeks: 4
+    },
+    {
+      query: {
+        enabled: Boolean(statsSubdivisionId && isExpanded)
       }
     }
   );
@@ -1750,12 +1818,12 @@ export default function StatisticsPage() {
                           >
                             <stop
                               offset='0%'
-                              stopColor='var(--primary)'
+                              stopColor='var(--color-waitDisplay)'
                               stopOpacity={0.4}
                             />
                             <stop
                               offset='100%'
-                              stopColor='var(--primary)'
+                              stopColor='var(--color-waitDisplay)'
                               stopOpacity={0.05}
                             />
                           </linearGradient>
@@ -1780,7 +1848,7 @@ export default function StatisticsPage() {
                           type='monotone'
                           dataKey='waitDisplay'
                           name={t('legend_wait_min')}
-                          stroke='var(--primary)'
+                          stroke='var(--color-waitDisplay)'
                           fill='url(#waitFillHourly)'
                           strokeWidth={2}
                           connectNulls={false}
@@ -1791,7 +1859,7 @@ export default function StatisticsPage() {
                           type='monotone'
                           dataKey='service'
                           name={t('legend_service_min')}
-                          stroke='var(--chart-2)'
+                          stroke='var(--color-service)'
                           strokeWidth={2}
                           dot={false}
                           connectNulls={false}
@@ -1809,12 +1877,12 @@ export default function StatisticsPage() {
                           >
                             <stop
                               offset='0%'
-                              stopColor='var(--primary)'
+                              stopColor='var(--color-waitDisplay)'
                               stopOpacity={0.35}
                             />
                             <stop
                               offset='100%'
-                              stopColor='var(--primary)'
+                              stopColor='var(--color-waitDisplay)'
                               stopOpacity={0}
                             />
                           </linearGradient>
@@ -1839,7 +1907,7 @@ export default function StatisticsPage() {
                           type='monotone'
                           dataKey='waitDisplay'
                           name={t('legend_wait_min')}
-                          stroke='var(--primary)'
+                          stroke='var(--color-waitDisplay)'
                           fill='url(#waitFill)'
                           strokeWidth={2}
                           connectNulls={false}
@@ -1849,7 +1917,7 @@ export default function StatisticsPage() {
                           type='monotone'
                           dataKey='service'
                           name={t('legend_service_min')}
-                          stroke='var(--chart-2)'
+                          stroke='var(--color-service)'
                           fill='none'
                           strokeWidth={2}
                           connectNulls={false}
@@ -1900,19 +1968,19 @@ export default function StatisticsPage() {
                       <Bar
                         dataKey='created'
                         name={t('legend_created')}
-                        fill='var(--primary)'
+                        fill='var(--color-created)'
                         radius={[4, 4, 0, 0]}
                       />
                       <Bar
                         dataKey='completed'
                         name={t('legend_completed')}
-                        fill='var(--chart-2)'
+                        fill='var(--color-completed)'
                         radius={[4, 4, 0, 0]}
                       />
                       <Bar
                         dataKey='noShow'
                         name={t('legend_no_show')}
-                        fill='var(--chart-4)'
+                        fill='var(--color-noShow)'
                         radius={[4, 4, 0, 0]}
                       />
                     </BarChart>
@@ -2025,7 +2093,7 @@ export default function StatisticsPage() {
                                 ? t('legend_score_native')
                                 : t('legend_score_norm5')
                             }
-                            stroke='var(--primary)'
+                            stroke='var(--color-score)'
                             strokeWidth={2}
                             dot={false}
                             connectNulls={false}
@@ -2218,7 +2286,7 @@ export default function StatisticsPage() {
                         dataKey='breach'
                         name={t('legend_sla_wait_breach')}
                         stackId='sla'
-                        fill='var(--destructive)'
+                        fill='var(--color-breach)'
                       />
                       {slaDisplayMode === 'percent' &&
                         slaChart.sumSvcTot > 0 && (
@@ -2226,7 +2294,7 @@ export default function StatisticsPage() {
                             dataKey='svcPct'
                             name={t('legend_sla_service_pct')}
                             type='monotone'
-                            stroke='var(--chart-2)'
+                            stroke='var(--color-svcPct)'
                             strokeWidth={2}
                             dot={false}
                             connectNulls={false}
@@ -2328,7 +2396,7 @@ export default function StatisticsPage() {
                           type='monotone'
                           dataKey='util'
                           name={t('legend_utilization_pct')}
-                          stroke='var(--chart-3)'
+                          stroke='var(--color-util)'
                           strokeWidth={2}
                           dot={false}
                           connectNulls={false}
@@ -2340,6 +2408,102 @@ export default function StatisticsPage() {
               </Card>
             )}
           </div>
+
+          {/* Staff Performance section (expanded scope only) */}
+          {isExpanded && (
+            <div className='space-y-6 pt-2'>
+              <Card className='lg:col-span-3'>
+                <CardHeader>
+                  <CardTitle>{t('staff_performance_title')}</CardTitle>
+                  <CardDescription>
+                    {t('staff_performance_hint')}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {staffPerformanceListQuery.isLoading ? (
+                    <p className='text-muted-foreground text-sm'>
+                      {t('loading')}
+                    </p>
+                  ) : staffPerformanceListQuery.isError ? (
+                    <p className='text-destructive text-sm'>{t('error')}</p>
+                  ) : (
+                    <StaffLeaderboard
+                      items={
+                        staffPerformanceListQuery.data?.status === 200
+                          ? (staffPerformanceListQuery.data.data.items ?? [])
+                          : []
+                      }
+                      selectedUserId={staffSelectedUserId}
+                      onSelectUser={(uid) =>
+                        setStaffSelectedUserId((prev) =>
+                          prev === uid ? '' : uid
+                        )
+                      }
+                      sortBy={staffSortBy}
+                      onSortChange={setStaffSortBy}
+                    />
+                  )}
+                </CardContent>
+              </Card>
+
+              {staffSelectedUserId && (
+                <div>
+                  {staffDetailQuery.isLoading ? (
+                    <p className='text-muted-foreground text-sm'>
+                      {t('loading')}
+                    </p>
+                  ) : staffDetailQuery.isError ? (
+                    <p className='text-destructive text-sm'>{t('error')}</p>
+                  ) : staffDetailQuery.data?.status === 200 ? (
+                    <StaffOperatorDetailCard
+                      data={staffDetailQuery.data.data}
+                    />
+                  ) : null}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Staffing Forecast section (expanded scope only) */}
+          {isExpanded && (
+            <div className='pt-2'>
+              <Card className='lg:col-span-3'>
+                <CardHeader>
+                  <CardTitle>{t('staffing_forecast_title')}</CardTitle>
+                  <CardDescription>
+                    {t('staffing_forecast_hint')}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {staffingForecastQuery.isLoading ? (
+                    <p className='text-muted-foreground text-sm'>
+                      {t('loading')}
+                    </p>
+                  ) : staffingForecastQuery.isError ? (
+                    <p className='text-destructive text-sm'>{t('error')}</p>
+                  ) : staffingForecastQuery.data?.status === 200 ? (
+                    <StaffingForecastPanel
+                      data={staffingForecastQuery.data.data}
+                      targetDate={forecastTargetDate}
+                      targetSlaPct={forecastSlaPct}
+                      targetMaxWaitMin={forecastMaxWait}
+                      onParamsChange={(p) => {
+                        if (p.targetDate) setForecastTargetDate(p.targetDate);
+                        if (p.targetSlaPct != null)
+                          setForecastSlaPct(p.targetSlaPct);
+                        if (p.targetMaxWaitMin != null)
+                          setForecastMaxWait(p.targetMaxWaitMin);
+                      }}
+                    />
+                  ) : (
+                    <p className='text-muted-foreground text-sm'>
+                      {t('sf_no_data')}
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </>
       )}
     </div>
