@@ -376,11 +376,11 @@ export function StaffingForecastPanel({
                 />
                 <YAxis tick={{ fontSize: 10 }} allowDecimals />
                 <Tooltip
-                  formatter={(v: number, name: string) => [
-                    typeof v === 'number' ? v.toFixed(1) : v,
+                  formatter={(v, name) => [
+                    typeof v === 'number' ? v.toFixed(1) : String(v ?? ''),
                     name === 'expectedArrivals'
                       ? t('sf_expected_arrivals')
-                      : name
+                      : String(name)
                   ]}
                   labelFormatter={(label) => String(label)}
                 />
