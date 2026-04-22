@@ -150,6 +150,7 @@ export default function UnitKioskPage() {
     socketClient.onEtaUpdate(h);
     return () => {
       socketClient.offEtaUpdate(h);
+      socketClient.disconnect();
     };
   }, [isTicketModalOpen, createdTicket, kioskApiUnitId]);
 

@@ -2066,6 +2066,7 @@
     "processing": "Обработка...",
     "cancel": "Отмена",
     "confirm": "Подтвердить",
+    "staffing_toast_extra_counters": "+{count, plural, one {# дополнительная стойка} few {# дополнительные стойки} many {# дополнительных стоек} other {# дополнительных стоек}}",
     "pre_registration": {
       "badge": "Запись",
       "show_details_aria": "Показать детали предварительной записи"

@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -297,6 +298,59 @@ func TestGetUnitQueueSummary_zeroQueueNoETA(t *testing.T) {
 	}
 	if summary.EstimatedWaitMinutes != 0 {
 		t.Errorf("empty queue should produce 0 ETA, got %f", summary.EstimatedWaitMinutes)
+	}
+}
+
+// countingTicketRepo counts GetAvgServiceSecPerOccupiedCounter calls and can return a fixed waiting list.
+type countingTicketRepo struct {
+	etaTicketRepo
+	getAvgCalls    int
+	waitingTickets []models.Ticket
+}
+
+func (r *countingTicketRepo) GetWaitingTickets(unitID string) ([]models.Ticket, error) {
+	if r.waitingTickets != nil {
+		return r.waitingTickets, nil
+	}
+	return r.etaTicketRepo.GetWaitingTickets(unitID)
+}
+
+func (r *countingTicketRepo) GetAvgServiceSecPerOccupiedCounter(unitID string, n int) (map[string]float64, error) {
+	r.getAvgCalls++
+	return r.etaTicketRepo.GetAvgServiceSecPerOccupiedCounter(unitID, n)
+}
+
+func TestComputeUnitETASnapshot_fetchesOccupiedCounterSamplesOnce(t *testing.T) {
+	t.Parallel()
+	unitID := "u1"
+	svcID := "s1"
+	samples := []int{60, 60, 60, 60, 60}
+	waiting := make([]models.Ticket, 20)
+	for i := range waiting {
+		waiting[i] = models.Ticket{
+			ID:        fmt.Sprintf("t%d", i),
+			Status:    "waiting",
+			UnitID:    unitID,
+			ServiceID: svcID,
+		}
+	}
+	repo := &countingTicketRepo{
+		etaTicketRepo: etaTicketRepo{
+			recentTimes:   map[string][]int{unitID + "|" + svcID: samples},
+			waitingByUnit: 20,
+		},
+		waitingTickets: waiting,
+	}
+	svc := NewETAService(repo, &etaCounterRepo{activeCount: 2})
+	snap, err := svc.ComputeUnitETASnapshot(unitID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if repo.getAvgCalls != 1 {
+		t.Errorf("GetAvgServiceSecPerOccupiedCounter: want 1 call, got %d", repo.getAvgCalls)
+	}
+	if len(snap.Tickets) != 20 {
+		t.Errorf("tickets in snapshot: want 20, got %d", len(snap.Tickets))
 	}
 }
 

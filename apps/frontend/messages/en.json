@@ -2066,6 +2066,7 @@
     "processing": "Processing...",
     "cancel": "Cancel",
     "confirm": "Confirm",
+    "staffing_toast_extra_counters": "+{count, plural, one {# extra counter} other {# extra counters}}",
     "pre_registration": {
       "badge": "PRE",
       "show_details_aria": "Show pre-registration details"

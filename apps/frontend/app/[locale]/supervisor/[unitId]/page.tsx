@@ -60,7 +60,9 @@ export default function ShiftDashboardPage({
       toast.warning(a.message, {
         description:
           a.recommendedExtraCounters != null
-            ? `+${a.recommendedExtraCounters} counters`
+            ? t('staffing_toast_extra_counters', {
+                count: a.recommendedExtraCounters
+              })
             : undefined
       });
     };
@@ -74,7 +76,7 @@ export default function ShiftDashboardPage({
       socketClient.offStaffingAlert(onStaff);
       socketClient.offAnomalyAlert(onAnom);
     };
-  }, [unitId]);
+  }, [unitId, t]);
 
   const [showEODDialog, setShowEODDialog] = useState(false);
   const [forceReleaseDialogOpen, setForceReleaseDialogOpen] = useState(false);

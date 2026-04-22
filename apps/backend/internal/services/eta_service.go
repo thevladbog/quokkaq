@@ -163,6 +163,11 @@ func (s *ETAService) ComputeUnitETASnapshot(unitID string) (UnitETASnapshot, err
 		return UnitETASnapshot{}, err
 	}
 
+	perCounter, err := s.ticketRepo.GetAvgServiceSecPerOccupiedCounter(unitID, etaCounterSamples)
+	if err != nil {
+		perCounter = nil
+	}
+
 	var estimatedWaitMinutes float64
 	if queueLength > 0 {
 		baseSec, _ := s.effectiveServiceSec(unitID, "", now)
@@ -171,7 +176,7 @@ func (s *ETAService) ComputeUnitETASnapshot(unitID string) (UnitETASnapshot, err
 			if divisor <= 0 {
 				divisor = 1
 			}
-			throughput := s.harmonicThroughputPerSec(unitID, baseSec, activeCounters)
+			throughput := harmonicThroughputFromOccupiedSamples(perCounter, baseSec, activeCounters)
 			if throughput > 0 {
 				estimatedWaitMinutes = (float64(queueLength) / throughput) / 60.0
 			} else {
@@ -193,10 +198,32 @@ func (s *ETAService) ComputeUnitETASnapshot(unitID string) (UnitETASnapshot, err
 	if err != nil {
 		return snap, err
 	}
+
+	uniqService := make(map[string]struct{}, len(waiting)+1)
+	for i := range waiting {
+		uniqService[waiting[i].ServiceID] = struct{}{}
+	}
+	baseSecByService := make(map[string]int, len(uniqService))
+	for sid := range uniqService {
+		sec, _ := s.effectiveServiceSec(unitID, sid, now)
+		baseSecByService[sid] = sec
+	}
+
+	throughputByBase := make(map[int]float64)
 	for i := range waiting {
 		t := &waiting[i]
 		pos := i + 1
-		etaSec := s.estimateWaitSecondsEnhanced(t, pos)
+		baseSec := baseSecByService[t.ServiceID]
+		var thr float64
+		if baseSec > 0 {
+			var have bool
+			thr, have = throughputByBase[baseSec]
+			if !have {
+				thr = harmonicThroughputFromOccupiedSamples(perCounter, baseSec, activeCounters)
+				throughputByBase[baseSec] = thr
+			}
+		}
+		etaSec := estimateWaitSecondsFromInputs(t, pos, baseSec, activeCounters, thr)
 		snap.Tickets = append(snap.Tickets, TicketETAInfo{
 			TicketID:         t.ID,
 			Position:         pos,
@@ -214,6 +241,7 @@ func (s *ETAService) ComputeUnitETASnapshot(unitID string) (UnitETASnapshot, err
 				}
 				return ids
 			}())
+			baseSecCache := make(map[string]int, len(perService))
 			for _, sc := range perService {
 				if sc.Count <= 0 {
 					continue
@@ -227,15 +255,23 @@ func (s *ETAService) ComputeUnitETASnapshot(unitID string) (UnitETASnapshot, err
 						info.ServiceName = svc.Name
 					}
 				}
-				baseSec, _ := s.effectiveServiceSec(unitID, sc.ServiceID, now)
+				baseSec, have := baseSecCache[sc.ServiceID]
+				if !have {
+					baseSec, _ = s.effectiveServiceSec(unitID, sc.ServiceID, now)
+					baseSecCache[sc.ServiceID] = baseSec
+				}
 				if baseSec > 0 {
 					divisor := activeCounters
 					if divisor <= 0 {
 						divisor = 1
 					}
-					throughput := s.harmonicThroughputPerSec(unitID, baseSec, activeCounters)
-					if throughput > 0 {
-						info.EstimatedWaitMinutes = float64(sc.Count) / throughput / 60.0
+					thr, haveThr := throughputByBase[baseSec]
+					if !haveThr {
+						thr = harmonicThroughputFromOccupiedSamples(perCounter, baseSec, activeCounters)
+						throughputByBase[baseSec] = thr
+					}
+					if thr > 0 {
+						info.EstimatedWaitMinutes = float64(sc.Count) / thr / 60.0
 					} else {
 						info.EstimatedWaitMinutes = float64(sc.Count) * float64(baseSec) / float64(divisor) / 60.0
 					}
@@ -363,12 +399,13 @@ func (s *ETAService) resolveTZ(unitID string) string {
 	return tz
 }
 
-func (s *ETAService) harmonicThroughputPerSec(unitID string, fallbackBaseSec int, activeCounters int64) float64 {
+// harmonicThroughputFromOccupiedSamples aggregates completions/sec from per-counter averages when present;
+// otherwise falls back to activeCounters/fallbackBaseSec. Used to avoid repeated DB reads in snapshots.
+func harmonicThroughputFromOccupiedSamples(perCounter map[string]float64, fallbackBaseSec int, activeCounters int64) float64 {
 	if activeCounters <= 0 {
 		activeCounters = 1
 	}
-	perCounter, err := s.ticketRepo.GetAvgServiceSecPerOccupiedCounter(unitID, etaCounterSamples)
-	if err != nil || len(perCounter) == 0 {
+	if len(perCounter) == 0 {
 		if fallbackBaseSec <= 0 {
 			return 0
 		}
@@ -389,27 +426,44 @@ func (s *ETAService) harmonicThroughputPerSec(unitID string, fallbackBaseSec int
 	return sumInverse
 }
 
-func (s *ETAService) estimateWaitSecondsEnhanced(ticket *models.Ticket, position int) int {
+func (s *ETAService) harmonicThroughputPerSec(unitID string, fallbackBaseSec int, activeCounters int64) float64 {
+	perCounter, err := s.ticketRepo.GetAvgServiceSecPerOccupiedCounter(unitID, etaCounterSamples)
+	if err != nil {
+		perCounter = nil
+	}
+	return harmonicThroughputFromOccupiedSamples(perCounter, fallbackBaseSec, activeCounters)
+}
+
+func estimateWaitSecondsFromInputs(ticket *models.Ticket, position int, baseSec int, activeCounters int64, throughput float64) int {
 	if ticket.Status != "waiting" || position <= 0 {
 		return 0
 	}
-	now := time.Now().UTC()
-	baseSec, _ := s.effectiveServiceSec(ticket.UnitID, ticket.ServiceID, now)
 	if baseSec <= 0 {
 		if ticket.MaxWaitingTime != nil && *ticket.MaxWaitingTime > 0 {
 			return *ticket.MaxWaitingTime
 		}
 		return 0
 	}
-
-	activeCounters, err := s.counterRepo.CountActive(ticket.UnitID)
-	if err != nil || activeCounters <= 0 {
+	if activeCounters <= 0 {
 		activeCounters = 1
 	}
-
-	throughput := s.harmonicThroughputPerSec(ticket.UnitID, baseSec, activeCounters)
 	if throughput > 0 {
 		return int(math.Round(float64(position) / throughput))
 	}
 	return (position * baseSec) / int(activeCounters)
+}
+
+func (s *ETAService) estimateWaitSecondsEnhanced(ticket *models.Ticket, position int) int {
+	now := time.Now().UTC()
+	baseSec, _ := s.effectiveServiceSec(ticket.UnitID, ticket.ServiceID, now)
+	activeCounters, err := s.counterRepo.CountActive(ticket.UnitID)
+	if err != nil || activeCounters <= 0 {
+		activeCounters = 1
+	}
+	perCounter, err := s.ticketRepo.GetAvgServiceSecPerOccupiedCounter(ticket.UnitID, etaCounterSamples)
+	if err != nil {
+		perCounter = nil
+	}
+	throughput := harmonicThroughputFromOccupiedSamples(perCounter, baseSec, activeCounters)
+	return estimateWaitSecondsFromInputs(ticket, position, baseSec, activeCounters, throughput)
 }

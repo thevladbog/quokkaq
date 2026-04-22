@@ -308,6 +308,11 @@ export class SocketClient {
   >();
 
   private onSlaEvent(event: string, callback: (data: SlaAlertPayload) => void) {
+    const prev = this.slaWrappers.get(callback);
+    if (prev) {
+      this.off(event, prev);
+      this.slaWrappers.delete(callback);
+    }
     const wrapper: Listener = (data) => {
       const parsed = SlaAlertPayloadSchema.safeParse(data);
       if (!parsed.success) {
@@ -364,6 +369,11 @@ export class SocketClient {
   }
 
   onEtaUpdate(callback: (data: UnitETASnapshot) => void) {
+    const prev = this.etaWrappers.get(callback);
+    if (prev) {
+      this.off('unit.eta_update', prev);
+      this.etaWrappers.delete(callback);
+    }
     const wrapper: Listener = (data) => {
       const parsed = UnitETASnapshotSchema.safeParse(data);
       if (!parsed.success) {
@@ -385,6 +395,11 @@ export class SocketClient {
   }
 
   onStaffingAlert(callback: (data: UnitStaffingAlert) => void) {
+    const prev = this.staffingWrappers.get(callback);
+    if (prev) {
+      this.off('unit.staffing_alert', prev);
+      this.staffingWrappers.delete(callback);
+    }
     const wrapper: Listener = (data) => {
       const parsed = UnitStaffingAlertSchema.safeParse(data);
       if (!parsed.success) {
@@ -406,6 +421,11 @@ export class SocketClient {
   }
 
   onAnomalyAlert(callback: (data: UnitAnomalyAlert) => void) {
+    const prev = this.anomalyWrappers.get(callback);
+    if (prev) {
+      this.off('unit.anomaly_alert', prev);
+      this.anomalyWrappers.delete(callback);
+    }
     const wrapper: Listener = (data) => {
       const parsed = UnitAnomalyAlertSchema.safeParse(data);
       if (!parsed.success) {
