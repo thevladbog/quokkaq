@@ -618,7 +618,7 @@ pnpm nx affected -t lint
 Запускается при push в **`release`**, если менялись `apps/marketing/` или `packages/`:
 
 - Повышает версию в `apps/marketing/package.json`
-- Собирает Docker-образ с Next.js standalone выводом
+- Собирает Docker-образ со standalone-выводом Next.js
 - Отправляет в Yandex Container Registry
 - Разворачивает на Yandex Cloud VM
 - Создает git тег: `vX.Y.Z-marketing`
@@ -653,10 +653,11 @@ pnpm nx affected -t lint
 Каждое приложение поддерживает свою собственную версию:
 
 - **Frontend**: `apps/frontend/package.json`
+- **Marketing**: `apps/marketing/package.json`
 - **Backend**: `apps/backend/VERSION`
 - **Kiosk**: `apps/kiosk-desktop/package.json`
 
-Git теги следуют паттерну: `v1.2.3-frontend`, `v1.2.3-backend`, `v1.2.3-kiosk`
+Git теги следуют паттерну: `v1.2.3-frontend`, `v1.2.3-marketing`, `v1.2.3-backend`, `v1.2.3-kiosk`
 
 Это позволяет разворачивать приложения независимо без ненужных повышений версий.
 

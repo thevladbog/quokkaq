@@ -633,10 +633,11 @@ Versions are bumped automatically based on commit messages:
 Each application maintains its own version:
 
 - **Frontend**: `apps/frontend/package.json`
+- **Marketing**: `apps/marketing/package.json`
 - **Backend**: `apps/backend/VERSION`
 - **Kiosk**: `apps/kiosk-desktop/package.json`
 
-Git tags follow the pattern: `v1.2.3-frontend`, `v1.2.3-backend`, `v1.2.3-kiosk`
+Git tags follow the pattern: `v1.2.3-frontend`, `v1.2.3-marketing`, `v1.2.3-backend`, `v1.2.3-kiosk`
 
 This allows deploying apps independently without unnecessary version bumps.
 

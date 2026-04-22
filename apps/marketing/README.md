@@ -6,16 +6,17 @@ Public-facing Next.js website for QuokkaQ — the modern queue management system
 
 ## Tech Stack
 
-| Technology | Version | Purpose |
-|---|---|---|
-| **Next.js** | 16.2+ (App Router) | Framework |
-| **React** | 19 | UI runtime |
-| **TypeScript** | 6 | Language |
-| **Tailwind CSS** | 4 | Styling |
-| **Orval** | 8 | OpenAPI → TypeScript client generation |
-| **Zod** | 4 | Runtime validation |
+| Technology       | Version            | Purpose                                |
+| ---------------- | ------------------ | -------------------------------------- |
+| **Next.js**      | 16.2+ (App Router) | Framework                              |
+| **React**        | 19                 | UI runtime                             |
+| **TypeScript**   | 6                  | Language                               |
+| **Tailwind CSS** | 4                  | Styling                                |
+| **Orval**        | 8                  | OpenAPI → TypeScript client generation |
+| **Zod**          | 4                  | Runtime validation                     |
 
 **Workspace packages used:**
+
 - `@quokkaq/shared-types` — shared Zod schemas and TypeScript types
 - `@quokkaq/subscription-pricing` — plan feature/limit definitions, pricing row builder, and price formatting utilities
 
@@ -90,9 +91,9 @@ Generated files live under `lib/api/generated/` and must not be edited manually.
 
 ## Environment Variables
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `NEXT_PUBLIC_API_URL` | No | `http://localhost:3001` | Backend base URL for fetching subscription plans |
+| Variable              | Required | Default                 | Description                                      |
+| --------------------- | -------- | ----------------------- | ------------------------------------------------ |
+| `NEXT_PUBLIC_API_URL` | No       | `http://localhost:3001` | Backend base URL for fetching subscription plans |
 
 ---
 
@@ -101,6 +102,7 @@ Generated files live under `lib/api/generated/` and must not be edited manually.
 Automated deployment is triggered by pushing to the `release` branch when `apps/marketing/` or `packages/` change.
 
 The pipeline:
+
 1. Bumps the **patch** version in `package.json` (or minor/major based on commit message keyword)
 2. Builds a Docker image using `output: 'standalone'`
 3. Pushes to **Yandex Container Registry**
@@ -109,14 +111,14 @@ The pipeline:
 
 ### Required GitHub Secrets
 
-| Secret | Purpose |
-|--------|---------|
-| `YC_REGISTRY_ID` | Yandex Container Registry ID |
+| Secret                   | Purpose                               |
+| ------------------------ | ------------------------------------- |
+| `YC_REGISTRY_ID`         | Yandex Container Registry ID          |
 | `YC_SA_JSON_CREDENTIALS` | Yandex Cloud service account JSON key |
-| `VM_HOST` | Deployment server host |
-| `VM_USERNAME` | SSH username |
-| `VM_SSH_KEY` | SSH private key |
-| `NEXT_PUBLIC_API_URL` | Production backend API URL |
+| `VM_HOST`                | Deployment server host                |
+| `VM_USERNAME`            | SSH username                          |
+| `VM_SSH_KEY`             | SSH private key                       |
+| `NEXT_PUBLIC_API_URL`    | Production backend API URL            |
 
 ### Docker
 
@@ -134,7 +136,7 @@ docker run -p 3010:3010 \
 
 ## Project Structure
 
-```
+```text
 apps/marketing/
 ├── app/                  # Next.js App Router pages and layouts
 ├── components/           # React components (landing, pricing, etc.)

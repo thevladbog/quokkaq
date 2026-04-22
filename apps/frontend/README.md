@@ -233,7 +233,7 @@ The `env.local` template:
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:3001
 NEXT_PUBLIC_APP_URL=http://localhost:3000
-NEXT_PUBLIC_WS_URL=http://localhost:3001
+NEXT_PUBLIC_WS_URL=ws://localhost:3001
 ```
 
 ### Run
@@ -314,5 +314,5 @@ Routes are prefixed with `/{locale}/` where `locale ∈ {en, ru}`. The `proxy.ts
 | `NEXT_PUBLIC_API_URL`      | Yes      | `http://localhost:3001` | Go backend base URL (browser-side)                |
 | `API_UPSTREAM_URL`         | No       | `NEXT_PUBLIC_API_URL`   | Server-side proxy upstream (for containers)       |
 | `NEXT_PUBLIC_APP_URL`      | No       | `http://localhost:3000` | Frontend public URL                               |
-| `NEXT_PUBLIC_WS_URL`       | Yes      | `http://localhost:3001` | WebSocket server URL (`wss://...` in production)  |
+| `NEXT_PUBLIC_WS_URL`       | Yes      | `ws://localhost:3001`   | WebSocket server URL (`wss://...` in production)  |
 | `NEXT_PUBLIC_OTEL_ENABLED` | No       | —                       | Set to `true` to enable browser OpenTelemetry RUM |
