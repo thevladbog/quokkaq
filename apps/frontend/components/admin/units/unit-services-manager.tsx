@@ -59,7 +59,17 @@ import {
 } from '@/lib/service-tree';
 import { cn, serviceTitleForLocale } from '@/lib/utils';
 import type { Service } from '@quokkaq/shared-types';
-import { Plus, Ticket, X } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import {
+  Clock,
+  Gauge,
+  Pencil,
+  Plus,
+  Ticket,
+  Timer,
+  Trash2,
+  X
+} from 'lucide-react';
 import { FolderIcon } from '@/src/components/ui/icons/akar-icons-folder';
 import {
   DropdownMenu,
@@ -67,10 +77,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
+import { Badge } from '@/components/ui/badge';
 
 interface UnitServicesManagerProps {
   unitId: string;
 }
+
+const UNIT_SERVICES_TABLE_COL_COUNT = 7;
 
 export function UnitServicesManager({ unitId }: UnitServicesManagerProps) {
   const [selectedUnitId] = useState<string>(unitId);
@@ -254,20 +267,42 @@ export function UnitServicesManager({ unitId }: UnitServicesManagerProps) {
             </Button>
           </div>
 
-          <Table>
+          <Table className='table-fixed'>
+            <colgroup>
+              <col style={{ width: '24%' }} />
+              <col style={{ width: '12%' }} />
+              <col style={{ width: '12%' }} />
+              <col style={{ width: '12%' }} />
+              <col style={{ width: '12%' }} />
+              <col style={{ width: '12%' }} />
+              <col style={{ width: '88px' }} />
+            </colgroup>
             <TableHeader>
               <TableRow>
                 <TableHead>{tServices('name')}</TableHead>
                 <TableHead>{tServices('column_zone')}</TableHead>
                 <TableHead>{tServices('ticket_prefix')}</TableHead>
-                <TableHead>{tServices('duration_short')}</TableHead>
-                <TableHead>{tServices('actions')}</TableHead>
+                <TableHead className='whitespace-normal'>
+                  {tServices('column_max_wait')}
+                </TableHead>
+                <TableHead className='whitespace-normal'>
+                  {tServices('column_avg_service')}
+                </TableHead>
+                <TableHead className='whitespace-normal'>
+                  {tServices('column_max_service')}
+                </TableHead>
+                <TableHead className='pr-2 text-right'>
+                  {tServices('actions')}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {servicesLoading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className='text-center'>
+                  <TableCell
+                    colSpan={UNIT_SERVICES_TABLE_COL_COUNT}
+                    className='text-center'
+                  >
                     {tServices('loading', {
                       defaultValue: 'Loading services...'
                     })}
@@ -275,7 +310,10 @@ export function UnitServicesManager({ unitId }: UnitServicesManagerProps) {
                 </TableRow>
               ) : services.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className='text-center'>
+                  <TableCell
+                    colSpan={UNIT_SERVICES_TABLE_COL_COUNT}
+                    className='text-center'
+                  >
                     {tServices('no_services_found', {
                       defaultValue: 'No services found'
                     })}
@@ -283,7 +321,10 @@ export function UnitServicesManager({ unitId }: UnitServicesManagerProps) {
                 </TableRow>
               ) : filteredTree.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className='text-center'>
+                  <TableCell
+                    colSpan={UNIT_SERVICES_TABLE_COL_COUNT}
+                    className='text-center'
+                  >
                     {tServices('no_match_filters')}
                   </TableCell>
                 </TableRow>
@@ -356,6 +397,34 @@ function indentPaddingClass(depth: number): string {
   return ['pl-0', 'pl-4', 'pl-8', 'pl-12', 'pl-16'][i]!;
 }
 
+function formatSlaDuration(totalSec: number): string {
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  if (m > 0 && s === 0) return `${m}m`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
+function DurationBadge({
+  seconds,
+  Icon,
+  variant = 'secondary'
+}: {
+  seconds?: number | null;
+  Icon: LucideIcon;
+  variant?: 'secondary' | 'destructive';
+}) {
+  if (seconds == null || seconds <= 0) {
+    return <span className='text-muted-foreground'>—</span>;
+  }
+  return (
+    <Badge variant={variant} className='max-w-full font-normal tabular-nums'>
+      <Icon className='shrink-0' aria-hidden />
+      <span className='min-w-0'>{formatSlaDuration(seconds)}</span>
+    </Badge>
+  );
+}
+
 function ServiceTreeRows({
   nodes,
   depth,
@@ -380,7 +449,12 @@ function ServiceTreeRows({
       {nodes.map((node) => (
         <Fragment key={node.id}>
           <TableRow>
-            <TableCell className={cn('font-medium', indentPaddingClass(depth))}>
+            <TableCell
+              className={cn(
+                'max-w-0 font-medium whitespace-normal',
+                indentPaddingClass(depth)
+              )}
+            >
               <div className='flex min-w-0 items-center gap-2'>
                 {node.isLeaf ? (
                   <Ticket
@@ -399,34 +473,67 @@ function ServiceTreeRows({
                 </span>
               </div>
             </TableCell>
-            <TableCell className='text-muted-foreground max-w-[14rem] truncate'>
-              {node.isLeaf && node.restrictedServiceZoneId?.trim()
-                ? (zoneNameById.get(node.restrictedServiceZoneId.trim()) ?? '—')
-                : '—'}
+            <TableCell className='text-muted-foreground max-w-0 whitespace-normal'>
+              <span className='block truncate'>
+                {node.isLeaf && node.restrictedServiceZoneId?.trim()
+                  ? (zoneNameById.get(node.restrictedServiceZoneId.trim()) ??
+                    '—')
+                  : '—'}
+              </span>
             </TableCell>
             <TableCell>{node.prefix || '-'}</TableCell>
-            <TableCell>
-              {node.duration
-                ? `${Math.floor(node.duration / 60)}m ${node.duration % 60}s`
-                : '-'}
+            <TableCell className='max-w-0 whitespace-normal'>
+              {!node.isLeaf ? (
+                <span className='text-muted-foreground'>—</span>
+              ) : (
+                <DurationBadge
+                  seconds={node.maxWaitingTime}
+                  Icon={Clock}
+                  variant='destructive'
+                />
+              )}
             </TableCell>
-            <TableCell>
-              <div className='flex flex-wrap gap-2'>
+            <TableCell className='max-w-0 whitespace-normal'>
+              <DurationBadge seconds={node.duration} Icon={Gauge} />
+            </TableCell>
+            <TableCell className='max-w-0 whitespace-normal'>
+              {!node.isLeaf ? (
+                <span className='text-muted-foreground'>—</span>
+              ) : (
+                <DurationBadge
+                  seconds={node.maxServiceTime}
+                  Icon={Timer}
+                  variant='destructive'
+                />
+              )}
+            </TableCell>
+            <TableCell className='w-[88px] max-w-[88px] p-2 text-right whitespace-nowrap'>
+              <div className='flex justify-end gap-0.5'>
                 <Button
-                  variant='outline'
-                  size='sm'
+                  type='button'
+                  variant='ghost'
+                  size='icon'
+                  className='size-8 shrink-0'
                   onClick={() => onEdit(node)}
+                  aria-label={tServices('edit')}
+                  title={tServices('edit')}
                 >
-                  {tServices('edit')}
+                  <Pencil className='size-4' aria-hidden />
                 </Button>
                 <Button
-                  variant='destructive'
-                  size='sm'
+                  type='button'
+                  variant='ghost'
+                  size='icon'
+                  className='text-destructive hover:bg-destructive/10 hover:text-destructive size-8 shrink-0'
                   onClick={() => onDelete(node.id)}
-                >
-                  {tRoot('general.delete', {
+                  aria-label={tRoot('general.delete', {
                     defaultValue: 'Delete'
                   })}
+                  title={tRoot('general.delete', {
+                    defaultValue: 'Delete'
+                  })}
+                >
+                  <Trash2 className='size-4' aria-hidden />
                 </Button>
               </div>
             </TableCell>
@@ -942,83 +1049,6 @@ function ServiceForm({
       ) : null}
 
       <div className='space-y-2'>
-        <Label htmlFor='duration'>
-          {tRoot('forms.fields.expected_duration')}
-        </Label>
-        <div className='flex items-end gap-2'>
-          <div className='flex-1'>
-            <Label
-              htmlFor='duration_minutes'
-              className='text-muted-foreground text-xs'
-            >
-              {tRoot('forms.fields.minutes', { defaultValue: 'Minutes' })}
-            </Label>
-            <Input
-              id='duration_minutes'
-              type='number'
-              min='0'
-              value={
-                formValues.duration
-                  ? Math.floor((formValues.duration || 0) / 60)
-                  : 0
-              }
-              onChange={(e) => {
-                const mins = parseInt(e.target.value) || 0;
-                const secs = (formValues.duration || 0) % 60;
-                setFormValues((prev) => ({
-                  ...prev,
-                  duration: mins * 60 + secs
-                }));
-              }}
-            />
-          </div>
-          <div className='flex-1'>
-            <Label
-              htmlFor='duration_seconds'
-              className='text-muted-foreground text-xs'
-            >
-              {tRoot('forms.fields.seconds', { defaultValue: 'Seconds' })}
-            </Label>
-            <Input
-              id='duration_seconds'
-              type='number'
-              min='0'
-              max='59'
-              value={formValues.duration ? (formValues.duration || 0) % 60 : 0}
-              onChange={(e) => {
-                const secs = parseInt(e.target.value) || 0;
-                const mins = Math.floor((formValues.duration || 0) / 60);
-                setFormValues((prev) => ({
-                  ...prev,
-                  duration: mins * 60 + secs
-                }));
-              }}
-            />
-          </div>
-          <Button
-            type='button'
-            variant='outline'
-            onClick={() =>
-              setFormValues((prev) => ({ ...prev, duration: undefined }))
-            }
-            disabled={
-              formValues.duration === undefined || formValues.duration === 0
-            }
-          >
-            {tRoot('general.clear', { defaultValue: 'Clear' })}
-          </Button>
-        </div>
-        <p className='text-muted-foreground text-xs'>
-          {tRoot('forms.fields.total', { defaultValue: 'Total' })}:{' '}
-          {formValues.duration || 0}{' '}
-          {tRoot('forms.fields.seconds', { defaultValue: 'seconds' })}
-        </p>
-        <p className='text-muted-foreground text-xs'>
-          {tRoot('forms.fields.expected_duration_hint')}
-        </p>
-      </div>
-
-      <div className='space-y-2'>
         <Label htmlFor='maxWaitingTime'>
           {tRoot('forms.fields.max_waiting_time')}
         </Label>
@@ -1095,6 +1125,83 @@ function ServiceForm({
         </p>
         <p className='text-muted-foreground text-xs'>
           {tRoot('forms.fields.max_waiting_time_hint')}
+        </p>
+      </div>
+
+      <div className='space-y-2'>
+        <Label htmlFor='duration'>
+          {tRoot('forms.fields.expected_duration')}
+        </Label>
+        <div className='flex items-end gap-2'>
+          <div className='flex-1'>
+            <Label
+              htmlFor='duration_minutes'
+              className='text-muted-foreground text-xs'
+            >
+              {tRoot('forms.fields.minutes', { defaultValue: 'Minutes' })}
+            </Label>
+            <Input
+              id='duration_minutes'
+              type='number'
+              min='0'
+              value={
+                formValues.duration
+                  ? Math.floor((formValues.duration || 0) / 60)
+                  : 0
+              }
+              onChange={(e) => {
+                const mins = parseInt(e.target.value) || 0;
+                const secs = (formValues.duration || 0) % 60;
+                setFormValues((prev) => ({
+                  ...prev,
+                  duration: mins * 60 + secs
+                }));
+              }}
+            />
+          </div>
+          <div className='flex-1'>
+            <Label
+              htmlFor='duration_seconds'
+              className='text-muted-foreground text-xs'
+            >
+              {tRoot('forms.fields.seconds', { defaultValue: 'Seconds' })}
+            </Label>
+            <Input
+              id='duration_seconds'
+              type='number'
+              min='0'
+              max='59'
+              value={formValues.duration ? (formValues.duration || 0) % 60 : 0}
+              onChange={(e) => {
+                const secs = parseInt(e.target.value) || 0;
+                const mins = Math.floor((formValues.duration || 0) / 60);
+                setFormValues((prev) => ({
+                  ...prev,
+                  duration: mins * 60 + secs
+                }));
+              }}
+            />
+          </div>
+          <Button
+            type='button'
+            variant='outline'
+            onClick={() =>
+              setFormValues((prev) => ({ ...prev, duration: undefined }))
+            }
+            disabled={
+              formValues.duration === undefined || formValues.duration === 0
+            }
+          >
+            {tRoot('general.clear', { defaultValue: 'Clear' })}
+          </Button>
+        </div>
+        <p className='text-muted-foreground text-xs'>
+          {tRoot('forms.fields.total', { defaultValue: 'Total' })}:{' '}
+          {formValues.duration || 0}{' '}
+          {tRoot('forms.fields.seconds', { defaultValue: 'seconds' })}
+        </p>
+        <p className='text-muted-foreground text-xs'>
+          {tRoot('forms.fields.expected_duration_hint')}
         </p>
       </div>
 

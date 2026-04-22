@@ -87,22 +87,27 @@ export function SupervisorShiftDashboard({
             <h1 className='text-3xl font-bold'>{t('pageTitle')}</h1>
             <p className='text-muted-foreground'>{unitName ?? '…'}</p>
           </div>
-          <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end'>
-            <Button variant='outline' size='sm' asChild className='shrink-0'>
+          <div className='flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-end'>
+            <Button variant='outline' asChild className='h-8 shrink-0'>
               <Link href='/staff/support'>
                 <Bug className='mr-2 h-4 w-4' aria-hidden />
                 {tStaffSupport('sidebarSupport')}
               </Link>
             </Button>
-            <TabsList className='grid w-full grid-cols-3 sm:inline-flex sm:w-auto'>
-              <TabsTrigger value='live'>{t('viewLive')}</TabsTrigger>
-              <TabsTrigger value='list'>{t('viewListGlobal')}</TabsTrigger>
-              <TabsTrigger value='timeline'>{t('viewTimeline')}</TabsTrigger>
+            <TabsList className='grid h-8 w-full grid-cols-3 sm:inline-flex sm:w-auto'>
+              <TabsTrigger value='live' className='h-full'>
+                {t('viewLive')}
+              </TabsTrigger>
+              <TabsTrigger value='list' className='h-full'>
+                {t('viewListGlobal')}
+              </TabsTrigger>
+              <TabsTrigger value='timeline' className='h-full'>
+                {t('viewTimeline')}
+              </TabsTrigger>
             </TabsList>
             <Button
               variant='destructive'
-              size='lg'
-              className='shrink-0'
+              className='h-8 shrink-0'
               onClick={onEod}
               disabled={eodPending}
             >

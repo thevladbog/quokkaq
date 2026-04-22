@@ -148,7 +148,7 @@ export function CalledTicketsTable({
                 >
                   {/* Слева: фиксированная зона талона | черта | статус (без flex-1 — иначе «центрируется» в строке) */}
                   <div className='flex min-w-0 shrink-0 flex-col gap-2 sm:flex-row sm:items-stretch sm:gap-0'>
-                    <div className='min-w-0 sm:w-[10.5rem] md:w-[12rem] lg:w-[13rem]'>
+                    <div className='min-w-0 sm:w-[14rem] md:w-[16rem] lg:w-[18rem]'>
                       <div
                         className={`mb-1 text-[10px] font-semibold tracking-wider uppercase md:text-xs ${labelTone}`}
                       >
@@ -164,7 +164,7 @@ export function CalledTicketsTable({
                       orientation='vertical'
                     />
 
-                    <div className='flex min-w-0 shrink-0 flex-col justify-center text-left sm:max-w-[16rem] sm:pl-2 md:max-w-[18rem] md:pl-3'>
+                    <div className='flex min-w-0 shrink-0 flex-col justify-center text-left sm:max-w-[20rem] sm:pl-2 md:max-w-[24rem] md:pl-3'>
                       <div
                         className={`mb-1 text-[10px] font-semibold tracking-wider uppercase md:text-xs ${labelTone}`}
                       >

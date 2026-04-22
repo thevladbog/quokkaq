@@ -531,7 +531,10 @@
       "language_english": "English",
       "english_fields_heading": "English (optional)",
       "name_ru_required": "Enter the name in Russian.",
-      "remove_english_block": "Remove English name and description"
+      "remove_english_block": "Remove English name and description",
+      "column_avg_service": "Avg. service time",
+      "column_max_wait": "Max wait time",
+      "column_max_service": "Max service time"
     },
     "users": {
       "title": "Users & Roles",

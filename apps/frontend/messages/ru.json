@@ -531,7 +531,10 @@
       "language_english": "Английский",
       "english_fields_heading": "Английский (необязательно)",
       "name_ru_required": "Укажите название на русском.",
-      "remove_english_block": "Убрать английские поля (название и описание)"
+      "remove_english_block": "Убрать английские поля (название и описание)",
+      "column_avg_service": "Среднее время обслуж.",
+      "column_max_wait": "Макс. время ожидания",
+      "column_max_service": "Макс. время обслуж."
     },
     "users": {
       "title": "Пользователи и роли",

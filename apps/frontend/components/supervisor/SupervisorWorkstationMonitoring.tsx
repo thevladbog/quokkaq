@@ -626,18 +626,23 @@ export function SupervisorWorkstationMonitoring({
   return (
     <Card data-testid='e2e-supervisor-workstation-monitoring'>
       <CardHeader className='flex flex-col gap-4'>
-        <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
-          <div>
+        <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
+          <div className='flex-1'>
             <CardTitle>{t('monitoringTitle')}</CardTitle>
             <CardDescription>{t('monitoringDescription')}</CardDescription>
           </div>
           <Tabs
             value={layout}
             onValueChange={(v) => setLayout(v as 'grid' | 'list')}
+            className='shrink-0'
           >
-            <TabsList className='shrink-0'>
-              <TabsTrigger value='grid'>{t('viewGrid')}</TabsTrigger>
-              <TabsTrigger value='list'>{t('viewList')}</TabsTrigger>
+            <TabsList className='grid w-full grid-cols-2'>
+              <TabsTrigger value='grid' className='text-sm'>
+                {t('viewGrid')}
+              </TabsTrigger>
+              <TabsTrigger value='list' className='text-sm'>
+                {t('viewList')}
+              </TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
