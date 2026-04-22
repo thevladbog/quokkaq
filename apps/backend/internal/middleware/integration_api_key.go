@@ -105,10 +105,12 @@ func IntegrationAPIKeyAuth(db *gorm.DB) func(http.Handler) http.Handler {
 			if row.UnitID != nil {
 				ctx = context.WithValue(ctx, IntegrationKeyUnitIDKey, *row.UnitID)
 			}
+			reqBase := r.Context()
 			go func(id string) {
-				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+				// WithoutCancel: touch should not abort when the HTTP request ends; parent still ties to request for gosec G118.
+				c, cancel := context.WithTimeout(context.WithoutCancel(reqBase), 2*time.Second)
 				defer cancel()
-				_ = repository.NewIntegrationAPIKeyRepository(db).TouchLastUsed(ctx, id)
+				_ = repository.NewIntegrationAPIKeyRepository(db).TouchLastUsed(c, id)
 			}(row.ID)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
