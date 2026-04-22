@@ -173,7 +173,9 @@ export function LandingPricing({
                             </span>
                           </div>
                         ) : isEnterpriseOnRequest ? (
-                          <span className='font-display text-3xl font-bold text-[color:var(--color-text)]'>
+                          <span
+                            className={`font-display text-[color:var(--color-text)] ${priceTypography}`}
+                          >
                             {copy.pricingFromApi.customPricing}
                           </span>
                         ) : (

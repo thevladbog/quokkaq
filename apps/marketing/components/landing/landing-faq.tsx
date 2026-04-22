@@ -36,12 +36,12 @@ export function LandingFaq({ copy }: Props) {
                 <button
                   type='button'
                   onClick={() => setOpenIndex(isOpen ? null : index)}
-                  className='focus-ring flex w-full items-start gap-4 p-6 text-left transition hover:bg-[color:var(--color-surface-elevated)]'
+                  className='focus-ring flex w-full items-center gap-4 p-6 text-left transition hover:bg-[color:var(--color-surface-elevated)]'
                   aria-expanded={isOpen}
                   aria-controls={panelId}
                 >
                   <span
-                    className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition ${
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition ${
                       isOpen
                         ? 'bg-[color:var(--color-primary)] text-white'
                         : 'bg-[color:var(--color-primary)]/10 text-[color:var(--color-primary)]'
@@ -63,7 +63,7 @@ export function LandingFaq({ copy }: Props) {
                       />
                     </svg>
                   </span>
-                  <span className='font-display text-lg font-semibold text-[color:var(--color-text)]'>
+                  <span className='font-display text-lg leading-snug font-bold text-[color:var(--color-text)]'>
                     {item.question}
                   </span>
                 </button>
