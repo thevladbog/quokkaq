@@ -68,6 +68,7 @@ export default function VirtualQueuePage() {
     if (!unitId || !wsRoomId) return;
     socketClient.connect(wsRoomId);
     const onEta = (snap: UnitETASnapshot) => {
+      if (snap.unitId !== wsRoomId) return;
       setQueueStatus({
         queueLength: snap.queueLength,
         estimatedWaitMinutes: snap.estimatedWaitMinutes,
@@ -191,7 +192,9 @@ export default function VirtualQueuePage() {
                     >
                       {svc.serviceName}: {svc.queueLength}
                       {svc.estimatedWaitMinutes > 0
-                        ? ` · ~${Math.round(svc.estimatedWaitMinutes)} min`
+                        ? ` · ${t('estimated_wait_short', {
+                            minutes: Math.round(svc.estimatedWaitMinutes)
+                          })}`
                         : ''}
                     </span>
                   ))}

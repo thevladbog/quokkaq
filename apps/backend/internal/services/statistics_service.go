@@ -893,7 +893,7 @@ type AnomalyAlertItem struct {
 	Kind      string    `json:"kind"`
 	Message   string    `json:"message"`
 	Severity  string    `json:"severity"`
-	CreatedAt time.Time `json:"createdAt"`
+	CreatedAt time.Time `json:"createdAt" swaggertype:"string" format:"date-time"`
 }
 
 // AnomalyAlertsResponse lists recent anomaly_alerts for a subdivision.

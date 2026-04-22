@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"sync"
 	"testing"
 	"time"
 
@@ -36,6 +37,7 @@ func TestMaybeBroadcastStaffingAlert_heuristicHighWait(t *testing.T) {
 	t.Parallel()
 	db := predictionTestDB(t)
 	hub := ws.NewHub()
+	t.Cleanup(hub.Stop)
 	go hub.Run()
 
 	unitID := "u1"
@@ -44,9 +46,22 @@ func TestMaybeBroadcastStaffingAlert_heuristicHighWait(t *testing.T) {
 		waitingByUnit: 20,
 		recentTimes:   map[string][]int{unitID + "|": {60, 60, 60, 60, 60}},
 	}
-	eta := NewETAServiceFull(ticketRepo, &etaCounterRepo{activeCount: 1}, &etaServiceRepo{}, nil, nil)
+	// statsRepo bucket fallback so queue ETA is non-zero without full ticket history (heuristic needs wait >= 12 min).
+	statsRepo := &etaStatsRepoStub{avgSec: 120, ok: true}
+	eta := NewETAServiceFull(ticketRepo, &etaCounterRepo{activeCount: 1}, &etaServiceRepo{}, nil, statsRepo)
 
-	unitRepo := &predUnitRepo{u: &models.Unit{ID: unitID, CompanyID: "unknown-company", Kind: models.UnitKindSubdivision}}
+	// Empty company ID skips DB plan lookup (CompanyAllowsAdvancedReports returns true).
+	unitRepo := &predUnitRepo{u: &models.Unit{ID: unitID, CompanyID: "", Kind: models.UnitKindSubdivision}}
+
+	var mu sync.Mutex
+	var sawStaff bool
+	hub.BroadcastHook = func(event, room string) {
+		if event == "unit.staffing_alert" && room == unitID {
+			mu.Lock()
+			sawStaff = true
+			mu.Unlock()
+		}
+	}
 
 	p := NewPredictionService(db, hub, eta, unitRepo, ticketRepo)
 
@@ -60,6 +75,13 @@ func TestMaybeBroadcastStaffingAlert_heuristicHighWait(t *testing.T) {
 	case <-done:
 	case <-time.After(2 * time.Second):
 		t.Fatal("MaybeBroadcastStaffingAlert blocked (is hub.Run() running?)")
+	}
+
+	mu.Lock()
+	ok := sawStaff
+	mu.Unlock()
+	if !ok {
+		t.Fatal("expected unit.staffing_alert broadcast for heuristic high-wait path")
 	}
 }
 

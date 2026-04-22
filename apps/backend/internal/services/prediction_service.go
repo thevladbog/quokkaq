@@ -3,6 +3,8 @@ package services
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"log/slog"
 	"math"
 	"strings"
 	"sync"
@@ -151,25 +153,7 @@ func (p *PredictionService) MaybeBroadcastStaffingAlert(ctx context.Context, uni
 	p.mu.Unlock()
 }
 
-func (p *PredictionService) strictestWaitSLASec(unitID string) *int {
-	tickets, err := p.ticketRepo.GetWaitingTicketsWithSLA(unitID)
-	if err != nil || len(tickets) == 0 {
-		waiting, werr := p.ticketRepo.GetWaitingTickets(unitID)
-		if werr != nil {
-			return nil
-		}
-		var best *int
-		for i := range waiting {
-			t := &waiting[i]
-			if t.MaxWaitingTime != nil && *t.MaxWaitingTime > 0 {
-				if best == nil || *t.MaxWaitingTime < *best {
-					v := *t.MaxWaitingTime
-					best = &v
-				}
-			}
-		}
-		return best
-	}
+func minPositiveMaxWaitingSec(tickets []models.Ticket) *int {
 	var best *int
 	for i := range tickets {
 		t := &tickets[i]
@@ -181,6 +165,21 @@ func (p *PredictionService) strictestWaitSLASec(unitID string) *int {
 		}
 	}
 	return best
+}
+
+func (p *PredictionService) strictestWaitSLASec(unitID string) *int {
+	tickets, err := p.ticketRepo.GetWaitingTicketsWithSLA(unitID)
+	if err != nil {
+		return nil
+	}
+	if len(tickets) > 0 {
+		return minPositiveMaxWaitingSec(tickets)
+	}
+	waiting, werr := p.ticketRepo.GetWaitingTickets(unitID)
+	if werr != nil {
+		return nil
+	}
+	return minPositiveMaxWaitingSec(waiting)
 }
 
 func (p *PredictionService) maybeHeuristicStaffingAlert(unitID string, summary UnitQueueSummary) {
@@ -233,35 +232,44 @@ func NewAnomalyService(db *gorm.DB, hub *ws.Hub, unitRepo repository.UnitReposit
 }
 
 // RunPeriodicCheck scans subdivision units for spike / slow-service / mass no-show anomalies.
-func (a *AnomalyService) RunPeriodicCheck(ctx context.Context) {
+func (a *AnomalyService) RunPeriodicCheck(ctx context.Context) error {
 	if a == nil || a.db == nil {
-		return
+		return nil
 	}
 	var ids []string
 	if err := a.db.WithContext(ctx).Model(&models.Unit{}).
 		Where("kind = ?", models.UnitKindSubdivision).
 		Pluck("id", &ids).Error; err != nil {
-		return
+		return fmt.Errorf("anomaly periodic: list subdivisions: %w", err)
 	}
 	for _, id := range ids {
-		a.checkUnit(ctx, id)
+		if err := a.checkUnit(ctx, id); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
-func (a *AnomalyService) checkUnit(ctx context.Context, unitID string) {
+func (a *AnomalyService) checkUnit(ctx context.Context, unitID string) error {
 	u, err := a.unitRepo.FindByIDLight(unitID)
-	if err != nil || u == nil {
-		return
+	if err != nil {
+		return fmt.Errorf("anomaly check unit %s: load unit: %w", unitID, err)
+	}
+	if u == nil {
+		return nil
 	}
 	ok, err := CompanyAllowsAdvancedReports(ctx, a.db, u.CompanyID)
-	if err != nil || !ok {
-		return
+	if err != nil {
+		return fmt.Errorf("anomaly check unit %s: plan feature: %w", unitID, err)
+	}
+	if !ok {
+		return nil
 	}
 
 	a.mu.Lock()
 	if last, ok := a.last[unitID]; ok && time.Since(last) < a.cooldown {
 		a.mu.Unlock()
-		return
+		return nil
 	}
 	a.mu.Unlock()
 
@@ -274,13 +282,13 @@ func (a *AnomalyService) checkUnit(ctx context.Context, unitID string) {
 	if err := a.db.WithContext(ctx).Raw(`
 SELECT COUNT(*) FROM tickets WHERE unit_id = ? AND is_eod = false AND created_at >= NOW() - INTERVAL '1 hour'
 `, unitID).Scan(&lastHour).Error; err != nil {
-		return
+		return fmt.Errorf("anomaly check unit %s: last hour arrivals: %w", unitID, err)
 	}
 
 	normArrivals := a.avgTicketsCreatedSameHourWeekday(ctx, unitID, tz)
 	if normArrivals >= 3 && float64(lastHour) > 2.0*normArrivals {
 		a.emit(ctx, unitID, "arrival_spike", "Ticket arrivals in the last hour are much higher than the usual level for this hour and weekday.")
-		return
+		return nil
 	}
 
 	var lastHourNoShow int64
@@ -288,12 +296,12 @@ SELECT COUNT(*) FROM tickets WHERE unit_id = ? AND is_eod = false AND created_at
 SELECT COUNT(*) FROM tickets WHERE unit_id = ? AND is_eod = false AND status = 'no_show'
   AND completed_at IS NOT NULL AND completed_at >= NOW() - INTERVAL '1 hour'
 `, unitID).Scan(&lastHourNoShow).Error; err != nil {
-		return
+		return fmt.Errorf("anomaly check unit %s: last hour no-show: %w", unitID, err)
 	}
 	normNoShow := a.avgNoShowSameHourWeekday(ctx, unitID, tz)
 	if normNoShow >= 1 && float64(lastHourNoShow) > 3.0*normNoShow {
 		a.emit(ctx, unitID, "mass_no_show", "No-show completions in the last hour are much higher than the usual level for this hour and weekday.")
-		return
+		return nil
 	}
 
 	var slowRatio float64
@@ -312,11 +320,12 @@ WITH last_hour AS (
 SELECT CASE WHEN day.v > 0 AND last_hour.v > 0 THEN last_hour.v / day.v ELSE 0 END
 FROM last_hour, day
 `, unitID, unitID).Scan(&slowRatio).Error; err != nil {
-		return
+		return fmt.Errorf("anomaly check unit %s: slow service ratio: %w", unitID, err)
 	}
 	if slowRatio > 2.0 {
 		a.emit(ctx, unitID, "slow_service", "Average service duration in the last hour is much higher than the recent baseline.")
 	}
+	return nil
 }
 
 func (a *AnomalyService) avgTicketsCreatedSameHourWeekday(ctx context.Context, unitID, tz string) float64 {
@@ -325,15 +334,16 @@ func (a *AnomalyService) avgTicketsCreatedSameHourWeekday(ctx context.Context, u
 SELECT AVG(daily_cnt) FROM (
   SELECT COUNT(*)::float AS daily_cnt
   FROM tickets t
-  WHERE t.unit_id::text = ?
+  WHERE t.unit_id = ?
     AND t.is_eod = false
+    AND (t.created_at AT TIME ZONE ?) >= ((CURRENT_TIMESTAMP AT TIME ZONE ?) - INTERVAL '56 days')
     AND (t.created_at AT TIME ZONE ?)::date < (CURRENT_TIMESTAMP AT TIME ZONE ?)::date
     AND EXTRACT(DOW FROM (t.created_at AT TIME ZONE ?)) = EXTRACT(DOW FROM (CURRENT_TIMESTAMP AT TIME ZONE ?))
     AND EXTRACT(HOUR FROM (t.created_at AT TIME ZONE ?)) = EXTRACT(HOUR FROM (CURRENT_TIMESTAMP AT TIME ZONE ?))
   GROUP BY (t.created_at AT TIME ZONE ?)::date
 ) sub
 `
-	if err := a.db.WithContext(ctx).Raw(q, unitID, tz, tz, tz, tz, tz, tz, tz).Scan(&v).Error; err != nil || !v.Valid {
+	if err := a.db.WithContext(ctx).Raw(q, unitID, tz, tz, tz, tz, tz, tz, tz, tz, tz).Scan(&v).Error; err != nil || !v.Valid {
 		return 0
 	}
 	return v.Float64
@@ -345,17 +355,18 @@ func (a *AnomalyService) avgNoShowSameHourWeekday(ctx context.Context, unitID, t
 SELECT AVG(daily_cnt) FROM (
   SELECT COUNT(*)::float AS daily_cnt
   FROM tickets t
-  WHERE t.unit_id::text = ?
+  WHERE t.unit_id = ?
     AND t.is_eod = false
     AND t.status = 'no_show'
     AND t.completed_at IS NOT NULL
+    AND (t.completed_at AT TIME ZONE ?) >= ((CURRENT_TIMESTAMP AT TIME ZONE ?) - INTERVAL '56 days')
     AND (t.completed_at AT TIME ZONE ?)::date < (CURRENT_TIMESTAMP AT TIME ZONE ?)::date
     AND EXTRACT(DOW FROM (t.completed_at AT TIME ZONE ?)) = EXTRACT(DOW FROM (CURRENT_TIMESTAMP AT TIME ZONE ?))
     AND EXTRACT(HOUR FROM (t.completed_at AT TIME ZONE ?)) = EXTRACT(HOUR FROM (CURRENT_TIMESTAMP AT TIME ZONE ?))
   GROUP BY (t.completed_at AT TIME ZONE ?)::date
 ) sub
 `
-	if err := a.db.WithContext(ctx).Raw(q, unitID, tz, tz, tz, tz, tz, tz, tz).Scan(&v).Error; err != nil || !v.Valid {
+	if err := a.db.WithContext(ctx).Raw(q, unitID, tz, tz, tz, tz, tz, tz, tz, tz, tz).Scan(&v).Error; err != nil || !v.Valid {
 		return 0
 	}
 	return v.Float64
@@ -370,7 +381,10 @@ func (a *AnomalyService) emit(ctx context.Context, unitID, kind, msg string) {
 		CreatedAt: time.Now().UTC(),
 	}
 	if a.alertRepo != nil {
-		_ = a.alertRepo.Create(ctx, row)
+		if err := a.alertRepo.Create(ctx, row); err != nil {
+			slog.Error("anomaly alert persist failed", "unit", unitID, "kind", kind, "err", err)
+			return
+		}
 	}
 	if a.hub == nil {
 		a.mu.Lock()

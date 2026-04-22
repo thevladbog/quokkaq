@@ -232,7 +232,12 @@ func run() error {
 	predictionService := services.NewPredictionService(database.DB, hub, etaService, unitRepo, ticketRepo)
 	etaBroadcaster := services.NewETABroadcaster(etaService, hub, 0)
 	etaBroadcaster.SetAfterFlush(func(unitID string) {
-		predictionService.MaybeBroadcastStaffingAlert(context.Background(), unitID)
+		uid := unitID
+		go func() {
+			ctx, cancel := context.WithTimeout(refreshCtx, 15*time.Second)
+			defer cancel()
+			predictionService.MaybeBroadcastStaffingAlert(ctx, uid)
+		}()
 	})
 	services.WireTicketServiceETAScheduler(ticketService, etaBroadcaster)
 	services.WireCounterServiceETAScheduler(counterService, etaBroadcaster)

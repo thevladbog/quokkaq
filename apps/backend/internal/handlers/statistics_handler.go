@@ -790,7 +790,7 @@ func (h *StatisticsHandler) GetStaffingForecast(w http.ResponseWriter, r *http.R
 // @Tags         statistics
 // @Security     BearerAuth
 // @Param        unitId path   string true  "Subdivision unit ID"
-// @Param        limit  query  int    false "Max rows (default 50, max 200)"
+// @Param        limit  query  int    false "Max rows" default(50) minimum(1) maximum(200)
 // @Success      200 {object} services.AnomalyAlertsResponse
 // @Failure      401 {string} string "Unauthorized"
 // @Failure      403 {string} string "Forbidden"

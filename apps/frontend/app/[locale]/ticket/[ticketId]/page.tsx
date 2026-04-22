@@ -105,8 +105,17 @@ export default function TicketPage() {
         // before registering socket listeners — otherwise duplicate handlers pile up.
         if (cancelled) return;
 
+        setLiveEta(null);
+        etaMaxRef.current = null;
+
         ticketRef.current = t_data;
         setTicket(t_data);
+        if (
+          t_data.estimatedWaitSeconds != null &&
+          t_data.estimatedWaitSeconds > 0
+        ) {
+          etaMaxRef.current = t_data.estimatedWaitSeconds;
+        }
 
         if (t_data?.unitId) {
           try {
@@ -186,11 +195,6 @@ export default function TicketPage() {
       if (pollingRef.current) clearInterval(pollingRef.current);
     };
   }, [ticketId, t, refreshTicket]);
-
-  useEffect(() => {
-    setLiveEta(null);
-    etaMaxRef.current = null;
-  }, [ticketId]);
 
   const getVisitorToken = () =>
     ticketId

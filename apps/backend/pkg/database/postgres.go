@@ -2310,6 +2310,27 @@ CREATE INDEX IF NOT EXISTS idx_anomaly_alerts_unit_created ON anomaly_alerts (un
 		return fmt.Errorf("failed to run v1.7.2_anomaly_alerts migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.7.3_anomaly_alerts_unit_fk", func(db *gorm.DB) error {
+		// When GORM runs with DisableForeignKeyConstraintWhenMigrating, CREATE TABLE may omit FK;
+		// add it on upgrades and fresh installs if missing.
+		return db.Exec(`
+DO $$
+BEGIN
+	IF NOT EXISTS (
+		SELECT 1 FROM pg_constraint
+		WHERE conname = 'fk_anomaly_alerts_unit_id'
+	) THEN
+		ALTER TABLE anomaly_alerts
+		ADD CONSTRAINT fk_anomaly_alerts_unit_id
+		FOREIGN KEY (unit_id) REFERENCES units(id) ON UPDATE CASCADE ON DELETE CASCADE;
+	END IF;
+END $$;
+`).Error
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.7.3_anomaly_alerts_unit_fk migration: %w", err)
+	}
+
 	fmt.Println("✅ All migrations completed successfully")
 	return nil
 }

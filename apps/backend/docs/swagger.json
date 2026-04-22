@@ -4192,6 +4192,7 @@
             "services.AnomalyAlertItem": {
                 "properties": {
                     "createdAt": {
+                        "format": "date-time",
                         "type": "string"
                     },
                     "id": {
@@ -22112,10 +22113,13 @@
                         }
                     },
                     {
-                        "description": "Max rows (default 50, max 200)",
+                        "description": "Max rows",
                         "in": "query",
                         "name": "limit",
                         "schema": {
+                            "default": 50,
+                            "maximum": 200,
+                            "minimum": 1,
                             "type": "integer"
                         }
                     }

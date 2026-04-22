@@ -376,18 +376,26 @@ export function StaffingForecastPanel({
                 />
                 <YAxis tick={{ fontSize: 10 }} allowDecimals />
                 <Tooltip
-                  formatter={(v, name) => [
-                    typeof v === 'number' ? v.toFixed(1) : String(v ?? ''),
-                    name === 'expectedArrivals'
-                      ? t('sf_expected_arrivals')
-                      : String(name)
-                  ]}
+                  formatter={(v, name) => {
+                    let label: string;
+                    if (name === 'expectedArrivals')
+                      label = t('sf_expected_arrivals');
+                    else if (name === 'arrivalsHigh')
+                      label = t('sf_arrivals_high');
+                    else if (name === 'arrivalsLow')
+                      label = t('sf_arrivals_low');
+                    else label = String(name);
+                    return [
+                      typeof v === 'number' ? v.toFixed(1) : String(v ?? ''),
+                      label
+                    ];
+                  }}
                   labelFormatter={(label) => String(label)}
                 />
                 <Line
                   type='monotone'
                   dataKey='arrivalsHigh'
-                  name='high'
+                  name='arrivalsHigh'
                   stroke='hsl(var(--muted-foreground))'
                   strokeWidth={1}
                   strokeDasharray='4 3'
@@ -396,7 +404,7 @@ export function StaffingForecastPanel({
                 <Line
                   type='monotone'
                   dataKey='arrivalsLow'
-                  name='low'
+                  name='arrivalsLow'
                   stroke='hsl(var(--muted-foreground))'
                   strokeWidth={1}
                   strokeDasharray='4 3'
@@ -415,37 +423,41 @@ export function StaffingForecastPanel({
         </div>
       )}
 
-      <div className='space-y-2 rounded-lg border border-dashed p-3'>
-        <p className='text-foreground text-sm font-medium'>
-          {t('sf_ai_recommendations_title')}
-        </p>
-        <ul className='text-muted-foreground list-inside list-disc space-y-1 text-xs'>
-          <li>
-            {t('sf_ai_peak_line', {
-              hour: fmtHour(summary?.peakHour ?? 0),
-              n: (summary?.peakArrivals ?? 0).toFixed(0)
-            })}
-          </li>
-          {(data.loadTrendPct ?? 0) !== 0 ? (
-            <li>
-              {(data.loadTrendPct ?? 0) > 0
-                ? t('sf_ai_trend_up_line', {
-                    pct: Math.abs(data.loadTrendPct ?? 0).toFixed(1)
-                  })
-                : t('sf_ai_trend_down_line', {
-                    pct: Math.abs(data.loadTrendPct ?? 0).toFixed(1)
+      {summary != null &&
+        hourlyData.length > 0 &&
+        (summary.peakArrivals ?? 0) > 0 && (
+          <div className='space-y-2 rounded-lg border border-dashed p-3'>
+            <p className='text-foreground text-sm font-medium'>
+              {t('sf_ai_recommendations_title')}
+            </p>
+            <ul className='text-muted-foreground list-inside list-disc space-y-1 text-xs'>
+              <li>
+                {t('sf_ai_peak_line', {
+                  hour: fmtHour(summary.peakHour ?? 0),
+                  n: (summary.peakArrivals ?? 0).toFixed(0)
+                })}
+              </li>
+              {(data.loadTrendPct ?? 0) !== 0 ? (
+                <li>
+                  {(data.loadTrendPct ?? 0) > 0
+                    ? t('sf_ai_trend_up_line', {
+                        pct: Math.abs(data.loadTrendPct ?? 0).toFixed(1)
+                      })
+                    : t('sf_ai_trend_down_line', {
+                        pct: Math.abs(data.loadTrendPct ?? 0).toFixed(1)
+                      })}
+                </li>
+              ) : null}
+              {(data.arrivalUncertaintyPct ?? 0) > 12 ? (
+                <li>
+                  {t('sf_ai_volatile_line', {
+                    pct: (data.arrivalUncertaintyPct ?? 0).toFixed(1)
                   })}
-            </li>
-          ) : null}
-          {(data.arrivalUncertaintyPct ?? 0) > 12 ? (
-            <li>
-              {t('sf_ai_volatile_line', {
-                pct: (data.arrivalUncertaintyPct ?? 0).toFixed(1)
-              })}
-            </li>
-          ) : null}
-        </ul>
-      </div>
+                </li>
+              ) : null}
+            </ul>
+          </div>
+        )}
 
       <p className='text-muted-foreground text-xs'>
         {t('sf_erlang_hint', {

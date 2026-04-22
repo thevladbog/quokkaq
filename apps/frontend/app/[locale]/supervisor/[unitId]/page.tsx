@@ -60,7 +60,7 @@ export default function ShiftDashboardPage({
       toast.warning(a.message, {
         description:
           a.recommendedExtraCounters != null
-            ? t('staffing_toast_extra_counters', {
+            ? t('staffing_alert_extra_counters', {
                 count: a.recommendedExtraCounters
               })
             : undefined

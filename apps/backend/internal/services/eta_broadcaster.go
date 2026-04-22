@@ -23,6 +23,8 @@ type ETABroadcaster struct {
 	pending    map[string]*time.Timer
 	debounce   time.Duration
 	afterFlush func(unitID string)
+	// flushGen increments on each Schedule for a unit; stale timer callbacks exit without touching state.
+	flushGen map[string]uint64
 }
 
 // NewETABroadcaster creates a debounced ETA broadcaster. hub or eta may be nil (no-op).
@@ -35,6 +37,7 @@ func NewETABroadcaster(eta *ETAService, hub *ws.Hub, debounce time.Duration) *ET
 		hub:      hub,
 		pending:  make(map[string]*time.Timer),
 		debounce: debounce,
+		flushGen: make(map[string]uint64),
 	}
 }
 
@@ -43,7 +46,9 @@ func (b *ETABroadcaster) SetAfterFlush(f func(unitID string)) {
 	if b == nil {
 		return
 	}
+	b.mu.Lock()
 	b.afterFlush = f
+	b.mu.Unlock()
 }
 
 // Schedule enqueues a debounced ETA snapshot broadcast for the unit.
@@ -59,14 +64,22 @@ func (b *ETABroadcaster) Schedule(unitID string) {
 	if t, ok := b.pending[unitID]; ok {
 		t.Stop()
 	}
-	b.pending[unitID] = time.AfterFunc(b.debounce, func() { b.flush(unitID) })
+	b.flushGen[unitID]++
+	gen := b.flushGen[unitID]
+	b.pending[unitID] = time.AfterFunc(b.debounce, func() { b.flush(unitID, gen) })
 	b.mu.Unlock()
 }
 
-func (b *ETABroadcaster) flush(unitID string) {
+func (b *ETABroadcaster) flush(unitID string, gen uint64) {
 	b.mu.Lock()
+	if b.flushGen[unitID] != gen {
+		b.mu.Unlock()
+		return
+	}
 	delete(b.pending, unitID)
+	after := b.afterFlush
 	b.mu.Unlock()
+
 	if b.eta == nil || b.hub == nil {
 		return
 	}
@@ -75,8 +88,8 @@ func (b *ETABroadcaster) flush(unitID string) {
 		return
 	}
 	b.hub.BroadcastEvent("unit.eta_update", snap, unitID)
-	if b.afterFlush != nil {
-		b.afterFlush(unitID)
+	if after != nil {
+		after(unitID)
 	}
 }
 

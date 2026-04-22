@@ -291,12 +291,9 @@ func ewmaSeconds(samples []int, alpha float64) int {
 	if alpha <= 0 || alpha > 1 {
 		alpha = etaEWMAAlpha
 	}
-	// Repository returns newest-first; process oldest-first for EWMA.
-	for i, j := 0, len(samples)-1; i < j; i, j = i+1, j-1 {
-		samples[i], samples[j] = samples[j], samples[i]
-	}
-	e := float64(samples[0])
-	for i := 1; i < len(samples); i++ {
+	// Repository returns newest-first; integrate oldest-first without mutating the slice.
+	e := float64(samples[len(samples)-1])
+	for i := len(samples) - 2; i >= 0; i-- {
 		e = alpha*float64(samples[i]) + (1-alpha)*e
 	}
 	return int(math.Round(e))

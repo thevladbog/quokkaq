@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"time"
 
 	"quokkaq-go-backend/internal/services"
 
@@ -79,7 +80,11 @@ func (c *jobClient) EnqueueVisitorNotifyRaw(payload VisitorNotifyPayload) error 
 
 func (c *jobClient) EnqueueAnomalyCheck() error {
 	task := asynq.NewTask(TypeAnomalyCheck, []byte("{}"))
-	_, err := c.client.Enqueue(task, asynq.Queue("low"), asynq.MaxRetry(1))
+	_, err := c.client.Enqueue(task,
+		asynq.Queue("low"),
+		asynq.MaxRetry(1),
+		asynq.Unique(10*time.Minute),
+	)
 	return err
 }
 

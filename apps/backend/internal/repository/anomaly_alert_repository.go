@@ -33,12 +33,15 @@ func (r *anomalyAlertRepository) Create(ctx context.Context, row *models.Anomaly
 }
 
 func (r *anomalyAlertRepository) ListByUnit(ctx context.Context, unitID string, limit int) ([]models.AnomalyAlert, error) {
-	if limit <= 0 || limit > 500 {
+	switch {
+	case limit <= 0:
 		limit = 100
+	case limit > 500:
+		limit = 500
 	}
 	var rows []models.AnomalyAlert
 	err := r.db.WithContext(ctx).
-		Where("unit_id::text = ?", unitID).
+		Where("unit_id = ?", unitID).
 		Order("created_at DESC").
 		Limit(limit).
 		Find(&rows).Error

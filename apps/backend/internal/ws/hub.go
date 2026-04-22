@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"quokkaq-go-backend/internal/logger"
+	"sync"
 	"time"
 )
 
@@ -34,6 +35,12 @@ type Hub struct {
 
 	// activeRoomsQuery requests a snapshot of rooms that have at least one client.
 	activeRoomsQuery chan activeRoomsRequest
+
+	quit     chan struct{}
+	stopOnce sync.Once
+
+	// BroadcastHook is optional; used in tests to observe BroadcastEvent calls (nil in production).
+	BroadcastHook func(event, roomID string)
 }
 
 type BroadcastMessage struct {
@@ -55,12 +62,23 @@ func NewHub() *Hub {
 		clients:          make(map[*Client]bool),
 		rooms:            make(map[string]map[*Client]bool),
 		activeRoomsQuery: make(chan activeRoomsRequest),
+		quit:             make(chan struct{}),
 	}
+}
+
+// Stop ends the hub loop; safe to call once from shutdown or tests.
+func (h *Hub) Stop() {
+	if h == nil {
+		return
+	}
+	h.stopOnce.Do(func() { close(h.quit) })
 }
 
 func (h *Hub) Run() {
 	for {
 		select {
+		case <-h.quit:
+			return
 		case client := <-h.register:
 			h.clients[client] = true
 		case client := <-h.unregister:
@@ -117,6 +135,9 @@ func (h *Hub) Run() {
 }
 
 func (h *Hub) BroadcastEvent(event string, data interface{}, roomID string) {
+	if h.BroadcastHook != nil {
+		h.BroadcastHook(event, roomID)
+	}
 	msg := map[string]interface{}{
 		"event": event,
 		"data":  data,

@@ -234,6 +234,5 @@ func (w *jobWorker) handleAnomalyCheck(ctx context.Context, _ *asynq.Task) error
 	if w.anomalySvc == nil {
 		return nil
 	}
-	w.anomalySvc.RunPeriodicCheck(ctx)
-	return nil
+	return w.anomalySvc.RunPeriodicCheck(ctx)
 }

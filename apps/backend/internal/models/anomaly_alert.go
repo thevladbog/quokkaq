@@ -8,7 +8,7 @@ type AnomalyAlert struct {
 	UnitID    string    `gorm:"not null;index" json:"unitId"`
 	Kind      string    `gorm:"not null" json:"kind"`
 	Message   string    `gorm:"type:text;not null" json:"message"`
-	Severity  string    `gorm:"not null;default:warning" json:"severity"`
+	Severity  string    `gorm:"not null;default:'warning'" json:"severity"`
 	CreatedAt time.Time `gorm:"not null" json:"createdAt"`
 
 	Unit Unit `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-" swaggerignore:"true"`
