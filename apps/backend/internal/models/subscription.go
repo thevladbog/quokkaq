@@ -8,7 +8,9 @@ import (
 	"gorm.io/gorm"
 )
 
-// SubscriptionPlan represents a subscription tier with features and limits
+// SubscriptionPlan represents a subscription tier with features and limits.
+// Catalog plans use interval "month" for recurring monthly billing; annual prepay checkout is enabled when exactly one of
+// annualPrepayDiscountPercent (1–100) or annualPrepayPricePerMonth (minor units) is set (mutually exclusive).
 type SubscriptionPlan struct {
 	ID       string          `gorm:"primaryKey" json:"id"`
 	Name     string          `gorm:"not null" json:"name"` // Primary display name (e.g. Russian on RU marketing)
@@ -37,9 +39,13 @@ type SubscriptionPlan struct {
 	//   "per_unit" – price per subdivision per billing period; total = price * active_subdivisions
 	//   "flat"     – fixed price per billing period (legacy; use only for grandfathered plans)
 	// enums: flat,per_unit
-	PricingModel string    `gorm:"not null;default:'per_unit';column:pricing_model" json:"pricingModel" enums:"flat,per_unit"`
-	CreatedAt    time.Time `gorm:"autoCreateTime" json:"createdAt"`
-	UpdatedAt    time.Time `gorm:"autoUpdateTime" json:"updatedAt"`
+	PricingModel string `gorm:"not null;default:'per_unit';column:pricing_model" json:"pricingModel" enums:"flat,per_unit"`
+	// AnnualPrepayDiscountPercent when set (1–100, interval must be month): yearly checkout uses price*12*(100-pct)/100.
+	AnnualPrepayDiscountPercent *int `gorm:"column:annual_prepay_discount_percent" json:"annualPrepayDiscountPercent,omitempty" minimum:"1" maximum:"100"`
+	// AnnualPrepayPricePerMonth when set (minor units, interval month): yearly checkout uses this * 12 per year.
+	AnnualPrepayPricePerMonth *int64    `gorm:"column:annual_prepay_price_per_month" json:"annualPrepayPricePerMonth,omitempty" minimum:"1"`
+	CreatedAt                 time.Time `gorm:"autoCreateTime" json:"createdAt"`
+	UpdatedAt                 time.Time `gorm:"autoUpdateTime" json:"updatedAt"`
 }
 
 // BeforeCreate assigns a UUID when ID is empty so inserts work without a DB default (Postgres gen_random_uuid is not portable to SQLite tests).

@@ -297,3 +297,38 @@ body.doc-scroll-active::-webkit-scrollbar-thumb:hover {
     transition: none;
   }
 }
+
+/* Annual prepay discount pill on landing pricing cards */
+.landing-annual-bubble {
+  filter: drop-shadow(0 2px 4px rgb(0 0 0 / 0.2));
+}
+
+.landing-annual-bubble__body {
+  position: relative;
+  padding: 0.38rem 0.58rem 0.32rem;
+  border-radius: 999px;
+  color: var(--color-text);
+  background: linear-gradient(
+    145deg,
+    rgb(253 230 138 / 0.96),
+    rgb(252 211 77 / 0.99)
+  );
+  border: 1.5px solid rgb(217 119 6 / 0.55);
+  transform: rotate(-6deg);
+}
+
+.dark .landing-annual-bubble__body {
+  background: linear-gradient(
+    145deg,
+    rgb(253 224 71 / 0.24),
+    rgb(245 158 11 / 0.22)
+  );
+  border-color: rgb(251 191 36 / 0.48);
+  color: rgb(254 249 195);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-annual-bubble__body {
+    transform: none;
+  }
+}

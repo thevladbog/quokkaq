@@ -40,6 +40,38 @@ export function getLocalizedName(
   return getLocalizedValue(name, nameRu, nameEn, currentLocale);
 }
 
+/**
+ * Service heading for UI grids/lists: prefers `nameRu`/`nameEn` for that locale,
+ * then canonical `name`, then the other locale (same idea as `ticketServiceDisplayName`).
+ * If everything is empty, falls back to a short `id` hint so broken API payloads are still distinguishable.
+ */
+export function serviceTitleForLocale(
+  service: {
+    id?: string;
+    name: string;
+    nameRu?: string | null;
+    nameEn?: string | null;
+  },
+  currentLocale: string
+): string {
+  const loc = primaryLocaleTag(currentLocale);
+  const n = (service.name ?? '').trim();
+  const ru = (service.nameRu ?? '').trim();
+  const en = (service.nameEn ?? '').trim();
+  let out = '';
+  if (loc === 'ru') {
+    out = ru || n || en;
+  } else if (loc === 'en') {
+    out = en || n || ru;
+  } else {
+    out = n || ru || en;
+  }
+  if (out) return out;
+  const id = service.id?.trim();
+  if (id && id.length > 8) return `${id.slice(0, 8)}…`;
+  return id ?? '';
+}
+
 // Get initials from user name
 export function getInitials(name?: string): string {
   if (!name) return 'U';

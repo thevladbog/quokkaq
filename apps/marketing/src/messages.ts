@@ -76,7 +76,12 @@ export type HomeMessages = {
   interfaceShowcase: {
     heading: string;
     subheading: string;
-    items: Array<{ title: string; description: string }>;
+    items: Array<{
+      title: string;
+      description: string;
+      image: string;
+      imageAlt: string;
+    }>;
   };
   useCases: {
     heading: string;
@@ -109,6 +114,18 @@ export type HomeMessages = {
     perYear: string;
     /** Label for per-unit pricing model: "/ unit / mo". */
     perUnitPerMonth?: string;
+    /** Billing period toggle (shown when at least one plan has annual prepay). */
+    billingToggleMonth: string;
+    billingToggleAnnual: string;
+    /** Accessible name for the billing period tablist (not the same as the "Monthly" tab label). */
+    billingToggleGroupLabel: string;
+    /** Secondary line under price when annual toggle is on (12-month prepay). */
+    billedAnnuallyFootnote: string;
+    /**
+     * Pill on a plan card in annual mode; `{percent}` is the plan’s discount %
+     * (explicit or equivalent from fixed effective monthly).
+     */
+    annualPrepayBubbleLabel: string;
     popularBadge: string;
     /** Top pill on enterprise (sales-led) when not the promoted plan. */
     enterpriseBadge: string;
@@ -292,22 +309,34 @@ export const messages: Record<
           {
             title: 'Check-in Kiosk',
             description:
-              'Large buttons, clear categories, instant ticket printing. Accessible for all ages.'
+              'Self-service ticket kiosk with large touch-friendly buttons, clear service categories, and instant ticket printing. Multilingual interface accessible for all ages and abilities. Perfect for high-traffic environments like government offices, healthcare facilities, and retail locations.',
+            image: '/kiosk.png',
+            imageAlt:
+              'QuokkaQ self-service kiosk interface showing service selection screen with large buttons for taking tickets and arranging services'
           },
           {
             title: 'Public Display',
             description:
-              'High-contrast design visible from distance. Shows current numbers and wait estimates.'
+              'High-contrast digital queue display board visible from distance. Shows currently serving ticket numbers, wait time estimates, and real-time queue status. Optimized for TV screens and digital signage in waiting areas.',
+            image: '/public_screen.png',
+            imageAlt:
+              'QuokkaQ public display screen showing currently serving tickets with numbers, status, and queue information on a large digital board'
           },
           {
             title: 'Staff Dashboard',
             description:
-              'Dense information layout with keyboard shortcuts. Built for speed and efficiency.'
+              'Efficient employee workstation interface with keyboard shortcuts for calling tickets, transferring between counters, and managing queue flow. Dense information layout designed for speed and productivity during peak hours.',
+            image: '/desk.png',
+            imageAlt:
+              'QuokkaQ staff dashboard interface showing ticket queue management, call controls, and visitor service workflow for employees'
           },
           {
-            title: 'Admin Panel',
+            title: 'Supervisor Panel',
             description:
-              'Configure services, manage locations, view analytics, and control system settings.'
+              'Real-time monitoring and analytics dashboard for queue supervisors. View active workstations, service metrics, wait times, and staff performance. Configure services, manage multiple locations, and access detailed reporting.',
+            image: '/supervisor.png',
+            imageAlt:
+              'QuokkaQ supervisor panel showing real-time queue analytics, workstation monitoring, and management dashboard for administrators'
           }
         ]
       },
@@ -412,6 +441,11 @@ export const messages: Record<
         perMonth: '/mo',
         perYear: '/yr',
         perUnitPerMonth: '/ unit / mo',
+        billingToggleMonth: 'Monthly',
+        billingToggleAnnual: '12 months',
+        billingToggleGroupLabel: 'Billing period',
+        billedAnnuallyFootnote: 'Billed annually (12 months)',
+        annualPrepayBubbleLabel: '−{percent}% annual',
         popularBadge: 'Recommended',
         /** Shown on enterprise plan pill (product term, same in all locales). */
         enterpriseBadge: 'Enterprise',
@@ -622,22 +656,34 @@ export const messages: Record<
           {
             title: 'Киоск регистрации',
             description:
-              'Крупные кнопки, чёткие категории, мгновенная печать талонов. Доступно для всех возрастов.'
+              'Киоск самообслуживания с крупными сенсорными кнопками, чёткими категориями услуг и мгновенной печатью талонов. Мультиязычный интерфейс доступен для всех возрастов и уровней подготовки. Идеально подходит для мест с высоким трафиком: государственных учреждений, медицинских центров и точек обслуживания клиентов.',
+            image: '/kiosk.png',
+            imageAlt:
+              'Интерфейс киоска самообслуживания QuokkaQ с экраном выбора услуг и крупными кнопками для получения талонов'
           },
           {
             title: 'Публичное табло',
             description:
-              'Высококонтрастный дизайн, видимый издалека. Показывает текущие номера и оценку времени ожидания.'
+              'Высококонтрастное цифровое табло очередей, видимое издалека. Показывает номера обслуживаемых талонов, оценку времени ожидания и статус очереди в реальном времени. Оптимизировано для телевизоров и цифровых вывесок в зонах ожидания.',
+            image: '/public_screen.png',
+            imageAlt:
+              'Публичное табло QuokkaQ, показывающее текущие обслуживаемые талоны с номерами, статусом и информацией об очереди на большом экране'
           },
           {
             title: 'Панель персонала',
             description:
-              'Плотная компоновка информации с клавиатурными сокращениями. Создана для скорости и эффективности.'
+              'Эффективный интерфейс рабочего места сотрудника с клавиатурными сокращениями для вызова талонов, перевода между окнами и управления потоком очереди. Плотная компоновка информации для скорости и продуктивности в часы пик.',
+            image: '/desk.png',
+            imageAlt:
+              'Рабочая панель персонала QuokkaQ с управлением очередью талонов, элементами вызова и процессом обслуживания посетителей'
           },
           {
-            title: 'Панель администратора',
+            title: 'Панель супервайзера',
             description:
-              'Настройка услуг, управление точками, просмотр аналитики и контроль системных настроек.'
+              'Дашборд мониторинга и аналитики очередей для супервайзеров в реальном времени. Просмотр активных рабочих мест, метрик обслуживания, времени ожидания и эффективности персонала. Настройка услуг, управление несколькими точками и доступ к детальным отчётам.',
+            image: '/supervisor.png',
+            imageAlt:
+              'Панель супервайзера QuokkaQ с аналитикой очередей в реальном времени, мониторингом рабочих мест и административной панелью'
           }
         ]
       },
@@ -743,6 +789,11 @@ export const messages: Record<
         perMonth: '/мес',
         perYear: '/год',
         perUnitPerMonth: '/ подр. / мес',
+        billingToggleMonth: 'Месяц',
+        billingToggleAnnual: '12 месяцев',
+        billingToggleGroupLabel: 'Период оплаты',
+        billedAnnuallyFootnote: 'Оплата за 12 месяцев',
+        annualPrepayBubbleLabel: '−{percent}% за год',
         popularBadge: 'Рекомендуем',
         enterpriseBadge: 'Enterprise',
         startTrial: 'Начать пробный период',

@@ -287,7 +287,7 @@ func run() error {
 		}
 	}
 	subscriptionSvc := services.NewSubscriptionService(subscriptionRepo, userRepo, companyRepo, leadIssueService)
-	subscriptionHandler := handlers.NewSubscriptionHandler(subscriptionRepo, userRepo, companyRepo, paymentProvider, subscriptionSvc)
+	subscriptionHandler := handlers.NewSubscriptionHandler(subscriptionRepo, userRepo, companyRepo, unitRepo, paymentProvider, subscriptionSvc)
 	yShop := strings.TrimSpace(os.Getenv("YOOKASSA_SHOP_ID"))
 	ySecret := strings.TrimSpace(os.Getenv("YOOKASSA_SECRET_KEY"))
 	yWebhook := strings.TrimSpace(os.Getenv("YOOKASSA_WEBHOOK_SECRET"))

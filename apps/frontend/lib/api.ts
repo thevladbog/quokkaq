@@ -1416,9 +1416,13 @@ export const subscriptionsApi = {
     return z.array(SubscriptionPlanSchema).parse(res.data ?? []);
   },
 
-  createCheckout: async (planCode: string) => {
+  createCheckout: async (
+    planCode: string,
+    billingPeriod: 'month' | 'annual' = 'month'
+  ) => {
     const res = await orvalTenantBilling.createCheckout({
-      planCode
+      planCode,
+      billingPeriod
     });
     return z
       .object({
@@ -1437,16 +1441,24 @@ export const subscriptionsApi = {
   },
 
   /** Creates a Yandex Tracker ticket; plan switch applies after support processing. */
-  requestPlanChange: async (requestedPlanCode: string) => {
+  requestPlanChange: async (
+    requestedPlanCode: string,
+    billingPeriod: 'month' | 'annual' = 'month'
+  ) => {
     await orvalTenantBilling.postSubscriptionPlanChangeRequest({
-      requestedPlanCode
+      requestedPlanCode,
+      billingPeriod
     });
   },
 
   /** Marketing-style [REQ] ticket for individual pricing (comment + session user/company). */
-  requestCustomTermsLead: async (comment: string) => {
+  requestCustomTermsLead: async (
+    comment: string,
+    billingPeriod: 'month' | 'annual' = 'month'
+  ) => {
     await orvalTenantBilling.postSubscriptionCustomTermsLeadRequest({
-      comment
+      comment,
+      billingPeriod
     });
   }
 };

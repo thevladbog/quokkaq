@@ -33,6 +33,7 @@ import { FolderIcon } from '@/src/components/ui/icons/akar-icons-folder';
 import { XSmallIcon } from '@/src/components/ui/icons/akar-icons-x-small';
 import { useUpdateService } from '@/lib/hooks';
 import { getUnitDisplayName } from '@/lib/unit-display';
+import { serviceTitleForLocale } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
   SERVICE_GRID_COLS,
@@ -133,8 +134,9 @@ const ServiceItem: React.FC<{
   service: ServiceWithPosition;
   onAdd: (service: ServiceWithPosition) => void;
   dragLabel: string;
+  locale: string;
   zoneNameById?: ReadonlyMap<string, string>;
-}> = ({ service, onAdd, dragLabel, zoneNameById }) => {
+}> = ({ service, onAdd, dragLabel, locale, zoneNameById }) => {
   const [{ isDragging }, drag] = useDrag(
     () => ({
       type: GRID_DND_PALETTE,
@@ -148,13 +150,14 @@ const ServiceItem: React.FC<{
 
   const isParentService = service.isLeaf === false;
   const zoneLabel = serviceZoneDisplayName(service, zoneNameById);
+  const serviceLabel = serviceTitleForLocale(service, locale);
 
   return (
     <div
       ref={drag as unknown as React.Ref<HTMLDivElement>}
       role='button'
       tabIndex={0}
-      title={dragLabel}
+      title={`${dragLabel} — ${serviceLabel}`}
       className={`bg-background hover:bg-accent mb-2 flex cursor-grab items-center rounded border p-3 active:cursor-grabbing ${isDragging ? 'opacity-50' : ''}`}
       onClick={() => onAdd(service)}
       onKeyDown={(e) => {
@@ -165,7 +168,7 @@ const ServiceItem: React.FC<{
       }}
     >
       <span className='flex min-w-0 flex-grow flex-col items-start gap-0.5'>
-        <span className='w-full truncate font-medium'>{service.name}</span>
+        <span className='w-full truncate font-medium'>{serviceLabel}</span>
         {zoneLabel ? (
           <span className='text-muted-foreground w-full truncate text-xs font-normal'>
             {zoneLabel}
@@ -244,6 +247,7 @@ const GridServiceOverlay: React.FC<{
   cellHeight: number;
   dragLabel: string;
   resizeLabel: string;
+  locale: string;
   zoneNameById?: ReadonlyMap<string, string>;
 }> = ({
   service,
@@ -254,6 +258,7 @@ const GridServiceOverlay: React.FC<{
   cellHeight,
   dragLabel,
   resizeLabel,
+  locale,
   zoneNameById
 }) => {
   const overlayOuterRef = useRef<HTMLDivElement>(null);
@@ -330,6 +335,7 @@ const GridServiceOverlay: React.FC<{
   const conflict = hasConflict();
   const isParentService = service.isLeaf === false;
   const zoneLabel = serviceZoneDisplayName(service, zoneNameById);
+  const serviceLabel = serviceTitleForLocale(service, locale);
 
   const handleRemoveService = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -451,9 +457,9 @@ const GridServiceOverlay: React.FC<{
         <div
           ref={drag as unknown as React.Ref<HTMLDivElement>}
           className='flex h-full min-h-0 w-full flex-col items-center justify-center gap-0.5'
-          title={dragLabel}
+          title={`${dragLabel} — ${serviceLabel}`}
         >
-          <span className='line-clamp-3'>{service.name}</span>
+          <span className='line-clamp-3'>{serviceLabel}</span>
           {zoneLabel ? (
             <span className='line-clamp-2 text-[10px] leading-tight opacity-80'>
               {zoneLabel}
@@ -513,6 +519,7 @@ const MainGridWithOverlays: React.FC<{
   ) => void;
   dragPlacedLabel: string;
   resizeLabel: string;
+  locale: string;
   zoneNameById?: ReadonlyMap<string, string>;
 }> = ({
   services: gridServices,
@@ -523,6 +530,7 @@ const MainGridWithOverlays: React.FC<{
   onCellDrop,
   dragPlacedLabel,
   resizeLabel,
+  locale,
   zoneNameById
 }) => {
   const gridContainerRef = useRef<HTMLDivElement>(null);
@@ -584,6 +592,7 @@ const MainGridWithOverlays: React.FC<{
             cellHeight={cellHeight}
             dragLabel={dragPlacedLabel}
             resizeLabel={resizeLabel}
+            locale={locale}
             zoneNameById={zoneNameById}
           />
         ))}
@@ -610,6 +619,7 @@ const ChildGridWithOverlays: React.FC<{
   ) => void;
   dragPlacedLabel: string;
   resizeLabel: string;
+  locale: string;
   zoneNameById?: ReadonlyMap<string, string>;
 }> = ({
   services: gridServices,
@@ -620,6 +630,7 @@ const ChildGridWithOverlays: React.FC<{
   onCellDrop,
   dragPlacedLabel,
   resizeLabel,
+  locale,
   zoneNameById
 }) => {
   const childGridRef = useRef<HTMLDivElement>(null);
@@ -681,6 +692,7 @@ const ChildGridWithOverlays: React.FC<{
             cellHeight={cellHeight}
             dragLabel={dragPlacedLabel}
             resizeLabel={resizeLabel}
+            locale={locale}
             zoneNameById={zoneNameById}
           />
         ))}
@@ -883,6 +895,7 @@ const ServiceGridWithTabs: React.FC<{
   setActiveTab: (tab: string) => void;
   dragPlacedLabel: string;
   resizeLabel: string;
+  locale: string;
   zoneNameById?: ReadonlyMap<string, string>;
 }> = ({
   services,
@@ -893,6 +906,7 @@ const ServiceGridWithTabs: React.FC<{
   setActiveTab,
   dragPlacedLabel,
   resizeLabel,
+  locale,
   zoneNameById
 }) => {
   const parentServices = services.filter((service) => service.isLeaf === false);
@@ -953,7 +967,7 @@ const ServiceGridWithTabs: React.FC<{
         </TabsTrigger>
         {parentServices.map((parent) => (
           <TabsTrigger key={`tab-${parent.id}`} value={`grid-${parent.id}`}>
-            {parent.name}
+            {serviceTitleForLocale(parent, locale)}
           </TabsTrigger>
         ))}
       </TabsList>
@@ -983,6 +997,7 @@ const ServiceGridWithTabs: React.FC<{
                 onCellDrop={onCellDrop}
                 dragPlacedLabel={dragPlacedLabel}
                 resizeLabel={resizeLabel}
+                locale={locale}
                 zoneNameById={zoneNameById}
               />
             </ResponsiveGridWrapper>
@@ -1006,7 +1021,8 @@ const ServiceGridWithTabs: React.FC<{
             <Card>
               <CardHeader>
                 <CardTitle>
-                  {parent.name} {/* @ts-expect-error - t is injected */}
+                  {serviceTitleForLocale(parent, locale)}{' '}
+                  {/* @ts-expect-error - t is injected */}
                   {parentServices[0]?.t('grid_configuration.sub_grid')} (
                   {SERVICE_GRID_COLS}x{SERVICE_GRID_ROWS})
                 </CardTitle>
@@ -1028,6 +1044,7 @@ const ServiceGridWithTabs: React.FC<{
                     onCellDrop={onCellDrop}
                     dragPlacedLabel={dragPlacedLabel}
                     resizeLabel={resizeLabel}
+                    locale={locale}
                     zoneNameById={zoneNameById}
                   />
                 </ResponsiveGridWrapper>
@@ -1053,6 +1070,7 @@ const SimpleGrid: React.FC<{
   dragPaletteLabel: string;
   dragPlacedLabel: string;
   resizeLabel: string;
+  locale: string;
   zoneNameById?: ReadonlyMap<string, string>;
 }> = ({
   services,
@@ -1063,6 +1081,7 @@ const SimpleGrid: React.FC<{
   dragPaletteLabel,
   dragPlacedLabel,
   resizeLabel,
+  locale,
   zoneNameById
 }) => {
   const [activeTab, setActiveTab] = useState<string>('main-grid');
@@ -1236,6 +1255,7 @@ const SimpleGrid: React.FC<{
                         service={service}
                         onAdd={handleAddService}
                         dragLabel={dragPaletteLabel}
+                        locale={locale}
                         zoneNameById={zoneNameById}
                       />
                     ))}
@@ -1272,7 +1292,7 @@ const SimpleGrid: React.FC<{
                                     />
                                   )}
                                   <span className='truncate font-medium'>
-                                    {service.name}
+                                    {serviceTitleForLocale(service, locale)}
                                   </span>
                                 </div>
                                 {zoneLine ? (
@@ -1318,6 +1338,7 @@ const SimpleGrid: React.FC<{
               setActiveTab={setActiveTab}
               dragPlacedLabel={dragPlacedLabel}
               resizeLabel={resizeLabel}
+              locale={locale}
               zoneNameById={zoneNameById}
             />
           </div>
@@ -1395,6 +1416,7 @@ const ServiceGridWorkArea: React.FC<{
   showBranchGridHint?: boolean;
   /** Resolve `restrictedServiceZoneId` → zone unit name for labels (subdivision + zone editors). */
   zoneNameById?: ReadonlyMap<string, string>;
+  locale: string;
   t: AdminTranslate;
   onAddService: (service: ServiceWithPosition) => void;
   onPropertyChange: (id: string, field: string, value: number | null) => void;
@@ -1409,6 +1431,7 @@ const ServiceGridWorkArea: React.FC<{
   lockedZoneScope,
   showBranchGridHint,
   zoneNameById,
+  locale,
   t,
   onAddService,
   onPropertyChange,
@@ -1442,6 +1465,7 @@ const ServiceGridWorkArea: React.FC<{
         dragPaletteLabel={t('grid_configuration.drag_from_palette_hint')}
         dragPlacedLabel={t('grid_configuration.drag_placed_hint')}
         resizeLabel={t('grid_configuration.resize_corner_hint')}
+        locale={locale}
         zoneNameById={zoneNameById}
       />
     </>
@@ -1818,6 +1842,7 @@ const ServiceGridEditor: React.FC<ServiceGridEditorProps> = ({
                   !effectiveLockedZoneId
                 }
                 zoneNameById={zoneNameById}
+                locale={locale}
                 t={t}
                 onAddService={handleAddService}
                 onPropertyChange={handlePropertyChange}

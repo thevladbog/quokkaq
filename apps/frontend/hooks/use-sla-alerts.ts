@@ -36,6 +36,7 @@ function sendBrowserNotification(title: string, body: string, tag: string) {
 export function useSlaAlerts(unitId: string | null | undefined) {
   const queryClient = useQueryClient();
   const t = useTranslations('supervisor.dashboardUi.sla');
+  const tStats = useTranslations('statistics');
   const [activeSlaAlerts, setActiveSlaAlerts] = useState<SlaAlertPayload[]>([]);
 
   // Track which (alertType, ticketId, thresholdPct) triples have been toasted.
@@ -59,8 +60,8 @@ export function useSlaAlerts(unitId: string | null | undefined) {
       if (seenRef.current.has(key)) return;
       seenRef.current.add(key);
 
-      const elapsed = formatSlaDuration(payload.elapsedSec);
-      const maxWait = formatSlaDuration(payload.maxWaitTimeSec);
+      const elapsed = formatSlaDuration(payload.elapsedSec, tStats);
+      const maxWait = formatSlaDuration(payload.maxWaitTimeSec, tStats);
 
       const isServiceAlert = alertType === 'service';
 
@@ -126,7 +127,7 @@ export function useSlaAlerts(unitId: string | null | undefined) {
       // Refresh the supervisor queue so updated ticket times are visible.
       void queryClient.invalidateQueries({ queryKey: ['shift-queue', unitId] });
     },
-    [t, queryClient, unitId]
+    [t, tStats, queryClient, unitId]
   );
 
   const dismissAlert = useCallback(

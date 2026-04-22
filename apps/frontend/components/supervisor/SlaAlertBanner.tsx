@@ -6,17 +6,12 @@ import { useTranslations } from 'next-intl';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import type { SlaAlertPayload } from '@/hooks/use-sla-alerts';
+import { formatSlaDuration } from '@/lib/format-sla-duration';
 
 interface SlaAlertBannerProps {
   alerts: SlaAlertPayload[];
   onDismiss: (ticketId: string, alertType?: 'wait' | 'service') => void;
   onDismissAll: () => void;
-}
-
-function formatMinutes(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return s === 0 ? `${m}m` : `${m}m ${s}s`;
 }
 
 function SlaAlertRow({
@@ -27,6 +22,8 @@ function SlaAlertRow({
   onDismiss: (id: string, alertType?: 'wait' | 'service') => void;
 }) {
   const t = useTranslations('supervisor.dashboardUi.sla');
+  const tStats = useTranslations('statistics');
+
   const isBreach = alert.thresholdPct >= 100;
   const alertType = alert.alertType ?? 'wait';
   const isServiceAlert = alertType === 'service';
@@ -55,8 +52,8 @@ function SlaAlertRow({
           {alert.serviceName}
         </span>
         <span className='text-muted-foreground shrink-0 text-xs'>
-          {formatMinutes(alert.elapsedSec)} /{' '}
-          {formatMinutes(alert.maxWaitTimeSec)}
+          {formatSlaDuration(alert.elapsedSec, tStats)} /{' '}
+          {formatSlaDuration(alert.maxWaitTimeSec, tStats)}
         </span>
         <Badge
           variant={isBreach ? 'destructive' : 'secondary'}

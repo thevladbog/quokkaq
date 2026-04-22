@@ -51,13 +51,13 @@ Main on-page anchors used by the header: `#features`, `#how-it-works`, `#pillars
 
 When `NEXT_PUBLIC_GTM_ID` is set, the site loads GTM (see `components/consent/cookie-consent-and-gtm.tsx`). Client code pushes events via [`lib/marketing-analytics.ts`](lib/marketing-analytics.ts): each push includes `event: 'marketing'`, `event_name: <name>`, and optional fields (e.g. `cta_id`, `nav_href`, `source`).
 
-| `event_name`                   | Typical use                                       |
-| ------------------------------ | ------------------------------------------------- |
-| `marketing_cta_click`          | Trial / tracked CTAs (header, hero, pricing)      |
-| `marketing_nav_click`          | Header / mobile nav anchor links                  |
-| `marketing_mobile_menu_toggle` | Mobile menu open/close (`open` in payload)        |
-| `marketing_lead_open`          | Lead modal or mailto from contact buttons         |
-| `marketing_lead_submit`        | Successful lead form POST (`source`, `plan_code`) |
+| `event_name`                   | Typical use                                                         |
+| ------------------------------ | ------------------------------------------------------------------- |
+| `marketing_cta_click`          | Trial / tracked CTAs (header, hero, pricing)                        |
+| `marketing_nav_click`          | Header / mobile nav anchor links                                    |
+| `marketing_mobile_menu_toggle` | Mobile menu open/close (`open` in payload)                          |
+| `marketing_lead_open`          | Lead modal or mailto (`source`, `plan_code`, `billing_period`)      |
+| `marketing_lead_submit`        | Successful lead form POST (`source`, `plan_code`, `billing_period`) |
 
 In **Google Tag Manager**, create a Custom Event trigger for `marketing` and branch on the **Data Layer Variable** for `event_name` (or use a single tag with lookup tables).
 

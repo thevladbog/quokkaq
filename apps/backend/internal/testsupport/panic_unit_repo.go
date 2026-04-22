@@ -39,5 +39,6 @@ func (PanicUnitRepo) FindFirstByCompanyID(string) (*models.Unit, error) { panic(
 func (PanicUnitRepo) FindFirstByCompanyIDTx(*gorm.DB, string) (*models.Unit, error) {
 	panic("unexpected")
 }
+func (PanicUnitRepo) CountSubdivisionsByCompanyID(string) (int64, error) { panic("unexpected") }
 
 var _ repository.UnitRepository = PanicUnitRepo{}

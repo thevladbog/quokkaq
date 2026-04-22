@@ -3,8 +3,10 @@
 import { useMemo } from 'react';
 import { SubscriptionPlan } from '@quokkaq/shared-types';
 import {
+  annualPrepayEffectiveMonthlyMinor,
   formatPriceMinorUnits,
   formatPriceMinorUnitsAmountOnly,
+  planSupportsAnnualPrepay,
   subscriptionPlanDisplayName
 } from '@quokkaq/subscription-pricing';
 import { intlLocaleFromAppLocale } from '@/lib/format-datetime';
@@ -31,10 +33,16 @@ export const PLAN_CODES = {
 interface PlanSelectorProps {
   plans: SubscriptionPlan[];
   currentPlanId?: string;
-  onSelect: (plan: SubscriptionPlan) => void;
+  /** Second argument is the billing period to send to APIs (annual only when the plan supports prepay). */
+  onSelect: (
+    plan: SubscriptionPlan,
+    billingForCheckout: 'month' | 'annual'
+  ) => void;
   isLoading?: boolean;
   /** When set, non-current plan buttons use this label instead of checkout/select/contact copy. */
   primaryCtaLabel?: string;
+  checkoutBillingPeriod?: 'month' | 'annual';
+  onCheckoutBillingPeriodChange?: (v: 'month' | 'annual') => void;
 }
 
 export function PlanSelector({
@@ -42,7 +50,9 @@ export function PlanSelector({
   currentPlanId,
   onSelect,
   isLoading,
-  primaryCtaLabel
+  primaryCtaLabel,
+  checkoutBillingPeriod = 'month',
+  onCheckoutBillingPeriodChange
 }: PlanSelectorProps) {
   const locale = useLocale();
   const intlLocale = useMemo(() => intlLocaleFromAppLocale(locale), [locale]);
@@ -84,204 +94,274 @@ export function PlanSelector({
   const isCurrentPlan = (planId: string) => planId === currentPlanId;
   const isPromotedPlan = (plan: SubscriptionPlan) => plan.isPromoted === true;
 
+  const showBillingToggle = useMemo(
+    () => plans.some((p) => planSupportsAnnualPrepay(p)),
+    [plans]
+  );
+
   return (
-    <div className='grid gap-6 md:grid-cols-2 lg:grid-cols-3'>
-      {plans
-        .filter((plan) => {
-          if (plan.code === PLAN_CODES.GRANDFATHERED) return false;
-          if (
-            plan.isPublic === false &&
-            (!currentPlanId || plan.id !== currentPlanId)
-          ) {
-            return false;
-          }
-          return true;
-        })
-        .map((plan) => (
-          <Card
-            key={plan.id}
-            className={cn(
-              'relative flex h-full flex-col',
-              isPromotedPlan(plan) &&
-                'border-primary dark:border-primary border-2 shadow-xl',
-              isCurrentPlan(plan.id) &&
-                'ring-primary/35 dark:ring-primary/50 ring-2'
-            )}
+    <div className='space-y-6'>
+      {showBillingToggle && onCheckoutBillingPeriodChange ? (
+        <div className='flex justify-center'>
+          <div
+            role='tablist'
+            className='bg-muted/50 inline-flex rounded-full border p-1'
           >
-            {isPromotedPlan(plan) && (
-              <div className='absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 transform'>
-                <Badge>
-                  <Sparkles className='mr-1 h-3 w-3' />
-                  {t('popularBadge')}
-                </Badge>
-              </div>
-            )}
+            <button
+              type='button'
+              role='tab'
+              aria-selected={checkoutBillingPeriod === 'month'}
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                checkoutBillingPeriod === 'month'
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+              onClick={() => onCheckoutBillingPeriodChange('month')}
+            >
+              {tBilling('billingToggleMonth')}
+            </button>
+            <button
+              type='button'
+              role='tab'
+              aria-selected={checkoutBillingPeriod === 'annual'}
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                checkoutBillingPeriod === 'annual'
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+              onClick={() => onCheckoutBillingPeriodChange('annual')}
+            >
+              {tBilling('billingToggleAnnual')}
+            </button>
+          </div>
+        </div>
+      ) : null}
+      <div className='grid gap-6 md:grid-cols-2 lg:grid-cols-3'>
+        {plans
+          .filter((plan) => {
+            if (plan.code === PLAN_CODES.GRANDFATHERED) return false;
+            if (
+              plan.isPublic === false &&
+              (!currentPlanId || plan.id !== currentPlanId)
+            ) {
+              return false;
+            }
+            return true;
+          })
+          .map((plan) => {
+            const planFree = plan.isFree === true;
+            const annualOn =
+              checkoutBillingPeriod === 'annual' &&
+              planSupportsAnnualPrepay(plan) &&
+              !planFree;
+            const displayPriceMinor = annualOn
+              ? (annualPrepayEffectiveMonthlyMinor(plan) ?? plan.price)
+              : plan.price;
+            return (
+              <Card
+                key={plan.id}
+                className={cn(
+                  'relative flex h-full flex-col',
+                  isPromotedPlan(plan) &&
+                    'border-primary dark:border-primary border-2 shadow-xl',
+                  isCurrentPlan(plan.id) &&
+                    'ring-primary/35 dark:ring-primary/50 ring-2'
+                )}
+              >
+                {isPromotedPlan(plan) && (
+                  <div className='absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 transform'>
+                    <Badge>
+                      <Sparkles className='mr-1 h-3 w-3' />
+                      {t('popularBadge')}
+                    </Badge>
+                  </div>
+                )}
 
-            {isCurrentPlan(plan.id) && (
-              <div className='absolute top-4 right-4 z-10'>
-                <Badge
-                  variant='outline'
-                  className='border-primary/40 bg-background/95 text-foreground dark:bg-background/90 shadow-sm backdrop-blur-sm'
-                >
-                  {t('currentPlan')}
-                </Badge>
-              </div>
-            )}
-
-            <CardHeader className='shrink-0 pb-4'>
-              <CardTitle className='text-foreground text-2xl'>
-                {(() => {
-                  const name = subscriptionPlanDisplayName(plan, locale);
-                  const split =
-                    locale.startsWith('en') &&
-                    plan.price > 0 &&
-                    plan.code !== PLAN_CODES.ENTERPRISE;
-                  return split
-                    ? `${name}, ${(plan.currency ?? 'RUB').toUpperCase()}`
-                    : name;
-                })()}
-              </CardTitle>
-              <div className='mt-4'>
-                {(() => {
-                  if (plan.isFree) {
-                    return (
-                      <div className='text-foreground text-2xl font-bold'>
-                        {t('freePlan', { defaultValue: 'Бесплатно' })}
-                      </div>
-                    );
-                  }
-                  if (plan.price > 0) {
-                    const isPerUnit = plan.pricingModel === 'per_unit';
-                    return (
-                      <div className='flex flex-nowrap items-baseline gap-x-2 whitespace-nowrap'>
-                        <span className='text-foreground text-4xl font-bold tabular-nums'>
-                          {locale.startsWith('en') &&
-                          plan.code !== PLAN_CODES.ENTERPRISE
-                            ? formatPriceMinorUnitsAmountOnly(
-                                plan.price,
-                                plan.currency,
-                                intlLocale
-                              )
-                            : formatPriceMinorUnits(
-                                plan.price,
-                                plan.currency ?? 'RUB',
-                                intlLocale
-                              )}
-                        </span>
-                        <span className='text-muted-foreground shrink-0 text-sm'>
-                          {isPerUnit
-                            ? t('perUnitPerMonth', {
-                                defaultValue: '/ подр. / мес'
-                              })
-                            : plan.interval === 'month'
-                              ? tBilling('perMonth')
-                              : tBilling('perYear')}
-                        </span>
-                      </div>
-                    );
-                  }
-                  return (
-                    <div className='text-foreground text-2xl font-bold'>
-                      {t('customPricing')}
-                    </div>
-                  );
-                })()}
-              </div>
-            </CardHeader>
-
-            <CardContent className='flex flex-1 flex-col space-y-4'>
-              <div className='space-y-2'>
-                <p className='text-foreground text-sm font-semibold'>
-                  {t('limitsTitle')}
-                </p>
-                <ul className='space-y-1'>
-                  {getLimitsText(plan).map((limit) => (
-                    <li
-                      key={limit.key}
-                      className='text-muted-foreground text-sm'
+                {isCurrentPlan(plan.id) && (
+                  <div className='absolute top-4 right-4 z-10'>
+                    <Badge
+                      variant='outline'
+                      className='border-primary/40 bg-background/95 text-foreground dark:bg-background/90 shadow-sm backdrop-blur-sm'
                     >
-                      <span className='text-foreground font-medium'>
-                        {limit.value}
-                      </span>{' '}
-                      {limit.label}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+                      {t('currentPlan')}
+                    </Badge>
+                  </div>
+                )}
 
-              <div className='space-y-2'>
-                <p className='text-foreground text-sm font-semibold'>
-                  {t('featuresTitle')}
-                </p>
-                <ul className='space-y-2'>
-                  {(() => {
-                    const all = getFeaturesList(plan.features);
-                    const head = all.slice(0, 6);
-                    const rest = all.length - head.length;
-                    return (
-                      <>
-                        {head.map((feature) => (
-                          <li
-                            key={feature.key}
-                            className='flex items-start gap-2 text-sm'
-                          >
-                            <Check className='text-primary mt-0.5 h-4 w-4 flex-shrink-0' />
-                            <span className='text-foreground'>
-                              {feature.text}
-                            </span>
-                          </li>
-                        ))}
-                        {rest > 0 ? (
-                          <li className='text-muted-foreground pl-6 text-sm'>
-                            {t('moreFeatures', { count: rest })}
-                          </li>
-                        ) : null}
-                      </>
-                    );
-                  })()}
-                </ul>
-              </div>
-            </CardContent>
-
-            <CardFooter className='mt-auto border-t pt-6'>
-              {!isCurrentPlan(plan.id) ? (
-                <Button
-                  type='button'
-                  onClick={() => onSelect(plan)}
-                  disabled={isLoading}
-                  className='w-full'
-                  variant={isPromotedPlan(plan) ? 'default' : 'outline'}
-                >
-                  {primaryCtaLabel ??
-                    (() => {
-                      const planExt = plan as SubscriptionPlan & {
-                        isFree?: boolean;
-                      };
-                      if (planExt.isFree)
-                        return t('startFree', {
-                          defaultValue: 'Начать бесплатно'
-                        });
-                      if (plan.price > 0) {
-                        return plan.allowInstantPurchase === false
-                          ? t('requestPlanAccess')
-                          : t('selectPlan');
-                      }
-                      return t('contactUs');
+                <CardHeader className='shrink-0 pb-4'>
+                  <CardTitle className='text-foreground text-2xl'>
+                    {(() => {
+                      const name = subscriptionPlanDisplayName(plan, locale);
+                      const split =
+                        locale.startsWith('en') &&
+                        displayPriceMinor > 0 &&
+                        plan.code !== PLAN_CODES.ENTERPRISE;
+                      return split
+                        ? `${name}, ${(plan.currency ?? 'RUB').toUpperCase()}`
+                        : name;
                     })()}
-                </Button>
-              ) : (
-                <Button
-                  type='button'
-                  variant='outline'
-                  className='w-full'
-                  disabled
-                >
-                  {t('currentPlan')}
-                </Button>
-              )}
-            </CardFooter>
-          </Card>
-        ))}
+                  </CardTitle>
+                  <div className='mt-4'>
+                    {(() => {
+                      if (planFree) {
+                        return (
+                          <div className='text-foreground text-2xl font-bold'>
+                            {t('freePlan', { defaultValue: 'Бесплатно' })}
+                          </div>
+                        );
+                      }
+                      if (plan.price > 0) {
+                        const isPerUnit = plan.pricingModel === 'per_unit';
+                        return (
+                          <div className='flex flex-nowrap items-baseline gap-x-2 whitespace-nowrap'>
+                            <span className='text-foreground text-4xl font-bold tabular-nums'>
+                              {locale.startsWith('en') &&
+                              plan.code !== PLAN_CODES.ENTERPRISE
+                                ? formatPriceMinorUnitsAmountOnly(
+                                    displayPriceMinor,
+                                    plan.currency,
+                                    intlLocale
+                                  )
+                                : formatPriceMinorUnits(
+                                    displayPriceMinor,
+                                    plan.currency ?? 'RUB',
+                                    intlLocale
+                                  )}
+                            </span>
+                            <span className='text-muted-foreground shrink-0 text-sm'>
+                              {annualOn
+                                ? isPerUnit
+                                  ? `${t('perUnitPerMonth', { defaultValue: '/ подр. / мес' })} — ${tBilling('billedAnnuallyFootnote')}`
+                                  : `${tBilling('perMonth')} — ${tBilling('billedAnnuallyFootnote')}`
+                                : isPerUnit
+                                  ? t('perUnitPerMonth', {
+                                      defaultValue: '/ подр. / мес'
+                                    })
+                                  : plan.interval === 'month'
+                                    ? tBilling('perMonth')
+                                    : tBilling('perYear')}
+                            </span>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className='text-foreground text-2xl font-bold'>
+                          {t('customPricing')}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </CardHeader>
+
+                <CardContent className='flex flex-1 flex-col space-y-4'>
+                  <div className='space-y-2'>
+                    <p className='text-foreground text-sm font-semibold'>
+                      {t('limitsTitle')}
+                    </p>
+                    <ul className='space-y-1'>
+                      {getLimitsText(plan).map((limit) => (
+                        <li
+                          key={limit.key}
+                          className='text-muted-foreground text-sm'
+                        >
+                          <span className='text-foreground font-medium'>
+                            {limit.value}
+                          </span>{' '}
+                          {limit.label}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className='space-y-2'>
+                    <p className='text-foreground text-sm font-semibold'>
+                      {t('featuresTitle')}
+                    </p>
+                    <ul className='space-y-2'>
+                      {(() => {
+                        const all = getFeaturesList(plan.features);
+                        const head = all.slice(0, 6);
+                        const rest = all.length - head.length;
+                        return (
+                          <>
+                            {head.map((feature) => (
+                              <li
+                                key={feature.key}
+                                className='flex items-start gap-2 text-sm'
+                              >
+                                <Check className='text-primary mt-0.5 h-4 w-4 flex-shrink-0' />
+                                <span className='text-foreground'>
+                                  {feature.text}
+                                </span>
+                              </li>
+                            ))}
+                            {rest > 0 ? (
+                              <li className='text-muted-foreground pl-6 text-sm'>
+                                {t('moreFeatures', { count: rest })}
+                              </li>
+                            ) : null}
+                          </>
+                        );
+                      })()}
+                    </ul>
+                  </div>
+                </CardContent>
+
+                <CardFooter className='mt-auto border-t pt-6'>
+                  {!isCurrentPlan(plan.id) ? (
+                    <Button
+                      type='button'
+                      onClick={() => {
+                        const billingForCheckout: 'month' | 'annual' =
+                          checkoutBillingPeriod === 'annual' &&
+                          planSupportsAnnualPrepay(plan) &&
+                          !planFree
+                            ? 'annual'
+                            : 'month';
+                        if (
+                          billingForCheckout !== checkoutBillingPeriod &&
+                          onCheckoutBillingPeriodChange
+                        ) {
+                          onCheckoutBillingPeriodChange(billingForCheckout);
+                        }
+                        onSelect(plan, billingForCheckout);
+                      }}
+                      disabled={isLoading}
+                      className='w-full'
+                      variant={isPromotedPlan(plan) ? 'default' : 'outline'}
+                    >
+                      {primaryCtaLabel ??
+                        (() => {
+                          const planExt = plan as SubscriptionPlan & {
+                            isFree?: boolean;
+                          };
+                          if (planExt.isFree)
+                            return t('startFree', {
+                              defaultValue: 'Начать бесплатно'
+                            });
+                          if (plan.price > 0) {
+                            return plan.allowInstantPurchase === false
+                              ? t('requestPlanAccess')
+                              : t('selectPlan');
+                          }
+                          return t('contactUs');
+                        })()}
+                    </Button>
+                  ) : (
+                    <Button
+                      type='button'
+                      variant='outline'
+                      className='w-full'
+                      disabled
+                    >
+                      {t('currentPlan')}
+                    </Button>
+                  )}
+                </CardFooter>
+              </Card>
+            );
+          })}
+      </div>
     </div>
   );
 }

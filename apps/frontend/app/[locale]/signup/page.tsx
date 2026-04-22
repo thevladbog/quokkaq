@@ -35,6 +35,9 @@ export default function SignupPage() {
   const wordmarkSrc = getWordmarkSrc(locale);
   const searchParams = useSearchParams();
   const planCode = searchParams.get('plan')?.trim() || undefined;
+  const billingRaw = searchParams.get('billing')?.trim().toLowerCase();
+  const billingPeriod =
+    billingRaw === 'annual' || billingRaw === 'month' ? billingRaw : undefined;
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -85,6 +88,7 @@ export default function SignupPage() {
         password,
         companyName: cn,
         planCode,
+        ...(billingPeriod ? { billingPeriod } : {}),
         companySlug,
         privacyConsentAccepted: privacyAccepted
       });

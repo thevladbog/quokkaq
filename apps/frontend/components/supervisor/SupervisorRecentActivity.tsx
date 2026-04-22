@@ -50,7 +50,8 @@ export function SupervisorRecentActivity({
         limit: DASHBOARD_ACTIVITY_LIMIT
       }),
     enabled: Boolean(activityUnitId && queryEnabled),
-    refetchInterval: 10_000
+    refetchInterval: 10_000,
+    refetchOnMount: 'always'
   });
 
   const items = data?.items ?? [];

@@ -14,6 +14,8 @@ type Props = {
   appBaseUrl: string | null;
   /** When set (e.g. pricing card), sent as context. */
   planCode?: string;
+  /** month | annual — passed to the lead API when set. */
+  billingPeriod?: string;
   className?: string;
   children: React.ReactNode;
   onOpen?: () => void;
@@ -28,6 +30,7 @@ export function LeadRequestCta({
   lead,
   appBaseUrl,
   planCode,
+  billingPeriod,
   className,
   onOpen,
   children
@@ -41,7 +44,9 @@ export function LeadRequestCta({
         className={className}
         onClick={() => {
           pushMarketingEvent('marketing_lead_open', {
-            source: `${source}_mailto`
+            source: `${source}_mailto`,
+            plan_code: planCode?.trim() ?? '',
+            billing_period: billingPeriod?.trim() || 'month'
           });
         }}
       >
@@ -59,7 +64,8 @@ export function LeadRequestCta({
           setOpen(true);
           pushMarketingEvent('marketing_lead_open', {
             source,
-            plan_code: planCode?.trim() ?? ''
+            plan_code: planCode?.trim() ?? '',
+            billing_period: billingPeriod?.trim() || 'month'
           });
           onOpen?.();
         }}
@@ -72,6 +78,7 @@ export function LeadRequestCta({
         locale={locale}
         source={source}
         planCode={planCode}
+        billingPeriod={billingPeriod}
         lead={lead}
       />
     </>

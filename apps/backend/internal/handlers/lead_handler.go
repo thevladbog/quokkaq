@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"quokkaq-go-backend/internal/billingperiod"
 	"quokkaq-go-backend/internal/config"
 	"quokkaq-go-backend/internal/logger"
 	"quokkaq-go-backend/internal/services"
@@ -34,6 +35,7 @@ type PublicLeadRequestBody struct {
 	Locale                 string `json:"locale"`
 	Referrer               string `json:"referrer"`
 	PlanCode               string `json:"planCode"`
+	BillingPeriod          string `json:"billingPeriod" enums:"month,annual"`
 	PrivacyConsentAccepted *bool  `json:"privacyConsentAccepted"`
 }
 
@@ -78,6 +80,12 @@ func (h *LeadHandler) PostPublicLeadRequest(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "privacy consent is required", http.StatusBadRequest)
 		return
 	}
+	bp, err := billingperiod.ParseOptional(req.BillingPeriod)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	req.BillingPeriod = bp
 	ok, err := h.leadIssues.LeadsConfigured(r.Context())
 	if err != nil {
 		http.Error(w, "Failed to verify configuration", http.StatusInternalServerError)
@@ -89,6 +97,7 @@ func (h *LeadHandler) PostPublicLeadRequest(w http.ResponseWriter, r *http.Reque
 	}
 	err = h.leadIssues.CreateLeadRequest(r.Context(), name, email, strings.TrimSpace(req.Company), strings.TrimSpace(req.Message),
 		strings.TrimSpace(req.Source), strings.TrimSpace(req.Locale), strings.TrimSpace(req.Referrer), strings.TrimSpace(req.PlanCode),
+		strings.TrimSpace(req.BillingPeriod),
 		true)
 	if err != nil {
 		logger.PrintfCtx(r.Context(), "PostPublicLeadRequest: CreateLeadRequest: %v", err)

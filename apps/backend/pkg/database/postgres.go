@@ -2331,6 +2331,52 @@ END $$;
 		return fmt.Errorf("failed to run v1.7.3_anomaly_alerts_unit_fk migration: %w", err)
 	}
 
+	err = manager.RunMigration("v1.7.4_subscription_plan_annual_prepay", func(db *gorm.DB) error {
+		if err := db.Exec(`
+ALTER TABLE subscription_plans
+	ADD COLUMN IF NOT EXISTS annual_prepay_discount_percent integer;
+ALTER TABLE subscription_plans
+	ADD COLUMN IF NOT EXISTS annual_prepay_price_per_month bigint;
+`).Error; err != nil {
+			return err
+		}
+		if err := db.Exec(`
+DO $$
+BEGIN
+	ALTER TABLE subscription_plans
+		ADD CONSTRAINT subscription_plans_annual_prepay_discount_pct_chk
+		CHECK (annual_prepay_discount_percent IS NULL OR (annual_prepay_discount_percent BETWEEN 1 AND 100));
+EXCEPTION
+	WHEN duplicate_object THEN NULL;
+END $$;
+DO $$
+BEGIN
+	ALTER TABLE subscription_plans
+		ADD CONSTRAINT subscription_plans_annual_prepay_price_per_mo_chk
+		CHECK (annual_prepay_price_per_month IS NULL OR annual_prepay_price_per_month > 0);
+EXCEPTION
+	WHEN duplicate_object THEN NULL;
+END $$;
+DO $$
+BEGIN
+	ALTER TABLE subscription_plans
+		ADD CONSTRAINT subscription_plans_annual_prepay_exclusive_chk
+		CHECK (
+			(annual_prepay_discount_percent IS NULL)
+			OR (annual_prepay_price_per_month IS NULL)
+		);
+EXCEPTION
+	WHEN duplicate_object THEN NULL;
+END $$;
+`).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to run v1.7.4_subscription_plan_annual_prepay migration: %w", err)
+	}
+
 	fmt.Println("✅ All migrations completed successfully")
 	return nil
 }

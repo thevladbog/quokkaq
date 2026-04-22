@@ -44,6 +44,8 @@ import { toast } from 'sonner';
 const INVALID_PLAN_PRICE = 'INVALID_PLAN_PRICE';
 const INVALID_PLAN_LIMITS = 'INVALID_PLAN_LIMITS';
 const INVALID_PLAN_DISPLAY_ORDER = 'INVALID_PLAN_DISPLAY_ORDER';
+const INVALID_ANNUAL_DISCOUNT = 'INVALID_ANNUAL_DISCOUNT';
+const INVALID_ANNUAL_PPM = 'INVALID_ANNUAL_PPM';
 
 /** Plan feature keys that the Go backend actually reads for access control. */
 const BACKEND_ENFORCED_PLAN_FEATURES = new Set<string>([
@@ -77,6 +79,8 @@ function defaultFeatureMap(): Record<
   >;
 }
 
+type AnnualPrepayMode = 'none' | 'discount' | 'fixed';
+
 type PlanForm = {
   name: string;
   nameEn: string;
@@ -94,6 +98,9 @@ type PlanForm = {
   isFree: boolean;
   /** "flat" = fixed price, "per_unit" = price × active subdivisions. */
   pricingModel: 'flat' | 'per_unit';
+  annualPrepayMode: AnnualPrepayMode;
+  annualPrepayDiscountPercentStr: string;
+  annualPrepayPricePerMonthStr: string;
   /** Raw input strings; validated to integers only on submit (see `parseLimitsFromForm`). */
   limits: Record<PlanLimitKey, string>;
   limitsNegotiable: Record<PlanLimitKey, boolean>;
@@ -115,6 +122,9 @@ function emptyForm(): PlanForm {
     allowInstantPurchase: true,
     isFree: false,
     pricingModel: 'per_unit',
+    annualPrepayMode: 'none',
+    annualPrepayDiscountPercentStr: '',
+    annualPrepayPricePerMonthStr: '',
     limits: Object.fromEntries(
       PLAN_LIMIT_KEYS.map((k) => [k, String(DEFAULT_LIMITS[k])])
     ) as Record<PlanLimitKey, string>,
@@ -173,6 +183,14 @@ function formFromPlan(p: ModelsSubscriptionPlan, locale: string): PlanForm {
   for (const k of PLAN_FEATURE_KEYS) {
     features[k] = readFeature(featSrc, k);
   }
+  const disc = p.annualPrepayDiscountPercent;
+  const ppm = p.annualPrepayPricePerMonth;
+  let annualPrepayMode: AnnualPrepayMode = 'none';
+  if (typeof disc === 'number' && disc >= 1 && disc <= 100) {
+    annualPrepayMode = 'discount';
+  } else if (typeof ppm === 'number' && ppm > 0) {
+    annualPrepayMode = 'fixed';
+  }
   return {
     name: p.name ?? '',
     nameEn: p.nameEn ?? '',
@@ -189,6 +207,13 @@ function formFromPlan(p: ModelsSubscriptionPlan, locale: string): PlanForm {
     pricingModel: ((p as { pricingModel?: string }).pricingModel === 'flat'
       ? 'flat'
       : 'per_unit') as 'flat' | 'per_unit',
+    annualPrepayMode,
+    annualPrepayDiscountPercentStr:
+      typeof disc === 'number' && disc >= 1 && disc <= 100 ? String(disc) : '',
+    annualPrepayPricePerMonthStr:
+      typeof ppm === 'number' && ppm > 0
+        ? minorUnitsToAmountInputString(ppm, cur, locale)
+        : '',
     limits,
     limitsNegotiable,
     features
@@ -233,6 +258,39 @@ function parseLimitsFromForm(
   return out;
 }
 
+function annualPrepayApiFieldsFromForm(
+  form: PlanForm,
+  intlLocale: string
+): Pick<
+  HandlersPlatformCreateSubscriptionPlanBody,
+  'annualPrepayDiscountPercent' | 'annualPrepayPricePerMonth'
+> {
+  if (
+    form.isFree ||
+    form.interval !== 'month' ||
+    form.annualPrepayMode === 'none'
+  ) {
+    return {};
+  }
+  if (form.annualPrepayMode === 'discount') {
+    const n = parseStrictIntString(form.annualPrepayDiscountPercentStr);
+    if (n === null || n < 1 || n > 100) {
+      throw new Error(INVALID_ANNUAL_DISCOUNT);
+    }
+    return { annualPrepayDiscountPercent: n };
+  }
+  const cur = (form.currency || 'RUB').trim() || 'RUB';
+  const m = parseAmountStringToMinorUnits(
+    form.annualPrepayPricePerMonthStr.trim(),
+    cur,
+    intlLocale
+  );
+  if (!Number.isFinite(m) || m <= 0) {
+    throw new Error(INVALID_ANNUAL_PPM);
+  }
+  return { annualPrepayPricePerMonth: Math.round(m) };
+}
+
 type PlanRow = ModelsSubscriptionPlan & { id: string };
 
 export default function PlatformPlansPage() {
@@ -268,7 +326,9 @@ export default function PlatformPlansPage() {
     if (
       msg === INVALID_PLAN_PRICE ||
       msg === INVALID_PLAN_LIMITS ||
-      msg === INVALID_PLAN_DISPLAY_ORDER
+      msg === INVALID_PLAN_DISPLAY_ORDER ||
+      msg === INVALID_ANNUAL_DISCOUNT ||
+      msg === INVALID_ANNUAL_PPM
     ) {
       return null;
     }
@@ -313,6 +373,7 @@ export default function PlatformPlansPage() {
       if (parsedLimits === null || !validateLimits(parsedLimits)) {
         throw new Error(INVALID_PLAN_LIMITS);
       }
+      const annual = annualPrepayApiFieldsFromForm(form, intlLocale);
       return createSubscriptionPlan({
         name: form.name.trim(),
         nameEn: form.nameEn.trim(),
@@ -329,7 +390,8 @@ export default function PlatformPlansPage() {
         displayOrder,
         allowInstantPurchase: form.isFree ? true : form.allowInstantPurchase,
         isFree: form.isFree,
-        pricingModel: form.pricingModel
+        pricingModel: form.pricingModel,
+        ...annual
       });
     },
     onSuccess: () => {
@@ -353,6 +415,14 @@ export default function PlatformPlansPage() {
         toast.error(t('displayOrderInvalid'));
         return;
       }
+      if (err.message === INVALID_ANNUAL_DISCOUNT) {
+        toast.error(t('annualPrepayDiscountInvalid'));
+        return;
+      }
+      if (err.message === INVALID_ANNUAL_PPM) {
+        toast.error(t('annualPrepayFixedInvalid'));
+        return;
+      }
       toast.error(t('toastError', { message: err.message }));
     }
   });
@@ -372,6 +442,7 @@ export default function PlatformPlansPage() {
       if (parsedLimits === null || !validateLimits(parsedLimits)) {
         throw new Error(INVALID_PLAN_LIMITS);
       }
+      const annual = annualPrepayApiFieldsFromForm(form, intlLocale);
       return updateSubscriptionPlan(editPlan.id, {
         name: form.name.trim(),
         nameEn: form.nameEn.trim(),
@@ -388,7 +459,8 @@ export default function PlatformPlansPage() {
         displayOrder,
         allowInstantPurchase: form.isFree ? true : form.allowInstantPurchase,
         isFree: form.isFree,
-        pricingModel: form.pricingModel
+        pricingModel: form.pricingModel,
+        ...annual
       });
     },
     onSuccess: () => {
@@ -410,6 +482,14 @@ export default function PlatformPlansPage() {
       }
       if (err.message === INVALID_PLAN_DISPLAY_ORDER) {
         toast.error(t('displayOrderInvalid'));
+        return;
+      }
+      if (err.message === INVALID_ANNUAL_DISCOUNT) {
+        toast.error(t('annualPrepayDiscountInvalid'));
+        return;
+      }
+      if (err.message === INVALID_ANNUAL_PPM) {
+        toast.error(t('annualPrepayFixedInvalid'));
         return;
       }
       toast.error(t('toastError', { message: err.message }));
@@ -487,12 +567,20 @@ export default function PlatformPlansPage() {
           id={fid('interval')}
           className='border-input bg-background h-9 w-full rounded-md border px-2 text-sm'
           value={form.interval}
-          onChange={(e) =>
+          onChange={(e) => {
+            const interval = e.target.value as 'month' | 'year';
             setForm((f) => ({
               ...f,
-              interval: e.target.value as 'month' | 'year'
-            }))
-          }
+              interval,
+              ...(interval === 'year'
+                ? {
+                    annualPrepayMode: 'none' as const,
+                    annualPrepayDiscountPercentStr: '',
+                    annualPrepayPricePerMonthStr: ''
+                  }
+                : {})
+            }));
+          }}
         >
           <option value='month'>{t('intervalMonth')}</option>
           <option value='year'>{t('intervalYear')}</option>
@@ -578,7 +666,14 @@ export default function PlatformPlansPage() {
                 ...f,
                 isFree: v,
                 price: v ? '0' : f.price,
-                allowInstantPurchase: v ? true : f.allowInstantPurchase
+                allowInstantPurchase: v ? true : f.allowInstantPurchase,
+                ...(v
+                  ? {
+                      annualPrepayMode: 'none' as const,
+                      annualPrepayDiscountPercentStr: '',
+                      annualPrepayPricePerMonthStr: ''
+                    }
+                  : {})
               }))
             }
           />
@@ -623,6 +718,101 @@ export default function PlatformPlansPage() {
           })}
         </p>
       </div>
+
+      {!form.isFree && form.interval === 'month' ? (
+        <div className='border-border bg-muted/30 grid gap-3 rounded-lg border p-4'>
+          <div>
+            <h3 className='text-sm font-semibold'>
+              {t('annualPrepaySection')}
+            </h3>
+            <p className='text-muted-foreground mt-1 text-xs'>
+              {t('annualPrepayHint')}
+            </p>
+          </div>
+          {/* TODO: migrate to shadcn/Radix RadioGroup for shared keyboard + roving tabindex semantics. */}
+          <div
+            className='flex flex-wrap gap-2'
+            role='radiogroup'
+            aria-label={t('annualPrepaySection')}
+          >
+            {(
+              [
+                ['none', t('annualPrepayNone')],
+                ['discount', t('annualPrepayDiscount')],
+                ['fixed', t('annualPrepayFixed')]
+              ] as const
+            ).map(([mode, label]) => (
+              <button
+                key={mode}
+                type='button'
+                role='radio'
+                aria-checked={form.annualPrepayMode === mode}
+                className={`rounded-md border px-3 py-1.5 text-sm font-medium transition ${
+                  form.annualPrepayMode === mode
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-border bg-background hover:bg-muted/50'
+                }`}
+                onClick={() =>
+                  setForm((f) => ({
+                    ...f,
+                    annualPrepayMode: mode,
+                    ...(mode !== 'discount'
+                      ? { annualPrepayDiscountPercentStr: '' }
+                      : {}),
+                    ...(mode !== 'fixed'
+                      ? { annualPrepayPricePerMonthStr: '' }
+                      : {})
+                  }))
+                }
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {form.annualPrepayMode === 'discount' ? (
+            <div className='grid gap-2'>
+              <Label htmlFor={fid('annual-discount')}>
+                {t('annualPrepayDiscountLabel')}
+              </Label>
+              <Input
+                id={fid('annual-discount')}
+                type='text'
+                inputMode='numeric'
+                autoComplete='off'
+                value={form.annualPrepayDiscountPercentStr}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    annualPrepayDiscountPercentStr: e.target.value
+                  }))
+                }
+                placeholder='10'
+              />
+            </div>
+          ) : null}
+          {form.annualPrepayMode === 'fixed' ? (
+            <div className='grid gap-2'>
+              <Label htmlFor={fid('annual-ppm')}>
+                {t('annualPrepayFixedLabel')}
+              </Label>
+              <Input
+                id={fid('annual-ppm')}
+                type='text'
+                inputMode='decimal'
+                autoComplete='off'
+                value={form.annualPrepayPricePerMonthStr}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    annualPrepayPricePerMonthStr: e.target.value
+                  }))
+                }
+                placeholder={locale.startsWith('ru') ? '2400,00' : '2400.00'}
+              />
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className='border-border mt-2 border-t pt-4'>
         <h3 className='mb-3 text-sm font-semibold'>{t('limitsSection')}</h3>
