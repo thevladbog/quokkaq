@@ -94,7 +94,8 @@ export default function ShiftDashboardPage({
 
   const { data: unit } = useQuery({
     queryKey: getGetUnitByIDQueryKey(unitId),
-    queryFn: () => unitsApi.getById(unitId)
+    queryFn: () => unitsApi.getById(unitId),
+    refetchOnMount: 'always'
   });
 
   const unitListsChildWorkplaces = unit?.kind === 'service_zone';
@@ -103,7 +104,8 @@ export default function ShiftDashboardPage({
     {
       queryKey: getGetUnitsUnitIdChildWorkplacesQueryKey(unitId),
       queryFn: () => unitsApi.getChildWorkplaces(unitId),
-      enabled: Boolean(unitListsChildWorkplaces)
+      enabled: Boolean(unitListsChildWorkplaces),
+      refetchOnMount: 'always'
     }
   );
 
@@ -143,19 +145,22 @@ export default function ShiftDashboardPage({
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['shift-dashboard', unitId],
     queryFn: () => shiftApi.getDashboard(unitId),
-    refetchInterval: 10000
+    refetchInterval: 10000,
+    refetchOnMount: 'always'
   });
 
   const { data: queue, isLoading: queueLoading } = useQuery({
     queryKey: ['shift-queue', unitId],
     queryFn: () => shiftApi.getQueue(unitId),
-    refetchInterval: 10000
+    refetchInterval: 10000,
+    refetchOnMount: 'always'
   });
 
   const { data: counters, isLoading: countersLoading } = useQuery({
     queryKey: ['shift-counters', countersUnitId],
     queryFn: () => shiftApi.getCounters(countersUnitId!),
     refetchInterval: 10000,
+    refetchOnMount: 'always',
     enabled: Boolean(countersUnitId && countersQueryEnabled)
   });
 

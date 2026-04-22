@@ -227,6 +227,8 @@
     "tooltip_duration_min_sec": "{minutes} min {seconds} s",
     "tooltip_total": "Total",
     "minutes_short": "min",
+    "seconds_short": "s",
+    "duration_format_min_sec": "{minutes}m {seconds}s",
     "utilization_metric_serving": "Serving",
     "utilization_metric_idle": "Idle & break",
     "export_csv": "Export CSV",

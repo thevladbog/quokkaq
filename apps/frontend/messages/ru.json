@@ -227,6 +227,8 @@
     "tooltip_duration_min_sec": "{minutes} мин {seconds} с",
     "tooltip_total": "Итого",
     "minutes_short": "мин",
+    "seconds_short": "с",
+    "duration_format_min_sec": "{minutes}м {seconds}с",
     "utilization_metric_serving": "Обслуживание",
     "utilization_metric_idle": "Простой и перерыв",
     "export_csv": "Экспорт CSV",

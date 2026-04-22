@@ -59,19 +59,6 @@ function KpiTile({ label, value, sub }: KpiTileProps) {
   );
 }
 
-function fmtDuration(ms?: number): string {
-  if (!ms) return '—';
-  const totalSec = Math.round(ms / 1000);
-  const min = Math.floor(totalSec / 60);
-  const sec = totalSec % 60;
-  return `${min}m ${sec.toString().padStart(2, '0')}s`;
-}
-
-function fmtPct(v?: number): string {
-  if (v === undefined || v === null) return '—';
-  return `${v.toFixed(1)}%`;
-}
-
 interface StaffOperatorDetailCardProps {
   data: ServicesStaffPerformanceResponse;
 }
@@ -82,6 +69,22 @@ export function StaffOperatorDetailCard({
   const t = useTranslations('statistics');
   const appLocale = useLocale();
   const dateLocale = appLocale.toLowerCase().startsWith('ru') ? ru : enUS;
+
+  const fmtDuration = (ms?: number): string => {
+    if (!ms) return '—';
+    const totalSec = Math.round(ms / 1000);
+    const min = Math.floor(totalSec / 60);
+    const sec = totalSec % 60;
+    return t('duration_format_min_sec', {
+      minutes: min,
+      seconds: sec.toString().padStart(2, '0')
+    });
+  };
+
+  const fmtPct = (v?: number): string => {
+    if (v === undefined || v === null) return '—';
+    return `${v.toFixed(1)}%`;
+  };
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [completedColor, setCompletedColor] = useState('rgb(218, 160, 42)');
@@ -167,7 +170,7 @@ export function StaffOperatorDetailCard({
           label={t('staff_detail_break_time')}
           value={
             data.totalBreakMin !== undefined
-              ? `${data.totalBreakMin.toFixed(0)} min`
+              ? `${data.totalBreakMin.toFixed(0)} ${t('minutes_short')}`
               : '—'
           }
         />
@@ -230,7 +233,29 @@ export function StaffOperatorDetailCard({
                   />
                   <Tooltip
                     content={
-                      <ChartTooltipContent labelFormatter={fmtTooltipLabel} />
+                      <ChartTooltipContent
+                        labelFormatter={fmtTooltipLabel}
+                        formatter={(value, name) => {
+                          if (name === t('legend_completed')) {
+                            return [
+                              typeof value === 'number'
+                                ? Math.round(value)
+                                : value,
+                              name
+                            ];
+                          }
+
+                          if (name === t('radar_sla_wait')) {
+                            return [
+                              typeof value === 'number'
+                                ? `${value.toFixed(1)}%`
+                                : value,
+                              name
+                            ];
+                          }
+                          return [value, name];
+                        }}
+                      />
                     }
                   />
                   <Legend />
@@ -245,7 +270,7 @@ export function StaffOperatorDetailCard({
                     yAxisId='right'
                     type='monotone'
                     dataKey='slaWait'
-                    name={t('radar_sla_wait')}
+                    name={`${t('radar_sla_wait')}, %`}
                     stroke={slaWaitColor}
                     strokeWidth={2}
                     dot={false}

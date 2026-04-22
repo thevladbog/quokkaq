@@ -12,14 +12,6 @@ import {
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 
-function fmtDuration(ms?: number): string {
-  if (!ms) return '—';
-  const totalSec = Math.round(ms / 1000);
-  const min = Math.floor(totalSec / 60);
-  const sec = totalSec % 60;
-  return `${min}m ${sec.toString().padStart(2, '0')}s`;
-}
-
 function fmtPct(v?: number): string {
   if (v === undefined || v === null) return '—';
   return `${v.toFixed(1)}%`;
@@ -81,6 +73,17 @@ export function StaffLeaderboard({
   onSortChange
 }: StaffLeaderboardProps) {
   const t = useTranslations('statistics');
+
+  const fmtDuration = (ms?: number): string => {
+    if (!ms) return '—';
+    const totalSec = Math.round(ms / 1000);
+    const min = Math.floor(totalSec / 60);
+    const sec = totalSec % 60;
+    return t('duration_format_min_sec', {
+      minutes: min,
+      seconds: sec.toString().padStart(2, '0')
+    });
+  };
 
   if (items.length === 0) {
     return (

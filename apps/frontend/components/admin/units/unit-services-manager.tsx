@@ -105,6 +105,7 @@ export function UnitServicesManager({ unitId }: UnitServicesManagerProps) {
 
   const tServices = useTranslations('admin.services');
   const tRoot = useTranslations();
+  const tStats = useTranslations('statistics');
   const locale = useLocale();
 
   const { data: childUnitsRaw } = useQuery({
@@ -338,6 +339,7 @@ export function UnitServicesManager({ unitId }: UnitServicesManagerProps) {
                   onDelete={handleDelete}
                   tServices={tServices}
                   tRoot={tRoot}
+                  tStats={tStats}
                 />
               )}
             </TableBody>
@@ -397,22 +399,32 @@ function indentPaddingClass(depth: number): string {
   return ['pl-0', 'pl-4', 'pl-8', 'pl-12', 'pl-16'][i]!;
 }
 
-function formatSlaDuration(totalSec: number): string {
+function formatSlaDurationLocal(
+  totalSec: number,
+  t: ReturnType<typeof useTranslations<'statistics'>>
+): string {
   const m = Math.floor(totalSec / 60);
   const s = totalSec % 60;
-  if (m > 0 && s === 0) return `${m}m`;
-  if (m > 0) return `${m}m ${s}s`;
-  return `${s}s`;
+  if (m > 0 && s === 0) return `${m}${t('minutes_short')}`;
+  if (m > 0) {
+    return t('duration_format_min_sec', {
+      minutes: m,
+      seconds: s.toString().padStart(2, '0')
+    });
+  }
+  return `${s}${t('seconds_short')}`;
 }
 
 function DurationBadge({
   seconds,
   Icon,
-  variant = 'secondary'
+  variant = 'secondary',
+  t
 }: {
   seconds?: number | null;
   Icon: LucideIcon;
   variant?: 'secondary' | 'destructive';
+  t: ReturnType<typeof useTranslations<'statistics'>>;
 }) {
   if (seconds == null || seconds <= 0) {
     return <span className='text-muted-foreground'>—</span>;
@@ -420,7 +432,7 @@ function DurationBadge({
   return (
     <Badge variant={variant} className='max-w-full font-normal tabular-nums'>
       <Icon className='shrink-0' aria-hidden />
-      <span className='min-w-0'>{formatSlaDuration(seconds)}</span>
+      <span className='min-w-0'>{formatSlaDurationLocal(seconds, t)}</span>
     </Badge>
   );
 }
@@ -433,7 +445,8 @@ function ServiceTreeRows({
   onEdit,
   onDelete,
   tServices,
-  tRoot
+  tRoot,
+  tStats
 }: {
   nodes: ServiceNode[];
   depth: number;
@@ -443,6 +456,7 @@ function ServiceTreeRows({
   onDelete: (id: string) => void;
   tServices: ReturnType<typeof useTranslations<'admin.services'>>;
   tRoot: ReturnType<typeof useTranslations>;
+  tStats: ReturnType<typeof useTranslations<'statistics'>>;
 }) {
   return (
     <>
@@ -490,11 +504,12 @@ function ServiceTreeRows({
                   seconds={node.maxWaitingTime}
                   Icon={Clock}
                   variant='destructive'
+                  t={tStats}
                 />
               )}
             </TableCell>
             <TableCell className='max-w-0 whitespace-normal'>
-              <DurationBadge seconds={node.duration} Icon={Gauge} />
+              <DurationBadge seconds={node.duration} Icon={Gauge} t={tStats} />
             </TableCell>
             <TableCell className='max-w-0 whitespace-normal'>
               {!node.isLeaf ? (
@@ -504,6 +519,7 @@ function ServiceTreeRows({
                   seconds={node.maxServiceTime}
                   Icon={Timer}
                   variant='destructive'
+                  t={tStats}
                 />
               )}
             </TableCell>
@@ -548,6 +564,7 @@ function ServiceTreeRows({
               onDelete={onDelete}
               tServices={tServices}
               tRoot={tRoot}
+              tStats={tStats}
             />
           ) : null}
         </Fragment>

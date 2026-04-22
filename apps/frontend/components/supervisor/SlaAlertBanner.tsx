@@ -13,12 +13,6 @@ interface SlaAlertBannerProps {
   onDismissAll: () => void;
 }
 
-function formatMinutes(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return s === 0 ? `${m}m` : `${m}m ${s}s`;
-}
-
 function SlaAlertRow({
   alert,
   onDismiss
@@ -27,6 +21,19 @@ function SlaAlertRow({
   onDismiss: (id: string, alertType?: 'wait' | 'service') => void;
 }) {
   const t = useTranslations('supervisor.dashboardUi.sla');
+  const tStats = useTranslations('statistics');
+
+  const formatMinutes = (seconds: number): string => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return s === 0
+      ? `${m}${tStats('minutes_short')}`
+      : tStats('duration_format_min_sec', {
+          minutes: m,
+          seconds: s.toString().padStart(2, '0')
+        });
+  };
+
   const isBreach = alert.thresholdPct >= 100;
   const alertType = alert.alertType ?? 'wait';
   const isServiceAlert = alertType === 'service';

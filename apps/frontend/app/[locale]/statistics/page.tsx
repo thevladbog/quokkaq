@@ -25,10 +25,6 @@ import {
   Pie,
   PieChart,
   Cell,
-  Label as RechartsRadialLabel,
-  PolarRadiusAxis,
-  RadialBar,
-  RadialBarChart,
   Sector
 } from 'recharts';
 import { formatInTimeZone } from 'date-fns-tz';
@@ -1226,10 +1222,23 @@ export default function StatisticsPage() {
     };
   }, [slaSummaryBody]);
 
-  /** Stacked radial (shadcn-style): сначала «в цели», затем нарушение по дуге слева направо. */
-  const slaRadialChartData = useMemo(
-    () => [{ within: radialSlaRow.within, breach: radialSlaRow.breach }],
-    [radialSlaRow.breach, radialSlaRow.within]
+  /** Semi-circle gauge as Pie slices (within first from startAngle) — avoids Recharts 3 stacked RadialBar angle mismatch. */
+  const slaGaugePieData = useMemo(
+    () => [
+      {
+        seriesId: 'within' as const,
+        name: t('legend_sla_within'),
+        value: radialSlaRow.within,
+        fill: 'var(--color-within)'
+      },
+      {
+        seriesId: 'breach' as const,
+        name: t('legend_sla_breach'),
+        value: radialSlaRow.breach,
+        fill: 'var(--color-breach)'
+      }
+    ],
+    [radialSlaRow.breach, radialSlaRow.within, t]
   );
 
   const radialSlaChartConfig = useMemo(
@@ -1237,7 +1246,7 @@ export default function StatisticsPage() {
       ({
         within: {
           label: t('legend_sla_within'),
-          color: 'var(--chart-3)'
+          color: '#94a3b8'
         },
         breach: {
           label: t('legend_sla_breach'),
@@ -1667,97 +1676,71 @@ export default function StatisticsPage() {
                     {t('chart_sla_radial_empty')}
                   </p>
                 ) : (
-                  <ChartContainer
-                    config={radialSlaChartConfig}
-                    className='mx-auto aspect-square w-full max-w-[320px]'
-                  >
-                    <RadialBarChart
-                      data={slaRadialChartData}
-                      margin={{ top: 20, right: 0, bottom: 12, left: 0 }}
-                      startAngle={180}
-                      endAngle={0}
-                      innerRadius={100}
-                      outerRadius={140}
+                  <div className='relative mx-auto aspect-square w-full max-w-[320px]'>
+                    <ChartContainer
+                      config={radialSlaChartConfig}
+                      className='h-full w-full'
                     >
-                      <RadialBar
-                        dataKey='within'
-                        stackId='sla'
-                        fill='var(--color-within)'
-                        cornerRadius={5}
-                        className='stroke-transparent stroke-2'
-                      />
-                      <RadialBar
-                        dataKey='breach'
-                        stackId='sla'
-                        fill='var(--color-breach)'
-                        cornerRadius={5}
-                        className='stroke-transparent stroke-2'
-                      />
-                      <ChartTooltip
-                        cursor={false}
-                        content={
-                          <ChartTooltipContent
-                            hideLabel
-                            formatter={(value, name) => {
-                              const pct =
-                                typeof value === 'number'
-                                  ? `${value.toLocaleString(appLocale, {
-                                      minimumFractionDigits: 1,
-                                      maximumFractionDigits: 1
-                                    })}%`
-                                  : String(value ?? '');
-                              const label =
-                                name === 'within'
-                                  ? t('legend_sla_within')
-                                  : name === 'breach'
-                                    ? t('legend_sla_breach')
-                                    : String(name ?? '');
-                              return [pct, label];
-                            }}
-                          />
-                        }
-                      />
-                      <PolarRadiusAxis
-                        tick={false}
-                        tickLine={false}
-                        axisLine={false}
+                      <PieChart
+                        margin={{ top: 20, right: 0, bottom: 12, left: 0 }}
                       >
-                        <RechartsRadialLabel
-                          content={({ viewBox }) => {
-                            if (viewBox && 'cx' in viewBox && 'cy' in viewBox) {
-                              const cx = Number(viewBox.cx);
-                              const cy = Number(viewBox.cy);
-                              return (
-                                <text x={cx} y={cy} textAnchor='middle'>
-                                  <tspan
-                                    x={cx}
-                                    y={cy - 20}
-                                    className='fill-foreground text-3xl font-bold'
-                                  >
-                                    {`${radialSlaRow.withinPct.toLocaleString(
-                                      appLocale,
-                                      {
-                                        minimumFractionDigits: 1,
-                                        maximumFractionDigits: 1
-                                      }
-                                    )}%`}
-                                  </tspan>
-                                  <tspan
-                                    x={cx}
-                                    y={cy + 8}
-                                    className='fill-muted-foreground text-sm'
-                                  >
-                                    {t('chart_sla_radial_center')}
-                                  </tspan>
-                                </text>
-                              );
-                            }
-                            return null;
-                          }}
+                        <ChartTooltip
+                          cursor={false}
+                          content={
+                            <ChartTooltipContent
+                              hideLabel
+                              formatter={(value, _name, item) => {
+                                const seriesId = (
+                                  item?.payload as {
+                                    seriesId?: string;
+                                  }
+                                )?.seriesId;
+                                const actualPct =
+                                  seriesId === 'within'
+                                    ? radialSlaRow.within
+                                    : seriesId === 'breach'
+                                      ? radialSlaRow.breach
+                                      : typeof value === 'number'
+                                        ? value
+                                        : 0;
+                                return `${actualPct.toLocaleString(appLocale, {
+                                  minimumFractionDigits: 1,
+                                  maximumFractionDigits: 1
+                                })}%`;
+                              }}
+                            />
+                          }
                         />
-                      </PolarRadiusAxis>
-                    </RadialBarChart>
-                  </ChartContainer>
+                        <Pie
+                          data={slaGaugePieData}
+                          dataKey='value'
+                          nameKey='name'
+                          startAngle={180}
+                          endAngle={0}
+                          innerRadius='62%'
+                          outerRadius='88%'
+                          stroke='transparent'
+                          strokeWidth={0}
+                          isAnimationActive={false}
+                        >
+                          {slaGaugePieData.map((row) => (
+                            <Cell key={row.seriesId} fill={row.fill} />
+                          ))}
+                        </Pie>
+                      </PieChart>
+                    </ChartContainer>
+                    <div className='pointer-events-none absolute inset-0 flex flex-col items-center justify-center'>
+                      <span className='text-3xl font-bold tabular-nums'>
+                        {`${radialSlaRow.withinPct.toLocaleString(appLocale, {
+                          minimumFractionDigits: 1,
+                          maximumFractionDigits: 1
+                        })}%`}
+                      </span>
+                      <span className='text-muted-foreground mt-1 max-w-[12rem] text-center text-sm'>
+                        {t('chart_sla_radial_center')}
+                      </span>
+                    </div>
+                  </div>
                 )}
                 {/* Service-time SLA summary — from the same GetSlaSummary query (respects service filter) */}
                 {!slaSummaryQuery.isLoading && !slaSummaryQuery.isError && (
@@ -2290,13 +2273,21 @@ export default function StatisticsPage() {
                       <Legend />
                       <Bar
                         dataKey='within'
-                        name={t('legend_sla_wait_within')}
+                        name={
+                          slaDisplayMode === 'percent'
+                            ? `${t('legend_sla_wait_within')}, %`
+                            : t('legend_sla_wait_within')
+                        }
                         stackId='sla'
                         fill='#94a3b8'
                       />
                       <Bar
                         dataKey='breach'
-                        name={t('legend_sla_wait_breach')}
+                        name={
+                          slaDisplayMode === 'percent'
+                            ? `${t('legend_sla_wait_breach')}, %`
+                            : t('legend_sla_wait_breach')
+                        }
                         stackId='sla'
                         fill='var(--color-breach)'
                       />
